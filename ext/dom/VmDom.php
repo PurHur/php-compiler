@@ -318,6 +318,11 @@ final class VmDom
         $text->parentLc = self::CLASS_CHARACTER_DATA;
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $text->properties[] = new ClassProperty(self::PROP_WHOLE_TEXT, null, $strProto);
+        // php-src ext/dom/text.c — DOMText::__construct orphaned text (#24631).
+        $textConstruct = new TextConstruct();
+        $text->constructor = $textConstruct;
+        $text->methods['__construct'] = $textConstruct;
+        $text->methodVisibility['__construct'] = $pub;
         $text->methods['splittext'] = new TextSplitText();
         $text->methodVisibility['splittext'] = $pub;
         $text->methodNames['splittext'] = 'splitText';
@@ -333,6 +338,11 @@ final class VmDom
         $cdata->isInternal = true;
         $cdata->parentLc = self::CLASS_TEXT;
         $cdata->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        // php-src ext/dom/cdatasection.c — DOMCdataSection::__construct (#24631).
+        $cdataConstruct = new CdataSectionConstruct();
+        $cdata->constructor = $cdataConstruct;
+        $cdata->methods['__construct'] = $cdataConstruct;
+        $cdata->methodVisibility['__construct'] = $pub;
         $ctx->classes[self::CLASS_CDATA] = $cdata;
 
         $characterData = new ClassEntry('DOMCharacterData');
@@ -368,12 +378,22 @@ final class VmDom
         $comment->isInternal = true;
         $comment->parentLc = self::CLASS_CHARACTER_DATA;
         $comment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        // php-src ext/dom/comment.c — DOMComment::__construct orphaned comment (#24631).
+        $commentConstruct = new CommentConstruct();
+        $comment->constructor = $commentConstruct;
+        $comment->methods['__construct'] = $commentConstruct;
+        $comment->methodVisibility['__construct'] = $pub;
         $ctx->classes[self::CLASS_COMMENT] = $comment;
 
         $entityRef = new ClassEntry('DOMEntityReference');
         $entityRef->isInternal = true;
         $entityRef->parentLc = self::CLASS_NODE;
         $entityRef->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        // php-src ext/dom/entityreference.c — DOMEntityReference::__construct (#24631).
+        $entityRefConstruct = new EntityReferenceConstruct();
+        $entityRef->constructor = $entityRefConstruct;
+        $entityRef->methods['__construct'] = $entityRefConstruct;
+        $entityRef->methodVisibility['__construct'] = $pub;
         $ctx->classes[self::CLASS_ENTITY_REFERENCE] = $entityRef;
 
         $entity = new ClassEntry('DOMEntity');
@@ -404,6 +424,11 @@ final class VmDom
         $specifiedDefault = new Variable(Variable::TYPE_BOOLEAN);
         $specifiedDefault->bool(true);
         $attr->properties[] = new ClassProperty(self::PROP_SPECIFIED, $specifiedDefault, $boolProto);
+        // php-src ext/dom/attr.c — DOMAttr::__construct orphaned attribute (#24631).
+        $attrConstruct = new AttrConstruct();
+        $attr->constructor = $attrConstruct;
+        $attr->methods['__construct'] = $attrConstruct;
+        $attr->methodVisibility['__construct'] = $pub;
         $attr->methods['isid'] = new AttrIsId();
         $attr->methodVisibility['isid'] = $pub;
         $attr->methodNames['isid'] = 'isId';
@@ -581,6 +606,11 @@ final class VmDom
         $processingInstruction->properties[] = new ClassProperty(self::PROP_NODE_VALUE, $nullProto, $strProto);
         $processingInstruction->properties[] = new ClassProperty(self::PROP_TARGET, null, $strProto);
         $processingInstruction->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
+        // php-src ext/dom/processinginstruction.c — DOMProcessingInstruction::__construct (#24631).
+        $piConstruct = new ProcessingInstructionConstruct();
+        $processingInstruction->constructor = $piConstruct;
+        $processingInstruction->methods['__construct'] = $piConstruct;
+        $processingInstruction->methodVisibility['__construct'] = $pub;
         $ctx->classes[self::CLASS_PROCESSING_INSTRUCTION] = $processingInstruction;
 
         $document = new ClassEntry('DOMDocument');
@@ -1242,6 +1272,136 @@ final class VmDom
         }
         self::ensureChildNodesList($ctx, $entry);
         self::ensureElementAttributesMap($ctx, $entry);
+    }
+
+    /**
+     * DOMText::__construct — initialize an already-allocated orphaned text node
+     * (php-src ext/dom/text.c; #24631).
+     */
+    public static function constructText(Context $ctx, ObjectEntry $entry, string $data): void
+    {
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_TEXT !== $lc && VmDomLiving::CLASS_TEXT !== $lc) {
+            throw new \LogicException('constructText() expects a DOMText in this compiler build');
+        }
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#text');
+        self::initNodePropertySlots($entry);
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_TEXT_NODE;
+        $state->nodeName = '#text';
+        $state->textContent = $data;
+        DomRegistry::attach($entry, $state);
+    }
+
+    /**
+     * DOMComment::__construct — orphaned comment (php-src ext/dom/comment.c; #24631).
+     */
+    public static function constructComment(Context $ctx, ObjectEntry $entry, string $data): void
+    {
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_COMMENT !== $lc && VmDomLiving::CLASS_COMMENT !== $lc) {
+            throw new \LogicException('constructComment() expects a DOMComment in this compiler build');
+        }
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#comment');
+        self::initNodePropertySlots($entry);
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_COMMENT_NODE;
+        $state->nodeName = '#comment';
+        $state->textContent = $data;
+        DomRegistry::attach($entry, $state);
+    }
+
+    /**
+     * DOMCdataSection::__construct — orphaned CDATA (php-src ext/dom/cdatasection.c; #24631).
+     */
+    public static function constructCdataSection(Context $ctx, ObjectEntry $entry, string $data): void
+    {
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_CDATA !== $lc && VmDomLiving::CLASS_CDATA !== $lc) {
+            throw new \LogicException('constructCdataSection() expects a DOMCdataSection in this compiler build');
+        }
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#cdata-section');
+        self::initNodePropertySlots($entry);
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_CDATA_SECTION_NODE;
+        $state->nodeName = '#cdata-section';
+        $state->textContent = $data;
+        DomRegistry::attach($entry, $state);
+    }
+
+    /**
+     * DOMProcessingInstruction::__construct — orphaned PI (php-src ext/dom/processinginstruction.c; #24631).
+     */
+    public static function constructProcessingInstruction(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $target,
+        string $data
+    ): void {
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_PROCESSING_INSTRUCTION !== $lc
+            && VmDomLiving::CLASS_PROCESSING_INSTRUCTION !== $lc
+        ) {
+            throw new \LogicException(
+                'constructProcessingInstruction() expects a DOMProcessingInstruction in this compiler build'
+            );
+        }
+        self::assertValidProcessingInstructionTarget($target);
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_PROCESSING_INSTRUCTION_NODE;
+        $state->nodeName = $target;
+        $state->textContent = $data;
+        DomRegistry::attach($entry, $state);
+        $entry->getProperty(self::PROP_NODE_NAME)->string($target);
+        $entry->getProperty(self::PROP_NODE_VALUE)->string($data);
+        $entry->getProperty(self::PROP_TARGET)->string($target);
+        $entry->getProperty(self::PROP_DATA)->string($data);
+        self::initNodePropertySlots($entry);
+    }
+
+    /**
+     * DOMEntityReference::__construct — orphaned entity ref (php-src ext/dom/entityreference.c; #24631).
+     */
+    public static function constructEntityReference(Context $ctx, ObjectEntry $entry, string $name): void
+    {
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_ENTITY_REFERENCE !== $lc && VmDomLiving::CLASS_ENTITY_REFERENCE !== $lc) {
+            throw new \LogicException(
+                'constructEntityReference() expects a DOMEntityReference in this compiler build'
+            );
+        }
+        self::assertValidEntityReferenceName($name);
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        self::initNodePropertySlots($entry);
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ENTITY_REF_NODE;
+        $state->nodeName = $name;
+        DomRegistry::attach($entry, $state);
+    }
+
+    /**
+     * DOMAttr::__construct — orphaned attribute (php-src ext/dom/attr.c; #24631).
+     */
+    public static function constructAttr(Context $ctx, ObjectEntry $entry, string $name, string $value): void
+    {
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_ATTR !== $lc && VmDomLiving::CLASS_ATTR !== $lc) {
+            throw new \LogicException('constructAttr() expects a DOMAttr in this compiler build');
+        }
+        self::assertValidXmlName($name);
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        $entry->getProperty(self::PROP_NAME)->string($name);
+        $entry->getProperty(self::PROP_VALUE)->string($value);
+        $entry->getProperty(self::PROP_OWNER_ELEMENT)->null();
+        self::initNodePropertySlots($entry);
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ATTRIBUTE_NODE;
+        $state->nodeName = $name;
+        $state->localName = $name;
+        $state->prefix = null;
+        $state->namespaceUri = null;
+        $state->textContent = $value;
+        DomRegistry::attach($entry, $state);
     }
 
     public static function createElement(
@@ -12339,6 +12499,9 @@ final class VmDom
                 return $object;
             }
             if (self::CLASS_PROCESSING_INSTRUCTION === $classLc && self::isProcessingInstruction($object)) {
+                return $object;
+            }
+            if (self::CLASS_ENTITY_REFERENCE === $classLc && self::isEntityReference($object)) {
                 return $object;
             }
             if (self::CLASS_DOCUMENT_FRAGMENT === $classLc && self::isDocumentFragment($object)) {
