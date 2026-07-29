@@ -37,3 +37,34 @@ stdlib/hrtime_nanosecond_precision            # confirms the AGENTS.md hrtime* s
 stdlib/mkdir                                  # filesystem state; flips with its _jit twin (#24672)
 stdlib/mkdir_jit                              # filesystem state; flips with the plain variant (#24672)
 stdlib/pcntl_setns                            # namespace availability (#24672)
+
+# ---------------------------------------------------------------------------
+# Measured 2026-07-29 (#24726): two complete mode=collect runs of the SAME commit in the CI
+# environment (GitHub runners) disagreed on 18 cases — TWICE the 9 measured on the dev box.
+# 430 of 448 distinct names were stable, so CI is ~96% deterministic vs the box's 98%.
+#
+# The runners are demonstrably noisier than a dedicated machine. Two clusters carry most of it:
+# highlight_* (7 cases, flipping in BOTH directions) and property-hook cases (6). Both smell like
+# output-formatting or timing sensitivity rather than 18 independent defects.
+
+# CI: failed in run 1, passed in run 2
+language/asymmetric_hook_write_error                          # CI-flaky (#24726)
+language/builtin_attribute_classes                            # CI-flaky (#24726)
+language/final_hooked_property                                # CI-flaky (#24726)
+stdlib/highlight_file_dir_concat                              # CI-flaky (#24726)
+stdlib/highlight_string                                       # CI-flaky (#24726)
+stdlib/highlight_string_bool_literal                          # CI-flaky (#24726)
+stdlib/highlight_string_null_profile82                        # CI-flaky (#24726)
+
+# CI: passed in run 1, failed in run 2
+language/foreach_ref_property_hook                            # CI-flaky (#24726)
+language/property_hook_assign_ref                             # CI-flaky (#24726)
+language/property_hook_foreach_ref                            # CI-flaky (#24726)
+language/property_hook_isset_empty                            # CI-flaky (#24726)
+language/property_hook_unset_throw                            # CI-flaky (#24726)
+language/property_hooks_profile_gate                          # CI-flaky (#24726)
+stdlib/array_all_internal_callback                            # CI-flaky (#24726)
+stdlib/highlight_file_br                                      # CI-flaky (#24726)
+stdlib/highlight_file_multiline_br                            # CI-flaky (#24726)
+stdlib/highlight_string_pre_wrapper                           # CI-flaky (#24726)
+stdlib/json_validate_function_exists_profile                  # CI-flaky (#24726)
