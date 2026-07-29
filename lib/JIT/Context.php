@@ -1063,6 +1063,8 @@ class Context {
         }
         $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
         $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
+        // php-src stub $datetime — InternalArgInfo still says time (#24589).
+        $this->functionProxies['dateinterval::createfromdatestring'] = new Call\DateIntervalCreateFromDateString();
         // Mutable setTimezone — thin user-script AOT property write (#22824).
         $this->functionProxies['datetime::settimezone'] = new Call\DateTimeSetTimezone(false);
         // Immutable: allocate+copy (not cloneObject) for MCJIT. Thin user-script AOT still

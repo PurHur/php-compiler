@@ -666,6 +666,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'spec', 'DateInterval::__construct'));
     }
 
+    /** @covers issue #24589 */
+    public function testDateIntervalCreateFromDateStringStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DateInterval::createFromDateString');
+        self::assertSame(['datetime'], $names);
+        self::assertSame(
+            ['datetime'],
+            BuiltinParamNames::paramNamesForInternalFunction('DateInterval::createFromDateString')
+        );
+        self::assertSame(
+            0,
+            BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'DateInterval::createFromDateString')
+        );
+        self::assertFalse(
+            BuiltinParamNames::lookupNamedParamIndex($names, 'time', 'DateInterval::createFromDateString')
+        );
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateInterval', 'createFromDateString'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('DateInterval', 'createFromDateString'));
+    }
+
     /** @covers issue #24592 */
     public function testFiberWeakReferenceStubNamedParamsResolve(): void
     {
