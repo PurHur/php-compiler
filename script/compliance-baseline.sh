@@ -118,6 +118,23 @@ current_executed() {
         | LC_ALL=C sort -u
 }
 
+# Cases the runner SKIPPED (--SKIPIF-- said so, #24888). Tracked separately from "not yielded at
+# all": a skipped case declares itself inapplicable to this host/profile, while an unyielded case
+# was gated out by VMTest::providePHPTests(). Both must be distinguishable from FIXED, because
+# PHPUnit emits testStarted for a skipped case too.
+current_skipped() {
+    local files
+    files=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.skipped" 2>/dev/null | LC_ALL=C sort)
+    if [ -z "$files" ]; then
+        return 1
+    fi
+    # shellcheck disable=SC2086
+    cat $files 2>/dev/null \
+        | sed -e 's/^.*data set "//' -e 's/"$//' \
+        | grep -v '^$' \
+        | LC_ALL=C sort -u
+}
+
 # Results from different --shards=N runs must never be mixed: the union would double-count some
 # cases and omit others, and the coverage check would compare against whichever N happened to sort
 # first. Refuse rather than silently produce a wrong baseline.
@@ -171,6 +188,7 @@ quarantined > /tmp/.cb_quarantine || true
 LC_ALL=C comm -23 /tmp/.cb_current /tmp/.cb_quarantine > /tmp/.cb_current_net
 
 current_executed > /tmp/.cb_executed 2>/dev/null || : > /tmp/.cb_executed
+current_skipped > /tmp/.cb_skipped 2>/dev/null || : > /tmp/.cb_skipped
 
 if [ "$MODE" = "collect" ]; then
     mkdir -p "$BASELINE_DIR"
@@ -221,13 +239,18 @@ echo "  quarantined      : $(wc -l < /tmp/.cb_quarantine | tr -d ' ')"
 # separate question (what is newly executed), so the two are gated independently — conflating them
 # once printed "executed, passing now" over a list that had never been checked for execution.
 dropped=""
+skipped_now=""
 real_fixes="$fixes"
 can_split=0
 if [ -s /tmp/.cb_executed ]; then
     can_split=1
     printf '%s\n' $fixes | grep -v '^$' | LC_ALL=C sort -u > /tmp/.cb_fixes
-    dropped=$(LC_ALL=C comm -23 /tmp/.cb_fixes /tmp/.cb_executed)
+    # Three-way, in precedence order: ran-and-passes (FIXED), was skipped (SKIPPED), neither
+    # (DROPPED — the provider never yielded it).
     real_fixes=$(LC_ALL=C comm -12 /tmp/.cb_fixes /tmp/.cb_executed)
+    LC_ALL=C comm -23 /tmp/.cb_fixes /tmp/.cb_executed > /tmp/.cb_notrun
+    skipped_now=$(LC_ALL=C comm -12 /tmp/.cb_notrun /tmp/.cb_skipped)
+    dropped=$(LC_ALL=C comm -23 /tmp/.cb_notrun /tmp/.cb_skipped)
 fi
 
 if [ -n "$real_fixes" ]; then
@@ -245,9 +268,19 @@ if [ -n "$real_fixes" ]; then
     fi
 fi
 
+if [ -n "$skipped_now" ]; then
+    echo
+    echo "SKIPPED (in baseline, --SKIPIF-- skipped them this run) — these were not fixed:"
+    printf '  %s\n' $skipped_now
+    echo
+    echo "  The case declared itself inapplicable to this host/profile (#24888). That is usually"
+    echo "  correct and they may leave the baseline — but it is a coverage LOSS, not a repair, and"
+    echo "  a guard that started firing wrongly would look identical. Check why each one skips."
+fi
+
 if [ -n "$dropped" ]; then
     echo
-    echo "DROPPED (in baseline, NOT EXECUTED in this run) — these were not fixed:"
+    echo "DROPPED (in baseline, NEITHER run NOR skipped) — these were not fixed:"
     printf '  %s\n' $dropped
     echo
     echo "  The provider stopped yielding them. VMTest gates cases on CompilerVersion::supports*(),"

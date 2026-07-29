@@ -94,6 +94,7 @@ jobs:
           path: |
             build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.failed
             build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.executed
+            build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.skipped
             build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.timeout
           if-no-files-found: warn
           retention-days: 14
