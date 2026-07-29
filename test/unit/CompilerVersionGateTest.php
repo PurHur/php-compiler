@@ -372,6 +372,39 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** Issue #24823 / re-#17863: default + PROFILE=8.2 withhold dynamic Class::{$expr}. */
+    public function testSupportsDynamicClassConstFetchFalseOnReferenceAndProfile82(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDynamicClassConstFetchTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsReadonlyAnonymousClassFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReadonlyAnonymousClass());

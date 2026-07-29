@@ -167,13 +167,27 @@ final class CompilerVersion
      * PHP 8.3+ dynamic class constant fetch (`C::{$name}`, `$cls::{$name}`).
      *
      * Rejected on the 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
-     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#17863, re-#17801).
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#17863, re-#17801, #24823).
+     * Do not use bare `VERSION >= 8.3` — VERSION is `8.4.0-dev`, which would always enable and break
+     * PROFILE=8.2 / default php-src-strict parity (#24725 regression).
      * php-src: Zend/zend_language_parser.y class_constant; Zend/zend_compile.c.
      */
     public static function supportsDynamicClassConstFetch(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=')
-            || version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
