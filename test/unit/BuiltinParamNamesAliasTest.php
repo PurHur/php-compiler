@@ -2189,4 +2189,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bindTo, 'new', 'Closure::bindTo'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bindTo, 'old', 'Closure::bindTo'));
     }
+
+    /** @covers issue #24584 */
+    public function testStreamContextGetOptionsNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('stream_context_get_options');
+        self::assertSame(['stream_or_context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'stream_or_context', 'stream_context_get_options'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'stream_context_get_options'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('stream_context_get_options'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('stream_context_get_options'));
+        self::assertSame(
+            ['stream_or_context'],
+            BuiltinParamNames::paramNamesForInternalFunction('stream_context_get_options')
+        );
+    }
 }
