@@ -13,7 +13,7 @@ What changed since the plan was written, all measured:
 | **P1.3** suites runnable **and gating** | **done** — `shard-compliance.sh` (#24445), `compliance-baseline.sh` (#24469), baseline of 422 names (#24634, #24673) |
 | **P1.4** flaky quarantine | **done** — 9 cases quarantined with measured direction (#24672) |
 | **P2.5** side-loadable extensions | boundary measured (#24285), `Module` declares deps + default-enabled (#24387), load list generated (#24418), build-time selection (#24421) |
-| **P3.9** spine split-TU | **blocked**, root cause mapped (#24429) |
+| **P3.9** spine split-TU | **blocked**; #24496 moved the wall from "aborts" to "compiles hollow" (#24429 reopened, #24836) |
 
 Three corrections the plan needed, each from measurement rather than reasoning:
 
@@ -316,6 +316,39 @@ day. Master merges ~4 commits/hour, ~56% touching lowering sources. Any artifact
    Encouraging: `lib/VM` (681 files) reached 144 s before erroring — a lower bound, but the right
    order of magnitude for per-chunk emits in minutes rather than a 4.6 h monolith with no
    checkpointing.
+
+   **RE-MEASURED 2026-07-29 after #24496 landed — and the fixtures above were invalid.** A bare
+   `require_once` list over one directory is not a PHP program: it references classes declared
+   elsewhere, so **Zend fatals on all seven with rc=255** (`ModuleAbstract`, `VmClassMethod`,
+   `Func\Internal` not found). Every "chunk X does not compile" row above conflates a compiler gap
+   with a fixture that is not a program. `script/spine-chunk-probe.sh` now generates the fixture with
+   the autoloader prepended and **checks the Zend baseline before judging the compiler**.
+
+   With `PHP_COMPILER_SPINE_CHUNK=1` at `fd3b1fedc`:
+
+   | chunk | result |
+   |---|---|
+   | `ext/ds` | **compiles**, 18.5 MB, 20 s — 61 calls lowered to a silent null |
+   | `ext/types` | `LLVMAbstract/Module.php` exception, rc=255 |
+   | `ext/msgpack` | unimplemented `TYPE_BITWISE` binary operation |
+   | `ext/sockets` | `Static call class must be a literal` (`lib/JIT.php:18097`) |
+   | `lib/VM` | same, at 202 s |
+   | `ext/spl` | **SIGSEGV** rc=139 at 71 s (#24836) |
+
+   So #24496 did what it claimed — the old `object::…` abort is gone — but the blocker moved from
+   "compile aborts" to **"compiles, silently wrong"**, which is worse. `ext/ds` produces a binary
+   with `hexdec`, `substr`, `is_string` and `str_starts_with` hollowed out; it exits 0 against a
+   fixture where Zend exits 255. rc=0 plus a non-empty binary is therefore **not** a pass criterion
+   here, and the probe fails a chunk with any unbound stub.
+
+   **Gen-1 consequence, measured 2026-07-29.** The single-TU link failed a fourth time: capped at
+   12 GiB it ran 4h55m, never OOM-killed (`memory.events oom_kill=0`) because it survived by
+   swapping — `max=1426` cap hits, 1.13 M direct-reclaim scans, 285 MB swapped, peak RSS 12.0 GiB,
+   pinned at 100 % of the cap with a single `php` at 99 % CPU, and no progress output beyond the
+   startup freshness warnings. Killed manually (exit 137). Together with the historical OOMs at 6,
+   24 and **48** GiB this settles it: capacity is not the constraint — a build that already failed at
+   48 GiB was never going to fit in 12 — and raising the cap is not a strategy. Split-TU is the only
+   path, and it stays blocked on binding.
 10. **Treat gen-0 as a release artifact, not a per-commit invariant.** Rebuild under a merge freeze,
     verify by function, tag, ship. Between releases, report staleness honestly
     (`bootstrap-gen0-staleness.php` already does) instead of restamping to green.
