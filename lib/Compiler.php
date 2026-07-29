@@ -45,6 +45,7 @@ use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\FinalPromotedPropertyRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\GeneratorYieldSourceMarker;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\Compiler\AbstractMethodBodyCheck;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceConstAmbiguityCheck;
@@ -123,8 +124,9 @@ class Compiler {
 
     /**
      * File-level ({main}) function decls early-bound at entry — skip at original CFG site (#24807).
+     * Set-like map of early-bound Function_ ops; no generics in @var (php-types / #24877).
      *
-     * @var SplObjectStorage<Op\Stmt\Function_, true>
+     * @var SplObjectStorage
      */
     private SplObjectStorage $earlyBoundFunctionOps;
 
@@ -10604,7 +10606,7 @@ class Compiler {
     /**
      * CFG blocks that are exclusive bodies of delayed declaration contexts (Zend: not early-bound).
      *
-     * @return SplObjectStorage<CfgBlock, true>
+     * @return SplObjectStorage
      */
     private function collectDelayedDeclarationCfgBlocks(CfgBlock $entry): SplObjectStorage
     {
@@ -10652,7 +10654,7 @@ class Compiler {
     /**
      * Exclusive branch/case arm (single CFG parent) — not a merge that also continues top-level code.
      *
-     * @param SplObjectStorage<CfgBlock, true> $delayed
+     * @param SplObjectStorage $delayed
      */
     private function markDelayedDeclBlockIfExclusiveArm(SplObjectStorage $delayed, ?CfgBlock $arm): void
     {
@@ -10672,7 +10674,8 @@ class Compiler {
         }
         $out = [];
         foreach ($op->getSubBlocks() as $name) {
-            $val = $op->{$name} ?? null;
+            // Gen-0/nikic rejects variable-property syntax — use OpSubBlockAccess (re-#10067 / #24877).
+            $val = OpSubBlockAccess::propertyValue($op, $name);
             if ($val instanceof CfgBlock) {
                 $out[] = $val;
             } elseif (\is_array($val)) {
