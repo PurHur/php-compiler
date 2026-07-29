@@ -1801,16 +1801,17 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        }
+
+        // 8.4.0-dev is a pre-release of 8.4 — MINOR_VERSION bypasses version_compare '-dev' trap.
+        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 3)) {
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
@@ -1820,20 +1821,7 @@ final class CompilerVersion
      */
     public static function advertisesJsonValidate(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        if (!self::supportsJsonValidate()) {
-            return false;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::supportsJsonValidate();
     }
 
     /**

@@ -153,10 +153,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testJsonValidateWithheldOnDefault84DevReference(): void
+    public function testJsonValidateAvailableOnDefault84DevReference(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
-        $this->assertFalse(CompilerVersion::advertisesJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::advertisesJsonValidate());
     }
 
     public function testJsonValidateWithheldOn82Profile(): void
@@ -1058,10 +1058,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterJsonValidateOnDefault84DevReference(): void
+    public function testVmRegistersJsonValidateOnDefault84DevReference(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmDoesNotRegisterPosixSysconfApisOnReferenceProfile(): void
