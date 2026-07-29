@@ -7027,7 +7027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/Bz2ExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 5 class method(s)
 
 ### `ext/bz2/Bz2JitHelper.php`
 
@@ -41091,7 +41091,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/ZipExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 5 class method(s)
 
 ### `ext/zip/ZipProceduralFunction.php`
 
@@ -53380,22 +53380,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new AttributeEntry (line 1908)
 - new Variable (line 2456)
 - new ParameterMetadata (line 2462)
-- new Variable (line 3277)
-- new Variable (line 3325)
-- new Variable (line 3384)
-- new ObjectEntry (line 3629)
-- new SourceLocation (line 3657)
-- new ParameterMetadata (line 4137)
-- new ObjectEntry (line 4205)
-- new ObjectEntry (line 4222)
-- new ObjectEntry (line 4440)
-- new ObjectEntry (line 4453)
-- new Variable (line 4533)
-- new ObjectEntry (line 4655)
-- new ObjectEntry (line 4675)
-- new Variable (line 4862)
-- new Variable (line 5047)
-- 255 class method(s)
+- new Variable (line 3302)
+- new Variable (line 3350)
+- new Variable (line 3409)
+- new ObjectEntry (line 3654)
+- new SourceLocation (line 3682)
+- new ParameterMetadata (line 4162)
+- new ObjectEntry (line 4234)
+- new ObjectEntry (line 4251)
+- new ObjectEntry (line 4469)
+- new ObjectEntry (line 4482)
+- new Variable (line 4562)
+- new ObjectEntry (line 4684)
+- new ObjectEntry (line 4704)
+- new Variable (line 4891)
+- new Variable (line 5076)
+- 257 class method(s)
 - 3 closure(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`
