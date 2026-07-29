@@ -12,7 +12,18 @@ final class SodiumConstants
     /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
-        return [
+        $out = [];
+        try {
+            $identity = VmSodium::libraryIdentity();
+            // Library identity (php-src ext/sodium/libsodium.c; #24069)
+            $out['SODIUM_LIBRARY_VERSION'] = $identity['version'];
+            $out['SODIUM_LIBRARY_MAJOR_VERSION'] = $identity['major'];
+            $out['SODIUM_LIBRARY_MINOR_VERSION'] = $identity['minor'];
+        } catch (\Throwable) {
+            // available() without version symbols — omit rather than fake (#24069)
+        }
+
+        return $out + [
             'SODIUM_CRYPTO_SECRETBOX_KEYBYTES' => VmSodium::CRYPTO_SECRETBOX_KEYBYTES,
             'SODIUM_CRYPTO_SECRETBOX_NONCEBYTES' => VmSodium::CRYPTO_SECRETBOX_NONCEBYTES,
             'SODIUM_CRYPTO_SECRETBOX_MACBYTES' => VmSodium::CRYPTO_SECRETBOX_MACBYTES,
