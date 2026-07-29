@@ -2,9 +2,11 @@
 stdlib bzcompress/bzdecompress via VmBz2Core without host ext-bz2 (#3402)
 --SKIPIF--
 <?php
-if (!\PHPCompiler\CompilerVersion::supportsBz2()) {
-    die('skip bz2 withheld on reference profile (#11992)');
+if (!\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::advertisesExtension()) {
+    die('skip bz2 withheld (#11992/#25011)');
 }
+--ENV--
+PHP_COMPILER_ENABLE_BZ2=1
 --FILE--
 <?php
 $plain = str_repeat('abc', 100);

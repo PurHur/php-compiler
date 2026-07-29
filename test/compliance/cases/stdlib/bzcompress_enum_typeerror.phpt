@@ -1,5 +1,7 @@
 --TEST--
 stdlib bzcompress() — backed enum case TypeError (#3402, ext/bz2/bz2.c, php-src-strict)
+--ENV--
+PHP_COMPILER_ENABLE_BZ2=1
 --FILE--
 <?php
 declare(strict_types=1);

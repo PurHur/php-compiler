@@ -4,31 +4,63 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\bz2\Bz2ExtensionPolicy;
 use PHPUnit\Framework\TestCase;
 
-/** Bz2ExtensionPolicy phantom withhold on reference profile (#14219, #16853). */
+/** Bz2ExtensionPolicy host / ENABLE gate (#14219, #25011). */
 final class Bz2ExtensionPolicyTest extends TestCase
 {
-    public function testAdvertisesExtensionFalseOnReferenceProfile(): void
+    public function testWithheldOnReferenceWithoutHostBz2(): void
     {
-        self::assertFalse(CompilerVersion::supportsBz2());
+        if (\extension_loaded('bz2')) {
+            self::markTestSkipped('host ext/bz2 loaded');
+        }
+
         self::assertFalse(Bz2ExtensionPolicy::advertisesExtension());
     }
 
-    public function testAdvertisesExtensionTrueOnForwardProfileWhenCoreAvailable(): void
+    public function testProfile84AloneDoesNotInventBz2(): void
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
+        if (\extension_loaded('bz2')) {
+            self::markTestSkipped('host ext/bz2 loaded');
+        }
+
+        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        $prevEnable = getenv('PHP_COMPILER_ENABLE_BZ2');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_ENABLE_BZ2');
         try {
-            self::assertTrue(CompilerVersion::supportsBz2());
-            self::assertTrue(Bz2ExtensionPolicy::advertisesExtension());
+            self::assertFalse(Bz2ExtensionPolicy::advertisesExtension());
         } finally {
-            if (false === $prev) {
+            if (false === $prevProfile) {
                 putenv('PHP_COMPILER_PROFILE');
             } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
+                putenv('PHP_COMPILER_PROFILE='.$prevProfile);
+            }
+            if (false === $prevEnable) {
+                putenv('PHP_COMPILER_ENABLE_BZ2');
+            } else {
+                putenv('PHP_COMPILER_ENABLE_BZ2='.$prevEnable);
+            }
+        }
+    }
+
+    public function testExplicitEnableAdvertisesWhenNativeAvailable(): void
+    {
+        if (\extension_loaded('bz2')) {
+            self::markTestSkipped('host ext/bz2 loaded');
+        }
+
+        $prevEnable = getenv('PHP_COMPILER_ENABLE_BZ2');
+        putenv('PHP_COMPILER_ENABLE_BZ2=1');
+        try {
+            $available = \PHPCompiler\ext\bz2\VmBz2Native::available();
+            self::assertSame($available, Bz2ExtensionPolicy::advertisesExtension());
+        } finally {
+            if (false === $prevEnable) {
+                putenv('PHP_COMPILER_ENABLE_BZ2');
+            } else {
+                putenv('PHP_COMPILER_ENABLE_BZ2='.$prevEnable);
             }
         }
     }

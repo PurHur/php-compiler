@@ -2,9 +2,11 @@
 stdlib bzopen/bzread/bzwrite/bzclose stream round-trip (#17301)
 --SKIPIF--
 <?php
-if (!\PHPCompiler\CompilerVersion::supportsBz2()) {
-    die('skip bz2 withheld on reference profile (#11992)');
+if (!\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::advertisesExtension()) {
+    die('skip bz2 withheld (#11992/#25011)');
 }
+--ENV--
+PHP_COMPILER_ENABLE_BZ2=1
 --FILE--
 <?php
 $tmp = sys_get_temp_dir().'/bz2_stream_compliance_'.getmypid().'.bz2';
