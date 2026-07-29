@@ -612,6 +612,17 @@ final class BuiltinParamNames
                 return ['stream', 'offset', 'whence'];
             case 'socket_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
+            // php-src ext/sockets/sockets.stub.php — InternalArgInfo still says addr/buf/type/optname (#24373)
+            case 'socket_bind':
+            case 'socket_connect':
+                return ['socket', 'address', 'port='];
+            case 'socket_read':
+                return ['socket', 'length', 'mode='];
+            case 'socket_write':
+                return ['socket', 'data', 'length='];
+            case 'socket_set_option':
+            case 'socket_setopt':
+                return ['socket', 'level', 'option', 'value'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says read_streams/tv_sec (#23598)
             case 'stream_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
