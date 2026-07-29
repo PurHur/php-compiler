@@ -78,6 +78,7 @@ class Module extends ModuleAbstract
         if (IntlExtensionPolicy::advertisesNormalizer()) {
             BuiltinClasses::registerNormalizer($runtime->vmContext);
         }
+        // GRAPHEME_EXTR_* / IDNA_* only when policy advertises (php-src php_intl.c; #24128).
         foreach (IntlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
