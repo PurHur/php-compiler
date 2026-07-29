@@ -45,10 +45,35 @@ fi
 BASELINE="${BASELINE_DIR}/${SUITE}.failing"
 EXECUTED_BASELINE="${BASELINE_DIR}/${SUITE}.executed"
 
-# Quarantined names, comments and blanks stripped.
+# Quarantined names for THIS suite, comments and blanks stripped.
+#
+# Flakiness is suite-specific, so the quarantine has to be too. A line may be scoped:
+#
+#   VMTest:stdlib/hrtime_nanosecond_precision   # only quarantined under VMTest
+#   stdlib/something                            # quarantined under every suite
+#
+# Without scoping, one entry hides the case everywhere. Measured: hrtime_nanosecond_precision flips
+# between VMTest runs of one commit (#24870) but fails STABLY under JITTest in both runs of
+# e7de99700 — quarantining it globally dropped a stable JITTest failure from the baseline, which is
+# the same "real failure made invisible" harm the quarantine itself caused in #24726.
 quarantined() {
     if [ -f "$QUARANTINE" ]; then
-        sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$QUARANTINE" | grep -v '^$' | LC_ALL=C sort -u
+        sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$QUARANTINE" \
+            | grep -v '^$' \
+            | awk -v suite="$SUITE" '
+                {
+                    line = $0
+                    idx = index(line, ":")
+                    if (idx > 0) {
+                        scope = substr(line, 1, idx - 1)
+                        name = substr(line, idx + 1)
+                        # A scope is only a scope if it names a suite; case names contain no colon.
+                        if (scope == suite) { print name }
+                        next
+                    }
+                    print line
+                }' \
+            | LC_ALL=C sort -u
     fi
 }
 
