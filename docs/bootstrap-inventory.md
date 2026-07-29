@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6630 |
-| Phase A inventory files (M2 ratio SSOT) | 6630 |
+| PHP files on vm.php path | 6631 |
+| Phase A inventory files (M2 ratio SSOT) | 6631 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21355 |
+| Source constructs flagged (warnings) | 21358 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -538,13 +538,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/enchant/enchant_dict_remove_from_session.php` | 0 | 2 |
 | `ext/enchant/enchant_dict_store_replacement.php` | 0 | 2 |
 | `ext/enchant/enchant_dict_suggest.php` | 0 | 2 |
+| `ext/exif/ExifConstants.php` | 0 | 1 |
 | `ext/exif/ExifImagetypeJitHelper.php` | 0 | 1 |
 | `ext/exif/JitExifImagetype.php` | 0 | 2 |
-| `ext/exif/Module.php` | 0 | 4 |
+| `ext/exif/Module.php` | 0 | 5 |
 | `ext/exif/VmExifRead.php` | 0 | 1 |
 | `ext/exif/VmExifWarning.php` | 0 | 1 |
 | `ext/exif/exif_imagetype.php` | 0 | 2 |
-| `ext/exif/exif_read_data.php` | 0 | 5 |
+| `ext/exif/exif_read_data.php` | 0 | 6 |
 | `ext/exif/exif_thumbnail.php` | 0 | 2 |
 | `ext/ffi/BuiltinClasses.php` | 0 | 1 |
 | `ext/ffi/FfiExtensionPolicy.php` | 0 | 1 |
@@ -9858,80 +9859,80 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 4021)
 - new DomNodeState (line 4026)
 - new Variable (line 4036)
-- new ObjectEntry (line 5129)
-- new DomNodeState (line 5131)
-- new ObjectEntry (line 5636)
-- new DomNodeState (line 5638)
-- new ObjectEntry (line 5666)
-- new DomNodeState (line 5668)
-- new ObjectEntry (line 5903)
-- new DomNodeState (line 5908)
-- new Variable (line 6353)
-- new DOMException (line 6407)
-- new Error (line 6465)
-- new DOMException (line 6471)
-- new Error (line 6481)
-- new Error (line 6719)
-- new DOMException (line 6807)
-- new DOMException (line 7097)
-- new DOMException (line 7101)
-- new DOMException (line 7176)
-- new DOMException (line 7208)
-- new DOMException (line 7250)
-- new Error (line 7258)
-- new ObjectEntry (line 8005)
-- new DomNodeState (line 8007)
-- new DOMException (line 8624)
-- new Variable (line 8701)
-- new DOMException (line 8992)
-- new DOMException (line 9201)
-- new DOMException (line 9246)
-- new ObjectEntry (line 9350)
-- new DomNodeState (line 9354)
-- new Variable (line 9361)
-- new ObjectEntry (line 9379)
-- new DomNodeState (line 9383)
-- new Variable (line 9390)
-- new ObjectEntry (line 9408)
-- new DomNodeState (line 9412)
-- new Variable (line 9419)
-- new DOMException (line 9502)
-- new ObjectEntry (line 9827)
-- new DomNodeState (line 9831)
-- new Variable (line 9840)
-- new ObjectEntry (line 9890)
-- new DomNodeState (line 9893)
-- new Variable (line 9901)
-- new Variable (line 10139)
-- new DOMException (line 10276)
-- new DOMException (line 10285)
-- new DOMException (line 10320)
-- new Variable (line 10430)
-- new DOMException (line 11524)
-- new Variable (line 11660)
-- new Variable (line 11683)
-- new Variable (line 11712)
-- new Variable (line 11750)
-- new DOMException (line 11761)
-- new Variable (line 11763)
-- new DOMException (line 11937)
-- new DOMException (line 11964)
-- new DOMException (line 12000)
-- new DOMException (line 12109)
-- new DOMException (line 12117)
-- new DOMException (line 12130)
-- new DOMException (line 12141)
-- new DOMException (line 12146)
-- new DOMException (line 12172)
-- new DOMException (line 12193)
-- new DOMException (line 12251)
-- new DOMException (line 12256)
-- new DOMException (line 12259)
-- new DOMException (line 12262)
-- new DOMException (line 12291)
-- new Error (line 13492)
-- new Error (line 13496)
-- 510 class method(s)
+- new ObjectEntry (line 5157)
+- new DomNodeState (line 5159)
+- new ObjectEntry (line 5664)
+- new DomNodeState (line 5666)
+- new ObjectEntry (line 5694)
+- new DomNodeState (line 5696)
+- new ObjectEntry (line 5931)
+- new DomNodeState (line 5936)
+- new Variable (line 6381)
+- new DOMException (line 6435)
+- new Error (line 6493)
+- new DOMException (line 6499)
+- new Error (line 6509)
+- new Error (line 6747)
+- new DOMException (line 6835)
+- new DOMException (line 7125)
+- new DOMException (line 7129)
+- new DOMException (line 7204)
+- new DOMException (line 7236)
+- new DOMException (line 7278)
+- new Error (line 7286)
+- new ObjectEntry (line 8033)
+- new DomNodeState (line 8035)
+- new DOMException (line 8652)
+- new Variable (line 8729)
+- new DOMException (line 9020)
+- new DOMException (line 9229)
+- new DOMException (line 9274)
+- new ObjectEntry (line 9378)
+- new DomNodeState (line 9382)
+- new Variable (line 9389)
+- new ObjectEntry (line 9407)
+- new DomNodeState (line 9411)
+- new Variable (line 9418)
+- new ObjectEntry (line 9436)
+- new DomNodeState (line 9440)
+- new Variable (line 9447)
+- new DOMException (line 9530)
+- new ObjectEntry (line 9855)
+- new DomNodeState (line 9859)
+- new Variable (line 9868)
+- new ObjectEntry (line 9918)
+- new DomNodeState (line 9921)
+- new Variable (line 9929)
+- new Variable (line 10167)
+- new DOMException (line 10304)
+- new DOMException (line 10313)
+- new DOMException (line 10348)
+- new Variable (line 10458)
+- new DOMException (line 11552)
+- new Variable (line 11688)
+- new Variable (line 11711)
+- new Variable (line 11740)
+- new Variable (line 11778)
+- new DOMException (line 11789)
+- new Variable (line 11791)
+- new DOMException (line 11965)
+- new DOMException (line 11992)
+- new DOMException (line 12028)
+- new DOMException (line 12137)
+- new DOMException (line 12145)
+- new DOMException (line 12158)
+- new DOMException (line 12169)
+- new DOMException (line 12174)
+- new DOMException (line 12200)
+- new DOMException (line 12221)
+- new DOMException (line 12279)
+- new DOMException (line 12284)
+- new DOMException (line 12287)
+- new DOMException (line 12290)
+- new DOMException (line 12319)
+- new Error (line 13619)
+- new Error (line 13623)
+- 513 class method(s)
 - 4 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -10451,6 +10452,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 28)
 - 2 class method(s)
 
+### `ext/exif/ExifConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/exif/ExifImagetypeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10465,15 +10471,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/exif/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new exif_read_data (line 17)
-- new exif_imagetype (line 18)
-- new exif_thumbnail (line 19)
-- 1 class method(s)
+- new VM\Variable (line 20)
+- new exif_read_data (line 29)
+- new exif_imagetype (line 30)
+- new exif_thumbnail (line 31)
+- 2 class method(s)
 
 ### `ext/exif/VmExifRead.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 20 class method(s)
 
 ### `ext/exif/VmExifWarning.php`
 
@@ -10492,8 +10499,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 34)
 - new ArgumentCountError (line 41)
 - new HashTable (line 61)
-- new Variable (line 63)
-- 2 class method(s)
+- new Variable (line 73)
+- new HashTable (line 75)
+- 3 class method(s)
 
 ### `ext/exif/exif_thumbnail.php`
 
@@ -41548,8 +41556,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1578)
-- new ArgumentCountError (line 1589)
+- new ArgumentCountError (line 1621)
+- new ArgumentCountError (line 1632)
 - 18 class method(s)
 - 1 closure(s)
 
@@ -42041,53 +42049,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 45075)
 - new OpCode (line 45198)
 - new OpCode (line 45237)
-- new OpCode (line 45315)
-- new OpCode (line 45336)
-- new OpCode (line 45371)
-- new OpCode (line 45404)
-- new OpCode (line 45496)
-- new OpCode (line 45550)
-- new OpCode (line 45572)
-- new Operand\Temporary (line 47360)
-- new Operand\Temporary (line 47891)
-- new Operand\Temporary (line 48077)
-- new Operand\Temporary (line 48109)
-- new Operand\Temporary (line 48212)
-- new Operand\Temporary (line 48341)
-- new OpCode (line 48343)
-- new OpCode (line 50005)
-- new Operand\Temporary (line 50476)
-- new OpCode (line 51081)
-- new Operand\Literal (line 51446)
-- new Variable (line 51448)
-- new OpCode (line 51494)
-- new OpCode (line 51709)
-- new OpCode (line 51719)
-- new OpCode (line 51722)
-- new Operand\Temporary (line 51749)
-- new Operand\Temporary (line 51786)
-- new OpCode (line 51788)
+- new OpCode (line 45326)
+- new OpCode (line 45347)
+- new OpCode (line 45382)
+- new OpCode (line 45415)
+- new OpCode (line 45507)
+- new OpCode (line 45561)
+- new OpCode (line 45583)
+- new Operand\Temporary (line 47371)
+- new Operand\Temporary (line 47902)
+- new Operand\Temporary (line 48088)
+- new Operand\Temporary (line 48120)
+- new Operand\Temporary (line 48223)
+- new Operand\Temporary (line 48352)
+- new OpCode (line 48354)
+- new OpCode (line 50016)
+- new Operand\Temporary (line 50487)
+- new OpCode (line 51092)
+- new Operand\Literal (line 51457)
+- new Variable (line 51459)
+- new OpCode (line 51505)
+- new OpCode (line 51720)
+- new OpCode (line 51730)
+- new OpCode (line 51733)
+- new Operand\Temporary (line 51760)
+- new Operand\Temporary (line 51797)
 - new OpCode (line 51799)
-- new Operand\Temporary (line 51802)
-- new OpCode (line 51804)
-- new OpCode (line 51812)
-- new OpCode (line 51822)
-- new OpCode (line 51830)
+- new OpCode (line 51810)
+- new Operand\Temporary (line 51813)
+- new OpCode (line 51815)
+- new OpCode (line 51823)
 - new OpCode (line 51833)
-- new OpCode (line 51960)
-- new OpCode (line 51988)
-- new OpCode (line 52014)
-- new OpCode (line 52032)
-- new OpCode (line 52039)
-- new Operand\Literal (line 52827)
-- new OpCode (line 54384)
-- new Literal (line 54547)
-- new OpCode (line 54646)
-- new Variable (line 54653)
-- new Temporary (line 54655)
-- new OpCode (line 54658)
-- new CompileFatal (line 54993)
-- new CompileFatal (line 55248)
+- new OpCode (line 51841)
+- new OpCode (line 51844)
+- new OpCode (line 51971)
+- new OpCode (line 51999)
+- new OpCode (line 52025)
+- new OpCode (line 52043)
+- new OpCode (line 52050)
+- new Operand\Literal (line 52838)
+- new OpCode (line 54395)
+- new Literal (line 54558)
+- new OpCode (line 54657)
+- new Variable (line 54664)
+- new Temporary (line 54666)
+- new OpCode (line 54669)
+- new CompileFatal (line 55004)
+- new CompileFatal (line 55259)
 - 1109 class method(s)
 - 51 closure(s)
 
@@ -42261,10 +42269,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/FinalPropertyOverrideCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 31)
-- new CompileError (line 193)
-- new CompileError (line 227)
-- new CompileError (line 292)
+- new self (line 33)
+- new CompileError (line 211)
+- new CompileError (line 245)
+- new CompileError (line 310)
 - 22 class method(s)
 
 ### `lib/Compiler/FunctionStaticAnonymousClassCompileCheck.php`

@@ -541,6 +541,7 @@ require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateFromFile.php';
 require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateFromString.php';
 require_once __DIR__.'/../../../ext/dom/dom_import_simplexml.php';
 require_once __DIR__.'/../../../ext/dom/ns_import_simplexml.php';
+require_once __DIR__.'/../../../ext/exif/ExifConstants.php';
 require_once __DIR__.'/../../../ext/exif/ExifImagetypeJitHelper.php';
 require_once __DIR__.'/../../../ext/exif/JitExifImagetype.php';
 require_once __DIR__.'/../../../ext/exif/Module.php';
