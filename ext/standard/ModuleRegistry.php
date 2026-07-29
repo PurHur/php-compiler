@@ -42,7 +42,6 @@ final class ModuleRegistry
         'getdate',
         'gmdate',
         'gmmktime',
-        'gmgetdate',
         'gmstrftime',
         'idate',
         'localtime',

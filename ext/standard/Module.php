@@ -909,7 +909,6 @@ class Module extends ModuleAbstract
             new gmstrftime(),
             new strptime(),
             new getdate(),
-            new gmgetdate(),
             new gmmktime(),
             new mktime(),
             new strtotime(),

@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** gmgetdate() — UTC associative date/time breakdown (VM VmDate; JIT GmgetdateJitHelper, #7001, #9181). */
+/**
+ * gmgetdate() — UTC associative date/time breakdown helper (not a php-src builtin; #24608).
+ *
+ * Kept for {@see VmDate::gmgetdate} / JIT helper unit coverage; not registered in Module.
+ */
 final class gmgetdate extends Internal
 {
     public function __construct()
