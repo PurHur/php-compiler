@@ -181,6 +181,19 @@ final class JitDomAttributeNodeNS
     private static function invokeCreateAttributeUserScript(Context $context, JITVariable ...$args): Value
     {
         $nameLit = self::compileTimeStringArg($args[1]);
+        // Invalid literal → VmDom helper (throws); valid literal keeps materialize (#24804).
+        if (null !== $nameLit && !self::isValidXmlNameLit($nameLit)) {
+            DomImportNodeRuntime::ensureCreateAttributeLinked($context);
+            $document = self::loadObjectArg($context, $args[0], 'DOMDocument::createAttribute() receiver');
+            $name = self::loadStringArg($context, $args[1]);
+            $attr = $context->builder->call(
+                $context->lookupFunction(DomImportNodeRuntime::ABI_CREATE_ATTRIBUTE),
+                $document,
+                $name
+            );
+
+            return self::boxObjectResult($context, $attr);
+        }
         if (null !== $nameLit) {
             DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
 
@@ -190,13 +203,22 @@ final class JitDomAttributeNodeNS
             );
         }
 
+        DomImportNodeRuntime::ensureCreateAttributeLinked($context);
+        $document = self::loadObjectArg($context, $args[0], 'DOMDocument::createAttribute() receiver');
         $name = self::loadStringArg($context, $args[1]);
-        $emptyNs = $context->builder->load($context->constantStringFromString(''));
-
-        return self::boxObjectResult(
-            $context,
-            self::materializeAttrFromRuntime($context, $emptyNs, $name, null)
+        $attr = $context->builder->call(
+            $context->lookupFunction(DomImportNodeRuntime::ABI_CREATE_ATTRIBUTE),
+            $document,
+            $name
         );
+
+        return self::boxObjectResult($context, $attr);
+    }
+
+    /** Mirror VmDom::isValidXmlName for AOT literal gating (#24804). */
+    private static function isValidXmlNameLit(string $name): bool
+    {
+        return '' !== $name && 1 === preg_match('/^[A-Za-z_:][\w.:-]*$/', $name);
     }
 
     private static function invokeCreateUserScript(Context $context, JITVariable ...$args): Value

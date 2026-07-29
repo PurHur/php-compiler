@@ -1411,7 +1411,18 @@ final class VmDom
         string $value = ''
     ): Variable {
         // php-src document.c / xmlValidateName — Invalid Character Error (#20594).
-        self::assertValidXmlName($name);
+        // Non-strict: php_dom_throw_error → warning + RETURN_FALSE (#24804).
+        if (!self::isValidXmlName($name)) {
+            self::phpDomThrowError(
+                $ctx,
+                $ownerDocument,
+                DomExceptionConstants::INVALID_CHARACTER_ERR,
+                'Invalid Character Error',
+                'DOMDocument::createElement()'
+            );
+
+            return self::falseBoolVariable();
+        }
         // Dom\HTMLDocument::createElement — lowercase + HTML namespace (php-src document.c; #21030).
         $namespaceUri = null;
         if (self::isLivingHtmlDocument($ownerDocument)) {
@@ -1462,7 +1473,19 @@ final class VmDom
         string $value = ''
     ): Variable {
         // php-src document.c — QName + xml/xmlns namespace URI rules (#20594).
-        self::assertValidElementNSName($namespace, $qualifiedName);
+        // Non-strict: php_dom_throw_error → warning + RETURN_FALSE (#24804).
+        $nsError = self::elementNSNameValidationError($namespace, $qualifiedName);
+        if (null !== $nsError) {
+            self::phpDomThrowError(
+                $ctx,
+                $ownerDocument,
+                DomExceptionConstants::NAMESPACE_ERR,
+                $nsError,
+                'DOMDocument::createElementNS()'
+            );
+
+            return self::falseBoolVariable();
+        }
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         // php-src php_dom.c dom_get_element_ce — HTMLElement only in HTML ns (#21030).
         $class = self::resolveElementClassForNamespace($ctx, $ownerDocument, $namespace);
@@ -1533,8 +1556,20 @@ final class VmDom
         bool $validateAsQName = true
     ): Variable {
         // createAttribute() uses Name rules; createAttributeNS() uses QName/NS rules (#20594).
+        // Non-strict: php_dom_throw_error → warning + RETURN_FALSE (#24804).
         if ($validateAsQName) {
-            self::assertValidElementNSName($namespace, $qualifiedName);
+            $nsError = self::elementNSNameValidationError($namespace, $qualifiedName);
+            if (null !== $nsError) {
+                self::phpDomThrowError(
+                    $ctx,
+                    $ownerDocument,
+                    DomExceptionConstants::NAMESPACE_ERR,
+                    $nsError,
+                    'DOMDocument::createAttributeNS()'
+                );
+
+                return self::falseBoolVariable();
+            }
             [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         } else {
             // Non-NS Attr keeps the full XML Name (php-src attr->name), including leading ':'.
@@ -1576,7 +1611,18 @@ final class VmDom
         ?ObjectEntry $ownerDocument = null
     ): Variable {
         // php-src xmlValidateName — Invalid Character Error (not Namespace Error) (#20594).
-        self::assertValidXmlName($name);
+        // Non-strict: php_dom_throw_error → warning + RETURN_FALSE (#24804).
+        if (!self::isValidXmlName($name)) {
+            self::phpDomThrowError(
+                $ctx,
+                $ownerDocument,
+                DomExceptionConstants::INVALID_CHARACTER_ERR,
+                'Invalid Character Error',
+                'DOMDocument::createAttribute()'
+            );
+
+            return self::falseBoolVariable();
+        }
 
         return self::createAttributeNS($ctx, null, $name, $ownerDocument, false);
     }
@@ -2376,6 +2422,8 @@ final class VmDom
     /**
      * DOMElement::setAttribute() — php-src element.c returns the Attr via DOM_RET_OBJ;
      * literal xmlns installs a nsDef and returns true (#24538).
+     *
+     * Name validation always uses strict=1 (php-src element.c; #24804) — unlike create*.
      */
     public static function setAttribute(
         Context $ctx,
@@ -2388,23 +2436,35 @@ final class VmDom
         }
         // php-src: xmlNewNs for name=="xmlns" → RETURN_TRUE (not Attr).
         if ('xmlns' === $name) {
-            self::setAttributeNS($ctx, $element, null, $name, $value);
+            self::setAttributeNS($ctx, $element, null, $name, $value, false);
             $var = new Variable();
             $var->bool(true);
 
             return $var;
         }
-        self::setAttributeNS($ctx, $element, null, $name, $value);
+        // Always-strict xmlValidateName (php-src passes 1 to php_dom_throw_error; #24804).
+        if (!self::isValidXmlName($name)) {
+            throw new \DOMException(
+                'Invalid Character Error',
+                DomExceptionConstants::INVALID_CHARACTER_ERR
+            );
+        }
+        // Skip QName re-check — Name rules already applied; leading ':' is a valid Name (#24804).
+        self::setAttributeNS($ctx, $element, null, $name, $value, false);
 
         return self::getAttributeNode($ctx, $element, $name);
     }
 
+    /**
+     * @param bool $validateQName when false (setAttribute path), skip QName/NS checks
+     */
     public static function setAttributeNS(
         Context $ctx,
         ObjectEntry $element,
         ?string $namespace,
         string $qualifiedName,
-        string $value
+        string $value,
+        bool $validateQName = true
     ): void {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
@@ -2430,6 +2490,21 @@ final class VmDom
             self::syncElementAttributes($ctx, $element);
 
             return;
+        }
+        // php-src element.c: setAttributeNS uses document strictErrorChecking (#24804).
+        if ($validateQName) {
+            $nsError = self::elementNSNameValidationError($namespace, $qualifiedName);
+            if (null !== $nsError) {
+                self::phpDomThrowError(
+                    $ctx,
+                    self::ownerDocumentEntry($element),
+                    DomExceptionConstants::NAMESPACE_ERR,
+                    $nsError,
+                    'DOMElement::setAttributeNS()'
+                );
+
+                return;
+            }
         }
         $attrExisted = \array_key_exists($qualifiedName, $state->attributes);
         $previousIdValue = $attrExisted ? ($state->attributes[$qualifiedName] ?? null) : null;
@@ -12141,9 +12216,49 @@ final class VmDom
     /** @throws \DOMException when $name is not a valid XML Name (php-src xmlValidateName). */
     private static function assertValidXmlName(string $name): void
     {
-        if ('' === $name || !preg_match('/^[A-Za-z_:][\w.:-]*$/', $name)) {
+        if (!self::isValidXmlName($name)) {
             throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
         }
+    }
+
+    /** libxml xmlValidateName — Name production (allows leading ':'). */
+    private static function isValidXmlName(string $name): bool
+    {
+        return '' !== $name && 1 === preg_match('/^[A-Za-z_:][\w.:-]*$/', $name);
+    }
+
+    private static function falseBoolVariable(): Variable
+    {
+        $var = new Variable(Variable::TYPE_BOOLEAN);
+        $var->bool(false);
+
+        return $var;
+    }
+
+    /**
+     * php-src php_dom_throw_error — strict document → DOMException; else E_WARNING (#24804).
+     * Caller returns false / no-ops after a non-strict warning.
+     */
+    private static function phpDomThrowError(
+        Context $ctx,
+        ?ObjectEntry $document,
+        int $code,
+        string $message,
+        string $methodPrefix
+    ): void {
+        $strict = true;
+        if (null !== $document && self::isDocument($document)) {
+            $strict = self::documentStrictErrorChecking($document);
+        }
+        if ($strict) {
+            throw new \DOMException($message, $code);
+        }
+        $ctx->errors->triggerError(
+            $methodPrefix.': '.$message,
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx
+        );
     }
 
     /**
@@ -12275,20 +12390,33 @@ final class VmDom
      */
     private static function assertValidElementNSName(?string $namespace, string $qualifiedName): void
     {
+        $error = self::elementNSNameValidationError($namespace, $qualifiedName);
+        if (null !== $error) {
+            throw new \DOMException($error, DomExceptionConstants::NAMESPACE_ERR);
+        }
+    }
+
+    /**
+     * @return string|null "Namespace Error" when invalid; null when OK
+     */
+    private static function elementNSNameValidationError(?string $namespace, string $qualifiedName): ?string
+    {
         if (!self::isValidXmlQName($qualifiedName)) {
-            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+            return 'Namespace Error';
         }
         [$prefix] = self::splitQualifiedName($qualifiedName);
         $ns = $namespace ?? '';
         if ('' !== $prefix && '' === $ns) {
-            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+            return 'Namespace Error';
         }
         if ('xml' === $prefix && 'http://www.w3.org/XML/1998/namespace' !== $ns) {
-            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+            return 'Namespace Error';
         }
         if ('xmlns' === $prefix && 'http://www.w3.org/2000/xmlns/' !== $ns) {
-            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+            return 'Namespace Error';
         }
+
+        return null;
     }
 
     /** libxml xmlValidateQName — NCName or NCName:NCName (no empty parts, one colon). */

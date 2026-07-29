@@ -35,24 +35,21 @@ final class JitDomCreateElement
             throw new \LogicException('DOMDocument::createElement() expects receiver and name');
         }
 
-        if (JitDomDocumentMethodKernel::shouldUse($context) && \count($args) >= 3) {
-            return self::invokeViaHelper($context, ...$args);
-        }
-
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $nameLit = self::compileTimeStringArg($args[1]);
+            // Invalid literal must not silently materialize (#24804 / #20594 AOT gap).
+            if (null !== $nameLit && !self::isValidXmlNameLit($nameLit)) {
+                return self::invokeViaHelper($context, ...$args);
+            }
             if (null !== $nameLit) {
                 $obj = self::materializeElementFromLiteral($context, $nameLit);
-                self::initTextContentSlot($context, $obj, null);
+                self::initTextContentSlot($context, $obj, $args[2] ?? null);
                 self::storeOwnerAndNullParent($context, $obj, $args[0]);
 
                 return $obj;
             }
-
-            $obj = self::materializeElementFromRuntimeName($context, $args[1]);
-            self::storeOwnerAndNullParent($context, $obj, $args[0]);
-
-            return $obj;
+            // Runtime name — helper applies xmlValidateName + strictErrorChecking.
+            return self::invokeViaHelper($context, ...$args);
         }
 
         $nameLit = self::compileTimeStringArg($args[1]);
@@ -63,21 +60,28 @@ final class JitDomCreateElement
         return self::materializeElementFromRuntimeName($context, $args[1]);
     }
 
+    /** Mirror VmDom::isValidXmlName for compile-time literal gating (#24804). */
+    private static function isValidXmlNameLit(string $name): bool
+    {
+        return '' !== $name && 1 === preg_match('/^[A-Za-z_:][\w.:-]*$/', $name);
+    }
+
     private static function invokeViaHelper(Context $context, JITVariable ...$args): Value
     {
         DomCreateElementRuntime::ensureLinked($context);
 
         $document = self::loadObjectArg($context, $args[0]);
         $name = self::loadStringArg($context, $args[1]);
-        $value = self::loadStringArg($context, $args[2]);
+        $valueArg = $args[2] ?? null;
+        $value = null !== $valueArg
+            ? self::loadStringArg($context, $valueArg)
+            : $context->builder->load($context->constantStringFromString(''));
         $element = $context->builder->call(
             $context->lookupFunction(DomCreateElementRuntime::ABI_NAME),
             $document,
             $name,
             $value
         );
-        self::initTextContentSlot($context, $element, $args[2] ?? null);
-
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
