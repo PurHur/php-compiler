@@ -2090,4 +2090,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::paramNamesForInternalFunction('pcntl_signal')
         );
     }
+
+    /** @covers issue #24563 */
+    public function testHashUpdateFileNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_update_file');
+        self::assertSame(['context', 'filename', 'stream_context='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'hash_update_file'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'hash_update_file'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'stream_context', 'hash_update_file'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'context_resource', 'hash_update_file'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('hash_update_file'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('hash_update_file'));
+        self::assertSame(
+            ['context', 'filename', 'stream_context='],
+            BuiltinParamNames::paramNamesForInternalFunction('hash_update_file')
+        );
+    }
 }
