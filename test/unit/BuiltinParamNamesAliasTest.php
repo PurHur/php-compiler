@@ -306,6 +306,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
     }
 
+    /** @covers issue #24535 */
+    public function testVfprintfNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('vfprintf');
+        self::assertSame(['stream', 'format', 'values'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'values', 'vfprintf'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'vfprintf'));
+    }
+
     /** @covers issue #24488 */
     public function testStreamWrapperFilterRegisterNamedParameters(): void
     {
