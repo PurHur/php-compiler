@@ -1312,6 +1312,12 @@ final class BuiltinParamNames
             // php-src ext/exif/exif.stub.php — InternalArgInfo still says filename/sections_needed/sub_arrays (#23605)
             case 'exif_read_data':
                 return ['file', 'required_sections=', 'as_arrays=', 'read_thumbnail='];
+            // php-src ext/exif/exif.stub.php — InternalArgInfo imagefile (#24458)
+            case 'exif_imagetype':
+                return ['filename'];
+            // php-src ext/exif/exif.stub.php — InternalArgInfo filename/imagetype (#24457)
+            case 'exif_thumbnail':
+                return ['file', '&width=', '&height=', '&image_type='];
             // php-src ext/simplexml/simplexml.stub.php — InternalArgInfo still has ns (#23455)
             case 'simplexml_load_string':
                 return ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
