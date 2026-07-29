@@ -278,6 +278,12 @@ final class BuiltinParamNames
                 return ['object', 'datetime'];
             case 'timezone_transitions_get':
                 return ['object', 'timestampBegin=', 'timestampEnd='];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still time/format/gmt_offset (#24363)
+            case 'date_sun_info':
+                return ['timestamp', 'latitude', 'longitude'];
+            case 'date_sunrise':
+            case 'date_sunset':
+                return ['timestamp', 'returnFormat=', 'latitude=', 'longitude=', 'zenith=', 'utcOffset='];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
             case 'mktime':
             case 'gmmktime':

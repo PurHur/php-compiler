@@ -1131,6 +1131,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp_end', 'timezone_transitions_get'));
     }
 
+    /** @covers issue #24363 */
+    public function testDateSunZendStubNamedParams(): void
+    {
+        self::assertSame(['timestamp', 'latitude', 'longitude'], BuiltinParamNames::forFunction('date_sun_info'));
+        $names = BuiltinParamNames::forFunction('date_sunrise');
+        self::assertSame(
+            ['timestamp', 'returnFormat=', 'latitude=', 'longitude=', 'zenith=', 'utcOffset='],
+            $names
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp', 'date_sunrise'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'returnFormat', 'date_sunrise'));
+        self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($names, 'utcOffset', 'date_sunrise'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'time', 'date_sunrise'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'date_sunrise'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'gmt_offset', 'date_sunrise'));
+        self::assertSame($names, BuiltinParamNames::forFunction('date_sunset'));
+    }
+
     /** @covers issue #24550 */
     public function testPhpinfoZendStubNamedFlagsParam(): void
     {
