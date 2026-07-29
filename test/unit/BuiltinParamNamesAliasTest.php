@@ -1857,12 +1857,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($expire, 'new_cache_expire', 'session_cache_expire'));
     }
 
-    /** @covers issue #23846 */
+    /** @covers issue #23846 / #24533 */
     public function testSessionSetCookieParamsZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('session_set_cookie_params');
-        self::assertSame(['lifetime', 'path', 'domain', 'secure', 'httponly'], $names);
-        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime', 'session_set_cookie_params'));
+        self::assertSame(['lifetime_or_options', 'path', 'domain', 'secure', 'httponly'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime_or_options', 'session_set_cookie_params'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime', 'session_set_cookie_params'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'path', 'session_set_cookie_params'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'domain', 'session_set_cookie_params'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'secure', 'session_set_cookie_params'));
