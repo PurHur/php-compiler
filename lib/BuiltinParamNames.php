@@ -1139,6 +1139,11 @@ final class BuiltinParamNames
             // php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo still says options/arg (#23645)
             case 'finfo_open':
                 return ['flags=', 'magic_database='];
+            // php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo *file_name/options (#24390)
+            case 'finfo_file':
+                return ['finfo', 'filename', 'flags=', 'context='];
+            case 'finfo_buffer':
+                return ['finfo', 'string', 'flags=', 'context='];
             // php-src ext/standard/file.stub.php — InternalArgInfo still says filename_or_stream (#23645)
             case 'mime_content_type':
                 return ['filename'];
