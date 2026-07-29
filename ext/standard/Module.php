@@ -131,7 +131,7 @@ class Module extends ModuleAbstract
             new fmod(),
             new modf(),
             // ldexp() — phantom vs php-src math.stub.php (#24607); keep VmMath::ldexp / MathLdexp internal.
-            new frexp(),
+            // frexp() — phantom vs php-src math.stub.php (#24133); keep VmMath::frexp / MathFrexp internal.
             new fdiv(),
             ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax(), new fadd(), new fsub(), new fmul()] : []),
             ...(CompilerVersion::supportsClamp() ? [new clamp()] : []),
@@ -737,7 +737,7 @@ class Module extends ModuleAbstract
             new get_included_files_('get_required_files'),
             new debug_backtrace(),
             new debug_print_backtrace(),
-            new get_debug_backtrace(),
+            // get_debug_backtrace() — phantom vs php-src (#24133); Zend has debug_backtrace() only.
             new class_exists_(),
             new class_alias(),
             ...(CompilerVersion::supportsLazyObjectFactories() ? [
