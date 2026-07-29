@@ -2474,11 +2474,20 @@ final class VmReflection
         if (Variable::TYPE_OBJECT !== $object->type) {
             throw new \LogicException('var_export() object branch expects an object in this compiler build');
         }
+        $obj = $object->toObject();
+        // php-src spl_array_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) (#24447).
+        $storage = \PHPCompiler\ext\spl\SplArrayStorage::varExportStorageTable($obj);
+        if (null !== $storage) {
+            $result = new Variable();
+            $result->array($storage);
+
+            return $result;
+        }
         $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($ctx->runtime->vm()->collectVarExportPropertiesForBuiltin($object->toObject(), $frame) as $name => $value) {
+        foreach ($ctx->runtime->vm()->collectVarExportPropertiesForBuiltin($obj, $frame) as $name => $value) {
             self::addObjectPropertyEntry($ht, $name, $value);
         }
 
