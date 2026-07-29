@@ -285,7 +285,9 @@ final class ClosureBindHelper
     {
         self::ensureClosureBindingProperties($context);
         $i1 = $context->getTypeFromString('int1');
-        $trueLit = $context->builder->load($i1->constInt(1, false));
+        // constInt already yields an i1 value — load() would treat it as a pointer and
+        // SIGSEGV inside LLVM (static fn / static function AOT, #24836).
+        $trueLit = $i1->constInt(1, false);
         $trueVar = new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $trueLit);
         $trueVar->addref();
         $context->type->object->storeInstanceProperty(
@@ -301,7 +303,7 @@ final class ClosureBindHelper
     {
         self::ensureClosureBindingProperties($context);
         $i1 = $context->getTypeFromString('int1');
-        $trueLit = $context->builder->load($i1->constInt(1, false));
+        $trueLit = $i1->constInt(1, false);
         $trueVar = new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $trueLit);
         $trueVar->addref();
         $context->type->object->storeInstanceProperty(
