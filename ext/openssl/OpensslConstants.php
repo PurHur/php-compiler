@@ -80,10 +80,24 @@ final class OpensslConstants
     public const X509_PURPOSE_OCSP_HELPER = 8;
     public const X509_PURPOSE_TIMESTAMP_SIGN = 9;
 
-    /** @return array<string, int> */
+    /**
+     * php-src ext/openssl/php_openssl.h OPENSSL_DEFAULT_STREAM_CIPHERS (#24070).
+     *
+     * Fixed cipher-suite string for stream crypto defaults — not from libcrypto.
+     */
+    public const OPENSSL_DEFAULT_STREAM_CIPHERS =
+        'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:'
+        .'ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:'
+        .'DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:'
+        .'ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:'
+        .'ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:'
+        .'DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:'
+        .'AES256-GCM-SHA384:AES128:AES256:HIGH:!SSLv2:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!RC4:!ADH';
+
+    /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
-        return [
+        return self::identityConstants() + [
             'OPENSSL_RAW_DATA' => self::OPENSSL_RAW_DATA,
             'OPENSSL_ZERO_PADDING' => self::OPENSSL_ZERO_PADDING,
             'OPENSSL_DONT_ZERO_PAD_KEY' => self::OPENSSL_DONT_ZERO_PAD_KEY,
@@ -91,6 +105,30 @@ final class OpensslConstants
             'OPENSSL_NO_PADDING' => self::OPENSSL_NO_PADDING,
             'OPENSSL_PKCS1_OAEP_PADDING' => self::OPENSSL_PKCS1_OAEP_PADDING,
         ] + self::algorithmConstants() + self::pkcs7Constants() + self::cmsConstants() + self::cipherConstants() + self::x509PurposeConstants();
+    }
+
+    /**
+     * OpenSSL library identity + default stream cipher list (php-src openssl.stub.php; #24070).
+     *
+     * VERSION_TEXT / VERSION_NUMBER come from linked libcrypto (same FFI path as encrypt/sign).
+     *
+     * @return array<string, int|string>
+     */
+    public static function identityConstants(): array
+    {
+        $out = [
+            'OPENSSL_DEFAULT_STREAM_CIPHERS' => self::OPENSSL_DEFAULT_STREAM_CIPHERS,
+        ];
+        $text = VmOpensslConfigNative::libraryVersionText();
+        if (null !== $text) {
+            $out['OPENSSL_VERSION_TEXT'] = $text;
+        }
+        $number = VmOpensslConfigNative::libraryVersionNumber();
+        if (null !== $number) {
+            $out['OPENSSL_VERSION_NUMBER'] = $number;
+        }
+
+        return $out;
     }
 
     /** @return array<string, int> */

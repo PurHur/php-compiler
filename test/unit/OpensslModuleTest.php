@@ -49,6 +49,9 @@ echo (int) defined('OPENSSL_PKCS1_OAEP_PADDING');
 echo OPENSSL_PKCS1_OAEP_PADDING;
 echo (int) defined('OPENSSL_ALGO_SHA256');
 echo OPENSSL_ALGO_SHA256;
+echo (int) (defined('OPENSSL_VERSION_TEXT') && is_string(OPENSSL_VERSION_TEXT) && str_starts_with(OPENSSL_VERSION_TEXT, 'OpenSSL '));
+echo (int) (defined('OPENSSL_VERSION_NUMBER') && is_int(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER > 0x10000000);
+echo (int) (defined('OPENSSL_DEFAULT_STREAM_CIPHERS') && is_string(OPENSSL_DEFAULT_STREAM_CIPHERS) && str_contains(OPENSSL_DEFAULT_STREAM_CIPHERS, 'AES128-GCM-SHA256'));
 echo (int) extension_loaded('openssl');
 echo (int) class_exists('OpenSSLCertificate', false);
 PHP;
@@ -56,7 +59,8 @@ PHP;
         ob_start();
         $runtime->run($block);
         // padding trio from registeredConstants() (#24071): defined+1, defined+3, defined+4
-        self::assertSame('11111111111111121113141711', ob_get_clean());
+        // identity trio (#24070): VERSION_TEXT / VERSION_NUMBER / DEFAULT_STREAM_CIPHERS shape checks
+        self::assertSame('11111111111111121113141711111', ob_get_clean());
     }
 
     public function test_openssl_cipher_key_length_aes_256_cbc(): void

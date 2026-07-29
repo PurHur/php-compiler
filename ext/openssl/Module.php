@@ -20,10 +20,14 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
-        // Use registeredConstants() so PKCS1/OAEP/NO padding reach defineConstant (#24071).
+        // Use registeredConstants() so PKCS1/OAEP/NO padding + identity trio reach defineConstant (#24071, #24070).
         foreach (OpensslConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int((int) $value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
     }

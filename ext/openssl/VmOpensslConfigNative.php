@@ -83,6 +83,54 @@ final class VmOpensslConfigNative
         return $names;
     }
 
+    /**
+     * Linked libcrypto OPENSSL_VERSION text (OpenSSL_version(OPENSSL_VERSION); #24070).
+     *
+     * Falls back to host OPENSSL_VERSION_TEXT when FFI is unavailable.
+     */
+    public static function libraryVersionText(): ?string
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $text = self::ffiString($ffi->OpenSSL_version(0));
+            if ('' !== $text) {
+                return $text;
+            }
+        }
+        if (\defined('OPENSSL_VERSION_TEXT')) {
+            $host = \constant('OPENSSL_VERSION_TEXT');
+            if (\is_string($host) && '' !== $host) {
+                return $host;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Linked libcrypto OPENSSL_VERSION_NUMBER (OpenSSL_version_num(); #24070).
+     *
+     * Falls back to host OPENSSL_VERSION_NUMBER when FFI is unavailable.
+     */
+    public static function libraryVersionNumber(): ?int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            return (int) $ffi->OpenSSL_version_num();
+        }
+        if (\defined('OPENSSL_VERSION_NUMBER')) {
+            $host = \constant('OPENSSL_VERSION_NUMBER');
+            if (\is_int($host)) {
+                return $host;
+            }
+            if (\is_float($host)) {
+                return (int) $host;
+            }
+        }
+
+        return null;
+    }
+
     /** @param \FFI\CData|string|null $ptr */
     private static function ffiString($ptr): string
     {
@@ -115,6 +163,9 @@ final class VmOpensslConfigNative
         }
 
         $cdef = <<<'CDEF'
+const char *OpenSSL_version(int type);
+unsigned long OpenSSL_version_num(void);
+
 const char *X509_get_default_cert_file(void);
 const char *X509_get_default_cert_dir(void);
 const char *X509_get_default_private_dir(void);
