@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #25026 #25027 */
+/** @covers issues #25026, #25027, #25028 */
 final class MagicMethodStaticCheckTest extends TestCase
 {
     /**
@@ -103,6 +103,28 @@ class Sl { public static function __sleep() { return []; } }
 PHP,
             'Method N\\Sl::__sleep() cannot be static',
         ];
+        yield 'instance __callStatic' => [
+            <<<'PHP'
+<?php
+class CS { public function __callStatic($n, $a) { return 1; } }
+PHP,
+            'Method CS::__callStatic() must be static',
+        ];
+        yield 'instance __set_state' => [
+            <<<'PHP'
+<?php
+class Ss { public function __set_state($a) { return new self; } }
+PHP,
+            'Method Ss::__set_state() must be static',
+        ];
+        yield 'namespaced instance __callStatic' => [
+            <<<'PHP'
+<?php
+namespace N;
+class CS { function __callStatic($n, $a) { return 1; } }
+PHP,
+            'Method N\\CS::__callStatic() must be static',
+        ];
     }
 
     public function testNonStaticMagicMethodsStillCompileAndRun(): void
@@ -133,5 +155,24 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame("7\n42\ncall:foo\nstr\nO:2:\"Ok\":0:{}\n", ob_get_clean());
+    }
+
+    public function testMustBeStaticMagicMethodsStillCompileAndRun(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Ok {
+    public static function __callStatic($n, $a) { return "cs:$n"; }
+    public static function __set_state($a) { return new self; }
+}
+echo Ok::m(), "\n";
+echo Ok::__set_state([]) instanceof Ok ? "ok\n" : "bad\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'valid_must_be_static_magic.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("cs:m\nok\n", ob_get_clean());
     }
 }
