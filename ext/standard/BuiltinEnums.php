@@ -34,6 +34,8 @@ final class BuiltinEnums
             self::registerParseUrl($ctx);
             self::registerRequestMethod($ctx);
             self::registerInfoView($ctx);
+        }
+        if (CompilerVersion::supportsClockGettime()) {
             self::registerClockInterface($ctx);
         }
         if (CompilerVersion::supportsRoundingModeEnum()) {
