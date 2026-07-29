@@ -126,6 +126,17 @@ final class BuiltinInternalDefaultValues
         'unpack' => [
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
+        'setcookie' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            3 => ['kind' => 'string', 'value' => ''],
+            4 => ['kind' => 'string', 'value' => ''],
+        ],
+        'setrawcookie' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            3 => ['kind' => 'string', 'value' => ''],
+            4 => ['kind' => 'string', 'value' => ''],
+        ],
     ];
 
     public static function isAvailable(
