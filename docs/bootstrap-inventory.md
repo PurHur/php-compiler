@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6623 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21332 |
+| Source constructs flagged (warnings) | 21333 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1525,7 +1525,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_pkcs7_sign.php` | 0 | 2 |
 | `ext/openssl/openssl_pkcs7_verify.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 2 |
-| `ext/openssl/openssl_pkey_export.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_export.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_export_to_file.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_free.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_details.php` | 0 | 2 |
@@ -18374,10 +18374,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
 - new Variable (line 1014)
-- new HashTable (line 2418)
-- new Variable (line 2420)
-- new HashTable (line 2431)
-- new Variable (line 2433)
+- new HashTable (line 2404)
+- new Variable (line 2406)
+- new HashTable (line 2417)
+- new Variable (line 2419)
 - 70 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
@@ -18704,14 +18704,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_pkey_export.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 37)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkey_export_to_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 37)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkey_free.php`
@@ -41497,8 +41498,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1514)
-- new ArgumentCountError (line 1525)
+- new ArgumentCountError (line 1519)
+- new ArgumentCountError (line 1530)
 - 18 class method(s)
 - 1 closure(s)
 
