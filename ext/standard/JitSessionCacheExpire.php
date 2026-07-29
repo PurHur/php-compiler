@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for session_cache_expire() (issue #14613). */
 final class JitSessionCacheExpire
 {
-    private const VALUE_ERROR = 'session_cache_expire(): Argument #1 ($new_cache_expire) must be greater than or equal to 0';
+    private const VALUE_ERROR = 'session_cache_expire(): Argument #1 ($value) must be greater than or equal to 0';
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
@@ -36,7 +36,7 @@ final class JitSessionCacheExpire
             $args[0],
             'session_cache_expire',
             1,
-            'new_cache_expire'
+            'value'
         );
         self::emitPositiveGuard($context, $minutes);
         $context->builder->store($minutes, $global);

@@ -1843,6 +1843,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sn, 'newname', 'session_name'));
     }
 
+    /** @covers issue #24583 */
+    public function testSessionCacheLimiterExpireZendStubNamedParams(): void
+    {
+        $limiter = BuiltinParamNames::forFunction('session_cache_limiter');
+        self::assertSame(['value='], $limiter);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($limiter, 'value', 'session_cache_limiter'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($limiter, 'new_cache_limiter', 'session_cache_limiter'));
+
+        $expire = BuiltinParamNames::forFunction('session_cache_expire');
+        self::assertSame(['value='], $expire);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($expire, 'value', 'session_cache_expire'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($expire, 'new_cache_expire', 'session_cache_expire'));
+    }
+
     /** @covers issue #23846 */
     public function testSessionSetCookieParamsZendStubNamedParams(): void
     {

@@ -228,7 +228,7 @@ final class VmSession
     {
         if ($minutes < 0) {
             throw new \ValueError(
-                'session_cache_expire(): Argument #1 ($new_cache_expire) must be greater than or equal to 0'
+                'session_cache_expire(): Argument #1 ($value) must be greater than or equal to 0'
             );
         }
         self::$cacheExpire = $minutes;
