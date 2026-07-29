@@ -527,9 +527,9 @@ final class BuiltinParamNames
                 return ['value='];
             case 'session_cache_expire':
                 return ['value='];
-            // php-src ext/session/session.stub.php — Reflection OK but forFunction empty (#23846)
+            // php-src ext/session/session.stub.php — lifetime → lifetime_or_options (#23846 / #24533)
             case 'session_set_cookie_params':
-                return ['lifetime', 'path', 'domain', 'secure', 'httponly'];
+                return ['lifetime_or_options', 'path', 'domain', 'secure', 'httponly'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says const_name/name (#23434)
