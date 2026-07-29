@@ -108,6 +108,12 @@ final class BuiltinInternalDefaultValues
         'unixtojd' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/file.stub.php — permissions=0777, context=null (#24885)
+        // InternalArgInfo int → 0; untyped context= has no inferrable default.
+        'mkdir' => [
+            1 => ['kind' => 'int', 'value' => 0777],
+            3 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\BuiltinInternalArgInfo;
+use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 final class BuiltinParamNamesAliasTest extends TestCase
@@ -1466,6 +1468,46 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'pattern', 'fnmatch'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'filename', 'fnmatch'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'flags', 'fnmatch'));
+    }
+
+    /** @covers issue #24885 */
+    public function testMkdirReflectionOptionalDefaultsNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('mkdir');
+        self::assertSame(['directory', 'permissions=', 'recursive=', 'context='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'directory', 'mkdir'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'permissions', 'mkdir'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'recursive', 'mkdir'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'mkdir'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mkdir'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('mkdir'));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'mkdir',
+            1,
+            ['name' => 'permissions', 'type' => 'int', 'isOptional' => true],
+            false
+        ));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'mkdir',
+            3,
+            ['name' => 'context', 'type' => '', 'isOptional' => true],
+            false
+        ));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'mkdir',
+            1,
+            ['name' => 'permissions', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(0777, $dest->toInt());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'mkdir',
+            3,
+            ['name' => 'context', 'type' => '', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
     /** @covers issue #23492 */

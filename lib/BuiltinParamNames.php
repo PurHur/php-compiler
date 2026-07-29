@@ -443,8 +443,8 @@ final class BuiltinParamNames
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
             case 'mkdir':
-                // php-src ext/standard/basic_functions.stub.php / filestat.c (#23453)
-                return ['directory', 'permissions', 'recursive', 'context'];
+                // php-src ext/standard/file.stub.php — permissions=0777, recursive=false, context=null (#23453 / #24885)
+                return ['directory', 'permissions=', 'recursive=', 'context='];
             case 'rmdir':
                 // php-src ext/standard/basic_functions.stub.php / filestat.c (#23454)
                 // Override InternalArgInfo dirname → Zend directory
