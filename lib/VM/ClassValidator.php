@@ -75,6 +75,12 @@ final class ClassValidator
         if ($entry->isEnum) {
             throw new \Error("Cannot instantiate enum {$entry->name}");
         }
+        if ($entry->isInterface) {
+            throw new \Error("Cannot instantiate interface {$entry->name}");
+        }
+        if ($entry->isTrait) {
+            throw new \Error("Cannot instantiate trait {$entry->name}");
+        }
         if ($entry->isStatic) {
             throw new \Error("Cannot instantiate static class {$entry->name}");
         }

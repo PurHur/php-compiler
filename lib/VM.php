@@ -7477,6 +7477,17 @@ restart:
                         }
                         break;
                     }
+                    if ($class->isTrait) {
+                        $catchFrame = $this->dispatchVmError(
+                            "Cannot instantiate trait {$class->name}",
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     try {
                         VM\ClassValidator::assertInstantiable($class);
                     } catch (\Error $e) {
@@ -18739,6 +18750,9 @@ restart:
         if ($class->isInterface) {
             throw new \Error("Cannot instantiate interface {$class->name}");
         }
+        if ($class->isTrait) {
+            throw new \Error("Cannot instantiate trait {$class->name}");
+        }
         VM\ClassValidator::assertInstantiable($class);
         if (null !== $class->constructor || $this->hasInstanceMethod($class, '__construct')) {
             // Unadvertised internal constructors skip visibility resolve (#22789).
@@ -18977,6 +18991,16 @@ restart:
                 if ($class->isEnum) {
                     throw new \Error("Cannot instantiate enum {$class->name}");
                 }
+                if ($class->isInterface) {
+                    throw new \Error("Cannot instantiate interface {$class->name}");
+                }
+                if ($class->isTrait) {
+                    throw new \Error("Cannot instantiate trait {$class->name}");
+                }
+                if ($class->isAbstract) {
+                    throw new \Error("Cannot instantiate abstract class {$class->name}");
+                }
+                VM\ClassValidator::assertInstantiable($class);
                 $this->enforceNewConstructorVisibility($class, $frame);
                 $this->emitClassInstantiationDeprecation($class, $frame);
                 $object = new VM\ObjectEntry($class);

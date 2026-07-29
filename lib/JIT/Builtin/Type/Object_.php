@@ -632,6 +632,9 @@ class Object_ extends Type {
             $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
             $this->context->builder->branchIf($isId, $caseBlock, $nextCheck);
             $this->context->builder->positionAtEnd($caseBlock);
+            if (null !== \PHPCompiler\JIT\InstantiableClassJitGuard::userInstantiationErrorMessage($this, $id)) {
+                \PHPCompiler\JIT\InstantiableClassJitGuard::emitBeforeAllocate($this, null, null, $id);
+            }
             $obj = $this->allocate($id);
             $this->context->builder->store($obj, $resultSlot);
             $this->context->builder->branch($done);
