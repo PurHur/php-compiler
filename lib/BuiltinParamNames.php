@@ -920,9 +920,9 @@ final class BuiltinParamNames
             case 'md5_file':
             case 'sha1_file':
                 return ['filename', 'binary'];
-            // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23290)
+            // php-src ext/hash/hash.stub.php — missing from InternalArgInfo; optionals + types (#23290, #25018)
             case 'hash_hkdf':
-                return ['algo', 'key', 'length', 'info', 'salt'];
+                return ['algo', 'key', 'length=', 'info=', 'salt='];
             // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23205)
             case 'hash_equals':
                 return ['known_string', 'user_string'];

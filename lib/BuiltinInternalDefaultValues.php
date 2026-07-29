@@ -83,6 +83,12 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'bool', 'value' => false],
             3 => ['kind' => 'array'],
         ],
+        // php-src ext/hash/hash.stub.php — length=0, info="", salt="" (string defaults not inferred) (#25018)
+        'hash_hkdf' => [
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'string', 'value' => ''],
+            4 => ['kind' => 'string', 'value' => ''],
+        ],
         'openssl_encrypt' => [
             3 => ['kind' => 'int', 'value' => 0],
             4 => ['kind' => 'string', 'value' => ''],
