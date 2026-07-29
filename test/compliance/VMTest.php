@@ -1163,6 +1163,9 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
                 && !str_contains($name, 'asymmetric_visibility_reference_profile')
                 && !str_contains($name, 'asymmetric_visibility_profile_gate')
+                // PROFILE-env SKIPIF (not supportsAsymmetricVisibility) — must stay runnable if the
+                // gate wrongly returns true on the reference profile (#24819).
+                && !str_contains($name, 'asymmetric_visibility_default_profile')
                 && !str_contains($name, 'asymmetric_visibility_forward_84')
                 && !str_contains($name, 'asymmetric_probes_profile')) {
                 continue;
