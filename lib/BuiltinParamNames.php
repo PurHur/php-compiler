@@ -476,6 +476,9 @@ final class BuiltinParamNames
                 return ['filename', 'mtime', 'atime'];
             case 'token_get_all':
                 return ['code', 'flags'];
+            // php-src ext/tokenizer/tokenizer.stub.php — InternalArgInfo still says type (#23658)
+            case 'token_name':
+                return ['id'];
             case 'getenv':
                 return ['name', 'local_only'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says setting (#23258)
@@ -631,6 +634,14 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — PHP builtin; no InternalArgInfo (#24609)
             case 'stream_isatty':
                 return ['stream'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says fp (#23658)
+            case 'stream_get_meta_data':
+            case 'socket_get_status': // PHP_FALIAS
+                return ['stream'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says socket/mode (#23658)
+            case 'stream_set_blocking':
+            case 'socket_set_blocking': // PHP_FALIAS
+                return ['stream', 'enable'];
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':
@@ -891,6 +902,9 @@ final class BuiltinParamNames
                 return ['json', 'depth=', 'flags='];
             case 'filter_var':
                 return ['value', 'filter', 'options'];
+            // php-src ext/filter/filter.stub.php — InternalArgInfo still says filtername (#23658)
+            case 'filter_id':
+                return ['name'];
             // php-src ext/filter/filter.stub.php — InternalArgInfo still says data/definition (#23598)
             case 'filter_var_array':
                 return ['array', 'options', 'add_empty'];
