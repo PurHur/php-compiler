@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** quoted_printable_* JIT routes through QuotPrintJitHelper PHP, not StringQuotPrintJit LLVM (#9910). */
+/** quoted_printable_* JIT via QuotPrintJitHelper + JitVmHelperLink::ensureCompiled (#9910, #24620). */
 final class QuotedPrintableRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -35,7 +35,14 @@ final class QuotedPrintableRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringQuotPrint::ensureLinked', $encode);
         $this->assertStringContainsString('__compiler_quoted_printable_encode', $encode);
         $this->assertStringContainsString('QuotPrintJitHelper', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
         $this->assertStringContainsString('VmString::quoted_printable_encode', $helper);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
+        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString('new JIT(', $bridge);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('emitEncode', $bridge);
         $this->assertStringNotContainsString('QPRINT_MAXL', $bridge);
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringQuotPrintJit.php');
