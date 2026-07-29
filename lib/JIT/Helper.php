@@ -1229,6 +1229,16 @@ restart:
             }
         }
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
+            if (JitValueNumeric::isArithOpcode($opcode->type)
+                && \PHPCompiler\CompilerVersion::supportsBcmath()
+            ) {
+                return \PHPCompiler\ext\bcmath\JitBcMathNumberOperators::binaryObjectObject(
+                    $this->context,
+                    $opcode->type,
+                    $left,
+                    $right
+                );
+            }
             if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
                 $result = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(

@@ -15939,6 +15939,7 @@ class JIT {
             || $toCall instanceof JIT\Call\ReflectionEnumConstruct
             || $toCall instanceof JIT\Call\RandomizerConstruct
             || $toCall instanceof JIT\Call\SimpleXMLElementConstruct
+            || $toCall instanceof JIT\Call\BcMathNumberConstruct
         ) {
             return true;
         }
