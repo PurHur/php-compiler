@@ -2244,4 +2244,35 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('getimagesize'));
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('getimagesize'));
     }
+
+    /** @covers issue #23655 */
+    public function testGzStreamNamedParamsResolve(): void
+    {
+        self::assertSame(['stream', 'length'], BuiltinParamNames::forFunction('gzread'));
+        self::assertSame(['stream', 'data', 'length='], BuiltinParamNames::forFunction('gzwrite'));
+        self::assertSame(['stream'], BuiltinParamNames::forFunction('gzclose'));
+        self::assertSame(['data', 'max_length='], BuiltinParamNames::forFunction('gzuncompress'));
+
+        $gzread = BuiltinParamNames::forFunction('gzread');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gzread, 'stream', 'gzread'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzread, 'zp', 'gzread'));
+
+        $gzwrite = BuiltinParamNames::forFunction('gzwrite');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gzwrite, 'data', 'gzwrite'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzwrite, 'string', 'gzwrite'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzwrite, 'zp', 'gzwrite'));
+
+        $gzclose = BuiltinParamNames::forFunction('gzclose');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gzclose, 'stream', 'gzclose'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzclose, 'zp', 'gzclose'));
+
+        $gzuncompress = BuiltinParamNames::forFunction('gzuncompress');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gzuncompress, 'data', 'gzuncompress'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gzuncompress, 'max_length', 'gzuncompress'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzuncompress, 'max_decoded_len', 'gzuncompress'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('gzuncompress'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('gzuncompress'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('gzwrite'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('gzwrite'));
+    }
 }
