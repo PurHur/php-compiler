@@ -93,4 +93,42 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         );
         self::assertSame(0, $var->toInt());
     }
+
+    /** @covers issue #24971 */
+    public function testPathQueryClusterDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'dirname',
+            1,
+            ['name' => 'levels', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(1, $dest->toInt());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'chunk_split',
+            1,
+            ['name' => 'length', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(76, $dest->toInt());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'getimagesize',
+            1,
+            ['name' => 'image_info', 'type' => 'array', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'umask',
+            0,
+            ['name' => 'mask', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
 }
