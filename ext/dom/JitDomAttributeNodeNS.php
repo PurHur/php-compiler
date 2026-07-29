@@ -533,6 +533,8 @@ final class JitDomAttributeNodeNS
     /**
      * DOMElement::setAttribute() — user-script AOT live Attr cache (#19281).
      * HTML id rebind updates getElementById map (#19870).
+     * Returns the Attr (xmlns → true) like php-src DOM_RET_OBJ (#24538).
+     * Rewrite returns the same cached Attr instance (php-src xmlSetProp).
      */
     public static function invokeSetAttribute(Context $context, JITVariable ...$args): Value
     {
@@ -543,9 +545,11 @@ final class JitDomAttributeNodeNS
         $nameLit = self::compileTimeStringArg($args[1]);
         $valueLit = self::compileTimeStringArg($args[2]);
         if (null !== $nameLit && null !== $valueLit) {
-            $attr = self::materializeAttrFromLiterals($context, '', $nameLit, $valueLit);
-            DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
-            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $attr);
+            // php-src xmlns → RETURN_TRUE (nsDef), not Attr (#24538).
+            if ('xmlns' === $nameLit) {
+                return self::boxBoolResult($context, true);
+            }
+            $attr = self::setAttributeLiteralReuseOrCreate($context, $nameLit, $valueLit);
             if ('id' === $nameLit) {
                 DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
                 $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
@@ -555,13 +559,59 @@ final class JitDomAttributeNodeNS
                 }
             }
 
-            return self::boxNullResult($context);
+            return self::boxObjectResult($context, $attr);
         }
         $name = self::loadStringArg($context, $args[1]);
         $value = self::loadStringArg($context, $args[2]);
         $attr = self::materializeAttrFromRuntime($context, $context->builder->load($context->constantStringFromString('')), $name, $value);
         // Runtime name: cannot key the compile-time cache; still materialize Attr for property writes.
-        return self::boxNullResult($context);
+        return self::boxObjectResult($context, $attr);
+    }
+
+    /**
+     * Reuse cached Attr on rewrite so setAttribute() returns the same instance (#24538).
+     */
+    private static function setAttributeLiteralReuseOrCreate(
+        Context $context,
+        string $nameLit,
+        string $valueLit
+    ): Value {
+        $tag = (string) (self::$boxSeq++);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $existing = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $existing, $objPtr->constNull());
+        $createBlock = BasicBlockHelper::append($context, 'dom_setattr_create_'.$tag);
+        $updateBlock = BasicBlockHelper::append($context, 'dom_setattr_update_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_setattr_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $objPtr);
+        $context->builder->branchIf($isNull, $createBlock, $updateBlock);
+
+        $context->builder->positionAtEnd($createBlock);
+        $created = self::materializeAttrFromLiterals($context, '', $nameLit, $valueLit);
+        DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
+        DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $created);
+        $context->builder->store($created, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($updateBlock);
+        self::storeStringProperty($context, $existing, self::PROP_VALUE, $valueLit);
+        self::storeStringProperty($context, $existing, self::PROP_NODE_VALUE, $valueLit);
+        $context->builder->store($existing, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function boxBoolResult(Context $context, bool $value): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt($value ? 1 : 0, false));
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
     /**

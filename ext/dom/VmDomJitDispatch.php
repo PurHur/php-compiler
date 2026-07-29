@@ -362,11 +362,8 @@ final class VmDomJitDispatch
         $value = self::stringArg($extra[1] ?? self::missingArg('setAttribute', 1), 'setAttribute', 1);
         // php-src element.c — name_len == 0 → ValueError (#24480).
         VmDom::rejectEmptyQualifiedName($name, 'DOMElement::setAttribute', 1);
-        VmDom::setAttributeNS($ctx, $element, null, $name, $value);
-        $null = new Variable();
-        $null->null();
-
-        return $null;
+        // php-src DOM_RET_OBJ / xmlns → true (#24538).
+        return VmDom::setAttribute($ctx, $element, $name, $value);
     }
 
     /**
