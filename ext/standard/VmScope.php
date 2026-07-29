@@ -407,7 +407,8 @@ final class VmScope
 
                     return self::scriptGlobalForDefinedVars($frame->vmContext, $name);
                 }
-                : null
+                : null,
+            $caller->initializedSlots
         );
     }
 

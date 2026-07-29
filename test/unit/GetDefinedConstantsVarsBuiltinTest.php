@@ -30,6 +30,7 @@ final class GetDefinedConstantsVarsBuiltinTest extends BaseTest
             'get_defined_constants_snmp_bucket.phpt',
             'get_defined_vars_extract.phpt',
             'get_defined_vars_extract_jit.phpt',
+            'get_defined_vars_omits_unassigned.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/stdlib/'.$file;
             yield $file => self::parsePHPT($path, $file);
