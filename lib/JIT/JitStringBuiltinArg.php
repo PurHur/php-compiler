@@ -130,6 +130,7 @@ final class JitStringBuiltinArg
      * parse_str $string soft-null (#21480, reverts #21380 TypeError).
      * trigger_error/user_error $message soft-null (#21480, reverts #21035 TypeError).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).
+     * error_log($message), gethostbyname($hostname), dns_get_record($hostname) soft-null (#24965, re-#24178, reverts #23858).
      * hex2bin/convert_uuencode/convert_uudecode/sscanf($string/$format), pack($values) soft-null (#21209/#21420/#21521).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).

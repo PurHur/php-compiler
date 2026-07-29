@@ -15,8 +15,8 @@ use PHPLLVM\Value;
 /**
  * error_log() — write message to SAPI/error log (php-src ext/standard/basic_functions.c; #3380).
  *
- * Z_PARAM_STR $message — null TypeError under caller strict_types or 8.4 forward profile
- * (#23858, reverts #21446 soft-null; php-src basic_functions.stub.php).
+ * Z_PARAM_STR $message — null TypeError under caller strict_types only; PROFILE=8.4 soft-null DEP+coerce
+ * (#24965 / re-#24178, reverts #23858 over-strict; php-src basic_functions.stub.php).
  * Optional $destination / $additional_headers stay nullable (?string).
  */
 final class error_log extends Internal
@@ -39,7 +39,7 @@ final class error_log extends Internal
             return;
         }
 
-        $message = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'error_log', 0, 'message');
+        $message = VmString::trimFamilyStringArgForFrame($frame, 0, 'error_log', 0, 'message');
         $messageType = 0;
         if ($argc >= 2) {
             $messageType = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'error_log', 1, 'message_type');
