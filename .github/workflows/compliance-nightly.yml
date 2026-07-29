@@ -93,6 +93,7 @@ jobs:
           name: shard-${{ matrix.shard }}
           path: |
             build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.failed
+            build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.executed
             build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.timeout
           if-no-files-found: warn
           retention-days: 14
@@ -155,5 +156,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.event.inputs.suite || 'VMTest' }}-baseline-${{ github.sha }}
-          path: test/compliance/baselines/${{ github.event.inputs.suite || 'VMTest' }}.failing
+          # Both files. Without the .executed companion the next diff cannot tell a fixed case from
+          # one the provider stopped yielding, which is how 18 real failures got buried (#24726).
+          path: |
+            test/compliance/baselines/${{ github.event.inputs.suite || 'VMTest' }}.failing
+            test/compliance/baselines/${{ github.event.inputs.suite || 'VMTest' }}.executed
           retention-days: 30
