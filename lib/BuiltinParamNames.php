@@ -444,6 +444,10 @@ final class BuiltinParamNames
             // php-src ext/spl/spl.stub.php — InternalArgInfo still says autoload_function (#23680)
             case 'spl_autoload_unregister':
                 return ['callback'];
+            // php-src ext/spl/spl.stub.php — InternalArgInfo still says obj / empty (#24569)
+            case 'spl_object_hash':
+            case 'spl_object_id':
+                return ['object'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
             case 'token_get_all':

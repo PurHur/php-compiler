@@ -306,6 +306,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
     }
 
+    /** @covers issue #24569 */
+    public function testSplObjectHashIdNamedParameters(): void
+    {
+        foreach (['spl_object_hash', 'spl_object_id'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['object'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'object', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+        }
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(['object'], 'obj', 'spl_object_hash'));
+    }
+
     /** @covers issue #24535 */
     public function testVfprintfNamedParameters(): void
     {
