@@ -17,27 +17,76 @@ final class VmCurlCore
     /** Bundled libcurl version string reported by curl_version()['version']. */
     public const LIBCURL_VERSION = '8.7.0';
 
+    /**
+     * curl_version_info() age / CURLVERSION_NOW for the bundled shape
+     * (libcurl curlver.h; php-src ext/curl/interface.c; #24463, #24099).
+     */
+    public const CURLVERSION_NOW = 10;
+
+    /** Bundled version_num for 8.7.0 — (major<<16)|(minor<<8)|patch. */
+    public const LIBCURL_VERSION_NUM = 526080;
+
     public static function available(): bool
     {
         return true;
     }
 
-    /** @return array<string, int|string|array<string, bool>> */
+    /**
+     * Zend-shaped curl_version() payload (php-src ext/curl/interface.c PHP_FUNCTION(curl_version); #24463).
+     *
+     * Key order matches master php-src: version_number, age, features, feature_list, ssl_*, version,
+     * host, libz, protocols, then age-gated ares/libidn/iconv/libssh/brotli fields.
+     *
+     * @return array<string, int|string|list<string>|array<string, bool>>
+     */
     public static function versionInfo(?int $age = null): array
     {
-        unset($age);
-
+        $age ??= self::CURLVERSION_NOW;
         $features = 125965879;
 
-        return [
-            'version_number' => 526080,
-            'version' => self::LIBCURL_VERSION,
-            'ssl_version_number' => 0,
-            'ssl_version' => 'OpenSSL/3.0.13',
-            'libz_version' => '1.3',
-            'host' => 'x86_64-pc-linux-gnu',
+        $info = [
+            'version_number' => self::LIBCURL_VERSION_NUM,
+            'age' => $age,
             'features' => $features,
             'feature_list' => self::featureList($features),
+            'ssl_version_number' => 0,
+            'version' => self::LIBCURL_VERSION,
+            'host' => 'x86_64-pc-linux-gnu',
+            'ssl_version' => 'OpenSSL/3.0.13',
+            'libz_version' => '1.3',
+            'protocols' => self::bundledProtocols(),
+        ];
+        if ($age >= 1) {
+            $info['ares'] = '';
+            $info['ares_num'] = 0;
+        }
+        if ($age >= 2) {
+            $info['libidn'] = '2.3.7';
+        }
+        if ($age >= 3) {
+            $info['iconv_ver_num'] = 0;
+            $info['libssh_version'] = 'libssh/0.10.6/openssl/zlib';
+        }
+        if ($age >= 4) {
+            $info['brotli_ver_num'] = 16781312;
+            $info['brotli_version'] = '1.1.0';
+        }
+
+        return $info;
+    }
+
+    /**
+     * Typical libcurl protocol list (numeric keys like curl_version_info()->protocols).
+     *
+     * @return list<string>
+     */
+    public static function bundledProtocols(): array
+    {
+        return [
+            'dict', 'file', 'ftp', 'ftps', 'gopher', 'gophers', 'http', 'https',
+            'imap', 'imaps', 'ldap', 'ldaps', 'mqtt', 'pop3', 'pop3s',
+            'rtmp', 'rtmpe', 'rtmps', 'rtmpt', 'rtmpte', 'rtmpts', 'rtsp',
+            'scp', 'sftp', 'smb', 'smbs', 'smtp', 'smtps', 'telnet', 'tftp',
         ];
     }
 
@@ -73,7 +122,8 @@ final class VmCurlCore
                     } else {
                         $s->string((string) $v);
                     }
-                    $inner->add($k, $s);
+                    // protocols use numeric indices; feature_list uses string keys (#24463).
+                    $inner->add(\is_int($k) ? (string) $k : $k, $s);
                 }
                 $slot->array($inner);
             } elseif (\is_int($value)) {

@@ -481,6 +481,8 @@ final class CurlConstants
             foreach (self::httpClientConstants() as $name => $value) {
                 $constants[$name] = $value;
             }
+            // curl_version_info age selector (php-src curl.stub.php / curlver.h; #24099, #24463).
+            $constants['CURLVERSION_NOW'] = VmCurlCore::CURLVERSION_NOW;
             $constants['CURLINFO_HTTP_CODE'] = self::CURLINFO_HTTP_CODE;
             $constants['CURLINFO_EFFECTIVE_URL'] = self::CURLINFO_EFFECTIVE_URL;
             $constants['CURLPAUSE_ALL'] = self::CURLPAUSE_ALL;
