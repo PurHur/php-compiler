@@ -17279,9 +17279,15 @@ class JIT {
                     $className = 'DOMDocument';
                     $declaringClassLc = 'domdocument';
                 }
-            } elseif ('appendchild' === $methodLc && $this->context->functionIsRegistered('domnode::appendchild')) {
-                $className = 'DOMNode';
-                $declaringClassLc = 'domnode';
+            } elseif ('appendchild' === $methodLc) {
+                // Prefer DOMDocument::appendChild when typed as document; untyped object
+                // receivers still fall back to DOMNode / ParentNode::append (#19208, #24973).
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::appendchild');
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
+                if ($this->context->functionIsRegistered('domnode::appendchild')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('append' === $methodLc && $this->context->functionIsRegistered('domnode::append')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -17332,12 +17338,28 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $proxyName = $this->resolveDomSubclassInstanceMethodProxy($declaringClassLc, $methodLc, $proxyName);
+        // Thin AOT: Element/Node appendChild → ParentNode::append for live NodeList (#19208).
+        // DOMDocument must keep DomDocumentAppendChild (documentElement + parentNode); the
+        // append remap corrupts child tagName after an intervening echo (#24973).
         if (
             'appendchild' === $methodLc
             && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
             && $this->context->functionIsRegistered('domnode::append')
         ) {
-            $proxyName = 'domnode::append';
+            $docAppendClasses = [
+                'domdocument' => true,
+                'dom\\document' => true,
+                'dom\\xmldocument' => true,
+                'dom\\htmldocument' => true,
+            ];
+            if (!isset($docAppendClasses[$declaringClassLc])) {
+                $proxyName = 'domnode::append';
+            } else {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::appendchild');
+                if ($this->context->functionIsRegistered('domdocument::appendchild')) {
+                    $proxyName = 'domdocument::appendchild';
+                }
+            }
         }
         // Register SimpleXML user-script AOT proxies before functionIsRegistered (#19306).
         if (str_starts_with(strtolower($proxyName), 'simplexmlelement::')

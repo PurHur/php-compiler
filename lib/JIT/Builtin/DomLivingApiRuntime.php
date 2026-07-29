@@ -297,25 +297,32 @@ final class DomLivingApiRuntime
     /**
      * Thin AOT isEqualNode: pointer identity or equal tagName (#21687).
      * Sufficient for leaf elements created via createElement (no DomRegistry).
+     *
+     * Distinct true-path blocks (pointer vs tag) + continuation after the phi so a
+     * prior self-compare cannot leave the insert point inside the phi block (#24973).
      */
     private static function isEqualNodeViaTagName(
         Context $context,
         Variable $receiver,
         Variable $other
     ): Value {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_isequal_slots');
+        static $seq = 0;
+        $id = (string) $seq++;
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_isequal_slots_'.$id);
         $i1 = $context->getTypeFromString('int1');
         $receiverLlvm = self::loadObject($context, $receiver);
         $otherLlvm = self::loadObject($context, $other);
 
         $fn = $context->builder->getInsertBlock()->getParent();
-        $hit = $fn->appendBasicBlock('dom_isequal_hit');
-        $miss = $fn->appendBasicBlock('dom_isequal_miss');
-        $cmpTags = $fn->appendBasicBlock('dom_isequal_tags');
-        $done = $fn->appendBasicBlock('dom_isequal_done');
+        $hitPtr = $fn->appendBasicBlock('dom_isequal_hit_ptr_'.$id);
+        $hitTag = $fn->appendBasicBlock('dom_isequal_hit_tag_'.$id);
+        $miss = $fn->appendBasicBlock('dom_isequal_miss_'.$id);
+        $cmpTags = $fn->appendBasicBlock('dom_isequal_tags_'.$id);
+        $done = $fn->appendBasicBlock('dom_isequal_done_'.$id);
+        $cont = $fn->appendBasicBlock('dom_isequal_cont_'.$id);
 
         $same = $context->builder->icmp(Builder::INT_EQ, $receiverLlvm, $otherLlvm);
-        $context->builder->branchIf($same, $hit, $cmpTags);
+        $context->builder->branchIf($same, $hitPtr, $cmpTags);
 
         $context->builder->positionAtEnd($cmpTags);
         $objectType = $context->type->object;
@@ -342,16 +349,21 @@ final class DomLivingApiRuntime
         $cmp = JitStringCompare::strcmp($context, $strA, $strB);
         $i64 = $context->getTypeFromString('int64');
         $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
-        $context->builder->branchIf($eq, $hit, $miss);
+        $context->builder->branchIf($eq, $hitTag, $miss);
 
-        $context->builder->positionAtEnd($hit);
+        $context->builder->positionAtEnd($hitPtr);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($hitTag);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($miss);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($i1);
-        $phi->addIncoming($i1->constInt(1, false), $hit);
+        $phi->addIncoming($i1->constInt(1, false), $hitPtr);
+        $phi->addIncoming($i1->constInt(1, false), $hitTag);
         $phi->addIncoming($i1->constInt(0, false), $miss);
+        $context->builder->branch($cont);
+        $context->builder->positionAtEnd($cont);
 
         return $phi;
     }
