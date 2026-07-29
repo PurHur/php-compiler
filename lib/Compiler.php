@@ -57,6 +57,7 @@ use PHPCompiler\Compiler\ClassConstDuplicateCheck;
 use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
+use PHPCompiler\Compiler\MagicMethodArityCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
@@ -601,6 +602,7 @@ class Compiler {
         InterfaceMethodBodyCheck::validate($script);
         AbstractMethodBodyCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
+        MagicMethodArityCheck::validate($script);
         MagicMethodReturnTypeCheck::validate($script);
         EnumMagicMethodCheck::validate($script);
         EnumAbstractMethodCompileCheck::validate($script);
