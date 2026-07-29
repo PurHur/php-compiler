@@ -22,9 +22,13 @@ final class JitDateParse
         if (1 !== \count($args)) {
             throw new \LogicException('date_parse() expects exactly 1 argument in this compiler build');
         }
-        // Z_PARAM_STR $datetime — null TypeError on PROFILE=8.4 (#20227).
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'date_parse', 0, 'datetime');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#24862; peer idate #21491).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'date_parse', 0, 'datetime');
+            } else {
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'date_parse', 0, 'datetime');
+            }
             $lit = '';
         } else {
             $lit = self::compileTimeStringArg($args[0]);

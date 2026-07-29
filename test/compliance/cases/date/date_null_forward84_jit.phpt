@@ -1,5 +1,5 @@
 --TEST--
-JIT date idate()/mktime()/gmmktime(null) soft-null; strftime/date_parse TypeError on 8.4 (#21491, reverts #20227)
+JIT date idate()/strftime()/date_parse()/mktime()/gmmktime(null) soft-null on 8.4 (#24862/#21491/#21582)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -30,6 +30,8 @@ foreach ([
             echo "{$name}: OK ", var_export($r, true), "\n";
         } elseif ('mktime' === $name || 'gmmktime' === $name) {
             echo "{$name}: OK ", (is_int($r) ? 'int' : gettype($r)), "\n";
+        } elseif ('date_parse' === $name) {
+            echo "{$name}: COERCE error_count=", $r['error_count'], "\n";
         } else {
             echo "{$name}: COERCE\n";
         }
@@ -42,8 +44,10 @@ foreach ([
 DEP
 WARN
 idate: OK false
-strftime: TypeError
-date_parse: TypeError
+DEP
+strftime: COERCE
+DEP
+date_parse: COERCE error_count=1
 DEP
 mktime: OK int
 DEP
