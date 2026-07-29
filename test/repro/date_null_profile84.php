@@ -1,5 +1,5 @@
 <?php
-// #21491 — idate/mktime/gmmktime soft-null; strftime/date_parse still TypeError under PROFILE=8.4
+// #21491/#24862/#21582 — idate/strftime/date_parse/mktime/gmmktime soft-null under PROFILE=8.4
 error_reporting(E_ALL);
 set_error_handler(static function (int $n, string $m): bool {
     return true;
@@ -17,6 +17,8 @@ foreach ([
       echo $name, ' ', var_export($r, true), "\n";
     } elseif ('mktime' === $name || 'gmmktime' === $name) {
       echo $name, ' ', (is_int($r) ? 'int' : gettype($r)), "\n";
+    } elseif ('date_parse' === $name) {
+      echo $name, ' COERCE error_count=', $r['error_count'], "\n";
     } else {
       echo $name, " COERCE\n";
     }

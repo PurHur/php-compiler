@@ -24,4 +24,4 @@ echo $c->x, "\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-Fatal error: Syntax error, unexpected ')', expecting T_AMPERSAND_NOT_FOLLOWED_BY_VAR_OR_VARARG in %s on line %d
+Parse error: Syntax error, unexpected ')', expecting T_AMPERSAND_NOT_FOLLOWED_BY_VAR_OR_VARARG in %s on line %d

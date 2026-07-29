@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinParamNames;
 use PHPUnit\Framework\TestCase;
 
@@ -374,6 +375,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('stream_isatty'));
     }
 
+    /** @covers issue #23658 */
+    public function testStreamMetaBlockingFilterTokenZendStubNamedParams(): void
+    {
+        $meta = BuiltinParamNames::forFunction('stream_get_meta_data');
+        self::assertSame(['stream'], $meta);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($meta, 'stream', 'stream_get_meta_data'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($meta, 'fp', 'stream_get_meta_data'));
+        self::assertSame(['stream'], BuiltinParamNames::forFunction('socket_get_status'));
+
+        $blocking = BuiltinParamNames::forFunction('stream_set_blocking');
+        self::assertSame(['stream', 'enable'], $blocking);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($blocking, 'stream', 'stream_set_blocking'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($blocking, 'enable', 'stream_set_blocking'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($blocking, 'socket', 'stream_set_blocking'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($blocking, 'mode', 'stream_set_blocking'));
+        self::assertSame(['stream', 'enable'], BuiltinParamNames::forFunction('socket_set_blocking'));
+
+        $filterId = BuiltinParamNames::forFunction('filter_id');
+        self::assertSame(['name'], $filterId);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($filterId, 'name', 'filter_id'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($filterId, 'filtername', 'filter_id'));
+
+        $tokenName = BuiltinParamNames::forFunction('token_name');
+        self::assertSame(['id'], $tokenName);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($tokenName, 'id', 'token_name'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($tokenName, 'type', 'token_name'));
+    }
+
     /** @covers issue #10045 */
     public function testFileGetContentsFilenameNamedParameter(): void
     {
@@ -488,11 +517,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #9647 */
+    /** @covers issue #9647 / #24845 */
     public function testDateNamedParameters(): void
     {
         $names = BuiltinParamNames::forFunction('date');
-        self::assertSame(['format', 'timestamp'], $names);
+        self::assertSame(['format', 'timestamp='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'date'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp', 'date'));
     }
@@ -1025,7 +1054,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($getdate, 'timestamp', 'getdate'));
 
         $gmdate = BuiltinParamNames::forFunction('gmdate');
-        self::assertSame(['format', 'timestamp'], $gmdate);
+        self::assertSame(['format', 'timestamp='], $gmdate);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'format', 'gmdate'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'timestamp', 'gmdate'));
 
@@ -1035,16 +1064,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'needle', 'substr_count'));
     }
 
-    /** @covers issue #23216 */
+    /** @covers issue #23216 / #24845 */
     public function testStrtotimeZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('strtotime');
-        self::assertSame(['datetime', 'baseTimestamp'], $names);
+        self::assertSame(['datetime', 'baseTimestamp='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'strtotime'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'baseTimestamp', 'strtotime'));
         // Legacy InternalArgInfo names must not resolve (Zend rejects $time / $now)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'time', 'strtotime'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'now', 'strtotime'));
+    }
+
+    /** @covers issue #24845 */
+    public function testDateGmdateStrtotimeNullableTimestampTypeOverride(): void
+    {
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('date', 1));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('gmdate', 1));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('strtotime', 1));
+        self::assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('date', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('date', 1);
+        self::assertNotNull($info);
+        self::assertSame('?int', $info['type']);
+        self::assertTrue($info['isOptional']);
     }
 
     /** @covers issue #23276 */
@@ -1815,12 +1857,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sn, 'newname', 'session_name'));
     }
 
-    /** @covers issue #23846 */
+    /** @covers issue #24583 */
+    public function testSessionCacheLimiterExpireZendStubNamedParams(): void
+    {
+        $limiter = BuiltinParamNames::forFunction('session_cache_limiter');
+        self::assertSame(['value='], $limiter);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($limiter, 'value', 'session_cache_limiter'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($limiter, 'new_cache_limiter', 'session_cache_limiter'));
+
+        $expire = BuiltinParamNames::forFunction('session_cache_expire');
+        self::assertSame(['value='], $expire);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($expire, 'value', 'session_cache_expire'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($expire, 'new_cache_expire', 'session_cache_expire'));
+    }
+
+    /** @covers issue #23846 / #24533 */
     public function testSessionSetCookieParamsZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('session_set_cookie_params');
-        self::assertSame(['lifetime', 'path', 'domain', 'secure', 'httponly'], $names);
-        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime', 'session_set_cookie_params'));
+        self::assertSame(['lifetime_or_options', 'path', 'domain', 'secure', 'httponly'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime_or_options', 'session_set_cookie_params'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime', 'session_set_cookie_params'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'path', 'session_set_cookie_params'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'domain', 'session_set_cookie_params'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'secure', 'session_set_cookie_params'));
@@ -2570,6 +2627,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'json_validate'));
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('json_validate'));
         self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('json_validate'));
+    }
+
+    /** @covers issue #24812 */
+    public function testJsonDecodeFlagsOptionalNamedParamsResolve(): void
+    {
+        self::assertSame(
+            ['json', 'associative=', 'depth=', 'flags='],
+            BuiltinParamNames::forFunction('json_decode')
+        );
+        $names = BuiltinParamNames::forFunction('json_decode');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'json', 'json_decode'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'associative', 'json_decode'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'depth', 'json_decode'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'json_decode'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('json_decode'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('json_decode'));
     }
 
     /** @covers issue #24577 */

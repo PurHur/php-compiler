@@ -8,6 +8,7 @@ use PHPCompiler\ext\calendar\CalendarConstants;
 use PHPCompiler\ext\curl\CurlConstants;
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
+use PHPCompiler\ext\exif\ExifConstants;
 use PHPCompiler\ext\fileinfo\FileinfoConstants;
 use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ext\ftp\FtpConstants;
@@ -114,6 +115,9 @@ final class ExtensionConstantGroups
         $groups['ftp'] = FtpConstants::registeredConstants();
         $groups['mysqli'] = MysqliConstants::registeredConstants();
         $groups['sqlite3'] = Sqlite3Constants::globalConstants();
+        // exif registers EXIF_USE_MBSTRING at MINIT (php-src ext/exif/exif.c). Without a group here
+        // it lands in the 'user' bucket, which must stay empty when the script calls no define().
+        $groups['exif'] = ExifConstants::registeredConstants();
         if (SnmpExtensionPolicy::advertisesExtension()) {
             $groups['snmp'] = SnmpConstants::registeredConstants();
         }

@@ -48,6 +48,24 @@ final class ExternalMethodBindTest extends TestCase
         );
     }
 
+    /**
+     * Dynamic `$class::method()` must be allowed to fall through under SPINE_CHUNK
+     * the same way unresolved instance methods do (#24429 sockets/vm abort).
+     */
+    public function testSpineChunkAllowsObjectFallthroughForDynamicStaticClass(): void
+    {
+        putenv(ExternalMethodBind::ENV_SPINE_CHUNK.'=1');
+        $_ENV[ExternalMethodBind::ENV_SPINE_CHUNK] = '1';
+        $this->assertTrue(ExternalMethodBind::spineChunkMode());
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $this->assertTrue(
+            ExternalMethodBind::allowUnresolvedMethodFallthrough($ctx, 'object', null)
+        );
+        $proxy = $ctx->resolveFunctionProxy('object::paint');
+        $this->assertInstanceOf(ExternalMethod::class, $proxy);
+    }
+
     public function testAllowFallthroughForExternalOnlyClass(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);

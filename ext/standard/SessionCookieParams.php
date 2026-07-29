@@ -66,7 +66,7 @@ final class SessionCookieParams
                 $function.'() expects at most 5 arguments, '.$argc.' given'
             );
         }
-        $lifetime = VmMath::parseIntBuiltinArg($args[0], $function, 1, 'lifetime');
+        $lifetime = VmMath::parseIntBuiltinArg($args[0], $function, 1, 'lifetime_or_options');
         $path = '/';
         if ($argc >= 2) {
             $path = VmString::coerceStringBuiltinArg($args[1], $function, 2, 'path');
@@ -116,7 +116,7 @@ final class SessionCookieParams
             $opt = $key->toString();
             switch ($opt) {
                 case 'lifetime':
-                    $lifetime = VmMath::parseIntBuiltinArg($valueVar, $function, 1, 'lifetime');
+                    $lifetime = VmMath::parseIntBuiltinArg($valueVar, $function, 1, 'lifetime_or_options');
                     ++$validKeys;
                     break;
                 case 'path':
@@ -188,7 +188,7 @@ final class SessionCookieParams
     ): array {
         if ($lifetime < 0) {
             throw new \ValueError(
-                'session_set_cookie_params(): Argument #1 ($lifetime) must be greater than or equal to 0'
+                'session_set_cookie_params(): Argument #1 ($lifetime_or_options) must be greater than or equal to 0'
             );
         }
 

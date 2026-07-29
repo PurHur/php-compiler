@@ -40,7 +40,12 @@ final class XmlReaderOpen extends VmClassMethod
             if (Variable::TYPE_STRING !== $uriVar->type) {
                 throw new \TypeError('XMLReader::open(): Argument #1 ($uri) must be of type string');
             }
-            $ok = VmXmlReader::openOnto($ctx, $first->toObject(), $uriVar->toString(), $frame);
+            $uri = $uriVar->toString();
+            // Before VmFsReadPure/fopen — host fopen('') throws generic "Path cannot be empty" (#24810).
+            if ('' === $uri) {
+                throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
+            }
+            $ok = VmXmlReader::openOnto($ctx, $first->toObject(), $uri, $frame);
             BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
                 $ret->bool($ok);
             });
@@ -51,7 +56,11 @@ final class XmlReaderOpen extends VmClassMethod
         if (Variable::TYPE_STRING !== $first->type) {
             throw new \TypeError('XMLReader::open(): Argument #1 ($uri) must be of type string');
         }
-        $reader = VmXmlReader::open($ctx, $first->toString(), $frame);
+        $uri = $first->toString();
+        if ('' === $uri) {
+            throw new \ValueError('XMLReader::open(): Argument #1 ($uri) cannot be empty');
+        }
+        $reader = VmXmlReader::open($ctx, $uri, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($reader): void {
             if (null === $reader) {
                 $ret->bool(false);

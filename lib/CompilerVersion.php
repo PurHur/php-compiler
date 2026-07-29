@@ -129,13 +129,29 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24719).
+     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367, #22705, #24809).
      *
-     * Enabled unconditionally when VERSION_ID >= 80300 (covers 8.4.0-dev).
+     * Withheld on 8.4.0-dev reference profile (phpversion() 8.2.31 matches Zend 8.2 parse error).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Do not use VERSION_ID / isForwardProfileAtLeast here — that re-enabled acceptance on default
+     * after #24719 and broke Zend 8.2 parity (#24809, re-#22782/#22705).
      */
     public static function supportsTypedClassConstants(): bool
     {
-        return self::VERSION_ID >= 80300;
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
@@ -167,13 +183,27 @@ final class CompilerVersion
      * PHP 8.3+ dynamic class constant fetch (`C::{$name}`, `$cls::{$name}`).
      *
      * Rejected on the 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
-     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#17863, re-#17801).
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#17863, re-#17801, #24823).
+     * Do not use bare `VERSION >= 8.3` — VERSION is `8.4.0-dev`, which would always enable and break
+     * PROFILE=8.2 / default php-src-strict parity (#24725 regression).
      * php-src: Zend/zend_language_parser.y class_constant; Zend/zend_compile.c.
      */
     public static function supportsDynamicClassConstFetch(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=')
-            || version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
@@ -1209,30 +1239,33 @@ final class CompilerVersion
     /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
-     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * ("Multiple access type modifiers are not allowed") — #24819, re-#12508 / #17197.
+     * `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset `PHP_COMPILER_PROFILE`
+     * keeps this false (do not use {@see isForwardProfileAtLeast()} here — that reopened the
+     * reference-profile accept regression via #24720/#24722).
      * Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
      * php-src: Zend/zend_language_parser.y T_PRIVATE_SET; Zend/zend_compile.c ZEND_ACC_*_SET.
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Enabled unconditionally when VERSION_ID >= 80400 (#24754). Explicit
-     * `PHP_COMPILER_PROFILE=8.2` still rejects via languageProfileVersion().
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#24818, re-#22781 / #22371 / #18531). `version_compare` treats `8.4.0-dev` as below `8.4.0`,
+     * so unset `PHP_COMPILER_PROFILE` keeps this false. Forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * (or stable 8.4.0+) enables hook syntax.
+     * Do not use VERSION_ID / isForwardProfileAtLeast here — that re-enabled acceptance on default
+     * after #24754/#24760 and broke Zend 8.2 parity (#24818).
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== $raw) {
-            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
-        }
-
-        return self::VERSION_ID >= 80400;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1381,13 +1414,13 @@ final class CompilerVersion
      * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization,isFinal,isAbstract,isVirtual},
      * ext/reflection/php_reflection.c, #17493, #20511, #22309).
      *
-     * Forward profile on 8.4.0-dev builds and stable 8.4.0+ (#24672, #6983, re-#22309).
-     * Explicit `PHP_COMPILER_PROFILE=8.2` / `8.3` keeps methods absent like Zend ≤8.3.
-     * Aligns with {@see supportsPropertyHooks()} — hook syntax is already enabled on default 8.4.0-dev.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
+     * Zend 8.2 (methods absent). Aligns with {@see supportsPropertyHooks()} (#24818, #24672, #6983).
+     * Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionPropertyHookProbes(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1767,11 +1800,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091, #22544).
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091, #22544, #24808).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate when reported
      * PHP_VERSION is the 8.2 reference string). Enable via stable 8.4.0+ or explicit
-     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16091, #17007).
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16091, #17007, #22544).
+     *
+     * Do not use {@see isForwardProfileAtLeast()} here — that would re-advertise on unset PROFILE
+     * while {@see phpversion()} still reports {@see REFERENCE_PHP_VERSION} (#24745 regression / #24808).
      */
     public static function supportsJsonValidate(): bool
     {
@@ -1779,21 +1815,20 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
-        }
-
-        // 8.4.0-dev is a pre-release of 8.4 — MINOR_VERSION bypasses version_compare '-dev' trap.
-        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 3)) {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
         }
 
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
-     * json_validate() visible to function_exists() — stable runtime or forward 8.3+ (#17007, #22544).
+     * json_validate() visible to function_exists() — same gate as registration (#17007, #22544, #24808).
      *
      * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
      */
@@ -3434,13 +3469,13 @@ final class CompilerVersion
     /**
      * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
-     * rejects like Zend 8.2 (#16450); forward profile enables rewriter (#11546).
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#16450, #24819). Same `version_compare` rule as {@see supportsAsymmetricVisibility()}.
      * php-src: Zend/zend_compile.c asymmetric visibility scope parsing.
      */
     public static function supportsParenthesizedAsymmetricSetModifier(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

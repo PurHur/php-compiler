@@ -1,5 +1,5 @@
 --TEST--
-stdlib substr(null) — soft-null on 8.4 forward profile JIT (#21189)
+stdlib substr(null) — soft-null on 8.4 forward profile JIT (#24817 / #21189)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--

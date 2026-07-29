@@ -201,6 +201,10 @@ patch_already_applied() {
     php-types-hash-init-arginfo.patch)
       grep -qF "'hash_init' => ['HashContext', 'algo' => 'string', 'flags=' => 'int', 'key=' => 'string', 'options=' => 'array']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-json-decode-flags-arginfo.patch)
+      # php-src ext/json/json.stub.php — int $flags = 0 (#24812)
+      grep -qF "'json_decode' => ['', 'json' => 'string', 'assoc=' => 'bool', 'depth=' => 'int', 'flags=' => 'int']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-llvm-builder-xor.patch)
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -6571,6 +6575,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-mysqli-fetch-column-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-ldap-get-option-byref.patch"
   apply_patch "$PATCH_DIR/php-types-hash-init-arginfo.patch"
+  apply_patch "$PATCH_DIR/php-types-json-decode-flags-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-missing-parent-no-echo.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"

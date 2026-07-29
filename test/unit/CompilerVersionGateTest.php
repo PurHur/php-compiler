@@ -372,6 +372,39 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** Issue #24823 / re-#17863: default + PROFILE=8.2 withhold dynamic Class::{$expr}. */
+    public function testSupportsDynamicClassConstFetchFalseOnReferenceAndProfile82(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDynamicClassConstFetchTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsReadonlyAnonymousClassFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReadonlyAnonymousClass());
@@ -807,9 +840,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
     }
 
-    public function testSupportsJsonValidateTrueOnDefault84DevReference(): void
+    public function testSupportsJsonValidateFalseOnDefault84DevReference(): void
     {
-        $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        $this->assertFalse(CompilerVersion::supportsJsonValidate());
     }
 
     public function testSupportsJsonValidateFalseOn82Profile(): void
@@ -1090,9 +1123,19 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsReflectionPropertyHookProbesTrueOn84DevForwardProfile(): void
+    public function testSupportsReflectionPropertyHookProbesFalseOnDefaultProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsReflectionPropertyHookProbes());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyHookProbes());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsReflectionPropertyHookProbesFalseWhenProfile82(): void
@@ -1579,9 +1622,22 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** @covers issue #24819 — must stay false on unset PROFILE (not isForwardProfileAtLeast) */
     public function testSupportsAsymmetricVisibilityFalseOn84DevReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        try {
+            $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+            $this->assertFalse(CompilerVersion::supportsParenthesizedAsymmetricSetModifier());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsAsymmetricVisibilityFalseWhenProfile82(): void
@@ -1614,13 +1670,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** Property hooks enabled unconditionally on VERSION_ID >= 80400 (#24754). */
-    public function testSupportsPropertyHooksTrueOnDefaultProfile(): void
+    /** Property hooks withheld on 8.4.0-dev reference profile — Zend 8.2 parity (#24818). */
+    public function testSupportsPropertyHooksFalseOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2363,10 +2419,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersJsonValidateOnDefault84DevReference(): void
+    public function testVmDoesNotRegisterJsonValidateOnDefault84DevReference(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmDoesNotRegisterJsonValidateOn82Profile(): void
@@ -2582,14 +2638,44 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersReflectionPropertyHookProbesOnForwardProfile(): void
+    public function testVmDoesNotRegisterReflectionPropertyHookProbesOnDefaultProfile(): void
     {
-        $runtime = new Runtime();
-        $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
-        $this->assertNotNull($rp);
-        $this->assertTrue(isset($rp->methods['isabstract']));
-        $this->assertTrue(isset($rp->methods['isvirtual']));
-        $this->assertTrue(isset($rp->methods['gethooks']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertFalse(isset($rp->methods['isabstract']));
+            $this->assertFalse(isset($rp->methods['isvirtual']));
+            $this->assertFalse(isset($rp->methods['gethooks']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersReflectionPropertyHookProbesWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertTrue(isset($rp->methods['isabstract']));
+            $this->assertTrue(isset($rp->methods['isvirtual']));
+            $this->assertTrue(isset($rp->methods['gethooks']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterReflectionPropertyHookProbesWhenProfile82(): void

@@ -32,8 +32,9 @@ final class date_parse extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR $datetime — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.c).
-        $date = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'date_parse', 0, 'datetime');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#24862; reverts #20227 TypeError).
+        // TypeError for null→string is PHP 9.0 (RFC deprecate_null_to_scalar_internal_arg), not 8.4.
+        $date = VmString::trimFamilyStringArgForFrame($frame, 0, 'date_parse', 0, 'datetime');
         $frame->returnVar->array(VmDate::parseResultToHashTable(VmDateTimeNative::parseDate($date)));
     }
 

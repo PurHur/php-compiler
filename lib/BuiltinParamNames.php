@@ -208,7 +208,8 @@ final class BuiltinParamNames
                 return ['string', 'width', 'break', 'cut_long_words'];
             case 'date':
             case 'gmdate':
-                return ['format', 'timestamp'];
+                // php-src ext/date/php_date.stub.php — ?int $timestamp = null (#24845)
+                return ['format', 'timestamp='];
             // php-src ext/date/php_date.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
             case 'checkdate':
                 return ['month', 'day', 'year'];
@@ -224,9 +225,9 @@ final class BuiltinParamNames
                 return ['datetime'];
             case 'date_parse_from_format':
                 return ['format', 'datetime'];
-            // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)
+            // php-src ext/date/php_date.stub.php — ?int $baseTimestamp = null (#23216 / #24845)
             case 'strtotime':
-                return ['datetime', 'baseTimestamp'];
+                return ['datetime', 'baseTimestamp='];
             // php-src ext/date/php_date.stub.php — Reflection had empty params (#23276)
             case 'date_create':
             case 'date_create_immutable':
@@ -476,6 +477,9 @@ final class BuiltinParamNames
                 return ['filename', 'mtime', 'atime'];
             case 'token_get_all':
                 return ['code', 'flags'];
+            // php-src ext/tokenizer/tokenizer.stub.php — InternalArgInfo still says type (#23658)
+            case 'token_name':
+                return ['id'];
             case 'getenv':
                 return ['name', 'local_only'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says setting (#23258)
@@ -519,9 +523,14 @@ final class BuiltinParamNames
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says arg_num (#24456)
             case 'func_get_arg':
                 return ['position'];
-            // php-src ext/session/session.stub.php — Reflection OK but forFunction empty (#23846)
+            // php-src ext/session/session.stub.php — InternalArgInfo still new_cache_* (#24583)
+            case 'session_cache_limiter':
+                return ['value='];
+            case 'session_cache_expire':
+                return ['value='];
+            // php-src ext/session/session.stub.php — lifetime → lifetime_or_options (#23846 / #24533)
             case 'session_set_cookie_params':
-                return ['lifetime', 'path', 'domain', 'secure', 'httponly'];
+                return ['lifetime_or_options', 'path', 'domain', 'secure', 'httponly'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says const_name/name (#23434)
@@ -631,6 +640,14 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — PHP builtin; no InternalArgInfo (#24609)
             case 'stream_isatty':
                 return ['stream'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says fp (#23658)
+            case 'stream_get_meta_data':
+            case 'socket_get_status': // PHP_FALIAS
+                return ['stream'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says socket/mode (#23658)
+            case 'stream_set_blocking':
+            case 'socket_set_blocking': // PHP_FALIAS
+                return ['stream', 'enable'];
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':
@@ -884,13 +901,17 @@ final class BuiltinParamNames
                 return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
             case 'json_encode':
                 return ['value', 'flags', 'depth'];
+            // php-src ext/json/json.stub.php — InternalArgInfo omits flags= (#24812)
             case 'json_decode':
-                return ['json', 'associative', 'depth', 'flags'];
+                return ['json', 'associative=', 'depth=', 'flags='];
             // php-src ext/json/json.stub.php — missing from InternalArgInfo (#23876)
             case 'json_validate':
                 return ['json', 'depth=', 'flags='];
             case 'filter_var':
                 return ['value', 'filter', 'options'];
+            // php-src ext/filter/filter.stub.php — InternalArgInfo still says filtername (#23658)
+            case 'filter_id':
+                return ['name'];
             // php-src ext/filter/filter.stub.php — InternalArgInfo still says data/definition (#23598)
             case 'filter_var_array':
                 return ['array', 'options', 'add_empty'];

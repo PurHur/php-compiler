@@ -94,6 +94,16 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/date/php_date.stub.php — ?int = null (InternalArgInfo int → 0) (#24845)
+        'date' => [
+            1 => ['kind' => 'null'],
+        ],
+        'gmdate' => [
+            1 => ['kind' => 'null'],
+        ],
+        'strtotime' => [
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

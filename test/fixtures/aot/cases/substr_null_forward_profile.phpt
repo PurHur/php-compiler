@@ -1,5 +1,5 @@
 --TEST--
-AOT: substr(null) — soft-null on 8.4 forward profile (#21189)
+AOT: substr(null) — soft-null on 8.4 forward profile (#24817 / #21189)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--

@@ -18092,8 +18092,37 @@ class JIT {
     {
         $classOp = $block->getOperand($classOpIdx);
         $nameOp = $block->getOperand($nameOpIdx);
-        assert($nameOp instanceof Operand\Literal);
+        // Scope can lose Literal operands while slot constants remain (sockets/vm spine
+        // chunks under SPINE_CHUNK — getOperand null for both class+name, #24429).
+        if (!$classOp instanceof Operand\Literal && isset($block->constants[$classOpIdx])) {
+            $classOp = new Operand\Literal($block->constants[$classOpIdx]->toString());
+        }
+        if (!$nameOp instanceof Operand\Literal && isset($block->constants[$nameOpIdx])) {
+            $nameOp = new Operand\Literal($block->constants[$nameOpIdx]->toString());
+        }
+        if (!$nameOp instanceof Operand\Literal) {
+            if (\PHPCompiler\AOT\ExternalMethodBind::spineChunkMode()) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('object::__unknownStatic');
+                $this->context->scope->args = [];
+
+                return;
+            }
+            throw new \LogicException('Static call method must be a literal');
+        }
         if (!$classOp instanceof Operand\Literal) {
+            // `$class::method()` / non-literal class operand — fall through under
+            // SPINE_CHUNK / external-only like unresolved instance methods (#24496).
+            if (\PHPCompiler\AOT\ExternalMethodBind::allowUnresolvedMethodFallthrough(
+                $this->context,
+                'object',
+                null
+            )) {
+                $proxyName = 'object::'.strtolower((string) $nameOp->value);
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [];
+
+                return;
+            }
             throw new \LogicException('Static call class must be a literal');
         }
         $selfScope = 'self' === strtolower((string) $classOp->value);

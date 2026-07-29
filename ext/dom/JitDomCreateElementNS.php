@@ -46,17 +46,12 @@ final class JitDomCreateElementNS
             $value
         );
 
-        return self::boxObjectResult($context, $element);
-    }
-
-    private static function boxObjectResult(Context $context, Value $object): Value
-    {
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
             $ptr,
-            $object
+            $element
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);

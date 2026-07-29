@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** socket_atmark JIT routes through SocketAtmarkJitHelper PHP not JIT stub (#9215). */
+/** socket_atmark JIT via SocketAtmarkJitHelper + JitVmHelperLink::ensureCompiled (#9215, #24831). */
 final class SocketAtmarkRuntimeShrinkTest extends TestCase
 {
     public function testSocketAtmarkCallUsesJitSocketAtmark(): void
@@ -23,10 +23,17 @@ final class SocketAtmarkRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmSockets::atmarkForFd', $source);
     }
 
-    public function testSocketAtmarkRuntimeCompilesHelper(): void
+    public function testSocketAtmarkRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketAtmarkRuntime.php');
         $this->assertStringContainsString('SocketAtmarkJitHelper::atmarkForHandle', $source);
-        $this->assertLessThan(120, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertLessThan(80, \substr_count($source, "\n") + 1);
     }
 }

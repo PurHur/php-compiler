@@ -1,6 +1,6 @@
 <?php
-// Issue #23846 — session_set_cookie_params Zend stub named params (ext/session/session.stub.php).
-$ok = session_set_cookie_params(lifetime: 3600, path: '/app');
+// Issue #23846 / #24533 — session_set_cookie_params Zend stub named params (ext/session/session.stub.php).
+$ok = session_set_cookie_params(lifetime_or_options: 3600, path: '/app');
 $params = session_get_cookie_params();
 $rf = new ReflectionFunction('session_set_cookie_params');
 $names = [];
