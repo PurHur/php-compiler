@@ -333,7 +333,20 @@ final class HelperRuntimeCache
         $cores = [self::coreFingerprint()];
         $liveLib = self::llvmLibSha256OrNull();
         if (null === $liveLib) {
-            return $list = $cores;
+            // No LLVM on host — try to reconstruct the Docker fingerprint from
+            // the committed manifest's llvm_identity_token so --strict checks
+            // pass on hosts without LLVM (#24302).
+            $root = \dirname(__DIR__, 2);
+            $archDir = $root.'/prelinked/helper-runtime/'.php_uname('m').'-'.strtolower(php_uname('s'));
+            $mfPath = $archDir.'/manifest.json';
+            if (is_file($mfPath)) {
+                $mf = json_decode((string) file_get_contents($mfPath), true);
+                $tok = \is_array($mf) ? (string) ($mf['llvm_identity_token'] ?? '') : '';
+                if ('' !== $tok && $tok !== self::llvmIdentityToken()) {
+                    $cores[] = self::coreFingerprintWithLlvmToken($tok);
+                }
+            }
+            return $list = array_values(array_unique($cores));
         }
         $root = \dirname(__DIR__, 2);
         foreach (array_unique(array_filter([
