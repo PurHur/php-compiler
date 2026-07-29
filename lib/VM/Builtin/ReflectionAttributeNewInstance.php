@@ -37,6 +37,8 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
             throw new \Error('Attribute class "'.$className.'" not found');
         }
         $classEntry = $ctx->classes[$lc];
+        // Class must carry #[Attribute] (php-src ZEND_ACC_ATTRIBUTE, #24930).
+        ReflectionSupport::assertAttributeNewInstanceIsAttributeClass($receiver, $classEntry);
         // Wrong Attribute::TARGET_* on declaration site → Error (php-src newInstance, #23528).
         ReflectionSupport::assertAttributeNewInstanceTargetAllowed($receiver, $classEntry);
         // Userland non-IS_REPEATABLE duplicates: Error at newInstance, not compile (#22930).

@@ -779,11 +779,34 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionAttribute::newInstance() — reject classes without #[Attribute] (#24930).
+     *
+     * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)
+     * checks ce->ce_flags & ZEND_ACC_ATTRIBUTE before target / repeatable checks.
+     */
+    public static function assertAttributeNewInstanceIsAttributeClass(
+        ObjectEntry $receiver,
+        ClassEntry $attributeClass,
+    ): void {
+        if (AttributeClassRegistry::isRegisteredAttributeClass($attributeClass->attributeEntries)) {
+            return;
+        }
+        $nameVar = $receiver->getProperty(self::PROP_ATTR_NAME)->resolveIndirect();
+        $name = Variable::TYPE_STRING === $nameVar->type
+            ? $nameVar->toString()
+            : $attributeClass->name;
+        $name = ltrim($name, '\\');
+
+        throw new \Error('Attempting to use non-attribute class "'.$name.'" as attribute');
+    }
+
+    /**
      * ReflectionAttribute::newInstance() — reject wrong Attribute::TARGET_* (#23528).
      *
      * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)
      * checks (attr->flags & target) after resolving the attribute class's #[Attribute] mask.
      * Compile-time AttributeTargetValidator covers some paths; Reflection must still enforce.
+     * Caller must run {@see assertAttributeNewInstanceIsAttributeClass} first (#24930).
      */
     public static function assertAttributeNewInstanceTargetAllowed(
         ObjectEntry $receiver,
@@ -791,7 +814,9 @@ final class ReflectionSupport
     ): void {
         $flags = AttributeClassRegistry::extractSelfAttributeFlags($attributeClass->attributeEntries);
         if (null === $flags) {
-            // No #[Attribute] meta — non-attribute-class Error is a separate gap; skip here.
+            // Defensive: primary guard is assertAttributeNewInstanceIsAttributeClass (#24930).
+            self::assertAttributeNewInstanceIsAttributeClass($receiver, $attributeClass);
+
             return;
         }
         $allowed = $flags & AttributeSupport::targetAll();
