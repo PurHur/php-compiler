@@ -267,6 +267,9 @@ final class BuiltinParamNames
             case 'mktime':
             case 'gmmktime':
                 return ['hour', 'minute', 'second', 'month', 'day', 'year'];
+            // php-src ext/date/php_date.stub.php — associative_array→associative (#23447)
+            case 'localtime':
+                return ['timestamp=', 'associative='];
             // php-src ext/standard/basic_functions.stub.php — exactly array+callback (#23875).
             // #6949 asked for optional $strict; php-src never shipped it.
             case 'array_all':
@@ -1056,7 +1059,14 @@ final class BuiltinParamNames
             case 'gzgets': // InternalArgInfo length required; Zend stub length optional (#24392)
                 return ['stream', 'length='];
             case 'gzuncompress':
+            case 'gzdecode':
+            case 'gzinflate':
                 return ['data', 'max_length='];
+            // php-src ext/zlib/zlib.stub.php — encoding/level optional (#23447)
+            case 'gzencode':
+            case 'gzcompress':
+            case 'gzdeflate':
+                return ['data', 'level=', 'encoding='];
             // php-src ext/zlib/zlib.stub.php — options/flush_mode optional; inflate_add data not encoded_data (#23642, #24568)
             case 'inflate_init':
             case 'deflate_init':
