@@ -1008,6 +1008,15 @@ final class BuiltinParamNames
                 return ['version1', 'version2', 'operator'];
             case 'in_array':
                 return ['needle', 'haystack', 'strict'];
+            // php-src ext/zlib/zlib.stub.php — InternalArgInfo still says zp/string/max_decoded_len (#23655)
+            case 'gzread':
+                return ['stream', 'length'];
+            case 'gzwrite':
+                return ['stream', 'data', 'length='];
+            case 'gzclose':
+                return ['stream'];
+            case 'gzuncompress':
+                return ['data', 'max_length='];
             // php-src ext/zlib/zlib.stub.php — InternalArgInfo omits options on inflate_init (#23642)
             case 'inflate_init':
             case 'deflate_init':
