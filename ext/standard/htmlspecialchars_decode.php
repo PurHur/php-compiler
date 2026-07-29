@@ -38,11 +38,13 @@ final class htmlspecialchars_decode extends Internal
         }
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         if ($argc >= 2) {
-            $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('htmlspecialchars_decode() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            VmMath::rejectNullIntBuiltinArg($frame->calledArgs[1], 'htmlspecialchars_decode', 2, 'flags');
+            $flags = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'htmlspecialchars_decode',
+                2,
+                'flags'
+            );
         }
         $frame->returnVar->string(VmString::htmlspecialchars_decode($string, $flags));
     }

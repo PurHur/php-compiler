@@ -24,6 +24,22 @@ final class VmMath
      *
      * Call sites that always soft-null use {@see parseChrCodepoint} / {@see parseZParamLongBuiltinArg}.
      */
+    /**
+     * Reject null for a non-nullable int builtin parameter (Z_PARAM_LONG without NULLABLE;
+     * php-src html.c $flags — #24696). Call before parseIntBuiltinArg for parameters where
+     * Zend never accepts null, regardless of forward-profile or strict_types.
+     */
+    public static function rejectNullIntBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+        }
+    }
+
     public static function requiresForwardProfileStrictLongNull(): bool
     {
         return false;
