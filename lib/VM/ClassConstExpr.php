@@ -13,6 +13,7 @@ use PHPCompiler\OpCode;
  *
  * Reference: Zend/zend_compile.c — zend_compile_const_expr(), zend_const_expr_to_zval()
  * Array and string {@see OpCode::TYPE_ARRAY_DIM_FETCH} are both allowed (#5465, #24927).
+ * Scalar/(array) casts on PHP 8.5+ (#24947); compile gate rejects them on ≤8.4 (#24905).
  */
 final class ClassConstExpr
 {
@@ -49,7 +50,12 @@ final class ClassConstExpr
             OpCode::TYPE_CLASS_CONST_FETCH,
             OpCode::TYPE_ARRAY_DIM_FETCH,
             OpCode::TYPE_PROPERTY_FETCH,
-            OpCode::TYPE_PROPERTY_FETCH_WRITE => true,
+            OpCode::TYPE_PROPERTY_FETCH_WRITE,
+            OpCode::TYPE_CAST_BOOL,
+            OpCode::TYPE_CAST_INT,
+            OpCode::TYPE_CAST_FLOAT,
+            OpCode::TYPE_CAST_STRING,
+            OpCode::TYPE_CAST_ARRAY => true,
             default => false,
         };
     }
@@ -85,6 +91,38 @@ final class ClassConstExpr
             case OpCode::TYPE_BITWISE_NOT:
             case OpCode::TYPE_BOOLEAN_NOT:
                 $frame->scope[$op->arg1]->unaryOp($op->type, $frame->scope[$op->arg2]);
+                break;
+            case OpCode::TYPE_CAST_BOOL:
+                $frame->scope[$op->arg1]->castFrom(
+                    Variable::TYPE_BOOLEAN,
+                    self::resolveValue($frame, $block, (int) $op->arg2)
+                );
+                break;
+            case OpCode::TYPE_CAST_INT:
+                $frame->scope[$op->arg1]->castFrom(
+                    Variable::TYPE_INTEGER,
+                    self::resolveValue($frame, $block, (int) $op->arg2)
+                );
+                break;
+            case OpCode::TYPE_CAST_FLOAT:
+                $frame->scope[$op->arg1]->castFrom(
+                    Variable::TYPE_FLOAT,
+                    self::resolveValue($frame, $block, (int) $op->arg2)
+                );
+                break;
+            case OpCode::TYPE_CAST_STRING:
+                $frame->scope[$op->arg1]->castFrom(
+                    Variable::TYPE_STRING,
+                    self::resolveValue($frame, $block, (int) $op->arg2)
+                );
+                break;
+            case OpCode::TYPE_CAST_ARRAY:
+                $frame->scope[$op->arg1]->copyFrom(
+                    CastSupport::toArray(
+                        self::resolveValue($frame, $block, (int) $op->arg2),
+                        $context->classes
+                    )
+                );
                 break;
             case OpCode::TYPE_CONCAT:
                 $frame->scope[$op->arg1]->string(
