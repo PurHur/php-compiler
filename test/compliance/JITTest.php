@@ -1468,6 +1468,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_plain_property_eval_override')) {
                 continue;
             }
+            // final plain property override/child_override _84: host PHP 8.2 parser rejects `final` on plain properties (#24687).
+            if (str_contains($name, 'final_plain_property_override_84')
+                || str_contains($name, 'final_plain_property_child_override_84')) {
+                continue;
+            }
             // final static property read: VM green (#23403); MCJIT static prop module-verify pending (same as plain static $x).
             if (str_ends_with($name, 'final_static_property')) {
                 continue;
