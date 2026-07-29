@@ -5587,7 +5587,7 @@ class Object_ extends Type {
     /**
      * isset(Class::$prop) without reading uninitialized typed slots (#15112, zend_object_handlers.c).
      */
-    public function compileStaticPropertyIsSet(int $classId, string $name): Value
+    public function compileStaticPropertyIsSet(int $classId, string $name): PHPLLVM\Value
     {
         return ObjectStaticPropertyLlvm::compileIsSet($this, $classId, $name);
     }
