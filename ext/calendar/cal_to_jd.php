@@ -48,7 +48,9 @@ final class cal_to_jd extends Internal
 
     private static function assertMonthYear(int $month, int $year): void
     {
-        if ($month <= 0 || $month > \PHP_INT_MAX - 1) {
+        // php-src calendar.c does not ValueError on month<=0 — SDN helpers return 0
+        // (needed for null soft-null → 0 under PROFILE=8.4; #24864).
+        if ($month > \PHP_INT_MAX - 1) {
             throw new \ValueError(
                 \sprintf('cal_to_jd(): Argument #2 ($month) must be between 1 and %d', \PHP_INT_MAX - 1)
             );

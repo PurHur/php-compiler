@@ -28,7 +28,8 @@ final class jdtogregorian extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $julday = CalendarArgs::requireInt($frame, 'jdtogregorian', 1, 'julday');
+        // php-src calendar.stub.php — int $julian_day (#24864 / #24362)
+        $julday = CalendarArgs::requireInt($frame, 'jdtogregorian', 1, 'julian_day');
         $frame->returnVar->string(VmCalendar::jdtogregorian($julday));
     }
 

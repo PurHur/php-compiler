@@ -30,7 +30,8 @@ final class cal_from_jd extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $jd = CalendarArgs::requireInt($frame, 'cal_from_jd', 1, 'jd');
+        // php-src calendar.stub.php — int $julian_day (#24864 / #24362)
+        $jd = CalendarArgs::requireInt($frame, 'cal_from_jd', 1, 'julian_day');
         $cal = CalendarArgs::requireInt($frame, 'cal_from_jd', 2, 'calendar');
         CalendarArgs::assertValidCalendarId($cal, 'cal_from_jd', 2);
         $frame->returnVar->array(VmCalendar::calFromJd($jd, $cal));

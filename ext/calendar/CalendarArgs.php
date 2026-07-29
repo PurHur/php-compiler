@@ -4,31 +4,38 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\calendar;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /** Shared VM argument parsing for ext/calendar builtins (php-src ext/calendar/calendar.c). */
 final class CalendarArgs
 {
+    /**
+     * Z_PARAM_LONG — null deprecates and coerces to 0 under php-src-strict (incl. PROFILE=8.4;
+     * TypeError is PHP 9.0). Matches Zend ext/calendar/*.c (#24864).
+     */
     public static function requireInt(Frame $frame, string $fn, int $position, string $name): int
     {
-        $var = $frame->calledArgs[$position - 1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type int, %s given',
-                $fn,
-                $position,
-                $name,
-                self::vmTypeName($var->type)
-            ));
-        }
-
-        return $var->toInt();
+        return VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            $position - 1,
+            $fn,
+            $position,
+            $name
+        );
     }
 
+    /**
+     * Z_PARAM_LONG_OR_NULL — omitted/null stay null (unixtojd ?int $timestamp = null; #24863).
+     */
     public static function optionalInt(Frame $frame, string $fn, int $position, string $name): ?int
     {
         if (\count($frame->calledArgs) < $position) {
+            return null;
+        }
+        $var = $frame->calledArgs[$position - 1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
 
@@ -44,20 +51,5 @@ final class CalendarArgs
                 $position
             ));
         }
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        return match ($type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            Variable::TYPE_ENUM_CASE => 'object',
-            default => 'mixed',
-        };
     }
 }
