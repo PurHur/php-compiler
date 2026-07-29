@@ -315,7 +315,7 @@ final class VmArrayAccess
         JitVariable $container,
         ?Operand $containerOp
     ): bool {
-        if (JitVariable::TYPE_OBJECT !== $container->type) {
+        if (JitVariable::TYPE_OBJECT !== $container->type && JitVariable::TYPE_VALUE !== $container->type) {
             return false;
         }
         $classLc = self::resolveContainerClassLc($container, $containerOp);
