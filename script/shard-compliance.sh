@@ -55,10 +55,12 @@ if [ "$SHARD" -ge "$SHARDS" ] || [ "$SHARD" -lt 0 ]; then
     exit 2
 fi
 
-CASES_DIR="test/compliance/cases"
+# Override for unit tests (#24498); production stays on the real corpus.
+: "${COMPLIANCE_CASES_DIR:=test/compliance/cases}"
+CASES_DIR="$COMPLIANCE_CASES_DIR"
 
 # Case name == path under cases/ with .phpt stripped, matching BaseTest::providePHPTestsFromDir().
-# Sorted so shard membership is deterministic across machines and runs.
+# Sorted so listing order is deterministic across machines and runs (membership itself is hash-stable).
 mapfile -t ALL_CASES < <(
     find "$CASES_DIR" -name '*.phpt' -type f \
         | sed "s|^${CASES_DIR}/||; s|\.phpt$||" \
@@ -71,25 +73,43 @@ if [ "$total" -eq 0 ]; then
     exit 2
 fi
 
-# Round-robin by index: stdlib is 63% of the corpus, so contiguous slicing would leave one shard
-# with nothing but stdlib and another with none of it. Interleaving keeps shards comparable.
-SHARD_CASES=()
-for i in "${!ALL_CASES[@]}"; do
-    if [ $((i % SHARDS)) -eq "$SHARD" ]; then
-        SHARD_CASES+=("${ALL_CASES[$i]}")
-    fi
-done
+# Hash-stable membership (#24498): shard = crc32(case_name) % SHARDS.
+# Index round-robin reshuffled every case after a corpus add/remove/disable; hashing a case name
+# moves only that case. Shards are slightly uneven by count — fine, cost is not uniform anyway.
+# One PHP process for the whole list (not one spawn per case).
+mapfile -t SHARD_CASES < <(
+    printf '%s\n' "${ALL_CASES[@]}" | SHARDS="$SHARDS" SHARD="$SHARD" "$PHP_BIN" -r '
+        $shards = (int) getenv("SHARDS");
+        $shard = (int) getenv("SHARD");
+        if ($shards < 1) {
+            fwrite(STDERR, "shard-compliance: invalid SHARDS\n");
+            exit(2);
+        }
+        while (($line = fgets(STDIN)) !== false) {
+            $name = rtrim($line, "\r\n");
+            if ($name === "") {
+                continue;
+            }
+            if (((crc32($name) & 0xffffffff) % $shards) === $shard) {
+                echo $name, "\n";
+            }
+        }
+    '
+)
 
 count="${#SHARD_CASES[@]}"
+if [ "$LIST_ONLY" -eq 1 ]; then
+    # Empty is allowed for --list (tiny fixtures / unlucky hash buckets); real runs still fail below.
+    if [ "$count" -gt 0 ]; then
+        printf '%s\n' "${SHARD_CASES[@]}"
+    fi
+    echo "# shard $SHARD/$SHARDS: $count of $total cases" >&2
+    exit 0
+fi
+
 if [ "$count" -eq 0 ]; then
     echo "shard-compliance: shard $SHARD of $SHARDS selected 0 cases from $total" >&2
     exit 1
-fi
-
-if [ "$LIST_ONLY" -eq 1 ]; then
-    printf '%s\n' "${SHARD_CASES[@]}"
-    echo "# shard $SHARD/$SHARDS: $count of $total cases" >&2
-    exit 0
 fi
 
 # PHPUnit names a data-provider case `Suite::test with data set "<name>"`. Escape regex
