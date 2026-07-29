@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\filter;
 
 /**
- * Lowered into JIT/AOT modules for __compiler_filter_validate_ip (#4403, php-in-PHP).
+ * Lowered into JIT/AOT modules for __compiler_filter_validate_ip (#4403, #24650, php-in-PHP).
  *
  * SSOT: {@see VmFilter::isValidIpAddress()} (php-src ext/filter/logical_filters.c).
  *
