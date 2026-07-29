@@ -180,6 +180,8 @@ final class BuiltinInternalArgInfo
             'strtotime' => 1 === $index ? '?int' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
+            // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
+            'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
             default => null,
         };
     }
