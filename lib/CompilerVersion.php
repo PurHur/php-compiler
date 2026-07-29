@@ -2652,7 +2652,8 @@ final class CompilerVersion
      * PHP 8.4+ Closure var_dump name/file/line via zend_closure_get_debug_info (#7069, #22565).
      *
      * Not a Closure method — Zend uses the object get_debug_info handler only
-     * (Zend/zend_closures.c). Gated so 8.4.0-dev / PROFILE=8.2 match Zend 8.2 empty dumps.
+     * (Zend/zend_closures.c). Gated so PROFILE=8.2 omits name/file/line (Zend 8.2 still emits
+     * the `parameter` bag when args exist — see ClosureState::debugInfoEntries, #24521).
      */
     public static function supportsClosureRichDebugInfo(): bool
     {

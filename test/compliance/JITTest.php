@@ -399,6 +399,12 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'closure_debuginfo_phantom')) {
                 continue;
             }
+            // Parameter-only dump on reference profile; forward_84 adds name/file/line (#24521).
+            if (CompilerVersion::supportsClosureRichDebugInfo()
+                && str_contains($name, 'closure_var_dump_parameter')
+                && !str_contains($name, 'closure_var_dump_parameter_forward_84')) {
+                continue;
+            }
             // HashContext::__debugInfo withheld on reference; forward_84 / profile82 use --ENV-- (#22563).
             if (CompilerVersion::supportsHashContextDebugInfo()
                 && str_contains($name, 'hash_context_debug_info')
