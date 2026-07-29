@@ -38,7 +38,12 @@ final class array_reverse extends Internal
         $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reverse', 1, 'array');
         $preserveKeys = false;
         if (2 === $argc) {
-            $preserveKeys = $frame->calledArgs[1]->resolveIndirect()->toBool();
+            $preserveKeys = VmMath::parseBoolBuiltinArgStrict(
+                $frame->calledArgs[1],
+                'array_reverse',
+                2,
+                'preserve_keys'
+            );
         }
         $frame->returnVar->array($ht->reverseCopy($preserveKeys));
     }
