@@ -11,6 +11,10 @@
 #
 # Why the diff and not the exit status: neither suite is green (~422 known failures), so "did it
 # fail?" is always yes and carries no information. Only new NAMES matter (AGENTS.md §2).
+#
+# The suite is selectable on workflow_dispatch. The cron nightly runs VMTest, which is the suite
+# with a committed baseline; JITTest (~472 failures) has none yet, so `--suite=JITTest --diff` is
+# expected to refuse until a collect run has been reviewed and landed by a human.
 name: Compliance nightly
 
 on:
@@ -25,14 +29,27 @@ on:
         default: 'diff'
         type: choice
         options: ['diff', 'collect']
+      suite:
+        description: 'which compliance suite to run'
+        required: false
+        default: 'VMTest'
+        type: choice
+        options: ['VMTest', 'JITTest']
 
 concurrency:
-  group: compliance-nightly-${{ github.ref }}
+  # Keyed on the suite too: a JITTest collect must not cancel a VMTest nightly on the same ref.
+  # On `schedule` there are no inputs, so this falls back to VMTest — which is what the cron runs.
+  group: compliance-nightly-${{ github.ref }}-${{ github.event.inputs.suite || 'VMTest' }}
   cancel-in-progress: true
+
+env:
+  # Single source of truth for the suite. `schedule` supplies no inputs, so the cron nightly is
+  # VMTest; workflow_dispatch can select JITTest to collect its (uncommitted, ~472-failure) baseline.
+  SUITE: ${{ github.event.inputs.suite || 'VMTest' }}
 
 jobs:
   shard:
-    name: VMTest shard ${{ matrix.shard }}
+    name: ${{ github.event.inputs.suite || 'VMTest' }} shard ${{ matrix.shard }}
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     strategy:
@@ -55,12 +72,13 @@ jobs:
             -e PHP_COMPILER_MEMORY_LIMIT=1536M \
             -e PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M \
             -e SHARD_TIMEOUT=900 \
+            -e SUITE="$SUITE" \
             -v "$PWD:/compiler" -w /compiler \
             php-compiler:22.04-dev bash -lc '
               set -uo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
               script/apply-patches.sh
-              script/shard-compliance.sh --suite=VMTest --shards=24 --shard=${{ matrix.shard }}
+              script/shard-compliance.sh --suite="$SUITE" --shards=24 --shard=${{ matrix.shard }}
             '
 
       # Upload even on failure: a shard that times out still produces partial results plus a
@@ -71,8 +89,8 @@ jobs:
         with:
           name: shard-${{ matrix.shard }}
           path: |
-            build/compliance-shards/VMTest-${{ matrix.shard }}-of-24.failed
-            build/compliance-shards/VMTest-${{ matrix.shard }}-of-24.timeout
+            build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.failed
+            build/compliance-shards/${{ github.event.inputs.suite || 'VMTest' }}-${{ matrix.shard }}-of-24.timeout
           if-no-files-found: warn
           retention-days: 14
 
@@ -99,7 +117,7 @@ jobs:
           # compliance-baseline.sh refuses a partial set, a mixed --shards=N set, or any set
           # containing a .timeout marker — so reaching a verdict at all means the run was whole.
           # It exits non-zero only on NEW failing names, never on the ~422 known ones.
-          bash script/compliance-baseline.sh --diff --suite=VMTest
+          bash script/compliance-baseline.sh --diff --suite="$SUITE"
 
       # A baseline is only valid for the environment that produced it (#24726). The first nightly
       # diffed a dev-box baseline from a runner and reported 23 "regressions" that conflate genuine
@@ -112,14 +130,14 @@ jobs:
         if: github.event.inputs.mode == 'collect'
         run: |
           ls -la build/compliance-shards/ || true
-          bash script/compliance-baseline.sh --collect --suite=VMTest
+          bash script/compliance-baseline.sh --collect --suite="$SUITE"
           echo "--- collected ---"
-          head -5 test/compliance/baselines/VMTest.failing
+          head -5 "test/compliance/baselines/${SUITE}.failing"
 
       - name: Upload collected baseline
         if: github.event.inputs.mode == 'collect'
         uses: actions/upload-artifact@v4
         with:
-          name: VMTest-baseline-${{ github.sha }}
-          path: test/compliance/baselines/VMTest.failing
+          name: ${{ github.event.inputs.suite || 'VMTest' }}-baseline-${{ github.sha }}
+          path: test/compliance/baselines/${{ github.event.inputs.suite || 'VMTest' }}.failing
           retention-days: 30
