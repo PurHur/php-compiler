@@ -824,16 +824,9 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'curl_multi_phantom')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
-                && str_contains($name, 'ldap_')
-                && !str_contains($name, 'phantom')) {
-                continue;
-            }
-            if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
-                && (str_contains($name, 'phantom_ldap')
-                    || (str_contains($name, 'ldap_') && str_contains($name, 'phantom')
-                        && !str_contains($name, 'phantom_profile')))) {
-                // Keep PROFILE=8.2 / phantom_profile* cases when ldap FFI is present (#22731).
+            // Reference profile withholds ldap; functional cases set PROFILE via --ENV-- (#23857).
+            if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::runsLdapCompliance($name)
+                && \PHPCompiler\ext\ldap\LdapExtensionPolicy::isLdapComplianceCase($name)) {
                 continue;
             }
             if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesWalletConnect()

@@ -1,5 +1,7 @@
 --TEST--
 ext ldap ldap_escape filter and DN escaping (issue #6352, ext/ldap/ldap.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo function_exists('ldap_escape') ? "yes\n" : "no\n";

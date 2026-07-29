@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 /**
- * When ldap is withheld, ldap_escape must not advertise via function_exists
- * but may still execute if resolved through the internal table (#17680).
- * When libldap FFI advertises (#3369), function_exists is expected true.
+ * When ldap is withheld, ldap_escape must not advertise via function_exists (#17680 / #23857).
+ * When host php-ldap or PHP_COMPILER_PROFILE + libldap FFI advertises, escape is callable.
  */
 if (extension_loaded('ldap') || function_exists('ldap_connect')) {
     if (!function_exists('ldap_escape')) {

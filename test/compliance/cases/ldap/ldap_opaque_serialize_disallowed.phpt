@@ -1,5 +1,7 @@
 --TEST--
 LDAP Connection/Result/ResultEntry serialize()/unserialize() reject (issue #23169, ext/ldap/ldap.stub.php)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['LDAP\\Connection', 'LDAP\\Result', 'LDAP\\ResultEntry'] as $c) {
