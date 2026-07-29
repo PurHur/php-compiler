@@ -35,6 +35,8 @@ final class BuiltinParamNames
             'dateinterval::__construct' => ['duration'],
             'errorexception::__construct' => ['message=', 'code=', 'severity=', 'filename=', 'line=', 'previous='],
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
+            // php-src ext/spl/spl_directory.stub.php — InternalArgInfo still says file_name (#24505)
+            'splfileinfo::__construct' => ['filename'],
             'splfileobject::seek' => ['line'],
             'splfileobject::fgetcsv' => ['separator', 'enclosure', 'escape'],
             'splfileobject::fputcsv' => ['fields', 'separator', 'enclosure', 'escape', 'eol'],
