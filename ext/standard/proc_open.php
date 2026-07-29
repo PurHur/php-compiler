@@ -79,8 +79,13 @@ final class proc_open extends Internal
     private static function parseCommand(Variable $arg, string $functionName, int $argNum): string|array
     {
         $arg = $arg->resolveIndirect();
+        // php-src stub: array|string $command — null is TypeError (ext/standard/proc_open.stub.php; #24481).
         if (Variable::TYPE_NULL === $arg->type) {
-            return '';
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($command) must be of type array|string, null given',
+                $functionName,
+                $argNum
+            ));
         }
         if (Variable::TYPE_STRING === $arg->type) {
             return $arg->toString();
