@@ -116,11 +116,6 @@ final class filter_input extends Internal
             $typeVal,
             $i64->constInt(VmFilter::INPUT_SERVER, false)
         );
-        $isSession = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeVal,
-            $i64->constInt(VmFilter::INPUT_SESSION, false)
-        );
 
         $id = 'fi'.spl_object_id($context);
         $pickPostBlock = BasicBlockHelper::append($context, 'filter_input_pick_post_'.$id);
@@ -129,14 +124,12 @@ final class filter_input extends Internal
         $cookieBlock = BasicBlockHelper::append($context, 'filter_input_cookie_'.$id);
         $envBlock = BasicBlockHelper::append($context, 'filter_input_env_'.$id);
         $serverBlock = BasicBlockHelper::append($context, 'filter_input_server_'.$id);
-        $sessionBlock = BasicBlockHelper::append($context, 'filter_input_session_'.$id);
         $badTypeBlock = BasicBlockHelper::append($context, 'filter_input_bad_type_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'filter_input_type_done_'.$id);
 
         $cookieBodyBlock = BasicBlockHelper::append($context, 'filter_input_cookie_body_'.$id);
         $envBodyBlock = BasicBlockHelper::append($context, 'filter_input_env_body_'.$id);
         $serverBodyBlock = BasicBlockHelper::append($context, 'filter_input_server_body_'.$id);
-        $sessionBodyBlock = BasicBlockHelper::append($context, 'filter_input_session_body_'.$id);
 
         $context->builder->branchIf($isGet, $getBlock, $pickPostBlock);
         $context->builder->positionAtEnd($pickPostBlock);
@@ -156,18 +149,12 @@ final class filter_input extends Internal
         $envTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
+        // No INPUT_SESSION in php-src — unknown types fall through to badType (#24358).
         $context->builder->positionAtEnd($serverBlock);
-        $context->builder->branchIf($isServer, $serverBodyBlock, $sessionBlock);
+        $context->builder->branchIf($isServer, $serverBodyBlock, $badTypeBlock);
         $context->builder->positionAtEnd($serverBodyBlock);
         $serverResult = self::filterFromSuperglobal($context, '_SERVER', $keyVar, $filterArg);
         $serverTail = $context->builder->getInsertBlock();
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($sessionBlock);
-        $context->builder->branchIf($isSession, $sessionBodyBlock, $badTypeBlock);
-        $context->builder->positionAtEnd($sessionBodyBlock);
-        $sessionResult = self::filterFromSuperglobal($context, '_SESSION', $keyVar, $filterArg);
-        $sessionTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($badTypeBlock);
@@ -192,7 +179,6 @@ final class filter_input extends Internal
         $phi->addIncoming($cookieResult, $cookieTail);
         $phi->addIncoming($envResult, $envTail);
         $phi->addIncoming($serverResult, $serverTail);
-        $phi->addIncoming($sessionResult, $sessionTail);
 
         return $phi;
     }

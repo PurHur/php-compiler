@@ -44,12 +44,12 @@ final class BuiltinEnums
         $entry->isEnum = true;
         $entry->backedType = 'int';
 
+        // php-src: no Session / INPUT_SESSION (#24358).
         self::registerBackedEnumCase($entry, 'Post', VmFilter::INPUT_POST);
         self::registerBackedEnumCase($entry, 'Get', VmFilter::INPUT_GET);
         self::registerBackedEnumCase($entry, 'Cookie', VmFilter::INPUT_COOKIE);
         self::registerBackedEnumCase($entry, 'Env', VmFilter::INPUT_ENV);
         self::registerBackedEnumCase($entry, 'Server', VmFilter::INPUT_SERVER);
-        self::registerBackedEnumCase($entry, 'Session', VmFilter::INPUT_SESSION);
 
         EnumSupport::ensureBuiltinCasesMethod($entry);
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
