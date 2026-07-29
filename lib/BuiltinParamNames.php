@@ -806,6 +806,9 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#24377)
             case 'hash_hmac_file':
                 return ['algo', 'filename', 'key', 'binary'];
+            // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#23586)
+            case 'hash_final':
+                return ['context', 'binary'];
             // php-src ext/hash/hash.stub.php — InternalArgInfo omits stream_context (#24563)
             case 'hash_update_file':
                 return ['context', 'filename', 'stream_context='];

@@ -10,6 +10,9 @@ use PHPCompiler\VM\Variable;
 
 /**
  * hash_final() — finalize HashContext digest (php-src ext/hash/hash.c; issue #7174).
+ *
+ * Stub second param is `$binary` (php-src hash.stub.php); legacy InternalArgInfo
+ * `raw_output` is overridden via BuiltinParamNames (#23586).
  */
 final class hash_final extends HashFunction
 {
@@ -24,7 +27,7 @@ final class hash_final extends HashFunction
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('hash_final() raw_output must be boolean in this compiler build');
+                throw new \LogicException('hash_final() binary must be boolean in this compiler build');
             }
             $raw = $rawArg->toBool();
         }
