@@ -6426,6 +6426,13 @@ apply_patch "$PATCH_DIR/php-llvm-vector-get-address-space.patch"
 apply_patch "$PATCH_DIR/php-llvm-token-type-kind-typo.patch"
 apply_patch "$PATCH_DIR/php-llvm-function-getbasicblocks-nparams-typo.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
+
+# PHP 8.4 implicitly-nullable parameter deprecations in php-cfg / php-optimizer (35 params across
+# 23 files). The notice goes to stderr, and the compliance harness compares stderr — so on an 8.4
+# host these would make cases differ from Zend on stderr alone. Harmless on 8.2: `?Type` has been
+# valid since 7.1 and the declarations already accepted null. The matching declarations in
+# lib/Visitor/* were fixed directly (#24972).
+apply_patch "$PATCH_DIR/php-vendor-implicit-nullable-84.patch"
 repair_php_llvm_token_type_kind_typo_in_prelinked
 
 # php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.

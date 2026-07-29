@@ -1,0 +1,313 @@
+# PHP 8.4 deprecates `Foo $x = null` (implicitly nullable parameter) and writes the notice to
+# stderr — which the compliance harness compares, so on an 8.4 host every case whose path
+# touches one of these would differ from Zend on stderr alone.
+#
+# 35 parameters across 23 files in php-cfg / php-optimizer. `?Type` has been valid since PHP
+# 7.1 and these declarations already accepted null, so behaviour is unchanged on every
+# supported version. The matching declarations in lib/Visitor/* were fixed directly (#24972).
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php
+@@ -34,15 +34,15 @@
+     {
+     }
+ 
+-    public function enterBlock(Block $block, Block $prior = null)
++    public function enterBlock(Block $block, ?Block $prior = null)
+     {
+     }
+ 
+-    public function leaveBlock(Block $block, Block $prior = null)
++    public function leaveBlock(Block $block, ?Block $prior = null)
+     {
+     }
+ 
+-    public function skipBlock(Block $block, Block $prior = null)
++    public function skipBlock(Block $block, ?Block $prior = null)
+     {
+     }
+ 
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Block.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Block.php
+@@ -34,7 +34,7 @@
+      */
+     public $deadOperands = [];
+ 
+-    public function __construct(self $parent = null)
++    public function __construct(?self $parent = null)
+     {
+         if ($parent) {
+             $this->parents[] = $parent;
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
+@@ -58,7 +58,7 @@
+ 
+     /** @var bool */
+     public $strictTypes = false;
+-    public function __construct(string $name, int $flags, Op\Type $returnType, Operand $class = null, array $attributes = [])
++    public function __construct(string $name, int $flags, Op\Type $returnType, ?Operand $class = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->name = $name;
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ArrayDimFetch.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ArrayDimFetch.php
+@@ -20,7 +20,7 @@
+ 
+     public $dim;
+ 
+-    public function __construct(Operand $var, Operand $dim = null, array $attributes = [])
++    public function __construct(Operand $var, ?Operand $dim = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->var = $this->addReadRef($var);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ClassConstFetch.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ClassConstFetch.php
+@@ -20,7 +20,7 @@
+ 
+     public $name;
+ 
+-    public function __construct(Operand $class, Operand $name = null, array $attributes = [])
++    public function __construct(Operand $class, ?Operand $name = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->class = $this->addReadRef($class);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ConstFetch.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ConstFetch.php
+@@ -20,7 +20,7 @@
+ 
+     public $name;
+ 
+-    public function __construct(Operand $name, Operand $nsName = null, array $attributes = [])
++    public function __construct(Operand $name, ?Operand $nsName = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->name = $this->addReadRef($name);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php
+@@ -21,7 +21,7 @@
+     /** Optional message operand for `exit($status, $message)` (#6718). */
+     public $message = null;
+ 
+-    public function __construct(Operand $expr = null, array $attributes = [])
++    public function __construct(?Operand $expr = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         if (null !== $expr) {
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
+@@ -51,8 +51,8 @@
+         Op\Type $type,
+         bool $byRef,
+         bool $variadic,
+-        Operand $defaultVar = null,
+-        Block $defaultBlock = null,
++        ?Operand $defaultVar = null,
++        ?Block $defaultBlock = null,
+         array $attributes = []
+     ) {
+         parent::__construct($attributes);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Yield_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Yield_.php
+@@ -22,7 +22,7 @@
+ 
+     protected $writeVariables = ['result'];
+ 
+-    public function __construct(Operand $value = null, Operand $key = null, array $attributes = [])
++    public function __construct(?Operand $value = null, ?Operand $key = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         if (null !== $value) {
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php
+@@ -22,7 +22,7 @@
+ 
+     public $implements;
+ 
+-    public function __construct(Operand $name, int $flags, Operand $extends = null, array $implements, Block $stmts, array $attributes = [])
++    public function __construct(Operand $name, int $flags, ?Operand $extends = null, array $implements, Block $stmts, array $attributes = [])
+     {
+         parent::__construct($name, $stmts, $attributes);
+         $this->flags = $flags;
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+@@ -45,7 +45,7 @@
+     /** PHP 8.4 lazy property modifier recovered from phpc-lazy-property marker (#16813). */
+     public bool $propertyLazy = false;
+ 
+-    public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
++    public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, ?Operand $defaultVar = null, ?Block $defaultBlock = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->name = $this->addReadRef($name);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Return_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Return_.php
+@@ -18,7 +18,7 @@
+ {
+     public $expr = null;
+ 
+-    public function __construct(Operand $expr = null, array $attributes = [])
++    public function __construct(?Operand $expr = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         if (null !== $expr) {
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php
+@@ -27,7 +27,7 @@
+     /** Declared type from typed function-local static (#9998). */
+     public ?Type $declaredType = null;
+ 
+-    public function __construct(Operand $var, Block $defaultBlock = null, Operand $defaultVar = null, array $attributes = [])
++    public function __construct(Operand $var, ?Block $defaultBlock = null, ?Operand $defaultVar = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->var = $this->addWriteRef($var);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand/Temporary.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand/Temporary.php
+@@ -22,7 +22,7 @@
+      *
+      * @param Operand|null $original The previous variable this was constructed from
+      */
+-    public function __construct(Operand $original = null)
++    public function __construct(?Operand $original = null)
+     {
+         $this->original = $original;
+     }
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -60,7 +60,7 @@
+ 
+     protected $anonId = 0;
+ 
+-    public function __construct(AstParser $astParser, AstTraverser $astTraverser = null)
++    public function __construct(AstParser $astParser, ?AstTraverser $astTraverser = null)
+     {
+         $this->astParser = $astParser;
+         if (! $astTraverser) {
+@@ -181,7 +181,7 @@
+         throw new \RuntimeException('Unknown Node Encountered : '.$type);
+     }
+ 
+-    protected function parseTypeNode(Node $node = null): Op\Type
++    protected function parseTypeNode(?Node $node = null): Op\Type
+     {
+         if (null === $node) {
+             return new Op\Type\Mixed_();
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
+@@ -244,7 +244,7 @@
+         ];
+     }
+ 
+-    protected function renderType(Op\Type $type = null): string
++    protected function renderType(?Op\Type $type = null): string
+     {
+         if ($type instanceof Op\Type\Mixed_) {
+             return 'mixed';
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Traverser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Traverser.php
+@@ -52,7 +52,7 @@
+         $this->seen = null;
+     }
+ 
+-    private function traverseBlock(Block $block, Block $prior = null)
++    private function traverseBlock(Block $block, ?Block $prior = null)
+     {
+         if ($this->seen->contains($block)) {
+             $this->event('skipBlock', [$block, $prior]);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php
+@@ -25,13 +25,13 @@
+ 
+     public function leaveFunc(Func $func);
+ 
+-    public function enterBlock(Block $block, Block $prior = null);
++    public function enterBlock(Block $block, ?Block $prior = null);
+ 
+     public function enterOp(Op $op, Block $block);
+ 
+     public function leaveOp(Op $op, Block $block);
+ 
+-    public function leaveBlock(Block $block, Block $prior = null);
++    public function leaveBlock(Block $block, ?Block $prior = null);
+ 
+-    public function skipBlock(Block $block, Block $prior = null);
++    public function skipBlock(Block $block, ?Block $prior = null);
+ }
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DeadBlockEliminator.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DeadBlockEliminator.php
+@@ -17,7 +17,7 @@
+ 
+ class DeadBlockEliminator extends AbstractVisitor
+ {
+-    public function leaveBlock(Block $block, Block $prior = null)
++    public function leaveBlock(Block $block, ?Block $prior = null)
+     {
+         $toRemove = [];
+         foreach ($block->parents as $key => $parent) {
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DebugVisitor.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DebugVisitor.php
+@@ -32,7 +32,7 @@
+         echo "Leave Script\n";
+     }
+ 
+-    public function enterBlock(Block $block, Block $prior = null)
++    public function enterBlock(Block $block, ?Block $prior = null)
+     {
+         echo 'Enter Block #'.$this->getBlockId($block)."\n";
+     }
+@@ -47,12 +47,12 @@
+         echo 'Leave Op '.$op->getType()."\n";
+     }
+ 
+-    public function leaveBlock(Block $block, Block $prior = null)
++    public function leaveBlock(Block $block, ?Block $prior = null)
+     {
+         echo 'Leave Block #'.$this->getBlockId($block)."\n";
+     }
+ 
+-    public function skipBlock(Block $block, Block $prior = null)
++    public function skipBlock(Block $block, ?Block $prior = null)
+     {
+         echo 'Skip Block #'.$this->getBlockId($block)."\n";
+     }
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php
+@@ -26,7 +26,7 @@
+         $this->phiNodes = new \SplObjectStorage();
+     }
+ 
+-    public function enterBlock(Block $block, Block $prior = null)
++    public function enterBlock(Block $block, ?Block $prior = null)
+     {
+         foreach ($block->phi as $phi) {
+             $this->phiNodes->attach($phi);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/VariableFinder.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/VariableFinder.php
+@@ -29,7 +29,7 @@
+         return $this->variables;
+     }
+ 
+-    public function enterBlock(Block $block, Block $prior = null)
++    public function enterBlock(Block $block, ?Block $prior = null)
+     {
+         foreach ($block->phi as $phi) {
+             $this->enterOp($phi, $block);
+--- vendor/ircmaxell/php-optimizer/lib/PHPOptimizer/Visitor/JumpBlockEliminator.php
++++ vendor/ircmaxell/php-optimizer/lib/PHPOptimizer/Visitor/JumpBlockEliminator.php
+@@ -17,7 +17,7 @@
+ 
+ class JumpBlockEliminator extends AbstractVisitor
+ {
+-    public function leaveBlock(Block $block, Block $prior = null)
++    public function leaveBlock(Block $block, ?Block $prior = null)
+     {
+         if (count($block->children) !== 1 || ! $block->children[0] instanceof Op\Stmt\Jump) {
+             return;
+@@ -65,7 +65,7 @@
+         return $originalJump->target;
+     }
+ 
+-    public function skipBlock(Block $block, Block $prior = null)
++    public function skipBlock(Block $block, ?Block $prior = null)
+     {
+     }
+ 
