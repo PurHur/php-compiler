@@ -111,14 +111,21 @@ PHP
         self::assertSame($src, NewDereferenceableDesugar::desugar($src));
     }
 
-    public function testAllowsCtorParensObjectDerefOnDefault84DevProfile(): void
+    /** Default / unset PROFILE rejects like Zend 8.2 (#24883, re-#22783). */
+    public function testRejectsCtorParensObjectDerefOnDefaultProfile(): void
     {
         putenv('PHP_COMPILER_PROFILE');
-        if (!CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
-            self::markTestSkipped('dereferencable new forward profile unavailable');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            self::markTestSkipped('dereferencable new unexpectedly enabled on default profile');
         }
 
-        $code = '<?php echo new Greeter()->hello();';
-        self::assertSame($code, NewDereferenceableSyntaxRejector::reject($code, 'ok_new.php'));
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(NewDereferenceableDesugar::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR);
+
+        NewDereferenceableSyntaxRejector::reject(
+            '<?php class Greeter { public function hello(): string { return "hi"; } } echo new Greeter()->hello();',
+            'default_new.php'
+        );
     }
 }

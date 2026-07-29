@@ -1344,13 +1344,17 @@ final class CompilerVersion
     /**
      * PHP 8.4+ dereferencable `new` without outer parentheses (`new Class()->m()`, RFC new_without_parentheses).
      *
-     * Forward profile on 8.4.0-dev builds and stable 8.4.0+ (#24755, #19684, re-#6974).
-     * Explicit `PHP_COMPILER_PROFILE=8.2` / `8.3` rejects like Zend ≤8.3.
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (`unexpected token "->"`). `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset
+     * `PHP_COMPILER_PROFILE` keeps this false (#24883, re-#22783 / #24755 / #19684).
+     * Do not use {@see isForwardProfileAtLeast} here — that re-enabled acceptance on default and
+     * broke Zend 8.2 parity.
+     * Forward profile via `PHP_COMPILER_PROFILE=8.4` (or stable 8.4.0+) enables the form.
      * php-src: Zend/zend_language_parser.y — new_dereferenceable / new_non_dereferenceable.
      */
     public static function supportsDereferencableNewWithoutOuterParens(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

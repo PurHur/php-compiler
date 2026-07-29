@@ -1506,9 +1506,21 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDereferencableNewWithoutOuterParensTrueOn84DevForwardProfile(): void
+    /** @covers issue #24883 — must stay false on unset PROFILE (not isForwardProfileAtLeast) */
+    public function testSupportsDereferencableNewWithoutOuterParensFalseOnDefaultProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        try {
+            $this->assertFalse(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsDereferencableNewWithoutOuterParensFalseWhenProfile82(): void
