@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #25024 */
+/** @covers issues #25024 #25029 */
 final class MagicMethodArityCheckTest extends TestCase
 {
     /**
@@ -94,6 +94,20 @@ class D { function __destruct($a) {} }
 PHP,
             'Method D::__destruct() cannot take arguments',
         ];
+        yield '__toString args' => [
+            <<<'PHP'
+<?php
+class A { public function __toString($x) { return "x"; } }
+PHP,
+            'Method A::__toString() cannot take arguments',
+        ];
+        yield '__toString optional' => [
+            <<<'PHP'
+<?php
+class A { public function __toString($x = null) { return "x"; } }
+PHP,
+            'Method A::__toString() cannot take arguments',
+        ];
         yield 'namespaced __get' => [
             <<<'PHP'
 <?php
@@ -120,17 +134,19 @@ class Good {
     public static function __set_state($a) { return new self; }
     public function __destruct() {}
     public function __clone() {}
+    public function __toString(): string { return "s"; }
 }
 $g = new Good();
 echo $g->missing, "\n";
 echo $g->foo(), "\n";
 echo Good::bar(), "\n";
+echo $g, "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'valid_magic_arity.php');
         $this->assertNotNull($block);
         ob_start();
         $runtime->run($block);
-        $this->assertSame("missing\nfoo\nbar\n", ob_get_clean());
+        $this->assertSame("missing\nfoo\nbar\ns\n", ob_get_clean());
     }
 
     public function testRequiredPlusVariadicCountsAsExactArity(): void

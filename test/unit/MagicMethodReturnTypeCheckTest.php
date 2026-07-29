@@ -180,7 +180,7 @@ PHP;
 
     /**
      * @dataProvider magicMethodWithArgsProvider
-     * @covers issue #25023
+     * @covers issues #25023 #25029
      */
     public function testMagicMethodWithArgsFailsAtCompileTime(string $code, string $message): void
     {
@@ -227,6 +227,13 @@ PHP,
 class Di { function __debugInfo($a = null) {} }
 PHP,
             'Method Di::__debugInfo() cannot take arguments',
+        ];
+        yield '__toString required' => [
+            <<<'PHP'
+<?php
+class A { public function __toString($x) { return "x"; } }
+PHP,
+            'Method A::__toString() cannot take arguments',
         ];
     }
 }

@@ -12,7 +12,7 @@ use PHPCfg\Script;
  * Compile-time magic method parameter-count rules (PHP 8.0+).
  *
  * php-src: Zend/zend_API.c — zend_check_magic_method_args /
- * zend_check_magic_method_implementation (#25024)
+ * zend_check_magic_method_implementation (#25024, #25029 __toString)
  *
  * Counts declared non-variadic parameters (Zend common.num_args excludes the
  * trailing variadic parameter).

@@ -14,7 +14,7 @@ use PHPCompiler\MethodVisibility;
  * Compile-time magic method return type and arity rules (PHP 8.0+).
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
- * (#4988 return types; #25023 zero-parameter magic methods; #25025 __toString)
+ * (#4988 return types; #25023 zero-parameter magic methods; #25025/#25029 __toString)
  */
 final class MagicMethodReturnTypeCheck
 {
@@ -29,6 +29,7 @@ final class MagicMethodReturnTypeCheck
         '__clone' => '__clone',
         '__serialize' => '__serialize',
         '__debuginfo' => '__debugInfo',
+        '__tostring' => '__toString',
     ];
 
     public static function validate(Script $script): void
