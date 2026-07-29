@@ -7,15 +7,22 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\StringBitwiseNotJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** String unary ~ JIT routes through StringBitwiseNotJitHelper PHP not inline LLVM (#14823). */
+/** String unary ~ JIT: StringBitwiseNotJitHelper via JitVmHelperLink (#14823, #24513). */
 final class StringBitwiseNotRuntimeShrinkTest extends TestCase
 {
     public function testStringBitwiseNotUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringBitwiseNot.php');
         $this->assertStringContainsString('StringBitwiseNotJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('bitwise_not_loop', $source);
         $this->assertStringNotContainsString('bitwise_not_body', $source);
+        $this->assertLessThan(140, \substr_count($source, "\n") + 1);
     }
 
     public function testStringBitwiseNotJitHelperMatchesVmStringOperand(): void
