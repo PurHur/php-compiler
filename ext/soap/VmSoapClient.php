@@ -821,72 +821,86 @@ final class VmSoapClient
             throw new \SoapFault('Client', 'SoapClient location is not set');
         }
 
-        // php-src php_http.c: Connection close vs Keep-Alive (#20364).
-        $headers = ($state->keepAlive ? "Connection: Keep-Alive\r\n" : "Connection: close\r\n").
-            "Content-Type: text/xml; charset=utf-8\r\n".
-            'SOAPAction: "'.$action."\"\r\n";
-        if ('' !== $acceptEncoding) {
-            $headers .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
-        }
-        if ('' !== $contentEncoding) {
-            $headers .= 'Content-Encoding: '.$contentEncoding."\r\n";
-        }
-        if ('' !== $cookieHeader) {
-            $headers .= 'Cookie: '.$cookieHeader."\r\n";
-        }
-        if ('' !== $authHeader) {
-            $headers .= $authHeader."\r\n";
-        }
-        if ($useProxy && '' !== $proxyAuthHeader) {
-            $headers .= $proxyAuthHeader."\r\n";
-        }
-        $contextHeaderExtra = self::streamContextHttpHeaderBlock(
-            $state->streamContextOptions,
-            '' !== $authHeader,
-            $useProxy && '' !== $proxyAuthHeader,
-            '' !== $cookieHeader
-        );
-        if ('' !== $contextHeaderExtra) {
-            $headers .= $contextHeaderExtra;
-        }
-        $httpOpts = [
-            'method' => 'POST',
-            'header' => $headers,
-            'content' => $bodyOut,
-            'ignore_errors' => true,
-            'timeout' => null !== $state->connectionTimeout ? $state->connectionTimeout : 30,
-        ];
-        // Merge user stream_context http/ssl options (php-src http_connect) (#20365).
-        $httpOpts = self::mergeStreamContextHttpOptions($httpOpts, $state->streamContextOptions);
-        if ($useProxy && null !== $state->proxyHost && null !== $state->proxyPort) {
-            // php-src http_connect via proxy — PHP stream proxy URI (#20339).
-            $httpOpts['proxy'] = 'tcp://'.$state->proxyHost.':'.$state->proxyPort;
-            $httpOpts['request_fulluri'] = true;
-        }
-        $ctxOpts = ['http' => $httpOpts];
-        if (isset($state->streamContextOptions['ssl']) && \is_array($state->streamContextOptions['ssl'])) {
-            $ctxOpts['ssl'] = $state->streamContextOptions['ssl'];
-        }
-        // php-src php_http.c: ssl_method → STREAM_CRYPTO_METHOD_*_CLIENT (#20366).
-        if (null !== $state->sslMethod && \preg_match('#^https://#i', $location)) {
-            $crypto = self::sslMethodToCryptoMethod($state->sslMethod);
-            if (null !== $crypto) {
-                if (!isset($ctxOpts['ssl']) || !\is_array($ctxOpts['ssl'])) {
-                    $ctxOpts['ssl'] = [];
-                }
-                if (!\array_key_exists('crypto_method', $ctxOpts['ssl'])) {
-                    $ctxOpts['ssl']['crypto_method'] = $crypto;
+        // php-src php_http.c — stream POST + Z_CLIENT_HTTPSOCKET keep-alive (#24913).
+        // Proxy+HTTPS CONNECT still uses file_get_contents (httpsocket stays null).
+        if (SoapHttpTransport::canHandle($location, $useProxy)) {
+            [$body, $responseHeaders] = SoapHttpTransport::post(
+                $object,
+                $state,
+                $location,
+                $requestHeaders,
+                $bodyOut,
+                $useProxy
+            );
+        } else {
+            // Legacy host HTTP wrapper (proxy+https CONNECT / missing stream_socket_client).
+            $headers = ($state->keepAlive ? "Connection: Keep-Alive\r\n" : "Connection: close\r\n").
+                "Content-Type: text/xml; charset=utf-8\r\n".
+                'SOAPAction: "'.$action."\"\r\n";
+            if ('' !== $acceptEncoding) {
+                $headers .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
+            }
+            if ('' !== $contentEncoding) {
+                $headers .= 'Content-Encoding: '.$contentEncoding."\r\n";
+            }
+            if ('' !== $cookieHeader) {
+                $headers .= 'Cookie: '.$cookieHeader."\r\n";
+            }
+            if ('' !== $authHeader) {
+                $headers .= $authHeader."\r\n";
+            }
+            if ($useProxy && '' !== $proxyAuthHeader) {
+                $headers .= $proxyAuthHeader."\r\n";
+            }
+            $contextHeaderExtra = self::streamContextHttpHeaderBlock(
+                $state->streamContextOptions,
+                '' !== $authHeader,
+                $useProxy && '' !== $proxyAuthHeader,
+                '' !== $cookieHeader
+            );
+            if ('' !== $contextHeaderExtra) {
+                $headers .= $contextHeaderExtra;
+            }
+            $httpOpts = [
+                'method' => 'POST',
+                'header' => $headers,
+                'content' => $bodyOut,
+                'ignore_errors' => true,
+                'timeout' => null !== $state->connectionTimeout ? $state->connectionTimeout : 30,
+            ];
+            // Merge user stream_context http/ssl options (php-src http_connect) (#20365).
+            $httpOpts = self::mergeStreamContextHttpOptions($httpOpts, $state->streamContextOptions);
+            if ($useProxy && null !== $state->proxyHost && null !== $state->proxyPort) {
+                // php-src http_connect via proxy — PHP stream proxy URI (#20339).
+                $httpOpts['proxy'] = 'tcp://'.$state->proxyHost.':'.$state->proxyPort;
+                $httpOpts['request_fulluri'] = true;
+            }
+            $ctxOpts = ['http' => $httpOpts];
+            if (isset($state->streamContextOptions['ssl']) && \is_array($state->streamContextOptions['ssl'])) {
+                $ctxOpts['ssl'] = $state->streamContextOptions['ssl'];
+            }
+            // php-src php_http.c: ssl_method → STREAM_CRYPTO_METHOD_*_CLIENT (#20366).
+            if (null !== $state->sslMethod && \preg_match('#^https://#i', $location)) {
+                $crypto = self::sslMethodToCryptoMethod($state->sslMethod);
+                if (null !== $crypto) {
+                    if (!isset($ctxOpts['ssl']) || !\is_array($ctxOpts['ssl'])) {
+                        $ctxOpts['ssl'] = [];
+                    }
+                    if (!\array_key_exists('crypto_method', $ctxOpts['ssl'])) {
+                        $ctxOpts['ssl']['crypto_method'] = $crypto;
+                    }
                 }
             }
-        }
-        $ctx = \stream_context_create($ctxOpts);
-        $body = @\file_get_contents($location, false, $ctx);
-        if (false === $body) {
-            throw new \SoapFault('HTTP', 'Could not connect to host');
-        }
-        $responseHeaders = '';
-        if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
-            $responseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+            $ctx = \stream_context_create($ctxOpts);
+            SoapHttpTransport::closeSocket($object, $state);
+            $body = @\file_get_contents($location, false, $ctx);
+            if (false === $body) {
+                throw new \SoapFault('HTTP', 'Could not connect to host');
+            }
+            $responseHeaders = '';
+            if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
+                $responseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+            }
         }
         // php-src: HTTP 401 + WWW-Authenticate Digest → store challenge and retry (#20340).
         if (
@@ -910,8 +924,7 @@ final class VmSoapClient
                 $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
             }
         }
-        // php-src php_http.c: attach Soap\Url on successful HTTP connect (#23246).
-        // httpsocket stays null while transport uses file_get_contents (no keep-alive php_stream) (#23904).
+        // php-src php_http.c: attach Soap\Url on successful HTTP connect (#23246 / #24913).
         self::attachHttpUrl($object, $location);
         // php-src — sync stub __last_* after HTTP transport (#23925).
         self::syncTraceProperties($object, $state);
@@ -922,7 +935,7 @@ final class VmSoapClient
     /**
      * php-src php_http.c — Z_CLIENT_HTTPURL gets Soap\Url after successful stream connect (#23246).
      * Attaches parsed php_url payload for keep-alive host/port/scheme compare (#23926).
-     * Z_CLIENT_HTTPSOCKET is declared on the client; live stream attach needs stream-based HTTP (#23904).
+     * Z_CLIENT_HTTPSOCKET is attached by {@see SoapHttpTransport} (#24913).
      */
     private static function attachHttpUrl(ObjectEntry $object, string $location): void
     {
@@ -2826,6 +2839,12 @@ final class SoapClientState
 
     /** php-src _keep_alive — default true; false → Connection: close (#20364). */
     public bool $keepAlive = true;
+
+    /**
+     * php-src Z_CLIENT_HTTPSOCKET — VmFs stream handle for keep-alive HTTP (#24913).
+     * Mirrored onto SoapClient::$httpsocket after successful connect.
+     */
+    public ?int $httpSocketHandle = null;
 
     /**
      * php-src stream_context wrapper options (http/ssl bags) (#20365).
