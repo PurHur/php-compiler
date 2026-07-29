@@ -1251,18 +1251,17 @@ final class CompilerVersion
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Enabled unconditionally when VERSION_ID >= 80400 (#24754). Explicit
-     * `PHP_COMPILER_PROFILE=8.2` still rejects via languageProfileVersion().
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#24818, re-#22781 / #22371 / #18531). `version_compare` treats `8.4.0-dev` as below `8.4.0`,
+     * so unset `PHP_COMPILER_PROFILE` keeps this false. Forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * (or stable 8.4.0+) enables hook syntax.
+     * Do not use VERSION_ID / isForwardProfileAtLeast here — that re-enabled acceptance on default
+     * after #24754/#24760 and broke Zend 8.2 parity (#24818).
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== $raw) {
-            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
-        }
-
-        return self::VERSION_ID >= 80400;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1411,13 +1410,13 @@ final class CompilerVersion
      * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization,isFinal,isAbstract,isVirtual},
      * ext/reflection/php_reflection.c, #17493, #20511, #22309).
      *
-     * Forward profile on 8.4.0-dev builds and stable 8.4.0+ (#24672, #6983, re-#22309).
-     * Explicit `PHP_COMPILER_PROFILE=8.2` / `8.3` keeps methods absent like Zend ≤8.3.
-     * Aligns with {@see supportsPropertyHooks()} — hook syntax is already enabled on default 8.4.0-dev.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
+     * Zend 8.2 (methods absent). Aligns with {@see supportsPropertyHooks()} (#24818, #24672, #6983).
+     * Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionPropertyHookProbes(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
