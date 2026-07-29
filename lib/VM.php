@@ -6756,6 +6756,7 @@ restart:
                                 null !== $calleeBlock->func
                                 && null !== $calleeBlock->func->class
                                 && !(($calleeBlock->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                                && !(($calleeBlock->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)
                             ) {
                                 $thisArgOffset = 1;
                             }
@@ -6975,6 +6976,7 @@ restart:
                         null !== $frame->block->func
                         && null !== $frame->block->func->class
                         && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                        && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)
                     ) {
                         ++$recvIdx;
                     }
@@ -15379,6 +15381,7 @@ restart:
                 null !== $block->func
                 && null !== $block->func->class
                 && !(($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                && !(($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)
             ) {
                 $thisArgOffset = 1;
             }
