@@ -37,6 +37,10 @@ final class BuiltinParamNames
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
             // php-src ext/spl/spl_directory.stub.php — InternalArgInfo still says file_name (#24505)
             'splfileinfo::__construct' => ['filename'],
+            // php-src ext/spl/spl_directory.stub.php — InternalArgInfo still says path (#24503)
+            'directoryiterator::__construct' => ['directory'],
+            'filesystemiterator::__construct' => ['directory', 'flags='],
+            'recursivedirectoryiterator::__construct' => ['directory', 'flags='],
             'splfileobject::seek' => ['line'],
             'splfileobject::fgetcsv' => ['separator', 'enclosure', 'escape'],
             'splfileobject::fputcsv' => ['fields', 'separator', 'enclosure', 'escape', 'eol'],
