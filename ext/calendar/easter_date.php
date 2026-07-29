@@ -25,15 +25,18 @@ final class easter_date extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \ArgumentCountError('easter_date() accepts at most 1 argument, '.$argc.' given');
+        if ($argc > 2) {
+            throw new \ArgumentCountError('easter_date() accepts at most 2 arguments, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
         }
         $year = self::resolveYear($frame);
         self::assertEasterYear($year);
-        $frame->returnVar->int(VmCalendar::easterDate($year));
+        $mode = $argc < 2
+            ? CalendarConstants::CAL_EASTER_DEFAULT
+            : CalendarArgs::requireInt($frame, 'easter_date', 2, 'mode');
+        $frame->returnVar->int(VmCalendar::easterDate($year, $mode));
     }
 
     private static function assertEasterYear(int $year): void

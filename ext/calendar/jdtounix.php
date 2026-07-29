@@ -28,8 +28,8 @@ final class jdtounix extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $jday = CalendarArgs::requireInt($frame, 'jdtounix', 1, 'jday');
-        $frame->returnVar->int(VmCalendar::jdtounix($jday));
+        $julianDay = CalendarArgs::requireInt($frame, 'jdtounix', 1, 'julian_day');
+        $frame->returnVar->int(VmCalendar::jdtounix($julianDay));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
