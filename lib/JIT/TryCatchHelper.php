@@ -425,11 +425,29 @@ final class TryCatchHelper
             return;
         }
 
-        // Uncaught: Enum::from also fills the type-error pending message for abort text.
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            && null !== $context->module->getNamedFunction('phpc_jit_abort_if_pending_type_error')
-        ) {
-            $builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        // No local handler: check for a pending throw from a callee and abort (#24680).
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $i32 = $context->getTypeFromString('int32');
+            $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
+            $hasBool = $builder->icmp(
+                Builder::INT_NE,
+                $hasPending,
+                $i32->constInt(0, false)
+            );
+            $cont = self::appendBlock($func, 'after_call_no_throw');
+            $pending = self::appendBlock($func, 'after_call_throw_pending_uncaught');
+            $builder->branchIf($hasBool, $pending, $cont);
+            $builder->positionAtEnd($pending);
+            if (null !== $context->module->getNamedFunction('phpc_jit_type_error_clear_pending')) {
+                $builder->call($context->lookupFunction('phpc_jit_type_error_clear_pending'));
+            }
+            $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
+            self::emitUncaughtUserHandlerOrAbort($context, $pendingObj);
+            $builder->positionAtEnd($cont);
+
+            if (null !== $context->module->getNamedFunction('phpc_jit_abort_if_pending_type_error')) {
+                $builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+            }
         }
     }
 
@@ -606,6 +624,14 @@ final class TryCatchHelper
                 return;
             }
             $obj = self::loadThrownObject($context, $thrown);
+            // Inside a user function without a local try/catch: set the exception
+            // pending and return so the caller's try/catch can dispatch (#24680).
+            if (null !== $block->func && !$block->isMainScript()) {
+                $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+                self::returnAfterPendingThrow($context);
+
+                return;
+            }
             self::emitUncaughtUserHandlerOrAbort($context, $obj);
 
             return;
@@ -941,6 +967,47 @@ final class TryCatchHelper
         UncaughtThrowPrinter::emitPrintAndExit($context, $exceptionObj);
         // Do not open a fall-through insert block after exit — that attached main
         // epilogue and produced silent rc=0 (#23641).
+    }
+
+    /**
+     * Return from the current LLVM function after setting a pending throw (#24680).
+     * The caller's emitCheckPendingThrowAfterCall detects the pending exception.
+     */
+    private static function returnAfterPendingThrow(Context $context): void
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof Function_);
+        if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
+            $context->builder->returnVoid();
+
+            return;
+        }
+        $fnType = BasicBlockHelper::llvmFunctionSignatureType($fn);
+        if (null !== $fnType) {
+            $returnType = $fnType->getReturnType();
+            if (\PHPLLVM\Type::KIND_POINTER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constNull());
+
+                return;
+            }
+            if (\PHPLLVM\Type::KIND_INTEGER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constInt(0, false));
+
+                return;
+            }
+            $structName = $context->getStringFromType($returnType);
+            if ('__value__' === $structName) {
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                $context->builder->returnValue($context->builder->load($slot));
+
+                return;
+            }
+        }
+        $context->builder->returnVoid();
     }
 
     /**
