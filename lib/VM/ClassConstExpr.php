@@ -12,6 +12,7 @@ use PHPCompiler\OpCode;
  * Evaluate scalar class constant expressions at class-compile time (#3567).
  *
  * Reference: Zend/zend_compile.c — zend_compile_const_expr(), zend_const_expr_to_zval()
+ * Array and string {@see OpCode::TYPE_ARRAY_DIM_FETCH} are both allowed (#5465, #24927).
  */
 final class ClassConstExpr
 {
@@ -360,13 +361,38 @@ final class ClassConstExpr
             throw new \LogicException('[] append is not supported in class constant expressions');
         }
         $container = self::resolveValue($frame, $block, $op->arg2);
+        $dim = self::resolveValue($frame, $block, $op->arg3);
+        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+
+        // php-src zend_ast_evaluate / ZEND_AST_DIM: string operands yield a single-byte string (#24927).
+        if (Variable::TYPE_STRING === $container->type) {
+            $byteIndex = Variable::stringOffsetIndexFromDim(
+                $dim,
+                $context->errors,
+                $context,
+                $frame,
+                $scriptFile
+            );
+            $readShell = new Variable(Variable::TYPE_STRING_OFFSET);
+            $readShell->stringOffset(
+                $container,
+                $byteIndex,
+                $context->errors,
+                $context,
+                $frame,
+                $scriptFile
+            );
+            $frame->scope[$op->arg1]->string($readShell->toString());
+
+            return;
+        }
+
         if (Variable::TYPE_ARRAY !== $container->type) {
             if (TypeCheck::isScalarUsedAsArray($container)) {
                 throw new \Error(TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE);
             }
             throw new \LogicException('[] is only supported for arrays in class constant expressions');
         }
-        $dim = self::resolveValue($frame, $block, $op->arg3);
         $dimVar = new Variable();
         $dimVar->copyFrom($dim);
         $table = $container->toArray();
@@ -375,7 +401,7 @@ final class ClassConstExpr
                 $dimVar,
                 $context,
                 $frame,
-                '' !== $frame->scriptPath ? $frame->scriptPath : null
+                $scriptFile
             );
             $frame->scope[$op->arg1]->null();
 
