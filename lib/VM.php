@@ -4965,6 +4965,15 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (\BadMethodCallException $e) {
+                        // SPL CachingIterator::__toString without CALL_TOSTRING (#24907).
+                        $frame->callSiteLine = $savedCallSiteLine;
+                        $catchFrame = $this->dispatchVmBadMethodCallException($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $frame->callSiteLine = $savedCallSiteLine;
                         $this->clearTryCatchUnwindState();
@@ -10424,6 +10433,14 @@ restart:
         } catch (ScriptExit $e) {
             throw $e;
         } catch (\BadMethodCallException $e) {
+            // During (string)/echo __toString coercion, rethrow so TYPE_CAST_STRING (etc.)
+            // can dispatch into the *user* try/catch. Bridging here returns a catch frame that
+            // invokeMagicToString turns into MagicMethodInvocationAborted — which CAST swallows,
+            // leaving "" / undefined ($s) instead of BadMethodCallException (#24907 CachingIterator).
+            if ($this->context->coercingObjectToString) {
+                throw $e;
+            }
+
             return $this->dispatchVmBadMethodCallException($e, $callerFrame);
         } catch (\OutOfBoundsException $e) {
             return $this->dispatchVmOutOfBoundsException($e, $callerFrame);
