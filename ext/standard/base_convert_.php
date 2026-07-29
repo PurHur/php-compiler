@@ -49,6 +49,9 @@ final class base_convert_ extends Internal
             $fromBase,
             $toBase
         ));
+        if (VmMath::takeInvalidRadixCharsDeprecation()) {
+            VmMathRadixDeprecation::emit($frame);
+        }
     }
 
     public Context $context;

@@ -17,6 +17,13 @@ final class VmMath
 {
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 
+    /** php-src math.c — _php_math_basetozval invalid-digit E_DEPRECATED (#24950). */
+    public const INVALID_RADIX_CHARS_MESSAGE =
+        'Invalid characters passed for attempted conversion, these have been ignored';
+
+    /** Set by {@see baseToZval()}; consumed by VM/JIT callers (#24950). */
+    private static bool $invalidRadixChars = false;
+
     /**
      * Historically gated Z_PARAM_LONG null→TypeError on PROFILE=8.4 (#18850), but Zend 8.4 still
      * deprecates and coerces null→0 for Z_PARAM_LONG (php-src zend_API.h / math.c). Keep false until
@@ -1280,10 +1287,20 @@ final class VmMath
         }
 
         $value = self::baseToZval($number, $fromBase);
+        // Leave {@see $invalidRadixChars} for the caller (VM execute / JIT helper) (#24950).
 
         return is_float($value)
             ? self::doubleToBase($value, $toBase)
             : self::longToBase((int) $value, $toBase);
+    }
+
+    /** Whether the last {@see baseToZval()} skipped invalid digits (php-src E_DEPRECATED; #24950). */
+    public static function takeInvalidRadixCharsDeprecation(): bool
+    {
+        $seen = self::$invalidRadixChars;
+        self::$invalidRadixChars = false;
+
+        return $seen;
     }
 
     /**
@@ -1319,6 +1336,7 @@ final class VmMath
      */
     public static function baseToZval(string $str, int $base): int|float
     {
+        self::$invalidRadixChars = false;
         $len = \strlen($str);
         $start = 0;
         $end = $len;
@@ -1360,20 +1378,14 @@ final class VmMath
             }
 
             if ($invalidChars > 0) {
-                @\trigger_error(
-                    'Invalid characters passed for attempted conversion, these have been ignored',
-                    \E_USER_DEPRECATED
-                );
+                self::$invalidRadixChars = true;
             }
 
             return self::baseToZvalFloat($str, $start, $end, $base);
         }
 
         if ($invalidChars > 0) {
-            @\trigger_error(
-                'Invalid characters passed for attempted conversion, these have been ignored',
-                \E_USER_DEPRECATED
-            );
+            self::$invalidRadixChars = true;
         }
 
         return $num;
@@ -1447,6 +1459,9 @@ final class VmMath
             return;
         }
         $result = self::baseToZval($str, $base);
+        if (self::takeInvalidRadixCharsDeprecation()) {
+            VmMathRadixDeprecation::emit();
+        }
         if (\is_int($result)) {
             $returnVar->int($result);
         } else {
