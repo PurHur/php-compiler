@@ -50,7 +50,12 @@ quarantined() {
     fi
 }
 
-# Union of every shard's failing names for this suite.
+# Union of every shard's failing names for this suite, normalised to bare case names.
+#
+# PHPUnit reports a data-provider case as `testCases with data set "stdlib/mkdir"`, but the
+# quarantine file and anything human-readable use the bare `stdlib/mkdir`. Without normalising here
+# the quarantine matched nothing and silently excluded zero cases while still reporting success —
+# caught only because the regenerated baseline count did not drop by the expected amount.
 current_failing() {
     local files
     files=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.failed" 2>/dev/null | LC_ALL=C sort)
@@ -58,7 +63,10 @@ current_failing() {
         return 1
     fi
     # shellcheck disable=SC2086
-    cat $files 2>/dev/null | LC_ALL=C sort -u
+    cat $files 2>/dev/null \
+        | sed -e 's/^.*data set "//' -e 's/"$//' \
+        | grep -v '^$' \
+        | LC_ALL=C sort -u
 }
 
 # Results from different --shards=N runs must never be mixed: the union would double-count some
