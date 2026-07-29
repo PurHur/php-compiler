@@ -12,6 +12,7 @@ use PHPCompiler\VM\Variable;
  * setcookie() / setrawcookie() argument parsing (positional + options array; issue #3507).
  *
  * php-src: ext/standard/head.c — php_setcookie()
+ * Sparse named optionals (path: without expires_or_options) (#24968).
  */
 final class SetcookieOptions
 {
@@ -39,14 +40,15 @@ final class SetcookieOptions
      */
     public static function parseArgs(string $function, array $args, ?Frame $frame = null): array
     {
-        $argc = \count($args);
-        if ($argc < 1) {
+        // Named optionals leave sparse calledArgs (path: without expires_or_options) (#24968).
+        if (!isset($args[0])) {
             throw new \ArgumentCountError($function.'() expects at least 1 argument, 0 given');
         }
-        if ($argc >= 3) {
+        $maxIdx = self::highestArgIndex($args);
+        if (isset($args[2])) {
             $third = $args[2]->resolveIndirect();
             if (Variable::TYPE_ARRAY === $third->type) {
-                if ($argc > 3) {
+                if ($maxIdx > 2) {
                     throw new \ArgumentCountError(
                         $function.'() expects at most 3 arguments when argument #3 is an array'
                     );
@@ -56,18 +58,32 @@ final class SetcookieOptions
                     $function,
                     // Z_PARAM_STR — null → E_DEPRECATED + '' on 8.4, then empty-name ValueError (#21233, re-#21003).
                     self::coerceNameArg($function, $args[0], $frame),
-                    $argc >= 2
+                    isset($args[1])
                         ? VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value')
                         : '',
                     $third->toArray()
                 );
             }
         }
-        if ($argc > 7) {
+        if ($maxIdx > 6) {
             throw new \ArgumentCountError($function.'() accepts at most seven arguments');
         }
 
         return self::parsePositional($function, $args, $frame);
+    }
+
+    /**
+     * Highest present parameter index in a possibly sparse arg map (#24968).
+     *
+     * @param Variable[] $args
+     */
+    private static function highestArgIndex(array $args): int
+    {
+        if ([] === $args) {
+            return -1;
+        }
+
+        return (int) max(array_keys($args));
     }
 
     private static function coerceNameArg(string $function, Variable $var, ?Frame $frame): string
@@ -96,14 +112,13 @@ final class SetcookieOptions
      */
     private static function parsePositional(string $function, array $args, ?Frame $frame = null): array
     {
-        $argc = \count($args);
         $name = self::coerceNameArg($function, $args[0], $frame);
         $value = '';
-        if ($argc >= 2) {
+        if (isset($args[1])) {
             $value = VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value');
         }
         $expires = 0;
-        if ($argc >= 3) {
+        if (isset($args[2])) {
             $third = $args[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $third->type) {
                 if (VmMath::requiresForwardProfileStrictLongNull()) {
@@ -119,19 +134,19 @@ final class SetcookieOptions
             }
         }
         $path = '';
-        if ($argc >= 4) {
+        if (isset($args[3])) {
             $path = VmString::coerceStringBuiltinArg($args[3], $function, 3, 'path');
         }
         $domain = '';
-        if ($argc >= 5) {
+        if (isset($args[4])) {
             $domain = VmString::coerceStringBuiltinArg($args[4], $function, 4, 'domain');
         }
         $secure = false;
-        if ($argc >= 6) {
+        if (isset($args[5])) {
             $secure = VmMath::parseBoolBuiltinArg($args[5], $function, 6, 'secure');
         }
         $httponly = false;
-        if ($argc >= 7) {
+        if (isset($args[6])) {
             $httponly = VmMath::parseBoolBuiltinArg($args[6], $function, 7, 'httponly');
         }
 

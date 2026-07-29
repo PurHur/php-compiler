@@ -93,4 +93,28 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         );
         self::assertSame(0, $var->toInt());
     }
+
+    /** @covers issue #24968 */
+    public function testSetcookieStringDefaultsAreEmpty(): void
+    {
+        $info = ['name' => 'value', 'type' => 'string', 'isOptional' => true];
+        foreach (['setcookie', 'setrawcookie'] as $fn) {
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $info, false));
+            $var = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($var, $fn, 1, $info));
+            self::assertSame('', $var->toString());
+
+            $path = ['name' => 'path', 'type' => 'string', 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 3, $path, false));
+            $var = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($var, $fn, 3, $path));
+            self::assertSame('', $var->toString());
+
+            $domain = ['name' => 'domain', 'type' => 'string', 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 4, $domain, false));
+            $var = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($var, $fn, 4, $domain));
+            self::assertSame('', $var->toString());
+        }
+    }
 }
