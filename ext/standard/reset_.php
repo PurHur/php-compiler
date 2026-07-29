@@ -25,7 +25,7 @@ final class reset_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('reset() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'reset', true, $frame->vmContext);
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'reset', true, $frame->vmContext, $frame);
         VmArrayPointer::returnValue($frame, $target->pointerReset());
     }
 

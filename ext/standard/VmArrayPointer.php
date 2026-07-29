@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -104,8 +105,13 @@ final class VmArrayPointer
     /**
      * @throws \TypeError when {@param $value} is not an array or object
      */
-    public static function requirePointerTarget(Variable $value, string $fn, bool $mutator, ?Context $ctx = null): VmPointerTarget
-    {
+    public static function requirePointerTarget(
+        Variable $value,
+        string $fn,
+        bool $mutator,
+        ?Context $ctx = null,
+        ?Frame $frame = null
+    ): VmPointerTarget {
         if (Variable::TYPE_INDIRECT === $value->type) {
             $value = $value->resolveIndirect();
         }
@@ -117,6 +123,8 @@ final class VmArrayPointer
             return self::fromArray(VmArray::requireArray($value, $fn));
         }
         if (Variable::TYPE_OBJECT === $value->type) {
+            self::deprecateObjectPointer($fn, $ctx, $frame);
+
             return self::fromObject($value->toObject(), $ctx);
         }
 
@@ -150,6 +158,21 @@ final class VmArrayPointer
         }
 
         return $value->toArray();
+    }
+
+    /** PHP 8.1+ E_DEPRECATED when using array-pointer API on objects (ext/standard/array.c; #23574). */
+    private static function deprecateObjectPointer(string $fn, ?Context $ctx, ?Frame $frame): void
+    {
+        if (null === $ctx) {
+            return;
+        }
+        $ctx->errors->triggerErrorWithHandlerFirst(
+            \sprintf('%s(): Calling %s() on an object is deprecated', $fn, $fn),
+            ErrorReporter::E_DEPRECATED,
+            null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $ctx,
+            $frame
+        );
     }
 
     private static function typeLabel(Variable $value): string
