@@ -200,7 +200,7 @@ if (!function_exists('php_compiler_cli_sync_host_exception_ignore_args')) {
 
 if (!function_exists('php_compiler_cli_sync_host_exception_string_param_max_len')) {
     /**
-     * Inherit host {@code php -d zend.exception_string_param_max_len=...} into the guest VM (#24487).
+     * Inherit host {@code php -d zend.exception_string_param_max_len=...} into the guest VM (#24486, #24487).
      *
      * Guest argv {@code bin/vm.php -d zend.exception_string_param_max_len=0} wins via
      * {@see php_compiler_cli_apply_ini_overrides}; otherwise mirror host {@code ini_get}
