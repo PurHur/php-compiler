@@ -210,4 +210,42 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('fgetcsv', 1));
     }
 
+    /** @covers issue #24814 */
+    public function testFileGetContentsContextLengthDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'file_get_contents',
+            2,
+            ['name' => 'context', 'type' => '', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'file_get_contents',
+            4,
+            ['name' => 'length', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('file_get_contents', 4));
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fopen',
+            3,
+            ['name' => 'context', 'type' => '', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'rmdir',
+            1,
+            ['name' => 'context', 'type' => '', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
 }
