@@ -10,8 +10,8 @@ What changed since the plan was written, all measured:
 | item | state |
 |---|---|
 | **P1.1** CI on `lib/`, `ext/` | **done** — `compiler-gate.yml` (#24275): nikic preflight → `aot-smoke.sh` → VM sweep, green on master |
-| **P1.3** suites runnable | **done** — `shard-compliance.sh` (#24445) + `compliance-baseline.sh` (#24469); 8,846 cases, 24 shards, ~315 s each |
-| **P1.4** flaky quarantine | mechanism done, list **deliberately empty** until two-run evidence exists |
+| **P1.3** suites runnable **and gating** | **done** — `shard-compliance.sh` (#24445), `compliance-baseline.sh` (#24469), baseline of 422 names (#24634, #24673) |
+| **P1.4** flaky quarantine | **done** — 9 cases quarantined with measured direction (#24672) |
 | **P2.5** side-loadable extensions | boundary measured (#24285), `Module` declares deps + default-enabled (#24387), load list generated (#24418), build-time selection (#24421) |
 | **P3.9** spine split-TU | **blocked**, root cause mapped (#24429) |
 
@@ -24,6 +24,36 @@ Three corrections the plan needed, each from measurement rather than reasoning:
    concurrent containers corrupt each other's caches — so 24 shards is ~2 h.
 3. **"Clone and compile hello world" was ~9 minutes**, not seconds: the corpus warmup ignored the
    committed cache. Now 5 s and gated by `cold-build-check.sh` (#24302, #24351, #24361).
+
+### Phase 1 is complete (2026-07-29)
+
+The compliance suite is now a **gate**, not just runnable:
+
+```
+script/shard-compliance.sh --suite=VMTest --shards=24 --shard=N   # 24 shards, ~320s each
+script/compliance-baseline.sh --diff --suite=VMTest               # set difference by NAME
+```
+
+Measured over two complete independent runs of one commit, 2.1 h each, zero timeouts:
+
+| | |
+|---|---|
+| cases executed | 8,023 of 8,844 (rest withheld by host-library policies) |
+| failing, stable in both runs | **422** |
+| flaky (flipped between runs) | **9**, quarantined with direction |
+| determinism | 422 of 431 distinct names identical — **98%** |
+
+**A single-run baseline was wrong in 9 places and looked authoritative.** Five were absent from it
+but failing intermittently, i.e. they would have reported as phantom *regressions*. That is the
+argument for two-run baselines, and it is why the quarantine file stayed empty until measured.
+
+Validation that matters: the 422-name baseline diffs **clean against both runs** — including the run
+it was not built from. Two runs that disagreed on 9 cases now both report no regressions.
+
+**The failures are concentrated, not diffuse** (#24697): `gmp` fails 6/6, `intl` 56/63 (88.9%),
+together 62 of 422 — while `spl` (121 executed), `mbstring` (45), `phar` (21), `openssl` (21) and
+`xmlwriter` (20) are perfectly clean. `stdlib` and `language` carry the largest counts but the
+*lowest* rates (~5%). That makes the debt a scoping decision rather than a quality verdict.
 
 ### The pattern worth carrying forward
 
