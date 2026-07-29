@@ -514,6 +514,10 @@ final class VmDom
             $tokenList->methods['foreach'] = new TokenListForEach();
             $tokenList->methodVisibility['foreach'] = $pub;
             $tokenList->methodNames['foreach'] = 'forEach';
+            // php-src token_list.c — __toString returns the same string as $value (#24545).
+            $tokenList->methods['__tostring'] = new TokenListToString();
+            $tokenList->methodVisibility['__tostring'] = $pub;
+            $tokenList->methodNames['__tostring'] = '__toString';
             $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
         }
 

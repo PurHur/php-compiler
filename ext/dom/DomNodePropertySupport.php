@@ -357,6 +357,10 @@ final class DomNodePropertySupport
                 return false;
             }
         }
+        // Attr::$value only — TokenList::$value is DomTokenListPropertySupport (#24545).
+        if (strtolower(VmDom::PROP_VALUE) === $lc && !VmDom::isAttr($owner)) {
+            return false;
+        }
         $resolved = $value->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
             $text = '';

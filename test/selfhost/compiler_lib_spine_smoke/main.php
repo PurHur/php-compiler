@@ -507,6 +507,7 @@ require_once __DIR__.'/../../../ext/dom/TokenListKeys.php';
 require_once __DIR__.'/../../../ext/dom/TokenListRemove.php';
 require_once __DIR__.'/../../../ext/dom/TokenListReplace.php';
 require_once __DIR__.'/../../../ext/dom/TokenListSupports.php';
+require_once __DIR__.'/../../../ext/dom/TokenListToString.php';
 require_once __DIR__.'/../../../ext/dom/TokenListToggle.php';
 require_once __DIR__.'/../../../ext/dom/TokenListValues.php';
 require_once __DIR__.'/../../../ext/dom/VmDom.php';
