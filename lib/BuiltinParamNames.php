@@ -321,7 +321,8 @@ final class BuiltinParamNames
                 return ['string', 'length', 'pad_string', 'pad_type'];
             case 'str_replace':
             case 'str_ireplace':
-                return ['search', 'replace', 'subject', 'count'];
+                // php-src ext/standard/string.stub.php — &$count = null (#24886)
+                return ['search', 'replace', 'subject', 'count='];
             case 'parse_str':
                 return \PHPCompiler\CompilerVersion::supportsParseStrSeparator()
                     ? ['string', 'result', 'separator']

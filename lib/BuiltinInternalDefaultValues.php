@@ -114,6 +114,13 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0777],
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/string.stub.php — &$count = null (InternalArgInfo int → 0) (#24886)
+        'str_replace' => [
+            3 => ['kind' => 'null'],
+        ],
+        'str_ireplace' => [
+            3 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
