@@ -260,10 +260,45 @@ PHP;
         self::assertSame("1\nNot yet implemented\n", ob_get_clean());
     }
 
+    public function test_dom_document_adopt_node_nyi_on_reference_profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$d1 = new DOMDocument();
+$d1->loadXML('<a><n>t</n></a>');
+$d2 = new DOMDocument();
+echo (int) method_exists($d2, 'adoptNode'), "\n";
+try {
+    $d2->adoptNode($d1->documentElement->firstChild);
+    echo "adopted\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+            $block = $runtime->parseAndCompile($code, 'dom_adopt_node_nyi.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("1\nNot yet implemented\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function test_dom_document_adopt_node_registered(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 $d1 = new DOMDocument();
 $d1->loadXML('<a><n>t</n></a>');
@@ -284,13 +319,20 @@ try {
     echo (DOMException::NOT_SUPPORTED_ERR === $e->getCode()) ? "reject-doc\n" : ("other\n");
 }
 PHP;
-        $block = $runtime->parseAndCompile($code, 'dom_adopt_node.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame(
-            "1\nn\n<a/>\nowner-d2\n<b><n>t</n></b>\nreject-doc\n",
-            ob_get_clean()
-        );
+            $block = $runtime->parseAndCompile($code, 'dom_adopt_node.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                "1\nn\n<a/>\nowner-d2\n<b><n>t</n></b>\nreject-doc\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function test_dom_node_is_supported_and_default_namespace(): void

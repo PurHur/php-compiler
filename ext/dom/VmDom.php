@@ -11819,13 +11819,19 @@ final class VmDom
     }
 
     /**
-     * DOMDocument::adoptNode() — move node into this document (php-src ext/dom/document.c; #19654).
+     * DOMDocument::adoptNode() — move node into this document (php-src ext/dom/document.c; #19654, #24995).
      *
      * Unlinks from the previous parent / owner element and updates ownerDocument. Does not
      * insert into the target tree (caller must appendChild / etc.).
+     *
+     * On reference / PROFILE&lt;8.3 matches Zend 8.2: method exists but throws
+     * {@code Error: Not yet implemented} ({@see CompilerVersion::supportsDomDocumentAdoptNode()}).
      */
     public static function adoptNode(Context $ctx, ObjectEntry $document, ObjectEntry $node): Variable
     {
+        if (!CompilerVersion::supportsDomDocumentAdoptNode()) {
+            throw new \Error('Not yet implemented');
+        }
         self::ensureDocument($document);
         if (!self::isDomNode($node)) {
             throw new \TypeError('DOMDocument::adoptNode(): Argument #1 ($node) must be of type DOMNode');
