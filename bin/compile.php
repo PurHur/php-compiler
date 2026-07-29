@@ -286,12 +286,13 @@ function run(string $filename, string $code, array $options): void
                 default => $n,
             };
         };
-        // Non-driver selfhost bundles: 6G floor. Inventory compile_driver emit:
-        // 16G floor with skip-bundle (bundling alone OOMs through 24GiB — #23970).
-        $floorMib = $isCompileDriver ? 16384 : 6144;
+        // Non-driver selfhost bundles: 10G floor (compiler_minimal OOMs through
+        // 6G in VM/Optimizer/AssignOp since the bundle grew past ~110 units).
+        // Inventory compile_driver emit: 16G floor with skip-bundle (#23970).
+        $floorMib = $isCompileDriver ? 16384 : 10240;
         $curMib = $limitMib($bundleLimit);
         if ($curMib < $floorMib) {
-            $floor = $isCompileDriver ? '16384M' : '6G';
+            $floor = $isCompileDriver ? '16384M' : '10G';
             ini_set('memory_limit', $floor);
             putenv('PHP_COMPILER_MEMORY_LIMIT='.$floor);
             $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = $floor;
