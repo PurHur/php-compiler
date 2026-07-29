@@ -121,6 +121,23 @@ final class BuiltinInternalDefaultValues
         'str_ireplace' => [
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
+        'setcookie' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'string', 'value' => ''],
+            4 => ['kind' => 'string', 'value' => ''],
+            5 => ['kind' => 'bool', 'value' => false],
+            6 => ['kind' => 'bool', 'value' => false],
+        ],
+        'setrawcookie' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'string', 'value' => ''],
+            4 => ['kind' => 'string', 'value' => ''],
+            5 => ['kind' => 'bool', 'value' => false],
+            6 => ['kind' => 'bool', 'value' => false],
+        ],
         // php-src ext/standard/basic_functions.stub.php — int $offset = 0 (#24896)
         // InternalArgInfo omits offset; override has no type → need explicit default.
         'unpack' => [
