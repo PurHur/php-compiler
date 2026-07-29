@@ -193,7 +193,11 @@ final class ClosureState
     }
 
     /**
-     * Zend zend_closure_get_debug_info handler bag — not a user-visible Closure method (#22565).
+     * Zend zend_closure_get_debug_info handler bag — not a user-visible Closure method (#22565, #24521).
+     *
+     * php-src Zend/zend_closures.c: parameter bag (`$name` / `&$name` => `"<required>"` /
+     * `"<optional>"`) on every profile when the closure has args or is variadic. name/file/line
+     * are PHP 8.4+ only ({@see CompilerVersion::supportsClosureRichDebugInfo()}).
      *
      * @return array<string, Variable>
      */
@@ -203,27 +207,68 @@ final class ClosureState
             return $this->fakeClosureDebugInfoEntries();
         }
 
-        // PHP 8.2: plain user closures dump empty; name/file/line arrived in 8.4.
-        if (!CompilerVersion::supportsClosureRichDebugInfo()) {
-            return [];
+        $entries = [];
+
+        // PHP 8.4+: name/file/line (Zend always emits these for non-fake user closures).
+        if (CompilerVersion::supportsClosureRichDebugInfo()) {
+            $name = new Variable();
+            $name->string($this->debugDisplayName());
+            $entries['name'] = $name;
+            if ('' !== $this->definitionFile) {
+                $file = new Variable();
+                $file->string($this->definitionFile);
+                $entries['file'] = $file;
+            }
+            if ($this->definitionLine > 0) {
+                $line = new Variable();
+                $line->int($this->definitionLine);
+                $entries['line'] = $line;
+            }
         }
 
-        $entries = [];
-        $name = new Variable();
-        $name->string($this->debugDisplayName());
-        $entries['name'] = $name;
-        if ('' !== $this->definitionFile) {
-            $file = new Variable();
-            $file->string($this->definitionFile);
-            $entries['file'] = $file;
-        }
-        if ($this->definitionLine > 0) {
-            $line = new Variable();
-            $line->int($this->definitionLine);
-            $entries['line'] = $line;
+        $parameter = $this->parameterDebugInfoEntry($this->func->block);
+        if (null !== $parameter) {
+            $entries['parameter'] = $parameter;
         }
 
         return $entries;
+    }
+
+    /**
+     * Build Zend `parameter` debug hash, or null when there are no declared args (#24521).
+     */
+    private function parameterDebugInfoEntry(?Block $block): ?Variable
+    {
+        if (null === $block) {
+            return null;
+        }
+        $paramNames = $block->paramNames;
+        $numArgs = \count($paramNames);
+        if (0 === $numArgs) {
+            return null;
+        }
+
+        $required = 0;
+        for ($i = 0; $i < $numArgs; ++$i) {
+            if ($block->variadicParamIndex === $i || ParamArgumentCountError::parameterHasDefault($block, $i)) {
+                break;
+            }
+            ++$required;
+        }
+
+        $ht = new HashTable();
+        for ($i = 0; $i < $numArgs; ++$i) {
+            $prefix = isset($block->paramByRef[$i]) ? '&' : '';
+            $key = $prefix.'$'.$paramNames[$i];
+            $info = new Variable();
+            $info->string($i >= $required ? '<optional>' : '<required>');
+            $ht->addNew($key, $info);
+        }
+
+        $parameter = new Variable();
+        $parameter->array($ht);
+
+        return $parameter;
     }
 
     private function debugDisplayName(): string
