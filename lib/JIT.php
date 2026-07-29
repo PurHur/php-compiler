@@ -11507,18 +11507,20 @@ class JIT {
                                 break;
                             }
                         }
-                        $hookFetched = JIT\PropertyHookDispatch::tryEmitPropertyGet(
-                            $this->context,
-                            $receiver,
-                            $declaringClass,
-                            $name->value,
-                            $block
-                        );
-                        if (null !== $hookFetched) {
-                            $this->assignOperandValue($result, $hookFetched);
-                            break;
+                        if (!$forWrite) {
+                            $hookFetched = JIT\PropertyHookDispatch::tryEmitPropertyGet(
+                                $this->context,
+                                $receiver,
+                                $declaringClass,
+                                $name->value,
+                                $block
+                            );
+                            if (null !== $hookFetched) {
+                                $this->assignOperandValue($result, $hookFetched);
+                                break;
+                            }
                         }
-                        if (JIT\PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
+                        if (!$forWrite && JIT\PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
                             $this->context,
                             $this,
                             $declaringClass,
