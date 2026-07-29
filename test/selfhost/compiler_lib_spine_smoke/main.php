@@ -109,6 +109,7 @@ require_once __DIR__.'/../../../ext/bcmath/NumberMod.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMul.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberPow.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberRound.php';
+require_once __DIR__.'/../../../ext/bcmath/NumberSerialize.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberSqrt.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberSub.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberToString.php';
@@ -6736,8 +6737,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../ext/standard/JitOpenStreamHandles.php';
-require_once __DIR__.'/../../../ext/standard/VmClosureInvoke.php';
-require_once __DIR__.'/../../../lib/JIT/ArrayReduceLlvm.php';
-require_once __DIR__.'/../../../lib/JIT/Call/NestedClosureInvoke.php';
-require_once __DIR__.'/../../../lib/JIT/NestedClosureInvokeLlvm.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
