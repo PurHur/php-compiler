@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6637 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21388 |
+| Source constructs flagged (warnings) | 21393 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -376,7 +376,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateDocumentFragment.php` | 0 | 3 |
 | `ext/dom/JitDomCreateDocumentType.php` | 0 | 4 |
 | `ext/dom/JitDomCreateElement.php` | 0 | 7 |
-| `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
+| `ext/dom/JitDomCreateElementNS.php` | 0 | 6 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
 | `ext/dom/JitDomDocumentElement.php` | 0 | 10 |
 | `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 1 |
@@ -8945,7 +8945,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateElementNS.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new JITVariable (line 245)
+- new JITVariable (line 247)
+- new JITVariable (line 338)
+- new JITVariable (line 365)
+- new JITVariable (line 380)
+- 16 class method(s)
 
 ### `ext/dom/JitDomCreateTextNode.php`
 
@@ -41568,8 +41573,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 354)
-- 20 class method(s)
+- new InternalArgInfo (line 374)
+- 21 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
 

@@ -4857,6 +4857,7 @@
         "lib/Compiler/NewCtorParens.php",
         "lib/Compiler/NewWithoutParensCompileCheck.php",
         "lib/Compiler/NoDiscardMetadata.php",
+        "lib/Compiler/NonAbstractMethodBodyCheck.php",
         "lib/Compiler/NonEnumBuiltinInterfaceCompileCheck.php",
         "lib/Compiler/OverrideValidator.php",
         "lib/Compiler/ParameterMetadata.php",
@@ -6870,9 +6871,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6636,
+        "inventory_files": 6637,
         "excluded": 0,
-        "eligible": 6636,
+        "eligible": 6637,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
