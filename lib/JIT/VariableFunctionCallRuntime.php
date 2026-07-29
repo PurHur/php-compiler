@@ -10,8 +10,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT runtime dispatch for dynamic $fn() via VariableFunctionCallJitHelper PHP (#10135).
+ * JIT/AOT runtime dispatch for dynamic $fn() via VariableFunctionCallJitHelper PHP (#10135, #24902).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519 / Lcg #22495).
  * Replaces per-candidate JitStringCompare LLVM chains in {@see VariableFunctionCallHelper}.
  */
 final class VariableFunctionCallRuntime
@@ -118,44 +119,18 @@ final class VariableFunctionCallRuntime
     private static function matchHelperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower(self::MATCH_INDEX_HELPER);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException(self::MATCH_INDEX_HELPER.' missing after VariableFunctionCallJitHelper compile (#10135)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::MATCH_INDEX_HELPER, '#24902');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VariableFunctionCallJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('VariableFunctionCallJitHelper.php parseAndCompile failed (#10135)');
-            }
-            $jit = new \PHPCompiler\JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10135)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#24902'
+        );
     }
 
     /**
