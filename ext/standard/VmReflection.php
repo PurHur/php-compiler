@@ -2265,30 +2265,64 @@ final class VmReflection
     }
 
     /**
-     * Current parameter values for {@see userCallArgs()} (php-src-strict; #21984).
+     * Current parameter values for {@see userCallArgs()} / debug_backtrace args (php-src-strict; #21984, #24948).
+     *
+     * Sparse named-arg maps keep holes for RECV defaults (#23388). Zend's func_* / backtrace argc is
+     * {@code max(passed parameter index)+1}, with skipped leading optionals filled from live locals
+     * (defaults already applied). Do not {@see array_values()} — that collapses `f(b:9)` to one slot.
      *
      * @return list<Variable>
      */
-    private static function liveUserCallArgs(Frame $userFrame): array
+    public static function liveUserCallArgs(Frame $userFrame): array
     {
         $block = $userFrame->block;
         $cfgFunc = $block->func;
         $isInstance = null !== $cfgFunc->class
             && 0 === (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
-        $called = $userFrame->calledArgs;
-        $snapshot = $isInstance ? array_slice($called, 1) : array_values($called);
+        $userCalled = [];
+        foreach ($userFrame->calledArgs as $idx => $var) {
+            $i = (int) $idx;
+            if ($isInstance) {
+                if ($i < 1) {
+                    continue;
+                }
+                $userCalled[$i - 1] = $var;
+            } else {
+                $userCalled[$i] = $var;
+            }
+        }
+        if ([] === $userCalled) {
+            return [];
+        }
+
+        $maxIdx = (int) max(array_keys($userCalled));
         $variadicIdx = $block->variadicParamIndex;
         $out = [];
-        foreach ($snapshot as $i => $callArg) {
+        for ($i = 0; $i <= $maxIdx; ++$i) {
             $useLive = null === $variadicIdx || $i < $variadicIdx;
             if ($useLive) {
-                $slot = $block->paramSlotForIndex((int) $i);
+                // Prefer the named CV — ARG_RECV slots can go stale after try/catch CFG splits (#24948).
+                $name = $block->paramNames[$i] ?? null;
+                if (null !== $name && '' !== $name) {
+                    $byName = $block->findVariableByRuntimeName($name, $userFrame);
+                    if (null !== $byName) {
+                        $out[] = $byName;
+                        continue;
+                    }
+                }
+                $slot = $block->paramSlotForIndex($i);
                 if (null !== $slot && isset($userFrame->scope[$slot])) {
                     $out[] = $userFrame->scope[$slot];
                     continue;
                 }
             }
-            $out[] = $callArg;
+            if (array_key_exists($i, $userCalled)) {
+                $out[] = $userCalled[$i];
+                continue;
+            }
+            $missing = new Variable();
+            $missing->null();
+            $out[] = $missing;
         }
 
         return $out;

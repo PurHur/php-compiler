@@ -108,8 +108,9 @@ class Native implements Call {
      */
     public function callWithArgMap(Context $context, array $args): Value {
         ksort($args);
-        // CallArgv / func_get_args: values in parameter-index order (holes omitted from the pack).
-        $sentArgs = array_values($args);
+        // CallArgv: parameter-index order with defaults for skipped named optionals (#24948).
+        // Keep $args sparse for RECV / LLVM binding; only the func_* snapshot is densified.
+        $sentArgs = $this->densifyCallArgvArgs($args);
         if (null !== $this->variadicArgIndex) {
             $this->enforceVariadicTrailingArgs($context, $args);
             $args = $this->packVariadicCallArgs($context, $args);
@@ -170,6 +171,58 @@ class Native implements Call {
             $this->function,
             ...$argValues
         );
+    }
+
+    /**
+     * Densify sparse named-arg maps for CallArgv / func_* (Zend zend_execute.c, #24948).
+     *
+     * Skips an implicit $this / NEW receiver prefix. Fills holes up to max passed index with
+     * {@see $defaultArgs} (indexed like LLVM params, including the receiver offset).
+     *
+     * @param array<int, Variable> $args
+     *
+     * @return list<Variable>
+     */
+    private function densifyCallArgvArgs(array $args): array
+    {
+        if ([] === $args) {
+            return [];
+        }
+        $prefix = 0;
+        if (
+            [] !== $this->paramNames
+            && \count($this->argTypes) === \count($this->paramNames) + 1
+        ) {
+            $prefix = 1;
+        }
+        $userArgs = [];
+        foreach ($args as $idx => $var) {
+            $i = (int) $idx;
+            if ($i < $prefix) {
+                continue;
+            }
+            $userArgs[$i - $prefix] = $var;
+        }
+        if ([] === $userArgs) {
+            return [];
+        }
+        if (array_is_list($userArgs)) {
+            return $userArgs;
+        }
+        $maxIdx = (int) max(array_keys($userArgs));
+        $out = [];
+        for ($i = 0; $i <= $maxIdx; ++$i) {
+            if (isset($userArgs[$i])) {
+                $out[] = $userArgs[$i];
+                continue;
+            }
+            $defaultIdx = $prefix + $i;
+            if (isset($this->defaultArgs[$defaultIdx])) {
+                $out[] = $this->defaultArgs[$defaultIdx];
+            }
+        }
+
+        return $out;
     }
 
     protected function compileArg(Context $context, Variable $arg, int $argNum): Value {

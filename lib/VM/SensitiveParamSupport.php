@@ -10,7 +10,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Builtin\SensitiveParameterValueDebugInfo;
 use PHPCompiler\VM\Builtin\SensitiveParameterValueGetValue;
 use PHPCompiler\ext\standard\VmIni;
-use PHPCfg\Func;
+use PHPCompiler\ext\standard\VmReflection;
 
 /**
  * #[\SensitiveParameter] trace redaction (PHP 8.2, Zend zend_builtin_functions.c, issue #3351).
@@ -118,35 +118,38 @@ final class SensitiveParamSupport
      */
     public static function buildArgsArray(Frame $frame): ?Variable
     {
-        if ([] === $frame->calledArgs || null === $frame->block) {
+        if (null === $frame->block || null === $frame->block->func || $frame->block->isMainScript()) {
             return null;
         }
 
-        $sensitive = $frame->block->paramSensitive;
-        if ([] === $sensitive) {
-            return self::copyArgsList($frame);
+        // Densify sparse named-arg maps (incl. skipped optionals) like Zend func_get_args (#24948).
+        $args = VmReflection::liveUserCallArgs($frame);
+        if ([] === $args && [] === $frame->calledArgs) {
+            return self::emptyArgsArray();
         }
 
-        $thisOffset = self::calledArgThisOffset($frame);
+        $sensitive = $frame->block->paramSensitive;
         $out = new Variable();
         $out->newArray();
         $ht = $out->toArray();
-        $paramCount = count($frame->block->paramNames);
-        for ($paramIdx = 0; $paramIdx < $paramCount; ++$paramIdx) {
-            $argIdx = $thisOffset + $paramIdx;
-            if (!array_key_exists($argIdx, $frame->calledArgs)) {
-                continue;
-            }
-            if (self::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
+        foreach ($args as $paramIdx => $arg) {
+            if (self::compileTimeParamIsSensitive($sensitive, (int) $paramIdx)) {
                 // Zend: wrap the real arg in SensitiveParameterValue (methods + getValue) (#22487).
-                $ht->append(self::wrapValue($frame->calledArgs[$argIdx]));
-
+                $ht->append(self::wrapValue($arg));
                 continue;
             }
             $copy = new Variable();
-            $copy->copyFrom($frame->calledArgs[$argIdx]->resolveIndirect());
+            $copy->copyFrom($arg->resolveIndirect());
             $ht->append($copy);
         }
+
+        return $out;
+    }
+
+    private static function emptyArgsArray(): Variable
+    {
+        $out = new Variable();
+        $out->newArray();
 
         return $out;
     }
@@ -252,33 +255,6 @@ final class SensitiveParamSupport
         }
 
         return $out;
-    }
-
-    private static function copyArgsList(Frame $frame): Variable
-    {
-        $out = new Variable();
-        $out->newArray();
-        $ht = $out->toArray();
-        foreach ($frame->calledArgs as $arg) {
-            $copy = new Variable();
-            $copy->copyFrom($arg->resolveIndirect());
-            $ht->append($copy);
-        }
-
-        return $out;
-    }
-
-    private static function calledArgThisOffset(Frame $frame): int
-    {
-        $func = $frame->block->func ?? null;
-        if (null === $func || null === $func->class) {
-            return 0;
-        }
-        if (($func->flags ?? 0) & Func::FLAG_STATIC) {
-            return 0;
-        }
-
-        return 1;
     }
 
     private static function markerClassEntry(): ClassEntry
