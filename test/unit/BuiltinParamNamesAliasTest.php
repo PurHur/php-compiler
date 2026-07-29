@@ -1396,14 +1396,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'delims', 'ucwords'));
     }
 
-    /** @covers issue #23242 */
+    /** @covers issue #23242 / #25070 */
     public function testRangeZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('range');
-        self::assertSame(['start', 'end', 'step'], $names);
+        self::assertSame(['start', 'end', 'step='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'range'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'end', 'range'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'step', 'range'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('range'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('range'));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'range',
+            2,
+            ['name' => 'step', 'type' => 'int', 'isOptional' => true],
+            false
+        ));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'range',
+            2,
+            ['name' => 'step', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(1, $dest->toInt());
         // Legacy InternalArgInfo names must not resolve (Zend rejects $low / $high)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'low', 'range'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'high', 'range'));

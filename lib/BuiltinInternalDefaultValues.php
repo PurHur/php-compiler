@@ -230,6 +230,10 @@ final class BuiltinInternalDefaultValues
         'iterator_to_array' => [
             1 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/standard/array.stub.php — int|float $step = 1 (InternalArgInfo int → 0) (#25070)
+        'range' => [
+            2 => ['kind' => 'int', 'value' => 1],
+        ],
     ];
 
     public static function isAvailable(

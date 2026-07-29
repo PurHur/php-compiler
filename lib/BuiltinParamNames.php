@@ -381,9 +381,9 @@ final class BuiltinParamNames
             case 'array_first':
             case 'array_last':
                 return ['array'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says low/high (#23242)
+            // php-src ext/standard/array.stub.php — start/end; step=1 (InternalArgInfo still says low/high) (#23242 / #25070)
             case 'range':
-                return ['start', 'end', 'step'];
+                return ['start', 'end', 'step='];
             case 'array_push':
                 return ['array', 'values'];
             case 'array_unshift':
