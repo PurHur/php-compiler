@@ -55,6 +55,22 @@ together 62 of 422 — while `spl` (121 executed), `mbstring` (45), `phar` (21),
 `xmlwriter` (20) are perfectly clean. `stdlib` and `language` carry the largest counts but the
 *lowest* rates (~5%). That makes the debt a scoping decision rather than a quality verdict.
 
+> **CORRECTION 2026-07-29 — those rates count cases the corpus declares inapplicable.** `--SKIPIF--`
+> was parsed and then never read by `test/BaseTest.php`, so every skip guard in the corpus was dead
+> (#24888). 671 cases carry one; 455 executed; **81 were failing in the baseline**, and at least 19
+> of those carry a guard that evaluates to `skip` — `no MYSQLI_TEST_DSN`, `no pg_connect (libpq
+> FFI)`, `requires PHP 8.4+`, `inotify unavailable`. Those are not compiler defects; they are
+> environment-unavailable cases counted as failures.
+>
+> Of the 56 failing `intl` cases, **46 carry an ignored guard** and 2 are confirmed skips. The other
+> 44 were *inconclusive* under a standalone evaluator, not "would run" — so the honest intl number
+> may drop by anywhere between 2 and 46, and the 88.9 % rate above cannot be relied on until a
+> collect is taken with SKIPIF honoured. `gmp` is unaffected: 6 failing, none of them skip cases.
+>
+> Fixed by #24897; the committed baselines predate it, so the next collect will move these cases out
+> of the failing set **and** out of the executed set. They should surface as DROPPED, not FIXED —
+> that distinction is the whole point of tracking the executed set (see the pattern below).
+
 ### The pattern worth carrying forward
 
 Nearly every problem found this week was a **check that reported success without executing**: a
@@ -65,6 +81,25 @@ reshuffled by a `git pull` mid-run.
 
 None was a wrong answer; all were absent answers wearing a clean result. So: **validate a gate by
 making it fail**, and distrust any zero or clean result until you know the check ran.
+
+Three more of the same shape landed on 2026-07-29, two of them in this plan's own tooling:
+
+- **`--SKIPIF--` parsed and never read** (#24888). 671 cases stated when they were inapplicable; the
+  harness discarded every statement. The corpus grew ~1,100 lines of hand-written
+  `str_contains($name, …)` rules in `VMTest.php` to do the same job — which is what gets built when
+  the declarative mechanism silently does nothing and nobody notices.
+- **The quarantine hid 6 real failures** (#24726). It was derived from two collects 15 commits
+  apart, so every "flip" was a change, not flakiness. Re-measured against a properly pinned pair:
+  8,112 executed cases, **exactly one** genuine flip. Held constant, both suites are deterministic —
+  VMTest and JITTest alike.
+- **A baseline of failing names cannot tell "fixed" from "no longer run".** The nightly reported
+  four cases as FIXED that do not execute at all, and the prescribed response to FIXED is
+  "regenerate the baseline" — which would have deleted them from tracking permanently. The collector
+  now records the **executed** set and splits FIXED / DROPPED / NEWLY EXECUTED (#24835).
+
+The generalisation: it is not enough for a check to run. It must be impossible to satisfy it by
+*absence* — a case vanishing, a guard never evaluated, a set never compared. Whenever a gate's
+happy path is "nothing to report", ask what would produce that output if the subject disappeared.
 
 ## Diagnosis
 
