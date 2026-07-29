@@ -43931,6 +43931,58 @@ class Compiler {
                                     ) {
                                         continue;
                                     }
+                                    // $d->appendChild($d->createElement('root')); importNode($src->documentElement, true)
+                                    // — typed appendChild/createElement are prior statements, not importNode
+                                    // args; ordinal matching would bind deep to documentElement (#24571, re-#18860).
+                                    if (
+                                        property_exists($mixedProducer, 'result')
+                                        && (
+                                            null === $mixedProducer->result
+                                            || empty($mixedProducer->result->usages)
+                                        )
+                                    ) {
+                                        continue;
+                                    }
+                                    $feedsLaterCallProducer = false;
+                                    foreach ($mixedProducers as $laterProducer) {
+                                        if ($laterProducer === $mixedProducer) {
+                                            continue;
+                                        }
+                                        if (
+                                            !(
+                                                $laterProducer instanceof Op\Expr\MethodCall
+                                                || $laterProducer instanceof Op\Expr\FuncCall
+                                                || $laterProducer instanceof Op\Expr\NsFuncCall
+                                                || $laterProducer instanceof Op\Expr\StaticCall
+                                            )
+                                        ) {
+                                            continue;
+                                        }
+                                        $laterIndex = array_search(
+                                            $laterProducer,
+                                            $block->orig->children,
+                                            true
+                                        );
+                                        if (
+                                            !\is_int($laterIndex)
+                                            || $laterIndex <= $mixedProducerIndex
+                                        ) {
+                                            continue;
+                                        }
+                                        if (
+                                            null !== $mixedProducer->result
+                                            && $this->cfgExprUsesOperand(
+                                                $laterProducer,
+                                                $mixedProducer->result
+                                            )
+                                        ) {
+                                            $feedsLaterCallProducer = true;
+                                            break;
+                                        }
+                                    }
+                                    if ($feedsLaterCallProducer) {
+                                        continue;
+                                    }
                                 }
                                 $orderedMixed[] = $mixedProducer;
                                 continue;
@@ -43942,6 +43994,23 @@ class Compiler {
                                 }
                             }
                         }
+                        // PropertyFetch + ConstFetch only (prior MethodCalls filtered) — fall through
+                        // to propertyFetchPreludeMatchingCallArg / bool ConstFetch folding (#24571).
+                        $orderedMixedHasCallProducer = false;
+                        foreach ($orderedMixed as $orderedProducer) {
+                            if (
+                                $orderedProducer instanceof Op\Expr\MethodCall
+                                || $orderedProducer instanceof Op\Expr\FuncCall
+                                || $orderedProducer instanceof Op\Expr\NsFuncCall
+                                || $orderedProducer instanceof Op\Expr\StaticCall
+                            ) {
+                                $orderedMixedHasCallProducer = true;
+                                break;
+                            }
+                        }
+                        if (!$orderedMixedHasCallProducer) {
+                            // leave mixedMatched unset; outer paths wire PropertyFetch + true
+                        } else {
                         $mixedMatched = null;
                         if (\count($orderedMixed) === $mixedDeadTempCount) {
                             $mixedMatched = $orderedMixed[(int) $argIndex] ?? null;
@@ -43983,6 +44052,7 @@ class Compiler {
                                 continue;
                             }
                         }
+                        } // orderedMixedHasCallProducer
                     }
                 }
             }
