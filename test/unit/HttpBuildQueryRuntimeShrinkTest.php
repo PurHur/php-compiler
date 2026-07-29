@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\VmHttpBuildQuery;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
-/** StringHttpBuildQuery must route through HttpBuildQueryJitHelper PHP, not LLVM walker (#9443). */
+/** StringHttpBuildQuery via HttpBuildQueryJitHelper + JitVmHelperLink::ensureCompiled (#9443, #24887). */
 final class HttpBuildQueryRuntimeShrinkTest extends TestCase
 {
     public function testStringHttpBuildQueryUsesJitHelperNotLlvmWalker(): void
@@ -22,6 +22,19 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('__hashtable__setStringKeyString', $source);
         $this->assertStringNotContainsString('strkey_node', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHttpBuildQueryStandaloneLlvm.php');
+    }
+
+    public function testStringHttpBuildQueryUsesJitVmHelperLinkEnsureCompiled(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHttpBuildQuery.php');
+        $this->assertStringContainsString('HttpBuildQueryJitHelper::build', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
     public function testHttpBuildQueryJitHelperDelegatesToVmHttpBuildQuery(): void
