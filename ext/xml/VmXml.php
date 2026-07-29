@@ -156,24 +156,81 @@ final class VmXml
             throw new \ValueError('xml_parse(): Argument #1 ($parser) must be a valid XML parser');
         }
 
-        if (!$isFinal) {
-            return 1;
+        // php-src XML_Parse(parser, data, len, isFinal): non-final chunks still feed Expat
+        // and may fire SAX handlers; only EOF incompleteness is deferred (#24647).
+        $state = self::$parsers[$parser];
+        if (!empty($state['finished'])) {
+            // Expat returns 0 with no new error code after a prior isFinal document.
+            return 0;
         }
 
-        $error = self::validateWellFormed($data);
-        if (null === $error) {
-            self::recordSuccessfulParse($parser, $data);
-            if (null !== $parserObject) {
-                VmXmlSaxDispatcher::dispatch($ctx, $parserObject, $data, $frame);
+        $state['buffer'] = ($state['buffer'] ?? '').$data;
+        self::$parsers[$parser] = $state;
+        $accumulated = $state['buffer'];
+
+        if ('' === $accumulated) {
+            if (!$isFinal) {
+                return 1;
             }
+            $error = self::validateWellFormed($accumulated);
+            if (null === $error) {
+                self::$parsers[$parser]['finished'] = true;
+
+                return 1;
+            }
+            self::recordParserError($parser, $error, $accumulated);
+            \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
+            self::$parsers[$parser]['finished'] = true;
+
+            return 0;
+        }
+
+        $error = self::validateWellFormed($accumulated);
+        if (null === $error) {
+            self::recordSuccessfulParse($parser, $accumulated);
+            $state = self::$parsers[$parser];
+            if (null !== $parserObject && empty($state['saxDispatched'])) {
+                VmXmlSaxDispatcher::dispatch($ctx, $parserObject, $accumulated, $frame);
+                $state['saxDispatched'] = true;
+            }
+            if ($isFinal) {
+                $state['finished'] = true;
+                $state['buffer'] = '';
+            }
+            self::$parsers[$parser] = $state;
 
             return 1;
         }
 
-        self::recordParserError($parser, $error, $data);
+        // Incomplete token / unclosed root while more data may arrive — Expat returns success
+        // with error code 0 until isFinal (php-src ext/xml/xml.c XML_Parse).
+        if (!$isFinal && self::isRecoverableIncompleteError($error)) {
+            return 1;
+        }
+
+        self::recordParserError($parser, $error, $accumulated);
         \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
+        if ($isFinal) {
+            // Do not clobber diagnostics recorded above with a stale $state copy.
+            self::$parsers[$parser]['finished'] = true;
+        }
 
         return 0;
+    }
+
+    /**
+     * Errors that mean "need more input" rather than a hard well-formedness failure.
+     *
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int} $error
+     */
+    private static function isRecoverableIncompleteError(array $error): bool
+    {
+        $code = $error['code'];
+
+        return self::XML_ERR_TAG_NOT_FINISHED === $code
+            || self::XML_ERR_UNCLOSED_NODE_TAG === $code
+            || self::XML_ERR_NAME_REQUIRED === $code
+            || 4 === $code; // empty / not-well-formed token at EOF — deferred until isFinal
     }
 
     private static function clearParserDiagnostics(int $parser): void

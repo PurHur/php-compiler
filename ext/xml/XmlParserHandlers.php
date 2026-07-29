@@ -48,6 +48,11 @@ final class XmlParserHandlers
             'line' => 0,
             'column' => 0,
             'byteIndex' => 0,
+            // Accumulated feed for xml_parse(..., $is_final=false) chunks (php-src XML_Parse; #24647).
+            'buffer' => '',
+            'saxDispatched' => false,
+            // After is_final=true Expat rejects further XML_Parse (php-src; #24647).
+            'finished' => false,
             'nsAware' => false,
             'nsSeparator' => ':',
             'options' => [
