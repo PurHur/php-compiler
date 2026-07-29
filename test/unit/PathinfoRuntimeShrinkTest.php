@@ -44,6 +44,13 @@ final class PathinfoRuntimeShrinkTest extends TestCase
         );
     }
 
+    /** php-src php_pathinfo options==0 → '' (#24941). */
+    public function testPathinfoFlagsZeroReturnsEmptyString(): void
+    {
+        $this->assertSame('', VmString::pathinfo('/a/b.txt', 0));
+        $this->assertSame('string', \gettype(VmString::pathinfo('/a/b.txt', 0)));
+    }
+
     public function testSpineBundleIncludesPathinfoJitHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');

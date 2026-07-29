@@ -12,6 +12,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\StringPathinfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
@@ -24,6 +25,9 @@ final class JitPathinfo
         $pathVal = JitFilestatArg::lowerPathComponentFilename($context, $path, 'pathinfo', 0, 'path');
         $maskConst = 15;
         if (null !== $flags) {
+            if (JITVariable::TYPE_NULL === $flags->type || ($flags->isNullConstant ?? false)) {
+                self::emitNullFlagsDeprecation($context);
+            }
             $resolved = self::tryResolveFlags($context, $flags);
             if (null === $resolved) {
                 throw new \LogicException(
@@ -33,8 +37,9 @@ final class JitPathinfo
             $maskConst = $resolved;
         }
         $mask = $maskConst & 15;
+        // php-src php_pathinfo(): options==0 → empty string (not empty array). #24941
         if (0 === $mask) {
-            return self::buildAllArray($context, []);
+            return $context->builder->load($context->constantStringFromString(''));
         }
 
         $literal = $path->compileTimeString ?? null;
@@ -93,6 +98,10 @@ final class JitPathinfo
 
     public static function tryResolveFlags(Context $context, JITVariable $flags): ?int
     {
+        // php-src: null flags deprecate+coerce to 0 (#24941)
+        if (JITVariable::TYPE_NULL === $flags->type || ($flags->isNullConstant ?? false)) {
+            return 0;
+        }
         $constName = $flags->compileTimeConstantName ?? null;
         if (null !== $constName) {
             $lookup = strtolower($constName);
