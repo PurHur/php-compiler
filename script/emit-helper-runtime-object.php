@@ -516,6 +516,7 @@ if (in_array('--prelink', $argv, true)) {
         'arch' => $arch,
         'role' => 'committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally',
         'core_fingerprint' => HelperRuntimeCache::coreFingerprint(),
+        'llvm_identity_token' => HelperRuntimeCache::llvmIdentityToken(),
         'unit_count' => $published,
         'total_bytes' => $totalBytes,
         'refresh' => 'php script/emit-helper-runtime-object.php --prelink (pinned env)',
