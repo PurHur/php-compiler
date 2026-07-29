@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
@@ -23,12 +23,11 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 use llvm\LLVMValueRef_ptr;
 
 /**
- * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542, #21212).
+ * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542, #21212, #24943).
  *
- * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\PregJitHelper}
- * (IniRuntime #21200 / IncludePath #20877 shape — no dishonest Kernel stub fork).
- * Common metacharacter patterns under thin AOT use {@see PregJitHelperThinAot} +
- * {@see \PHPCompiler\ext\standard\PregAotFastPath} (#24115) until VmPregEngine NestedJIT
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (peer StringPack
+ * #22842 / VariableFunctionCall #24902). Embed uses PregJitHelper + VmPreg*; thin standalone
+ * AOT uses PregJitHelperThinAot + PregAotFastPath (#24115) until VmPregEngine NestedJIT
  * lands (#16075).
  * preg_replace_callback uses PHP match loop + thin LLVM callback invoke (#13736).
  * php-src: ext/pcre/php_pcre.c
@@ -570,100 +569,34 @@ final class PregMatchRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
         // Thin standalone AOT: VmPregPure NestedJIT still hits CFG/property gaps (#16075).
         // Use PregJitHelperThinAot (fast paths, no Native→Pure) to avoid AOT segfault (#24115).
         // JIT/embed keeps PregJitHelper + Native (Pure resolves under MCJIT).
-        $helperRel = $context->isThinStandaloneAotMain()
-            ? '/ext/standard/PregJitHelperThinAot.php'
-            : self::HELPER_PATH;
-        $paths = [
-            $root.'/ext/standard/StdlibConstants.php',
-            $root.'/ext/standard/VmPregPattern.php',
-            $root.'/ext/standard/VmPregNative.php',
-            $root.'/ext/standard/VmPregMatches.php',
-            $root.$helperRel,
-        ];
-        // Thin AOT helper does not call Native/Matches — skip compiling them.
-        if ($context->isThinStandaloneAotMain()) {
-            $paths = [
-                $root.'/ext/standard/StdlibConstants.php',
-                $root.'/ext/standard/PregAotFastPath.php',
-                $root.$helperRel,
+        $bundle = $context->isThinStandaloneAotMain()
+            ? [
+                '/ext/standard/StdlibConstants.php',
+                '/ext/standard/PregAotFastPath.php',
+                '/ext/standard/PregJitHelperThinAot.php',
+            ]
+            : [
+                '/ext/standard/StdlibConstants.php',
+                '/ext/standard/VmPregPattern.php',
+                '/ext/standard/VmPregNative.php',
+                '/ext/standard/VmPregMatches.php',
+                self::HELPER_PATH,
             ];
-        }
         foreach (['add', 'updateindex', 'append'] as $htMethod) {
             NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
         }
         foreach (['null', 'int', 'string', 'array'] as $varMethod) {
             NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
         }
-        NestedVmActiveContextLlvm::ensureMethod($context);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths): void {
-            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
-            if (\function_exists('putenv')) {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-                putenv('PHP_COMPILER_SELFHOST_AOT=0');
-                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
-                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
-            }
-            try {
-                $jit = new JIT($context);
-                foreach ($paths as $includePath) {
-                    $real = \realpath($includePath) ?: $includePath;
-                    if ($context->hasJitIncludedFileCompiled($real)) {
-                        continue;
-                    }
-                    $block = $runtime->parseAndCompile(
-                        (string) \file_get_contents($includePath),
-                        \basename($includePath)
-                    );
-                    if (null === $block) {
-                        throw new \LogicException(\basename($includePath).' parseAndCompile failed (#9542)');
-                    }
-                    $jit->compile($block);
-                    $context->markJitIncludedFileCompiled($real);
-                }
-            } finally {
-                if (\function_exists('putenv')) {
-                    if (false === $prevUser || '' === (string) $prevUser) {
-                        putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                        unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-                    } else {
-                        putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUser);
-                        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
-                        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
-                    }
-                    if (false === $prevSelf || '' === (string) $prevSelf) {
-                        putenv('PHP_COMPILER_SELFHOST_AOT=');
-                        unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
-                    } else {
-                        putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelf);
-                        $_ENV['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
-                        $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
-                    }
-                }
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT preg (#9542)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            $bundle,
+            self::COMPILED_HELPERS,
+            '#24943'
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void

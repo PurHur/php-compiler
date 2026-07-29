@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\PregJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** preg_* JIT: always PregJitHelper NestedJIT — no dishonest Kernel stubs (#9542, #21212). */
+/** preg_* JIT: PregJitHelper via JitVmHelperLink::ensureCompiledBundle — no dishonest Kernel stubs (#9542, #21212, #24943). */
 final class PregMatchRuntimeShrinkTest extends TestCase
 {
     public function testStringPregMatchJitIsThinDispatcher(): void
@@ -31,6 +31,11 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('StringFormat::ensureLinked', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('pcre2_compile', $source);
         $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm', $source);
         $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
