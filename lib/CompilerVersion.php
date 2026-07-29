@@ -1287,6 +1287,23 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ `static class` declarations (Zend/zend_language_parser.y, #24894, re-#6929).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile and
+     * `PHP_COMPILER_PROFILE=8.2` parse-reject like Zend 8.2 (`unexpected token "class"`).
+     * `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset profile keeps this false.
+     * Forward profile via `PHP_COMPILER_PROFILE=8.4` enables strip/annotate via
+     * {@see Ast\StaticClassPreprocessor}.
+     *
+     * Compliance reject cases must SKIPIF on PROFILE env, not this method — otherwise a
+     * wrongly-true gate would skip the guard and reopen the regression silently.
+     */
+    public static function supportsStaticClass(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ `lazy` property modifier — deferred default initializer (#16813).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
