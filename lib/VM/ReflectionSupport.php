@@ -473,6 +473,15 @@ final class ReflectionSupport
         if ($classEntry->isEnum) {
             throw new \Error("Cannot instantiate enum {$classEntry->name}");
         }
+        if ($classEntry->isInterface) {
+            throw new \Error("Cannot instantiate interface {$classEntry->name}");
+        }
+        if ($classEntry->isTrait) {
+            throw new \Error("Cannot instantiate trait {$classEntry->name}");
+        }
+        if ($classEntry->isAbstract) {
+            throw new \Error("Cannot instantiate abstract class {$classEntry->name}");
+        }
         $object = new ObjectEntry($classEntry);
         $result = new Variable();
         $result->object($object);
