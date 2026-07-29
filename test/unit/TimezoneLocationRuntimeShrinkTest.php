@@ -8,13 +8,19 @@ use PHPCompiler\ext\standard\TimezoneLocationJitHelper;
 use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPUnit\Framework\TestCase;
 
-/** TimezoneLocationRuntime routes through TimezoneLocationJitHelper PHP not zone.tab LLVM (#9451). */
+/** TimezoneLocationRuntime routes through TimezoneLocationJitHelper PHP not zone.tab LLVM (#9451, #24801). */
 final class TimezoneLocationRuntimeShrinkTest extends TestCase
 {
     public function testTimezoneLocationRuntimeRoutesThroughJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/TimezoneLocationRuntime.php');
         $this->assertStringContainsString('TimezoneLocationJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('exportZoneTabEntries', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
         $this->assertStringNotContainsString('emitLocationHashtable', $source);
