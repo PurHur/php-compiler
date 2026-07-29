@@ -149,7 +149,9 @@ final class MethodVisibility
             if ($callerClassLc === $declaringClassLc) {
                 return;
             }
-            if (null !== $isSameOrSubclassOf && $isSameOrSubclassOf($callerClassLc, $declaringClassLc)) {
+            if (null !== $isSameOrSubclassOf
+                && ($isSameOrSubclassOf($callerClassLc, $declaringClassLc)
+                    || $isSameOrSubclassOf($declaringClassLc, $callerClassLc))) {
                 return;
             }
             // Zend allows protected access anywhere in the inheritance chain — parent can call
