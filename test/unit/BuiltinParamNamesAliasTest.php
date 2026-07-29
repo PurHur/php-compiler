@@ -1257,14 +1257,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($mime, 'imagetype', 'image_type_to_mime_type'));
     }
 
-    /** @covers issue #23642 */
+    /** @covers issue #23642 / #24568 */
     public function testInflateDeflateInitZendStubNamedParams(): void
     {
         foreach (['inflate_init', 'deflate_init'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
-            self::assertSame(['encoding', 'options'], $names, $fn);
+            self::assertSame(['encoding', 'options='], $names, $fn);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn), $fn);
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'options', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
         }
     }
 
@@ -2306,5 +2307,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
             ['stream', 'data', 'length='],
             BuiltinParamNames::paramNamesForInternalFunction('gzputs')
         );
+    }
+
+    /** @covers issue #24568 */
+    public function testDeflateInflateNamedParamsResolve(): void
+    {
+        self::assertSame(['encoding', 'options='], BuiltinParamNames::forFunction('deflate_init'));
+        self::assertSame(['encoding', 'options='], BuiltinParamNames::forFunction('inflate_init'));
+        self::assertSame(['context', 'data', 'flush_mode='], BuiltinParamNames::forFunction('deflate_add'));
+        self::assertSame(['context', 'data', 'flush_mode='], BuiltinParamNames::forFunction('inflate_add'));
+
+        $deflateInit = BuiltinParamNames::forFunction('deflate_init');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($deflateInit, 'encoding', 'deflate_init'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($deflateInit, 'options', 'deflate_init'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('deflate_init'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('deflate_init'));
+
+        $inflateAdd = BuiltinParamNames::forFunction('inflate_add');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($inflateAdd, 'context', 'inflate_add'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($inflateAdd, 'data', 'inflate_add'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($inflateAdd, 'flush_mode', 'inflate_add'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($inflateAdd, 'encoded_data', 'inflate_add'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('inflate_add'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('inflate_add'));
     }
 }

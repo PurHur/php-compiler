@@ -1022,10 +1022,13 @@ final class BuiltinParamNames
                 return ['stream', 'length='];
             case 'gzuncompress':
                 return ['data', 'max_length='];
-            // php-src ext/zlib/zlib.stub.php — InternalArgInfo omits options on inflate_init (#23642)
+            // php-src ext/zlib/zlib.stub.php — options/flush_mode optional; inflate_add data not encoded_data (#23642, #24568)
             case 'inflate_init':
             case 'deflate_init':
-                return ['encoding', 'options'];
+                return ['encoding', 'options='];
+            case 'deflate_add':
+            case 'inflate_add':
+                return ['context', 'data', 'flush_mode='];
             case 'array_search':
                 return ['needle', 'haystack', 'strict'];
             case 'array_rand':
