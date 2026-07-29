@@ -81,4 +81,27 @@ final class ExternalMethodBindTest extends TestCase
         $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
         $this->assertNull(ExternalMethodBind::tryBind($ctx, 'otherchunk\\widget::paint'));
     }
+
+    /**
+     * Bound Native::$argTypes must be PHPLLVM\Type objects — string names make
+     * getStringFromType() TypeError and break cold-build under helper-runtime (#24636).
+     */
+    public function testTryBindNativeArgTypesAreLlvmTypesNotStrings(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $i64 = $ctx->getTypeFromString('int64');
+        $void = $ctx->getTypeFromString('void');
+        $fn = $ctx->module->addFunction(
+            '__test_externalmethodbind_argtypes',
+            $ctx->context->functionType($void, false, $i64)
+        );
+        $proxy = 'phpcompiler\\ext\\standard\\errorsilencejithelper::seterrorreporting';
+        $ctx->functions[$proxy] = $fn;
+        $bound = ExternalMethodBind::tryBind($ctx, $proxy);
+        $this->assertInstanceOf(JIT\Call\Native::class, $bound);
+        $this->assertCount(1, $bound->argTypes);
+        $this->assertInstanceOf(\PHPLLVM\Type::class, $bound->argTypes[0]);
+        $this->assertSame('int64', $ctx->getStringFromType($bound->argTypes[0]));
+    }
 }

@@ -76,9 +76,10 @@ final class ExternalMethodBind
             return null;
         }
 
+        // Native::$argTypes must be PHPLLVM\Type objects — callers use getStringFromType() (#24636).
         $argTypes = [];
         for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
-            $argTypes[] = $context->getStringFromType($fn->getParam($i)->typeOf());
+            $argTypes[] = $fn->getParam($i)->typeOf();
         }
         $native = new Call\Native($fn, $proxyName, $argTypes);
         $context->functionProxies[$lc] = $native;
