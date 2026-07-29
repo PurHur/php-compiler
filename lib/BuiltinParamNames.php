@@ -848,6 +848,10 @@ final class BuiltinParamNames
             case 'str_starts_with':
             case 'str_ends_with':
                 return ['haystack', 'needle'];
+            // php-src ext/standard/string.stub.php — str_increment/str_decrement (#24577)
+            case 'str_increment':
+            case 'str_decrement':
+                return ['string'];
             // php-src ext/standard/string.stub.php — named dispatch uses forFunction (#23182, re-#16616, #24038)
             case 'strpos':
             case 'stripos':
