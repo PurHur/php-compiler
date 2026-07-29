@@ -460,6 +460,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['socket', 'level', 'option', 'value'], BuiltinParamNames::forFunction('socket_setopt'));
     }
 
+    /** @covers issue #24642 */
+    public function testSocketStrerrorErrorCodeZendStubNamedParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('socket_strerror');
+        self::assertSame(['error_code'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', 'socket_strerror'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errno', 'socket_strerror'));
+        self::assertSame(
+            ['error_code'],
+            BuiltinParamNames::paramNamesForInternalFunction('socket_strerror')
+        );
+    }
+
     /** @covers issue #10045 */
     public function testFileGetContentsFilenameNamedParameter(): void
     {

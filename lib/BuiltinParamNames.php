@@ -623,6 +623,9 @@ final class BuiltinParamNames
             case 'socket_set_option':
             case 'socket_setopt':
                 return ['socket', 'level', 'option', 'value'];
+            // php-src ext/sockets/sockets.stub.php — InternalArgInfo still says errno (#24642)
+            case 'socket_strerror':
+                return ['error_code'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says read_streams/tv_sec (#23598)
             case 'stream_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
