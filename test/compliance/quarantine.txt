@@ -15,3 +15,25 @@
 # interface_abstract_static_call and dnf_return_type_error as suspected flaky, but suspicion is not
 # measurement — each needs two full runs of one commit showing it on one side and not the other
 # before it is quarantined here. Adding them on reputation would hide real regressions.
+
+# ---------------------------------------------------------------------------
+# Measured 2026-07-29 (#24672): two complete 24-shard VMTest runs of the SAME
+# commit, zero timeouts, differed on these 9 cases. 422 of 431 distinct failing
+# names were identical, so the suite is ~98% deterministic — these are the gap.
+#
+# Direction recorded because it decides the damage: a case in the baseline that
+# starts passing reads as a phantom FIX; one absent from it that starts failing
+# reads as a phantom REGRESSION, which is what wastes someone's afternoon.
+
+# failed in run 1, passed in run 2 (were in the baseline -> phantom fixes)
+stdlib/mt_getrandmax_jit                      # randomness (#24672)
+stdlib/stream_resolve_include_path_dot        # include-path resolution (#24672)
+stdlib/string_builtin_null_coerce_batch2      # flips in lockstep with its _jit twin (#24672)
+stdlib/string_builtin_null_coerce_batch2_jit  # flips in lockstep with the plain variant (#24672)
+
+# passed in run 1, failed in run 2 (absent from the baseline -> phantom regressions)
+language/reflection_property_is_abstract      # (#24672)
+stdlib/hrtime_nanosecond_precision            # confirms the AGENTS.md hrtime* suspicion with data (#24672)
+stdlib/mkdir                                  # filesystem state; flips with its _jit twin (#24672)
+stdlib/mkdir_jit                              # filesystem state; flips with the plain variant (#24672)
+stdlib/pcntl_setns                            # namespace availability (#24672)
