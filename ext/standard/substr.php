@@ -47,7 +47,9 @@ final class substr extends Internal
                 $argc
             ));
         }
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'substr', 0, 'string');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#24817; reverts #24694/#18980 TypeError).
+        // TypeError for null→string is PHP 9.0 (RFC deprecate_null_to_scalar_internal_arg), not 8.4.
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -104,7 +106,12 @@ final class substr extends Internal
         if (null === $strLit
             && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
         ) {
-            $strLit = null;
+            // Soft-null fold outside strict_types (#24817 / #21189); strict keeps TypeError path.
+            if ($context->callerStrictTypes) {
+                $strLit = null;
+            } else {
+                $strLit = '';
+            }
         }
         if (null !== $strLit) {
             $offsetLit = self::compileTimeSignedLong($context, $args[1]);
@@ -137,10 +144,11 @@ final class substr extends Internal
             }
         }
 
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#24817; peer strpos #21189).
         if ($context->callerStrictTypes) {
             $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
         } else {
-            $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr', 0, 'string');
+            $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr', 0, 'string');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_str_cont');
         $structName = $str->typeOf()->getElementType()->getName();
