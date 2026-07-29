@@ -7955,7 +7955,11 @@ class Compiler {
     }
 
     /**
-     * Fold lowered match() in class constant initializers (#9987, zend_const_expr_to_zval).
+     * Historical fold for lowered match() in class constant initializers (#9987).
+     *
+     * Unreachable for honest php-src-strict: match is not a const-expr
+     * ({@see ThrowInClassConstCompileCheck}, #24904). Kept so accidental CFG shapes
+     * still resolve rather than silently emitting a wrong constant.
      *
      * @param list<Op> $defaultBlockChildren
      */
