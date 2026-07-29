@@ -805,6 +805,9 @@ final class BuiltinParamNames
                 return ['value', 'flags', 'depth'];
             case 'json_decode':
                 return ['json', 'associative', 'depth', 'flags'];
+            // php-src ext/json/json.stub.php — missing from InternalArgInfo (#23876)
+            case 'json_validate':
+                return ['json', 'depth=', 'flags='];
             case 'filter_var':
                 return ['value', 'filter', 'options'];
             // php-src ext/filter/filter.stub.php — InternalArgInfo still says data/definition (#23598)
