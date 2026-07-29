@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
 
 /**
  * DOMDocument::importNode() for compiled JIT/AOT modules (#19212).
@@ -70,7 +71,7 @@ final class DomImportNodeJitHelper
         return $var->toObject();
     }
 
-    /** DOMDocument::createAttributeNS() — user-script AOT (#19265). */
+    /** DOMDocument::createAttributeNS() — user-script AOT (#19265, #24804). */
     public static function createAttributeNSArgv(
         Context $ctx,
         ObjectEntry $document,
@@ -79,22 +80,25 @@ final class DomImportNodeJitHelper
     ): ObjectEntry {
         $ns = '' === $namespace ? null : $namespace;
         $var = VmDom::documentCreateAttributeNS($ctx, $document, $ns, $qualifiedName, null);
-        if (\PHPCompiler\VM\Variable::TYPE_OBJECT !== $var->type) {
-            throw new \DOMException('Invalid State Error', 11);
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
         }
 
         return $var->toObject();
     }
 
-    /** DOMDocument::createAttribute() — JIT/AOT (#20676). */
+    /** DOMDocument::createAttribute() — JIT/AOT (#20676, #24804). */
     public static function createAttributeArgv(
         Context $ctx,
         ObjectEntry $document,
         string $name
     ): ObjectEntry {
         $var = VmDom::createAttribute($ctx, $name, $document);
-        if (\PHPCompiler\VM\Variable::TYPE_OBJECT !== $var->type) {
-            throw new \DOMException('Invalid State Error', 11);
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \DOMException(
+                'Invalid Character Error',
+                DomExceptionConstants::INVALID_CHARACTER_ERR
+            );
         }
 
         return $var->toObject();

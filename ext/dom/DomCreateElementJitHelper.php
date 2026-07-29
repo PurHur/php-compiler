@@ -8,7 +8,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
-/** DOMDocument::createElement() with optional value for JIT/AOT (#18938, #18951). */
+/** DOMDocument::createElement() with optional value for JIT/AOT (#18938, #18951, #24804). */
 final class DomCreateElementJitHelper
 {
     public static function createElementArgv(
@@ -17,7 +17,16 @@ final class DomCreateElementJitHelper
         string $name,
         string $value = ''
     ): ObjectEntry {
-        return VmDom::createElement($ctx, $name, $document, $value)->toObject();
+        $var = VmDom::createElement($ctx, $name, $document, $value);
+        // NestedJIT ABI is __object__*; non-strict false is VM/JIT-only (#24804).
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \DOMException(
+                'Invalid Character Error',
+                DomExceptionConstants::INVALID_CHARACTER_ERR
+            );
+        }
+
+        return $var->toObject();
     }
 
     public static function appendObjectArgv1(ObjectEntry $parent, ObjectEntry $child): void
