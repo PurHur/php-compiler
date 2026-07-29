@@ -66,6 +66,17 @@ Still avoid changing `--shards=N` mid-run (that re-partitions everything). Disab
 mid-run is now membership-safe for the *other* cases (#24498); re-run the shard that owned the
 disabled case (and any shard that gains it if you re-enable later), not necessarily the full set.
 
+The same applies to the **scripts and the working tree generally**. Long runs execute in a container
+bind-mounting the repo (`-v /root/php-compiler:/app`), and each shard re-invokes
+`script/shard-compliance.sh` from disk. So an edit, a merge, or a `git pull` during a run lands
+*inside* the running job. It has already happened here: `shard-compliance.sh` changed 2.5 h into a
+24-shard run, so shards 0–1 used one version and shards 2+ another. That change only added a marker
+file, so the partition was unaffected — but had it touched shard selection, half the run would have
+used a different partition with no sign in the results.
+
+While a long run is in flight: edit only files the run does not read, and do not `git pull`. Land
+anything that touches the run's own scripts afterwards.
+
 ### 3. Silent wrong output is the characteristic failure mode
 
 The compliance suite asserts against **recorded** expectations, so it only catches what someone
