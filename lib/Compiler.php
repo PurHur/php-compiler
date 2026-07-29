@@ -16298,11 +16298,14 @@ class Compiler {
                     // var_export([array_any([], fn), array_all([], fn)]) — stmt-before Array_ (#14516).
                     // new C([...]) in param/static defaultBlocks: php-cfg often leaves the ctor arg
                     // as inferred unknown/mixed while Array_.result is int[] (#22390, #8561).
+                    // var_export([...new ArrayIterator([...])]) — unpack Array_ is inferred unknown
+                    // while an earlier ctor Array_ sits before New_; bind stmt-before (#24645).
                     // Do not apply the New_ fallback to typed null/scalar dead temps — that steals
                     // the trailing Array_ for `new C(null, [...])` (#22770).
                     $deadTempWantsArray = $this->callArgIsDeadInlineTemporary($callArgProbe)
                         && (
                             $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            || $this->callArgIsDeadUnknownOrMixedTemporary($callArgProbe)
                             || $this->newCtorDeadTempMayBindStmtBeforeArray(
                                 $callArgProbe,
                                 $callOp,
@@ -19036,6 +19039,85 @@ class Compiler {
         }
 
         return $slots;
+    }
+
+    /**
+     * Result slot of the last TYPE_ARRAY_SPREAD after FUNCCALL_EXEC_RETURN (#24645).
+     *
+     * Distinguishes `[...new ArrayIterator($ctorArray)]` (spread result) from the ctor
+     * Array_ when both appear around the same call-arg wiring.
+     *
+     * @param list<OpCode> $pendingOps
+     */
+    private function slotForArraySpreadResultAfterLastExecReturn(Block $block, array $pendingOps = []): ?string
+    {
+        $ops = array_merge($block->opCodes, $pendingOps);
+        $start = 0;
+        for ($i = \count($ops) - 1; $i >= 0; --$i) {
+            $type = $ops[$i]->type;
+            // EXEC_NORETURN (var_export) must bound like EXEC_RETURN so a later plain
+            // array arg is not rewired to a prior [...$x] spread slot (#24645).
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $type
+            ) {
+                $start = $i + 1;
+                break;
+            }
+        }
+        $slot = null;
+        for ($i = $start, $n = \count($ops); $i < $n; ++$i) {
+            $op = $ops[$i];
+            if (OpCode::TYPE_ARRAY_SPREAD === $op->type && null !== $op->arg1) {
+                $slot = (string) $op->arg1;
+            }
+        }
+
+        return $slot;
+    }
+
+    /**
+     * Rewire sole dead-array ARG_SEND to the ARRAY_SPREAD result after nested New_ (#24645).
+     *
+     * @param list<OpCode> $argSends
+     *
+     * @return list<OpCode>
+     */
+    private function rewriteCallArgSendsForArraySpreadResult(array $argSends, Block $block, ?Op $cfgCallOp): array
+    {
+        if (null === $cfgCallOp || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return $argSends;
+        }
+        $spreadSlot = $this->slotForArraySpreadResultAfterLastExecReturn($block, $argSends);
+        if (null === $spreadSlot) {
+            return $argSends;
+        }
+        $sendOps = [];
+        foreach ($argSends as $op) {
+            if ($op instanceof OpCode && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendOps[] = $op;
+            }
+        }
+        if (1 !== \count($sendOps)) {
+            return $argSends;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (
+            !$callArg instanceof Operand
+            || !$this->callArgIsDeadInlineTemporary($callArg)
+            || !(
+                $this->callArgOperandExpectsArrayProducer($callArg)
+                || $this->callArgIsDeadUnknownOrMixedTemporary($callArg)
+            )
+        ) {
+            return $argSends;
+        }
+        $send = $sendOps[0];
+        if ((string) $send->arg1 !== $spreadSlot) {
+            $send->arg1 = $spreadSlot;
+        }
+
+        return $argSends;
     }
 
     /**
@@ -32730,15 +32812,22 @@ class Compiler {
         }
         if (
             $stmtBefore instanceof Op\Expr\Array_
-            && $this->callArgOperandExpectsArrayProducer($callArg)
             && $this->callArgIsDeadInlineTemporary($callArg)
+            && (
+                $this->callArgOperandExpectsArrayProducer($callArg)
+                || $this->callArgIsDeadUnknownOrMixedTemporary($callArg)
+            )
         ) {
-            $arraySlot = $block->slotForOperand($stmtBefore->result);
+            // Prefer INIT_ARRAY after last FUNCCALL_EXEC_RETURN so nested ctor Array_
+            // (`new ArrayIterator([1,2,3])` inside `[...$it]`) is not re-sent (#24645).
+            $arraySlot = $this->slotForInitArrayBeforeCurrentFunccall($block)
+                ?? $block->slotForOperand($stmtBefore->result);
             if (null === $arraySlot) {
                 foreach ($this->compileArrayLiteral($stmtBefore, $block) as $op) {
                     $emitOps[] = $op;
                 }
-                $arraySlot = $block->slotForOperand($stmtBefore->result)
+                $arraySlot = $this->slotForInitArrayBeforeCurrentFunccall($block)
+                    ?? $block->slotForOperand($stmtBefore->result)
                     ?? $this->slotForRecentInitArrayCallArg($block);
             }
 
@@ -32768,9 +32857,13 @@ class Compiler {
             }
             if ($child instanceof Op\Expr\Array_) {
                 // var_export([strlen('x'), …]) — stmt-before Array_ feeds arg #0, not hoisted element call (#15783, #10733, #16067).
+                // Also accept unknown/mixed dead temps for spread arrays (#24645).
                 if (
                     $i === $callIndex - 1
-                    && $this->callArgOperandExpectsArrayProducer($callArg)
+                    && (
+                        $this->callArgOperandExpectsArrayProducer($callArg)
+                        || $this->callArgIsDeadUnknownOrMixedTemporary($callArg)
+                    )
                     && (
                         (null !== $child->result && $this->operandsReferToSameVariable($child->result, $callArg))
                         || $this->callArgIsDeadInlineTemporary($callArg)
@@ -32785,8 +32878,11 @@ class Compiler {
                 $stmtBefore = $block->orig->children[$callIndex - 1] ?? null;
                 if (
                     $stmtBefore instanceof Op\Expr\Array_
-                    && $this->callArgOperandExpectsArrayProducer($callArg)
                     && $this->callArgIsDeadInlineTemporary($callArg)
+                    && (
+                        $this->callArgOperandExpectsArrayProducer($callArg)
+                        || $this->callArgIsDeadUnknownOrMixedTemporary($callArg)
+                    )
                 ) {
                     $candidate = $stmtBefore;
                     break;
@@ -49852,6 +49948,23 @@ class Compiler {
                     $valueSlot = $this->compileOperand($bareLocalProbe, $block, true);
                 }
             }
+            // [...new ArrayIterator([...])] as call arg: nested ctor Array_ slot may win over
+            // the spread INIT_ARRAY that sits after FUNCCALL_EXEC_RETURN (#24645).
+            $callArgProbeFinal = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (
+                null !== $cfgCallOp
+                && $callArgProbeFinal instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($callArgProbeFinal)
+                && (
+                    $this->callArgOperandExpectsArrayProducer($callArgProbeFinal)
+                    || $this->callArgIsDeadUnknownOrMixedTemporary($callArgProbeFinal)
+                )
+            ) {
+                $spreadResultSlot = $this->slotForArraySpreadResultAfterLastExecReturn($block, $sends);
+                if (null !== $spreadResultSlot) {
+                    $valueSlot = $spreadResultSlot;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -54299,6 +54412,7 @@ class Compiler {
         }
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
+        $argSends = $this->rewriteCallArgSendsForArraySpreadResult($argSends, $block, $cfgCallOp);
         // Hoisted call-arg ConstFetch lands on $block during compileCallArgSends — prepend INIT now (#17697).
         if (
             !$initPrependedBeforeArgConstFetch
