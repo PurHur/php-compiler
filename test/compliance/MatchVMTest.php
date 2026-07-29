@@ -47,6 +47,7 @@ final class MatchVMTest extends BaseTest
                 'match_duplicate_default.phpt',
                 'match_default_not_last.phpt',
                 'match_typed_class_const.phpt',
+                'match_class_const_compile_error.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(

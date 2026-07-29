@@ -99,6 +99,56 @@ final class C {
 PHP);
     }
 
+    public function testMatchInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = match(1) { 1 => "one", default => "x" };
+}
+PHP);
+    }
+
+    public function testMatchInTypedClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public const int X = match (2) { 1 => 10, 2 => 20, default => 0 };
+}
+PHP);
+    }
+
+    public function testMatchInGlobalConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+const X = match(1) { 1 => "one", default => "x" };
+PHP);
+    }
+
+    public function testMatchDefaultOnlyInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = match(1) { default => "x" };
+}
+PHP);
+    }
+
+    public function testTernaryWithIdenticalInClassConstStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class A {
+    public const X = (1 === 1) ? "a" : "b";
+}
+PHP, 'class_const_ternary_identical_ok.php');
+        $this->assertNotNull($block);
+    }
+
     public function testLegalClassConstStillCompiles(): void
     {
         $runtime = new Runtime();

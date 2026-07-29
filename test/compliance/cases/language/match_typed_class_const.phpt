@@ -1,5 +1,5 @@
 --TEST--
-Language: match in typed class constant initializer (#9987)
+Language: match in class constant initializer is not a const-expr (#24904, re-#9987, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -7,12 +7,7 @@ class C {
 }
 var_export(C::X);
 echo "\n";
-
-interface I {
-    public const string TAG = match ('a') { 'a' => 'alpha', default => 'other' };
-}
-var_export(I::TAG);
-echo "\n";
---EXPECT--
-20
-'alpha'
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: Constant expression contains invalid operations
