@@ -6,7 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Issue #18980: AOT compile for substr(null) TypeError guard on 8.4 forward profile. */
+/**
+ * AOT compile for substr(null) under declare(strict_types=1) — TypeError at runtime (#18980).
+ * Non-strict soft-null on PROFILE=8.4 is #24817 / #21189 (not a compile-time TypeError).
+ */
 final class SubstrNullForwardProfileAotCompileTest extends TestCase
 {
     public function testNullHaystackForwardProfileAotCompileSucceeds(): void

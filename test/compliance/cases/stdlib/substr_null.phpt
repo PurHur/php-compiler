@@ -1,5 +1,5 @@
 --TEST--
-stdlib substr(null) — soft-null on 8.4 forward profile (#21189, reverts #18980 TypeError)
+stdlib substr(null) — soft-null on 8.4 forward profile (#24817 / #21189, reverts #24694/#18980 TypeError)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
