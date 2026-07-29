@@ -34,5 +34,9 @@ final class ArrayPointerBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/array_pointer_object.phpt',
             'array_pointer_object.phpt'
         );
+        yield 'array_pointer_object_deprecated.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/array_pointer_object_deprecated.phpt',
+            'array_pointer_object_deprecated.phpt'
+        );
     }
 }

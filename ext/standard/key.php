@@ -25,7 +25,7 @@ final class key extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('key() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'key', false, $frame->vmContext);
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'key', false, $frame->vmContext, $frame);
         VmArrayPointer::returnKey($frame, $target->pointerKey());
     }
 
