@@ -171,4 +171,43 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('fgets', 1));
     }
 
+    /** @covers issue #24826 */
+    public function testFgetcsvReflectionDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fgetcsv',
+            1,
+            ['name' => 'length', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fgetcsv',
+            2,
+            ['name' => 'separator', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame(',', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fgetcsv',
+            3,
+            ['name' => 'enclosure', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame('"', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fgetcsv',
+            4,
+            ['name' => 'escape', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame('\\', $dest->toString());
+
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('fgetcsv', 1));
+    }
+
 }
