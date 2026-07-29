@@ -8,7 +8,6 @@ use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
-use PHPCompiler\ext\standard\strval as StrvalBuiltin;
 use PHPLLVM\Value;
 
 /**
@@ -31,18 +30,22 @@ final class JitBcMathNumberInit
 
     public static function initFromArg(Context $context, Variable $receiver, Variable $numArg): void
     {
-        \PHPCompiler\JIT\Builtin\Bcmath::ensureLinked($context);
         $obj = self::loadObjectFromArg($context, $receiver);
-        $valueStr = (new StrvalBuiltin())->call($context, $numArg);
-        $canonical = $context->builder->call(
-            $context->lookupFunction('__compiler_bcmath_number_canonical'),
-            $valueStr
-        );
-        $scale = $context->builder->call(
-            $context->lookupFunction('__compiler_bcmath_number_decimal_scale'),
-            $valueStr
-        );
-        self::storeValueAndScale($context, $obj, $canonical, $scale);
+        $lit = \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($numArg);
+        if (null === $lit) {
+            if (Variable::TYPE_NATIVE_LONG === $numArg->type && null !== ($numArg->compileTimeLong ?? null)) {
+                $lit = (string) $numArg->compileTimeLong;
+            }
+        }
+        if (null === $lit) {
+            throw new \LogicException('BcMath\\Number::__construct() JIT requires a compile-time string|int in this build (#24683)');
+        }
+        // Avoid NestedJIT mid-ctor (dominance); fold canonical/scale at compile time.
+        $canonical = VmBcmath::canonicalNumberString($lit);
+        $scale = VmBcmath::decimalScale($lit);
+        $valueStr = $context->builder->load($context->constantStringFromString($canonical));
+        $scaleLong = $context->getTypeFromString('int64')->constInt($scale, true);
+        self::storeValueAndScale($context, $obj, $valueStr, $scaleLong);
         $context->type->object->markObjectConstructed($obj);
     }
 
