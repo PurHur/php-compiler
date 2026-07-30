@@ -36,6 +36,10 @@ done < <(scan_dirs '^memory_limit=-1' --include='*.ini')
 
 while IFS= read -r hit; do
   [[ -z "$hit" ]] && continue
+  # Intentional probe: unlimited request must clamp under max_memory_limit (#497 / maintainer gap).
+  if [[ "$hit" == *maintainer_gap_max_memory_limit_ini_85_ceiling.php* ]]; then
+    continue
+  fi
   echo "check-no-unlimited-memory: forbidden ini_set: $hit" >&2
   fail=1
 done < <(scan_dirs "ini_set\\s*\\(\\s*['\\\"]memory_limit['\\\"]\\s*,\\s*['\\\"]-1['\\\"]" --include='*.php')

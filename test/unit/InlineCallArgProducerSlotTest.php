@@ -5005,6 +5005,25 @@ PHP;
         self::assertSame("current=2\n", $out);
     }
 
+    /** Issue #25097 — cast stdClass: by-ref next() must not GC properties before current()/var_export. */
+    public function testVarExportCurrentAfterNextOnCastStdClass(): void
+    {
+        $code = <<<'PHP'
+<?php
+error_reporting(E_ALL & ~E_DEPRECATED);
+$o2 = (object)['a' => 1, 'b' => 2];
+next($o2);
+echo 'next_current=' . var_export(current($o2), true) . ' key=' . var_export(key($o2), true) . "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_current_cast_stdclass.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("next_current=2 key='b'\n", $out);
+    }
+
     /** Issue #16272 — var_export($nested, true) after chown assign must not wire sibling chown EXEC_RETURN as return arg. */
     public function testVarExportAfterChownAssignUsesConstFetchTrueSlot(): void
     {
