@@ -1179,16 +1179,35 @@ final class VmArray
     public static function shufflePackedWithPicker(HashTable $ht, callable $pickIndex): void
     {
         $n = $ht->getNumElements();
-        if ($n < 2) {
+        if (0 === $n) {
             return;
         }
-        $values = [];
-        foreach ($ht->iterate(true) as $value) {
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $values[] = $copy;
+        $values = self::copyPackedValues($ht);
+        if ($n >= 2) {
+            self::fisherYatesShuffleVariablesWithPicker($values, $pickIndex);
         }
-        self::fisherYatesShuffleVariablesWithPicker($values, $pickIndex);
+        self::writeReindexedValues($ht, $values);
+    }
+
+    /**
+     * sort()/rsort()/usort()/shuffle() assign new keys 0..n-1 (php-src php_array_sort).
+     *
+     * Early-exit paths for n<2 must still reindex single-element non-list arrays (#25385).
+     */
+    public static function reindexToListKeys(HashTable $ht): void
+    {
+        $n = $ht->getNumElements();
+        if (0 === $n || self::isList($ht)) {
+            return;
+        }
+        self::writeReindexedValues($ht, self::copyPackedValues($ht));
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    public static function writeReindexedValues(HashTable $ht, array $values): void
+    {
         if (self::isList($ht)) {
             $ht->replacePackedValues($values);
         } else {
@@ -1199,23 +1218,29 @@ final class VmArray
     /** sort() on packed list — reindex 0..n-1 (#12769, php-src php_array_sort). */
     public static function sortPackedInPlace(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): void
     {
-        if ($ht->getNumElements() < 2) {
+        $n = $ht->getNumElements();
+        if (0 === $n) {
             return;
         }
         $values = self::copyPackedValues($ht);
-        self::sortPackedValues($values, $flags, 'sort()', false);
-        $ht->replacePackedValues($values);
+        if ($n >= 2) {
+            self::sortPackedValues($values, $flags, 'sort()', false);
+        }
+        self::writeReindexedValues($ht, $values);
     }
 
     /** rsort() on packed list — reindex descending (#12769). */
     public static function sortPackedReverseInPlace(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): void
     {
-        if ($ht->getNumElements() < 2) {
+        $n = $ht->getNumElements();
+        if (0 === $n) {
             return;
         }
         $values = self::copyPackedValues($ht);
-        self::sortPackedValues($values, $flags, 'rsort()', true);
-        $ht->replacePackedValues($values);
+        if ($n >= 2) {
+            self::sortPackedValues($values, $flags, 'rsort()', true);
+        }
+        self::writeReindexedValues($ht, $values);
     }
 
     /**

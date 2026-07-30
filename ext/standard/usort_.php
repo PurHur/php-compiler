@@ -35,7 +35,18 @@ final class usort_ extends Internal
         VmArraySortCallback::requireCallback($callback, 'usort');
         VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, 'usort');
         VmArraySortCallback::requireVmCallable($frame, $callback, 'usort');
-        if ($ht->getNumElements() < 2) {
+        $n = $ht->getNumElements();
+        if (0 === $n) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
+        if (1 === $n) {
+            // php-src still assigns new keys 0..n-1 for a single element (#25385).
+            $array->separateArrayForWrite();
+            VmArray::reindexToListKeys($array->resolveIndirect()->toArray());
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
             }
@@ -67,12 +78,7 @@ final class usort_ extends Internal
             );
         }
         $array->separateArrayForWrite();
-        $ht = $array->resolveIndirect()->toArray();
-        if (VmArray::isList($ht)) {
-            $ht->replacePackedValues($values);
-        } else {
-            $ht->assignPackedList($values);
-        }
+        VmArray::writeReindexedValues($array->resolveIndirect()->toArray(), $values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

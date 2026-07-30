@@ -7,9 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * sort()/rsort() for compiled JIT/AOT modules (#12769, php-in-PHP).
+ * sort()/rsort() for compiled JIT/AOT modules (#12769, #25385, php-in-PHP).
  *
- * SSOT shared with {@see sort_} / {@see rsort_} VM execute()
+ * SSOT shared with {@see sort_} / {@see rsort_} VM execute() — including
+ * single-element non-list reindex via {@see VmArray::sortPackedInPlace()}.
  * php-src: ext/standard/array.c — php_array_sort
  */
 final class SortJitHelper

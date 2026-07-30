@@ -13,8 +13,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for sort()/rsort() (#12769, #24010).
  *
- * SORT_REGULAR / reverse use LLVM `__hashtable__sortPacked*` (NestedJIT SortJitHelper
- * currently emits a no-op stub). Locale/natural still bridge via SortJitHelper PHP.
+ * SORT_REGULAR / reverse use LLVM `__hashtable__sortPacked*` (walks packed
+ * nextFreeElement slots). Locale/natural bridge SortJitHelper PHP.
+ * Associative-key reindex for n<2 is handled on the VM execute path (#25385);
+ * NestedJIT helpers cannot yet rewrite string-key hashtables under thin AOT.
  *
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::sortPackedInPlace()} /
  * {@see \PHPCompiler\ext\standard\VmArray::sortPackedReverseInPlace()}
