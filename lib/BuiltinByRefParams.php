@@ -53,6 +53,9 @@ final class BuiltinByRefParams
             case 'dns_get_mx':
             case 'getmxrr':
                 return [1, 2];
+            // php-src basic_functions.stub.php — &$authoritative_name_servers, &$additional_records (#23358)
+            case 'dns_get_record':
+                return [2, 3];
             case 'stream_socket_client':
                 return [1, 2];
             case 'stream_socket_accept':

@@ -3301,4 +3301,44 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('a', $dest->toString());
     }
 
+    /** @covers issue #23358 */
+    public function testDnsLookupReflectionNamesAndRaw(): void
+    {
+        foreach (['checkdnsrr', 'dns_check_record'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['hostname', 'type='], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'hostname', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'type', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'host', $fn));
+        }
+
+        $dns = BuiltinParamNames::forFunction('dns_get_record');
+        self::assertSame(
+            [
+                'hostname',
+                'type=',
+                'authoritative_name_servers=',
+                'additional_records=',
+                'raw=',
+            ],
+            $dns
+        );
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($dns, 'authoritative_name_servers', 'dns_get_record'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($dns, 'additional_records', 'dns_get_record'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($dns, 'raw', 'dns_get_record'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dns, 'authns', 'dns_get_record'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dns, 'addtl', 'dns_get_record'));
+        self::assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('dns_get_record', 4));
+        self::assertSame(5, BuiltinParamNames::paramCountForInternalFunction('dns_get_record'));
+
+        $info = ['name' => 'type', 'type' => 'int', 'isOptional' => true];
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'dns_get_record', 1, $info));
+        self::assertSame(268435456, $dest->toInt());
+        $rawInfo = ['name' => 'raw', 'type' => 'bool', 'isOptional' => true];
+        $rawDest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($rawDest, 'dns_get_record', 4, $rawInfo));
+        self::assertFalse($rawDest->toBool());
+    }
+
 }

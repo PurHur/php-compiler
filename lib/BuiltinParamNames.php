@@ -379,6 +379,19 @@ final class BuiltinParamNames
             case 'dns_get_mx':
             case 'getmxrr':
                 return ['hostname', 'mxhosts', 'weight'];
+            // php-src ext/standard/basic_functions.stub.php — host→hostname (#23358)
+            case 'checkdnsrr':
+            case 'dns_check_record':
+                return ['hostname', 'type='];
+            // php-src basic_functions.stub.php — authns/addtl→authoritative_*/additional_*; +raw (#23358)
+            case 'dns_get_record':
+                return [
+                    'hostname',
+                    'type=',
+                    'authoritative_name_servers=',
+                    'additional_records=',
+                    'raw=',
+                ];
             case 'gethostbyname':
                 // php-src ext/standard/basic_functions.stub.php / dns.c (#23492)
                 return ['hostname'];
