@@ -895,6 +895,21 @@ final class VmDateTimeNative
             try {
                 $tzId = self::validateTimezoneId($matches[8]);
             } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+                // Bare abbreviations (GMT/EST/…) are not always valid DateTimeZone ids.
+                if (!\str_contains($matches[8], '/') && null !== self::abbreviationOffsetAndDst($matches[8])) {
+                    $result = self::finalizeParsedDateComponents([
+                        'year' => (int) $matches[1],
+                        'month' => (int) $matches[2],
+                        'day' => (int) $matches[3],
+                        'hour' => $hasTime ? (int) $matches[4] : false,
+                        'minute' => $hasTime ? (int) $matches[5] : false,
+                        'second' => $hasTime ? (int) $matches[6] : false,
+                        'fraction' => $fraction,
+                    ], null);
+
+                    return self::withAbbreviationTimezoneMetadata($result, $matches[8]);
+                }
+
                 return self::parseUnrecognizedDateString($date);
             }
             $result = self::finalizeParsedDateComponents([
@@ -907,7 +922,7 @@ final class VmDateTimeNative
                 'fraction' => $fraction,
             ], $tzId);
 
-            return self::withNamedTimezoneMetadata($result, $tzId);
+            return self::withParsedTimezoneToken($result, $matches[8]);
         }
         if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $date, $matches)) {
             $month = self::englishMonthToNumber($matches[1]);
@@ -1874,7 +1889,7 @@ final class VmDateTimeNative
      *   is_localtime: bool
      * }
      */
-    private static function finalizeParsedDateComponents(array $components, string $tzName): array
+    private static function finalizeParsedDateComponents(array $components, ?string $tzName = null): array
     {
         $year = $components['year'];
         $month = $components['month'];
@@ -1901,7 +1916,15 @@ final class VmDateTimeNative
                 $microsecond = (int) \round($components['fraction'] * 1_000_000);
             }
             try {
-                $timestamp = self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+                $timestamp = self::mktimeInTimezone(
+                    $year,
+                    $month,
+                    $day,
+                    $hour,
+                    $minute,
+                    $second,
+                    $tzName ?? 'UTC'
+                );
                 $rolled = self::parseResultFromTimestamp($timestamp, $microsecond);
                 $result = self::parseResultFromComponents([
                     'year' => $rolled['year'],
@@ -2010,11 +2033,36 @@ final class VmDateTimeNative
      */
     private static function withUtcTimezoneMetadata(array $result): array
     {
+        // php-src timelib — trailing Z is TIMELIB_ZONETYPE_ABBR with tz_abbr="Z" (#25486).
         $result['zone_type'] = 2;
         $result['zone'] = 0;
         $result['is_dst'] = false;
+        $result['tz_abbr'] = 'Z';
 
         return $result;
+    }
+
+    /**
+     * Resolve free-form date_parse() timezone token to php-src zone keys (#25486).
+     *
+     * UTC → zone_type ID + tz_abbr; bare abbreviations → TIMELIB_ZONETYPE_ABBR;
+     * IANA ids (e.g. America/New_York) → zone_type ID without tz_abbr.
+     *
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withParsedTimezoneToken(array $result, string $token): array
+    {
+        if (0 === \strcasecmp($token, 'UTC')) {
+            return self::withNamedTimezoneMetadata($result, 'UTC');
+        }
+        // Bare abbreviations (no region slash) that timelib treats as TIMELIB_ZONETYPE_ABBR.
+        if (!\str_contains($token, '/') && null !== self::abbreviationOffsetAndDst($token)) {
+            return self::withAbbreviationTimezoneMetadata($result, $token);
+        }
+
+        return self::withNamedTimezoneMetadata($result, $token);
     }
 
     /**
@@ -2047,7 +2095,7 @@ final class VmDateTimeNative
                 return self::withOffsetTimezoneMetadata($result, $offset);
             }
 
-            return self::withNamedTimezoneMetadata($result, $embedded);
+            return self::withParsedTimezoneToken($result, $embedded);
         }
 
         return $result;
