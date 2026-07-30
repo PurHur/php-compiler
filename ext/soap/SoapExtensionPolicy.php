@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\soap;
 
 /**
- * ext/soap advertisement — php-src ext/soap/soap.c (#20124 / #3724 / #20267 / #22859).
+ * ext/soap advertisement — php-src ext/soap/soap.c (#20124 / #3724 / #20267 / #22859 / #25165).
  *
  * SoapClient / SoapServer / SoapFault stay in-tree (PHP-in-PHP) but are withheld from
- * extension_loaded() / class_exists() on the reference harness when host Zend has no
- * php-soap — same shape as yaml/brotli (#6275 / #17563). Enable via host ext/soap or
- * `PHP_COMPILER_PROFILE=8.4` ({@see CompilerVersion::supportsSoap()}).
+ * extension_loaded() / class_exists() when host Zend has no php-soap — same shape as
+ * yaml/brotli (#6275 / #17563). Enable via host ext/soap only; `PHP_COMPILER_PROFILE`
+ * must not invent soap (#25165, re-#22859).
  *
  * Tracks SOAP_GLOBAL(use_soap_error_handler) for soap_error_handler (#20267).
  */
@@ -20,15 +20,13 @@ final class SoapExtensionPolicy
     private static bool $useSoapErrorHandler = false;
 
     /**
-     * extension_loaded('soap') / CREDITS_MODULES — match Zend without phantom soap (#22859).
+     * extension_loaded('soap') / CREDITS_MODULES — match Zend without phantom soap (#22859 / #25165).
+     *
+     * Host php-soap only; language profile alone must not advertise (#25165).
      */
     public static function advertisesExtension(): bool
     {
-        if (\extension_loaded('soap')) {
-            return true;
-        }
-
-        return \PHPCompiler\CompilerVersion::supportsSoap();
+        return \extension_loaded('soap');
     }
 
     public static function advertisesExceptionClass(): bool
