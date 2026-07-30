@@ -104,6 +104,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('file_put_contents', 1));
     }
 
+    /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511). */
+    public function testGzencodeGzdecodeReflectionReturnUnions(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzencode'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzdecode'));
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));

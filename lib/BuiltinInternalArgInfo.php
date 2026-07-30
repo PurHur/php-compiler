@@ -80,6 +80,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
             'file_get_contents', 'fread', 'fgets' => 'string|false',
             'file_put_contents', 'fwrite' => 'int|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511)
+            'gzencode', 'gzdecode' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
