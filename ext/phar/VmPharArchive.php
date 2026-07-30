@@ -265,6 +265,12 @@ final class VmPharArchive
 
             return;
         }
+        // php-src phar_object_init: creating a new executable phar under PHAR_G(readonly) throws (#25168).
+        if (!VmPhar::canWrite()) {
+            throw new \UnexpectedValueException(
+                'creating archive "'.$path.'" disabled by the php.ini setting phar.readonly'
+            );
+        }
         $dir = \dirname($path);
         if ('.' !== $dir && !VmStatPath::isDir($dir) && !VmStatPath::isFile($dir)) {
             throw new \UnexpectedValueException('phar error: unable to create phar "'.$path.'"');
@@ -272,9 +278,7 @@ final class VmPharArchive
         self::bind($object, $path, [], true, []);
         self::registerFilenameMap($path);
         // New archive is dirty; flush immediately only when writable.
-        if (VmPhar::canWrite()) {
-            self::flush($object);
-        }
+        self::flush($object);
     }
 
     public static function requireWritable(string $method): void
