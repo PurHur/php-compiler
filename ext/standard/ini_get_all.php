@@ -21,9 +21,17 @@ final class ini_get_all extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 2) {
+        // Named details alone leaves a hole at extension (php-src basic_functions.stub.php; #25276).
+        $maxIndex = -1;
+        foreach (\array_keys($frame->calledArgs) as $index) {
+            if (\is_int($index) && $index > $maxIndex) {
+                $maxIndex = $index;
+            }
+        }
+        $argc = $maxIndex + 1;
+        if ($argc > 2) {
             throw new \ArgumentCountError(
-                'ini_get_all() expects at most 2 arguments, '.\count($frame->calledArgs).' given'
+                'ini_get_all() expects at most 2 arguments, '.$argc.' given'
             );
         }
         if (null === $frame->vmContext || null === $frame->returnVar) {
@@ -32,7 +40,7 @@ final class ini_get_all extends Internal
 
         $extension = null;
         $details = true;
-        if (\count($frame->calledArgs) >= 1) {
+        if (\array_key_exists(0, $frame->calledArgs)) {
             $extension = VmString::typedNullableStringBuiltinArgForFrame(
                 $frame,
                 0,
@@ -41,7 +49,7 @@ final class ini_get_all extends Internal
                 'extension'
             );
         }
-        if (2 === \count($frame->calledArgs)) {
+        if (\array_key_exists(1, $frame->calledArgs)) {
             $arg1 = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $arg1->type) {
                 throw new \LogicException('ini_get_all() details flag must be a boolean in this compiler build');
