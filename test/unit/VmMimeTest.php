@@ -50,6 +50,15 @@ final class VmMimeTest extends TestCase
         $this->assertSame('image/png', VmMime::detectFromBytes("\x89PNG\r\n\x1a\n".$ihdr));
     }
 
+    /** Issue #25197: bare %PDF is text/plain; %PDF-… is application/pdf (libmagic). */
+    public function testDetectFromBytesPdf(): void
+    {
+        $this->assertSame('text/plain', VmMime::detectFromBytes('%PDF'));
+        $this->assertSame('application/pdf', VmMime::detectFromBytes('%PDF-'));
+        $this->assertSame('application/pdf', VmMime::detectFromBytes("%PDF-1.4\n"));
+        $this->assertSame('text/plain', VmMime::detectFromBytes("%pdf-1.4\n"));
+    }
+
     public function testDetectFromBytesPlainText(): void
     {
         $this->assertSame('text/plain', VmMime::detectFromBytes('not a known format'));
