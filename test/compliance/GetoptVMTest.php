@@ -93,4 +93,27 @@ final class GetoptVMTest extends TestCase
         $this->assertStringContainsString("'long' => 'L'", $stdout);
         $this->assertStringContainsString("'opt' => 'V'", $stdout);
     }
+
+    /** Issue #25144 — named rest_index with omitted long_options + Reflection defaults. */
+    public function testGetoptNamedRestIndexAndReflection(): void
+    {
+        $repoRoot = \dirname(__DIR__, 2);
+        $vm = $repoRoot.'/bin/vm.php';
+        $script = $repoRoot.'/test/repro/issue_25144_getopt_named_rest_index.php';
+        $this->assertFileExists($vm);
+        $this->assertFileExists($script);
+
+        $cmd = \sprintf(
+            '%s %s %s 2>&1',
+            \escapeshellarg(\PHP_BINARY),
+            \escapeshellarg($vm),
+            \escapeshellarg($script)
+        );
+        $stdout = shell_exec('cd '.\escapeshellarg($repoRoot).' && '.$cmd);
+        $this->assertIsString($stdout);
+        $this->assertStringContainsString("ri=1\n", $stdout);
+        $this->assertStringNotContainsString('resolveIndirect()', $stdout);
+        $this->assertStringContainsString('rest_index OPT REF=NULL', $stdout);
+        $this->assertStringContainsString('argc=3 req=1', $stdout);
+    }
 }

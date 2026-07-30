@@ -270,6 +270,10 @@ final class BuiltinInternalDefaultValues
         'range' => [
             2 => ['kind' => 'int', 'value' => 1],
         ],
+        // php-src ext/standard/basic_functions.stub.php — &$rest_index = null (missing from InternalArgInfo) (#25144)
+        'getopt' => [
+            2 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
