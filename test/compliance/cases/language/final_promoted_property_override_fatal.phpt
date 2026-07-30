@@ -14,4 +14,4 @@ echo "override_ok\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Cannot override final property ParentFP::$name
+Fatal error: Cannot override final property ParentFP::$name in %s on line %d
