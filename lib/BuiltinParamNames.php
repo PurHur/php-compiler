@@ -1035,7 +1035,8 @@ final class BuiltinParamNames
             case 'fopen':
                 return ['filename', 'mode', 'use_include_path', 'context'];
             case 'stream_get_contents':
-                return ['stream', 'length', 'offset'];
+                // php-src ext/standard/file.stub.php — ?int $length = null, int $offset = -1 (#25134)
+                return ['stream', 'length=', 'offset='];
             case 'fgets':
             case 'fgetss':
                 return ['stream', 'length'];

@@ -60,6 +60,11 @@ final class BuiltinInternalDefaultValues
         'array_search' => [
             2 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/standard/file.stub.php — ?int $length = null, int $offset = -1 (#25134)
+        'stream_get_contents' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'int', 'value' => -1],
+        ],
         // php-src ext/standard/basic_functions.stub.php — bool $return = false (#23785)
         'highlight_string' => [
             1 => ['kind' => 'bool', 'value' => false],
