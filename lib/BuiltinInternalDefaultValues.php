@@ -133,6 +133,19 @@ final class BuiltinInternalDefaultValues
         'join' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — DNS_ANY / null / null / false (#23358)
+        'dns_get_record' => [
+            1 => ['kind' => 'int', 'value' => 268435456],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'bool', 'value' => false],
+        ],
+        'checkdnsrr' => [
+            1 => ['kind' => 'string', 'value' => 'MX'],
+        ],
+        'dns_check_record' => [
+            1 => ['kind' => 'string', 'value' => 'MX'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — separator/enclosure/escape string defaults (#24813)
         'str_getcsv' => [
             1 => ['kind' => 'string', 'value' => ','],

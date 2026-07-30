@@ -34,15 +34,16 @@ final class dns_get_record extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('dns_get_record() requires one to four arguments in this compiler build');
+        if ($argc < 1 || $argc > 5) {
+            throw new \LogicException('dns_get_record() requires one to five arguments in this compiler build');
         }
         if (null === $frame->returnVar) {
             return;
         }
 
         $hostname = VmString::trimFamilyStringArgForFrame($frame, 0, 'dns_get_record', 0, 'hostname');
-        $type = StdlibConstants::DNS_A;
+        // php-src basic_functions.stub.php — int $type = DNS_ANY (#23358)
+        $type = StdlibConstants::DNS_ANY;
         if ($argc >= 2) {
             $typeVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_ARRAY === $typeVar->type) {
@@ -58,7 +59,17 @@ final class dns_get_record extends Internal
             self::clearOptionalByRefArray($frame->calledArgs[3]);
         }
 
-        $result = VmDns::dnsGetRecord($hostname, $type);
+        $raw = false;
+        if ($argc >= 5) {
+            $raw = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[4]->resolveIndirect(),
+                'dns_get_record',
+                4,
+                'raw'
+            );
+        }
+
+        $result = VmDns::dnsGetRecord($hostname, $type, $raw);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -69,8 +80,8 @@ final class dns_get_record extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('dns_get_record() requires one to four arguments in this compiler build');
+        if ($argc < 1 || $argc > 5) {
+            throw new \LogicException('dns_get_record() requires one to five arguments in this compiler build');
         }
 
         $hostnameArg = $args[0];
@@ -90,7 +101,8 @@ final class dns_get_record extends Internal
                 '',
                 $argc >= 2 ? $args[1] : null,
                 $argc >= 3 ? $args[2] : null,
-                $argc >= 4 ? $args[3] : null
+                $argc >= 4 ? $args[3] : null,
+                $argc >= 5 ? $args[4] : null
             );
         }
 
@@ -108,16 +120,15 @@ final class dns_get_record extends Internal
             $literal,
             $argc >= 2 ? $args[1] : null,
             $argc >= 3 ? $args[2] : null,
-            $argc >= 4 ? $args[3] : null
+            $argc >= 4 ? $args[3] : null,
+            $argc >= 5 ? $args[4] : null
         );
     }
 
     private static function clearOptionalByRefArray(\PHPCompiler\VM\Variable $arg): void
     {
+        // php-src dns.c — optional &$authns/&$addtl become empty arrays when provided (#23358)
         $arg = $arg->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $arg->type) {
-            return;
-        }
         $empty = new Variable(Variable::TYPE_ARRAY);
         $empty->array(new \PHPCompiler\VM\HashTable());
         $arg->copyFrom($empty);

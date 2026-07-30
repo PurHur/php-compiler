@@ -22,6 +22,7 @@ final class JitDnsGetRecord
         ?JITVariable $typeArg,
         ?JITVariable $authnsArg,
         ?JITVariable $addtlArg,
+        ?JITVariable $rawArg = null,
     ): Value {
         $literal = JitStringArg::compileTimeLiteral($hostnameArg);
         if (null === $literal) {
@@ -30,7 +31,7 @@ final class JitDnsGetRecord
             );
         }
 
-        return self::invokeLiteral($context, $literal, $typeArg, $authnsArg, $addtlArg);
+        return self::invokeLiteral($context, $literal, $typeArg, $authnsArg, $addtlArg, $rawArg);
     }
 
     public static function invokeLiteral(
@@ -39,15 +40,34 @@ final class JitDnsGetRecord
         ?JITVariable $typeArg,
         ?JITVariable $authnsArg,
         ?JITVariable $addtlArg,
+        ?JITVariable $rawArg = null,
     ): Value {
-        $typeInt = StdlibConstants::DNS_A;
+        // php-src basic_functions.stub.php — int $type = DNS_ANY (#23358)
+        $typeInt = StdlibConstants::DNS_ANY;
         if (null !== $typeArg) {
             $typeInt = self::compileTimeInt($context, $typeArg)
                 ?? throw new \LogicException('dns_get_record() requires compile-time int type for JIT/AOT in this build');
         }
 
+        $raw = false;
+        if (null !== $rawArg) {
+            $rawConst = self::compileTimeInt($context, $rawArg);
+            if (null !== $rawConst) {
+                $raw = 0 !== $rawConst;
+            } elseif (JITVariable::TYPE_NATIVE_BOOL === $rawArg->type && JITVariable::KIND_VALUE === $rawArg->kind) {
+                $lib = $context->llvm->lib;
+                if (null !== $lib->LLVMIsAConstantInt($rawArg->value->value)) {
+                    $raw = 0 !== (int) $lib->LLVMConstIntGetSExtValue($rawArg->value->value);
+                } else {
+                    throw new \LogicException('dns_get_record() requires compile-time bool raw for JIT/AOT in this build');
+                }
+            } else {
+                throw new \LogicException('dns_get_record() requires compile-time bool raw for JIT/AOT in this build');
+            }
+        }
+
         VmDns::validateDnsGetRecordType($typeInt);
-        $materialized = JitDnsGetRecordMaterializer::materialize($context, $literal, $typeInt);
+        $materialized = JitDnsGetRecordMaterializer::materialize($context, $literal, $typeInt, $raw);
 
         if (null !== $authnsArg) {
             $authnsPtr = JitValueBox::valuePtrFromVariable($context, $authnsArg);

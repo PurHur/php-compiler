@@ -331,10 +331,11 @@ final class VmDns
      * dns_get_record() — DNS record list for hostname (#6392).
      *
      * php-src: ext/standard/dns.c — php_dns_get_record()
+     * $raw — when true, prefer numeric type + binary `data` (php-src raw path; #23358).
      *
      * @return HashTable|false indexed list of associative record arrays
      */
-    public static function dnsGetRecord(string $hostname, int $type = 1)
+    public static function dnsGetRecord(string $hostname, int $type = StdlibConstants::DNS_ANY, bool $raw = false)
     {
         self::validateDnsGetRecordType($type);
 
@@ -358,7 +359,7 @@ final class VmDns
                 default => [],
             };
             foreach ($chunk as $record) {
-                $records[] = $record;
+                $records[] = $raw ? self::dnsRecordToRaw($record, $meta['qtype']) : $record;
             }
         }
 
@@ -374,6 +375,49 @@ final class VmDns
         }
 
         return $ht;
+    }
+
+    /**
+     * php-src dns.c raw mode — type as int + binary rdata in `data` (#23358).
+     *
+     * @param HashTable $record parsed associative record
+     */
+    private static function dnsRecordToRaw(HashTable $record, int $qtype): HashTable
+    {
+        $out = new HashTable();
+        $host = $record->find('host');
+        if (null !== $host && Variable::TYPE_STRING === $host->type) {
+            self::addDnsStringField($out, 'host', $host->toString());
+        }
+        $class = $record->find('class');
+        if (null !== $class && Variable::TYPE_STRING === $class->type) {
+            self::addDnsStringField($out, 'class', $class->toString());
+        } else {
+            self::addDnsStringField($out, 'class', 'IN');
+        }
+        $ttl = $record->find('ttl');
+        if (null !== $ttl && Variable::TYPE_INTEGER === $ttl->type) {
+            self::addDnsIntField($out, 'ttl', $ttl->toInt());
+        }
+        self::addDnsIntField($out, 'type', $qtype);
+
+        $data = '';
+        if (1 === $qtype) {
+            $ip = $record->find('ip');
+            if (null !== $ip && Variable::TYPE_STRING === $ip->type) {
+                $packed = @\inet_pton($ip->toString());
+                $data = false === $packed ? '' : $packed;
+            }
+        } elseif (28 === $qtype) {
+            $ipv6 = $record->find('ipv6');
+            if (null !== $ipv6 && Variable::TYPE_STRING === $ipv6->type) {
+                $packed = @\inet_pton($ipv6->toString());
+                $data = false === $packed ? '' : $packed;
+            }
+        }
+        self::addDnsStringField($out, 'data', $data);
+
+        return $out;
     }
 
     /**

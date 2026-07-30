@@ -14,9 +14,9 @@ final class JitDnsGetRecordMaterializer
     /**
      * @return array{records: Value, authns: Value, addtl: Value, ok: bool}
      */
-    public static function materialize(Context $context, string $hostname, int $type): array
+    public static function materialize(Context $context, string $hostname, int $type, bool $raw = false): array
     {
-        $result = VmDns::dnsGetRecord($hostname, $type);
+        $result = VmDns::dnsGetRecord($hostname, $type, $raw);
         if (false === $result) {
             return [
                 'records' => HashTableHelper::alloc($context),

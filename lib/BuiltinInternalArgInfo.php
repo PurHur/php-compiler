@@ -292,6 +292,8 @@ final class BuiltinInternalArgInfo
                 0, 1 => '?array',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — trailing bool $raw = false (#23358)
+            'dns_get_record' => 4 === $index ? 'bool' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24846)
             'fwrite' => 2 === $index ? '?int' : null,
             'fgets' => 1 === $index ? '?int' : null,
