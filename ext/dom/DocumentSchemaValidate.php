@@ -18,7 +18,8 @@ final class DocumentSchemaValidate extends DomClassMethod
     {
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::schemaValidate()');
         if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMDocument::schemaValidate() expects exactly 1 argument, 0 given');
+            // Optional $flags → Zend "at least" (php-src php_dom.stub.php / #25323)
+            throw new \ArgumentCountError('DOMDocument::schemaValidate() expects at least 1 argument, 0 given');
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::schemaValidate() requires VM context in this compiler build');

@@ -18,7 +18,8 @@ final class DocumentRelaxNGValidateSource extends DomClassMethod
     {
         $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::relaxNGValidateSource()');
         if (\count($frame->calledArgs) < 2) {
-            throw new \ArgumentCountError('DOMDocument::relaxNGValidateSource() expects at least 1 argument, 0 given');
+            // Fixed arity 1 → Zend "exactly" (php-src php_dom.stub.php / #25323)
+            throw new \ArgumentCountError('DOMDocument::relaxNGValidateSource() expects exactly 1 argument, 0 given');
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::relaxNGValidateSource() requires VM context in this compiler build');
