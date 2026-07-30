@@ -1,0 +1,130 @@
+# Compare the whole compliance corpus across two host PHP versions, at one commit.
+#
+# WHY
+#
+# The compiler targets 8.4 (CompilerVersion::VERSION is '8.4.0-dev') while its differential
+# reference is the 8.2 interpreter in the dev image. Features get enabled to match the target and
+# reverted to match the reference — five feature pairs were enabled AND reverted on 2026-07-29
+# alone, across 30 profile-gating commits. Moving the host to 8.4 removes that contradiction.
+#
+# Before proposing that switch, the corpus has to be measured on both hosts. A 315-case sample
+# showed byte-identical failing names, but that is 4 % of the corpus with a hand-picked filter —
+# weak evidence, and chosen by the same person who wants the answer to be "no change".
+#
+# This runs all ~8,100 cases twice, at the SAME commit, differing only in the host PHP, and diffs
+# by NAME. It reuses compliance-baseline.sh --compare, so the FIXED / SKIPPED / DROPPED / NEWLY
+# EXECUTED split and every completeness guard apply to both sides.
+name: Compliance host compare
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'which compliance suite'
+        required: false
+        default: 'VMTest'
+        type: choice
+        options: ['VMTest', 'JITTest']
+      php_before:
+        description: 'baseline host PHP version'
+        required: false
+        default: '8.2'
+        type: string
+      php_after:
+        description: 'candidate host PHP version'
+        required: false
+        default: '8.4'
+        type: string
+
+concurrency:
+  group: compliance-host-compare-${{ github.ref }}-${{ github.event.inputs.suite || 'VMTest' }}
+  cancel-in-progress: false     # a manual measurement run must not be killed by another
+
+env:
+  SUITE: ${{ github.event.inputs.suite || 'VMTest' }}
+
+jobs:
+  shard:
+    name: php${{ matrix.side == 'before' && (github.event.inputs.php_before || '8.2') || (github.event.inputs.php_after || '8.4') }} shard ${{ matrix.shard }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        side: [before, after]
+        shard: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dev image for this host version
+        env:
+          PHP_VERSION: ${{ matrix.side == 'before' && (github.event.inputs.php_before || '8.2') || (github.event.inputs.php_after || '8.4') }}
+        run: |
+          set -euo pipefail
+          docker build --build-arg PHP_VERSION="$PHP_VERSION" \
+            -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:hostcmp .
+          # Assert the image really carries the requested PHP — a silent fallback to the default
+          # would make both sides identical and the comparison would report "no change" having
+          # measured one version twice.
+          actual="$(docker run --rm php-compiler:hostcmp php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+          echo "requested=$PHP_VERSION actual=$actual"
+          [ "$actual" = "$PHP_VERSION" ] || { echo "image PHP mismatch" >&2; exit 1; }
+
+      - name: Run shard
+        run: |
+          docker run --rm -m 10g \
+            -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
+            -e PHP_COMPILER_MEMORY_LIMIT=1536M \
+            -e PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M \
+            -e SHARD_TIMEOUT=900 \
+            -e SUITE="$SUITE" \
+            -v "$PWD:/compiler" -w /compiler \
+            php-compiler:hostcmp bash -lc '
+              set -uo pipefail
+              composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh
+              script/shard-compliance.sh --suite="$SUITE" --shards=24 --shard=${{ matrix.shard }}
+            '
+
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.side }}-${{ matrix.shard }}
+          path: |
+            build/compliance-shards/${{ env.SUITE }}-${{ matrix.shard }}-of-24.failed
+            build/compliance-shards/${{ env.SUITE }}-${{ matrix.shard }}-of-24.executed
+            build/compliance-shards/${{ env.SUITE }}-${{ matrix.shard }}-of-24.skipped
+            build/compliance-shards/${{ env.SUITE }}-${{ matrix.shard }}-of-24.timeout
+          if-no-files-found: warn
+          retention-days: 14
+
+  compare:
+    name: Compare hosts
+    needs: shard
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: before-*
+          merge-multiple: true
+          path: build/compliance-before
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: after-*
+          merge-multiple: true
+          path: build/compliance-after
+
+      - name: Compare
+        run: |
+          echo "host ${{ github.event.inputs.php_before || '8.2' }} -> ${{ github.event.inputs.php_after || '8.4' }} at ${{ github.sha }}"
+          # Exits non-zero on any case that regresses when only the host PHP changed. That is the
+          # decision criterion for adopting the new host: names, not counts.
+          bash script/compliance-baseline.sh --compare --suite="$SUITE" \
+            --before=build/compliance-before \
+            --after=build/compliance-after
