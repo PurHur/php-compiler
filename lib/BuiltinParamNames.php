@@ -662,6 +662,11 @@ final class BuiltinParamNames
             case 'socket_set_option':
             case 'socket_setopt':
                 return ['socket', 'level', 'option', 'value'];
+            // php-src ext/sockets/sockets.stub.php — missing from InternalArgInfo (#25133)
+            case 'socket_export_stream':
+                return ['socket'];
+            case 'socket_import_stream':
+                return ['stream'];
             // php-src ext/sockets/sockets.stub.php — InternalArgInfo still says errno (#24642)
             case 'socket_strerror':
                 return ['error_code'];

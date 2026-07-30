@@ -460,6 +460,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['socket', 'level', 'option', 'value'], BuiltinParamNames::forFunction('socket_setopt'));
     }
 
+    /** @covers issue #25133 */
+    public function testSocketExportImportStreamZendStubNamedParams(): void
+    {
+        $export = BuiltinParamNames::forFunction('socket_export_stream');
+        self::assertSame(['socket'], $export);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($export, 'socket', 'socket_export_stream'));
+        self::assertSame(
+            ['socket'],
+            BuiltinParamNames::paramNamesForInternalFunction('socket_export_stream')
+        );
+
+        $import = BuiltinParamNames::forFunction('socket_import_stream');
+        self::assertSame(['stream'], $import);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($import, 'stream', 'socket_import_stream'));
+    }
+
     /** @covers issue #24642 */
     public function testSocketStrerrorErrorCodeZendStubNamedParam(): void
     {
