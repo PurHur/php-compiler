@@ -1313,8 +1313,8 @@ final class CompilerVersion
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
      * ("Cannot declare property … final, the final modifier is allowed only for methods…").
      * `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset `PHP_COMPILER_PROFILE`
-     * keeps this false (#24316, re-#24216). Forward profile via `PHP_COMPILER_PROFILE=8.4`
-     * enables parse/compile of `final public $x`.
+     * keeps this false (#25379, re-#24895/#24316/#24216). Forward profile via
+     * `PHP_COMPILER_PROFILE=8.4` enables parse/compile of `final public $x`.
      * php-src: Zend/zend_inheritance.c — Cannot override final property.
      *
      * Compliance reject cases must SKIPIF on PROFILE env, not this method — otherwise a

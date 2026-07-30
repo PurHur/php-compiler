@@ -1,5 +1,5 @@
 --TEST--
-Language: final plain property rejected on default 8.4.0-dev reference profile (#24895, re-#24822/#24316, Zend/zend_compile.c)
+Language: final plain property rejected on default 8.4.0-dev reference profile (#25379, re-#24895/#24822/#24316, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 // Key off PROFILE env — not supportsFinalProperties(). If the gate wrongly
