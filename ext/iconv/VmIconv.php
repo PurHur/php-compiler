@@ -83,19 +83,19 @@ final class VmIconv
         $fromEncoding = self::resolveIconvEncoding($fromEncoding, true);
         $toEncoding = self::resolveIconvEncoding($toEncoding, false);
         if (null === CharsetEngine::parseEncodingSpec($fromEncoding)) {
-            self::triggerUnsupportedEncodingWarning($frame, $fromEncoding, $toEncoding);
+            self::triggerUnsupportedEncodingWarning($frame, 'iconv', $fromEncoding, $toEncoding);
 
             return false;
         }
         if (null === CharsetEngine::parseEncodingSpec($toEncoding)) {
-            self::triggerUnsupportedEncodingWarning($frame, $fromEncoding, $toEncoding);
+            self::triggerUnsupportedEncodingWarning($frame, 'iconv', $fromEncoding, $toEncoding);
 
             return false;
         }
 
         $result = CharsetEngine::convert($fromEncoding, $toEncoding, $input);
         if (false === $result) {
-            self::triggerConvertNotice($frame, CharsetEngine::lastError());
+            self::triggerConvertNotice($frame, 'iconv', CharsetEngine::lastError());
 
             return false;
         }
@@ -103,14 +103,17 @@ final class VmIconv
         return $result;
     }
 
-    private static function triggerConvertNotice(?Frame $frame, int $errorKind): void
+    /**
+     * php-src ext/iconv/iconv.c — notice prefix is the calling builtin (iconv / iconv_strlen / …).
+     */
+    private static function triggerConvertNotice(?Frame $frame, string $function, int $errorKind): void
     {
         if (null === $frame?->vmContext) {
             return;
         }
         $message = CharsetEngine::ERROR_INCOMPLETE === $errorKind
-            ? 'iconv(): Detected an incomplete multibyte character in input string'
-            : 'iconv(): Detected an illegal character in input string';
+            ? sprintf('%s(): Detected an incomplete multibyte character in input string', $function)
+            : sprintf('%s(): Detected an illegal character in input string', $function);
         $frame->vmContext->errors->triggerError(
             $message,
             ErrorReporter::E_NOTICE,
@@ -120,14 +123,22 @@ final class VmIconv
         );
     }
 
-    private static function triggerUnsupportedEncodingWarning(?Frame $frame, string $fromEncoding, string $toEncoding): void
-    {
+    /**
+     * php-src php_iconv_string helpers report conversion toward UCS-4LE for length/search ops.
+     */
+    private static function triggerUnsupportedEncodingWarning(
+        ?Frame $frame,
+        string $function,
+        string $fromEncoding,
+        string $toEncoding
+    ): void {
         if (null === $frame?->vmContext) {
             return;
         }
         $frame->vmContext->errors->triggerError(
             sprintf(
-                'iconv(): Wrong encoding, conversion from "%s" to "%s" is not allowed',
+                '%s(): Wrong encoding, conversion from "%s" to "%s" is not allowed',
+                $function,
                 $fromEncoding,
                 $toEncoding
             ),
@@ -153,15 +164,20 @@ final class VmIconv
         return self::coerceEncodingArg($var, $function, $argIndex, $param, $frame);
     }
 
+    /** UCS-4LE is the internal width used by php-src _php_iconv_strlen / strpos family. */
+    private const HELPER_WIDTH_ENCODING = 'UCS-4LE';
+
     public static function iconvStrlen(string $input, string $encoding, ?Frame $frame = null): int|false
     {
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
-            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+            self::triggerUnsupportedEncodingWarning($frame, 'iconv_strlen', $encoding, self::HELPER_WIDTH_ENCODING);
 
             return false;
         }
         if (null === CharsetString::splitCharacters($encoding, $input)) {
-            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
+            // Classify incomplete vs illegal via same-charset convert (php-src iconv.c).
+            CharsetEngine::convert($encoding, $encoding, $input);
+            self::triggerConvertNotice($frame, 'iconv_strlen', CharsetEngine::lastError());
 
             return false;
         }
@@ -177,12 +193,13 @@ final class VmIconv
         ?Frame $frame = null
     ): string|false {
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
-            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+            self::triggerUnsupportedEncodingWarning($frame, 'iconv_substr', $encoding, self::HELPER_WIDTH_ENCODING);
 
             return false;
         }
         if (null === CharsetString::splitCharacters($encoding, $input)) {
-            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
+            CharsetEngine::convert($encoding, $encoding, $input);
+            self::triggerConvertNotice($frame, 'iconv_substr', CharsetEngine::lastError());
 
             return false;
         }
@@ -198,13 +215,12 @@ final class VmIconv
         ?Frame $frame = null
     ): int|false {
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
-            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+            self::triggerUnsupportedEncodingWarning($frame, 'iconv_strpos', $encoding, self::HELPER_WIDTH_ENCODING);
 
             return false;
         }
+        // php-src: invalid haystack → false with no illegal/incomplete notice (iconv_strpos).
         if (null === CharsetString::splitCharacters($encoding, $haystack)) {
-            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
-
             return false;
         }
 
@@ -218,13 +234,12 @@ final class VmIconv
         ?Frame $frame = null
     ): int|false {
         if (null === CharsetEngine::parseEncodingSpec($encoding)) {
-            self::triggerUnsupportedEncodingWarning($frame, $encoding, $encoding);
+            self::triggerUnsupportedEncodingWarning($frame, 'iconv_strrpos', $encoding, self::HELPER_WIDTH_ENCODING);
 
             return false;
         }
+        // php-src: invalid haystack → false with no illegal/incomplete notice (iconv_strrpos).
         if (null === CharsetString::splitCharacters($encoding, $haystack)) {
-            self::triggerConvertNotice($frame, CharsetEngine::ERROR_ILLEGAL);
-
             return false;
         }
 
