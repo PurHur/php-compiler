@@ -55536,6 +55536,11 @@ class Compiler {
                 && $this->operandsChainEqual($op->var, $operand)) {
                 return $this->operandUsedInWriteContext($ops, $j + 1, $op->result);
             }
+            // Chained write: $a?->b->x = / ++ — PropertyFetch sits between nullsafe and assign (#25560).
+            if ($op instanceof Op\Expr\PropertyFetch
+                && $this->operandsChainEqual($op->var, $operand)) {
+                return $this->operandUsedInWriteContext($ops, $j + 1, $op->result);
+            }
             if ($op instanceof Op\Expr\ArrayDimFetch
                 && $this->operandsChainEqual($op->var, $operand)) {
                 return $this->operandUsedInWriteContext($ops, $j + 1, $op->result);
@@ -55637,12 +55642,20 @@ class Compiler {
         if ($operand instanceof Op\Expr\NullsafePropertyFetch) {
             return true;
         }
+        if ($operand instanceof Op\Expr\PropertyFetch) {
+            return $this->lvalueContainsNullsafePropertyFetch($operand->var, $block);
+        }
         if ($operand instanceof Op\Expr\ArrayDimFetch) {
             return $this->lvalueContainsNullsafePropertyFetch($operand->var, $block);
         }
         if (null !== $block && null !== $block->orig) {
             if ($this->operandIsNullsafePropertyFetchResult($operand, $block->orig->children)) {
                 return true;
+            }
+            // php-cfg result temps omit `original`; resolve PropertyFetch producer for chains (#25560).
+            $propFetch = $this->findPropertyFetchForResult($operand, $block);
+            if (null !== $propFetch) {
+                return $this->lvalueContainsNullsafePropertyFetch($propFetch->var, $block);
             }
         }
 
