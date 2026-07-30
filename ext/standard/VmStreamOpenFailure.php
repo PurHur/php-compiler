@@ -8,20 +8,31 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * E_WARNING when fopen/file read fails for path-based builtins (php-src streams.c; #10625, #10441).
+ * E_WARNING when fopen/file read fails for path-based builtins (php-src streams.c; #10625, #10441, #25288).
  */
 final class VmStreamOpenFailure
 {
-    public static function warnFailedToOpen(Frame $frame, string $function, string $path): void
-    {
+    /**
+     * @param string|null $detail strerror / wrapper reason; null → HTTP last transport err or ENOENT
+     */
+    public static function warnFailedToOpen(
+        Frame $frame,
+        string $function,
+        string $path,
+        ?string $detail = null
+    ): void {
         if (null === $frame->vmContext) {
             return;
         }
-        VmStreamErrorStore::recordOpenFailed($path);
+        if (null === $detail || '' === $detail) {
+            $detail = self::resolveOpenFailureDetail($path);
+        }
+        VmStreamErrorStore::recordOpenFailed($path, $detail);
         $message = \sprintf(
-            '%s(%s): Failed to open stream: No such file or directory',
+            '%s(%s): Failed to open stream: %s',
             $function,
-            $path
+            $path,
+            $detail
         );
         $frame->vmContext->errors->triggerError(
             $message,
@@ -30,6 +41,21 @@ final class VmStreamOpenFailure
             $frame->vmContext,
             $frame
         );
+    }
+
+    /**
+     * php-src streams.c — http wrapper propagates connect strerror; plainfile defaults ENOENT.
+     */
+    private static function resolveOpenFailureDetail(string $path): string
+    {
+        if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
+            $httpDetail = VmHttpFetchPure::lastOpenFailureDetail();
+            if (null !== $httpDetail && '' !== $httpDetail) {
+                return $httpDetail;
+            }
+        }
+
+        return 'No such file or directory';
     }
 
     public static function warnHighlightFailedOpening(Frame $frame, string $function, string $path): void

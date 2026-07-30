@@ -15,9 +15,73 @@ final class VmHttpFetchPure
 {
     private const DEFAULT_TIMEOUT_SEC = 60;
 
+    /** Last http/https transport open failure detail (strerror text; #25288). */
+    private static ?string $lastOpenFailureDetail = null;
+
     public static function available(): bool
     {
         return VmStreamSocketNative::available();
+    }
+
+    /**
+     * Detail for {@code Failed to open stream: …} after a failed HTTP wrapper open (#25288).
+     *
+     * php-src: ext/standard/streams.c — php_stream_xport_create errno → strerror
+     */
+    public static function lastOpenFailureDetail(): ?string
+    {
+        return self::$lastOpenFailureDetail;
+    }
+
+    public static function clearLastOpenFailureDetail(): void
+    {
+        self::$lastOpenFailureDetail = null;
+    }
+
+    /**
+     * Connect-only probe for fopen/readfile http:// paths that lack stream handles (#25288).
+     *
+     * @return string|null strerror text when TCP connect fails; null when connect succeeds (caller still fails open)
+     */
+    public static function probeConnectFailure(string $url): ?string
+    {
+        self::$lastOpenFailureDetail = null;
+        if (!self::available()) {
+            return null;
+        }
+
+        $parts = VmString::parseUrl($url);
+        if (!\is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $scheme = \strtolower((string) $parts['scheme']);
+        if ('http' !== $scheme && 'https' !== $scheme) {
+            return null;
+        }
+
+        $host = (string) $parts['host'];
+        if ('' === $host) {
+            return null;
+        }
+
+        $useTls = 'https' === $scheme;
+        $port = isset($parts['port']) ? (int) $parts['port'] : ($useTls ? 443 : 80);
+        $remote = 'tcp://'.$host.':'.$port;
+        [$handle, $errno, $errstr] = VmStreamSocketNative::client(
+            $remote,
+            (float) self::DEFAULT_TIMEOUT_SEC,
+            StdlibConstants::STREAM_CLIENT_CONNECT,
+            null
+        );
+        if (false === $handle) {
+            self::$lastOpenFailureDetail = '' !== $errstr ? $errstr : 'Connection refused';
+
+            return self::$lastOpenFailureDetail;
+        }
+        VmFs::fclose($handle);
+
+        return null;
     }
 
     /**
@@ -83,6 +147,7 @@ final class VmHttpFetchPure
     private static function request(string $url, string $method, array $httpOptions = []): ?array
     {
         VmHttpLastResponseHeaders::clear();
+        self::$lastOpenFailureDetail = null;
 
         if (!self::available()) {
             return null;
@@ -124,6 +189,9 @@ final class VmHttpFetchPure
             null
         );
         if (false === $handle) {
+            // Match stream_socket_client / Zend http wrapper strerror text (#25288).
+            self::$lastOpenFailureDetail = '' !== $errstr ? $errstr : 'Connection refused';
+
             return null;
         }
 

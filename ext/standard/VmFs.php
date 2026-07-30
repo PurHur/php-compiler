@@ -992,6 +992,12 @@ final class VmFs
         if (VmPhpFdStream::isFdUri($path)) {
             return self::finalizeStreamOpen(VmPhpFdStream::openFromUri($path, $mode), $mode);
         }
+        if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
+            // Probe TCP only — HTTP stream handles not wired; match Zend connect strerror (#25288).
+            VmHttpFetchPure::probeConnectFailure($path);
+
+            return false;
+        }
         if (\str_starts_with($path, 'php://')) {
             return false;
         }
