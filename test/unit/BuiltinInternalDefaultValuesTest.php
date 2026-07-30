@@ -472,6 +472,33 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertTrue($dest->toBool());
     }
 
+    /** @covers issue #25390 */
+    public function testSplAutoloadRegisterThrowDefaultIsTrue(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'spl_autoload_register',
+            0,
+            ['name' => 'callback', 'type' => '?callable', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'spl_autoload_register',
+            1,
+            ['name' => 'throw', 'type' => 'bool', 'isOptional' => true]
+        ));
+        self::assertTrue($dest->toBool());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'spl_autoload_register',
+            2,
+            ['name' => 'prepend', 'type' => 'bool', 'isOptional' => true]
+        ));
+        self::assertFalse($dest->toBool());
+    }
+
     /** @covers issue #25392 */
     public function testDateCreateDatetimeAndTimezoneDefaults(): void
     {

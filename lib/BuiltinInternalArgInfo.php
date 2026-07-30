@@ -302,6 +302,12 @@ final class BuiltinInternalArgInfo
             },
             // ext/spl/spl.stub.php — Traversable|array (InternalArgInfo says traversable) (#25066)
             'iterator_to_array' => 0 === $index ? 'Traversable|array' : null,
+            // ext/spl/spl.stub.php — ?callable $callback = null; InternalArgInfo empty type (#25390)
+            'spl_autoload_register' => match ($index) {
+                0 => '?callable',
+                1, 2 => 'bool',
+                default => null,
+            },
             default => null,
         };
     }

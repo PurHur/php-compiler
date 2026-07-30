@@ -388,6 +388,13 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'string', 'value' => 'now'],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/spl/spl.stub.php — ?callable=null, bool $throw=true, bool $prepend=false (#25390)
+        // InternalArgInfo empty callback type + bool infer defaults throw to false.
+        'spl_autoload_register' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'bool', 'value' => true],
+            2 => ['kind' => 'bool', 'value' => false],
+        ],
         // php-src ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (#25166)
         'datetime::createfromformat' => [
             2 => ['kind' => 'null'],
