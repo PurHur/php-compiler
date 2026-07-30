@@ -773,6 +773,9 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
                     ? ['num1', 'num2', 'scale', 'rounding_mode']
                     : ['num1', 'num2', 'scale'];
+            // php-src ext/bcmath/bcmath.stub.php — PHP 8.4; not in php-types InternalArgInfo (#24578)
+            case 'bcdivmod':
+                return ['num1', 'num2', 'scale='];
             case 'bcpowmod':
                 return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
                     ? ['num', 'exponent', 'modulus', 'scale', 'rounding_mode']
