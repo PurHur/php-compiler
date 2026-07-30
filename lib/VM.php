@@ -6415,10 +6415,10 @@ restart:
                     break;
                 case OpCode::TYPE_RETURN_VOID:
                     $frame->returnSiteLine = (int) ($op->arg1 ?? 0);
-                    // Explicit `return;` in finally (arg1 = source line) overrides pending try
-                    // return and suppresses a pending exception (#25239). Fused empty-finally
-                    // epilogues use TYPE_RETURN_VOID(null) and must keep exception unwind (#24728).
-                    if ($this->frameIsInFinallyBody($frame) && null !== $op->arg1) {
+                    // Explicit `return;` in a distinct finally body overrides pending try return
+                    // and suppresses a pending exception (#25239). Fused empty-finally epilogues
+                    // share the merge block and must keep exception unwind (#24728).
+                    if ($this->frameIsInDistinctFinallyBody($frame) && null !== $op->arg1) {
                         if ($this->applyReturnInsideFinally($frame, null, true)) {
                             goto restart;
                         }
@@ -6444,9 +6444,10 @@ restart:
                         }
                     }
                     $returnValue = $this->resolveVmReturnValue($frame, $op);
-                    // Explicit valued return inside finally replaces pending try/catch return and
-                    // clears a pending exception (Zend zend_vm_def.h / zend_execute.c, #25239).
-                    if ($this->frameIsInFinallyBody($frame)) {
+                    // Explicit return inside a real finally body (finally block != merge) overrides
+                    // pending try return / pending exception (#25239). Fused empty finally shares
+                    // the merge block and must keep exception unwind (#24728).
+                    if ($this->frameIsInDistinctFinallyBody($frame)) {
                         if ($this->applyReturnInsideFinally($frame, $returnValue, false)) {
                             goto restart;
                         }
@@ -11952,17 +11953,37 @@ restart:
 
     private function frameIsInFinallyBody(Frame $frame): bool
     {
+        return null !== $this->findFinallyOpForFrameBody($frame);
+    }
+
+    /**
+     * True when executing a finally CFG block that is distinct from the try merge block.
+     * Empty `finally {}` often fuses with the merge (#24728); those epilogues must not be
+     * treated as an explicit `return` inside finally (#25239).
+     */
+    private function frameIsInDistinctFinallyBody(Frame $frame): bool
+    {
+        $finallyOp = $this->findFinallyOpForFrameBody($frame);
+        if (null === $finallyOp) {
+            return false;
+        }
+
+        return $finallyOp->block1 !== $finallyOp->block2;
+    }
+
+    private function findFinallyOpForFrameBody(Frame $frame): ?OpCode
+    {
         for ($handler = $frame->parent; null !== $handler; $handler = $handler->parent) {
             $finallyOp = $this->findFinallyOpForHandler($handler);
             if (null === $finallyOp || null === $finallyOp->block1) {
                 continue;
             }
             if ($finallyOp->block1 === $frame->block) {
-                return true;
+                return $finallyOp;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**
