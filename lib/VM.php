@@ -15667,7 +15667,9 @@ restart:
         if ($call instanceof Func\Internal) {
             $qualified = $frame?->builtinCalleeQualifiedMethod;
             if (null !== $qualified) {
-                $names = BuiltinParamNames::forClassMethod($qualified);
+                // Explicit BuiltinParamNames table, then php-types InternalArgInfo (#25182).
+                // Bare getName() ("saveXML") has no param table and rejects Zend named args.
+                $names = BuiltinParamNames::paramNamesForInternalFunction($qualified);
                 if (null !== $names) {
                     return [
                         $names,

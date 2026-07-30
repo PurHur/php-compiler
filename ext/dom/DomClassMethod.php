@@ -211,23 +211,30 @@ abstract class DomClassMethod extends VmClassMethod
     /**
      * DOMDocument::saveXML/saveHTML — ?DOMNode $node, int $options (php-src ext/dom/document.c).
      *
+     * CalledArgs may be sparse when a trailing optional is named and $node is omitted (#25182).
+     *
      * @return array{0: ?ObjectEntry, 1: int}
      */
     protected function parseSaveNodeAndOptionsArgs(Frame $frame, string $label): array
     {
         $node = null;
         $options = 0;
-        $argc = \count($frame->calledArgs) - 1;
-        if ($argc >= 1) {
+        $hasNode = \array_key_exists(1, $frame->calledArgs);
+        $hasOptions = \array_key_exists(2, $frame->calledArgs);
+
+        if ($hasNode) {
             $first = $frame->calledArgs[1]->resolveIndirect();
-            if (1 === $argc && \in_array($first->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT], true)) {
+            // Positional saveXML(LIBXML_…) — single int is options, not a node (#6140).
+            if (!$hasOptions && \in_array($first->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT], true)) {
                 $options = $first->toInt();
             } else {
                 $node = $this->saveSerializationOptionalDomNodeArg($frame->calledArgs[1], $label, 0);
-                if ($argc >= 2) {
+                if ($hasOptions) {
                     $options = $this->optionsIntArg($frame->calledArgs[2], $label, 1);
                 }
             }
+        } elseif ($hasOptions) {
+            $options = $this->optionsIntArg($frame->calledArgs[2], $label, 1);
         }
 
         return [$node, $options];

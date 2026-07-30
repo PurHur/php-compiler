@@ -26,7 +26,12 @@ final class JitDomSaveXMLUserScript
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
         // saveXML($node) after textContent mutation: serialize from node slots (#23251).
-        if (\count($args) >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
+        // Explicit node: null is document-wide (same as omitted) — do not treat as an object (#25182).
+        if (\count($args) >= 2
+            && !NamedOptionalCallArgs::isOmittedOptional($args[1])
+            && JITVariable::TYPE_NULL !== $args[1]->type
+            && !($args[1]->isNullConstant ?? false)
+        ) {
             $serialized = self::trySerializeNode($context, $args[1]);
             if (null !== $serialized) {
                 return $serialized;
@@ -48,6 +53,10 @@ final class JitDomSaveXMLUserScript
 
     private static function trySerializeNode(Context $context, JITVariable $nodeVar): ?Value
     {
+        // Only typed object receivers — null / VALUE null mean document-wide save (#25182).
+        if (JITVariable::TYPE_OBJECT !== $nodeVar->type) {
+            return null;
+        }
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return null;
         }
