@@ -2645,6 +2645,18 @@ final class ReflectionSupport
     private static function internalParameterIsPassedByReference(Context $ctx, ObjectEntry $reflection): bool
     {
         $index = self::parameterIndexForReflection($reflection);
+        // Prefer ClassEntry methodParameterMetadata.byRef (php_user_filter::$consumed; #25584).
+        $className = self::parameterDeclaringClassNameOrNull($reflection);
+        if (null !== $className) {
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null !== $entry) {
+                $methodLc = strtolower(self::methodNameFromReflection($reflection));
+                $meta = $entry->methodParameterMetadata[$methodLc][$index] ?? null;
+                if (null !== $meta) {
+                    return $meta->byRef;
+                }
+            }
+        }
         $callable = self::internalCallableName($ctx, $reflection);
         $lc = strtolower($callable);
         if (str_contains($lc, '::')) {
