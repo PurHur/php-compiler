@@ -2723,13 +2723,25 @@ final class VmDom
         if (null === $document) {
             DomExceptionConstants::raiseNotFound();
         }
-        // php-src php_set_attribute_id only sets atype + marks ids modified; it does not
-        // xmlAddID. getElementById then tree-walks connected nodes only (#23999 / bug 77686).
-        self::unregisterElementId($document, $element);
+        // php-src 8.2 php_set_attribute_id → xmlAddID / xmlRemoveID (ext/dom/element.c).
+        // xmlAddID sets atype only on success; duplicate IDs leave isId false (#25274).
+        // libxml keeps the ID table entry until the attribute/element is destroyed — not on
+        // detach — so getElementById filters with php_dom_is_node_attached (#23999).
         if ($isId) {
+            if ($state->idAttributeName === $qName) {
+                // Already marked ID on this attr (atype == XML_ATTRIBUTE_ID) — no-op.
+                self::syncElementIdMapProperty($document);
+
+                return;
+            }
+            self::unregisterElementId($document, $element);
             $state->idAttributeName = $qName;
-            self::registerElementId($document, $element);
+            if (!self::registerElementId($document, $element)) {
+                // xmlAddID failed (ID already defined by another attr) — do not leave atype set.
+                $state->idAttributeName = null;
+            }
         } else {
+            self::unregisterElementId($document, $element);
             $state->idAttributeName = null;
         }
         self::syncElementIdMapProperty($document);
@@ -2775,24 +2787,30 @@ final class VmDom
         return self::lookupNamespaceURI($element, $prefix) ?? '';
     }
 
-    private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
+    /**
+     * libxml xmlAddID — first registration wins; detached nodes stay in the table (#25274 / #25275).
+     *
+     * @return bool true when this element owns the ID slot after the call
+     */
+    private static function registerElementId(ObjectEntry $document, ObjectEntry $element): bool
     {
-        // Detached nodes must not enter the document ID map (php-src getElementById walks
-        // the live tree / checks php_dom_is_node_connected; #23999, bug 77686).
-        if (!self::isConnected($element)) {
-            return;
-        }
         $nodeState = DomRegistry::state($element);
         $docState = DomRegistry::state($document);
         $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
         if (null === $idAttr) {
-            return;
+            return false;
         }
         $value = $nodeState->attributes[$idAttr] ?? null;
         if (null === $value || '' === $value) {
-            return;
+            return false;
+        }
+        // xmlHashAddEntry fails when the ID is already defined (even on a detached node).
+        if (\array_key_exists($value, $docState->elementIds)) {
+            return $docState->elementIds[$value] === $element->id;
         }
         $docState->elementIds[$value] = $element->id;
+
+        return true;
     }
 
     /**
@@ -4583,7 +4601,8 @@ final class VmDom
             $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
             if (null !== $idAttr) {
                 $value = $nodeState->attributes[$idAttr] ?? null;
-                if (null !== $value && '' !== $value) {
+                // Document-order first wins — do not overwrite an existing ID slot (#25275).
+                if (null !== $value && '' !== $value && !\array_key_exists($value, $docState->elementIds)) {
                     $docState->elementIds[$value] = $node->id;
                 }
             }
@@ -4688,7 +4707,9 @@ final class VmDom
     }
 
     /**
-     * Before remove/detach from the live tree — drop ID attrs (php-src ext/dom/node.c; #19212).
+     * Drop ID table entries when nodes are about to be destroyed (replaceChildren / textContent),
+     * matching libxml xmlFreeNode → xmlRemoveID. Detach via removeChild/replaceChild must NOT
+     * clear IDs — libxml keeps them until destruction (#25274, php-src document.c getElementById).
      */
     private static function unregisterSubtreeElementIdsIfConnected(ObjectEntry $node): void
     {
@@ -6486,7 +6507,7 @@ final class VmDom
             if (isset($parentState->childIds[$index + 1])) {
                 $refChild = DomRegistry::entry($parentState->childIds[$index + 1]);
             }
-            self::unregisterSubtreeElementIdsIfConnected($oldChild);
+            // Keep oldChild IDs in the document table (libxml; #25274) — only destroy paths clear.
             $parentState->childIds = \array_values(\array_filter(
                 $parentState->childIds,
                 static fn (int $id): bool => $id !== $oldChild->id
@@ -6515,7 +6536,7 @@ final class VmDom
         self::assertAttrMutationChild($parent, $newChild);
         self::assertSameDocument($parent, $newChild);
         self::assertNotAncestorOfParent($parent, $newChild);
-        self::unregisterSubtreeElementIdsIfConnected($oldChild);
+        // Keep oldChild IDs in the document table (libxml; #25274) — only destroy paths clear.
         self::detachNodeIfAttached($ctx, $newChild);
         $parentState = DomRegistry::state($parent);
         $index = self::childIndex($parentState->childIds, $oldChild->id);
@@ -6618,7 +6639,7 @@ final class VmDom
     {
         self::assertMutationParent($parent);
         self::assertChildOfParent($parent, $child, 'DOMNode::removeChild()');
-        self::unregisterSubtreeElementIdsIfConnected($child);
+        // libxml keeps ID table entries on unlink; getElementById filters detached (#25274).
         $parentState = DomRegistry::state($parent);
         $parentState->childIds = \array_values(\array_filter(
             $parentState->childIds,
