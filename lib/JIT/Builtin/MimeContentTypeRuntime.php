@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_mime_content_type via MimeContentTypeJitHelper PHP (#9236).
+ * JIT/AOT link for __compiler_mime_content_type via MimeContentTypeJitHelper PHP (#9236, #25544).
  *
  * Replaces ~150-line LLVM magic-byte sniff + libc strncmp. SSOT: {@see \PHPCompiler\ext\standard\VmMime}.
  * php-src: ext/standard/file.c — PHP_FUNCTION(mime_content_type)
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GetcwdJit #25541).
  */
 final class MimeContentTypeRuntime
 {
@@ -67,41 +69,17 @@ final class MimeContentTypeRuntime
     private static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower(self::MIME_HELPER);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException(self::MIME_HELPER.' missing after MimeContentTypeJitHelper compile (#9236)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::MIME_HELPER, '#25544');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'MimeContentTypeJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('MimeContentTypeJitHelper.php parseAndCompile failed (#9236)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9236)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25544'
+        );
     }
 }
