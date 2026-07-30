@@ -299,6 +299,21 @@ final class BuiltinInternalDefaultValues
         'user_error' => [
             1 => ['kind' => 'int', 'value' => 1024],
         ],
+        // php-src ext/date/php_date.stub.php — ?int minute…year = null (InternalArgInfo int → 0) (#25147)
+        'mktime' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+            5 => ['kind' => 'null'],
+        ],
+        'gmmktime' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+            5 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
