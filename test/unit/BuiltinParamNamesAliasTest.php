@@ -938,6 +938,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DateTimeZone', 'listIdentifiers'));
     }
 
+    /** @covers issue #25164 */
+    public function testDatePeriodConstructStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DatePeriod::__construct');
+        self::assertSame(['start', 'interval=', 'end=', 'options='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'DatePeriod::__construct'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'interval', 'DatePeriod::__construct'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'end', 'DatePeriod::__construct'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'DatePeriod::__construct'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'recur', 'DatePeriod::__construct'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('DatePeriod', '__construct'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('DatePeriod', '__construct'));
+    }
+
     /** @covers issue #10059 */
     public function testArrayMultisortArraySpliceNamedParameters(): void
     {
