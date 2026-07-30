@@ -187,6 +187,27 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         $this->assertNotSame($legacyFp, $next['fingerprint']);
     }
 
+    /**
+     * #25377: --prelink must not mass-delete live-site units that failed to emit
+     * (that made check-helper-runtime-prelink --strict green by absence).
+     */
+    public function testEmitPrelinkKeepsLiveSiteUnitsByDefault(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $source = (string) file_get_contents($root.'/script/emit-helper-runtime-object.php');
+        $this->assertStringContainsString('live-site prune guard #25377', $source);
+        $this->assertStringContainsString('--prelink-no-prune', $source);
+        $this->assertStringContainsString('--prelink-prune-stale', $source);
+        $this->assertStringContainsString('kept_live_unpublished', $source);
+        $this->assertStringContainsString('isset($liveSlugs[$slug])', $source);
+        // Default path must keep live sites; only --prelink-prune-stale restores mass-delete.
+        $this->assertMatchesRegularExpression(
+            '/if\s*\(\s*!\s*\$pruneStale\s*&&\s*isset\(\s*\$liveSlugs\[\$slug\]\s*\)\s*\)/',
+            $source,
+            'default --prelink must keep committed units whose helper site still exists'
+        );
+    }
+
     private function fingerprintViaSubprocess(string $root, string $unitFile, string $llvmPath): string
     {
         $php = escapeshellarg(PHP_BINARY);

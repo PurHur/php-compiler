@@ -24,6 +24,14 @@ declare(strict_types=1);
  * content-based, so any clone on the same arch consumes them cold) and
  * rewrites that arch's manifest.json. Commit the result when intentional.
  *
+ * Prune policy (#25377 / artifact-honesty): by default --prelink only removes
+ * committed units whose helper site no longer exists (orphan rename/delete).
+ * Units that still have a live site but failed or incomplete local emit are
+ * KEPT — deleting them made check-helper-runtime-prelink --strict green by
+ * absence while cold builds lost coverage. Pass --prelink-prune-stale to
+ * restore the old "delete anything not freshly published" behaviour, or
+ * --prelink-no-prune to keep every committed unit including orphans.
+ *
  * Usage (pinned env, LLVM 9 required):
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink'
@@ -498,10 +506,29 @@ if (in_array('--prelink', $argv, true)) {
         $publishedSlugs[$slug] = true;
         ++$published;
     }
+    // Live helper-site slugs (presence in corpus), independent of emit success.
+    $liveSlugs = [];
+    foreach ($sites as $path => $_) {
+        $liveSlugs[HelperRuntimeCache::slugFor($path)] = true;
+    }
+    $noPrune = in_array('--prelink-no-prune', $argv, true);
+    $pruneStale = in_array('--prelink-prune-stale', $argv, true);
     // Drop committed units whose helper site no longer exists (or was renamed).
+    // Do NOT delete live-site units that failed/incomplete emit — that made
+    // check-helper-runtime-prelink --strict green by absence (#25377).
     $removed = 0;
+    $keptLiveUnpublished = 0;
     foreach (glob($prelinkUnits.'/*', GLOB_ONLYDIR) ?: [] as $dir) {
-        if (isset($publishedSlugs[basename($dir)])) {
+        $slug = basename($dir);
+        if (isset($publishedSlugs[$slug])) {
+            continue;
+        }
+        if ($noPrune) {
+            ++$keptLiveUnpublished;
+            continue;
+        }
+        if (!$pruneStale && isset($liveSlugs[$slug])) {
+            ++$keptLiveUnpublished;
             continue;
         }
         foreach (glob($dir.'/*') ?: [] as $file) {
@@ -510,6 +537,17 @@ if (in_array('--prelink', $argv, true)) {
         @rmdir($dir);
         ++$removed;
     }
+    $committedDirs = glob($prelinkUnits.'/*', GLOB_ONLYDIR) ?: [];
+    $unitCount = \count($committedDirs);
+    // Recount bytes for kept-but-unpublished dirs so manifest total_bytes is honest.
+    if ($keptLiveUnpublished > 0) {
+        $totalBytes = 0;
+        foreach ($committedDirs as $dir) {
+            foreach (['unit.o', 'unit.bc', 'manifest.json'] as $name) {
+                $totalBytes += (int) @filesize($dir.'/'.$name);
+            }
+        }
+    }
     file_put_contents($archDir.'/manifest.json', json_encode([
         'version' => 1,
         'generated_at' => gmdate('c'),
@@ -517,16 +555,20 @@ if (in_array('--prelink', $argv, true)) {
         'role' => 'committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally',
         'core_fingerprint' => HelperRuntimeCache::coreFingerprint(),
         'llvm_identity_token' => HelperRuntimeCache::llvmIdentityToken(),
-        'unit_count' => $published,
+        'unit_count' => $unitCount,
+        'published_fresh' => $published,
+        'kept_live_unpublished' => $keptLiveUnpublished,
         'total_bytes' => $totalBytes,
-        'refresh' => 'php script/emit-helper-runtime-object.php --prelink (pinned env)',
+        'refresh' => 'php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)',
     ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
     fwrite(STDOUT, sprintf(
-        "helper-runtime-prelink: %s — %d units published (%.1f MB), %d removed — commit prelinked/helper-runtime when intentional\n",
+        "helper-runtime-prelink: %s — %d fresh published (%.1f MB), %d removed, %d kept live-unpublished, %d committed — commit prelinked/helper-runtime when intentional\n",
         $arch,
         $published,
         $totalBytes / 1048576,
-        $removed
+        $removed,
+        $keptLiveUnpublished,
+        $unitCount
     ));
 }
 exit($emitted + $fresh > 0 ? 0 : 1);
