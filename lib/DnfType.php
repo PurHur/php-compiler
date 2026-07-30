@@ -40,7 +40,7 @@ final class DnfType
                 );
             }
 
-            return $arms;
+            return self::dedupeArms($arms);
         }
         if ($type instanceof CfgType\Reference) {
             if (null === $referenceName) {
@@ -69,7 +69,17 @@ final class DnfType
             return [['kind' => 'literal', 'name' => 'never']];
         }
         if ($type instanceof CfgType\Literal) {
-            return [['kind' => 'literal', 'name' => strtolower($type->name)]];
+            $nameLc = strtolower($type->name);
+            // php-src ZEND_TYPE_IS_ITERABLE_FALLBACK — iterable in unions/nullable
+            // expands to Traversable|array (#25562, #25065; Zend/zend_types.h).
+            if ('iterable' === $nameLc) {
+                return [
+                    ['kind' => 'literal', 'name' => 'traversable', 'display' => 'Traversable'],
+                    ['kind' => 'literal', 'name' => 'array'],
+                ];
+            }
+
+            return [['kind' => 'literal', 'name' => $nameLc]];
         }
 
         return [];
@@ -95,20 +105,71 @@ final class DnfType
     }
 
     /**
-     * True when arms need DNF metadata (intersection members). Simple scalar unions
-     * (`int|string`, `?int`) use unionTypeConstraints instead (#6701).
+     * True when arms need DNF metadata. Simple scalar unions (`int|string`, `?int`)
+     * use unionTypeConstraints instead (#6701). Class names, intersections, and
+     * iterable→Traversable|array expansions need DnfCheck so arrays match iterable
+     * and non-Traversable objects are rejected (#25562).
      *
      * @param list<DnfArm> $arms
      */
     public static function requiresDnfLowering(array $arms): bool
     {
         foreach ($arms as $arm) {
-            if (($arm['kind'] ?? '') === 'intersection') {
+            $kind = $arm['kind'] ?? '';
+            if ('intersection' === $kind) {
+                return true;
+            }
+            if ('literal' === $kind && !self::isScalarUnionConstraintName($arm['name'] ?? '')) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Pure scalar / null / object builtins that map to Variable::TYPE_* union arms.
+     */
+    private static function isScalarUnionConstraintName(string $name): bool
+    {
+        return match ($name) {
+            'int', 'integer', 'float', 'double', 'bool', 'boolean',
+            'string', 'array', 'null', 'true', 'false', 'object' => true,
+            default => false,
+        };
+    }
+
+    /**
+     * @param list<DnfArm> $arms
+     * @return list<DnfArm>
+     */
+    private static function dedupeArms(array $arms): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($arms as $arm) {
+            $kind = $arm['kind'] ?? '';
+            if ('null' === $kind) {
+                $key = 'null';
+            } elseif ('literal' === $kind) {
+                $key = 'literal:'.($arm['name'] ?? '');
+            } elseif ('intersection' === $kind) {
+                $ifaces = $arm['interfaces'] ?? [];
+                sort($ifaces);
+                $key = 'intersection:'.implode('&', $ifaces);
+            } else {
+                $out[] = $arm;
+
+                continue;
+            }
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $arm;
+        }
+
+        return $out;
     }
 
     /**
@@ -166,7 +227,8 @@ final class DnfType
             $parts[] = $part;
         }
 
-        return implode('|', $parts);
+        // Match zend_type_to_string order (classes first, then MAY_BE_* builtins).
+        return implode('|', self::zendSortUnionMemberNames($parts));
     }
 
     /**
