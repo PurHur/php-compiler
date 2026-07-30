@@ -3296,10 +3296,10 @@ final class ReflectionSupport
         self::assertReflectionMethodAccessible($ctx, $reflection);
         [$declaring, $methodLc, $func] = self::resolveReflectedMethod($ctx, $reflection);
         $methodName = $declaring->methodNames[$methodLc] ?? self::methodNameFromReflection($reflection);
-        if (!$func instanceof Func\PHP) {
-            throw new \LogicException("{$declaring->name}::{$methodName}() is not a user method in this compiler build");
-        }
-        if (self::methodIsStatic($func)) {
+        $isStatic = ($func instanceof Func\PHP && self::methodIsStatic($func))
+            || ($func instanceof Func\Internal
+                && (self::reflectedMethodCfgFlags($ctx, $reflection) & \PHPCfg\Func::FLAG_STATIC) !== 0);
+        if ($isStatic) {
             return $vm->invokeDeclaredStaticWithCalledArgs(
                 $declaring->name,
                 $declaring->name,
@@ -3323,6 +3323,16 @@ final class ReflectionSupport
             self::throwReflectionException(
                 'Given object is not an instance of the class this method was declared in'
             );
+        }
+        if ($func instanceof Func\Internal) {
+            return $vm->invokeInstanceMethod(
+                $objectArg->toObject(),
+                $methodName,
+                ...array_values($invokeArgs)
+            );
+        }
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException("{$declaring->name}::{$methodName}() is not a user method in this compiler build");
         }
 
         $thisVar = new Variable();
