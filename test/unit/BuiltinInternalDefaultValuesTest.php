@@ -224,6 +224,53 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('fgetcsv', 1));
     }
 
+    /** @covers issue #25135 */
+    public function testFputcsvReflectionDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fputcsv',
+            2,
+            ['name' => 'separator', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame(',', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fputcsv',
+            3,
+            ['name' => 'enclosure', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame('"', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fputcsv',
+            4,
+            ['name' => 'escape', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame('\\', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'fputcsv',
+            5,
+            ['name' => 'eol', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame("\n", $dest->toString());
+
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('fputcsv', 5));
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'splfileobject::fputcsv',
+            4,
+            ['name' => 'eol', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame("\n", $dest->toString());
+    }
+
     /** @covers issue #24814 */
     public function testFileGetContentsContextLengthDefaults(): void
     {
