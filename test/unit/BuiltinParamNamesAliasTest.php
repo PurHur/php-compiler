@@ -2348,13 +2348,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
     /** @covers issue #23241 */
     public function testStreamIoZendStubNamedParams(): void
     {
-        foreach (['fclose', 'feof', 'fgetc', 'ftell', 'rewind', 'fflush'] as $fn) {
+        foreach (['fclose', 'feof', 'fgetc', 'ftell', 'rewind', 'fflush', 'fsync', 'fdatasync'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame(['stream'], $names, $fn);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'stream', $fn), $fn);
             // Legacy InternalArgInfo name must not resolve (Zend rejects $fp)
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'fp', $fn), $fn);
         }
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('fsync'));
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('fdatasync'));
 
         $fseek = BuiltinParamNames::forFunction('fseek');
         self::assertSame(['stream', 'offset', 'whence'], $fseek);
