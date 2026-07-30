@@ -374,7 +374,7 @@ final class VmBcMathNumber
             return null;
         }
 
-        return VmBcmath::comp($leftOperand[0], $rightOperand[0], null);
+        return VmBcmath::compNumber($leftOperand[0], $rightOperand[0], null);
     }
 
     /**

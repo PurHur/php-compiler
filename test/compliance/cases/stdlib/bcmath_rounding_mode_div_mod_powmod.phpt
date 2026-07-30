@@ -9,5 +9,5 @@ echo bcpowmod('2', '10', '1000', 0, RoundingMode::HalfAwayFromZero), "\n";
 --EXPECT--
 3.33
 3
-11
+0
 24

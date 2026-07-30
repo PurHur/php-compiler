@@ -69,7 +69,7 @@ PHP;
     public function test_vmbcmath_core_ops(): void
     {
         self::assertSame('6.23', VmBcmath::add('1.234', '5', 2));
-        self::assertSame('1.67', VmBcmath::sub('5.000', '3.333', 2));
+        self::assertSame('1.66', VmBcmath::sub('5.000', '3.333', 2));
         self::assertSame('6.25', VmBcmath::mul('2.5', '2.5', 2));
         self::assertSame('3.33', VmBcmath::div('10', '3', 2));
         self::assertSame(0, VmBcmath::comp('1.0', '1.00', 2));

@@ -80,13 +80,18 @@ final class VmBcmath
     public static function divmod(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): array
     {
         $scale = self::resolveScale($scale);
+        $a = self::parse($left);
         $b = self::parse($right);
         if (self::isZero($b)) {
             throw new \DivisionByZeroError('Division by zero');
         }
+        // php-src libbcmath/src/divmod.c — quotient at scale 0; mul/sub at
+        // rscale = max(num1->n_scale, num2->n_scale + scale); rem chopped to $scale.
+        $rscale = \max(\strlen($a['frac']), \strlen($b['frac']) + $scale);
         $quotient = self::div($left, $right, 0, $roundingMode);
-        $product = self::mul($quotient, $right, $scale);
-        $remainder = self::sub($left, $product, $scale);
+        $product = self::mul($quotient, $right, $rscale);
+        $remainder = self::sub($left, $product, $rscale);
+        $remainder = self::format(self::parse($remainder), $scale);
 
         return [$quotient, $remainder];
     }
@@ -191,6 +196,22 @@ final class VmBcmath
         $mag = self::compareMagnitude($pa, $pb);
 
         return $pa['sign'] * $mag;
+    }
+
+    /**
+     * BcMath\Number compare / relational ops — omitted scale means full operand
+     * precision (php-src bcmath_number_compare), not {@see $defaultScale}.
+     */
+    public static function compNumber(string $left, string $right, ?int $scale = null): int
+    {
+        if (null === $scale) {
+            $scale = \max(
+                \strlen(self::parse($left)['frac']),
+                \strlen(self::parse($right)['frac'])
+            );
+        }
+
+        return self::comp($left, $right, $scale);
     }
 
     /** Remainder of arbitrary-precision division (php-src ext/bcmath/bcmath.c PHP_FUNCTION(bcmod); issue #6042). */
@@ -524,6 +545,10 @@ final class VmBcmath
     }
 
     /**
+     * Format to {@see $scale} fractional digits by truncating toward zero (php-src libbcmath
+     * default path — not half-up). Optional RoundingMode goes through {@see round()} instead.
+     * Half-up here made bcdiv("5","3",0) → "2" and bcmod("5","3") → "-1" (#25404).
+     *
      * @param array{sign:int,int:string,frac:string} $num
      */
     private static function format(array $num, int $scale): string
@@ -533,35 +558,23 @@ final class VmBcmath
         }
 
         $sign = $num['sign'] < 0 ? '-' : '';
-        $fracLen = \strlen($num['frac']);
-        $digits = self::unscaledDigits($num);
-        if ($fracLen < $scale + 1) {
-            $digits = \str_pad($digits, \strlen($digits) + ($scale + 1 - $fracLen), '0', STR_PAD_RIGHT);
-            $fracLen = $scale + 1;
+        $frac = $num['frac'];
+        if (\strlen($frac) < $scale) {
+            $frac = \str_pad($frac, $scale, '0', STR_PAD_RIGHT);
+        } elseif (\strlen($frac) > $scale) {
+            $frac = \substr($frac, 0, $scale);
         }
-
-        $intPart = \substr($digits, 0, -$fracLen);
-        $fracPart = \substr($digits, -$fracLen);
-        $roundDigit = (int) $fracPart[$scale];
-        $fracPart = \substr($fracPart, 0, $scale);
-        if ($roundDigit >= 5) {
-            $incremented = self::addDigitStrings($intPart.$fracPart, '1');
-            if (\strlen($incremented) > \strlen($intPart) + $scale) {
-                $intPart = \substr($incremented, 0, -$scale);
-                $fracPart = \substr($incremented, -$scale);
-            } else {
-                $intPart = \substr($incremented, 0, \max(1, \strlen($incremented) - $scale));
-                $fracPart = \str_pad(\substr($incremented, -\min($scale, \strlen($incremented))), $scale, '0', STR_PAD_LEFT);
-            }
+        $intPart = self::stripLeadingZeros($num['int']);
+        // Truncated zero magnitude is positive (php-src bc_is_zero clears sign).
+        if ('0' === $intPart && ('' === $frac || self::isAllZeroDigits($frac))) {
+            $sign = '';
         }
-        $intPart = self::stripLeadingZeros($intPart);
-        $fracPart = \str_pad($fracPart, $scale, '0', STR_PAD_RIGHT);
 
         if (0 === $scale) {
             return $sign.$intPart;
         }
 
-        return $sign.$intPart.'.'.$fracPart;
+        return $sign.$intPart.'.'.$frac;
     }
 
     /**
