@@ -450,6 +450,43 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($tokenName, 'type', 'token_name'));
     }
 
+    /** @covers issue #24391 — php-src ext/shmop/shmop.stub.php */
+    public function testShmopOpenReadWriteZendStubNamedParams(): void
+    {
+        $open = BuiltinParamNames::forFunction('shmop_open');
+        self::assertSame(['key', 'mode', 'permissions', 'size'], $open);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($open, 'key', 'shmop_open'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($open, 'mode', 'shmop_open'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($open, 'permissions', 'shmop_open'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($open, 'size', 'shmop_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($open, 'flags', 'shmop_open'));
+        self::assertSame(
+            ['key', 'mode', 'permissions', 'size'],
+            BuiltinParamNames::paramNamesForInternalFunction('shmop_open')
+        );
+
+        $read = BuiltinParamNames::forFunction('shmop_read');
+        self::assertSame(['shmop', 'offset', 'size'], $read);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($read, 'shmop', 'shmop_read'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($read, 'offset', 'shmop_read'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($read, 'size', 'shmop_read'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($read, 'shmid', 'shmop_read'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($read, 'start', 'shmop_read'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($read, 'count', 'shmop_read'));
+
+        $write = BuiltinParamNames::forFunction('shmop_write');
+        self::assertSame(['shmop', 'data', 'offset'], $write);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($write, 'shmop', 'shmop_write'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($write, 'shmid', 'shmop_write'));
+
+        foreach (['shmop_size', 'shmop_close', 'shmop_delete'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['shmop'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'shmop', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'shmid', $fn), $fn);
+        }
+    }
+
     /** @covers issue #24373 */
     public function testSocketBindConnectReadWriteSetOptionZendStubNamedParams(): void
     {
