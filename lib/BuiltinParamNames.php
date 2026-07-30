@@ -215,6 +215,14 @@ final class BuiltinParamNames
             case 'quoted_printable_encode':
             case 'quoted_printable_decode':
             case 'bin2hex':
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str (#23264)
+            case 'quotemeta':
+            case 'strrev':
+            case 'str_rot13':
+                return ['string'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/salt (#23264)
+            case 'crypt':
+                return ['string', 'salt'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/crc (#23491)
             case 'crc32':
                 return ['string'];
