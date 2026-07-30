@@ -1157,6 +1157,9 @@ final class BuiltinParamNames
             case 'stream_get_contents':
                 // php-src ext/standard/file.stub.php — ?int $length = null, int $offset = -1 (#25134)
                 return ['stream', 'length=', 'offset='];
+            // php-src ext/standard/file.stub.php — length (InternalArgInfo still maxlen) (#23921)
+            case 'stream_get_line':
+                return ['stream', 'length', 'ending='];
             case 'fgets':
             case 'fgetss':
                 return ['stream', 'length'];

@@ -65,6 +65,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'null'],
             2 => ['kind' => 'int', 'value' => -1],
         ],
+        // php-src ext/standard/file.stub.php — string $ending = "" (#23921)
+        'stream_get_line' => [
+            2 => ['kind' => 'string', 'value' => ''],
+        ],
         // php-src ext/standard/basic_functions.stub.php — string $mode = "a" (#25261)
         'php_uname' => [
             0 => ['kind' => 'string', 'value' => 'a'],

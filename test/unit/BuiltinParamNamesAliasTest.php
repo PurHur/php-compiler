@@ -829,6 +829,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('escape='));
         self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('eol='));
 
+        $streamGetLine = BuiltinParamNames::forFunction('stream_get_line');
+        self::assertSame(['stream', 'length', 'ending='], $streamGetLine);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($streamGetLine, 'length', 'stream_get_line'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($streamGetLine, 'maxlen', 'stream_get_line'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($streamGetLine, 'ending', 'stream_get_line'));
+
         // php-src basic_functions.stub.php — InternalArgInfo still file_name (#23785)
         $hf = BuiltinParamNames::forFunction('highlight_file');
         self::assertSame(['filename', 'return='], $hf);
