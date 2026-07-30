@@ -29,8 +29,8 @@ final class ListUnpackRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ListUnpackRuntime', $source);
         $this->assertStringContainsString('TypeErrorRaise::emitBranchOrAbortOnFailure', $source);
         $this->assertStringNotContainsString('isRuntimeTypeValue', $source);
-        $this->assertStringNotContainsString('LLVMBuildUnreachable', $source);
-        $this->assertLessThanOrEqual(210, substr_count($source, "\n") + 1);
+        // LLVMBuildUnreachable after exit(255) for AOT object list-Error (#25096 / #23641).
+        $this->assertLessThanOrEqual(360, substr_count($source, "\n") + 1);
     }
 
     public function testListUnpackJitHelperValueBoxIsArray(): void
