@@ -274,6 +274,11 @@ final class BuiltinInternalDefaultValues
         'getopt' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — timezoneGroup=DateTimeZone::ALL (2047), countryCode=null (#25172)
+        'datetimezone::listidentifiers' => [
+            0 => ['kind' => 'int', 'value' => 2047],
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
