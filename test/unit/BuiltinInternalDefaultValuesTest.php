@@ -385,4 +385,14 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(-1, $dest->toInt());
     }
 
+    /** @covers issue #25044 */
+    public function testStrSplitLengthDefaultIsOne(): void
+    {
+        $lengthInfo = ['name' => 'length', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('str_split', 1, $lengthInfo, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'str_split', 1, $lengthInfo));
+        self::assertSame(1, $dest->toInt());
+    }
+
 }

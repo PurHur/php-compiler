@@ -2018,7 +2018,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($chunk, 'ending', 'chunk_split'));
 
         $split = BuiltinParamNames::forFunction('str_split');
-        self::assertSame(['string', 'length'], $split);
+        self::assertSame(['string', 'length='], $split);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($split, 'string', 'str_split'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($split, 'length', 'str_split'));
         // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $split_length)
