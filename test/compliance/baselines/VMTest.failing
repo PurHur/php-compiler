@@ -108,7 +108,6 @@ language/exception_ignore_args
 language/exit_die_named_status_pragma_84
 language/final_hooked_property
 language/final_promoted_property
-language/foreach_byref_enum
 language/foreach_enum_case_by_ref
 language/function_scope_no_global_leak
 language/global_const_enum_case
