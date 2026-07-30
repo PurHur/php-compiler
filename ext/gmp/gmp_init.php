@@ -23,7 +23,7 @@ final class gmp_init extends GmpFunction
                 'gmp_init() expects 1 or 2 arguments, '.$argc.' given'
             );
         }
-        $base = 10;
+        $base = 0;
         if (2 === $argc) {
             $baseVar = $frame->calledArgs[1]->resolveIndirect();
             if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $baseVar->type) {
