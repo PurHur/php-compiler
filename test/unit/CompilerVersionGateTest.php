@@ -2180,12 +2180,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsOverridePropertyAttributeFalseWhenProfile84(): void
+    public function testSupportsOverridePropertyTargetFalseWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertFalse(CompilerVersion::supportsOverridePropertyAttribute());
+            $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2195,12 +2195,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsOverridePropertyAttributeTrueWhenProfile85(): void
+    public function testSupportsOverridePropertyTargetTrueWhenProfile85(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.5');
         try {
-            $this->assertTrue(CompilerVersion::supportsOverridePropertyAttribute());
+            $this->assertTrue(CompilerVersion::supportsOverridePropertyTarget());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
