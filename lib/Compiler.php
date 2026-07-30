@@ -2147,10 +2147,11 @@ class Compiler {
         // Hoist class-like definitions before functions so JIT/AOT see member
         // constants when compiling FUNCDEF bodies (issue #2215, MiniWebApp Router::CONST).
         // Enums stay in source order so enum_exists() before declaration matches Zend (#5013).
+        // Serializable / forbidden-implements stay in source order for DECLARE side effects (#18781, #25109).
         foreach ($ops as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Class_::class:
-                    if ($this->defersRuntimeInterfaceImplementationCheck($child)) {
+                    if ($this->requiresSourceOrderClassRegistration($child)) {
                         break;
                     }
                     $block->addOpCode($this->compileClassLike($child, $block));
@@ -2319,7 +2320,7 @@ class Compiler {
                 case Op\Stmt\Trait_::class:
                     break;
                 case Op\Stmt\Class_::class:
-                    if ($this->defersRuntimeInterfaceImplementationCheck($child)) {
+                    if ($this->requiresSourceOrderClassRegistration($child)) {
                         $block->addOpCode($this->compileClassLike($child, $block));
                     }
                     break;
@@ -6829,6 +6830,21 @@ class Compiler {
             ltrim($className, '\\'),
             $this->interfaceNamesFromOperands($class->implements)
         );
+    }
+
+    /**
+     * Classes whose DECLARE_CLASS must not be hoisted before preceding statements.
+     *
+     * - Forbidden implements (DateTimeInterface / reserved): fatals at DECLARE (#18781)
+     * - Serializable: E_DEPRECATED + class_exists timing match Zend (#22000, #25109)
+     */
+    protected function requiresSourceOrderClassRegistration(Op\Stmt\ClassLike $class): bool
+    {
+        if ($this->defersRuntimeInterfaceImplementationCheck($class)) {
+            return true;
+        }
+
+        return \in_array('serializable', $this->interfaceNamesFromOperands($class->implements), true);
     }
 
     protected function staticNameFromOperand(Operand $op): ?string
