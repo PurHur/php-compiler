@@ -523,6 +523,8 @@ final class VmMbstring
      *
      * php-src / libmbfl HTML-ENTITIES is not htmlentities(): ASCII (incl. <>&) stays literal;
      * named HTML entities for mapped non-ASCII; numeric &#N; for everything else (e.g. あ → &#12354;).
+     *
+     * Illegal bytes honor MBSTRG(filter_illegal_*) even when $from === $to (#25207).
      */
     public static function convertEncoding(string $source, string $to, string $from): string|false
     {
@@ -534,10 +536,10 @@ final class VmMbstring
                 return $utf8;
             }
 
-            return CharsetEngine::convert('UTF-8', $to, $utf8);
+            return self::convertBytesWithIllegalSubst('UTF-8', $to, $utf8);
         }
         if ($toHtml) {
-            $utf8 = CharsetEngine::convert($from, 'UTF-8', $source);
+            $utf8 = self::convertBytesWithIllegalSubst($from, 'UTF-8', $source);
             if (false === $utf8) {
                 return false;
             }
@@ -545,7 +547,205 @@ final class VmMbstring
             return self::encodeToHtmlEntities($utf8);
         }
 
-        return CharsetEngine::convert($from, $to, $source);
+        return self::convertBytesWithIllegalSubst($from, $to, $source);
+    }
+
+    /**
+     * Charset convert with libmbfl illegal-byte / unconvertible substitution (#25207).
+     *
+     * php-src: php_mb_convert_encoding → mbfl_buffer_converter with filter_illegal_mode/substchar.
+     * Same-charset is not a no-op: illegal sequences are still substituted and counted.
+     */
+    private static function convertBytesWithIllegalSubst(
+        string $fromEncoding,
+        string $toEncoding,
+        string $source
+    ): string|false {
+        $fromCanon = CharsetEngine::canonicalize($fromEncoding);
+        $toCanon = CharsetEngine::canonicalize($toEncoding);
+        if (null === $fromCanon || null === $toCanon) {
+            // Encodings CharsetEngine does not know (SJIS, …) — keep prior false-y behavior.
+            $fallback = CharsetEngine::convert($fromEncoding, $toEncoding, $source);
+
+            return $fallback;
+        }
+
+        if ($fromCanon === $toCanon) {
+            return self::scrubInEncoding($source, $fromCanon, true);
+        }
+
+        $decoded = self::decodeToCodepointsWithIllegal($source, $fromCanon);
+        if (null === $decoded) {
+            return CharsetEngine::convert($fromEncoding, $toEncoding, $source);
+        }
+
+        return self::encodeCodepointsWithIllegal($decoded['codepoints'], $toCanon, $decoded['illegal']);
+    }
+
+    /**
+     * @return array{codepoints: list<int|null>, illegal: int}|null null = encoding not handled here
+     */
+    private static function decodeToCodepointsWithIllegal(string $source, string $canon): ?array
+    {
+        if ('UTF-8' === $canon) {
+            return self::decodeUtf8ToCodepointsWithIllegal($source);
+        }
+        if ('ASCII' === $canon) {
+            return self::decodeAsciiToCodepointsWithIllegal($source);
+        }
+        if ('ISO-8859-1' === $canon) {
+            $cps = [];
+            $len = \strlen($source);
+            for ($i = 0; $i < $len; ++$i) {
+                $cps[] = \ord($source[$i]);
+            }
+
+            return ['codepoints' => $cps, 'illegal' => 0];
+        }
+        if ('8BIT' === $canon || 'BINARY' === $canon) {
+            $cps = [];
+            $len = \strlen($source);
+            for ($i = 0; $i < $len; ++$i) {
+                $cps[] = \ord($source[$i]);
+            }
+
+            return ['codepoints' => $cps, 'illegal' => 0];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{codepoints: list<int|null>, illegal: int}
+     */
+    private static function decodeUtf8ToCodepointsWithIllegal(string $source): array
+    {
+        $cps = [];
+        $illegal = 0;
+        $len = \strlen($source);
+        for ($i = 0; $i < $len; ) {
+            $need = 0;
+            if (!self::utf8SequenceValidAt($source, $len, $i, $need)) {
+                $cps[] = null; // MBFL_BAD_INPUT
+                ++$illegal;
+                ++$i;
+                continue;
+            }
+            if (0 === $need) {
+                $cps[] = \ord($source[$i]);
+                ++$i;
+                continue;
+            }
+            $byte = \ord($source[$i]);
+            $cp = $byte & (0xFF >> (2 + $need));
+            for ($j = 1; $j <= $need; ++$j) {
+                $cp = ($cp << 6) | (\ord($source[$i + $j]) & 0x3F);
+            }
+            $cps[] = $cp;
+            $i += $need + 1;
+        }
+
+        return ['codepoints' => $cps, 'illegal' => $illegal];
+    }
+
+    /**
+     * @return array{codepoints: list<int|null>, illegal: int}
+     */
+    private static function decodeAsciiToCodepointsWithIllegal(string $source): array
+    {
+        $cps = [];
+        $illegal = 0;
+        $len = \strlen($source);
+        for ($i = 0; $i < $len; ++$i) {
+            $b = \ord($source[$i]);
+            if ($b > 0x7F) {
+                $cps[] = null;
+                ++$illegal;
+            } else {
+                $cps[] = $b;
+            }
+        }
+
+        return ['codepoints' => $cps, 'illegal' => $illegal];
+    }
+
+    /**
+     * @param list<int|null> $codepoints null entries are MBFL_BAD_INPUT
+     */
+    private static function encodeCodepointsWithIllegal(array $codepoints, string $toCanon, int $illegalFromDecode): string
+    {
+        $out = '';
+        $illegal = $illegalFromDecode;
+        foreach ($codepoints as $cp) {
+            if (null === $cp) {
+                $out .= MbstringState::substitutionOutput($toCanon, null);
+                continue;
+            }
+            $encoded = self::tryEncodeScalarInto($cp, $toCanon);
+            if (null !== $encoded) {
+                $out .= $encoded;
+                continue;
+            }
+            // Unconvertible Unicode scalar (libmbfl illegal_output with real codepoint).
+            $out .= MbstringState::substitutionOutput($toCanon, $cp);
+            ++$illegal;
+        }
+        MbstringState::addIllegalChars($illegal);
+
+        return $out;
+    }
+
+    private static function tryEncodeScalarInto(int $cp, string $canon): ?string
+    {
+        if ('UTF-8' === $canon) {
+            return self::unicodeCodepointToUtf8($cp);
+        }
+        if ('ASCII' === $canon) {
+            return $cp <= 0x7F ? \chr($cp) : null;
+        }
+        if ('ISO-8859-1' === $canon) {
+            return $cp <= 0xFF ? \chr($cp) : null;
+        }
+        if ('8BIT' === $canon || 'BINARY' === $canon) {
+            return $cp <= 0xFF ? \chr($cp) : null;
+        }
+
+        return null;
+    }
+
+    private static function unicodeCodepointToUtf8(int $cp): string
+    {
+        if ($cp <= 0x7F) {
+            return \chr($cp);
+        }
+        if ($cp <= 0x7FF) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp <= 0xFFFF) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
+    }
+
+    /**
+     * Same-charset scrub with optional illegal_chars accounting (mb_scrub / mb_convert_encoding).
+     */
+    private static function scrubInEncoding(string $value, string $canon, bool $recordIllegal): string
+    {
+        if ('UTF-8' === $canon) {
+            return self::scrubUtf8($value, $recordIllegal);
+        }
+        if ('ASCII' === $canon) {
+            return self::scrubAscii($value, $recordIllegal);
+        }
+        // ISO-8859-1 / 8BIT: every byte is well-formed.
+        return $value;
     }
 
     /**
@@ -1757,6 +1957,8 @@ final class VmMbstring
 
     /**
      * mb_scrub() — replace invalid byte sequences (php-src ext/mbstring/mbstring.c; PHP 8.4, #6050).
+     *
+     * Honors mb_substitute_character() and increments MBSTRG(illegalchars) like php-src.
      */
     public static function scrub(string $value, ?string $encoding = null): string
     {
@@ -1764,10 +1966,10 @@ final class VmMbstring
         self::assertScrubEncodingName($encoding);
         $canonical = self::canonicalScrubEncoding($encoding);
         if ('UTF-8' === $canonical) {
-            return self::scrubUtf8($value);
+            return self::scrubUtf8($value, true);
         }
         if ('ASCII' === $canonical) {
-            return self::scrubAscii($value);
+            return self::scrubAscii($value, true);
         }
         if ('8BIT' === $canonical) {
             return $value;
@@ -1805,21 +2007,31 @@ final class VmMbstring
         return CharsetEngine::canonicalize($encoding);
     }
 
-    private static function scrubAscii(string $value): string
+    private static function scrubAscii(string $value, bool $recordIllegal = false): string
     {
         $out = '';
+        $illegal = 0;
         $len = \strlen($value);
         for ($i = 0; $i < $len; ++$i) {
             $byte = \ord($value[$i]);
-            $out .= $byte < 0x80 ? $value[$i] : '?';
+            if ($byte < 0x80) {
+                $out .= $value[$i];
+            } else {
+                $out .= MbstringState::substitutionOutput('ASCII', null);
+                ++$illegal;
+            }
+        }
+        if ($recordIllegal) {
+            MbstringState::addIllegalChars($illegal);
         }
 
         return $out;
     }
 
-    private static function scrubUtf8(string $value): string
+    private static function scrubUtf8(string $value, bool $recordIllegal = false): string
     {
         $out = '';
+        $illegal = 0;
         $len = \strlen($value);
         for ($i = 0; $i < $len; ) {
             $byte = \ord($value[$i]);
@@ -1830,12 +2042,16 @@ final class VmMbstring
             }
             $need = 0;
             if (!self::utf8SequenceValidAt($value, $len, $i, $need)) {
-                $out .= '?';
+                $out .= MbstringState::substitutionOutput('UTF-8', null);
+                ++$illegal;
                 ++$i;
                 continue;
             }
             $out .= \substr($value, $i, $need + 1);
             $i += $need + 1;
+        }
+        if ($recordIllegal) {
+            MbstringState::addIllegalChars($illegal);
         }
 
         return $out;

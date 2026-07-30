@@ -299,11 +299,16 @@ final class BuiltinByRefParams
     /** First argument index passed by reference for variadic tail (issue #3190). */
     public static function variadicByRefFromIndex(string $name): ?int
     {
-        if (\in_array(strtolower($name), ['sscanf', 'vfscanf', 'fscanf'], true)) {
+        $lc = strtolower($name);
+        if (\in_array($lc, ['sscanf', 'vfscanf', 'fscanf'], true)) {
             return 2;
         }
-        if ('array_multisort' === strtolower($name)) {
+        if ('array_multisort' === $lc) {
             return 0;
+        }
+        // php-src ext/mbstring/mbstring.stub.php — mixed &$var, mixed &...$vars (#25207 / #4572)
+        if ('mb_convert_variables' === $lc) {
+            return 2;
         }
 
         return null;

@@ -28,10 +28,10 @@ final class mb_substitute_character extends Internal
                 $argc
             ));
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (0 === $argc) {
+            if (null === $frame->returnVar) {
+                return;
+            }
             $value = MbstringState::substituteCharacter();
             if (\is_int($value)) {
                 $frame->returnVar->int($value);
@@ -41,7 +41,11 @@ final class mb_substitute_character extends Internal
 
             return;
         }
+        // Setter must run even when the return is discarded (php-src; #25207).
         $result = MbstringState::substituteCharacter($frame->calledArgs[0]);
+        if (null === $frame->returnVar) {
+            return;
+        }
         $frame->returnVar->bool($result);
     }
 
