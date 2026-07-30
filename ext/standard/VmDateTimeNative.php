@@ -1081,7 +1081,8 @@ final class VmDateTimeNative
             $result['warnings'] = $normalized['warnings'];
         }
 
-        return $result;
+        // php-src PHP_FUNCTION(date_parse_from_format) — emit zone_* from format tokens T/e/O/P (#25487).
+        return self::applyFromFormatTimezoneMetadata($result, $normalized['components']);
     }
 
     /**
@@ -1392,9 +1393,90 @@ final class VmDateTimeNative
     {
         $result['is_localtime'] = true;
         $result['zone_type'] = 3;
+        // php-src timelib — UTC identifier also exposes tz_abbr (#25486 / #25487).
+        if (0 === \strcasecmp($tzId, 'UTC')) {
+            $result['tz_abbr'] = 'UTC';
+        }
         $result['tz_id'] = $tzId;
 
         return $result;
+    }
+
+    /**
+     * php-src timelib — TIMELIB_ZONETYPE_ABBR (2) metadata for format token T (#25487).
+     *
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withAbbreviationTimezoneMetadata(array $result, string $abbr): array
+    {
+        $meta = self::abbreviationOffsetAndDst($abbr);
+        $result['is_localtime'] = true;
+        $result['zone_type'] = 2;
+        $result['zone'] = $meta['offset'] ?? 0;
+        $result['is_dst'] = $meta['dst'] ?? false;
+        $result['tz_abbr'] = $abbr;
+
+        return $result;
+    }
+
+    /**
+     * Apply timezone keys from date_parse_from_format match components (#25487).
+     *
+     * @param array<string, mixed> $result
+     * @param array<string, mixed> $components
+     *
+     * @return array<string, mixed>
+     */
+    private static function applyFromFormatTimezoneMetadata(array $result, array $components): array
+    {
+        if (!isset($components['timezone']) || !\is_string($components['timezone']) || '' === $components['timezone']) {
+            return $result;
+        }
+        $tz = $components['timezone'];
+        $kind = $components['timezone_kind'] ?? null;
+        $abbr = $components['timezone_abbr'] ?? null;
+
+        if ('offset' === $kind || null !== self::parseNumericTimezoneOffset($tz)) {
+            $offset = self::parseNumericTimezoneOffset($tz);
+            if (null === $offset) {
+                return $result;
+            }
+            $result['is_localtime'] = true;
+
+            return self::withOffsetTimezoneMetadata($result, $offset);
+        }
+
+        // Token T: UTC is zone_type ID; other abbreviations are TIMELIB_ZONETYPE_ABBR.
+        if ('abbr' === $kind && \is_string($abbr) && '' !== $abbr) {
+            if (0 === \strcasecmp($abbr, 'UTC')) {
+                return self::withNamedTimezoneMetadata($result, 'UTC');
+            }
+
+            return self::withAbbreviationTimezoneMetadata($result, $abbr);
+        }
+
+        return self::withNamedTimezoneMetadata($result, $tz);
+    }
+
+    /**
+     * @return array{offset: int, dst: bool}|null
+     */
+    private static function abbreviationOffsetAndDst(string $abbr): ?array
+    {
+        /** @var array<string, list<array{dst: bool, offset: int, timezone_id: ?string}>> $data */
+        $data = require __DIR__.'/TimezoneAbbreviationsData.php';
+        $entries = $data[\strtolower($abbr)] ?? null;
+        if (!\is_array($entries) || [] === $entries) {
+            return null;
+        }
+        $entry = $entries[0];
+
+        return [
+            'offset' => (int) $entry['offset'],
+            'dst' => (bool) $entry['dst'],
+        ];
     }
 
     private static function englishMonthToNumber(string $monthName): ?int
@@ -1614,14 +1696,21 @@ final class VmDateTimeNative
                         return false;
                     }
                     $components['timezone'] = $tzId;
+                    $components['timezone_kind'] = 'id';
 
                     break;
                 case 'T':
-                    $tzId = self::readFormatTimezoneAbbreviation($time, $pos, $timeLen);
-                    if (false === $tzId) {
+                    $abbr = self::readFormatTimezoneAbbreviationRaw($time, $pos, $timeLen);
+                    if (false === $abbr) {
                         return false;
                     }
-                    $components['timezone'] = $tzId;
+                    $resolved = self::timezoneNameFromAbbr($abbr);
+                    if (false === $resolved) {
+                        return false;
+                    }
+                    $components['timezone'] = $resolved;
+                    $components['timezone_kind'] = 'abbr';
+                    $components['timezone_abbr'] = $abbr;
 
                     break;
                 case 'P':
@@ -1630,6 +1719,7 @@ final class VmDateTimeNative
                         return false;
                     }
                     $components['timezone'] = $tzId;
+                    $components['timezone_kind'] = 'offset';
 
                     break;
                 case 'O':
@@ -1638,6 +1728,7 @@ final class VmDateTimeNative
                         return false;
                     }
                     $components['timezone'] = $tzId;
+                    $components['timezone_kind'] = 'offset';
 
                     break;
                 default:
@@ -3062,6 +3153,17 @@ final class VmDateTimeNative
 
     private static function readFormatTimezoneAbbreviation(string $time, int &$pos, int $timeLen): string|false
     {
+        $abbr = self::readFormatTimezoneAbbreviationRaw($time, $pos, $timeLen);
+        if (false === $abbr) {
+            return false;
+        }
+
+        return self::timezoneNameFromAbbr($abbr);
+    }
+
+    /** Raw abbreviation text for format token T (before timezone_name_from_abbr resolution). */
+    private static function readFormatTimezoneAbbreviationRaw(string $time, int &$pos, int $timeLen): string|false
+    {
         while ($pos < $timeLen && \ctype_space($time[$pos])) {
             ++$pos;
         }
@@ -3075,12 +3177,8 @@ final class VmDateTimeNative
         if ($start === $pos) {
             return false;
         }
-        $resolved = self::timezoneNameFromAbbr(\substr($time, $start, $pos - $start));
-        if (false === $resolved) {
-            return false;
-        }
 
-        return $resolved;
+        return \substr($time, $start, $pos - $start);
     }
 
     private static function readFormatTimezoneOffset(string $time, int &$pos, int $timeLen, bool $withColon): string|false
