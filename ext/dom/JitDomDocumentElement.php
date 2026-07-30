@@ -44,7 +44,10 @@ final class JitDomDocumentElement
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_document_element_us');
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
-        $element = JitDomCreateElement::materializeElementFromLiteral($context, $tag);
+        $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
+        // Seed textContent/nodeValue from compile-time XML so reads after loadXML
+        // do not hit an uninitialized string slot (#25475 / re-#23251).
+        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         self::syncChildrenFromXml($context, $element, $xml);
 
         return new JITVariable(
