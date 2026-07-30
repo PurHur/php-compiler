@@ -124,49 +124,112 @@ final class VmGmp
         if ('' === $trimmed) {
             return '0';
         }
-        if (10 === $base) {
-            if (!preg_match('/^[+-]?[0-9]+$/', $trimmed)) {
-                throw new \ValueError(\sprintf(
-                    '%s(): Argument #%d ($%s) is not a valid GMP base %d integer',
-                    $function,
-                    $index + 1,
-                    $label,
-                    $base
-                ));
-            }
-
-            return self::normalizeSignedDecimal($trimmed);
-        }
-        if (16 === $base) {
-            if (!preg_match('/^[+-]?[0-9A-Fa-f]+$/', $trimmed)) {
-                throw new \ValueError(\sprintf(
-                    '%s(): Argument #%d ($%s) is not a valid GMP base %d integer',
-                    $function,
-                    $index + 1,
-                    $label,
-                    $base
-                ));
-            }
-            $negative = str_starts_with($trimmed, '-');
-            $hex = ltrim($negative ? substr($trimmed, 1) : ($trimmed[0] === '+' ? substr($trimmed, 1) : $trimmed), '0');
-            if ('' === $hex) {
-                return '0';
-            }
-            $decimal = self::hexToDecimal($hex);
-            if ($negative && '0' !== $decimal) {
-                $decimal = '-'.$decimal;
-            }
-
-            return self::normalizeSignedDecimal($decimal);
+        // php-src ext/gmp/gmp.c convert_zstr_to_gmp — base 0 auto-detects 0x/0b/0o (#25405).
+        if (0 !== $base && ($base < 2 || $base > 62)) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($base) must be 0 or in the range 2..62',
+                $function,
+                2
+            ));
         }
 
+        $negative = false;
+        if ('-' === $trimmed[0] || '+' === $trimmed[0]) {
+            $negative = '-' === $trimmed[0];
+            $trimmed = substr($trimmed, 1);
+            if ('' === $trimmed) {
+                self::throwInvalidGmpInteger($function, $index, $label, 0 === $base ? 10 : $base);
+            }
+        }
+
+        $digits = $trimmed;
+        $effectiveBase = $base;
+        if (\strlen($digits) >= 2 && '0' === $digits[0]) {
+            $marker = $digits[1];
+            if ((0 === $base || 16 === $base) && ('x' === $marker || 'X' === $marker)) {
+                $effectiveBase = 16;
+                $digits = substr($digits, 2);
+            } elseif ((0 === $base || 8 === $base) && ('o' === $marker || 'O' === $marker)) {
+                $effectiveBase = 8;
+                $digits = substr($digits, 2);
+            } elseif ((0 === $base || 2 === $base) && ('b' === $marker || 'B' === $marker)) {
+                $effectiveBase = 2;
+                $digits = substr($digits, 2);
+            }
+        }
+        if (0 === $effectiveBase) {
+            $effectiveBase = 10;
+        }
+        if ('' === $digits) {
+            self::throwInvalidGmpInteger($function, $index, $label, $effectiveBase);
+        }
+        if (!self::isValidDigitsForBase($digits, $effectiveBase)) {
+            self::throwInvalidGmpInteger($function, $index, $label, $effectiveBase);
+        }
+
+        $decimal = self::digitsToDecimal($digits, $effectiveBase);
+        if ($negative && '0' !== $decimal) {
+            $decimal = '-'.$decimal;
+        }
+
+        return self::normalizeSignedDecimal($decimal);
+    }
+
+    /** @return never */
+    private static function throwInvalidGmpInteger(string $function, int $index, string $label, int $base): void
+    {
         throw new \ValueError(\sprintf(
-            '%s(): Argument #%d ($%s) uses unsupported base %d in this compiler build',
+            '%s(): Argument #%d ($%s) is not a valid GMP base %d integer',
             $function,
             $index + 1,
             $label,
             $base
         ));
+    }
+
+    private static function isValidDigitsForBase(string $digits, int $base): bool
+    {
+        $len = \strlen($digits);
+        for ($i = 0; $i < $len; ++$i) {
+            $value = self::digitValue($digits[$i]);
+            if ($value < 0 || $value >= $base) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function digitValue(string $ch): int
+    {
+        $ord = \ord($ch);
+        if ($ord >= 48 && $ord <= 57) {
+            return $ord - 48;
+        }
+        if ($ord >= 65 && $ord <= 90) {
+            return $ord - 55;
+        }
+        if ($ord >= 97 && $ord <= 122) {
+            return $ord - 87;
+        }
+
+        return -1;
+    }
+
+    private static function digitsToDecimal(string $digits, int $base): string
+    {
+        if (10 === $base) {
+            return ltrim($digits, '0') ?: '0';
+        }
+        $baseStr = (string) $base;
+        $acc = '0';
+        $len = \strlen($digits);
+        for ($i = 0; $i < $len; ++$i) {
+            $acc = self::mulMagnitude($acc, $baseStr);
+            $acc = self::addMagnitude($acc, (string) self::digitValue($digits[$i]));
+        }
+
+        return $acc;
     }
 
     public static function add(string $left, string $right): string
@@ -1434,19 +1497,6 @@ final class VmGmp
         return ltrim($result, '0') ?: '0';
     }
 
-    private static function hexToDecimal(string $hex): string
-    {
-        $hex = strtolower($hex);
-        $acc = '0';
-        for ($i = 0, $len = strlen($hex); $i < $len; ++$i) {
-            $acc = self::mulMagnitude($acc, '16');
-            $digit = ord($hex[$i]);
-            $value = ($digit >= 97) ? ($digit - 87) : ($digit - 48);
-            $acc = self::addMagnitude($acc, (string) $value);
-        }
-
-        return $acc;
-    }
 
     private static function decimalToHex(string $decimal): string
     {
