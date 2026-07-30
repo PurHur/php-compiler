@@ -929,6 +929,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('tempnam'));
     }
 
+    /** @covers issue #23448 */
+    public function testScandirDirectoryNamedParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('scandir');
+        self::assertSame(['directory', 'sorting_order=', 'context='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'directory', 'scandir'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'sorting_order', 'scandir'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'scandir'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'dir', 'scandir'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('scandir'));
+        $infoOrder = ['name' => 'sorting_order', 'type' => 'int', 'isOptional' => true];
+        $infoCtx = ['name' => 'context', 'type' => '', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('scandir', 1, $infoOrder, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('scandir', 2, $infoCtx, false));
+        $order = new Variable();
+        $ctx = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($order, 'scandir', 1, $infoOrder));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($ctx, 'scandir', 2, $infoCtx));
+        self::assertSame(0, $order->toInt());
+        self::assertSame(Variable::TYPE_NULL, $ctx->type);
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {
