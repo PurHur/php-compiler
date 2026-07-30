@@ -2754,6 +2754,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($opt, 'wrappername', 'stream_context_set_option'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($opt, 'optionname', 'stream_context_set_option'));
 
+        $setOptions = BuiltinParamNames::forFunction('stream_context_set_options');
+        self::assertSame(['context', 'options'], $setOptions);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($setOptions, 'context', 'stream_context_set_options'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($setOptions, 'options', 'stream_context_set_options'));
+
         $params = BuiltinParamNames::forFunction('stream_context_set_params');
         self::assertSame(['context', 'params'], $params);
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($params, 'params', 'stream_context_set_params'));
@@ -3368,6 +3373,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'name', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'proto', $fn));
         }
+    }
+
+    /** @covers issue #25453 */
+    public function testStreamContextSetOptionsStubReturnAndOptionsType(): void
+    {
+        self::assertSame(
+            'bool',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_set_options')
+        );
+        self::assertSame(
+            'array',
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_options', 1)
+        );
+        self::assertNull(
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_options', 0)
+        );
     }
 
 }

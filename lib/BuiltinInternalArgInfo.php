@@ -65,6 +65,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             'strstr', 'stristr' => 'string|false',
+            // ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
+            'stream_context_set_options' => 'bool',
             default => null,
         };
     }
@@ -300,6 +302,8 @@ final class BuiltinInternalArgInfo
                 0, 1 => '?array',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — array $options (context untyped; #25453)
+            'stream_context_set_options' => 1 === $index ? 'array' : null,
             // ext/standard/basic_functions.stub.php — trailing bool $raw = false (#23358)
             'dns_get_record' => 4 === $index ? 'bool' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24846)

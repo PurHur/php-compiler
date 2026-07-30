@@ -741,6 +741,9 @@ final class BuiltinParamNames
             // php-src stream context stubs — InternalArgInfo still says wrappername/optionname (#23939)
             case 'stream_context_set_option':
                 return ['context', 'wrapper_or_options', 'option_name', 'value'];
+            // php-src ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
+            case 'stream_context_set_options':
+                return ['context', 'options'];
             // php-src stream context stubs — InternalArgInfo still says options (#23939)
             case 'stream_context_set_params':
                 return ['context', 'params'];

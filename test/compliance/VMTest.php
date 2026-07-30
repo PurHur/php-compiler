@@ -897,9 +897,11 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'mutable_capture'))) {
                 continue;
             }
+            // *_forward84 cases set PROFILE via --ENV--; always include (#25453).
             if (!CompilerVersion::supportsStreamContextSetOptions()
                 && str_contains($name, 'stream_context_set_options')
-                && !str_contains($name, 'stream_context_set_options_phantom')) {
+                && !str_contains($name, 'stream_context_set_options_phantom')
+                && !str_contains($name, '_forward84')) {
                 continue;
             }
             if (CompilerVersion::supportsStreamContextSetOptions()
