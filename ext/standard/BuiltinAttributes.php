@@ -92,7 +92,7 @@ final class BuiltinAttributes
         // php-src Zend/zend_attributes.stub.php — TARGET_METHOD; +TARGET_PROPERTY on 8.5+ (#25138).
         // TARGET_CLASS_CONSTANT kept for #9821 compile coverage (not in php-src Override flags).
         $targets = AttributeSupport::TARGET_METHOD | AttributeSupport::TARGET_CLASS_CONSTANT;
-        if (CompilerVersion::supportsOverridePropertyAttribute()) {
+        if (CompilerVersion::supportsOverridePropertyTarget()) {
             $targets |= AttributeSupport::TARGET_PROPERTY;
         }
         self::registerBuiltinAttributeClass(
