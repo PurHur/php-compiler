@@ -2575,9 +2575,11 @@ class Compiler {
                         $iter = $ops[$i];
                         /** @var Op\Expr\AssignRef $assign */
                         $assign = $ops[$i + 1];
+                        $destSlot = $this->compileOperand($assign->var, $block, false);
+                        $this->registerForeachByRefLoopVarBindings($block, $assign, $iter, $destSlot);
                         $block->addOpCode(new OpCode(
                             OpCode::TYPE_ITER_VALUE,
-                            $this->compileOperand($assign->var, $block, false),
+                            $destSlot,
                             $this->compileOperand($iter->var, $block, true),
                             1
                         ));
@@ -2724,6 +2726,33 @@ class Compiler {
         return $iter->byRef
             && $iter->result === $assign->expr
             && !$this->operandIsPropertyWriteTarget($assign->var);
+    }
+
+    /**
+     * foreach ($iterable as &$loopVar) fusion — CV slot must feed inline call-arg producers (#25302).
+     */
+    private function registerForeachByRefLoopVarBindings(
+        Block $block,
+        Op\Expr\AssignRef $assign,
+        Op\Iterator\Value $iter,
+        int $destSlot
+    ): void {
+        $varRoot = Block::cfgVarRoot($assign->var);
+        if (null !== $varRoot) {
+            $block->registerNamedAssignDest($varRoot, $destSlot);
+        }
+        if ($iter->result !== $assign->var && [] !== $iter->result->usages) {
+            $block->registerAssignResultLvalue(
+                $this->compileOperand($iter->result, $block, false),
+                $destSlot
+            );
+        }
+        if ($assign->result !== $assign->var && [] !== $assign->result->usages) {
+            $block->registerAssignResultLvalue(
+                $this->compileOperand($assign->result, $block, false),
+                $destSlot
+            );
+        }
     }
 
     /**
@@ -19239,6 +19268,13 @@ class Compiler {
             return $mapped;
         }
         foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_ITER_VALUE === $op->type
+                && 1 === (int) ($op->arg3 ?? 0)
+                && (int) $op->arg1 === $resultSlot
+            ) {
+                return (int) $op->arg1;
+            }
             if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg1 === $resultSlot) {
                 return (int) $op->arg2;
             }
