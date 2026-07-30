@@ -1555,6 +1555,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #24865 */
+    public function testStripcslashesZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('stripcslashes');
+        self::assertSame(['string'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'stripcslashes'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'stripcslashes'));
+    }
+
     /** @covers issue #23264 */
     public function testCryptQuotemetaStrrevStrRot13ZendStubNamedParams(): void
     {

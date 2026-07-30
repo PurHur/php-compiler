@@ -215,6 +215,8 @@ final class BuiltinParamNames
             case 'strtolower':
             case 'addslashes':
             case 'stripslashes':
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str (#24865)
+            case 'stripcslashes':
             case 'quoted_printable_encode':
             case 'quoted_printable_decode':
             case 'bin2hex':
