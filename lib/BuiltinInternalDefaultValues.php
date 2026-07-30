@@ -142,6 +142,12 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'null'],
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/standard/array.stub.php — length=null, replacement=[] (#24824)
+        // InternalArgInfo int length → 0; replacement typed array (ok) but length must be null.
+        'array_splice' => [
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'array'],
+        ],
         // php-src ext/standard/file.stub.php — permissions=0777, context=null (#24885)
         // InternalArgInfo int → 0; untyped context= has no inferrable default.
         'mkdir' => [

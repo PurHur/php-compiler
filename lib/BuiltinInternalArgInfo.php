@@ -215,6 +215,12 @@ final class BuiltinInternalArgInfo
                 2 => 'int',
                 default => null,
             },
+            // ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
+            'array_splice' => match ($index) {
+                2 => '?int',
+                3 => 'mixed',
+                default => null,
+            },
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25018)
             'hash_hkdf' => match ($index) {
                 0, 1, 3, 4 => 'string',
