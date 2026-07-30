@@ -15263,6 +15263,9 @@ class Compiler {
 
     /**
      * php-cfg dead call-arg temps for hoisted isset()/empty() — map to producer result slot (#11498).
+     *
+     * Sibling isset()/empty() before another expression in the same array literal must not steal
+     * that call's literal/CV args (#25188).
      */
     private function resolveHoistedIssetOrEmptyCallArgSlot(
         Operand $arg,
@@ -15278,9 +15281,16 @@ class Compiler {
             return null;
         }
         $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+        $argIsProducerResult = $this->operandsReferToSameVariable($producer->result, $callArg);
+        $argIsDeadTemp = $this->callArgIsDeadInlineTemporary($callArg);
+        if (!$argIsDeadTemp && !$argIsProducerResult) {
+            // [isset($a['x']), array_key_exists('x', $a)] — preceding Isset_ is a sibling array
+            // element, not this call's arg; keep LITERAL/CV wiring (#25188).
+            return null;
+        }
         if (
-            $this->callArgIsDeadInlineTemporary($callArg)
-            && !$this->operandsReferToSameVariable($producer->result, $callArg)
+            $argIsDeadTemp
+            && !$argIsProducerResult
             && !$this->issetOrEmptyProducerIsImmediateCallPrelude($producer, $cfgCallOp, $block)
         ) {
             // isset() && … as call arg — php-cfg dead temp is && merge, not hoisted Isset_ (#10704).
