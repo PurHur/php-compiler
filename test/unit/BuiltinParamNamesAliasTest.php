@@ -2415,11 +2415,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'autoload_function', 'spl_autoload_unregister'));
     }
 
-    /** @covers issue #23422 */
+    /** @covers issue #23422 / #25388 */
     public function testClassAliasZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('class_alias');
-        self::assertSame(['class', 'alias', 'autoload'], $names);
+        self::assertSame(['class', 'alias', 'autoload='], $names);
+        self::assertTrue(BuiltinParamNames::namesEncodeOptionalParams($names));
+        self::assertFalse(BuiltinParamNames::overrideEntryIsOptional('class'));
+        self::assertFalse(BuiltinParamNames::overrideEntryIsOptional('alias'));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('autoload='));
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'class', 'class_alias'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'alias', 'class_alias'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'autoload', 'class_alias'));

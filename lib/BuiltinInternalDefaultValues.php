@@ -230,6 +230,11 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'int', 'value' => 1],
             4 => ['kind' => 'int', 'value' => 1],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — bool $autoload = true (#25388)
+        // InternalArgInfo marks all params optional; bool infer defaults false.
+        'class_alias' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
         'setcookie' => [
             1 => ['kind' => 'string', 'value' => ''],

@@ -1153,9 +1153,10 @@ final class BuiltinParamNames
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says function_name (#23435)
             case 'function_exists':
                 return ['function'];
-            // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says user_class_name/alias_name (#23422)
+            // php-src Zend/zend_builtin_functions.stub.php — class/alias required; autoload=true (#23422, #25388)
+            // InternalArgInfo still marks all three optional (`=`) with bool infer → false.
             case 'class_alias':
-                return ['class', 'alias', 'autoload'];
+                return ['class', 'alias', 'autoload='];
             case 'class_exists':
                 return ['class', 'autoload'];
             case 'interface_exists':
