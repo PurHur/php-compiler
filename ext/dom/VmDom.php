@@ -7671,6 +7671,17 @@ final class VmDom
         return true;
     }
 
+    /**
+     * HTML text/attr escape modes for serializeHtmlNode (libxml htmlNodeDump / htmlDocDump).
+     *
+     * UTF8: &<> only — HTML document node-scoped saveHTML (#24152).
+     * NAMED: HTML 4.01 named entities — HTML document-wide saveHTML (#23684).
+     * NUMERIC: &#xHH; hex refs — XML documents via saveHTML (#25208 / libxml HTML serializer).
+     */
+    private const HTML_ESCAPE_UTF8 = 0;
+    private const HTML_ESCAPE_NAMED = 1;
+    private const HTML_ESCAPE_NUMERIC = 2;
+
     public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null, int $options = 0): string
     {
         $state = self::ensureDocument($document);
@@ -7678,14 +7689,24 @@ final class VmDom
             throw new \LogicException('DOMDocument::saveHTML() called on non-document node in this compiler build');
         }
 
+        // XML docs: libxml HTML dump uses numeric hex character references for both
+        // node-scoped and document-wide saveHTML (#25208). HTML docs keep the
+        // node UTF-8 / document named-entity split (#24152 / #23684).
+        $escapeMode = $state->isHtmlDocument
+            ? self::HTML_ESCAPE_NAMED
+            : self::HTML_ESCAPE_NUMERIC;
+
         if (null !== $node) {
             if (!self::isDomNode($node)) {
                 throw new \TypeError('DOMDocument::saveHTML(): Argument #1 ($node) must be of type ?DOMNode');
             }
 
             // libxml htmlNodeDump: never XML self-close; HTML_EMPTY → <br>; else <tag></tag> (#20625).
-            // Non-ASCII stays UTF-8 — only &<> escaped (unlike htmlDocDump named entities; #24152).
-            return self::serializeHtmlNode($node, false, false);
+            // HTML docs: Non-ASCII stays UTF-8 — only &<> escaped (#24152).
+            // XML docs: numeric hex refs (#25208).
+            $nodeMode = $state->isHtmlDocument ? self::HTML_ESCAPE_UTF8 : self::HTML_ESCAPE_NUMERIC;
+
+            return self::serializeHtmlNode($node, false, $nodeMode);
         }
 
         $lines = [];
@@ -7693,15 +7714,14 @@ final class VmDom
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    // Document dump: named HTML entities for non-ASCII (#23684 / htmlDocDump).
-                    $lines[] = self::serializeHtmlNode($child, false, true);
+                    $lines[] = self::serializeHtmlNode($child, false, $escapeMode);
                 }
             }
         } else {
             $lines[] = self::serializeHtmlDoctypeFromDocumentState($state);
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_OBJECT === $rootVar->type) {
-                $lines[] = self::serializeHtmlNode($rootVar->toObject(), false, true);
+                $lines[] = self::serializeHtmlNode($rootVar->toObject(), false, $escapeMode);
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
                 $name = self::escapeName($state->documentElementName);
                 $lines[] = self::formatHtmlEmptyElementDump($name, '');
@@ -8682,7 +8702,7 @@ final class VmDom
     private static function serializeHtmlNode(
         ObjectEntry $entry,
         bool $emptySelfClosing = true,
-        bool $htmlNamedEntities = true
+        int $htmlEscapeMode = self::HTML_ESCAPE_NAMED
     ): string {
         if (self::isDocumentType($entry)) {
             $dt = DomRegistry::state($entry);
@@ -8700,20 +8720,21 @@ final class VmDom
         }
         // DocumentFragment: libxml dumps children only (php-src document.c; #22453).
         if (self::isDocumentFragment($entry)) {
-            return self::serializeDocumentFragmentChildrenHtml($entry, $emptySelfClosing, $htmlNamedEntities);
+            return self::serializeDocumentFragmentChildrenHtml($entry, $emptySelfClosing, $htmlEscapeMode);
         }
         if (self::isElement($entry)) {
-            return self::serializeHtmlElement($entry, $emptySelfClosing, $htmlNamedEntities);
+            return self::serializeHtmlElement($entry, $emptySelfClosing, $htmlEscapeMode);
         }
         if (self::isTextNode($entry)) {
             // libxml htmlNodeDump: escape &<> in normal text; leave script/style raw (#21149).
-            // Document dump also maps non-ASCII → named entities (#23684); node dump keeps UTF-8 (#24152).
+            // HTML document dump: non-ASCII → named entities (#23684); node dump keeps UTF-8 (#24152).
+            // XML document saveHTML: non-ASCII → &#xHH; (#25208).
             $text = DomRegistry::state($entry)->textContent ?? '';
             if (!self::htmlTextNeedsEntityEscape($entry)) {
                 return $text;
             }
 
-            return $htmlNamedEntities ? self::escapeHtmlText($text) : self::escapeText($text);
+            return self::escapeHtmlTextForMode($text, $htmlEscapeMode);
         }
         // libxml htmlNodeDump: CDATA → raw text (no entity escape, no <![CDATA[…]]> wrapper)
         // — php-src ext/dom/document.c / #24580.
@@ -8733,13 +8754,13 @@ final class VmDom
     private static function serializeDocumentFragmentChildrenHtml(
         ObjectEntry $fragment,
         bool $emptySelfClosing,
-        bool $htmlNamedEntities = true
+        int $htmlEscapeMode = self::HTML_ESCAPE_NAMED
     ): string {
         $parts = [];
         foreach (DomRegistry::state($fragment)->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing, $htmlNamedEntities);
+                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing, $htmlEscapeMode);
             }
         }
 
@@ -8774,11 +8795,11 @@ final class VmDom
     private static function serializeHtmlElement(
         ObjectEntry $entry,
         bool $emptySelfClosing = true,
-        bool $htmlNamedEntities = true
+        int $htmlEscapeMode = self::HTML_ESCAPE_NAMED
     ): string {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
-        $attrPart = self::serializeAttributes($state);
+        $attrPart = self::serializeAttributes($state, $htmlEscapeMode);
         if ([] === $state->childIds) {
             if ($emptySelfClosing) {
                 // XMLDocument / XML context (#18618, #22773): empty-element form <tag/>.
@@ -8792,7 +8813,7 @@ final class VmDom
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing, $htmlNamedEntities);
+                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing, $htmlEscapeMode);
             }
         }
 
@@ -9210,14 +9231,16 @@ final class VmDom
     }
 
     /** @return non-empty-string|string */
-    private static function serializeAttributes(DomNodeState $state): string
-    {
+    private static function serializeAttributes(
+        DomNodeState $state,
+        int $htmlEscapeMode = self::HTML_ESCAPE_UTF8
+    ): string {
         if ([] === $state->attributes) {
             return '';
         }
         $parts = [];
         foreach ($state->attributes as $aname => $avalue) {
-            $serialized = self::serializeAttributeValue($state, $aname, $avalue);
+            $serialized = self::serializeAttributeValue($state, $aname, $avalue, $htmlEscapeMode);
             $parts[] = self::escapeName($aname).'="'.$serialized.'"';
         }
 
@@ -9231,19 +9254,20 @@ final class VmDom
     private static function serializeAttributeValue(
         DomNodeState $elementState,
         string $aname,
-        string $avalue
+        string $avalue,
+        int $htmlEscapeMode = self::HTML_ESCAPE_UTF8
     ): string {
         $attrId = $elementState->attributeNodeIds[$aname] ?? null;
         if (null === $attrId) {
-            return self::escapeAttr($avalue);
+            return self::escapeHtmlAttrForMode($avalue, $htmlEscapeMode);
         }
         $attr = DomRegistry::entry($attrId);
         if (null === $attr || !self::isAttr($attr)) {
-            return self::escapeAttr($avalue);
+            return self::escapeHtmlAttrForMode($avalue, $htmlEscapeMode);
         }
         $attrState = DomRegistry::state($attr);
         if ([] === $attrState->childIds) {
-            return self::escapeAttr($avalue);
+            return self::escapeHtmlAttrForMode($avalue, $htmlEscapeMode);
         }
         $parts = [];
         $sawStructured = false;
@@ -9253,14 +9277,17 @@ final class VmDom
                 continue;
             }
             if (self::isTextNode($child)) {
-                $parts[] = self::escapeAttr(DomRegistry::state($child)->textContent ?? '');
+                $parts[] = self::escapeHtmlAttrForMode(
+                    DomRegistry::state($child)->textContent ?? '',
+                    $htmlEscapeMode
+                );
             } elseif (self::isEntityReference($child)) {
                 $sawStructured = true;
                 $parts[] = '&'.self::escapeName(DomRegistry::state($child)->nodeName).';';
             }
         }
         if (!$sawStructured && [] === $parts) {
-            return self::escapeAttr($avalue);
+            return self::escapeHtmlAttrForMode($avalue, $htmlEscapeMode);
         }
 
         return implode('', $parts);
@@ -12197,13 +12224,95 @@ final class VmDom
      * HTML text escape matching libxml htmlDocDump: &/</> plus named HTML 4.01 entity references
      * for non-ASCII codepoints (e.g. \xC2\xA0 → &nbsp;, \xC3\xA9 → &eacute;).
      *
-     * Used for document-wide saveHTML() only. Node-scoped saveHTML($node) uses escapeText
-     * (libxml htmlNodeDump keeps UTF-8; #24152). php-src ext/dom/document.c;
+     * Used for HTML document-wide saveHTML() only. Node-scoped saveHTML($node) on HTML docs
+     * uses escapeText (libxml htmlNodeDump keeps UTF-8; #24152). php-src ext/dom/document.c;
      * PHP's htmlentities(…, ENT_HTML401) uses the same codepoint→name table (#23684).
      */
     private static function escapeHtmlText(string $value): string
     {
         return htmlentities($value, ENT_NOQUOTES | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true);
+    }
+
+    /**
+     * Text escape for saveHTML / innerHTML by document mode (#24152 / #23684 / #25208).
+     */
+    private static function escapeHtmlTextForMode(string $value, int $mode): string
+    {
+        return match ($mode) {
+            self::HTML_ESCAPE_NAMED => self::escapeHtmlText($value),
+            self::HTML_ESCAPE_NUMERIC => self::escapeHtmlNumericText($value),
+            default => self::escapeText($value),
+        };
+    }
+
+    /**
+     * Attribute escape for HTML serializer modes. NUMERIC maps non-ASCII to &#xHH; (#25208);
+     * other modes keep escapeAttr (UTF-8 non-ASCII) to match prior HTML dump behaviour.
+     */
+    private static function escapeHtmlAttrForMode(string $value, int $mode): string
+    {
+        if (self::HTML_ESCAPE_NUMERIC === $mode) {
+            return self::escapeHtmlNumericAttr($value);
+        }
+
+        return self::escapeAttr($value);
+    }
+
+    /**
+     * libxml HTML dump on XML documents: &<> plus &#xHH; for non-ASCII (htmlNodeDump; #25208).
+     */
+    private static function escapeHtmlNumericText(string $value): string
+    {
+        return self::encodeNonAsciiHtmlNumeric(self::escapeText($value));
+    }
+
+    /**
+     * libxml HTML dump on XML documents: &/" plus &#xHH; for non-ASCII attribute values (#25208).
+     */
+    private static function escapeHtmlNumericAttr(string $value): string
+    {
+        return self::encodeNonAsciiHtmlNumeric(self::escapeAttr($value));
+    }
+
+    /**
+     * Map non-ASCII UTF-8 codepoints to uppercase hex character references (&#xE9;).
+     * ASCII bytes (including already-escaped &amp;/&lt;/&gt;/&quot;) are left unchanged.
+     */
+    private static function encodeNonAsciiHtmlNumeric(string $value): string
+    {
+        $out = '';
+        $len = \strlen($value);
+        $i = 0;
+        while ($i < $len) {
+            $o = \ord($value[$i]);
+            if ($o < 0x80) {
+                $out .= $value[$i];
+                ++$i;
+                continue;
+            }
+            if (0xC0 === ($o & 0xE0) && $i + 1 < $len) {
+                $cp = (($o & 0x1F) << 6) | (\ord($value[$i + 1]) & 0x3F);
+                $i += 2;
+            } elseif (0xE0 === ($o & 0xF0) && $i + 2 < $len) {
+                $cp = (($o & 0x0F) << 12)
+                    | ((\ord($value[$i + 1]) & 0x3F) << 6)
+                    | (\ord($value[$i + 2]) & 0x3F);
+                $i += 3;
+            } elseif (0xF0 === ($o & 0xF8) && $i + 3 < $len) {
+                $cp = (($o & 0x07) << 18)
+                    | ((\ord($value[$i + 1]) & 0x3F) << 12)
+                    | ((\ord($value[$i + 2]) & 0x3F) << 6)
+                    | (\ord($value[$i + 3]) & 0x3F);
+                $i += 4;
+            } else {
+                $out .= $value[$i];
+                ++$i;
+                continue;
+            }
+            $out .= '&#x'.\strtoupper(\dechex($cp)).';';
+        }
+
+        return $out;
     }
 
     private static function escapeName(string $name): string
