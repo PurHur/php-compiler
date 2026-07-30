@@ -262,7 +262,7 @@ final class VmDateTimeNative
             }
         }
         if (1 === preg_match(
-            '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+            '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years|weekday|weekdays)$/i',
             $time
         )) {
             $modifier = $time;
@@ -288,6 +288,20 @@ final class VmDateTimeNative
      */
     private static function tryParseExtendedDateTimeString(string $time, string $tzName, int $base): ?array
     {
+        // php-src timelib TIMELIB_SPECIAL_WEEKDAY — business-day steps (#25262).
+        if (1 === preg_match('/^next\s+weekdays?$/i', $time)) {
+            return self::specialWeekdayParseResult(1, $base, $tzName, false);
+        }
+        if (1 === preg_match('/^(last|previous)\s+weekdays?$/i', $time)) {
+            return self::specialWeekdayParseResult(-1, $base, $tzName, false);
+        }
+        if (1 === preg_match('/^this\s+weekdays?$/i', $time)) {
+            return self::specialWeekdayParseResult(0, $base, $tzName, false);
+        }
+        // Bare "weekday(s)" is parsed as TIMELIB_WEEKDAY with multiplier Monday (#25262).
+        if (1 === preg_match('/^weekdays?$/i', $time)) {
+            return self::weekdayParseResult('bare', 'monday', $base, $tzName);
+        }
         if (1 === preg_match(
             '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
             $time,
@@ -515,7 +529,7 @@ final class VmDateTimeNative
                 }
                 // Single-unit fallback (e.g. "+1 day") when compound grammar does not consume.
                 if (1 === preg_match(
-                    '/^[+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+                    '/^[+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years|weekday|weekdays)$/i',
                     $modifier
                 )) {
                     $normalized = preg_replace('/\s+/', ' ', $modifier) ?? $modifier;
@@ -547,6 +561,9 @@ final class VmDateTimeNative
         $weekday = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday';
         $ordinal = 'first|second|third|fourth|fifth|last';
         $suffixPatterns = [
+            // Business-day unit after absolute date (#25262).
+            '/^(.+?)\s+((?:next|last|previous|this)\s+weekdays?)$/i',
+            '/^(.+?)\s+(weekdays?)$/i',
             '/^(.+?)\s+((?:next|last|previous|this)\s+(?:'.$weekday.'))$/i',
             // Week + weekday either order (#23936 / #24018).
             '/^(.+?)\s+((?:'.$weekday.')\s+(?:this|next|last|previous)\s+week)$/i',
@@ -1921,6 +1938,75 @@ final class VmDateTimeNative
     }
 
     /**
+     * php-src tm2unixtime.c do_adjust_special_weekday — ±N business days (#25262).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function specialWeekdayParseResult(
+        int $amount,
+        int $base,
+        string $tzName,
+        bool $keepTime
+    ): ?array {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $dayDelta = self::specialWeekdayDayDelta($amount, self::tmInt($tm, 'tm_wday'));
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday') + $dayDelta,
+                $keepTime ? self::tmInt($tm, 'tm_hour') : 0,
+                $keepTime ? self::tmInt($tm, 'tm_min') : 0,
+                $keepTime ? self::tmInt($tm, 'tm_sec') : 0,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * Calendar-day delta for TIMELIB_SPECIAL_WEEKDAY (php-src do_adjust_special_weekday).
+     */
+    private static function specialWeekdayDayDelta(int $count, int $dow): int
+    {
+        $dayDelta = intdiv($count, 5) * 7;
+        $rem = $count % 5;
+
+        if ($count > 0) {
+            if (0 === $rem) {
+                if (0 === $dow) {
+                    $dayDelta -= 2;
+                } elseif (6 === $dow) {
+                    $dayDelta -= 1;
+                }
+            } elseif (6 === $dow) {
+                $dayDelta += 1;
+            } elseif ($dow + $rem > 5) {
+                $dayDelta += 2;
+            }
+        } else {
+            // Mirrors forward direction; also covers count==0 weekend snap to Monday.
+            if (0 === $rem) {
+                if (6 === $dow) {
+                    $dayDelta += 2;
+                } elseif (0 === $dow) {
+                    $dayDelta += 1;
+                }
+            } elseif (0 === $dow) {
+                $dayDelta -= 1;
+            } elseif ($dow + $rem < 1) {
+                $dayDelta -= 2;
+            }
+        }
+
+        return $dayDelta + $rem;
+    }
+
+    /**
      * php-src timelib — first|second|…|fifth|last weekday of named month (#15058, #19550).
      *
      * @return array{timestamp: int, microsecond: int}|null
@@ -2202,18 +2288,16 @@ final class VmDateTimeNative
                 break;
             }
             $tail = \substr($modifier, $pos);
+            // First chunk requires a sign; later chunks may omit it or repeat ± (php-src relative).
             $pattern = $requireSign
-                ? '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\b/i'
-                : '/^(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\b/i';
+                ? '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years|weekday|weekdays)\b/i'
+                : '/^([+-])?\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years|weekday|weekdays)\b/i';
             if (!preg_match($pattern, $tail, $matches)) {
                 return $matched ? $timestamp : null;
             }
-            if ($requireSign) {
-                $chunk = ($matches[1] ?? '+').' '.($matches[2] ?? '').' '.($matches[3] ?? '');
-                $requireSign = false;
-            } else {
-                $chunk = '+'.($matches[1] ?? '').' '.($matches[2] ?? '');
-            }
+            $sign = isset($matches[1]) && '' !== $matches[1] ? $matches[1] : '+';
+            $chunk = $sign.' '.($matches[2] ?? '').' '.($matches[3] ?? '');
+            $requireSign = false;
             $chunk = preg_replace('/\s+/', ' ', trim($chunk)) ?? trim($chunk);
             $pos += \strlen($matches[0]);
             try {
@@ -3007,6 +3091,13 @@ final class VmDateTimeNative
         $hour = self::tmInt($tm, 'tm_hour');
         $minute = self::tmInt($tm, 'tm_min');
         $second = self::tmInt($tm, 'tm_sec');
+        // php-src do_adjust_special_weekday — skip Sat/Sun (#25262).
+        if ('weekday' === $delta['unit']) {
+            $adjusted = self::specialWeekdayParseResult($delta['amount'], $timestamp, $tzName, true);
+
+            return null === $adjusted ? null : $adjusted['timestamp'];
+        }
+
         switch ($delta['unit']) {
             case 'second':
                 $second += $delta['amount'];
@@ -4106,7 +4197,7 @@ final class VmDateTimeNative
     private static function parseSignedRelativeDelta(string $modifier): array
     {
         if (!preg_match(
-            '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+            '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years|weekday|weekdays)$/i',
             $modifier,
             $matches
         )) {
@@ -4115,7 +4206,9 @@ final class VmDateTimeNative
         $sign = '-' === $matches[1] ? -1 : 1;
         $amount = $sign * (int) $matches[2];
         $unit = strtolower($matches[3]);
-        if (str_ends_with($unit, 's')) {
+        if ('weekdays' === $unit) {
+            $unit = 'weekday';
+        } elseif (str_ends_with($unit, 's')) {
             $unit = substr($unit, 0, -1);
         }
 
