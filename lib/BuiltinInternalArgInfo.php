@@ -323,6 +323,9 @@ final class BuiltinInternalArgInfo
             'simplexml_load_string', 'simplexml_load_file' => 1 === $index ? '?string' : null,
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
+            // ext/standard/string.stub.php — int $insertion_cost/$replacement_cost/$deletion_cost = 1
+            // InternalArgInfo only lists string1/string2; cost params are stub-only (#25538 / re-#24791)
+            'levenshtein' => ($index >= 2 && $index <= 4) ? 'int' : null,
             // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
             // InternalArgInfo still says varname:string required; local_only missing.
             'getenv' => match ($index) {

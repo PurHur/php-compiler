@@ -94,6 +94,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('json_encode', 0));
     }
 
+    /** php-src string.stub.php — cost params stub-only; InternalArgInfo has string1/string2 only (#25538). */
+    public function testLevenshteinCostParamTypesAreInt(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('levenshtein'));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('levenshtein', 0));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('levenshtein', 1));
+        foreach ([2, 3, 4] as $index) {
+            $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('levenshtein', $index), (string) $index);
+        }
+    }
+
     /** php-src basic_functions.stub.php — no return; InternalArgInfo says array (#25508). */
     public function testStreamContextCreateHasNoReturnType(): void
     {
