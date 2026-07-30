@@ -102,7 +102,61 @@ final class VmIntlDateFormatter
     }
 
     /**
+     * php-src dateformat_create.cpp {@code INTL_UDATE_FMT_OK} (#25205).
+     *
+     * Accepts UDAT_NONE / PATTERN / FULL–SHORT and RELATIVE_* (incl. bare UDAT_RELATIVE == 128).
+     */
+    public static function isValidUDateFormatStyle(int $style): bool
+    {
+        return self::NONE === $style
+            || self::PATTERN === $style
+            || ($style >= self::FULL && $style <= self::SHORT)
+            || ($style >= self::RELATIVE_FULL && $style <= self::RELATIVE_SHORT);
+    }
+
+    /**
+     * Validate date/time styles for create/__construct; set IntlError on failure (#25205).
+     *
+     * php-src: ext/intl/dateformat/dateformat_create.cpp — style checks before udat_open.
+     */
+    public static function validateStylesOrSetError(int $dateType, int $timeType): bool
+    {
+        if (!self::isValidUDateFormatStyle($dateType)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_create: invalid date format style: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (!self::isValidUDateFormatStyle($timeType)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_create: invalid time format style: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (self::PATTERN === $dateType && self::PATTERN !== $timeType) {
+            // php-src ≤8.2 wording uses UDAT_PATTERN; 8.4+ / PATTERN const gate uses class name.
+            $label = CompilerVersion::supportsIntlDateFormatterPatternConst()
+                ? 'IntlDateFormatter::PATTERN'
+                : 'UDAT_PATTERN';
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_create: time format must be '.$label.' if date format is '.$label.': U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Shared init for create() / __construct() (#21097; mirrors MessageFormatter #20809).
+     *
+     * Caller must validate styles via {@see validateStylesOrSetError()} first (#25205).
      *
      * @throws NativeDateInvalidTimeZoneException when $timezone is non-empty and invalid
      */
@@ -132,6 +186,11 @@ final class VmIntlDateFormatter
         ];
     }
 
+    /**
+     * @return ObjectEntry|null null when date/time styles are illegal (#25205)
+     *
+     * @throws NativeDateInvalidTimeZoneException when $timezone is non-empty and invalid
+     */
     public static function create(
         Context $ctx,
         string $locale,
@@ -140,7 +199,10 @@ final class VmIntlDateFormatter
         ?string $timezone,
         int $calendar,
         ?string $pattern
-    ): ObjectEntry {
+    ): ?ObjectEntry {
+        if (!self::validateStylesOrSetError($dateType, $timeType)) {
+            return null;
+        }
         if (!isset($ctx->classes[self::CLASS_LC])) {
             throw new \Error('Class "IntlDateFormatter" not found');
         }

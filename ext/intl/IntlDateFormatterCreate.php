@@ -66,6 +66,12 @@ final class IntlDateFormatterCreate extends VmClassMethod
 
             return;
         }
+        // Illegal styles → null + IntlError already set (#25205 / php-src dateformat_create.cpp).
+        if (null === $object) {
+            $frame->returnVar->null();
+
+            return;
+        }
         IntlError::clear();
         $frame->returnVar->object($object);
     }
