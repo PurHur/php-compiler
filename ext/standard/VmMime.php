@@ -119,7 +119,8 @@ final class VmMime
         if ($len >= 6 && (0 === \strncmp($data, 'GIF87a', 6) || 0 === \strncmp($data, 'GIF89a', 6))) {
             return 'image/gif';
         }
-        if ($len >= 4 && 0 === \strncmp($data, '%PDF', 4)) {
+        // libmagic: bare "%PDF" is text/plain; version dash required ("%PDF-…") (#25197).
+        if (self::looksLikePdf($data)) {
             return 'application/pdf';
         }
 
@@ -157,6 +158,14 @@ final class VmMime
         return \strlen($data) >= 16
             && 0 === \strncmp($data, "\x89PNG\r\n\x1a\n", 8)
             && 'IHDR' === \substr($data, 12, 4);
+    }
+
+    /**
+     * libmagic PDF: "%PDF-" (case-sensitive); bare "%PDF" is text/plain (#25197).
+     */
+    private static function looksLikePdf(string $data): bool
+    {
+        return \strlen($data) >= 5 && 0 === \strncmp($data, '%PDF-', 5);
     }
 
     /**
