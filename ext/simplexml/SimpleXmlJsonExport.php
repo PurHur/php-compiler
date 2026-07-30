@@ -77,7 +77,7 @@ final class SimpleXmlJsonExport
             $ht = new HashTable();
             $text = new Variable();
             $text->string(VmSimpleXml::textContent($object));
-            $ht->add(0, $text);
+            $ht->addIndex(0, $text);
             $result = new Variable();
             $result->array($ht);
 

@@ -2516,6 +2516,10 @@ final class VmReflection
 
             return $result;
         }
+        // SimpleXMLElement: same property map as (array)/get_object_vars (php-src sxe.c; #25339).
+        if (SimpleXmlJsonExport::handles($obj)) {
+            return SimpleXmlJsonExport::exportZendArrayCast($obj);
+        }
         $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
