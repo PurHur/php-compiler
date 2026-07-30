@@ -18,6 +18,9 @@ final class ProcessSlotJitHelper
 
     private const WNOHANG = 1;
 
+    /** Linux SIGCONT — wake SIGSTOP'd fork children before terminate (#25195). */
+    private const SIGCONT = 18;
+
     /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pendingSignals?: list<int>}> */
     private static array $slots = [];
 
@@ -172,8 +175,17 @@ final class ProcessSlotJitHelper
             return false;
         }
 
+        $pid = $entry['pid'];
+        // Match VmProcessProcOpenNative::terminate — SIGCONT then signal (#25195).
+        if ($pid > 0) {
+            try {
+                $ffi->kill($pid, self::SIGCONT);
+            } catch (\Throwable) {
+            }
+        }
+
         try {
-            return 0 === (int) $ffi->kill($entry['pid'], $signal);
+            return 0 === (int) $ffi->kill($pid, $signal);
         } catch (\Throwable) {
             return false;
         }
