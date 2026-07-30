@@ -252,6 +252,9 @@ final class BuiltinParamNames
             case 'gmdate':
                 // php-src ext/date/php_date.stub.php — ?int $timestamp = null (#24845)
                 return ['format', 'timestamp='];
+            // php-src ext/date/php_date.stub.php — string $format, ?int $timestamp = null (#25440)
+            case 'idate':
+                return ['format', 'timestamp='];
             // php-src ext/date/php_date.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
             case 'checkdate':
                 return ['month', 'day', 'year'];
@@ -279,7 +282,8 @@ final class BuiltinParamNames
             case 'jdmonthname':
                 return ['julian_day', 'mode'];
             case 'getdate':
-                return ['timestamp'];
+                // php-src ext/date/php_date.stub.php — ?int $timestamp = null (#25440)
+                return ['timestamp='];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says date (#23783)
             case 'date_parse':
                 return ['datetime'];

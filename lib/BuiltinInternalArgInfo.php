@@ -60,6 +60,8 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',
             'date_create_immutable' => 'DateTimeImmutable|false',
+            // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#25440)
+            'idate' => 'int|false',
             default => null,
         };
     }
@@ -212,6 +214,9 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
+            // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)
+            'idate' => 1 === $index ? '?int' : null,
+            'getdate' => 0 === $index ? '?int' : null,
             // ext/date/php_date.stub.php — absent from InternalArgInfo (#25392)
             'date_create', 'date_create_immutable' => match ($index) {
                 0 => 'string',
