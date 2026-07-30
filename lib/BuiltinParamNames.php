@@ -31,6 +31,8 @@ final class BuiltinParamNames
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still what/country (#25172)
             'datetimezone::listidentifiers' => ['timezoneGroup=', 'countryCode='],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still recur; UNKNOWN optionals (#25164)
+            'dateperiod::__construct' => ['start', 'interval=', 'end=', 'options='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
             // php-src ext/reflection/php_reflection.stub.php — ...$args; Z_PARAM_VARIADIC_WITH_NAMED (#24949)
