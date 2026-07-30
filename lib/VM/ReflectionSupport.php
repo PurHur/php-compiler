@@ -1642,6 +1642,12 @@ final class ReflectionSupport
         }
         $closure = $reflection->reflectionClosureState;
         if (null !== $closure) {
+            // fromCallable / FCC / getClosure: walk the wrapped target, not the empty stub (#25559).
+            $underlying = $closure->wrappedFunc ?? $closure->func;
+            if ($underlying instanceof PhpFunc) {
+                return $underlying;
+            }
+
             return $closure->func;
         }
 
@@ -2862,6 +2868,100 @@ final class ReflectionSupport
         return self::functionNameFromReflection($reflection);
     }
 
+    /**
+     * ReflectionFunction::getNumberOfParameters() — named, internal, or Closure (#25559).
+     *
+     * php-src: zim_ReflectionFunctionAbstract_getNumberOfParameters — fake closures keep
+     * the underlying zend_function arg_info (Zend/zend_closures.c).
+     */
+    public static function functionNumberOfParameters(Context $ctx, ObjectEntry $reflection): int
+    {
+        return \count(self::functionParameterNames($ctx, $reflection));
+    }
+
+    /**
+     * ReflectionFunction::getNumberOfRequiredParameters() (#25559).
+     */
+    public static function functionNumberOfRequiredParameters(Context $ctx, ObjectEntry $reflection): int
+    {
+        if (self::isReflectionInternalFunction($reflection)) {
+            $funcName = self::functionNameFromReflection($reflection);
+
+            return BuiltinParamNames::requiredParamCountForInternalFunction($funcName) ?? 0;
+        }
+        $state = $reflection->reflectionClosureState;
+        if (null !== $state) {
+            return self::closureNumberOfRequiredParameters($ctx, $state);
+        }
+        $func = self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
+
+        return self::requiredParameterCountFromBlock($func->block);
+    }
+
+    /**
+     * Parameter names for ReflectionFunction::getParameters() (#25559).
+     *
+     * @return list<string>
+     */
+    public static function functionParameterNames(Context $ctx, ObjectEntry $reflection): array
+    {
+        if (self::isReflectionInternalFunction($reflection)) {
+            $funcName = self::functionNameFromReflection($reflection);
+
+            return BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? [];
+        }
+        $state = $reflection->reflectionClosureState;
+        if (null !== $state) {
+            return self::closureParameterNames($ctx, $state);
+        }
+        $func = self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
+
+        return array_values($func->block->paramNames);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function closureParameterNames(Context $ctx, ClosureState $state): array
+    {
+        $underlying = $state->wrappedFunc ?? $state->func;
+        if ($underlying instanceof PhpFunc) {
+            return array_values($underlying->block->paramNames);
+        }
+        [$className, $methodName] = self::methodScopeAndNameFromClosureState($ctx, $state);
+        if (null !== $className && '' !== $className && null !== $methodName && '' !== $methodName) {
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null !== $entry) {
+                return array_values(self::methodParameterNames($entry, $methodName));
+            }
+        }
+        if ($underlying instanceof Func\Internal) {
+            return BuiltinParamNames::paramNamesForInternalFunction($underlying->getName()) ?? [];
+        }
+
+        return array_values($state->func->block->paramNames);
+    }
+
+    private static function closureNumberOfRequiredParameters(Context $ctx, ClosureState $state): int
+    {
+        $underlying = $state->wrappedFunc ?? $state->func;
+        if ($underlying instanceof PhpFunc) {
+            return self::requiredParameterCountFromBlock($underlying->block);
+        }
+        [$className, $methodName] = self::methodScopeAndNameFromClosureState($ctx, $state);
+        if (null !== $className && '' !== $className && null !== $methodName && '' !== $methodName) {
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null !== $entry) {
+                return self::methodNumberOfRequiredParameters($entry, $methodName);
+            }
+        }
+        if ($underlying instanceof Func\Internal) {
+            return BuiltinParamNames::requiredParamCountForInternalFunction($underlying->getName()) ?? 0;
+        }
+
+        return self::requiredParameterCountFromBlock($state->func->block);
+    }
+
     public static function methodNumberOfParameters(ClassEntry $entry, string $method): int
     {
         $methodLc = strtolower($method);
@@ -3002,6 +3102,11 @@ final class ReflectionSupport
     {
         $closure = $parameter->reflectionClosureState;
         if (null !== $closure) {
+            $underlying = $closure->wrappedFunc ?? $closure->func;
+            if ($underlying instanceof PhpFunc) {
+                return $underlying;
+            }
+
             return $closure->func;
         }
 
@@ -3500,13 +3605,19 @@ final class ReflectionSupport
     {
         $closure = $reflection->reflectionClosureState;
         if (null !== $closure) {
-            $block = $closure->func->block;
+            $underlying = $closure->wrappedFunc ?? $closure->func;
+            if ($underlying instanceof PhpFunc) {
+                $block = $underlying->block;
 
-            return [
-                array_values($block->paramNames),
-                $block->variadicParamIndex,
-                $block->func?->name,
-            ];
+                return [
+                    array_values($block->paramNames),
+                    $block->variadicParamIndex,
+                    $block->func?->name,
+                ];
+            }
+            $names = self::closureParameterNames($ctx, $closure);
+
+            return [$names, null, self::displayNameForClosureState($closure)];
         }
         $name = self::functionNameFromReflection($reflection);
         if (self::isReflectionInternalFunction($reflection)) {
@@ -4134,25 +4245,12 @@ final class ReflectionSupport
     /** @return list<string> */
     private static function reflectedFunctionParameterNames(Context $ctx, ObjectEntry $reflection): array
     {
-        $funcName = self::functionNameFromReflection($reflection);
-        if (self::isReflectionInternalFunction($reflection)) {
-            return BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? [];
-        }
-        $func = self::resolveFunctionFromReflection($ctx, $reflection);
-
-        return array_values($func->block->paramNames);
+        return self::functionParameterNames($ctx, $reflection);
     }
 
     private static function reflectedFunctionRequiredParameterCount(Context $ctx, ObjectEntry $reflection): int
     {
-        $funcName = self::functionNameFromReflection($reflection);
-        if (self::isReflectionInternalFunction($reflection)) {
-            return BuiltinInternalArgInfo::requiredParamCountForFunction($funcName)
-                ?? \count(BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? []);
-        }
-        $func = self::resolveFunctionFromReflection($ctx, $reflection);
-
-        return self::requiredParameterCountFromBlock($func->block);
+        return self::functionNumberOfRequiredParameters($ctx, $reflection);
     }
 
     private static function formatPropertyDefaultSuffix(Context $ctx, ClassEntry $entry, string $property): string
@@ -5007,6 +5105,15 @@ final class ReflectionSupport
 
                 return [$className, $shortName];
             }
+        }
+        // Static/internal method wrappers keep boundScopeClass + wrapped Func name (#25559).
+        if (null !== $wrapped && null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+            $shortName = $wrapped->getName();
+            if (str_contains($shortName, '::')) {
+                $shortName = substr($shortName, strrpos($shortName, '::') + 2);
+            }
+
+            return [$state->boundScopeClass, $shortName];
         }
 
         return [null, null];

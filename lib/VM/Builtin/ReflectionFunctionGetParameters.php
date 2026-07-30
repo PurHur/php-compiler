@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionFunction::getParameters() — VM (#3355). */
+/** ReflectionFunction::getParameters() — VM (#3355, #25559). */
 final class ReflectionFunctionGetParameters extends VmClassMethod
 {
     public function __construct()
@@ -24,12 +23,7 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         $funcName = ReflectionSupport::functionNameFromReflection($receiver);
-        if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
-            $paramNames = BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? [];
-        } else {
-            $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
-            $paramNames = $func->block->paramNames;
-        }
+        $paramNames = ReflectionSupport::functionParameterNames($ctx, $receiver);
         $closureState = $receiver->reflectionClosureState;
         $paramClass = $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] ?? null;
         if (null === $paramClass) {
