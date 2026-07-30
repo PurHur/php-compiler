@@ -18,7 +18,7 @@ final class StrtokJITTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['strtok_jit.phpt', 'strtok_null_continuation.phpt', 'strtok_type_error_jit.phpt'] as $file) {
+        foreach (['strtok_jit.phpt', 'strtok_null_continuation.phpt', 'strtok_null_token.phpt', 'strtok_type_error_jit.phpt'] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file

@@ -61,14 +61,13 @@ final class strtok extends Internal
         }
 
         StringStrtok::ensureLinked($context);
-        $tok = JitStringBuiltinArg::lower(
+        // Z_PARAM_STR_OR_NULL — preserve null so VmString::strtok one-arg mode matches php-src (#25171).
+        $tok = JitStringBuiltinArg::lowerNullableString(
             $context,
             $args[1],
             'strtok',
             1,
-            'token',
-            '?string',
-            '?string'
+            'token'
         );
 
         return JitStrtok::tokenize(

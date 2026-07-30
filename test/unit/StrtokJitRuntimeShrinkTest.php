@@ -39,11 +39,14 @@ final class StrtokJitRuntimeShrinkTest extends TestCase
     public function testStrtokJitHelperSemanticsMatchVmString(): void
     {
         \PHPCompiler\ext\standard\VmString::strtokResetState();
-        $this->assertSame('a', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('a,b,c', ',', 1));
-        $this->assertSame('b', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize(null, ',', 0));
-        $this->assertSame('c', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize(null, ',', 0));
-        $this->assertNull(\PHPCompiler\ext\standard\StrtokJitHelper::tokenize(null, ',', 0));
-        \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('x:y', ':', 1);
-        $this->assertSame('y', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize(null, ':', 0));
+        // tokenize(str, tok, init, strIsNull, tokIsNull) — #25171 null flags
+        $this->assertSame('a', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('a,b,c', ',', 1, 0, 0));
+        $this->assertSame('b', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ',', 0, 1, 0));
+        $this->assertSame('c', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ',', 0, 1, 0));
+        $this->assertFalse(\PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ',', 0, 1, 0));
+        \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('x:y', ':', 1, 0, 0);
+        $this->assertSame('y', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ':', 0, 1, 0));
+        // Explicit null token → false (php-src Z_PARAM_STR_OR_NULL one-arg mode) (#25171)
+        $this->assertFalse(\PHPCompiler\ext\standard\StrtokJitHelper::tokenize('a.b.c', '', 1, 0, 1));
     }
 }
