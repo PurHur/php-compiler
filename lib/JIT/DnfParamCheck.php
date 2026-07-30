@@ -175,6 +175,15 @@ final class DnfParamCheck
 
             return ('true' === $name) === $isTrue;
         }
+        // Closures / FCC are compile-time callables when the receiver resolves (#25561).
+        // Full zend_is_callable for strings/arrays stays on the runtime emit path.
+        if ('callable' === $name) {
+            return false;
+        }
+        if ('iterable' === $name) {
+            return Variable::TYPE_HASHTABLE === $arg->type
+                || (bool) ($arg->type & Variable::IS_NATIVE_ARRAY);
+        }
 
         return self::scalarGivenLabel($arg) === $name;
     }
@@ -183,6 +192,12 @@ final class DnfParamCheck
     {
         if ('true' === $name || 'false' === $name) {
             return self::emitLiteralTrueFalseMatches($context, $arg, 'true' === $name);
+        }
+        if ('callable' === $name) {
+            return self::emitCallableMatches($context, $arg);
+        }
+        if ('iterable' === $name) {
+            return self::emitIterableMatches($context, $arg);
         }
         $i1 = $context->getTypeFromString('int1');
         $vmTy = match ($name) {
@@ -213,6 +228,132 @@ final class DnfParamCheck
         }
 
         return self::emitClassNameLiteralMatches($context, $arg, $name);
+    }
+
+    /**
+     * Union arm `callable` — Closures / FCC / __invoke objects (#25561).
+     * String/array callables still need a full zend_is_callable probe; when a sibling
+     * `string`/`array` arm is present they match that arm instead.
+     */
+    private static function emitCallableMatches(Context $context, Variable $arg): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        if (null !== ClosureHelper::resolveCall($context, $arg)) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt(1, false)
+            );
+        }
+        $scalar = self::scalarGivenLabel($arg);
+        if (null !== $scalar) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt(0, false)
+            );
+        }
+        if (
+            Variable::TYPE_OBJECT !== $arg->type
+            && Variable::TYPE_VALUE !== $arg->type
+        ) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt(0, false)
+            );
+        }
+        $isClosure = self::emitClassNameLiteralMatches($context, $arg, 'closure');
+        $objectType = $context->type->object;
+        if (!$objectType instanceof ObjectType) {
+            return $isClosure;
+        }
+        $hasInvoke = self::emitObjectHasInvoke($context, $objectType, $arg);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $context->builder->or(
+                $context->helper->loadValue($isClosure),
+                $context->helper->loadValue($hasInvoke)
+            )
+        );
+    }
+
+    private static function emitObjectHasInvoke(
+        Context $context,
+        ObjectType $objectType,
+        Variable $arg
+    ): Variable {
+        $i1 = $context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        $obj = self::objectPointer($context, $arg);
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        foreach ($objectType->allClassNamesById() as $id => $name) {
+            if (!$objectType->hasMethod($id, '__invoke')) {
+                continue;
+            }
+            $expected = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+            $acc = $context->builder->or($acc, $isId);
+        }
+
+        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $acc);
+    }
+
+    /** Union arm `iterable` — array or Traversable (#25561 / zend_type.c IS_ITERABLE). */
+    private static function emitIterableMatches(Context $context, Variable $arg): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $scalar = self::scalarGivenLabel($arg);
+        if ('array' === $scalar) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt(1, false)
+            );
+        }
+        if (null !== $scalar) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt(0, false)
+            );
+        }
+        $isArray = Variable::TYPE_VALUE === $arg->type
+            ? self::emitValueBoxTypeEquals($context, $arg, \PHPCompiler\VM\Variable::TYPE_ARRAY)
+            : new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $i1->constInt(
+                    Variable::TYPE_HASHTABLE === $arg->type
+                        || (bool) ($arg->type & Variable::IS_NATIVE_ARRAY)
+                        ? 1
+                        : 0,
+                    false
+                )
+            );
+        $isTraversable = self::emitClassNameLiteralMatches($context, $arg, 'traversable');
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $context->builder->or(
+                $context->helper->loadValue($isArray),
+                $context->helper->loadValue($isTraversable)
+            )
+        );
     }
 
     private static function emitClassNameLiteralMatches(Context $context, Variable $arg, string $name): Variable
