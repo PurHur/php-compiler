@@ -896,6 +896,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', 'round'));
     }
 
+    /** @covers issue #23259 */
+    public function testAbsFloorCeilZendStubNamedParams(): void
+    {
+        foreach (['abs', 'floor', 'ceil'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['num'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'number', $fn), $fn);
+        }
+    }
+
     /** @covers issue #11785 / #25166 */
     public function testDateTimeClassMethodNamedParameters(): void
     {
