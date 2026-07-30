@@ -39999,7 +39999,7 @@ class Compiler {
                         ? $unsetExpr
                         : ($unsetExpr instanceof Operand ? $this->findStaticPropertyFetchForUnset($unsetExpr, $block) : null);
                     if (null !== $staticPropertyFetch) {
-                        $ops[] = new OpCode(
+                        $staticUnsetOp = new OpCode(
                             OpCode::TYPE_STATIC_PROPERTY_UNSET,
                             null,
                             $this->compileOperand($staticPropertyFetch->class, $block, true),
@@ -40009,6 +40009,8 @@ class Compiler {
                                 $block
                             )
                         );
+                        $this->assignSourceMetadata($staticUnsetOp, $terminal);
+                        $ops[] = $staticUnsetOp;
                         continue;
                     }
                     [$containerSlot, $dimSlot, $unsetOnProperty] = $this->resolveUnsetTarget($unsetExpr, $block);
@@ -40019,6 +40021,8 @@ class Compiler {
                         $dimSlot
                     );
                     $unsetOp->unsetOnProperty = $unsetOnProperty;
+                    // Stamp user site so readonly/unset Errors cite unset() not prior opcodes (#25556).
+                    $this->assignSourceMetadata($unsetOp, $terminal);
                     $ops[] = $unsetOp;
                 }
 
