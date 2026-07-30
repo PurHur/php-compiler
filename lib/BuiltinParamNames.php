@@ -50,7 +50,8 @@ final class BuiltinParamNames
             'recursivedirectoryiterator::__construct' => ['directory', 'flags='],
             'splfileobject::seek' => ['line'],
             'splfileobject::fgetcsv' => ['separator', 'enclosure', 'escape'],
-            'splfileobject::fputcsv' => ['fields', 'separator', 'enclosure', 'escape', 'eol'],
+            // php-src ext/spl/spl_directory.stub.php — trailing CSV args optional; InternalArgInfo omits `=`/`eol` (#25135)
+            'splfileobject::fputcsv' => ['fields', 'separator=', 'enclosure=', 'escape=', 'eol='],
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],
@@ -636,8 +637,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says read_streams/tv_sec (#23598)
             case 'stream_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
+            // php-src ext/standard/file.stub.php — $eol default "\n"; InternalArgInfo omits trailing eol (#25135)
             case 'fputcsv':
-                return ['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol'];
+                return ['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol='];
             case 'stream_context_create':
                 return ['options', 'params'];
             case 'stream_copy_to_stream':

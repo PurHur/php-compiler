@@ -221,6 +221,20 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'string', 'value' => '"'],
             4 => ['kind' => 'string', 'value' => '\\'],
         ],
+        // php-src ext/standard/file.stub.php — separator/enclosure/escape/eol string defaults (#25135)
+        'fputcsv' => [
+            2 => ['kind' => 'string', 'value' => ','],
+            3 => ['kind' => 'string', 'value' => '"'],
+            4 => ['kind' => 'string', 'value' => '\\'],
+            5 => ['kind' => 'string', 'value' => "\n"],
+        ],
+        // php-src ext/spl/spl_directory.stub.php — same CSV defaults; InternalArgInfo omits `=`/`eol` (#25135)
+        'splfileobject::fputcsv' => [
+            1 => ['kind' => 'string', 'value' => ','],
+            2 => ['kind' => 'string', 'value' => '"'],
+            3 => ['kind' => 'string', 'value' => '\\'],
+            4 => ['kind' => 'string', 'value' => "\n"],
+        ],
         // php-src ext/standard/file.stub.php — context=null, ?int length=null (#24814)
         'file_get_contents' => [
             2 => ['kind' => 'null'],

@@ -238,6 +238,8 @@ final class BuiltinInternalArgInfo
             'fgets' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24826)
             'fgetcsv' => 1 === $index ? '?int' : null,
+            // ext/standard/file.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
+            'fputcsv' => 5 === $index ? 'string' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24814)
             'file_get_contents' => 4 === $index ? '?int' : null,
             // ext/spl/spl.stub.php — Traversable|array (InternalArgInfo says traversable) (#25066)
@@ -299,6 +301,8 @@ final class BuiltinInternalArgInfo
             // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
             'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
+            // ext/spl/spl_directory.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
+            'splfileobject::fputcsv' => 4 === $index ? 'string' : null,
             default => null,
         };
     }
