@@ -71,6 +71,9 @@ final class BuiltinInternalArgInfo
             'stream_context_set_options' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
             'restore_error_handler' => 'true',
+            // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
+            'finfo_open' => 'finfo|false',
+            'finfo_file', 'finfo_buffer' => 'string|false',
             default => null,
         };
     }
@@ -283,6 +286,13 @@ final class BuiltinInternalArgInfo
             'substr_count' => 3 === $index ? '?int' : null,
             // ext/standard/string.stub.php — ?string $delimiter = null (InternalArgInfo string, OPT no default) (#25472)
             'preg_quote' => 1 === $index ? '?string' : null,
+            // ext/fileinfo/fileinfo.stub.php — finfo object + string (InternalArgInfo resource/char) (#25471)
+            'finfo_open' => 1 === $index ? '?string' : null,
+            'finfo_file', 'finfo_buffer' => match ($index) {
+                0 => 'finfo',
+                1 => 'string',
+                default => null,
+            },
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
