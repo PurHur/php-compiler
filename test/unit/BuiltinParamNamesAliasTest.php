@@ -322,6 +322,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['array', '...replacements'], BuiltinParamNames::forFunction('array_replace_recursive'));
         self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('...replacements'));
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_replace'));
+        foreach ([
+            'array_udiff',
+            'array_udiff_assoc',
+            'array_udiff_uassoc',
+            'array_uintersect',
+            'array_uintersect_assoc',
+            'array_uintersect_uassoc',
+        ] as $fn) {
+            self::assertSame(['array', '...rest'], BuiltinParamNames::forFunction($fn), $fn);
+            self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction($fn), $fn.' variadic');
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn), $fn.' total');
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn.' required');
+        }
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('...rest'));
         self::assertSame('int|float', BuiltinInternalArgInfo::stubParamTypeOverride('range', 2));
         self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('dirname', 1));
         self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('restore_error_handler'));
