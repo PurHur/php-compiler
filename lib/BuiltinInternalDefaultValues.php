@@ -98,6 +98,12 @@ final class BuiltinInternalDefaultValues
         'substr' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/mbstring/mbstring.stub.php — ?int $length = null, ?string $encoding = null (#25362)
+        // InternalArgInfo length=int → 0; encoding=string → OPT without default.
+        'mb_substr' => [
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+        ],
         'json_encode' => [
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'int', 'value' => 512],

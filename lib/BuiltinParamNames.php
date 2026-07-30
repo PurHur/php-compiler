@@ -1201,8 +1201,9 @@ final class BuiltinParamNames
                 return ['string', 'characters'];
             case 'mb_strlen':
                 return ['string', 'encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — ?int $length = null, ?string $encoding = null (#25362)
             case 'mb_substr':
-                return ['string', 'start', 'length', 'encoding'];
+                return ['string', 'start', 'length=', 'encoding='];
             case 'mb_strcut':
                 return ['string', 'start', 'length', 'encoding'];
             case 'mb_stripos':
