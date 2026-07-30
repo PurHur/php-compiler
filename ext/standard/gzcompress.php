@@ -34,10 +34,11 @@ final class gzcompress extends Internal
         $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'gzcompress', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
-        if ($argc >= 2) {
+        // Named encoding without level — sparse calledArgs (#25012 sibling).
+        if (isset($frame->calledArgs[1])) {
             $level = VmZlibArg::coerceLevel($frame, 1, 'gzcompress');
         }
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $encoding = VmZlibArg::coerceInt($frame, 2, 'gzcompress', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
