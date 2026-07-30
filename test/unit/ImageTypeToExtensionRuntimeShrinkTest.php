@@ -8,13 +8,23 @@ use PHPCompiler\ext\standard\ImageTypeToExtensionJitHelper;
 use PHPCompiler\ext\standard\VmImage;
 use PHPUnit\Framework\TestCase;
 
-/** image_type_to_extension() JIT routes through ImageTypeToExtensionJitHelper PHP not inline LLVM (#14851). */
+/**
+ * image_type_to_extension() NestedJIT via JitVmHelperLink::ensureCompiled (#25443 / peer #25433).
+ */
 final class ImageTypeToExtensionRuntimeShrinkTest extends TestCase
 {
-    public function testStringImageTypeToExtensionUsesJitHelperNotInlineLlvm(): void
+    public function testStringImageTypeToExtensionUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringImageTypeToExtension.php');
         $this->assertStringContainsString('ImageTypeToExtensionJitHelper', $source);
+        $this->assertStringContainsString('__compiler_image_type_to_extension', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitImageTypeToExtension.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/image_type_to_extension.php');
