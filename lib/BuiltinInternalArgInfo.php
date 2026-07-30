@@ -76,6 +76,8 @@ final class BuiltinInternalArgInfo
             'finfo_file', 'finfo_buffer' => 'string|false',
             // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#25510)
             'simplexml_load_string', 'simplexml_load_file' => 'SimpleXMLElement|false',
+            // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
+            'hash_equals' => 'bool',
             default => null,
         };
     }
@@ -269,6 +271,11 @@ final class BuiltinInternalArgInfo
             'hash_hkdf' => match ($index) {
                 0, 1, 3, 4 => 'string',
                 2 => 'int',
+                default => null,
+            },
+            // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
+            'hash_equals' => match ($index) {
+                0, 1 => 'string',
                 default => null,
             },
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
