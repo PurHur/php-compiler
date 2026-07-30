@@ -80,6 +80,21 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace_callback', 4));
     }
 
+    /** @covers issue #25361 */
+    public function testSimilarTextPercentDefaultIsNull(): void
+    {
+        $info = ['name' => 'percent', 'type' => 'float', 'isOptional' => true];
+        self::assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('similar_text', 2, $info, false)
+        );
+        $var = new Variable();
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'similar_text', 2, $info)
+        );
+        self::assertSame(Variable::TYPE_NULL, $var->type);
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('similar_text', 2));
+    }
+
     /** @covers issue #24896 */
     public function testUnpackOffsetDefaultIsZero(): void
     {
