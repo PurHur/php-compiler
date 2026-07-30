@@ -1259,6 +1259,21 @@ restart:
                 );
                 goto return_long;
             }
+            if (self::isOrderedCompareOpcode($opcode->type)) {
+                // Zend zend_compare_objects — same property walk as <=> (#25241).
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $cmp = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(
+                    $this->context,
+                    $leftValue,
+                    $rightValue
+                );
+                $result = JitValueCompare::boolFromSpaceshipCmp(
+                    $this->context,
+                    $opcode->type,
+                    $cmp
+                );
+                goto return_bool;
+            }
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                 $equal = JitValueCompare::looseEqualObjectPair($this->context, $leftValue, $rightValue);
                 if (OpCode::TYPE_EQUAL === $opcode->type) {

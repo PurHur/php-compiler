@@ -2133,15 +2133,18 @@ restart:
                 ));
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
-                $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($left, $right);
-                if (null === $bcCmp) {
-                    $bcCmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($left, $right);
-                }
+                // Zend compare_function → zend_compare_objects / zend_std_compare_objects
+                // (property order). Same path as <=> (#3691); do not numeric-coerce (#25241).
+                $bcCmp = self::tryRegisteredNumericObjectCompare($left, $right);
                 if (null !== $bcCmp) {
                     $this->bool($this->_compareFromSpaceship($opCode, $bcCmp));
                     break;
                 }
-                self::throwObjectNumericCompareError($left);
+                $this->bool($this->_compareFromSpaceship(
+                    $opCode,
+                    $left->object->compareSpaceship($right->object)
+                ));
+                break;
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
