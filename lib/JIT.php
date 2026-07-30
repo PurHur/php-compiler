@@ -13550,6 +13550,24 @@ class JIT {
 
             if (null === $newName) {
                 if (!isset($merged[$methodLc])) {
+                    // Own class methods are excluded from $merged before adaptations so they
+                    // can suppress trait collisions (Zend). Visibility-only `g as private`
+                    // must still succeed when the class also declares g() — the trait method
+                    // exists in $perTraitMethods; class method wins on install (#25577).
+                    $existsInTraits = false;
+                    if (null !== $traitLcFilter) {
+                        $existsInTraits = isset($perTraitMethods[$traitLcFilter][$methodLc]);
+                    } else {
+                        foreach ($perTraitMethods as $methods) {
+                            if (isset($methods[$methodLc])) {
+                                $existsInTraits = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isset($excluded[$methodLc]) && $existsInTraits) {
+                        continue;
+                    }
                     throw new \LogicException(
                         'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
                         . ' but this method does not exist'
