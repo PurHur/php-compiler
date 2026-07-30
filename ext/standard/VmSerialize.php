@@ -936,7 +936,8 @@ final class VmSerialize
         $recv->object($entry);
         $dataVar = new Variable();
         $dataVar->string($data);
-        $ctx->runtime->vm->invokePhpFunction($method, $recv, $dataVar);
+        // Isolated stack: nested Serializable::unserialize must not resume the caller (#25189, #11452).
+        $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv, $dataVar);
 
         return $recv;
     }
@@ -1317,7 +1318,8 @@ final class VmSerialize
         }
         $recv = new Variable();
         $recv->object($entry);
-        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        // Isolated stack: nested __sleep must not resume the caller frame mid-builtin (#25189, #11452).
+        $result = $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv);
         if (Variable::TYPE_ARRAY !== $result->type) {
             $ctx->errors->triggerError(
                 'serialize(): '.$entry->class->name.'::__sleep() should return an array only containing the names of instance-variables to serialize',
@@ -1670,7 +1672,8 @@ final class VmSerialize
         }
         $recv = new Variable();
         $recv->object($entry);
-        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        // Isolated stack: nested __serialize must not resume the caller frame mid-builtin (#25189, #11452).
+        $result = $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv);
         if (Variable::TYPE_ARRAY !== $result->type) {
             self::throwSerializeMustReturnArray($entry->class->name);
         }
@@ -1706,7 +1709,8 @@ final class VmSerialize
         }
         $recv = new Variable();
         $recv->object($entry);
-        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        // Isolated stack: nested Serializable::serialize must not resume the caller (#25189, #11452).
+        $result = $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv);
         if (Variable::TYPE_STRING !== $result->type) {
             throw new \LogicException('Serializable::serialize() must return a string');
         }
