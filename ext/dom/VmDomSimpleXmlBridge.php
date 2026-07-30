@@ -347,8 +347,14 @@ final class VmDomSimpleXmlBridge
             $element = VmDom::createElement($ctx, $node->name, $document)->toObject();
         }
 
+        // php-src setAttributeNS: default xmlns accepts null NS; xmlns:* requires
+        // http://www.w3.org/2000/xmlns/ (null → Namespace Error; #25124 / re-#22738).
         foreach ($node->attributes as $name => $value) {
-            VmDom::setAttributeNS($ctx, $element, null, $name, $value);
+            $attrNs = null;
+            if ('xmlns' === $name || str_starts_with($name, 'xmlns:')) {
+                $attrNs = 'http://www.w3.org/2000/xmlns/';
+            }
+            VmDom::setAttributeNS($ctx, $element, $attrNs, $name, $value);
         }
 
         // Link after initial attrs so setAttributeNS during build does not need a peer yet.
