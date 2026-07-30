@@ -2630,11 +2630,24 @@ final class ReflectionSupport
     {
         $index = self::parameterIndexForReflection($reflection);
         $callable = self::internalCallableName($ctx, $reflection);
-        if (str_contains($callable, '::')) {
-            return false;
+        $lc = strtolower($callable);
+        if (str_contains($lc, '::')) {
+            // BuiltinParamNames may mark by-ref with a leading '&' (Spoofchecker #25055).
+            $override = BuiltinParamNames::forClassMethod($lc);
+            if (null !== $override && isset($override[$index]) && str_starts_with($override[$index], '&')) {
+                return true;
+            }
+            $byRefs = BuiltinByRefParams::forFunction($lc);
+            // Instance call args include $this at index 0; Reflection params do not (#25055).
+            if (\in_array($index + 1, $byRefs, true)) {
+                return true;
+            }
+
+            // Static methods (no $this slot) keep BuiltinByRefParams indices as-is.
+            return \in_array($index, $byRefs, true);
         }
 
-        return \in_array($index, BuiltinByRefParams::forFunction($callable), true);
+        return \in_array($index, BuiltinByRefParams::forFunction($lc), true);
     }
 
     /**
@@ -2668,9 +2681,16 @@ final class ReflectionSupport
                 }
 
                 // No InternalArgInfo row: honor `=` markers on the override table (#24392 / #23391).
+                // Stub type overrides still apply when php-types omits the class entirely (#25055).
+                $typeOverride = BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(
+                    strtolower($className),
+                    strtolower($methodName),
+                    $index
+                );
+
                 return [
                     'name' => $name,
-                    'type' => '',
+                    'type' => $typeOverride ?? '',
                     'isOptional' => str_ends_with($override[$index], '='),
                 ];
             }

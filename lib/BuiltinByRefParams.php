@@ -187,6 +187,12 @@ final class BuiltinByRefParams
             case 'numfmt_parse_currency':
                 // $formatter + $string + &$currency + optional &$offset — php-src formatter.stub.php (#20780, #21127)
                 return [2, 3];
+            case 'spoofchecker::issuspicious':
+                // $this + $string + optional &$errorCode — php-src spoofchecker.stub.php (#25055)
+                return [2];
+            case 'spoofchecker::areconfusable':
+                // $this + $string1 + $string2 + optional &$errorCode — php-src spoofchecker.stub.php (#25055)
+                return [3];
             case 'intldateformatter::parse':
             case 'intldateformatter::parsetocalendar':
             case 'intldateformatter::localtime':
