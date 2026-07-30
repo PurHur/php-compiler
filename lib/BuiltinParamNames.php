@@ -746,9 +746,10 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says read_streams/tv_sec (#23598)
             case 'stream_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
-            // php-src ext/standard/file.stub.php — $eol default "\n"; InternalArgInfo omits trailing eol (#25135)
+            // php-src ext/standard/file.stub.php — separator/enclosure/escape/eol optional (#25135, #25259)
+            // Trailing `eol=` alone made namesEncodeOptionalParams=true and forced mid-params required.
             case 'fputcsv':
-                return ['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol='];
+                return ['stream', 'fields', 'separator=', 'enclosure=', 'escape=', 'eol='];
             case 'stream_context_create':
                 return ['options', 'params'];
             case 'stream_copy_to_stream':
