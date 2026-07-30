@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream_socket_accept() via StreamSocketAcceptJitHelper (#15346).
+ * JIT/AOT link for stream_socket_accept() via StreamSocketAcceptJitHelper (#15346, #25183).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StreamSocketGetName #24850 / StreamPath #25139).
+ * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_accept)
  */
 final class StreamSocketAcceptRuntime
 {
+    private const ABI_NAME = '__compiler_stream_socket_accept';
+
     private const HELPER_PATH = '/ext/standard/StreamSocketAcceptJitHelper.php';
 
     private const ACCEPT_HELPER = 'PHPCompiler\\ext\\standard\\StreamSocketAcceptJitHelper::acceptArgv';
@@ -26,9 +30,14 @@ final class StreamSocketAcceptRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_stream_socket_accept');
+        self::implement($context);
+    }
+
+    public static function implement(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_stream_socket_accept', $probe);
+            self::registerLinkedRuntime($context);
 
             return;
         }
@@ -41,6 +50,7 @@ final class StreamSocketAcceptRuntime
 
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
+        self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
@@ -51,10 +61,9 @@ final class StreamSocketAcceptRuntime
 
     private static function implementBridge(Context $context): void
     {
-        $name = '__compiler_stream_socket_accept';
-        $probe = $context->module->getNamedFunction($name);
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
+            $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
         }
@@ -64,7 +73,7 @@ final class StreamSocketAcceptRuntime
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
-                $name,
+                self::ABI_NAME,
                 $context->context->functionType($i64, false, $i64, $i64, $double)
             );
 
@@ -81,54 +90,33 @@ final class StreamSocketAcceptRuntime
         );
         $handle = JitNestedHelperCoerce::coerceBridgeResult($context, $handleRaw, $i64);
         $context->builder->returnValue($handle);
-        $context->registerFunction($name, $fn);
+        $context->registerFunction(self::ABI_NAME, $fn);
         $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamSocketAcceptJitHelper compile (#15346)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25183');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        if (isset($context->functions[\strtolower(self::ACCEPT_HELPER)])) {
-            return;
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25183'
+        );
+    }
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        $fn = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException(self::ABI_NAME.' missing after StreamSocketAcceptRuntime bridge (#15346)');
         }
-        try {
-            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamSocketAcceptJitHelper.php');
-                if (null === $block) {
-                    throw new \LogicException('StreamSocketAcceptJitHelper.php parseAndCompile failed (#15346)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-            });
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        if (!isset($context->functions[\strtolower(self::ACCEPT_HELPER)])) {
-            throw new \LogicException(self::ACCEPT_HELPER.' was not compiled for JIT (#15346)');
-        }
+        $context->registerFunction(self::ABI_NAME, $fn);
     }
 }
