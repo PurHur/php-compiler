@@ -19,6 +19,9 @@ final class VmEval
 {
     public const EVAL_FILENAME = "eval()'d code";
 
+    /** php-src Zend/zend_compile.c — zend_add_member_modifier() (#25114, #6774). */
+    public const MULTIPLE_ACCESS_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
+
     /**
      * eval() Internal builtin — caller scope is the parent frame of the handler.
      *
@@ -99,6 +102,31 @@ final class VmEval
         }
 
         return $vm->executeEvalBlock($block, $scopeFrame);
+    }
+
+    /**
+     * True when php-src emits this diagnostic via zend_throw_exception(zend_ce_compile_error)
+     * (catchable during eval), not zend_error_noreturn(E_COMPILE_ERROR) (#25114).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier / zend_modifier_list_to_flags.
+     * Inheritance and most other compile diagnostics stay uncatchable (#22922).
+     */
+    public static function isCatchableCompileError(\CompileError $error): bool
+    {
+        $message = trim($error->getMessage());
+        if (self::MULTIPLE_ACCESS_MODIFIERS_MESSAGE === $message) {
+            return true;
+        }
+        // "Multiple readonly modifiers are not allowed", etc.
+        if (1 === preg_match('/^Multiple [A-Za-z_]+ modifiers are not allowed$/', $message)) {
+            return true;
+        }
+        // "Cannot use the final modifier on an abstract method|property|class member"
+        if (str_starts_with($message, 'Cannot use the final modifier on an abstract')) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
