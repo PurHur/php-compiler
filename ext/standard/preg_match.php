@@ -40,10 +40,11 @@ final class preg_match extends Internal
             );
         }
 
-        $hostMatches = [];
+        $hostMatches = null;
         $result = VmPreg::pregMatch($pattern, $subject, $hostMatches, $flags, $offset);
 
-        if ($hasMatches && false !== $result) {
+        // Bind $matches when the engine filled it — including past-end offset → [] (#25313).
+        if ($hasMatches && \is_array($hostMatches)) {
             $target = $frame->calledArgs[2]->resolveIndirect();
             $ht = VmPregMatches::hostMatchesToHashTable($hostMatches, $flags);
             $target->array($ht);

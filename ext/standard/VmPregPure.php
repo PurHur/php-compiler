@@ -40,7 +40,9 @@ final class VmPregPure
         [$regex, $opts] = $parsed;
         $normalizedOffset = self::normalizeMatchSubjectOffset($offset, \strlen($subject));
         if (false === $normalizedOffset) {
+            // php-src php_pcre_pce_execute — still initializes $matches to [] (#25313).
             self::$lastError = StdlibConstants::PREG_INTERNAL_ERROR;
+            $matches = [];
 
             return false;
         }
@@ -65,25 +67,21 @@ final class VmPregPure
         }
         if (null === $ovector) {
             self::$lastError = 0;
-            if (null !== $matches) {
-                $matches = [];
-            }
+            $matches = [];
 
             return 0;
         }
 
         self::$lastError = 0;
-        if (null !== $matches) {
-            $matches = self::ovectorToMatches(
-                $ovector,
-                $subject,
-                $compiled['groupNameToIndex'],
-                $regex,
-                0 !== ($flags & StdlibConstants::PREG_OFFSET_CAPTURE),
-                0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL),
-                $compiled['captureGroupCount']
-            );
-        }
+        $matches = self::ovectorToMatches(
+            $ovector,
+            $subject,
+            $compiled['groupNameToIndex'],
+            $regex,
+            0 !== ($flags & StdlibConstants::PREG_OFFSET_CAPTURE),
+            0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL),
+            $compiled['captureGroupCount']
+        );
 
         return 1;
     }
@@ -105,7 +103,9 @@ final class VmPregPure
         $subjectLen = \strlen($subject);
         $normalizedOffset = self::normalizeMatchSubjectOffset($offset, $subjectLen);
         if (false === $normalizedOffset) {
+            // php-src php_pcre_pce_execute — still initializes $matches to [] (#25313).
             self::$lastError = StdlibConstants::PREG_INTERNAL_ERROR;
+            $matches = [];
 
             return false;
         }
@@ -140,14 +140,12 @@ final class VmPregPure
                 break;
             }
             ++$count;
-            if (null !== $matches) {
-                $one = self::ovectorToMatches($ovector, $subject, $compiled['groupNameToIndex'], $regex, $offsetCapture, false);
-                if ($setOrder) {
-                    $allMatches[] = $one;
-                } else {
-                    foreach ($one as $key => $val) {
-                        $allMatches[$key][] = $val;
-                    }
+            $one = self::ovectorToMatches($ovector, $subject, $compiled['groupNameToIndex'], $regex, $offsetCapture, false);
+            if ($setOrder) {
+                $allMatches[] = $one;
+            } else {
+                foreach ($one as $key => $val) {
+                    $allMatches[$key][] = $val;
                 }
             }
             $end = $ovector[1] ?? $start;
@@ -158,9 +156,7 @@ final class VmPregPure
             $fixedStart = false;
         }
 
-        if (null !== $matches) {
-            $matches = $allMatches;
-        }
+        $matches = $allMatches;
         self::$lastError = 0;
 
         return $count;

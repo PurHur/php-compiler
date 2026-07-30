@@ -109,9 +109,14 @@ final class PregJitHelper
     public static function matchExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
         self::$lastMatchExHt = null;
-        $matches = [];
+        $matches = null;
         $rc = VmPregNative::pregMatch($pattern, $subject, $matches, $flags, $offset);
         if (false === $rc) {
+            // Past-end offset fills [] (#25313); compile failure leaves null (#17597).
+            if (\is_array($matches)) {
+                self::$lastMatchExHt = VmPregMatches::hostMatchesToHashTable($matches, $flags);
+            }
+
             return -1;
         }
         self::$lastMatchExHt = VmPregMatches::hostMatchesToHashTable($matches, $flags);
@@ -142,9 +147,14 @@ final class PregJitHelper
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
         self::$lastMatchAllExHt = null;
-        $matches = [];
+        $matches = null;
         $rc = VmPregNative::pregMatchAll($pattern, $subject, $matches, $flags, $offset);
         if (false === $rc) {
+            // Past-end offset fills [] (#25313); compile failure leaves null (#17597).
+            if (\is_array($matches)) {
+                self::$lastMatchAllExHt = VmPregMatches::hostMatchAllToHashTable($matches, $flags);
+            }
+
             return -1;
         }
         self::$lastMatchAllExHt = VmPregMatches::hostMatchAllToHashTable($matches, $flags);

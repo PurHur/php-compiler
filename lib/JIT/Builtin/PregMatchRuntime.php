@@ -268,7 +268,22 @@ final class PregMatchRuntime
         $context->builder->branchIf($isError, $failBb, $okBb);
 
         $context->builder->positionAtEnd($failBb);
-        // Zend leaves by-ref $matches untouched on compile failure (ext/pcre/php_pcre.c, #17597).
+        // Compile failure: leave by-ref $matches untouched (#17597).
+        // Past-end offset: helper stored empty HT — write it (#25313).
+        $failHtRaw = $context->builder->call(self::helperFunction($context, $takeHtHelper));
+        $failHt = JitNestedHelperCoerce::coerceToHashtablePtr($context, $failHtRaw);
+        $failHtNull = $context->builder->icmp(Builder::INT_EQ, $failHt, $htPtr->constNull());
+        $failWriteBb = $fn->appendBasicBlock('preg_match_ex_fail_write');
+        $failDoneBb = $fn->appendBasicBlock('preg_match_ex_fail_done');
+        $context->builder->branchIf($failHtNull, $failDoneBb, $failWriteBb);
+        $context->builder->positionAtEnd($failWriteBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $fn->getParam(2),
+            $failHt
+        );
+        $context->builder->branch($failDoneBb);
+        $context->builder->positionAtEnd($failDoneBb);
         $context->builder->returnValue($negOne);
 
         $context->builder->positionAtEnd($okBb);
