@@ -102,6 +102,16 @@ final class BuiltinInternalDefaultValues
         'preg_quote' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/fileinfo/fileinfo.stub.php — ?string $magic_database = null; ? $context = null (#25471)
+        'finfo_open' => [
+            1 => ['kind' => 'null'],
+        ],
+        'finfo_file' => [
+            3 => ['kind' => 'null'],
+        ],
+        'finfo_buffer' => [
+            3 => ['kind' => 'null'],
+        ],
         // php-src stubs — InternalArgInfo types omit nullability / non-zero sentinels (#23181)
         'substr' => [
             2 => ['kind' => 'null'],
