@@ -1368,8 +1368,9 @@ final class BuiltinParamNames
             case 'chunk_split':
                 return ['string', 'length=', 'separator='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/split_length (#23206)
+            // php-src ext/standard/string.stub.php — int $length = 1 (#25044)
             case 'str_split':
-                return ['string', 'length'];
+                return ['string', 'length='];
             // php-src ext/standard/string.stub.php — string $string, ?string $token = null (#25171)
             // InternalArgInfo still says str / required non-nullable token typed "str".
             case 'strtok':

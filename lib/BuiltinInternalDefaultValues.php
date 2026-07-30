@@ -115,6 +115,10 @@ final class BuiltinInternalDefaultValues
         'explode' => [
             2 => ['kind' => 'int', 'value' => \PHP_INT_MAX],
         ],
+        // php-src ext/standard/string.stub.php — int $length = 1 (#25044)
+        'str_split' => [
+            1 => ['kind' => 'int', 'value' => 1],
+        ],
         'preg_match' => [
             2 => ['kind' => 'null'],
             3 => ['kind' => 'int', 'value' => 0],
