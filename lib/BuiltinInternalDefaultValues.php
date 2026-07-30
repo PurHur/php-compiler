@@ -393,6 +393,10 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             4 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/file.stub.php — context=null (#25509)
+        'file_put_contents' => [
+            3 => ['kind' => 'null'],
+        ],
         // Same context=null metadata hole as #24814/#24885
         'fopen' => [
             3 => ['kind' => 'null'],

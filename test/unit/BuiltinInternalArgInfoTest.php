@@ -92,6 +92,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_create'));
     }
 
+    /** php-src file.stub.php — InternalArgInfo omits |false (#25509). */
+    public function testFileIoFamilyReflectionReturnUnions(): void
+    {
+        foreach (['file_get_contents', 'fread', 'fgets'] as $f) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        foreach (['file_put_contents', 'fwrite'] as $f) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('file_put_contents', 1));
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));

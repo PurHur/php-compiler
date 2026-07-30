@@ -77,6 +77,9 @@ final class BuiltinInternalArgInfo
             'stream_context_create' => '',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
             'restore_error_handler' => 'true',
+            // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
+            'file_get_contents', 'fread', 'fgets' => 'string|false',
+            'file_put_contents', 'fwrite' => 'int|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
@@ -350,6 +353,8 @@ final class BuiltinInternalArgInfo
             'fputcsv' => 5 === $index ? 'string' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24814)
             'file_get_contents' => 4 === $index ? '?int' : null,
+            // ext/standard/file.stub.php — mixed $data (InternalArgInfo untyped) (#25509)
+            'file_put_contents' => 1 === $index ? 'mixed' : null,
             // ext/mbstring/mbstring.stub.php — ?int $length = null, ?string $encoding = null (#25362)
             'mb_substr' => match ($index) {
                 2 => '?int',
