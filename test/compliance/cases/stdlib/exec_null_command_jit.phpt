@@ -1,5 +1,5 @@
 --TEST--
-stdlib exec family null command — ValueError not TypeError — JIT (ext/standard/exec.c, #18676)
+stdlib exec family null command — ValueError not TypeError — JIT (ext/standard/exec.c, #18676 / #25113)
 --JIT--
 --FILE--
 <?php
@@ -18,7 +18,7 @@ $pipes = [];
 $result = proc_open(null, [], $pipes);
 echo 'proc_open: '.(is_resource($result) ? 'resource' : (null === $result ? 'NULL' : 'other'))."\n";
 if (is_resource($result)) {
-    proc_close($result);
+    @proc_terminate($result);
 }
 --EXPECT--
 shell_exec: ValueError
