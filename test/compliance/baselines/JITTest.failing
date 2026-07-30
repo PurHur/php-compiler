@@ -110,7 +110,6 @@ language/file_const_new
 language/final_hooked_property
 language/final_promoted_property
 language/final_static_property_write_and_is_final
-language/foreach_byref_enum
 language/function_scope_no_global_leak
 language/inc_dec_null
 language/include_once_basic

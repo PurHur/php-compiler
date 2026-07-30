@@ -1263,7 +1263,7 @@ language/foreach_by_ref_assoc
 language/foreach_by_ref_jit
 language/foreach_by_ref_unset
 language/foreach_byref_arrayiterator
-language/foreach_byref_enum
+language/enum/foreach_byref_enum
 language/foreach_byref_object_property
 language/foreach_byref_string_assign
 language/foreach_byref_unset_residual
