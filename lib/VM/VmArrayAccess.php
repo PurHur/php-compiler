@@ -411,7 +411,13 @@ final class VmArrayAccess
         if (null !== $containerOp && null !== $containerOp->type && Type::TYPE_OBJECT === $containerOp->type->type) {
             $userType = $containerOp->type->userType ?? '';
             if ('' !== $userType && 'object' !== strtolower(ltrim($userType, '\\'))) {
-                return strtolower(ltrim($userType, '\\'));
+                $lc = strtolower(ltrim($userType, '\\'));
+                // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338).
+                if ('simplemxml_element' === $lc) {
+                    return 'simplexmlelement';
+                }
+
+                return $lc;
             }
         }
 

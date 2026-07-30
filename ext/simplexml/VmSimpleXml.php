@@ -406,6 +406,60 @@ final class VmSimpleXml
     }
 
     /**
+     * empty($sxe[$dim]) — php-src sxe_prop_dim_exists(check_empty) (#25338).
+     *
+     * Distinct from empty($heldSxe): attribute/element objects stay truthy under (bool)/empty($var)
+     * when the node exists; dimension empty uses string emptiness (and element children).
+     */
+    public static function dimensionIsEmpty(ObjectEntry $entry, Variable $offset): bool
+    {
+        $offset = $offset->resolveIndirect();
+        if (!self::offsetExists($entry, $offset)) {
+            return true;
+        }
+        if (Variable::TYPE_STRING === $offset->type) {
+            $name = $offset->toString();
+            if (SimpleXmlRegistry::isAttributesView($entry)) {
+                $text = self::attributesMap($entry)[$name] ?? '';
+            } elseif (SimpleXmlRegistry::isNamedChildView($entry)) {
+                $matches = self::namedChildViewElements($entry);
+                $text = ([] === $matches) ? '' : ($matches[0]->attributes[$name] ?? '');
+            } else {
+                $text = SimpleXmlRegistry::state($entry)->attributes[$name] ?? '';
+            }
+
+            return self::textIsEmptyForDimEmpty($text);
+        }
+        if (Variable::TYPE_INTEGER === $offset->type) {
+            $index = $offset->toInt();
+            if (SimpleXmlRegistry::isAttributesView($entry)) {
+                $values = array_values(self::attributesMap($entry));
+
+                return self::textIsEmptyForDimEmpty($values[$index] ?? '');
+            }
+            $elements = self::viewElements($entry);
+            $node = $elements[$index] ?? null;
+            if (null === $node) {
+                return true;
+            }
+            // Element dims: child elements keep the node non-empty even when direct text is ''.
+            if ([] !== $node->children) {
+                return false;
+            }
+
+            return self::textIsEmptyForDimEmpty($node->text);
+        }
+
+        return true;
+    }
+
+    /** php-src empty() string rule used by SXE has_dimension(check_empty). */
+    private static function textIsEmptyForDimEmpty(string $text): bool
+    {
+        return '' === $text || '0' === $text;
+    }
+
+    /**
      * unset($sxe->child) — unlink all direct child elements with the given name (#19681, sxe_prop_dim_delete).
      */
     public static function unsetChildProperty(ObjectEntry $entry, string $name): void
