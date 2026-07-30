@@ -20363,14 +20363,21 @@ restart:
     {
         foreach ($frame->callArgEntries as $entry) {
             if ('u' === $entry[0]) {
-                ObjectLifetime::releaseDirectObject($entry[1]);
                 $slot = $entry[2] ?? null;
+                // By-ref sends store the CV (slot null) — must not releaseRef the live object (#25097).
+                if (null !== $slot) {
+                    ObjectLifetime::releaseDirectObject($entry[1]);
+                }
             } elseif ('n' === $entry[0]) {
-                ObjectLifetime::releaseDirectObject($entry[2]);
                 $slot = $entry[3] ?? null;
+                if (null !== $slot) {
+                    ObjectLifetime::releaseDirectObject($entry[2]);
+                }
             } else {
-                ObjectLifetime::releaseDirectObject($entry[1]);
                 $slot = $entry[2] ?? null;
+                if (null !== $slot) {
+                    ObjectLifetime::releaseDirectObject($entry[1]);
+                }
             }
             if (!is_int($slot) || $slot === $keepReturnSlot || $frame->block->isNamedVariableSlot($slot)) {
                 continue;
