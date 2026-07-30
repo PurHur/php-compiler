@@ -34,7 +34,7 @@ final class TimezoneLocationJitHelper
             } else {
                 throw new \LogicException('timezone_location_get() returned unexpected value type');
             }
-            $ht->addNew((string) $key, $entry);
+            $ht->add((string) $key, $entry);
         }
 
         return $ht;
