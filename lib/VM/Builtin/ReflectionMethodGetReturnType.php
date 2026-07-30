@@ -10,7 +10,7 @@ use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
 
-/** ReflectionMethod::getReturnType() — VM (#6597, ext/reflection/php_reflection.c). */
+/** ReflectionMethod::getReturnType() — VM (#6597, #25406; ext/reflection/php_reflection.c). */
 final class ReflectionMethodGetReturnType extends VmClassMethod
 {
     public function __construct()
@@ -25,13 +25,14 @@ final class ReflectionMethodGetReturnType extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
-        [, , $func] = ReflectionSupport::resolveReflectedMethod($ctx, $receiver);
-        if (!$func instanceof PhpFunc) {
-            $frame->returnVar->null();
-
-            return;
+        [$declaring, $methodLc] = ReflectionSupport::resolveReflectedMethodDeclaring($ctx, $receiver);
+        $declared = null;
+        $func = $declaring->methods[$methodLc] ?? null;
+        if ($func instanceof PhpFunc) {
+            $declared = $func->block->returnDeclaredType;
+        } elseif (isset($declaring->methodReturnDeclaredTypes[$methodLc])) {
+            $declared = $declaring->methodReturnDeclaredTypes[$methodLc];
         }
-        $declared = $func->block->returnDeclaredType;
         if (null === $declared || !ReflectionSupport::hasDeclaredReturnType($declared)) {
             $frame->returnVar->null();
 

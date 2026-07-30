@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DatePeriodConstruct;
@@ -536,12 +537,26 @@ final class BuiltinClasses
         $ctx->classes['backedenum'] = $backedEnum;
     }
 
-    /** Zend zend_interfaces.c — legacy Serializable (#3287, #6354). */
+    /** Zend zend_interfaces.c / zend_interfaces.stub.php — legacy Serializable (#3287, #6354, #25406). */
     private static function registerSerializable(Context $ctx): void
     {
         $entry = new ClassEntry('Serializable');
         $entry->isInterface = true;
         self::registerBuiltinInterfaceMethods($entry, ['serialize', 'unserialize']);
+        // Stub arginfo for LSP after #25384 — serialize() has no params; unserialize(string $data)
+        // has no declared return (tentative in php-src). Untyped $data implementers stay valid.
+        $entry->methodParameterMetadata['unserialize'] = [
+            new ParameterMetadata(
+                'data',
+                [],
+                false,
+                false,
+                false,
+                false,
+                'string',
+                null,
+            ),
+        ];
         $ctx->classes['serializable'] = $entry;
     }
 

@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionMethod::hasReturnType() — VM (#5141, ext/reflection/php_reflection.c). */
+/** ReflectionMethod::hasReturnType() — VM (#5141, #25406; ext/reflection/php_reflection.c). */
 final class ReflectionMethodHasReturnType extends VmClassMethod
 {
     public function __construct()
@@ -24,10 +24,22 @@ final class ReflectionMethodHasReturnType extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
-        [, , $func] = ReflectionSupport::resolveReflectedMethod($ctx, $receiver);
-        $frame->returnVar->bool(
-            $func instanceof PhpFunc
-            && ReflectionSupport::hasDeclaredReturnType($func->block->returnDeclaredType)
-        );
+        [$declaring, $methodLc] = ReflectionSupport::resolveReflectedMethodDeclaring($ctx, $receiver);
+        $func = $declaring->methods[$methodLc] ?? null;
+        if ($func instanceof PhpFunc) {
+            $frame->returnVar->bool(
+                ReflectionSupport::hasDeclaredReturnType($func->block->returnDeclaredType)
+            );
+
+            return;
+        }
+        if (isset($declaring->methodReturnDeclaredTypes[$methodLc])) {
+            $frame->returnVar->bool(
+                ReflectionSupport::hasDeclaredReturnType($declaring->methodReturnDeclaredTypes[$methodLc])
+            );
+
+            return;
+        }
+        $frame->returnVar->bool(false);
     }
 }
