@@ -43,10 +43,11 @@ final class XmlParserHandlers
     /** @return array<string, mixed> */
     public static function defaultParserState(): array
     {
+        // Expat starts current line/column at 1 before any input (php-src ext/xml/xml.c; #25286).
         return [
             'errorCode' => 0,
-            'line' => 0,
-            'column' => 0,
+            'line' => 1,
+            'column' => 1,
             'byteIndex' => 0,
             // Accumulated feed for xml_parse(..., $is_final=false) chunks (php-src XML_Parse; #24647).
             'buffer' => '',
