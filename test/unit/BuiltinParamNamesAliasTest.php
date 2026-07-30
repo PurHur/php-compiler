@@ -1484,6 +1484,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23264 */
+    public function testCryptQuotemetaStrrevStrRot13ZendStubNamedParams(): void
+    {
+        foreach (['quotemeta', 'strrev', 'str_rot13'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn));
+        }
+
+        $crypt = BuiltinParamNames::forFunction('crypt');
+        self::assertSame(['string', 'salt'], $crypt);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($crypt, 'string', 'crypt'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($crypt, 'salt', 'crypt'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($crypt, 'str', 'crypt'));
+    }
+
     /** @covers issue #23217 */
     public function testStripTagsZendStubNamedParams(): void
     {
