@@ -117,32 +117,7 @@ final class JitDomGetElementById
         $context->builder->branchIf($isMatch, $hitBlock, $missBlock);
 
         $context->builder->positionAtEnd($hitBlock);
-        $element = JitDomCreateElement::invoke(
-            $context,
-            $receiver,
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_STRING,
-                JITVariable::KIND_VALUE,
-                $context->builder->load($context->constantStringFromString($parsed['tag']))
-            )
-        );
-        $textStr = $context->builder->load($context->constantStringFromString($parsed['text']));
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $textStr
-        );
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($classId, 'textContent')) {
-            $objectType->defineProperty($classId, 'textContent', JITVariable::TYPE_STRING);
-        }
-        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($element, 'DOMElement', 'textContent'),
-            $propVar,
-            JITVariable::TYPE_STRING
-        );
+        $element = self::materializeParsedElement($context, $receiver, $parsed);
         $boxed = self::boxObjectResult($context, $element);
         $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
         $context->builder->branch($doneBlock);
@@ -273,16 +248,34 @@ final class JitDomGetElementById
 
         JitDomLoadHTMLUserScript::rememberLastGetElementByIdHit($parsed);
 
-        $element = JitDomCreateElement::invoke(
+        // Must return a boxed %__value__* — raw __object__* breaks the call convention (#25119).
+        return self::boxObjectResult(
             $context,
-            $receiver,
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_STRING,
-                JITVariable::KIND_VALUE,
-                $context->builder->load($context->constantStringFromString($parsed['tag']))
-            )
+            self::materializeParsedElement($context, $receiver, $parsed)
         );
+    }
+
+    /**
+     * Materialize a DOMElement for a compile-time loadHTML parse record.
+     *
+     * Tag lit must set {@see JITVariable::$compileTimeString} so createElement returns
+     * `__object__*` (not invokeViaHelper's boxed value) for propertyStore / id-map (#25119).
+     *
+     * @param array{tag: string, id: string, text: string} $parsed
+     */
+    private static function materializeParsedElement(
+        Context $context,
+        JITVariable $receiver,
+        array $parsed
+    ): Value {
+        $tagVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString($parsed['tag']))
+        );
+        $tagVar->compileTimeString = $parsed['tag'];
+        $element = JitDomCreateElement::invoke($context, $receiver, $tagVar);
         $textStr = $context->builder->load($context->constantStringFromString($parsed['text']));
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),

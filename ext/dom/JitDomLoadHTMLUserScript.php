@@ -206,16 +206,16 @@ final class JitDomLoadHTMLUserScript
         }
 
         $document = self::loadObjectArg($context, $receiver);
-        $element = JitDomCreateElement::invoke(
+        // Tag must carry compileTimeString so createElement materializes an __object__*
+        // (not invokeViaHelper's boxed %__value__*) for id-map / __phpc_dom_us_elem (#25119).
+        $tagVar = new JITVariable(
             $context,
-            $receiver,
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_STRING,
-                JITVariable::KIND_VALUE,
-                $context->builder->load($context->constantStringFromString($parsed['tag']))
-            )
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString($parsed['tag']))
         );
+        $tagVar->compileTimeString = $parsed['tag'];
+        $element = JitDomCreateElement::invoke($context, $receiver, $tagVar);
         self::storeElementTextContent($context, $element, $parsed['text']);
         self::storeElementInIdMap($context, $document, $parsed['id'], $element);
         $idStr = $context->builder->load($context->constantStringFromString($parsed['id']));
