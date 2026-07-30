@@ -33,7 +33,9 @@ final class BuiltinInternalArgInfo
         $lc = strtolower($name);
         $stub = self::stubReturnTypeLabelForFunction($lc);
         if (null !== $stub) {
-            return $stub;
+            $stub = trim($stub);
+            // Empty override clears a bogus InternalArgInfo return (stream_context_create #25508).
+            return '' === $stub ? null : $stub;
         }
         $info = self::instance()->functions[$lc] ?? null;
         if (null === $info) {
@@ -53,6 +55,8 @@ final class BuiltinInternalArgInfo
 
     /**
      * php-src stub return when InternalArgInfo omits the function entirely (#25392).
+     *
+     * Empty string = force no declared return type (overrides a wrong InternalArgInfo label).
      */
     public static function stubReturnTypeLabelForFunction(string $callableLc): ?string
     {
@@ -69,6 +73,8 @@ final class BuiltinInternalArgInfo
             'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
             // ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
             'stream_context_set_options' => 'bool',
+            // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says array (#25508)
+            'stream_context_create' => '',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
             'restore_error_handler' => 'true',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
