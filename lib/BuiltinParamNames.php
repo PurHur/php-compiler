@@ -504,6 +504,11 @@ final class BuiltinParamNames
                 return ['filename', 'line'];
             case 'number_format':
                 return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says number (#23259)
+            case 'abs':
+            case 'floor':
+            case 'ceil':
+                return ['num'];
             case 'round':
                 return ['num', 'precision', 'mode'];
             case 'frexp':
