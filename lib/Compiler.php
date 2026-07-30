@@ -28136,12 +28136,8 @@ class Compiler {
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->isStatementLevelSideEffectFuncCall($child)
             ) {
-                $consumer = $cfgChildren[$consumerIndex] ?? null;
-                if ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall) {
-                    if ($this->cfgCallAcceptsSingleInlineClosureCallback($consumer)) {
-                        continue;
-                    }
-                }
+                // Never count stmt-level side effects as hoisted arg producers (#25084, #16480).
+                continue;
             }
             ++$count;
         }
@@ -28875,6 +28871,13 @@ class Compiler {
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
             && $this->funcCallExprHasByRefMutatingSideEffects($producer)
         ) {
+            return false;
+        }
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && $this->isStatementLevelSideEffectFuncCall($producer)
+        ) {
+            // fwrite/rewind before var_export(fread(...), true) must not re-emit (#25084).
             return false;
         }
         if (
@@ -30272,9 +30275,9 @@ class Compiler {
                     ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                     && $this->isStatementLevelSideEffectFuncCall($child)
                 ) {
-                    // chmod(); substr(sprintf('%o', fileperms($path)), -N) — not a hoisted arg producer (#16451, #16480).
-                    --$i;
-                    continue;
+                    // fwrite/rewind/chmod end the hoisted sibling chain — do not walk past them as
+                    // firstSibling (re-#16451; prevents re-emitting fwrite before var_export (#25084)).
+                    break;
                 }
                 if (
                     ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
@@ -30464,13 +30467,9 @@ class Compiler {
                 ($skip instanceof Op\Expr\FuncCall || $skip instanceof Op\Expr\NsFuncCall)
                 && $this->isStatementLevelSideEffectFuncCall($skip)
             ) {
-                $consumer = $cfgChildren[$consumerIndex] ?? null;
-                if ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall) {
-                    if ($this->cfgCallAcceptsSingleInlineClosureCallback($consumer)) {
-                        ++$first;
-                        continue;
-                    }
-                }
+                // Leading fwrite/rewind/chmod are not the start of a hoisted arg chain (#25084, #16480).
+                ++$first;
+                continue;
             }
             break;
         }
@@ -36685,6 +36684,10 @@ class Compiler {
                 'fwrite',
                 'fputs',
                 'ftruncate',
+                // Stream position mutators — not hoisted arg producers for var_export/print_r (#25084, #16254).
+                'rewind',
+                'fseek',
+                'fsetpos',
                 'define',
                 'date_sunrise',
                 'date_sunset',
