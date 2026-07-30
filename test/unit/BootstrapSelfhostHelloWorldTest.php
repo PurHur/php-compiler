@@ -471,6 +471,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1', $script);
         $this->assertStringContainsString('inventory compile_driver (#3032)', $script);
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $script);
+        // Stale gen-0 argv drivers bake a compile-time repo root; harness worktrees need runtime override (#12486).
+        $this->assertStringContainsString('PHP_COMPILER_REPO_ROOT="${ROOT}"', $script);
         // #22178: argv native emit preferred over env SOURCE/OUT (gen-0 argv driver segfaults on env path).
         $this->assertStringContainsString('"${EMIT_HELPER}" -o "${AOT_OUT}" "${SOURCE}"', $script);
         $this->assertStringContainsString('env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT', $script);

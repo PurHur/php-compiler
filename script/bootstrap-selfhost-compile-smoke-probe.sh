@@ -84,7 +84,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-compile-smoke-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
-      m3_run_env=(PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${SOURCE}" PHP_COMPILER_M3_OUT="${AOT_OUT}")
+      m3_run_env=(PHP_COMPILER_REPO_ROOT="${ROOT}" PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${SOURCE}" PHP_COMPILER_M3_OUT="${AOT_OUT}")
       m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
       compile_out="$(
         env "${m3_run_env[@]}" "${EMIT_HELPER}" 2>&1

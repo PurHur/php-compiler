@@ -27,6 +27,8 @@ final class BootstrapGen0DriverFunctionalSmokeTest extends TestCase
         $script = $this->root.'/script/bootstrap-gen0-driver-functional-smoke.sh';
         $this->assertFileExists($script);
         $this->assertTrue(is_executable($script), $script.' must be executable');
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('PHP_COMPILER_REPO_ROOT="${ROOT}"', $body);
     }
 
     public function testFunctionalSmokeFailsWhenDriverReturnsParseAndCompileNull(): void

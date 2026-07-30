@@ -143,7 +143,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     echo "bootstrap-loop-gen1-link: emit helper link OK (${ROOT}/${EMIT_HELPER}, ${m4_link_mode})"
     if [[ "${BOOTSTRAP_M4_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
-      m4_run_env=(PHP_COMPILER_M3_COMPILE_MODE=compile PHP_COMPILER_M3_RUNTIME_COMPILE=1 PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${ROOT}/${GEN2_SOURCE}" PHP_COMPILER_M3_OUT="${ROOT}/${GEN2_OUT}")
+      m4_run_env=(PHP_COMPILER_REPO_ROOT="${ROOT}" PHP_COMPILER_M3_COMPILE_MODE=compile PHP_COMPILER_M3_RUNTIME_COMPILE=1 PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${ROOT}/${GEN2_SOURCE}" PHP_COMPILER_M3_OUT="${ROOT}/${GEN2_OUT}")
       m4_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
       compile_out="$(
         env "${m4_run_env[@]}" "./${EMIT_HELPER}" 2>&1

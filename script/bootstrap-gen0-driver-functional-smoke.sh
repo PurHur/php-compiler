@@ -47,7 +47,9 @@ echo "bootstrap-gen0-driver-functional-smoke: driver=${DRIVER}"
 echo "bootstrap-gen0-driver-functional-smoke: source=${SRC}"
 
 set +e
-driver_log="$("${DRIVER}" -o "${OUT}" "${SRC}" 2>&1)"
+driver_log="$(
+  env PHP_COMPILER_REPO_ROOT="${ROOT}" "${DRIVER}" -o "${OUT}" "${SRC}" 2>&1
+)"
 driver_rc=$?
 set -e
 

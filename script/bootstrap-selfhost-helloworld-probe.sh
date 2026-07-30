@@ -295,6 +295,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
       # Env PHP_COMPILER_M3_SOURCE/OUT on the gen-0 argv driver segfaults at c:main_before_php;
       # argv avoids that and still prints helloworld_compile_smoke: compile OK (#22178).
       m3_run_env=(
+        PHP_COMPILER_REPO_ROOT="${ROOT}"
         PHP_COMPILER_M3_COMPILE_MODE=compile
         PHP_COMPILER_M3_RUNTIME_COMPILE=1
         PHP_COMPILER_M3_EMIT_MINIMAL=1
