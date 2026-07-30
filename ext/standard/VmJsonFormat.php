@@ -248,7 +248,7 @@ final class VmJsonFormat
     }
 
     /**
-     * php-src ext/json/php_json_encoder.c — php_json_encode_double / zend_gcvt dtoa.
+     * php-src ext/json/php_json_encoder.c — php_json_encode_double / PG(serialize_precision) (#25111).
      */
     private static function encodeFloat(float $num, int $flags): string
     {
@@ -270,7 +270,8 @@ final class VmJsonFormat
             return (string) (int) $num;
         }
 
-        $text = VmFloatDtoa::formatH($num);
+        // php_json_encode_double → zend_gcvt with PG(serialize_precision).
+        $text = VmSerializeFormat::formatDouble($num);
         // php_json_encode_double emits lowercase exponent (1.0e+20) (#23545).
         if (str_contains($text, 'E')) {
             $text = str_replace('E', 'e', $text);

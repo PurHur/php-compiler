@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * print_r() float formatting — php-src ext/standard/var.c zend_print_zval double branch (#10933).
+ * print_r() float formatting — php-src ext/standard/var.c zend_print_zval double branch (#10933, #25111).
  *
- * Whole-number floats display as integers (1.0 → "1"); var_export() keeps ".0" via {@see VmVarExportFloat}.
+ * Honors PG(precision) via {@see VmZendDoubleString} (same as (string) cast). Whole-number floats
+ * display as integers (1.0 → "1"); var_export() keeps ".0" via {@see VmVarExportFloat}.
  */
 final class VmPrintRFloat
 {
@@ -32,6 +33,6 @@ final class VmPrintRFloat
             return (string) $i;
         }
 
-        return (string) $f;
+        return VmZendDoubleString::format($f);
     }
 }
