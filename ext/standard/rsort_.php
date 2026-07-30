@@ -35,7 +35,18 @@ final class rsort_ extends Internal
         if ($argc > 1) {
             $flags = VmInternalCompare::resolveSortFunctionFlags($frame, 'rsort');
         }
-        if ($ht->getNumElements() < 2) {
+        $n = $ht->getNumElements();
+        if (0 === $n) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
+        if (1 === $n) {
+            // php-src still assigns new keys 0..n-1 for a single element (#25385).
+            $array->separateArrayForWrite();
+            VmArray::reindexToListKeys($array->resolveIndirect()->toArray());
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
             }
@@ -98,7 +109,7 @@ final class rsort_ extends Internal
             VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
         }
         $array->separateArrayForWrite();
-        $array->resolveIndirect()->toArray()->replacePackedValues($values);
+        VmArray::writeReindexedValues($array->resolveIndirect()->toArray(), $values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

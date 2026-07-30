@@ -26,7 +26,14 @@ final class UsortJitHelper
 {
     public static function sortPackedWithClosure(HashTable $ht, Variable $closure): HashTable
     {
-        if ($ht->getNumElements() < 2) {
+        $n = $ht->getNumElements();
+        if (0 === $n) {
+            return $ht;
+        }
+        if (1 === $n) {
+            // php-src still assigns new keys 0..n-1 for a single element (#25385).
+            VmArray::reindexToListKeys($ht);
+
             return $ht;
         }
         $ctx = Superglobals::getActiveContext();
@@ -48,7 +55,7 @@ final class UsortJitHelper
                 }
             }
         }
-        $ht->replacePackedValues($values);
+        VmArray::writeReindexedValues($ht, $values);
 
         return $ht;
     }

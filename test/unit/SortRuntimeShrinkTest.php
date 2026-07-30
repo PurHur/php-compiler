@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * sort()/rsort() SORT_REGULAR use LLVM `__hashtable__sortPacked*` (#24010);
  * locale/natural still bridge SortJitHelper (#12769, #13049, #17775).
+ * Single-element reindex SSOT: {@see SortJitHelper} / VmArray (#25385).
  */
 final class SortRuntimeShrinkTest extends TestCase
 {
@@ -70,6 +71,17 @@ final class SortRuntimeShrinkTest extends TestCase
         $this->assertSame(['a', 'b', 'c'], self::stringValuesInOrder($ht));
     }
 
+    public function testSortJitHelperReindexesSingleElementStringKey(): void
+    {
+        $ht = new HashTable();
+        $cell = new Variable(Variable::TYPE_STRING);
+        $cell->string('v');
+        $ht->add('k', $cell);
+        SortJitHelper::sortPacked($ht);
+        $this->assertSame([0], self::intKeysInOrder($ht));
+        $this->assertSame(['v'], self::stringValuesInOrder($ht));
+    }
+
     /** @param list<int> $values */
     private static function listTable(int ...$values): HashTable
     {
@@ -113,6 +125,17 @@ final class SortRuntimeShrinkTest extends TestCase
         $out = [];
         foreach ($ht->iterate(true) as $value) {
             $out[] = $value->resolveIndirect()->toString();
+        }
+
+        return $out;
+    }
+
+    /** @return list<int> */
+    private static function intKeysInOrder(HashTable $ht): array
+    {
+        $out = [];
+        foreach ($ht->iterateKeyed(true) as [$key, $_]) {
+            $out[] = $key->resolveIndirect()->toInt();
         }
 
         return $out;
