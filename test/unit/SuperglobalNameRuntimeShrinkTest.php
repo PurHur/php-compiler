@@ -8,32 +8,53 @@ use PHPCompiler\ext\standard\SuperglobalNameJitHelper;
 use PHPCompiler\ext\standard\SuperglobalNames;
 use PHPUnit\Framework\TestCase;
 
-/** SuperglobalNameRuntime routes through SuperglobalNameJitHelper PHP not memcmp LLVM (#9271). */
+/**
+ * SuperglobalNameRuntime routes through SuperglobalNameJitHelper PHP via
+ * JitVmHelperLink::ensureCompiled (#9271 / #25091 / peer #25042).
+ */
 final class SuperglobalNameRuntimeShrinkTest extends TestCase
 {
     public function testSuperglobalNameRuntimeRoutesThroughJitHelper(): void
     {
-        $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalNameRuntime.php');
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalNameRuntime.php');
         $this->assertStringContainsString('SuperglobalNameJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString("lookupFunction('memcmp')", $source);
         $this->assertStringNotContainsString('identicalToAsciiLiteral', $source);
-        $this->assertLessThan(140, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(120, \substr_count($source, "\n") + 1);
     }
 
     public function testSuperglobalNameJitHelperDelegatesToSuperglobalNames(): void
     {
-        $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/SuperglobalNameJitHelper.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SuperglobalNameJitHelper.php');
         $this->assertStringContainsString('SuperglobalNames::isSuperglobalName', $source);
     }
 
-    public function testSuperglobalNameJitHelperSemanticsMatchTable(): void
+    public function testSuperglobalNameJitHelperSemanticsMatchSuperglobalNames(): void
     {
-        $this->assertSame(1, SuperglobalNameJitHelper::isSuperglobalName('_GET'));
-        $this->assertSame(1, SuperglobalNameJitHelper::isSuperglobalName('GLOBALS'));
+        foreach (['_GET', '_POST', '_SERVER', '_ENV', '_COOKIE', '_FILES', '_REQUEST', 'GLOBALS', '_SESSION'] as $name) {
+            $this->assertSame(
+                SuperglobalNames::isSuperglobalName($name) ? 1 : 0,
+                SuperglobalNameJitHelper::isSuperglobalName($name),
+                $name
+            );
+            $this->assertSame(1, SuperglobalNameJitHelper::isSuperglobalName($name), $name);
+        }
+        $this->assertSame(0, SuperglobalNameJitHelper::isSuperglobalName('foo'));
+        $this->assertSame(0, SuperglobalNameJitHelper::isSuperglobalName('_get'));
         $this->assertSame(0, SuperglobalNameJitHelper::isSuperglobalName('not_super'));
-        $this->assertSame(
-            SuperglobalNames::isSuperglobalName('_SESSION') ? 1 : 0,
-            SuperglobalNameJitHelper::isSuperglobalName('_SESSION')
-        );
+    }
+
+    public function testSpineBundleIncludesSuperglobalNameJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('SuperglobalNameJitHelper.php', $spine);
+        $this->assertStringContainsString('SuperglobalNameRuntime.php', $spine);
     }
 }
