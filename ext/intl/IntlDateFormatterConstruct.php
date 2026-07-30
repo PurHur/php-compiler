@@ -53,6 +53,11 @@ final class IntlDateFormatterConstruct extends VmClassMethod
             ? VmIntlDateFormatter::coerceOptionalPattern($frame->calledArgs[6], 'IntlDateFormatter::__construct', 5)
             : null;
 
+        // php-src datefmt_ctor FAILURE + EH_THROW → IntlException (#25205).
+        if (!VmIntlDateFormatter::validateStylesOrSetError($dateType, $timeType)) {
+            throw new \IntlException(IntlError::getMessage());
+        }
+
         try {
             VmIntlDateFormatter::initObject(
                 $receiver->toObject(),

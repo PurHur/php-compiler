@@ -67,6 +67,12 @@ final class datefmt_create extends Internal
 
             return;
         }
+        // Illegal styles → null + IntlError already set (#25205).
+        if (null === $object) {
+            $frame->returnVar->null();
+
+            return;
+        }
         IntlError::clear();
         $frame->returnVar->object($object);
     }
