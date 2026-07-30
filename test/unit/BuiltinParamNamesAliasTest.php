@@ -1263,16 +1263,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'timezone_identifier', 'date_default_timezone_set'));
     }
 
-    /** @covers issue #23446 */
+    /** @covers issue #23446 / #25173 */
     public function testTimezoneIdentifiersListZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('timezone_identifiers_list');
-        self::assertSame(['timezoneGroup', 'countryCode'], $names);
+        self::assertSame(['timezoneGroup=', 'countryCode='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'timezoneGroup', 'timezone_identifiers_list'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'countryCode', 'timezone_identifiers_list'));
         // Legacy InternalArgInfo names must not resolve (Zend rejects $what / $country)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'timezone_identifiers_list'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'country', 'timezone_identifiers_list'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('timezone_identifiers_list'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('timezone_identifiers_list'));
     }
 
     /** @covers issue #24359 */

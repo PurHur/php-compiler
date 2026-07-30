@@ -296,9 +296,9 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says timezone_identifier (#23446)
             case 'date_default_timezone_set':
                 return ['timezoneId'];
-            // php-src ext/date/php_date.stub.php — InternalArgInfo still says what/country (#23446)
+            // php-src ext/date/php_date.stub.php — InternalArgInfo required what/country (#23446, #25173)
             case 'timezone_identifiers_list':
-                return ['timezoneGroup', 'countryCode'];
+                return ['timezoneGroup=', 'countryCode='];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still gmtoffset/isdst (#24359)
             case 'timezone_name_from_abbr':
                 return ['abbr', 'utcOffset=', 'isDST='];

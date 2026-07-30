@@ -279,6 +279,11 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'int', 'value' => 2047],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — same defaults; InternalArgInfo marks both required (#25173)
+        'timezone_identifiers_list' => [
+            0 => ['kind' => 'int', 'value' => 2047],
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
