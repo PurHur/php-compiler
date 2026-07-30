@@ -73,6 +73,17 @@ final class BuiltinInternalDefaultValues
         'get_defined_functions' => [
             0 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/standard/basic_functions.stub.php — ?int $error_level = null (#25278)
+        'error_reporting' => [
+            0 => ['kind' => 'null'],
+        ],
+        // php-src ext/standard/basic_functions.stub.php — int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT (1) (#25278)
+        'debug_backtrace' => [
+            0 => ['kind' => 'int', 'value' => 1],
+        ],
+        'get_debug_backtrace' => [
+            0 => ['kind' => 'int', 'value' => 1],
+        ],
         // php-src ext/standard/basic_functions.stub.php — bool $return = false (#23785)
         'highlight_string' => [
             1 => ['kind' => 'bool', 'value' => false],
