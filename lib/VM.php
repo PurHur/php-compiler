@@ -5556,6 +5556,21 @@ restart:
                     $this->releaseVmStatementDeadTemps($frame, $condSlot);
                     $this->releaseVmJumpIfCondTemps($frame, $condSlot);
                     $branchTarget = $arg1 ? $op->block1 : $op->block2;
+                    // break/continue lower to JumpIf edges that leave the try body; run finally
+                    // before the branch target (Zend ZEND_BRK/ZEND_CONT, #25240).
+                    if ($this->completeActiveFinallyUnwind($frame)) {
+                        goto restart;
+                    }
+                    $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $branchTarget);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
+                        goto restart;
+                    }
+                    $finallyFrame = $this->beginGotoFinallyUnwind($frame, $branchTarget);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
+                        goto restart;
+                    }
                     $frame = $this->frameForBranch($frame, $branchTarget);
                     goto restart;
                 case OpCode::TYPE_CASE:
@@ -8975,6 +8990,9 @@ restart:
                     break;
                 case OpCode::TYPE_TRY:
                     $this->context->activeTryHandlerFrames[] = $frame;
+                    // Loop re-entry reuses the handler frame object; clear stale "finally done"
+                    // so break/continue unwind can run finally again (#25240).
+                    unset($this->context->completedFinallyHandlers[spl_object_id($frame)]);
                     if (null !== $op->block2) {
                         $this->context->tryMergeBlockIds[spl_object_id($op->block2)] = true;
                     }
@@ -11781,7 +11799,12 @@ restart:
     }
 
     /**
-     * Leaving a try body via goto must run finally before the jump target (Zend order, #4491).
+     * Leaving a try body via goto / break / continue must run finally before the jump target
+     * (Zend order, #4491 / #25240).
+     *
+     * php-cfg often wires break/continue (and try fall-through when those edges exist) straight
+     * to the try merge block, skipping the finally CFG edge. Jumping to that merge with a pending
+     * finally is an unwind. JumpIf edges that stay inside the try body must not unwind.
      */
     private function beginGotoFinallyUnwind(Frame $frame, Block $target): ?Frame
     {
@@ -11804,13 +11827,115 @@ restart:
             if (!$this->frameIsDescendantOf($frame, $handler)) {
                 continue;
             }
-            // Normal try/catch completion uses the merge block (registered at TYPE_TRY).
-            if (isset($this->context->tryMergeBlockIds[spl_object_id($target)])) {
+            $isMerge = isset($this->context->tryMergeBlockIds[spl_object_id($target)]);
+            // Intra-try JumpIf (e.g. `if` fall-through inside the try body) is not a leave.
+            if (!$isMerge && $this->blockIsInsideActiveTryBody($handler, $target)) {
                 continue;
             }
             $this->context->pendingGotoAfterFinally = $target;
 
             return $this->enterFinallyHandlerForUnwind($handler, false);
+        }
+
+        return null;
+    }
+
+    /**
+     * True when $target is part of the try body for $handler: reachable from the try entry
+     * without crossing merge/finally, and able to reach the merge (or finally) afterward.
+     * Leave edges such as `break` to the loop exit are successors of the try JumpIf but do
+     * not reach the merge — those must still unwind (#25240).
+     */
+    private function blockIsInsideActiveTryBody(Frame $handler, Block $target): bool
+    {
+        $tryOp = $this->findTryOpForHandler($handler);
+        if (null === $tryOp || null === $tryOp->block1) {
+            return false;
+        }
+        $entry = $tryOp->block1;
+        $merge = $tryOp->block2;
+        $finallyOp = $this->findFinallyOpForHandler($handler);
+        $finallyBlock = null !== $finallyOp ? $finallyOp->block1 : null;
+        if ($target === $entry) {
+            return true;
+        }
+        if ($target === $merge || $target === $finallyBlock) {
+            return false;
+        }
+        $leaveBlocked = [];
+        if (null !== $merge) {
+            $leaveBlocked[spl_object_id($merge)] = true;
+        }
+        if (null !== $finallyBlock) {
+            $leaveBlocked[spl_object_id($finallyBlock)] = true;
+        }
+        if (!$this->blockCanReach($entry, $target, $leaveBlocked)) {
+            return false;
+        }
+        // Still inside the try region only if control can rejoin via merge/finally.
+        if (null !== $merge && $this->blockCanReach($target, $merge, [])) {
+            return true;
+        }
+        if (null !== $finallyBlock && $this->blockCanReach($target, $finallyBlock, [])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, true> $blocked
+     */
+    private function blockCanReach(Block $from, Block $to, array $blocked): bool
+    {
+        if ($from === $to) {
+            return true;
+        }
+        $seen = [];
+        $queue = [$from];
+        while ([] !== $queue) {
+            /** @var Block $block */
+            $block = \array_pop($queue);
+            $id = spl_object_id($block);
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            foreach ($this->blockBranchTargets($block) as $succ) {
+                if ($succ === $to) {
+                    return true;
+                }
+                if (isset($blocked[spl_object_id($succ)])) {
+                    continue;
+                }
+                $queue[] = $succ;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<Block> */
+    private function blockBranchTargets(Block $block): array
+    {
+        $targets = [];
+        foreach ($block->opCodes as $op) {
+            foreach ([$op->block1, $op->block2, $op->block3] as $t) {
+                if ($t instanceof Block) {
+                    $targets[] = $t;
+                }
+            }
+        }
+
+        return $targets;
+    }
+
+    private function findTryOpForHandler(Frame $handler): ?OpCode
+    {
+        foreach ($handler->block->opCodes as $op) {
+            if (OpCode::TYPE_TRY === $op->type) {
+                return $op;
+            }
         }
 
         return null;
@@ -11979,6 +12104,18 @@ restart:
             $frame = $mergeFrame;
 
             return true;
+        }
+        // Nested try/finally: run outer finally before the pending break/continue/goto (#25240).
+        if (null !== $this->context->pendingGotoAfterFinally) {
+            $outerFinally = $this->beginGotoFinallyUnwind(
+                $frame,
+                $this->context->pendingGotoAfterFinally
+            );
+            if (null !== $outerFinally) {
+                $frame = $outerFinally;
+
+                return true;
+            }
         }
         $gotoFrame = $this->resumeGotoAfterFinally($frame);
         if (null !== $gotoFrame) {
