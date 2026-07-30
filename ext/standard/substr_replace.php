@@ -20,10 +20,9 @@ final class substr_replace extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'substr_replace', 3, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('substr_replace() requires three or four arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -74,10 +73,10 @@ final class substr_replace extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('substr_replace() requires three or four arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'substr_replace', 3, 4)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
         }

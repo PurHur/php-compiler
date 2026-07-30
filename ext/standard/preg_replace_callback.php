@@ -25,12 +25,8 @@ final class preg_replace_callback extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 6) {
-            throw new \LogicException(
-                'preg_replace_callback() expects 3 to 6 arguments in this compiler build'
-            );
-        }
+        // php-src ext/pcre/php_pcre.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'preg_replace_callback', 3, 6);
         if (null === $frame->vmContext) {
             throw new \LogicException('preg_replace_callback() requires VM context in this compiler build');
         }
@@ -151,6 +147,10 @@ final class preg_replace_callback extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Too-few → ArgumentCountError; JIT currently lowers the 3-arg form only (#25407).
+        if (!$this->requireAtLeastJitArgCount($context, $args, 'preg_replace_callback', 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         if (3 !== \count($args)) {
             throw new \LogicException(
                 'preg_replace_callback() JIT/AOT lowering requires exactly three arguments in this compiler build'

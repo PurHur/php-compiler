@@ -22,10 +22,9 @@ final class password_hash extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/password.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'password_hash', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
-        }
         // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21210, reverts #20174; password.c).
         $password = VmString::trimFamilyStringArgForFrame($frame, 0, 'password_hash', 0, 'password');
         $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_hash', 1, 'algo');
@@ -55,10 +54,10 @@ final class password_hash extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'password_hash', 2, 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $options = null;
         if (3 === $argc) {
             $options = $args[2];
