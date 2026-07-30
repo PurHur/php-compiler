@@ -94,6 +94,14 @@ final class BuiltinInternalDefaultValues
         'show_source' => [
             1 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/standard/string.stub.php — ?int $length = null (InternalArgInfo int → 0) (#25472)
+        'substr_count' => [
+            3 => ['kind' => 'null'],
+        ],
+        // php-src ext/standard/string.stub.php — ?string $delimiter = null (#25472)
+        'preg_quote' => [
+            1 => ['kind' => 'null'],
+        ],
         // php-src stubs — InternalArgInfo types omit nullability / non-zero sentinels (#23181)
         'substr' => [
             2 => ['kind' => 'null'],

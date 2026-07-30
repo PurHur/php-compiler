@@ -54,6 +54,16 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472). */
+    public function testHighlightFamilyReturnTypeIsStringOrBool(): void
+    {
+        foreach (['highlight_string', 'highlight_file', 'show_source'] as $f) {
+            $this->assertSame('string|bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('substr_count', 3));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('preg_quote', 1));
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));

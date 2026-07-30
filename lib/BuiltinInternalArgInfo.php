@@ -65,6 +65,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             'strstr', 'stristr' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472)
+            'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
             // ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
             'stream_context_set_options' => 'bool',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
@@ -277,6 +279,10 @@ final class BuiltinInternalArgInfo
                 1 => '?array',
                 default => null,
             },
+            // ext/standard/string.stub.php — ?int $length = null (InternalArgInfo int → 0) (#25472)
+            'substr_count' => 3 === $index ? '?int' : null,
+            // ext/standard/string.stub.php — ?string $delimiter = null (InternalArgInfo string, OPT no default) (#25472)
+            'preg_quote' => 1 === $index ? '?string' : null,
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
