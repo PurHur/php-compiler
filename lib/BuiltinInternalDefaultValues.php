@@ -284,6 +284,11 @@ final class BuiltinInternalDefaultValues
         'strtok' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
+        'getenv' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'bool', 'value' => false],
+        ],
         // php-src ext/date/php_date.stub.php — timezoneGroup=DateTimeZone::ALL (2047), countryCode=null (#25172)
         'datetimezone::listidentifiers' => [
             0 => ['kind' => 'int', 'value' => 2047],

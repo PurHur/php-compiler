@@ -6,33 +6,24 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758, #21579).
+ * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758, #21579, #24855).
  *
  * Embed + thin standalone AOT: process environ via {@see EnvironMirrorRuntime}
- * (`__superglobals__mirror_process_environ` — shared with $_SERVER refresh #18984),
- * then putenv overlay via {@see GetenvJitHelper::mergeLocalOverlayIntoNative}.
+ * (`__superglobals__mirror_process_environ` — shared with $_SERVER refresh #18984).
+ * putenv() mirrors into the process environ via {@see phpc_putenv_kernel}/setenv, so the
+ * environ walk already includes overlay entries. A NestedJIT overlay-merge helper
+ * segfaults under thin AOT when getenv() is the only env builtin (#24855 / re-#20758).
  * No inline environ-kernel walk in this bridge (Rename #19215 shape).
  * php-src: ext/standard/basic_functions.c — zif_getenv argc==0
  */
 final class StringGetenvAll
 {
-    private const HELPER_PATH = '/ext/standard/GetenvJitHelper.php';
-
-    private const MERGE_OVERLAY_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::mergeLocalOverlayIntoNative';
-
     private const BRIDGE_ENTRY = 'getenv_all_bridge_entry';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::MERGE_OVERLAY_HELPER,
-    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -64,7 +55,6 @@ final class StringGetenvAll
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureHashtableHelpers($context);
-        self::ensureOverlayHelperCompiled($context);
         // Ensure environ-mirror ABI before emitting getenv_all body (#21579).
         EnvironMirrorRuntime::ensureLinked($context);
         self::implementBridge($context);
@@ -126,18 +116,7 @@ final class StringGetenvAll
         $context->functions[$abiName] = $fn;
         $context->activeFunction = $abiName;
         try {
-            // Shared environ-mirror ABI (thin = libc kernel, embed = NestedJIT) (#21579).
             EnvironMirrorRuntime::emitFillCall($context, $ht);
-            $i64 = $context->getTypeFromString('int64');
-            $htI64 = JitNestedHelperCoerce::ptrToI64($context, $ht);
-            $htSlot = $context->builder->alloca($i64, 1);
-            $context->builder->store($htI64, $htSlot);
-            $htArg = $context->builder->load($htSlot);
-            JitNestedHelperCoerce::callHelper(
-                $context,
-                self::overlayHelper($context),
-                [$htArg]
-            );
         } finally {
             $context->activeFunction = $prevActive;
         }
@@ -170,24 +149,6 @@ final class StringGetenvAll
                 $context->registerFunction($name, $fn);
             }
         }
-    }
-
-    private static function ensureOverlayHelperCompiled(Context $context): void
-    {
-        StringGetenv::ensureNativeHtInternalProxies($context);
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#20758'
-        );
-    }
-
-    private static function overlayHelper(Context $context): LlvmFunction
-    {
-        self::ensureOverlayHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, self::MERGE_OVERLAY_HELPER, '#20758');
     }
 
     private static function registerLinkedRuntime(Context $context): void

@@ -233,6 +233,13 @@ final class BuiltinInternalArgInfo
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
+            // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
+            // InternalArgInfo still says varname:string required; local_only missing.
+            'getenv' => match ($index) {
+                0 => '?string',
+                1 => 'bool',
+                default => null,
+            },
             // ext/pcre/php_pcre.stub.php — string|array unions; &$count = null untyped (#23587)
             'preg_replace', 'preg_filter' => match ($index) {
                 0, 1, 2 => 'array|string',
