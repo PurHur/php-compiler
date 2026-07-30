@@ -17,6 +17,7 @@ use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Func;
 use PHPCompiler\ext\dom\VmDomCollectionDimension;
+use PHPCompiler\ext\intl\VmResourceBundle;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\ext\standard\VmIteratorWalk;
@@ -4844,6 +4845,30 @@ restart:
                         }
                     } elseif (
                         Variable::TYPE_OBJECT === $container->type
+                        && VmResourceBundle::isResourceBundleObject($container->toObject())
+                    ) {
+                        // ResourceBundle read_dimension (php-src resourcebundle_class.c; #25145).
+                        // No has_dimension / write_dimension — isset/write/unset stay Error.
+                        if ($forWrite) {
+                            $className = $container->toObject()->class->name;
+                            $catchFrame = $this->dispatchVmError(
+                                'Cannot use object of type ' . $className . ' as array',
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        VmResourceBundle::readDimension(
+                            $this->context,
+                            $container->toObject(),
+                            $arg3,
+                            $arg1
+                        );
+                    } elseif (
+                        Variable::TYPE_OBJECT === $container->type
                         && $this->objectImplementsArrayAccess($container->toObject())
                     ) {
                         $object = $container->toObject();
@@ -8317,6 +8342,19 @@ restart:
                                     goto restart;
                                 }
                                 $dst->bool($existsOut->toBool());
+                                break;
+                            }
+                            if (!$op->issetOnProperty) {
+                                // isset($obj[$k]) without has_dimension / ArrayAccess — Zend Error
+                                // (ResourceBundle has read_dimension only; #25145).
+                                $catchFrame = $this->dispatchVmError(
+                                    'Cannot use object of type ' . $object->class->name . ' as array',
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
                                 break;
                             }
                             [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
