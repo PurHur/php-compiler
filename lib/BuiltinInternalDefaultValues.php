@@ -270,6 +270,11 @@ final class BuiltinInternalDefaultValues
         'class_alias' => [
             2 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — bool $allow_string = true (#25439)
+        // Contrast is_a(..., bool $allow_string = false) which inference already matches.
+        'is_subclass_of' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
         'setcookie' => [
             1 => ['kind' => 'string', 'value' => ''],
