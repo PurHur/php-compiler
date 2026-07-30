@@ -201,6 +201,12 @@ final class BuiltinInternalArgInfo
             'unixtojd' => 0 === $index ? '?int' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
+            // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)
+            'user_error' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
             // ext/standard/array.stub.php — ?callable $callback; mode missing from InternalArgInfo (#24843)
             'array_filter' => match ($index) {
                 1 => '?callable',

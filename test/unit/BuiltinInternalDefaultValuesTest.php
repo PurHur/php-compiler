@@ -323,4 +323,26 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         );
     }
 
+    /** @covers issue #25174 */
+    public function testTriggerErrorUserErrorErrorLevelDefaultEUserNotice(): void
+    {
+        $info = ['name' => 'error_level', 'type' => 'int', 'isOptional' => true];
+        foreach (['trigger_error', 'user_error'] as $fn) {
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $info, false), $fn);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, 1, $info), $fn);
+            self::assertSame(1024, $dest->toInt(), $fn);
+        }
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('user_error', 0));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('user_error', 1));
+        self::assertSame(
+            ['name' => 'message', 'type' => 'string', 'isOptional' => false],
+            BuiltinInternalArgInfo::paramInfoForFunction('user_error', 0)
+        );
+        self::assertSame(
+            ['name' => 'error_level', 'type' => 'int', 'isOptional' => true],
+            BuiltinInternalArgInfo::paramInfoForFunction('user_error', 1)
+        );
+    }
+
 }
