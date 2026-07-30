@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 use PHPCompiler\Frame;
-use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * curl_version() — libcurl version array (php-src ext/curl/interface.c; #16659, #24463).
+ * curl_version() — libcurl version array (php-src ext/curl/interface.c / curl.stub.php; #16659, #24463, #25585).
+ *
+ * Modern php-src takes no parameters (removed optional $version / CURLVERSION_* age selector).
  */
 final class curl_version extends CurlFunction
 {
@@ -23,27 +24,24 @@ final class curl_version extends CurlFunction
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 1) {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 0) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_version() expects at most 1 argument, %d given',
-                \count($frame->calledArgs)
+                'curl_version() expects exactly 0 arguments, %d given',
+                $argc
             ));
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $age = null;
-        if (isset($frame->calledArgs[0])) {
-            $age = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'curl_version', 0, 'age');
-        }
-        $frame->returnVar->array(VmCurlCore::versionArray($age));
+        $frame->returnVar->array(VmCurlCore::versionArray(null));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
+        if (\count($args) > 0) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_version() expects at most 1 argument, %d given',
+                'curl_version() expects exactly 0 arguments, %d given',
                 \count($args)
             ));
         }
