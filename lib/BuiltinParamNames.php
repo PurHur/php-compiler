@@ -29,6 +29,8 @@ final class BuiltinParamNames
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still what/country (#25172)
+            'datetimezone::listidentifiers' => ['timezoneGroup=', 'countryCode='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
             // php-src ext/reflection/php_reflection.stub.php — ...$args; Z_PARAM_VARIADIC_WITH_NAMED (#24949)

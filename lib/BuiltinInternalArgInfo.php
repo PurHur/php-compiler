@@ -303,6 +303,8 @@ final class BuiltinInternalArgInfo
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
             // ext/spl/spl_directory.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
             'splfileobject::fputcsv' => 4 === $index ? 'string' : null,
+            // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string) (#25172)
+            'datetimezone::listidentifiers' => 1 === $index ? '?string' : null,
             default => null,
         };
     }

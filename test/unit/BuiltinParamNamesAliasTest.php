@@ -916,6 +916,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DateTimeZone', 'getTransitions'));
     }
 
+    /** @covers issue #25172 */
+    public function testDateTimeZoneListIdentifiersStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DateTimeZone::listIdentifiers');
+        self::assertSame(['timezoneGroup=', 'countryCode='], $names);
+        self::assertSame(
+            ['timezoneGroup=', 'countryCode='],
+            BuiltinParamNames::paramNamesForInternalFunction('DateTimeZone::listIdentifiers')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'timezoneGroup', 'DateTimeZone::listIdentifiers'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'countryCode', 'DateTimeZone::listIdentifiers'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'DateTimeZone::listIdentifiers'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'country', 'DateTimeZone::listIdentifiers'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('DateTimeZone', 'listIdentifiers'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DateTimeZone', 'listIdentifiers'));
+    }
+
     /** @covers issue #10059 */
     public function testArrayMultisortArraySpliceNamedParameters(): void
     {
