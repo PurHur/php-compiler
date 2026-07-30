@@ -626,9 +626,18 @@ final class VmIntlDateFormatter
 
             return false;
         }
-        $hour = false === $matched['hour'] ? 0 : $matched['hour'];
-        $minute = false === $matched['minute'] ? 0 : $matched['minute'];
-        $second = false === $matched['second'] ? 0 : $matched['second'];
+        // php-src: Calendar starts at "now"; parse overwrites only pattern fields (#25228).
+        // Unset time fields keep the formatter-timezone wall clock (not forced zero).
+        $nowH = 0;
+        $nowM = 0;
+        $nowS = 0;
+        $needNow = false === $matched['hour'] || false === $matched['minute'] || false === $matched['second'];
+        if ($needNow) {
+            [$nowH, $nowM, $nowS] = self::wallClockHmsInTimezone($state['timezone']);
+        }
+        $hour = false === $matched['hour'] ? $nowH : (int) $matched['hour'];
+        $minute = false === $matched['minute'] ? $nowM : (int) $matched['minute'];
+        $second = false === $matched['second'] ? $nowS : (int) $matched['second'];
         try {
             $timestamp = self::mktimeInTimezone(
                 (int) $year,
@@ -655,7 +664,8 @@ final class VmIntlDateFormatter
             'tm_year' => ((int) $bits[3]) - 1900,
             'tm_mday' => (int) $bits[4],
             'tm_wday' => (int) $bits[5],
-            'tm_yday' => (int) $bits[6],
+            // ICU UCAL_DAY_OF_YEAR is 1-based; PHP date('z') is 0-based (#25228).
+            'tm_yday' => ((int) $bits[6]) + 1,
             'tm_mon' => ((int) $bits[7]) - 1,
             'tm_isdst' => 0,
         ];
@@ -1741,6 +1751,19 @@ final class VmIntlDateFormatter
         $parsed = VmDateTimeNative::parseDateTime($iso, $tzName);
 
         return (int) $parsed['timestamp'];
+    }
+
+    /**
+     * Current wall-clock H:i:s in $tzName — defaults for unset localtime() fields (#25228).
+     *
+     * @return array{0: int, 1: int, 2: int}
+     */
+    private static function wallClockHmsInTimezone(string $tzName): array
+    {
+        $parts = VmDateTimeNative::format(\time(), 0, $tzName, 'H,i,s');
+        $bits = \explode(',', $parts);
+
+        return [(int) $bits[0], (int) $bits[1], (int) $bits[2]];
     }
 
     private static function fail(ObjectEntry $formatter, string $message, int $code): void
