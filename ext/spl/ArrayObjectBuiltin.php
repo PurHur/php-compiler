@@ -30,17 +30,13 @@ final class ArrayObjectBuiltin
 
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry = new ClassEntry('ArrayObject');
-        if (isset($ctx->classes['iteratoraggregate'])) {
-            $entry->interfaces[] = 'iteratoraggregate';
-        }
-        if (isset($ctx->classes['countable'])) {
-            $entry->interfaces[] = 'countable';
-        }
-        if (isset($ctx->classes['arrayaccess'])) {
-            $entry->interfaces[] = 'arrayaccess';
-        }
-        if (isset($ctx->classes['serializable'])) {
-            $entry->interfaces[] = 'serializable';
+        // php-src ext/spl/spl_array.stub.php:
+        //   class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Countable
+        // Order is observable via class_implements() / ReflectionClass::getInterfaces() (#25315, #25327).
+        foreach (['iteratoraggregate', 'arrayaccess', 'serializable', 'countable'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $entry->interfaces[] = $iface;
+            }
         }
 
         // php-src REGISTER_SPL_CLASS_CONST_LONG — lc keys + constNames for defined()/getConstant (#22348).
