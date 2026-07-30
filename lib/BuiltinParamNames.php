@@ -26,6 +26,9 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says modify (#23685)
             'datetime::modify',
             'datetimeimmutable::modify' => ['modifier'],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo omits microsecond; Immutable second required (#25400)
+            'datetime::settime',
+            'datetimeimmutable::settime' => ['hour', 'minute', 'second=', 'microsecond='],
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
@@ -299,7 +302,8 @@ final class BuiltinParamNames
             case 'date_date_set':
                 return ['object', 'year', 'month', 'day'];
             case 'date_time_set':
-                return ['object', 'hour', 'minute', 'second', 'microsecond'];
+                // php-src ext/date/php_date.stub.php — second/microsecond optional (#25400)
+                return ['object', 'hour', 'minute', 'second=', 'microsecond='];
             case 'date_timestamp_set':
                 return ['object', 'timestamp'];
             case 'date_timezone_set':

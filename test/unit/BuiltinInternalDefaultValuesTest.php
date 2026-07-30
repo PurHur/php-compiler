@@ -472,4 +472,24 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertTrue($dest->toBool());
     }
 
+    /** @covers issue #25400 */
+    public function testDateTimeSetTimeSecondAndMicrosecondDefaultsAreZero(): void
+    {
+        $dest = new Variable();
+        foreach (['datetime::settime', 'datetimeimmutable::settime'] as $callable) {
+            foreach ([2 => 'second', 3 => 'microsecond'] as $index => $name) {
+                $info = ['name' => $name, 'type' => 'int', 'isOptional' => true];
+                self::assertTrue(
+                    BuiltinInternalDefaultValues::isAvailable($callable, $index, $info, false),
+                    "$callable::$name"
+                );
+                self::assertTrue(
+                    BuiltinInternalDefaultValues::materialize($dest, $callable, $index, $info),
+                    "$callable::$name"
+                );
+                self::assertSame(0, $dest->toInt(), "$callable::$name");
+            }
+        }
+    }
+
 }

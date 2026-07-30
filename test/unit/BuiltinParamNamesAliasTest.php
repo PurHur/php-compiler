@@ -868,6 +868,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #25400 */
+    public function testDateTimeSetTimeMicrosecondNamedParameters(): void
+    {
+        foreach (['DateTime::setTime', 'DateTimeImmutable::setTime'] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame(['hour', 'minute', 'second=', 'microsecond='], $names, $qual);
+            self::assertSame(
+                3,
+                BuiltinParamNames::lookupNamedParamIndex($names, 'microsecond', $qual),
+                $qual
+            );
+        }
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('DateTime', 'setTime'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('DateTimeImmutable', 'setTime'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('DateTime', 'setTime'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('DateTimeImmutable', 'setTime'));
+    }
+
     /** @covers issue #23707 */
     public function testDateIntervalConstructStubNamedParamsResolve(): void
     {
