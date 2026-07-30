@@ -7627,7 +7627,7 @@ class Compiler {
                             )
                         );
                     if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
-                        // php-src Zend/zend_compile.c — pre-8.4 (#24895, re-#24822/#22308).
+                        // php-src Zend/zend_compile.c — pre-8.4 (#25379, re-#24895/#24822/#22308).
                         // CompileFatal → Zend-shaped "Fatal error: … in file on line N" on CLI.
                         $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
                         $sourceFile = $child->getFile();
