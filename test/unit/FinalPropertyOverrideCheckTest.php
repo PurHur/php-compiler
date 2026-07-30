@@ -64,6 +64,41 @@ PHP;
     }
 
     /**
+     * @covers issue #25535 — eval() must not accept final plain properties on reference profile
+     */
+    public function testEvalPlainFinalPropertyRejectedOnReferenceProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+eval('class T { final public int $x = 1; }');
+echo "parsed_ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_plain_eval_reject_ref.php');
+        self::assertTrue(\PHPCompiler\Block::requiresVmLowering($block));
+        try {
+            ob_start();
+            $runtime->run($block, false);
+            ob_end_clean();
+            $this->fail('Expected CompileFatal / ScriptExit for final plain property in eval');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            ob_end_clean();
+            self::assertStringContainsString(
+                'Cannot declare property T::$x final, the final modifier is allowed only for methods, classes, and class constants',
+                $e->getMessage()
+            );
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $out = ob_get_clean();
+            self::assertSame(255, $e->status);
+            self::assertStringNotContainsString('parsed_ok', (string) $out);
+        }
+    }
+
+    /**
      * @covers issue #24316 — construct + write must never run on reference profile
      * (issue table: declare=ok / write=… is the failure mode when the gate is skipped).
      */
