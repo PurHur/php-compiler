@@ -112,6 +112,15 @@ final class DnfCheck
             return Variable::TYPE_NULL === $value->type;
         }
 
+        // Pseudo-types use the same predicates as bare callable/iterable params
+        // (zend_type.c IS_CALLABLE / IS_ITERABLE) — not class-name lookup (#25561).
+        if ('callable' === $name) {
+            return CallableCheck::isCallable($value, $context);
+        }
+        if ('iterable' === $name) {
+            return IterableCheck::isIterable($value, $context);
+        }
+
         if (Variable::TYPE_BOOLEAN !== $value->type) {
             return match ($name) {
                 'int' => Variable::TYPE_INTEGER === $value->type,
