@@ -910,9 +910,50 @@ final class VmValueCompare
             $context->lookupFunction('__value__readLong'),
             $rightPtr
         );
-        $ordered = self::orderedLongCompare($context, $opcodeType, $leftLong, $rightLong);
+        $orderedLong = self::orderedLongCompare($context, $opcodeType, $leftLong, $rightLong);
 
-        return $context->builder->select($bothLong, $ordered, $falseVal);
+        // Zend compare_function object branch → zend_compare_objects (#25241).
+        $objectTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+        $bothObj = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $objectTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $objectTag)
+        );
+        SpaceshipRuntime::ensureLinked($context);
+        $leftObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $leftPtr
+        );
+        $rightObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $rightPtr
+        );
+        $objCmp = SpaceshipRuntime::callObjectCompareSpaceship($context, $leftObj, $rightObj);
+        $orderedObj = self::boolFromSpaceshipCmp($context, $opcodeType, $objCmp);
+
+        $notLong = $context->builder->select($bothObj, $orderedObj, $falseVal);
+
+        return $context->builder->select($bothLong, $orderedLong, $notLong);
+    }
+
+    /**
+     * Map zend_compare / spaceship i64 (-1/0/1) to relational bool (#25241).
+     */
+    public static function boolFromSpaceshipCmp(
+        Context $context,
+        int $opcodeType,
+        Value $cmp
+    ): Value {
+        $zero = $cmp->typeOf()->constInt(0, false);
+
+        return match ($opcodeType) {
+            OpCode::TYPE_SMALLER => $context->builder->icmp(Builder::INT_SLT, $cmp, $zero),
+            OpCode::TYPE_GREATER => $context->builder->icmp(Builder::INT_SGT, $cmp, $zero),
+            OpCode::TYPE_SMALLER_OR_EQUAL => $context->builder->icmp(Builder::INT_SLE, $cmp, $zero),
+            OpCode::TYPE_GREATER_OR_EQUAL => $context->builder->icmp(Builder::INT_SGE, $cmp, $zero),
+            default => throw new \LogicException(
+                'Ordered compare opcode not implemented for spaceship result: '.opcode_type_name($opcodeType)
+            ),
+        };
     }
 
     private static function orderedLongCompare(

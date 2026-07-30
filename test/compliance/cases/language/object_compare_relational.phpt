@@ -1,60 +1,43 @@
 --TEST--
-Language: object relational compare throws TypeError (#3445, Zend zend_operators.c)
+Language: object relational < > <= >= via zend_compare_objects (#25241, re-#3445/#3691)
 --FILE--
 <?php
-class A {}
-$a = new A();
-$b = new A();
-$msg = 'Object of class A could not be converted to number';
-
-try {
-    $a < $b;
-    echo "no error for <\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $msg ? "TypeError: <\n" : "wrong: <\n";
-} catch (Throwable $e) {
-    echo "Throwable: <\n";
+class Point {
+    public function __construct(public int $x) {}
 }
+class EmptyA {}
 
-try {
-    $a <= $b;
-    echo "no error for <=\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $msg ? "TypeError: <=\n" : "wrong: <=\n";
-} catch (Throwable $e) {
-    echo "Throwable: <=\n";
-}
+$a = new Point(1);
+$b = new Point(2);
+$same = new Point(1);
 
-try {
-    $a > $b;
-    echo "no error for >\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $msg ? "TypeError: >\n" : "wrong: >\n";
-} catch (Throwable $e) {
-    echo "Throwable: >\n";
-}
+var_export($a < $b); echo "\n";
+var_export($b > $a); echo "\n";
+var_export($a < $same); echo "\n";
+var_export($a <= $same); echo "\n";
+var_export($a >= $same); echo "\n";
+var_export($a > $same); echo "\n";
 
-try {
-    $a >= $b;
-    echo "no error for >=\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $msg ? "TypeError: >=\n" : "wrong: >=\n";
-} catch (Throwable $e) {
-    echo "Throwable: >=\n";
-}
+var_export((new EmptyA) < (new EmptyA)); echo "\n";
+var_export((new EmptyA) <= (new EmptyA)); echo "\n";
+var_export((new EmptyA) > (new EmptyA)); echo "\n";
+var_export((new EmptyA) >= (new EmptyA)); echo "\n";
 
-try {
-    $a <=> $b;
-    echo "no error for <=>\n";
-} catch (TypeError $e) {
-    echo $e->getMessage() === $msg ? "TypeError: <=>\n" : "wrong: <=>\n";
-} catch (Throwable $e) {
-    echo "Throwable: <=>\n";
-}
+var_export((object)['x' => 1] < (object)['x' => 2]); echo "\n";
+echo ($a <=> $b), "\n";
+echo ((new EmptyA) <=> (new EmptyA)), "\n";
 ?>
 --EXPECT--
-TypeError: <
-TypeError: <=
-TypeError: >
-TypeError: >=
-TypeError: <=>
+true
+true
+false
+true
+true
+false
+false
+true
+false
+true
+true
+-1
+0
