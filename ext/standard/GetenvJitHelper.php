@@ -90,12 +90,8 @@ final class GetenvJitHelper
             }
             phpc_native_ht_set_string_key($htPtr, $name, $value);
         }
-        foreach (PutenvJitHelper::localOverlayEntries() as $name => $value) {
-            if ('' === $name) {
-                continue;
-            }
-            phpc_native_ht_set_string_key($htPtr, $name, $value);
-        }
+        // Putenv overlay — slim NestedJIT leaf (#23414 / #24855).
+        PutenvJitHelper::mergeLocalOverlayIntoNative($htPtr);
     }
 
     /** Populate a native hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075, #20758). */

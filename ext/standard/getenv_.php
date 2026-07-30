@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  *
  * php-src: ext/standard/basic_functions.c — zif_getenv
  * Z_PARAM_STR_OR_NULL name: coerce scalars when caller is not strict_types (#4177); TypeError under strict (#17765).
+ * Named local_only without name + Reflection ?string/bool defaults (#24855).
  */
 final class getenv_ extends Internal
 {
@@ -35,20 +36,21 @@ final class getenv_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (0 === $argc) {
+        // Named local_only: without name leaves calledArgs[0] unset (#24855).
+        $localOnly = false;
+        if (isset($frame->calledArgs[1])) {
+            $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
+        }
+        if (!isset($frame->calledArgs[0])) {
             $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
 
             return;
         }
         $arg0 = $frame->calledArgs[0]->resolveIndirect();
-        if (1 === $argc && Variable::TYPE_NULL === $arg0->type) {
+        if (Variable::TYPE_NULL === $arg0->type) {
             $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
 
             return;
-        }
-        $localOnly = false;
-        if (2 === $argc) {
-            $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
         // Z_PARAM_STR_OR_NULL: coerce int/float/bool when caller is not strict_types (#4177).
         // Always-typed rejection (#17765) only applies under caller strict_types (php-src-strict).
@@ -72,15 +74,17 @@ final class getenv_ extends Internal
         if ($argc > 2) {
             throw new \LogicException('getenv() accepts at most two arguments');
         }
-        if (0 === $argc) {
-            return JitEnv::getenvAll($context);
-        }
-        if (1 === $argc && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+        // Densify pads omitted name with null constant before spread (#24855 / #9525).
+        if (
+            0 === $argc
+            || JITVariable::TYPE_NULL === $args[0]->type
+            || ($args[0]->isNullConstant ?? false)
+        ) {
             return JitEnv::getenvAll($context);
         }
         $i8 = $context->getTypeFromString('int8');
         $localOnlyI8 = $i8->constInt(0, false);
-        if (2 === $argc) {
+        if ($argc >= 2 && isset($args[1]) && !(($args[1]->isOptionalOmittedNamedArg ?? false))) {
             $localOnlyI8 = $context->builder->zExt(
                 JitBoolArg::lower($context, $args[1], 'getenv() local_only'),
                 $i8

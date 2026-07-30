@@ -1811,6 +1811,55 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #24855 */
+    public function testGetenvReflectionOptionalNameAndLocalOnly(): void
+    {
+        $names = BuiltinParamNames::forFunction('getenv');
+        self::assertSame(['name=', 'local_only='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'name', 'getenv'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'local_only', 'getenv'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'varname', 'getenv'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('getenv'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('getenv'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('getenv', 0));
+        self::assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('getenv', 1));
+        $info0 = BuiltinInternalArgInfo::paramInfoForFunction('getenv', 0);
+        self::assertNotNull($info0);
+        self::assertSame('?string', $info0['type']);
+        $info1 = BuiltinInternalArgInfo::paramInfoForFunction('getenv', 1);
+        self::assertNotNull($info1);
+        self::assertSame('bool', $info1['type']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'getenv',
+            0,
+            ['name' => 'name', 'type' => '?string', 'isOptional' => true],
+            false
+        ));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'getenv',
+            1,
+            ['name' => 'local_only', 'type' => 'bool', 'isOptional' => true],
+            false
+        ));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'getenv',
+            0,
+            ['name' => 'name', 'type' => '?string', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+        $dest2 = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest2,
+            'getenv',
+            1,
+            ['name' => 'local_only', 'type' => 'bool', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_BOOLEAN, $dest2->type);
+        self::assertFalse($dest2->toBool());
+    }
+
     /** @covers issue #23492 */
     public function testGethostbynameZendStubNamedParams(): void
     {

@@ -533,8 +533,10 @@ final class BuiltinParamNames
             // php-src ext/tokenizer/tokenizer.stub.php — InternalArgInfo still says type (#23658)
             case 'token_name':
                 return ['id'];
+            // php-src ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false
+            // InternalArgInfo still says varname / single required string (#24855)
             case 'getenv':
-                return ['name', 'local_only'];
+                return ['name=', 'local_only='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says setting (#23258)
             case 'putenv':
                 return ['assignment'];

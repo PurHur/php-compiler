@@ -50,11 +50,13 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
     public function testStringGetenvAllAlwaysUsesHelperBridge(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
-        $this->assertStringContainsString('GetenvJitHelper::mergeLocalOverlayIntoNative', $source);
         $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $source);
         $this->assertStringContainsString('EnvironMirrorRuntime::emitFillCall', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('getenv_all_bridge_entry', $source);
+        // putenv mirrors via setenv; NestedJIT overlay merge segfaults under thin AOT (#24855).
+        $this->assertStringNotContainsString('mergeLocalOverlayIntoNative', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('JitNestedHelperCoerce::callHelper', $source);
         $this->assertStringNotContainsString('JitEnvironMirrorKernel', $source);
         $this->assertStringNotContainsString('mirrorIntoHashtablePtr', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);

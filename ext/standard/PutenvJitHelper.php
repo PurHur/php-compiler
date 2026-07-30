@@ -76,4 +76,19 @@ final class PutenvJitHelper
     {
         return self::$local;
     }
+
+    /**
+     * Merge putenv overlay into a native hashtable (JIT/AOT getenv argc==0, #13431 / #24855).
+     *
+     * Lives here — not GetenvJitHelper — so NestedJIT does not compile that larger TU (#23414).
+     */
+    public static function mergeLocalOverlayIntoNative(int $htPtr): void
+    {
+        foreach (self::$local as $name => $value) {
+            if ('' === $name) {
+                continue;
+            }
+            phpc_native_ht_set_string_key($htPtr, $name, $value);
+        }
+    }
 }

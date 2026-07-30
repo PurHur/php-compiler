@@ -63,12 +63,12 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
     }
 
-    public function testStringGetenvAllUsesJitVmHelperLinkOverlay(): void
+    public function testStringGetenvAllUsesEnvironMirrorWithoutNestedOverlay(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
-        $this->assertStringContainsString('GetenvJitHelper::mergeLocalOverlayIntoNative', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('EnvironMirrorRuntime::emitFillCall', $source);
+        $this->assertStringNotContainsString('mergeLocalOverlayIntoNative', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('EnvLocalRuntime::emitMergeOverlay', $source);
