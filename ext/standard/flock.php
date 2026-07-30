@@ -27,7 +27,16 @@ final class flock extends Internal
             return;
         }
         $operation = VmFlockOperation::parseOperation($operationVar);
-        $frame->returnVar->bool(VmFs::flock($handle, $operation));
+        $wouldBlockOut = null;
+        $hasWouldBlock = \count($frame->calledArgs) >= 3;
+        if ($hasWouldBlock) {
+            $ok = VmFs::flock($handle, $operation, $wouldBlockOut);
+            // php-src php_flock: ZVAL_LONG(wouldblock, …) — integer 0/1 (#23352)
+            $frame->calledArgs[2]->resolveIndirect()->int((int) $wouldBlockOut);
+        } else {
+            $ok = VmFs::flock($handle, $operation);
+        }
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

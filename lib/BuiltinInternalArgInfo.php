@@ -319,6 +319,8 @@ final class BuiltinInternalArgInfo
                 2 => 'array|int',
                 default => null,
             },
+            // ext/standard/file.stub.php — &$would_block untyped; InternalArgInfo int (#23352)
+            'flock' => 2 === $index ? '' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
             'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
