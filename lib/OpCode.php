@@ -272,6 +272,13 @@ class OpCode {
     public array $attributeEntries = [];
     /** @var list<\PHPCompiler\Compiler\ParameterMetadata> method parameter metadata (#3340). */
     public array $parameterMetadata = [];
+    /**
+     * TYPE_DECLARE_METHOD: declared return type AST (including abstract/interface methods with no body).
+     * Needed for cross-file / eval inheritance variance (#25384); same-script uses InheritanceVariance on CFG.
+     *
+     * @var ?\PHPCfg\Op\Type
+     */
+    public $returnDeclaredType = null;
     /** True when TYPE_DECLARE_CLASS targets an abstract class (#3385). */
     public bool $classIsAbstract = false;
     /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */

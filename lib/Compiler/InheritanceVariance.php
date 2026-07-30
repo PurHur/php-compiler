@@ -739,6 +739,88 @@ final class MethodSig
         );
     }
 
+    /**
+     * Build a MethodSig from a live ClassEntry (cross-file / eval inherit path, #25384).
+     *
+     * Prefers Block AST types when a Func\PHP body exists; falls back to ClassEntry
+     * methodReturnDeclaredTypes + methodParameterMetadata for abstract/interface methods.
+     */
+    public static function fromClassEntry(\PHPCompiler\VM\ClassEntry $entry, string $methodLc): ?self
+    {
+        $hasMethod = isset($entry->methods[$methodLc]) || isset($entry->abstractMethods[$methodLc]);
+        if (!$hasMethod && !isset($entry->methodReturnDeclaredTypes[$methodLc])
+            && !isset($entry->methodParameterMetadata[$methodLc])
+        ) {
+            return null;
+        }
+
+        $ownerLc = $entry->methodDeclaringClassLc[$methodLc]
+            ?? strtolower(ltrim($entry->name, '\\'));
+        $params = [];
+        $names = [];
+        $hasDefault = [];
+        $returnType = null;
+
+        $func = $entry->methods[$methodLc] ?? null;
+        if ($func instanceof \PHPCompiler\Func\PHP) {
+            $block = $func->block;
+            $paramMetas = $entry->methodParameterMetadata[$methodLc] ?? [];
+            $paramCount = max(
+                count($block->paramDeclaredTypes),
+                count($block->paramNames),
+                count($paramMetas)
+            );
+            for ($i = 0; $i < $paramCount; ++$i) {
+                $cfgType = $block->paramDeclaredTypes[$i] ?? null;
+                if (null !== $cfgType) {
+                    $params[] = TypeSig::fromCfgType($cfgType);
+                } elseif (isset($paramMetas[$i])) {
+                    $params[] = TypeSig::fromDumpTypeString($paramMetas[$i]->typeString);
+                } else {
+                    $params[] = null;
+                }
+                $names[] = $block->paramNames[$i]
+                    ?? ($paramMetas[$i]->name ?? 'param');
+                $hasDefault[] = isset($paramMetas[$i])
+                    ? $paramMetas[$i]->isOptional
+                    : false;
+            }
+            $returnType = TypeSig::fromCfgType($block->returnDeclaredType);
+            if (null === $returnType && isset($entry->methodReturnDeclaredTypes[$methodLc])) {
+                $returnType = TypeSig::fromCfgType($entry->methodReturnDeclaredTypes[$methodLc]);
+            }
+        } else {
+            $paramMetas = $entry->methodParameterMetadata[$methodLc] ?? [];
+            foreach ($paramMetas as $meta) {
+                $params[] = TypeSig::fromDumpTypeString($meta->typeString);
+                $names[] = $meta->name;
+                $hasDefault[] = $meta->isOptional;
+            }
+            if (isset($entry->methodReturnDeclaredTypes[$methodLc])) {
+                $returnType = TypeSig::fromCfgType($entry->methodReturnDeclaredTypes[$methodLc]);
+            }
+        }
+
+        $vis = $entry->methodVisibility[$methodLc] ?? Func::FLAG_PUBLIC;
+        $visibility = $vis & (Func::FLAG_PUBLIC | Func::FLAG_PROTECTED | Func::FLAG_PRIVATE);
+        if (0 === $visibility) {
+            $visibility = Func::FLAG_PUBLIC;
+        }
+        $isAbstract = isset($entry->abstractMethods[$methodLc]) && !isset($entry->methods[$methodLc]);
+        $isFinal = 0 !== ($vis & Func::FLAG_FINAL);
+
+        return new self(
+            $ownerLc,
+            $params,
+            $names,
+            $hasDefault,
+            $returnType,
+            $isAbstract,
+            $visibility,
+            $isFinal
+        );
+    }
+
     /** Private parent methods are not visible to subclasses for #[\Override] (Zend find_override_method). */
     public function isVisibleForOverrideFrom(string $childClassLc): bool
     {
@@ -901,6 +983,38 @@ final class TypeSig
         }
 
         return null;
+    }
+
+    /**
+     * Parse Reflection/ParameterMetadata dump type strings ("int", "?Foo\\Bar") for #25384.
+     */
+    public static function fromDumpTypeString(?string $typeString): ?self
+    {
+        if (null === $typeString || '' === $typeString) {
+            return null;
+        }
+        $nullable = false;
+        if ('?' === $typeString[0]) {
+            $nullable = true;
+            $typeString = substr($typeString, 1);
+        }
+        if ('' === $typeString || 'mixed' === strtolower($typeString)) {
+            return null;
+        }
+        // Unions / intersections are uncommon in ParameterMetadata dumps; reject to null (unchecked).
+        if (false !== strpos($typeString, '|') || false !== strpos($typeString, '&')) {
+            return null;
+        }
+        $literal = new Op\Type\Literal($typeString);
+        $sig = self::fromCfgType($literal);
+        if (null === $sig) {
+            return null;
+        }
+        if ($nullable) {
+            $sig->nullable = true;
+        }
+
+        return $sig;
     }
 
     /**
