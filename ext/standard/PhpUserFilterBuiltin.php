@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -13,9 +14,11 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * php_user_filter internal base class (php-src ext/standard/streams.c; #11747).
+ * php_user_filter internal base class (php-src ext/standard/streams.c; #11747, #25584).
  *
  * User stream filters extend this class and register via stream_filter_register().
+ * Reflection / LSP names + arginfo must match php-src streamsfuncs.stub.php so subclasses
+ * can declare filter($in, $out, &$consumed, $closing).
  */
 final class PhpUserFilterBuiltin
 {
@@ -41,15 +44,36 @@ final class PhpUserFilterBuiltin
         $entry->properties[] = new ClassProperty(self::PROP_FILTERNAME, null, $strProto);
         $entry->properties[] = new ClassProperty(self::PROP_PARAMS, null, $arrProto);
 
-        $entry->methods['filter'] = new PhpUserFilterFilter();
+        $entry->methods['filter'] = new PhpUserFilterFilter('filter');
         $entry->methodVisibility['filter'] = $pub;
-        $entry->methods['oncreate'] = new PhpUserFilterOnCreate();
+        $entry->methodNames['filter'] = 'filter';
+        $entry->methodParameterMetadata['filter'] = self::filterParamMetadata();
+        $entry->methods['oncreate'] = new PhpUserFilterOnCreate('onCreate');
         $entry->methodVisibility['oncreate'] = $pub;
-        $entry->methods['onclose'] = new PhpUserFilterOnClose();
+        $entry->methodNames['oncreate'] = 'onCreate';
+        $entry->methodParameterMetadata['oncreate'] = [];
+        $entry->methods['onclose'] = new PhpUserFilterOnClose('onClose');
         $entry->methodVisibility['onclose'] = $pub;
+        $entry->methodNames['onclose'] = 'onClose';
+        $entry->methodParameterMetadata['onclose'] = [];
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    /**
+     * Zend stub: filter($in, $out, &$consumed, bool $closing) — php-src streamsfuncs.stub.php (#25584).
+     *
+     * @return list<ParameterMetadata>
+     */
+    public static function filterParamMetadata(): array
+    {
+        return [
+            new ParameterMetadata('in', [], false, false, false, false, null, null),
+            new ParameterMetadata('out', [], false, false, false, false, null, null),
+            new ParameterMetadata('consumed', [], false, false, false, true, null, null),
+            new ParameterMetadata('closing', [], false, false, false, false, 'bool', null),
+        ];
     }
 
     public static function isSubclassOf(Context $ctx, string $className): bool
@@ -73,7 +97,13 @@ final class PhpUserFilterBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['filter'], $entry->methods['oncreate'], $entry->methods['onclose']);
+        return isset(
+            $entry->methods['filter'],
+            $entry->methods['oncreate'],
+            $entry->methods['onclose'],
+            $entry->methodNames['filter'],
+            $entry->methodParameterMetadata['filter']
+        );
     }
 }
 
