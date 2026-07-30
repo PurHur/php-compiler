@@ -1499,6 +1499,32 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($headers, 'format', 'get_headers'));
     }
 
+    /** @covers issue #25046 */
+    public function testFilterVarReflectionDefaultsAndTypes(): void
+    {
+        $names = BuiltinParamNames::forFunction('filter_var');
+        self::assertSame(['value', 'filter=', 'options='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'filter_var'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'filter', 'filter_var'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'filter_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'variable', 'filter_var'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('filter_var'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('filter_var'));
+        self::assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('filter_var'));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('filter_var', 0));
+        self::assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('filter_var', 2));
+        $infoFilter = ['name' => 'filter', 'type' => 'int', 'isOptional' => true];
+        $infoOptions = ['name' => 'options', 'type' => 'array|int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('filter_var', 1, $infoFilter, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('filter_var', 2, $infoOptions, false));
+        $filter = new Variable();
+        $options = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($filter, 'filter_var', 1, $infoFilter));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($options, 'filter_var', 2, $infoOptions));
+        self::assertSame(516, $filter->toInt()); // FILTER_DEFAULT
+        self::assertSame(0, $options->toInt());
+    }
+
     /** @covers issue #23446 */
     public function testDateDefaultTimezoneSetZendStubNamedParams(): void
     {

@@ -544,6 +544,12 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'string', 'value' => 'SimpleXMLElement'],
             3 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/filter/filter.stub.php — int $filter = FILTER_DEFAULT (516), array|int $options = 0 (#25046)
+        // InternalArgInfo int → 0; options untyped → no inferrable default.
+        'filter_var' => [
+            1 => ['kind' => 'int', 'value' => 516], // FILTER_DEFAULT
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
     ];
 
     public static function isAvailable(
