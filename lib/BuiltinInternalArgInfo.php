@@ -269,6 +269,12 @@ final class BuiltinInternalArgInfo
             'fputcsv' => 5 === $index ? 'string' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24814)
             'file_get_contents' => 4 === $index ? '?int' : null,
+            // ext/mbstring/mbstring.stub.php — ?int $length = null, ?string $encoding = null (#25362)
+            'mb_substr' => match ($index) {
+                2 => '?int',
+                3 => '?string',
+                default => null,
+            },
             // ext/spl/spl.stub.php — Traversable|array (InternalArgInfo says traversable) (#25066)
             'iterator_to_array' => 0 === $index ? 'Traversable|array' : null,
             default => null,
