@@ -21,7 +21,14 @@ echo $rs->invoke(null), "\n";
 
 $rmArgs = new ReflectionMethod(Greeter::class, 'hello');
 echo $rmArgs->invokeArgs(new Greeter(), ['world']), "\n";
+
+$d = new DateTime('2020-01-15');
+$internal = new ReflectionMethod(DateTime::class, 'format');
+echo $internal->invoke($d, 'Y'), "\n";
+echo $internal->invokeArgs($d, ['Y']), "\n";
 --EXPECT--
 hi world
 static
 hi world
+2020
+2020
