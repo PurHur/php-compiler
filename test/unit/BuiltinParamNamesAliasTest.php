@@ -264,6 +264,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['object', '...args='], BuiltinParamNames::forClassMethod('ReflectionMethod::invoke'));
     }
 
+    /** @covers issue #23380 — stub shape callback + ...args (basic_functions.stub.php) */
+    public function testRegisterShutdownFunctionNamedParamMetadata(): void
+    {
+        $names = BuiltinParamNames::forFunction('register_shutdown_function');
+        self::assertSame(['callback', 'args'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', 'register_shutdown_function'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'args', 'register_shutdown_function'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'function', 'register_shutdown_function'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'parameter', 'register_shutdown_function'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('register_shutdown_function'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('register_shutdown_function'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('register_shutdown_function'));
+    }
+
     /** @covers issue #23803 */
     public function testCompactVariadicNamedParamMetadata(): void
     {
