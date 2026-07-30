@@ -25,6 +25,9 @@ final class ThrowableManifestTest extends TestCase
         $this->assertSame('Error', ThrowableManifest::parentName('TypeError'));
         $this->assertSame('TypeError', ThrowableManifest::parentName('ArgumentCountError'));
         $this->assertSame('ArithmeticError', ThrowableManifest::parentName('DivisionByZeroError'));
+        // php-src Zend/zend_exceptions.stub.php (#25420).
+        $this->assertSame('Error', ThrowableManifest::parentName('CompileError'));
+        $this->assertSame('CompileError', ThrowableManifest::parentName('ParseError'));
     }
 
     public function testExceptionSupportConstantsTrackManifest(): void
@@ -76,6 +79,26 @@ try {
         );
         $this->assertSame(0, $exit);
         $this->assertSame("probe\ninstance_ok\n", $stdout);
+    }
+
+    public function testParseErrorIsCompileErrorOnVm(): void
+    {
+        [$stdout, $exit] = $this->runVmCli(
+            '<?php
+echo get_parent_class(ParseError::class), "\n";
+$e = new ParseError("probe");
+echo ($e instanceof CompileError) ? "instance_ok\n" : "instance_bad\n";
+try {
+    throw $e;
+} catch (CompileError $c) {
+    echo "caught=", get_class($c), "\n";
+} catch (Throwable $t) {
+    echo "miss=", get_class($t), "\n";
+}
+'
+        );
+        $this->assertSame(0, $exit);
+        $this->assertSame("CompileError\ninstance_ok\ncaught=ParseError\n", $stdout);
     }
 
     /** @return array{0: string, 1: int} */
