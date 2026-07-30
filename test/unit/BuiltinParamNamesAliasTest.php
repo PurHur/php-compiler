@@ -819,10 +819,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
 
         $fputcsv = BuiltinParamNames::forFunction('fputcsv');
-        self::assertSame(['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol='], $fputcsv);
+        self::assertSame(['stream', 'fields', 'separator=', 'enclosure=', 'escape=', 'eol='], $fputcsv);
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'fields', 'fputcsv'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'separator', 'fputcsv'));
         self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'eol', 'fputcsv'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('fputcsv'));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('separator='));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('enclosure='));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('escape='));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('eol='));
 
         // php-src basic_functions.stub.php — InternalArgInfo still file_name (#23785)
         $hf = BuiltinParamNames::forFunction('highlight_file');
