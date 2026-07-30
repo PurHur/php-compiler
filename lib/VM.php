@@ -6415,6 +6415,15 @@ restart:
                     break;
                 case OpCode::TYPE_RETURN_VOID:
                     $frame->returnSiteLine = (int) ($op->arg1 ?? 0);
+                    // Explicit `return;` in finally (arg1 = source line) overrides pending try
+                    // return and suppresses a pending exception (#25239). Fused empty-finally
+                    // epilogues use TYPE_RETURN_VOID(null) and must keep exception unwind (#24728).
+                    if ($this->frameIsInFinallyBody($frame) && null !== $op->arg1) {
+                        if ($this->applyReturnInsideFinally($frame, null, true)) {
+                            goto restart;
+                        }
+                        goto return_void_complete;
+                    }
                     $finallyFrame = $this->beginReturnFinallyUnwind($frame, null, true);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
@@ -6434,6 +6443,15 @@ restart:
                             goto restart;
                         }
                     }
+                    $returnValue = $this->resolveVmReturnValue($frame, $op);
+                    // Explicit valued return inside finally replaces pending try/catch return and
+                    // clears a pending exception (Zend zend_vm_def.h / zend_execute.c, #25239).
+                    if ($this->frameIsInFinallyBody($frame)) {
+                        if ($this->applyReturnInsideFinally($frame, $returnValue, false)) {
+                            goto restart;
+                        }
+                        goto return_value_complete;
+                    }
                     // Empty finally may fuse with merge and end in TYPE_RETURN instead of JUMP (#24728).
                     // Check exception-unwind completion BEFORE beginReturnFinallyUnwind so the
                     // pending exception propagates to the outer catch instead of being swallowed
@@ -6441,7 +6459,6 @@ restart:
                     if (null !== $this->context->pendingException && $this->completeActiveFinallyUnwind($frame)) {
                         goto restart;
                     }
-                    $returnValue = $this->resolveVmReturnValue($frame, $op);
                     $finallyFrame = $this->beginReturnFinallyUnwind($frame, $returnValue, false);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
@@ -12052,6 +12069,48 @@ restart:
         $this->context->pendingReturnResumeFrame = $frame;
 
         return $this->enterFinallyHandlerForUnwind($handler, true);
+    }
+
+    /**
+     * Zend: return inside finally replaces any pending try/catch return and clears a pending
+     * exception so the finally return value is what the caller observes (#25239).
+     *
+     * php-src: Zend/zend_vm_def.h (finally return / ZEND_FAST_CALL), Zend/zend_execute.c
+     *
+     * @return bool true when the caller should goto restart (outer finally or pending dispatch)
+     */
+    private function applyReturnInsideFinally(Frame &$frame, ?Variable $value, bool $isVoid): bool
+    {
+        // Suppress pending try exception — finally return wins over EG(exception).
+        $this->context->pendingException = null;
+        $this->context->pendingCatchResumeHandler = null;
+        $this->context->pendingFinallyUnwindThrowFrame = null;
+        $this->context->activeCatchHandlerFrame = null;
+        $this->context->pendingMergeAfterFinally = null;
+        $this->context->pendingGotoAfterFinally = null;
+
+        $this->context->pendingReturnActive = true;
+        $this->context->pendingReturnIsVoid = $isVoid;
+        $this->context->pendingReturnValue = $value;
+        $this->context->pendingReturnResumeFrame = $frame;
+        $this->context->pendingReturnDispatch = false;
+
+        $this->markFinallyCompletedWhenLeavingFinallyBody($frame);
+
+        $finallyFrame = $this->continueReturnFinallyChain();
+        if (null !== $finallyFrame) {
+            $frame = $finallyFrame;
+
+            return true;
+        }
+        if ($this->schedulePendingReturnDispatch()) {
+            return true;
+        }
+
+        // No outer finally left — complete the return from this opcode now.
+        $this->clearPendingReturnState();
+
+        return false;
     }
 
     private function continueReturnFinallyChain(): ?Frame
