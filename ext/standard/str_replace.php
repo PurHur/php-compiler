@@ -24,10 +24,9 @@ final class str_replace extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'str_replace', 3, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
-        }
         $hasCount = $argc >= 4;
         // Z_PARAM_STR_OR_ARR — null TypeError on PROFILE=8.4 (#20173, #18914; php-src string.c).
         $searchVar = VmPreg::resolveStringOrArraySubject(
@@ -115,10 +114,10 @@ final class str_replace extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'str_replace', 3, 4)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
 
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189/#21198).
         if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[0], 'str_replace', 'search', 1, false)) {

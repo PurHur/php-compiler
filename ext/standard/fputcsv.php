@@ -29,17 +29,8 @@ final class fputcsv extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0], $frame->calledArgs[1])) {
-            throw new \LogicException('fputcsv() requires at least stream and fields arguments in this compiler build');
-        }
-        foreach (\array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 5) {
-                throw new \ArgumentCountError(\sprintf(
-                    'fputcsv() expects at most 6 arguments, %d given',
-                    $idx + 1
-                ));
-            }
-        }
+        // php-src ext/standard/file.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'fputcsv', 2, 6);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $fieldsVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fputcsv');
@@ -85,11 +76,8 @@ final class fputcsv extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('fputcsv() requires at least stream and fields arguments in this compiler build');
-        }
-        if (\count($args) > 6) {
-            throw new \LogicException('fputcsv() expects at most 6 arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'fputcsv', 2, 6)) {
+            return $context->constantFromInteger(0, 'int64');
         }
         $compileTimeFailure = $this->emitCompileTimeCsvValidationFailure($context, ...$args);
         if (null !== $compileTimeFailure) {

@@ -30,12 +30,8 @@ final class preg_replace extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 5) {
-            throw new \LogicException(
-                'preg_replace() expects 3 to 5 arguments in this compiler build'
-            );
-        }
+        // php-src ext/pcre/php_pcre.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'preg_replace', 3, 5);
         if (null === $frame->returnVar) {
             return;
         }
@@ -147,12 +143,11 @@ final class preg_replace extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException(
-                'preg_replace() expects 3 to 4 arguments in this compiler build'
-            );
+        // JIT/AOT supports through $limit; $count remains VM (#4765). Zend max is 5 (#25407).
+        if (!$this->requireArgCountRangeJit($context, $args, 'preg_replace', 3, 4)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $limit = 4 === $argc
             ? self::lowerLimit($context, $args[3])
             : $context->getTypeFromString('int64')->constInt(-1, false);

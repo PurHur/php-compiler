@@ -25,17 +25,8 @@ final class fgetcsv extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0])) {
-            throw new \LogicException('fgetcsv() requires at least a stream argument in this compiler build');
-        }
-        foreach (\array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 4) {
-                throw new \ArgumentCountError(\sprintf(
-                    'fgetcsv() expects at most 5 arguments, %d given',
-                    $idx + 1
-                ));
-            }
-        }
+        // php-src ext/standard/file.c — ArgumentCountError (#25407).
+        $this->requireArgCountRange($frame, 'fgetcsv', 1, 5);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fgetcsv');
         $length = null;
@@ -72,11 +63,11 @@ final class fgetcsv extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('fgetcsv() requires at least a stream argument in this compiler build');
-        }
-        if (\count($args) > 5) {
-            throw new \LogicException('fgetcsv() expects at most 5 arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'fgetcsv', 1, 5)) {
+            return $context->builder->pointerCast(
+                $context->constantFromInteger(0, 'int64'),
+                $context->getTypeFromString('__value__*')
+            );
         }
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
