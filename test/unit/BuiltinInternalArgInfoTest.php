@@ -146,4 +146,31 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));
         $this->assertSame(1, BuiltinInternalArgInfo::requiredParamCountForClassMethod('SplFileObject', 'seek'));
     }
+
+    /** php-src ext/spl/spl_heap.stub.php — mixed value1/value2; PriorityQueue priority1/2 (#25555). */
+    public function testSplHeapCompareStubParamTypesAndNames(): void
+    {
+        foreach (['SplHeap', 'SplMinHeap', 'SplMaxHeap'] as $class) {
+            $this->assertSame(
+                ['value1', 'value2'],
+                BuiltinParamNames::forClassMethod(strtolower($class).'::compare')
+            );
+            $this->assertSame(
+                'mixed',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'compare', 0)
+            );
+            $this->assertSame(
+                'mixed',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'compare', 1)
+            );
+        }
+        $this->assertSame(
+            ['priority1', 'priority2'],
+            BuiltinParamNames::forClassMethod('splpriorityqueue::compare')
+        );
+        $this->assertSame(
+            'mixed',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('splpriorityqueue', 'compare', 0)
+        );
+    }
 }
