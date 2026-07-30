@@ -13,6 +13,7 @@ echo array_key_exists('ares_num', $v) ? "ares_num_present\n" : "ares_num_missing
 echo array_key_exists('libidn', $v) ? "libidn_present\n" : "libidn_missing\n";
 echo array_key_exists('libssh_version', $v) ? "libssh_present\n" : "libssh_missing\n";
 echo array_key_exists('brotli_version', $v) ? "brotli_present\n" : "brotli_missing\n";
+// feature_list is PHP 8.4+ only; default 8.2 reference profile omits it (#25357)
 echo array_key_exists('feature_list', $v) ? "feature_list_present\n" : "feature_list_missing\n";
 echo defined('CURLVERSION_NOW') && CURLVERSION_NOW === $v['age'] ? "age_matches_CURLVERSION_NOW\n" : "age_CURLVERSION_mismatch\n";
 --EXPECT--
@@ -24,5 +25,5 @@ ares_num_present
 libidn_present
 libssh_present
 brotli_present
-feature_list_present
+feature_list_missing
 age_matches_CURLVERSION_NOW

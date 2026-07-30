@@ -213,4 +213,48 @@ PHP;
             }
         }
     }
+
+    public function testCurlVersionFeatureListProfileGate(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            self::assertFalse(\PHPCompiler\CompilerVersion::advertisesCurlVersionFeatureList());
+            self::assertArrayNotHasKey('feature_list', \PHPCompiler\ext\curl\VmCurlCore::versionInfo());
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(\PHPCompiler\CompilerVersion::advertisesCurlVersionFeatureList());
+            $info = \PHPCompiler\ext\curl\VmCurlCore::versionInfo();
+            self::assertArrayHasKey('feature_list', $info);
+            self::assertIsArray($info['feature_list']);
+            self::assertArrayHasKey('http2', $info['feature_list']);
+            self::assertIsBool($info['feature_list']['http2']);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            self::assertFalse(\PHPCompiler\CompilerVersion::advertisesCurlVersionFeatureList());
+            self::assertArrayNotHasKey('feature_list', \PHPCompiler\ext\curl\VmCurlCore::versionInfo());
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
