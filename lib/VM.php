@@ -724,7 +724,12 @@ class VM {
         return VM\InterfaceCheck::entryImplements($object->class, 'arrayaccess', $this->context);
     }
 
-    /** Array, ArrayAccess, or Traversable RHS for guarded list destructuring (#4325, #7440, #7452). */
+    /**
+     * Array or ArrayAccess RHS for guarded list destructuring (#4325, #7440, #25096).
+     *
+     * php-src ZEND_FETCH_LIST: Traversable-only / plain objects are not unpackable —
+     * dim fetch raises "Cannot use object of type … as array" (Generator, Iterator, stdClass).
+     */
     private function variableIsListDestructUnpackable(Variable $value): bool
     {
         $value = $value->resolveIndirect();
@@ -734,11 +739,8 @@ class VM {
         if (Variable::TYPE_OBJECT !== $value->type) {
             return false;
         }
-        if ($this->objectImplementsArrayAccess($value->toObject())) {
-            return true;
-        }
 
-        return VM\IterableCheck::isIterable($value, $this->context);
+        return $this->objectImplementsArrayAccess($value->toObject());
     }
 
     /**
@@ -4515,6 +4517,19 @@ restart:
                     $unpack = $unpackSlot->resolveIndirect();
                     if (null !== $op->block1) {
                         if (!$this->variableIsListDestructUnpackable($unpack)) {
+                            // Plain / Traversable-only objects: Zend FETCH_LIST Error (#25096).
+                            if (Variable::TYPE_OBJECT === $unpack->type) {
+                                $className = $unpack->toObject()->class->name;
+                                $catchFrame = $this->dispatchVmError(
+                                    'Cannot use object of type ' . $className . ' as array',
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
                             // By-ref list / `$r =& $s[$i]`: do not skip — FETCH_DIM_W + ASSIGN_REF
                             // raise Zend string-offset or scalar-as-array Errors (#21910).
                             if ($op->listUnpackHasByRef) {

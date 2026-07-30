@@ -1,5 +1,5 @@
 --TEST--
-Language: list destructuring from Iterator iterates like Zend (#7452, zend_execute.c)
+Language: list destructuring from Iterator raises object-as-array Error (#25096, re-#7452, zend_vm_def.h)
 --FILE--
 <?php
 class I implements Iterator
@@ -33,10 +33,18 @@ class I implements Iterator
     }
 }
 
-[$x, $y] = new I();
-echo "$x,$y\n";
-list($a, $b) = new I();
-echo "$a,$b\n";
+try {
+    [$x, $y] = new I();
+    echo "$x,$y\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
+    list($a, $b) = new I();
+    echo "$a,$b\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
 --EXPECT--
-a,b
-a,b
+Error:Cannot use object of type I as array
+Error:Cannot use object of type I as array

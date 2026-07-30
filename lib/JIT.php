@@ -8306,7 +8306,8 @@ class JIT {
                             $branchBlock,
                             $mergeBody,
                             $block->getOperand($op->arg2),
-                            $op->listUnpackHasByRef
+                            $op->listUnpackHasByRef,
+                            $this
                         );
                         break;
                     }

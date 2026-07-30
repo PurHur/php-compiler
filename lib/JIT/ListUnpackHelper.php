@@ -6,12 +6,16 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCompiler\ext\standard\JitArrayIsList;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\VmUnset;
+use PHPTypes\Type;
+use PHPLLVM\Builder;
 
 /**
  * Runtime guard for `list()` / `[]` destructuring on non-array RHS (#4325, #4308, #10486);
- * spread uses isList (#4298, #4841).
+ * spread uses isList (#4298, #4841). Object RHS → Zend Error (#25096).
  *
  * SSOT: {@see \PHPCompiler\VM\ListUnpackJitHelper}
  */
@@ -42,12 +46,9 @@ final class ListUnpackHelper
     }
 
     /**
-     * Guarded `[]` / list() destructuring: skip assign path when RHS is not an array at run time (#4325, #4308, #10486).
+     * Guarded `[]` / list() destructuring (#4325, #4308, #10486, #21910, #25096).
      *
-     * When {@see $hasByRef} is true, non-array RHS must still run FETCH_DIM_W + ASSIGN_REF so Zend
-     * string-offset / scalar-as-array Errors surface (#21910).
-     *
-     * @return bool true when assign-path opcodes should compile as unreachable stubs (compile-time non-array RHS)
+     * @return bool true when assign-path opcodes should compile as unreachable stubs
      */
     public static function emitGuardedListUnpackCheck(
         Context $context,
@@ -55,16 +56,20 @@ final class ListUnpackHelper
         \PHPLLVM\BasicBlock $branchBlock,
         \PHPLLVM\BasicBlock $mergeEntry,
         ?Operand $arrayOp = null,
-        bool $hasByRef = false
+        bool $hasByRef = false,
+        ?\PHPCompiler\JIT $jit = null
     ): bool {
         if (self::isDefinitelyNonArrayAtCompileTime($context, $array, $arrayOp)) {
-            if ($hasByRef) {
-                // Fall through to dim fetch + ASSIGN_REF (#21910).
-                $context->builder->positionAtEnd($branchBlock);
+            $context->builder->positionAtEnd($branchBlock);
+            if (Variable::TYPE_OBJECT === $array->type) {
+                self::emitObjectAsArrayListError($context, $array, $arrayOp, $jit);
+                self::finishObjectListErrorBlock($context, $mergeEntry);
 
+                return true;
+            }
+            if ($hasByRef) {
                 return false;
             }
-            $context->builder->positionAtEnd($branchBlock);
             $context->builder->branch($mergeEntry);
             $deadBb = BasicBlockHelper::append($context, 'list_unpack_skip_assign');
             $context->builder->positionAtEnd($deadBb);
@@ -77,15 +82,131 @@ final class ListUnpackHelper
         $context->builder->positionAtEnd($branchBlock);
         $context->builder->branchIf($isUnpackable, $assignBb, $nonUnpackableBb);
         $context->builder->positionAtEnd($nonUnpackableBb);
-        if ($hasByRef) {
-            $context->builder->branch($assignBb);
-        } else {
-            $context->builder->branch($mergeEntry);
-        }
-        // Numeric list slots warn per-key at dim fetch; spread tail keeps isList in TYPE_LIST_SPREAD_ASSIGN (#4841).
+        self::branchNonUnpackableListRhs($context, $array, $arrayOp, $assignBb, $mergeEntry, $hasByRef, $jit);
         $context->builder->positionAtEnd($assignBb);
 
         return false;
+    }
+
+    private static function branchNonUnpackableListRhs(
+        Context $context,
+        Variable $array,
+        ?Operand $arrayOp,
+        \PHPLLVM\BasicBlock $assignBb,
+        \PHPLLVM\BasicBlock $mergeEntry,
+        bool $hasByRef,
+        ?\PHPCompiler\JIT $jit
+    ): void {
+        if (Variable::TYPE_OBJECT === $array->type) {
+            self::emitObjectAsArrayListError($context, $array, $arrayOp, $jit);
+            self::finishObjectListErrorBlock($context, $mergeEntry);
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $array->type) {
+            ListUnpackRuntime::ensureLinked($context);
+            $typeByte = ListUnpackRuntime::loadValueBoxTypeByte($context, $array);
+            $i8 = $context->getTypeFromString('int8');
+            $isObject = $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->and(
+                    $context->builder->trunc($typeByte, $i8),
+                    $i8->constInt(0x7f, false)
+                ),
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT & 0x7f, false)
+            );
+            $objBb = BasicBlockHelper::append($context, 'list_unpack_object_err');
+            $otherBb = BasicBlockHelper::append($context, 'list_unpack_non_obj');
+            $context->builder->branchIf($isObject, $objBb, $otherBb);
+            $context->builder->positionAtEnd($objBb);
+            // Never fall through to dim fetch for objects — AOT object-dim is incomplete (#25096).
+            self::emitObjectAsArrayListError($context, $array, $arrayOp, $jit);
+            // Catchable/uncaught already terminated objBb — do not open an empty dead block
+            // (unterminated empty BB breaks AOT verify with try/catch).
+            $insert = $context->builder->getInsertBlock();
+            if (null !== $insert && null === $insert->getTerminator()) {
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            $context->builder->positionAtEnd($otherBb);
+            $context->builder->branch($hasByRef ? $assignBb : $mergeEntry);
+
+            return;
+        }
+        $context->builder->branch($hasByRef ? $assignBb : $mergeEntry);
+    }
+
+    private static function emitObjectAsArrayListError(
+        Context $context,
+        Variable $array,
+        ?Operand $arrayOp,
+        ?\PHPCompiler\JIT $jit
+    ): void {
+        unset($array);
+        $display = self::objectDisplayNameForListError($arrayOp) ?? 'stdClass';
+        $message = VmUnset::cannotUseObjectAsArrayMessage($display);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError($context, 'Error', $message, $jit);
+
+            return;
+        }
+        // Uncaught: print Zend-shaped fatal + exit(255). Avoid ErrorRaise pending (silent
+        // rc=0) and UncaughtThrowPrinter alloc (AOT segfault on this edge) (#25096, #23641).
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::ensureStandaloneBodies($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'fprintf',
+            $context->context->functionType($i32, true, $i8p, $i8p)
+        );
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'exit',
+            $context->context->functionType($context->getTypeFromString('void'), false, $i32)
+        );
+        $stderr = \PHPCompiler\JIT\Builtin\StringTriggerErrorJit::stderrFilePtr($context);
+        $line = 'PHP Fatal error:  Uncaught Error: '.$message."\n";
+        $context->builder->call(
+            $context->lookupFunction('fprintf'),
+            $stderr,
+            $context->builder->pointerCast($context->constantFromString('%s'), $i8p),
+            $context->builder->pointerCast($context->constantFromString($line), $i8p)
+        );
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $i32->constInt(255, false)
+        );
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+    }
+
+    /**
+     * Park builder on a dead block after object Error so assign/jump stubs stay valid.
+     * Never returnVoid after UncaughtThrowPrinter — that reattached main epilogue as
+     * silent rc=0 (#23641 / #25096).
+     */
+    private static function finishObjectListErrorBlock(
+        Context $context,
+        \PHPLLVM\BasicBlock $mergeEntry
+    ): void {
+        unset($mergeEntry);
+        $deadBb = BasicBlockHelper::append($context, 'list_unpack_object_err_dead');
+        $context->builder->positionAtEnd($deadBb);
+    }
+
+    private static function objectDisplayNameForListError(?Operand $arrayOp): ?string
+    {
+        if (null === $arrayOp || null === $arrayOp->type || Type::TYPE_OBJECT !== $arrayOp->type->type) {
+            return null;
+        }
+        $userType = $arrayOp->type->userType ?? '';
+        if ('' === $userType || 'object' === strtolower(ltrim($userType, '\\'))) {
+            return null;
+        }
+
+        return ltrim($userType, '\\');
     }
 
     public static function isDefinitelyNonArrayAtCompileTime(
@@ -143,7 +264,6 @@ final class ListUnpackHelper
 
     public static function isDefinitelyArrayAtCompileTime(Variable $array): bool
     {
-        // INIT_ARRAY into a value-box sets valueBoxHashtable (#23971 e08).
         if (!empty($array->valueBoxHashtable)) {
             return true;
         }
