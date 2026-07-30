@@ -1127,8 +1127,9 @@ final class BuiltinParamNames
                 return ['pattern', 'subject', 'limit=', 'count=', 'flags='];
             case 'preg_grep':
                 return ['pattern', 'array', 'flags'];
+            // php-src ext/standard/string.stub.php — ?string $delimiter = null (#25472)
             case 'preg_quote':
-                return ['str', 'delimiter'];
+                return ['str', 'delimiter='];
             case 'file_get_contents':
                 return ['filename', 'use_include_path', 'context', 'offset', 'length'];
             case 'file_put_contents':
@@ -1393,9 +1394,9 @@ final class BuiltinParamNames
                 return ['filename'];
             case 'glob':
                 return ['pattern', 'flags'];
-            // php-src ext/standard/string.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
+            // php-src ext/standard/string.stub.php — offset=0, ?int $length = null (#23462, #25472)
             case 'substr_count':
-                return ['haystack', 'needle', 'offset', 'length'];
+                return ['haystack', 'needle', 'offset=', 'length='];
             case 'substr_compare':
                 return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/repl/start (#23183)

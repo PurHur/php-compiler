@@ -1381,7 +1381,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($checkdate, 'year', 'checkdate'));
 
         $getdate = BuiltinParamNames::forFunction('getdate');
-        self::assertSame(['timestamp'], $getdate);
+        self::assertSame(['timestamp='], $getdate);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($getdate, 'timestamp', 'getdate'));
 
         $gmdate = BuiltinParamNames::forFunction('gmdate');
@@ -1390,9 +1390,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'timestamp', 'gmdate'));
 
         $substrCount = BuiltinParamNames::forFunction('substr_count');
-        self::assertSame(['haystack', 'needle', 'offset', 'length'], $substrCount);
+        self::assertSame(['haystack', 'needle', 'offset=', 'length='], $substrCount);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'haystack', 'substr_count'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'needle', 'substr_count'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'offset', 'substr_count'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'length', 'substr_count'));
+
+        $pregQuote = BuiltinParamNames::forFunction('preg_quote');
+        self::assertSame(['str', 'delimiter='], $pregQuote);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($pregQuote, 'str', 'preg_quote'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pregQuote, 'delimiter', 'preg_quote'));
     }
 
     /** @covers issue #23216 / #24845 */

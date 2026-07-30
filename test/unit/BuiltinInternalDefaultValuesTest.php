@@ -424,6 +424,22 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         }
     }
 
+    /** @covers issue #25472 */
+    public function testSubstrCountLengthAndPregQuoteDelimiterDefaultsNull(): void
+    {
+        $length = ['name' => 'length', 'type' => '?int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('substr_count', 3, $length, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'substr_count', 3, $length));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        $delimiter = ['name' => 'delimiter', 'type' => '?string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('preg_quote', 1, $delimiter, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'preg_quote', 1, $delimiter));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
     /** @covers issue #24813 */
     public function testStrGetcsvReflectionDefaults(): void
     {
