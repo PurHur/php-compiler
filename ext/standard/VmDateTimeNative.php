@@ -638,13 +638,14 @@ final class VmDateTimeNative
             return ['timestamp' => (int) $time, 'microsecond' => 0];
         }
         if (1 === preg_match(
-            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?(?:Z|([+-]\d{2}:?\d{2}))?$/',
+            // php-src parse_date.re — HH:MM accepted; seconds default 0 (#25309).
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?(?:Z|([+-]\d{2}:?\d{2}))?$/',
             $time,
             $matches
         )) {
-            $hour = isset($matches[4]) ? (int) $matches[4] : 0;
-            $minute = isset($matches[5]) ? (int) $matches[5] : 0;
-            $second = isset($matches[6]) ? (int) $matches[6] : 0;
+            $hour = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : 0;
+            $minute = isset($matches[5]) && '' !== $matches[5] ? (int) $matches[5] : 0;
+            $second = isset($matches[6]) && '' !== $matches[6] ? (int) $matches[6] : 0;
             $microsecond = 0;
             if (isset($matches[7]) && '' !== $matches[7]) {
                 $microsecond = (int) \str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT);
@@ -676,13 +677,14 @@ final class VmDateTimeNative
             ];
         }
         if (1 === preg_match(
-            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?\s+([A-Za-z][A-Za-z0-9_+\/-]*(?:\/[A-Za-z][A-Za-z0-9_+\/-]*)*)$/',
+            // php-src parse_date.re — HH:MM accepted; seconds default 0 (#25309).
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?)?\s+([A-Za-z][A-Za-z0-9_+\/-]*(?:\/[A-Za-z][A-Za-z0-9_+\/-]*)*)$/',
             $time,
             $matches
         )) {
-            $hour = isset($matches[4]) ? (int) $matches[4] : 0;
-            $minute = isset($matches[5]) ? (int) $matches[5] : 0;
-            $second = isset($matches[6]) ? (int) $matches[6] : 0;
+            $hour = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : 0;
+            $minute = isset($matches[5]) && '' !== $matches[5] ? (int) $matches[5] : 0;
+            $second = isset($matches[6]) && '' !== $matches[6] ? (int) $matches[6] : 0;
             $microsecond = 0;
             if (isset($matches[7]) && '' !== $matches[7]) {
                 $microsecond = (int) \str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT);
