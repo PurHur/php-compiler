@@ -146,6 +146,13 @@ final class BuiltinInternalDefaultValues
         'dns_check_record' => [
             1 => ['kind' => 'string', 'value' => 'MX'],
         ],
+        // php-src basic_functions.stub.php — array &$weights = null (#23353)
+        'getmxrr' => [
+            2 => ['kind' => 'null'],
+        ],
+        'dns_get_mx' => [
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — separator/enclosure/escape string defaults (#24813)
         'str_getcsv' => [
             1 => ['kind' => 'string', 'value' => ','],

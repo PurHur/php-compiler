@@ -378,7 +378,8 @@ final class BuiltinParamNames
                 return ['string', 'result'];
             case 'dns_get_mx':
             case 'getmxrr':
-                return ['hostname', 'mxhosts', 'weight'];
+                // php-src basic_functions.stub.php — hosts/weights (InternalArgInfo mxhosts/weight) (#23353)
+                return ['hostname', 'hosts', 'weights='];
             // php-src ext/standard/basic_functions.stub.php — host→hostname (#23358)
             case 'checkdnsrr':
             case 'dns_check_record':
