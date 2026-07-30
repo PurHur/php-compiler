@@ -255,17 +255,35 @@ final class BuiltinInternalArgInfo
         $methodLc = strtolower($method);
         $methods = self::instance()->methods[$classLc]['methods'] ?? [];
         $info = $methods[$methodLc] ?? null;
-        if (null === $info || !isset($info['params'][$index])) {
+        if (null !== $info && isset($info['params'][$index])) {
+            $normalized = self::normalizeParamInfo($info['params'][$index]);
+            $typeOverride = self::stubParamTypeOverrideForClassMethod($classLc, $methodLc, $index);
+            if (null !== $typeOverride) {
+                $normalized['type'] = $typeOverride;
+            }
+
+            return $normalized;
+        }
+
+        // Stub-only methods missing from php-types InternalArgInfo (#25055 Spoofchecker).
+        $typeOverride = self::stubParamTypeOverrideForClassMethod($classLc, $methodLc, $index);
+        $names = BuiltinParamNames::forClassMethod($classLc.'::'.$methodLc);
+        if (null === $names || !isset($names[$index])) {
             return null;
         }
-
-        $normalized = self::normalizeParamInfo($info['params'][$index]);
-        $typeOverride = self::stubParamTypeOverrideForClassMethod($classLc, $methodLc, $index);
-        if (null !== $typeOverride) {
-            $normalized['type'] = $typeOverride;
+        $rawName = $names[$index];
+        $isOptional = str_ends_with($rawName, '=');
+        $paramName = rtrim(ltrim($rawName, '&'), '=');
+        if (str_starts_with($paramName, '...')) {
+            $paramName = substr($paramName, 3);
+            $isOptional = true;
         }
 
-        return $normalized;
+        return [
+            'name' => $paramName,
+            'type' => $typeOverride ?? '',
+            'isOptional' => $isOptional,
+        ];
     }
 
     /**
@@ -278,6 +296,9 @@ final class BuiltinInternalArgInfo
             'domdocument::createelementns' => 0 === $index ? '?string' : null,
             // ext/dom/php_dom.stub.php — createAttributeNS(?string $namespace, …)
             'domdocument::createattributens' => 0 === $index ? '?string' : null,
+            // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
+            'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
+            'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
             default => null,
         };
     }

@@ -898,7 +898,8 @@ final class SpoofcheckerIsSuspicious extends VmClassMethod
         $string = VmSpoofchecker::coerceStringArg($frame->calledArgs[1], 'Spoofchecker::isSuspicious', 0, 'string');
         [$suspicious, $bits] = VmSpoofchecker::isSuspicious($object, $string);
         if ($argc >= 3) {
-            $frame->calledArgs[2]->resolveIndirect()->int($bits);
+            // ZEND_SEND_REF writeback — php-src spoofchecker_main.c (#25055)
+            $frame->calledArgs[2]->byRefTarget()->int($bits);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($suspicious);
@@ -934,7 +935,8 @@ final class SpoofcheckerAreConfusable extends VmClassMethod
         $s2 = VmSpoofchecker::coerceStringArg($frame->calledArgs[2], 'Spoofchecker::areConfusable', 1, 'string2');
         [$confusable, $bits] = VmSpoofchecker::areConfusable($object, $s1, $s2);
         if ($argc >= 4) {
-            $frame->calledArgs[3]->resolveIndirect()->int($bits);
+            // ZEND_SEND_REF writeback — php-src spoofchecker_main.c (#25055)
+            $frame->calledArgs[3]->byRefTarget()->int($bits);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($confusable);

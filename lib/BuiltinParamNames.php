@@ -62,6 +62,9 @@ final class BuiltinParamNames
             // php-src ext/intl/formatter/formatter.stub.php — InternalArgInfo still has num/str/position (#23409)
             'numberformatter::formatcurrency' => ['amount', 'currency'],
             'numberformatter::parsecurrency' => ['string', 'currency', 'offset'],
+            // php-src ext/intl/spoofchecker/spoofchecker.stub.php — missing from php-types ArgInfo (#25055)
+            'spoofchecker::issuspicious' => ['string', '&errorCode='],
+            'spoofchecker::areconfusable' => ['string1', 'string2', '&errorCode='],
             'transliterator::create' => ['id', 'direction'],
             'transliterator::transliterate' => ['string', 'start', 'end'],
             'resourcebundle::create' => ['locale', 'bundlename', 'fallback'],

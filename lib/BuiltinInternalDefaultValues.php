@@ -50,6 +50,13 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/intl/spoofchecker/spoofchecker.stub.php — &$errorCode = null (#25055)
+        'spoofchecker::issuspicious' => [
+            1 => ['kind' => 'null'],
+        ],
+        'spoofchecker::areconfusable' => [
+            2 => ['kind' => 'null'],
+        ],
         'array_search' => [
             2 => ['kind' => 'bool', 'value' => false],
         ],

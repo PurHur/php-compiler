@@ -75,14 +75,28 @@ echo 'clean=', (int) $s->isSuspicious('paypal.com'), "\n";
 // U+0430 CYRILLIC SMALL LETTER A in "pаypal.com"
 $mixed = "p\xD0\xB0ypal.com";
 echo 'mixed=', (int) $s->isSuspicious($mixed), "\n";
-$bits = 0;
+$bits = -1;
 $s->isSuspicious($mixed, $bits);
 echo 'bits=', $bits, "\n";
+$namedBits = -1;
+$s->isSuspicious(string: $mixed, errorCode: $namedBits);
+echo 'named_bits=', $namedBits, "\n";
+$m = new ReflectionMethod('Spoofchecker', 'isSuspicious');
+echo 'params=', $m->getNumberOfParameters(), "\n";
+foreach ($m->getParameters() as $p) {
+    echo $p->getName(),
+        ' byref=', (int) $p->isPassedByReference(),
+        ' opt=', (int) $p->isOptional(),
+        "\n";
+}
 echo 'const_ss=', Spoofchecker::SINGLE_SCRIPT, "\n";
 // Greek rho U+03C1 vs Latin p in lookalike pair
 $c1 = 'paypal';
 $c2 = "\xCF\x81aypal"; // ρaypal
 echo 'conf=', (int) $s->areConfusable($c1, $c2), "\n";
+$confBits = -1;
+$s->areConfusable($c1, $c2, $confBits);
+echo 'conf_bits=', $confBits, "\n";
         $s->setChecks(Spoofchecker::SINGLE_SCRIPT | Spoofchecker::INVISIBLE);
 $s->setRestrictionLevel(Spoofchecker::MODERATELY_RESTRICTIVE);
 echo 'ignore=', Spoofchecker::IGNORE_SPACE, "\n";
@@ -96,9 +110,22 @@ PHP;
             $runtime->run($block);
             $out = ob_get_clean();
             self::assertMatchesRegularExpression(
-                '/^class=1\nclean=0\nmixed=1\nbits=\d+\nconst_ss=16\nconf=1\nignore=1\nallowed_clean=0\nallowed_accent=1\nok\n$/',
+                '/^class=1\nclean=0\nmixed=1\nbits=[1-9]\d*\nnamed_bits=[1-9]\d*\n'
+                .'params=2\nstring byref=0 opt=0\nerrorCode byref=1 opt=1\n'
+                .'const_ss=16\nconf=1\nconf_bits=[1-9]\d*\nignore=1\nallowed_clean=0\nallowed_accent=1\nok\n$/',
                 $out
             );
+            // Separate Reflection type probe — getType() string for $string (#25055).
+            $typeCode = <<<'PHP'
+<?php
+$m = new ReflectionMethod('Spoofchecker', 'isSuspicious');
+$p = $m->getParameters()[0];
+echo (string) $p->getType(), "\n";
+PHP;
+            $typeBlock = $runtime->parseAndCompile($typeCode, 'spoofchecker_type.php');
+            ob_start();
+            $runtime->run($typeBlock);
+            self::assertSame("string\n", ob_get_clean());
             self::assertSame(16, VmSpoofchecker::SINGLE_SCRIPT);
         } finally {
             if (false === $prev) {
