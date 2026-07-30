@@ -884,6 +884,11 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\enchant\EnchantExtensionPolicy::isEnchantComplianceCase($name)) {
                 continue;
             }
+            // Functional zmq cases set PHP_COMPILER_ENABLE_ZMQ via --ENV--; phantoms when withheld (#23964).
+            if (!\PHPCompiler\ext\zmq\ZmqExtensionPolicy::runsZmqCompliance($name)
+                && \PHPCompiler\ext\zmq\ZmqExtensionPolicy::isZmqComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

@@ -6523,6 +6523,7 @@ require_once __DIR__.'/../../../ext/zmq/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/zmq/Module.php';
 require_once __DIR__.'/../../../ext/zmq/VmZmq.php';
 require_once __DIR__.'/../../../ext/zmq/ZmqConstants.php';
+require_once __DIR__.'/../../../ext/zmq/ZmqExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/zmq/ZmqFunction.php';
 require_once __DIR__.'/../../../ext/zmq/bootstrap_zmqexception.php';
 require_once __DIR__.'/../../../ext/zmq/zmq_bind.php';

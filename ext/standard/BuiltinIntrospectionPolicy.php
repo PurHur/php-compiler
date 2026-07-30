@@ -250,6 +250,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'uuid_')) {
             return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'zmq_')) {
+            return \PHPCompiler\ext\zmq\ZmqExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -334,6 +337,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('uuid' === $ext) {
             return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
+        }
+        if ('zmq' === $ext) {
+            return \PHPCompiler\ext\zmq\ZmqExtensionPolicy::advertisesExtension();
         }
 
         return true;
