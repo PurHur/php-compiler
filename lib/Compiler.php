@@ -6466,6 +6466,8 @@ class Compiler {
         AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'method');
         AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'method');
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
+        // Abstract/interface methods have no method body block — keep return AST for cross-file LSP (#25384).
+        $declare->returnDeclaredType = $child->func->returnType;
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
     }

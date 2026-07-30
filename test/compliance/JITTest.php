@@ -1491,6 +1491,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_method_eval_override')) {
                 continue;
             }
+            // eval() inheritance variance: VM inheritFromParent (#25384); MCJIT inline eval deferral pending.
+            if (str_contains($name, 'inheritance_variance_cross_eval')) {
+                continue;
+            }
             // eval() catchable CompileError (zend_throw_exception): VM TYPE_EVAL (#25114); MCJIT TYPE_SMALLER / inline eval pending.
             if (str_contains($name, 'eval_compile_error_catchable')) {
                 continue;

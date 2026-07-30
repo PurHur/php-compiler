@@ -7477,19 +7477,31 @@ restart:
                         $op->sourceLocation
                     );
                     self::defineClass($classEntry, $op->block1, $frame);
-                    if (!$parentPending && null !== $classEntry->parentLc) {
-                        $this->inheritFromParent($classEntry);
-                    }
-                    // Inherited static properties arrive after defineClass(); relink hooks (#6566).
-                    if (!$parentPending) {
-                        $this->linkStaticPropertyHooks($classEntry);
-                    }
-                    $this->inheritFromInterfaces($classEntry);
-                    if (VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($classEntry, $this->context)) {
-                        VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($classEntry);
-                    }
-                    if (!$parentPending) {
-                        VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context, $frame);
+                    try {
+                        if (!$parentPending && null !== $classEntry->parentLc) {
+                            $this->inheritFromParent($classEntry);
+                        }
+                        // Inherited static properties arrive after defineClass(); relink hooks (#6566).
+                        if (!$parentPending) {
+                            $this->linkStaticPropertyHooks($classEntry);
+                        }
+                        $this->inheritFromInterfaces($classEntry);
+                        if (VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($classEntry, $this->context)) {
+                            VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($classEntry);
+                        }
+                        if (!$parentPending) {
+                            VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context, $frame);
+                        }
+                    } catch (\CompileError $e) {
+                        // Inside eval(): rethrow so TYPE_EVAL can raiseEvalCompileFatal with the
+                        // caller site (Zend "file(line) : eval()'d code"). Outside eval, print and
+                        // ScriptExit — cli_driver otherwise exits 255 without a message (#25384).
+                        if (VmEval::EVAL_FILENAME === $frame->scriptPath
+                            || str_ends_with((string) $frame->scriptPath, VmEval::EVAL_FILENAME)
+                        ) {
+                            throw $e;
+                        }
+                        $this->raiseClassDeclareCompileFatal($e, $frame);
                     }
                     $this->context->classes[$lcname] = $classEntry;
                     if ($parentPending) {
@@ -11177,6 +11189,33 @@ restart:
             $evalLine = $error->sourceLine > 1 ? $error->sourceLine - 1 : max(1, $error->sourceLine);
         }
         [$file, $line] = VM\ExceptionSupport::evalFatalSite($frame, $evalLine);
+        if ($this->context->isolatedPhpFunctionInvoke || $this->context->bubbleUncaughtToNative) {
+            throw $error;
+        }
+        $this->context->errors->recordLastError(
+            VM\ErrorReporter::E_COMPILE_ERROR,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        VM\ErrorReporter::writeCliErrorOutput(
+            VM\ErrorReporter::E_COMPILE_ERROR,
+            $error->getMessage(),
+            $file,
+            $line,
+            $this->context->errors->getDisplayErrors()
+        );
+        throw new ScriptExit(255);
+    }
+
+    /**
+     * Zend E_COMPILE_ERROR during class declare (include/require / top-level) — uncatchable (#25384).
+     *
+     * @return never
+     */
+    private function raiseClassDeclareCompileFatal(\CompileError $error, Frame $frame): never
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         if ($this->context->isolatedPhpFunctionInvoke || $this->context->bubbleUncaughtToNative) {
             throw $error;
         }
@@ -17573,6 +17612,12 @@ restart:
             $iface = $this->context->classes[$ifaceLc];
             $this->inheritInterfacePropertyRules($entry, $iface);
             $this->inheritInterfacePropertyHooks($entry, $iface);
+            // Cross-file interface LSP (same-script covered by InheritanceVariance) (#25384).
+            foreach ($entry->methods as $methodLc => $_) {
+                if (isset($iface->methods[$methodLc]) || isset($iface->abstractMethods[$methodLc])) {
+                    $this->rejectIncompatibleChildMethodSignature($entry, $iface, $methodLc);
+                }
+            }
             foreach ($iface->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
                     // Class/interface body redeclared a final interface constant (#22329).
@@ -17892,6 +17937,8 @@ restart:
                 // Same-script compile is covered by FinalMethodOverrideCheck; cross-eval needs
                 // this runtime path (see final class const #22329 / final property #22988).
                 $this->rejectChildOverrideOfFinalMethod($entry, $parent, $name);
+                // Cross-file / eval LSP: same-script InheritanceVariance never sees the parent (#25384).
+                $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
                 continue;
             }
             // PDO_*_Ext driver methods stay on PDO only (#21552).
@@ -17907,6 +17954,17 @@ restart:
                 $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
             }
             $entry->methodNames[$name] = $parent->methodNames[$name] ?? $name;
+        }
+        // Abstract parent methods are not in $parent->methods — still enforce LSP on overrides (#25384).
+        foreach ($parent->abstractMethods as $name => $_) {
+            if (!isset($entry->methods[$name])) {
+                continue;
+            }
+            $vis = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                continue;
+            }
+            $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
         }
         foreach ($parent->staticProperties as $name => $storage) {
             if (isset($entry->staticProperties[$name])) {
@@ -18489,6 +18547,9 @@ restart:
                     }
                     if ([] !== $op->parameterMetadata) {
                         $entry->methodParameterMetadata[$name] = $op->parameterMetadata;
+                    }
+                    if (null !== $op->returnDeclaredType) {
+                        $entry->methodReturnDeclaredTypes[$name] = $op->returnDeclaredType;
                     }
                     if (null !== $op->sourceLocation) {
                         $entry->methodSourceLocations[$name] = $op->sourceLocation;
@@ -19923,6 +19984,165 @@ restart:
             $ownerDisplay,
             $methodDisplay
         ));
+    }
+
+    /**
+     * php-src zend_inheritance.c method compatibility — cross-file / eval / include (#25384).
+     * Same-script compile is {@see Compiler\InheritanceVariance}; this path sees the live ClassEntry.
+     */
+    private function rejectIncompatibleChildMethodSignature(
+        ClassEntry $entry,
+        ClassEntry $parent,
+        string $methodLc
+    ): void {
+        $childSig = Compiler\MethodSig::fromClassEntry($entry, $methodLc);
+        $parentSig = $this->resolveAncestorMethodSig($parent, $methodLc);
+        if (null === $childSig || null === $parentSig) {
+            return;
+        }
+        $msg = Compiler\InheritanceVariance::methodCompatibilityError(
+            $entry->name,
+            $methodLc,
+            $childSig,
+            $parent->name,
+            $parentSig,
+            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOfDuringDeclare(
+                $subtype,
+                $supertype,
+                $entry
+            ),
+            fn (string $classLc, string $interfaceLc): bool => $this->classEntryImplementsInterfaceDuringDeclare(
+                $classLc,
+                $interfaceLc,
+                $entry
+            )
+        );
+        if (null !== $msg) {
+            throw new \CompileError($msg);
+        }
+    }
+
+    /**
+     * Walk parent/interface chain for a MethodSig (abstract methods keep types on the declarer).
+     */
+    private function resolveAncestorMethodSig(ClassEntry $from, string $methodLc): ?Compiler\MethodSig
+    {
+        $current = $from;
+        $guard = 0;
+        while ($guard++ < 256) {
+            $sig = Compiler\MethodSig::fromClassEntry($current, $methodLc);
+            if (null !== $sig) {
+                return $sig;
+            }
+            $declLc = $current->methodDeclaringClassLc[$methodLc] ?? null;
+            if (null !== $declLc && isset($this->context->classes[$declLc])) {
+                $decl = $this->context->classes[$declLc];
+                if ($decl !== $current) {
+                    $sig = Compiler\MethodSig::fromClassEntry($decl, $methodLc);
+                    if (null !== $sig) {
+                        return $sig;
+                    }
+                }
+            }
+            if (null === $current->parentLc || !isset($this->context->classes[$current->parentLc])) {
+                break;
+            }
+            $current = $this->context->classes[$current->parentLc];
+        }
+
+        return null;
+    }
+
+    private function classEntryImplementsInterface(string $classLc, string $interfaceLc): bool
+    {
+        if ($classLc === $interfaceLc) {
+            return true;
+        }
+        if (!isset($this->context->classes[$classLc])) {
+            return false;
+        }
+        $entry = $this->context->classes[$classLc];
+        foreach ($entry->interfaces as $ifaceLc) {
+            if ($this->interfaceExtendsOrEquals($ifaceLc, $interfaceLc)) {
+                return true;
+            }
+        }
+        if (null !== $entry->parentLc) {
+            return $this->classEntryImplementsInterface($entry->parentLc, $interfaceLc);
+        }
+
+        return false;
+    }
+
+    /**
+     * Like {@see isSubclassOf()} but the class under TYPE_DECLARE_CLASS is not in
+     * context.classes until after inheritFromParent (#25384 self/static covariance).
+     */
+    private function isClassSubtypeOfDuringDeclare(
+        string $subtypeLc,
+        string $supertypeLc,
+        ClassEntry $defining
+    ): bool {
+        if ($subtypeLc === $supertypeLc) {
+            return true;
+        }
+        $definingLc = strtolower(ltrim($defining->name, '\\'));
+        if ($subtypeLc === $definingLc) {
+            if ($defining->parentLc === $supertypeLc) {
+                return true;
+            }
+            if (null !== $defining->parentLc) {
+                return $this->isSubclassOf($defining->parentLc, $supertypeLc)
+                    || $defining->parentLc === $supertypeLc;
+            }
+
+            return false;
+        }
+
+        return $this->isSubclassOf($subtypeLc, $supertypeLc);
+    }
+
+    private function classEntryImplementsInterfaceDuringDeclare(
+        string $classLc,
+        string $interfaceLc,
+        ClassEntry $defining
+    ): bool {
+        if ($classLc === $interfaceLc) {
+            return true;
+        }
+        $definingLc = strtolower(ltrim($defining->name, '\\'));
+        if ($classLc === $definingLc) {
+            foreach ($defining->interfaces as $ifaceLc) {
+                if ($this->interfaceExtendsOrEquals($ifaceLc, $interfaceLc)) {
+                    return true;
+                }
+            }
+            if (null !== $defining->parentLc) {
+                return $this->classEntryImplementsInterface($defining->parentLc, $interfaceLc);
+            }
+
+            return false;
+        }
+
+        return $this->classEntryImplementsInterface($classLc, $interfaceLc);
+    }
+
+    private function interfaceExtendsOrEquals(string $ifaceLc, string $targetLc): bool
+    {
+        if ($ifaceLc === $targetLc) {
+            return true;
+        }
+        if (!isset($this->context->classes[$ifaceLc])) {
+            return false;
+        }
+        $iface = $this->context->classes[$ifaceLc];
+        foreach ($iface->interfaces as $parentIface) {
+            if ($this->interfaceExtendsOrEquals($parentIface, $targetLc)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

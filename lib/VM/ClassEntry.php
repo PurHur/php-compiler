@@ -126,6 +126,12 @@ class ClassEntry {
     public array $constAttributeEntries = [];
     /** @var array<string, list<\PHPCompiler\Compiler\ParameterMetadata>> method (lowercase) => params (#3340). */
     public array $methodParameterMetadata = [];
+    /**
+     * Declared return type AST for methods (including abstract/interface — no Func\PHP block) (#25384).
+     *
+     * @var array<string, \PHPCfg\Op\Type> method (lowercase) => return type
+     */
+    public array $methodReturnDeclaredTypes = [];
     /** @var array<string, string> method (lowercase) => trait FQCN when imported via use Trait (#3416). */
     public array $traitMethodSources = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */
