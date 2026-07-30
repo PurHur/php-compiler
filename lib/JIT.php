@@ -18700,9 +18700,10 @@ class JIT {
             $name = $toCall->getName();
             // VmClassMethod Internals are registered under bare names ('bind'); prefer
             // Closure::… stub tables when the active proxy key is qualified (#24591).
+            // Fall through to InternalArgInfo via paramNamesForInternalFunction (#25182).
             $qualified = $this->jitQualifiedProxyNameForCall($toCall);
             if (null !== $qualified) {
-                $names = BuiltinParamNames::forClassMethod($qualified);
+                $names = BuiltinParamNames::paramNamesForInternalFunction($qualified);
                 if (null !== $names) {
                     return [
                         $names,
@@ -18814,8 +18815,10 @@ class JIT {
             return '__object__*' === $this->context->getStringFromType($toCall->argTypes[0]) ? 1 : 0;
         }
         // Instance-method proxies prepend $this before user args (Closure::call/bindTo, #24591).
+        // DOM JIT Call\Dom* helpers are always instance methods (#25182).
         if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
             || $toCall instanceof JIT\Call\ClosureBindTo
+            || str_starts_with($toCall::class, 'PHPCompiler\\JIT\\Call\\Dom')
         ) {
             return 1;
         }
