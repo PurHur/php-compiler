@@ -149,6 +149,10 @@ final class SplFileObjectStorage
     public static function seek(ObjectEntry $object, int $line): void
     {
         $state = &self::$state[$object->id];
+        if ($line < 0) {
+            throw new \ValueError('SplFileObject::seek(): Argument #1 ($line) must be greater than or equal to 0');
+        }
+        // php-src SplFileObject::seek — rewind, read_line line times, then bump key (#25321).
         if (!VmFs::rewind($state['handle'])) {
             throw new \RuntimeException('Cannot rewind file');
         }
@@ -156,16 +160,13 @@ final class SplFileObjectStorage
         $state['lineNum'] = 0;
         for ($i = 0; $i < $line; ++$i) {
             if (!self::readLineForIterator($object, true)) {
-                // php-src ext/spl/spl_directory.c — key reflects requested line past EOF (#18304).
-                $state['lineNum'] = $line;
-
+                // Early return on EOF — leave key at last successful read_line index.
                 return;
             }
-            self::freeLine($state);
-            ++$state['lineNum'];
         }
-        if (!self::readLineForIterator($object, true)) {
-            $state['lineNum'] = $line;
+        if ($line > 0 && !self::hasFlag($state, self::FLAG_READ_AHEAD)) {
+            ++$state['lineNum'];
+            self::freeLine($state);
         }
     }
 
