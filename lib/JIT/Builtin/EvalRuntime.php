@@ -34,19 +34,24 @@ final class EvalRuntime
         $literal = JitStringArg::compileTimeLiteral($codeVar);
 
         if (null !== $literal) {
-            $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal);
-            if ($evalBlock instanceof Block) {
-                IncludeHelper::compileInlinedBlock(
-                    $jit,
-                    $func,
-                    $callerBlock,
-                    $evalBlock,
-                    $resultOp,
-                    true,
-                    'c:eval'
-                );
+            // Type/function decls: bin/jit.php must VM-lower via Block::literalEvalSourceNeedsVm
+            // (#25535). Skip tryCompileBlock+inline here so a missed deferral cannot MCJIT-inline
+            // class decls (segfault); fall through to emitFalse only as last resort.
+            if (!Block::literalEvalSourceNeedsVm($literal)) {
+                $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal);
+                if ($evalBlock instanceof Block) {
+                    IncludeHelper::compileInlinedBlock(
+                        $jit,
+                        $func,
+                        $callerBlock,
+                        $evalBlock,
+                        $resultOp,
+                        true,
+                        'c:eval'
+                    );
 
-                return;
+                    return;
+                }
             }
         }
 

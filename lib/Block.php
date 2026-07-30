@@ -3192,7 +3192,12 @@ class Block {
      * ReflectionAttribute::newInstance() MCJIT execute segfaults (#4598); VM path matches Zend.
      */
     /**
-     * eval($variable) must run on VM — JIT inline path is compile-time literal only (#10248).
+     * eval() that cannot use the JIT literal-inline path must run on VM (#10248, #25535).
+     *
+     * - Non-literal `eval($var)` — runtime compile only on VM.
+     * - Literal eval that declares class/interface/trait/enum/function — IncludeHelper
+     *   inline of those decls segfaults under MCJIT; VM TYPE_EVAL raises Zend-shaped
+     *   CompileFatal (e.g. final plain properties on the reference profile).
      */
     public static function containsNonLiteralEvalOpcodes(?self $root): bool
     {
@@ -3213,6 +3218,9 @@ class Block {
                     if (!$codeOp instanceof Operand\Literal) {
                         return true;
                     }
+                    if (self::literalEvalSourceNeedsVm((string) $codeOp->value)) {
+                        return true;
+                    }
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                     if ($sub instanceof self) {
@@ -3223,6 +3231,19 @@ class Block {
         }
 
         return false;
+    }
+
+    /**
+     * True when a compile-time eval string declares a type/function — unsafe to MCJIT-inline.
+     *
+     * php-src: zif_eval always compiles at runtime; we only inline expression-only literals.
+     */
+    public static function literalEvalSourceNeedsVm(string $source): bool
+    {
+        return 1 === preg_match(
+            '/\b(?:class|interface|trait|enum|function)\b/i',
+            $source
+        );
     }
 
     /** func_get_arg(s) / func_num_args() — CallArgv must be stored at each call site (#197, #15907). */
