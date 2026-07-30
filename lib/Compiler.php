@@ -4996,6 +4996,11 @@ class Compiler {
     }
 
     /**
+     * Defer BinaryOp\Concat only when a following echo will lower pending ?? into the
+     * concat (compileEchoWithEmbeddedCoalesce). Already-merged coalesces must not count —
+     * otherwise a later `echo "x".$obj->prop` after `$a?->b ?? …` skips CONCAT and echoes
+     * an empty temp (#25525 / re-#18455).
+     *
      * @param Op[] $ops
      */
     private function isConcatLoweredByFollowingEcho(Op\Expr\BinaryOp\Concat $concat, array $ops, int $index): bool
@@ -5006,7 +5011,12 @@ class Compiler {
             if ($next instanceof Op\Terminal\Echo_) {
                 $coalesces = $this->findEmbeddedCoalesces($next->expr);
                 if ([] === $coalesces) {
-                    $coalesces = $this->findBlockCoalescesBeforeIndex($ops, $j);
+                    // Match compileEchoWithEmbeddedCoalesce: only pending ?? (#25525).
+                    foreach ($this->findBlockCoalescesBeforeIndex($ops, $j) as $candidate) {
+                        if (!isset($this->coalesceMergeBlocks[spl_object_id($candidate)])) {
+                            $coalesces[] = $candidate;
+                        }
+                    }
                 }
                 if ([] === $coalesces) {
                     return false;
