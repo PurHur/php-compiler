@@ -52975,6 +52975,11 @@ class Compiler {
      * the MethodCall result as a dead temp (empty usages), so the usual sibling-producer predicates
      * miss it and EXEC_NORETURN drops the new node (#25563).
      *
+     * Restricted to {@code create*} factory MethodCalls: a bare empty-usages MethodCall before a
+     * multi-arg consumer also matches statement {@code loadXML} ahead of
+     * {@code importNode(getElementsByTagName()->item(), true)}, which then drops the load and leaves
+     * {@code documentElement} null (#25605, re-#20284).
+     *
      * @param list<Op> $ops
      */
     private function methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
@@ -52986,6 +52991,12 @@ class Compiler {
             return false;
         }
         if (null !== $producer->result && !empty($producer->result->usages)) {
+            return false;
+        }
+        // Only DOM/document factory creates are inline dead-temp args for multi-arg MethodCalls
+        // (#25563). loadXML/loadHTML/etc. are statement-level even when their bool result is unused
+        // (#25605).
+        if (!$this->methodCallIsDeadTempCreateFactory($producer)) {
             return false;
         }
         $opCount = \count($ops);
@@ -53024,6 +53035,20 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * createElement / createTextNode / … — dead-temp factories that feed multi-arg MethodCalls (#25563).
+     * Not loadXML / query methods (#25605).
+     */
+    private function methodCallIsDeadTempCreateFactory(Op\Expr\MethodCall $call): bool
+    {
+        $method = $this->staticNameFromOperand($call->name);
+        if (null === $method) {
+            return false;
+        }
+
+        return str_starts_with(strtolower($method), 'create');
     }
 
     /** Block-scoped wrapper for {@see methodCallDeadTempFeedsLaterMultiArgMethodCallInOps} (#25563). */
