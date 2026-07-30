@@ -134,7 +134,9 @@ final class ExtensionConstantGroups
         if (\PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::advertisesExtension()) {
             $groups['pgsql'] = PgsqlConstants::registeredConstants();
         }
-        $groups['pspell'] = PspellConstants::registeredConstants();
+        if (\PHPCompiler\ext\pspell\PspellExtensionPolicy::advertisesExtension()) {
+            $groups['pspell'] = PspellConstants::registeredConstants();
+        }
         $groups['odbc'] = OdbcConstants::registeredConstants();
         $groups['sysvmsg'] = SysvmsgConstants::registeredConstants();
 
