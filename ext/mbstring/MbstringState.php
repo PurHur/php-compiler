@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -168,6 +169,102 @@ final class MbstringState
         if ($count > 0) {
             self::$illegalChars += $count;
         }
+    }
+
+    /**
+     * libmbfl mbfl_filt_conv_illegal_output() — bytes in $targetEncoding for one illegal event.
+     *
+     * @param int|null $codepoint Unicode scalar, or null for MBFL_BAD_INPUT (illegal byte)
+     */
+    public static function substitutionOutput(string $targetEncoding, ?int $codepoint): string
+    {
+        $canon = CharsetEngine::canonicalize($targetEncoding) ?? strtoupper($targetEncoding);
+
+        return match (self::$substituteMode) {
+            self::MODE_NONE => '',
+            self::MODE_LONG => null === $codepoint
+                ? self::encodeCodepointIntoTarget(self::$substituteCodepoint, $canon)
+                : self::encodeAsciiMarkupIntoTarget('U+'.strtoupper(dechex($codepoint)), $canon),
+            self::MODE_ENTITY => null === $codepoint
+                ? self::encodeCodepointIntoTarget(self::$substituteCodepoint, $canon)
+                : self::encodeAsciiMarkupIntoTarget('&#x'.strtoupper(dechex($codepoint)).';', $canon),
+            default => self::encodeCodepointIntoTarget(self::$substituteCodepoint, $canon),
+        };
+    }
+
+    /**
+     * Encode a Unicode scalar into $canon; fall back to '?' then drop (libmbfl illegal_output).
+     */
+    private static function encodeCodepointIntoTarget(int $codepoint, string $canon): string
+    {
+        $encoded = self::tryEncodeCodepointIntoTarget($codepoint, $canon);
+        if (null !== $encoded) {
+            return $encoded;
+        }
+        if (0x3F !== $codepoint) {
+            $encoded = self::tryEncodeCodepointIntoTarget(0x3F, $canon);
+            if (null !== $encoded) {
+                return $encoded;
+            }
+        }
+
+        return '';
+    }
+
+    private static function tryEncodeCodepointIntoTarget(int $codepoint, string $canon): ?string
+    {
+        if ('UTF-8' === $canon || 'UTF8' === $canon) {
+            return self::codepointToUtf8($codepoint);
+        }
+        if ('ASCII' === $canon || 'US-ASCII' === $canon) {
+            return $codepoint <= 0x7F ? \chr($codepoint) : null;
+        }
+        if ('ISO-8859-1' === $canon || 'LATIN1' === $canon) {
+            return $codepoint <= 0xFF ? \chr($codepoint) : null;
+        }
+        if ('8BIT' === $canon || 'BINARY' === $canon) {
+            return $codepoint <= 0xFF ? \chr($codepoint) : null;
+        }
+        // UTF-16LE/BE: encode via UTF-8 round-trip through CharsetEngine.
+        if (str_starts_with($canon, 'UTF-16')) {
+            $utf8 = self::codepointToUtf8($codepoint);
+            $out = CharsetEngine::convert('UTF-8', $canon, $utf8);
+
+            return false === $out ? null : $out;
+        }
+
+        return null;
+    }
+
+    private static function encodeAsciiMarkupIntoTarget(string $ascii, string $canon): string
+    {
+        if ('UTF-8' === $canon || 'ASCII' === $canon || 'ISO-8859-1' === $canon
+            || '8BIT' === $canon || 'BINARY' === $canon || 'US-ASCII' === $canon || 'LATIN1' === $canon) {
+            return $ascii;
+        }
+        $out = CharsetEngine::convert('ASCII', $canon, $ascii);
+
+        return false === $out ? $ascii : $out;
+    }
+
+    private static function codepointToUtf8(int $cp): string
+    {
+        if ($cp <= 0x7F) {
+            return \chr($cp);
+        }
+        if ($cp <= 0x7FF) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp <= 0xFFFF) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
     }
 
     public static function httpOutputConvMimetypes(): string
