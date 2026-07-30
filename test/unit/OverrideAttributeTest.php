@@ -337,8 +337,10 @@ PHP;
     public function testOverrideOnClassFailsAtCompileTime(): void
     {
         $this->requireOverrideValidation();
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 class Base {
     public function foo(): void {}
@@ -348,23 +350,31 @@ class Child extends Base {
     public function foo(): void {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant, property)');
-        $runtime->parseAndCompile($code, 'override_on_class.php');
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
+            $runtime->parseAndCompile($code, 'override_on_class.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
     public function testOverrideOnTraitDeclarationFailsAtCompileTime(): void
     {
         $this->requireOverrideValidation();
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 #[\Override]
 trait T {}
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method, class constant, property)');
-        $runtime->parseAndCompile($code, 'override_on_trait.php');
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
+            $runtime->parseAndCompile($code, 'override_on_trait.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
     public function testOverrideFailsWhenParentMethodIsPrivate(): void
@@ -485,28 +495,56 @@ PHP;
 
     public function testOverrideOnExtendsPropertyCompiles(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.5');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 class Base { public int $x = 1; }
 class Child extends Base { #[\Override] public int $x = 2; }
 echo (new Child())->x, "\n";
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'override_prop_extends.php'));
-        $this->assertSame("2\n", ob_get_clean());
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'override_prop_extends.php'));
+            $this->assertSame("2\n", ob_get_clean());
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
+    }
+
+    public function testOverrideOnPropertyRejectedUnderProfile84(): void
+    {
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class Base { public int $x = 1; }
+class Child extends Base { #[\Override] public int $x = 2; }
+echo "OK\n";
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Attribute "Override" cannot target property (allowed targets: method)');
+            $runtime->parseAndCompile($code, 'override_prop_84.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
     public function testInvalidOverrideOnPropertyFailsAtCompileTime(): void
     {
-        $this->requireOverrideValidation();
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.5');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 class C { #[\Override] public int $x = 1; }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('C::$x has #[\Override] attribute, but no matching parent property exists');
-        $runtime->parseAndCompile($code, 'override_prop_invalid.php');
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('C::$x has #[\Override] attribute, but no matching parent property exists');
+            $runtime->parseAndCompile($code, 'override_prop_invalid.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 }

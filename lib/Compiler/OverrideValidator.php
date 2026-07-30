@@ -104,6 +104,11 @@ final class OverrideValidator
                 if (!self::hasOverrideAttribute($attributeNames)) {
                     continue;
                 }
+                // Property target is 8.5+ only (zend_attributes.stub.php); AttributeNames rejects earlier (#25138).
+                if (!CompilerVersion::supportsOverridePropertyAttribute()) {
+                    AttributeNames::assertOverrideMethodTargetOnly($attributeNames, 'property');
+                    continue;
+                }
                 self::validateOverrideProperty($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
 
                 continue;

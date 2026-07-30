@@ -964,14 +964,14 @@ class VMTest extends BaseTest {
                 continue;
             }
             // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).
+            // override_property_invalid uses --ENV PROFILE=8.5 (#25138) — keep it runnable.
             if (!CompilerVersion::supportsOverrideAttribute()
                 && (str_contains($name, 'override_attribute_invalid')
                     || str_contains($name, 'override_attribute_fatal')
                     || str_contains($name, 'override_attribute_invalid_target')
                     || str_contains($name, 'override_signature_mismatch')
                     || str_contains($name, 'override_private_parent')
-                    || str_contains($name, 'override_class_constant_invalid')
-                    || str_contains($name, 'override_property_invalid'))) {
+                    || str_contains($name, 'override_class_constant_invalid'))) {
                 continue;
             }
             if (CompilerVersion::supportsOverrideAttribute()
