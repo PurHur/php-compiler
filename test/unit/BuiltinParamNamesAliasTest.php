@@ -918,6 +918,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $wb->type);
     }
 
+    /** @covers issue #23459 */
+    public function testTempnamDirectoryNamedParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('tempnam');
+        self::assertSame(['directory', 'prefix'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'directory', 'tempnam'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'prefix', 'tempnam'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'dir', 'tempnam'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('tempnam'));
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {

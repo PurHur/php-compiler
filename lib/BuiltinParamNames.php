@@ -538,6 +538,9 @@ final class BuiltinParamNames
             // php-src file.stub.php / dir.stub.php / basic_functions.stub.php (#23461)
             case 'unlink':
                 return ['filename', 'context'];
+            // php-src ext/standard/file.stub.php — directory/prefix (InternalArgInfo dir) (#23459)
+            case 'tempnam':
+                return ['directory', 'prefix'];
             case 'chdir':
                 return ['directory'];
             // php-src ext/standard/basic_functions.stub.php — ?int $mask = null (#24971)
