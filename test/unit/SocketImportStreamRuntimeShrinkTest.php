@@ -24,12 +24,21 @@ final class SocketImportStreamRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('TriggerErrorJitHelper::warning', $source);
     }
 
-    public function testSocketImportStreamRuntimeCompilesHelper(): void
+    public function testSocketImportStreamRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SocketImportStreamRuntime.php');
         $this->assertStringContainsString('::canImportArgv', $source);
         $this->assertStringContainsString('__compiler_socket_import_can_import', $source);
         $this->assertStringContainsString('__compiler_socket_import_register', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('PHP_COMPILER_SELFHOST_AOT', $source);
+        $this->assertStringNotContainsString('putenv', $source);
     }
 
     public function testSpineBundleIncludesSocketImportStreamJitHelper(): void
