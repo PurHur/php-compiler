@@ -33,5 +33,7 @@ final class DomSimpleXmlBridgeTest extends TestCase
         // #22738 — NS identity fields via createElementNS + ancestor xmlns scope
         $this->assertStringContainsString('createElementNS', $source);
         $this->assertStringContainsString('parentNamespaceScopeForExport', $source);
+        // #25124 — xmlns:* attrs need xmlns NS URI (null → Namespace Error in php-src)
+        $this->assertStringContainsString('http://www.w3.org/2000/xmlns/', $source);
     }
 }
