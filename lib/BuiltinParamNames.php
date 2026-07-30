@@ -1096,8 +1096,9 @@ final class BuiltinParamNames
                 return ['stream', 'length'];
             case 'fgetcsv':
                 return ['stream', 'length', 'separator', 'enclosure', 'escape'];
+            // php-src ext/standard/basic_functions.stub.php — separator=","; enclosure="\""; escape="\\" (#24813)
             case 'str_getcsv':
-                return ['string', 'separator', 'enclosure', 'escape'];
+                return ['string', 'separator=', 'enclosure=', 'escape='];
             case 'parse_ini_string':
                 return ['ini_string', 'process_sections', 'scanner_mode'];
             case 'parse_ini_file':
