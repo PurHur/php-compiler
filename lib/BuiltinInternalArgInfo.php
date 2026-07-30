@@ -89,6 +89,9 @@ final class BuiltinInternalArgInfo
             'simplexml_load_string', 'simplexml_load_file' => 'SimpleXMLElement|false',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
+            // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
+            'json_decode' => 'mixed',
+            'json_encode' => 'string|false',
             default => null,
         };
     }
@@ -289,6 +292,9 @@ final class BuiltinInternalArgInfo
                 0, 1 => 'string',
                 default => null,
             },
+            // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
+            'json_decode' => 1 === $index ? '?bool' : null,
+            'json_encode' => 0 === $index ? 'mixed' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
             'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)

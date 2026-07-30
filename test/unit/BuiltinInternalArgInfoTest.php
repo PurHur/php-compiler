@@ -85,6 +85,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('hash_equals', 1));
     }
 
+    /** php-src ext/json/json.stub.php — InternalArgInfo omits mixed / |false / ?bool (#25458). */
+    public function testJsonDecodeEncodeReflectionStubTypes(): void
+    {
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('json_decode'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('json_encode'));
+        $this->assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('json_decode', 1));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('json_encode', 0));
+    }
+
     /** php-src basic_functions.stub.php — no return; InternalArgInfo says array (#25508). */
     public function testStreamContextCreateHasNoReturnType(): void
     {
