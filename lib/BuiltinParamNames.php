@@ -757,7 +757,7 @@ final class BuiltinParamNames
                     : [];
             case 'get_defined_functions':
                 return \PHPCompiler\CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
-                    ? ['exclude_disabled']
+                    ? ['exclude_disabled=']
                     : [];
             case 'fdiv':
                 // php-src basic_functions.stub.php — exactly num1, num2 (#23576; no rounding_mode).
