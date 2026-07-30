@@ -8583,6 +8583,79 @@ PHP;
         self::assertSame("r/1\n", ob_get_clean());
     }
 
+    /** Issue #25563 — replaceChild(createElement, getElementsByTagName()->item()) must bind createElement + item. */
+    public function testDomReplaceChildCreateElementAndGetElementsByTagNameItemUsesDistinctExecReturnSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d = new DOMDocument();
+$d->loadXML('<r><a/><a/><b/></r>');
+$list = $d->getElementsByTagName('a');
+$d->documentElement->replaceChild(
+    $d->createElement('a'),
+    $d->getElementsByTagName('b')->item(0)
+);
+echo $list->length, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_replacechild_inline_item_25563.php');
+
+        $replaceArgSendSlots = [];
+        $seenReplaceChild = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'replaceChild' === $block->constants[$op->arg2]->toString()) {
+                $seenReplaceChild = true;
+                continue;
+            }
+            if ($seenReplaceChild && OpCode::TYPE_ARG_SEND === $op->type) {
+                $replaceArgSendSlots[] = $op->arg1;
+            }
+            if ($seenReplaceChild && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)
+                && \count($replaceArgSendSlots) >= 2) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $replaceArgSendSlots, 'replaceChild arg sends='.json_encode($replaceArgSendSlots));
+        self::assertNotSame($replaceArgSendSlots[0], $replaceArgSendSlots[1]);
+
+        $createElementSlot = null;
+        $itemSlot = null;
+        $pendingCreate = false;
+        $pendingItem = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])) {
+                $name = $block->constants[$op->arg2]->toString();
+                $pendingCreate = ('createElement' === $name);
+                $pendingItem = ('item' === $name);
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                if ($pendingCreate && null === $createElementSlot) {
+                    $createElementSlot = $op->arg1;
+                }
+                if ($pendingItem) {
+                    $itemSlot = $op->arg1;
+                }
+                $pendingCreate = false;
+                $pendingItem = false;
+            }
+        }
+        self::assertNotNull($createElementSlot, 'createElement must EXEC_RETURN');
+        self::assertNotNull($itemSlot, 'item must EXEC_RETURN');
+        self::assertSame((string) $createElementSlot, (string) $replaceArgSendSlots[0], 'arg #0 must be createElement result');
+        self::assertSame((string) $itemSlot, (string) $replaceArgSendSlots[1], 'arg #1 must be item result');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("3\n", ob_get_clean());
+    }
+
     /** Issue #18410 — documentElement->appendChild(createElement) must not feed receiver fetch into inner arg. */
     public function testDomDocumentElementAppendChildCreateElementUsesDistinctArgSlots(): void
     {

@@ -27611,6 +27611,54 @@ class Compiler {
     }
 
     /**
+     * Empty-usages MethodCall in a mixed PropertyFetch+call arg window is statement-level when it
+     * sits outside the trailing dead-temp arg span and every intervening call also has empty
+     * usages (appendChild(createElement) before importNode — #24571). Inline dead-temp args such
+     * as replaceChild(createElement, getElementsByTagName()->item()) keep a later call with live
+     * usages in the window (#25563) or fall inside the dead-temp span (item).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function mixedCallArgProducerIsStatementLevelEmptyUsages(
+        int $producerIndex,
+        int $consumerIndex,
+        int $deadInlineArgCount,
+        array $cfgChildren
+    ): bool {
+        if ($deadInlineArgCount > 0 && ($consumerIndex - $producerIndex) <= $deadInlineArgCount) {
+            return false;
+        }
+        for ($scan = $producerIndex + 1; $scan < $consumerIndex; ++$scan) {
+            $between = $cfgChildren[$scan] ?? null;
+            if (
+                $between instanceof Op\Expr\MethodCall
+                || $between instanceof Op\Expr\FuncCall
+                || $between instanceof Op\Expr\NsFuncCall
+                || $between instanceof Op\Expr\StaticCall
+            ) {
+                if (
+                    property_exists($between, 'result')
+                    && null !== $between->result
+                    && !empty($between->result->usages)
+                ) {
+                    return false;
+                }
+                continue;
+            }
+            if (
+                $between instanceof Op\Expr\PropertyFetch
+                || $between instanceof Op\Expr\NullsafePropertyFetch
+                || $between instanceof Op\Expr\ConstFetch
+                || $between instanceof Op\Expr\ClassConstFetch
+            ) {
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Whether a MethodCall should be skipped while walking the hoisted sibling call-arg chain.
      *
      * Typed producers (createElement → DOMElement) always stay. inferred:unknown results are kept
@@ -28104,6 +28152,14 @@ class Compiler {
         // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
         if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
             return false;
+        }
+        // replaceChild(createElement(...), getElementsByTagName(...)->item(0)) — createElement is a
+        // dead-temp MethodCall before a multi-arg MethodCall; defer so EXEC_RETURN is forced (#25563).
+        if (
+            $op instanceof Op\Expr\MethodCall
+            && $this->methodCallDeadTempFeedsLaterMultiArgMethodCallInOps($op, $ops, $producerIndex)
+        ) {
+            return true;
         }
         $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         if (null !== $consumerIndex) {
@@ -31275,6 +31331,25 @@ class Compiler {
             $contiguousFirst = $firstSibling;
         }
         $cfgChildren = $block->orig->children;
+        // Include dead-temp MethodCall producers (createElement) that precede the contiguous
+        // sibling chain for multi-arg MethodCall consumers (#25563).
+        if (null !== $contiguousFirst) {
+            for ($j = $contiguousFirst - 1; $j >= 0; --$j) {
+                $prior = $cfgChildren[$j] ?? null;
+                if (
+                    $prior instanceof Op\Expr\MethodCall
+                    && $this->methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
+                        $prior,
+                        $cfgChildren,
+                        $j
+                    )
+                ) {
+                    $contiguousFirst = $j;
+                    continue;
+                }
+                break;
+            }
+        }
         $this->ensureStatementLevelSideEffectsBeforeChainStartCompiled(
             $block,
             $contiguousFirst,
@@ -31303,7 +31378,16 @@ class Compiler {
                 $j,
                 $callIndex,
                 $cfgChildren
-            )) {
+            )
+                && !(
+                    $producer instanceof Op\Expr\MethodCall
+                    && $this->methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
+                        $producer,
+                        $cfgChildren,
+                        $j
+                    )
+                )
+            ) {
                 continue;
             }
             $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
@@ -44707,11 +44791,24 @@ class Compiler {
                                     // $d->appendChild($d->createElement('root')); importNode($src->documentElement, true)
                                     // — typed appendChild/createElement are prior statements, not importNode
                                     // args; ordinal matching would bind deep to documentElement (#24571, re-#18860).
+                                    //
+                                    // Do not treat every empty-usages MethodCall as statement-level: php-cfg
+                                    // also marks dead-temp *inline* args that way, e.g.
+                                    // replaceChild(createElement(...), getElementsByTagName(...)->item(0))
+                                    // (#25563). Keep those when a later call in the window still has live
+                                    // usages (getElementsByTagName → item), or when the producer sits in the
+                                    // trailing dead-temp arg window (item itself).
                                     if (
                                         property_exists($mixedProducer, 'result')
                                         && (
                                             null === $mixedProducer->result
                                             || empty($mixedProducer->result->usages)
+                                        )
+                                        && $this->mixedCallArgProducerIsStatementLevelEmptyUsages(
+                                            $mixedProducerIndex,
+                                            $mixedConsumerIndex,
+                                            $mixedDeadTempCount,
+                                            $block->orig->children
                                         )
                                     ) {
                                         continue;
@@ -52680,20 +52777,25 @@ class Compiler {
         $argSends = $this->compileCallArgSends($args, $block, null, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
+        // replaceChild(createElement(...), getElementsByTagName(...)->item(0)) — nested MethodCall
+        // producers must run before INIT so they do not clobber the outer pending call (#25563).
+        // Note: rewireSiblingMultiArgInlineCallArgSendSlots is FuncCall-oriented and can steal
+        // createElement's EXEC_RETURN in favor of getElementsByTagName for MethodCall consumers;
+        // mixed PropertyFetch+MethodCall ARG_SEND wiring in compileCallArgSends handles DOM cases.
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
                 $return[] = $send;
             }
         }
+        foreach ($nestedProducerOps as $op) {
+            $return[] = $op;
+        }
         $return[] = new OpCode(
             OpCode::TYPE_METHODCALL_INIT,
             $receiver,
             $methodName
         );
-        foreach ($nestedProducerOps as $op) {
-            $return[] = $op;
-        }
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;
@@ -52724,6 +52826,7 @@ class Compiler {
             || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->outerSiblingInlineFuncCallProducerNeedsReturnSlot($cfgCallOp, $block)
             || $this->hoistedSiblingFeedsLaterMultiArgConsumer($cfgCallOp, $block)
+            || $this->methodCallDeadTempFeedsLaterMultiArgMethodCall($cfgCallOp, $block)
             || $this->inlineClosurePairHaystackFuncCallNeedsReturnSlot($cfgCallOp, $block)
             || $this->isAdjacentOuterHoistedFuncCallBeforeMultiArgConsumer($cfgCallOp, $block)
             || $this->nestedLiteralPreludeInlineCallProducerNeedsReturnSlot($cfgCallOp, $block)
@@ -52865,6 +52968,81 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * createElement(...) before replaceChild(..., getElementsByTagName(...)->item(0)) — php-cfg marks
+     * the MethodCall result as a dead temp (empty usages), so the usual sibling-producer predicates
+     * miss it and EXEC_NORETURN drops the new node (#25563).
+     *
+     * @param list<Op> $ops
+     */
+    private function methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
+        Op\Expr\MethodCall $producer,
+        array $ops,
+        int $producerIndex
+    ): bool {
+        if ($this->methodCallHasStatementLevelSideEffects($producer)) {
+            return false;
+        }
+        if (null !== $producer->result && !empty($producer->result->usages)) {
+            return false;
+        }
+        $opCount = \count($ops);
+        for ($j = $producerIndex + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j] ?? null;
+            if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
+                if (!\is_array($next->args ?? null) || \count($next->args) < 2) {
+                    continue;
+                }
+                $deadTempCount = 0;
+                foreach ($next->args as $arg) {
+                    if ($this->callArgIsDeadInlineTemporary($arg)) {
+                        ++$deadTempCount;
+                    }
+                }
+                if ($deadTempCount >= 2) {
+                    return true;
+                }
+                continue;
+            }
+            if (
+                $next instanceof Op\Expr\PropertyFetch
+                || $next instanceof Op\Expr\NullsafePropertyFetch
+                || $next instanceof Op\Expr\ConstFetch
+                || $next instanceof Op\Expr\ClassConstFetch
+                || $next instanceof Op\Expr\FuncCall
+                || $next instanceof Op\Expr\NsFuncCall
+                || $this->isUnaryInlineSiblingCallArgExpr($next)
+            ) {
+                continue;
+            }
+            if ($next instanceof Op && $this->isSiblingInlineCallProducerExpr($next)) {
+                continue;
+            }
+            break;
+        }
+
+        return false;
+    }
+
+    /** Block-scoped wrapper for {@see methodCallDeadTempFeedsLaterMultiArgMethodCallInOps} (#25563). */
+    private function methodCallDeadTempFeedsLaterMultiArgMethodCall(?Op $cfgCallOp, Block $block): bool
+    {
+        if (!$cfgCallOp instanceof Op\Expr\MethodCall || null === $block->orig) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        $producerIndex = array_search($cfgCallOp, $cfgChildren, true);
+        if (!\is_int($producerIndex)) {
+            return false;
+        }
+
+        return $this->methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
+            $cfgCallOp,
+            $cfgChildren,
+            $producerIndex
+        );
     }
 
     /**
