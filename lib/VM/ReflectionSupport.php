@@ -1512,7 +1512,10 @@ final class ReflectionSupport
                 return $decl->name;
             }
         }
-        foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+        $chain = $entry->isInterface
+            ? VmReflection::interfaceDeclarationChain($entry, $ctx)
+            : VmReflection::classHierarchyChain($entry, $ctx);
+        foreach ($chain as $class) {
             if ($class->isTrait) {
                 continue;
             }
@@ -3652,7 +3655,10 @@ final class ReflectionSupport
         $methodLc = strtolower($methodName);
         // php-src walks inheritance for ReflectionClass::getMethod() / ReflectionMethod::__construct.
         $declaring = null;
-        foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+        $chain = $entry->isInterface
+            ? VmReflection::interfaceDeclarationChain($entry, $ctx)
+            : VmReflection::classHierarchyChain($entry, $ctx);
+        foreach ($chain as $class) {
             if (!isset($class->methods[$methodLc]) && !isset($class->abstractMethods[$methodLc])) {
                 continue;
             }

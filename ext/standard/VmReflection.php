@@ -2774,7 +2774,7 @@ final class VmReflection
      *
      * @return list<ClassEntry>
      */
-    private static function interfaceDeclarationChain(ClassEntry $entry, Context $ctx): array
+    public static function interfaceDeclarationChain(ClassEntry $entry, Context $ctx): array
     {
         $chain = [$entry];
         foreach ($entry->interfaces as $parentLc) {
@@ -3444,42 +3444,84 @@ final class VmReflection
      */
     public static function collectClassMethodsForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
     {
-        $chain = $entry->isInterface
-            ? array_reverse(self::interfaceDeclarationChain($entry, $ctx))
-            : array_reverse(self::classHierarchyChain($entry, $ctx));
+        if ($entry->isInterface) {
+            return self::collectInterfaceMethodsForReflection($entry, $ctx, $filter);
+        }
+
+        $chain = array_reverse(self::classHierarchyChain($entry, $ctx));
         $byLc = [];
         foreach ($chain as $class) {
-            $methodLcs = array_keys($class->methods);
-            foreach (array_keys($class->abstractMethods) as $abstractLc) {
-                if (!in_array($abstractLc, $methodLcs, true)) {
-                    $methodLcs[] = $abstractLc;
-                }
-            }
-            foreach ($methodLcs as $methodLc) {
-                $flags = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                if (isset($class->abstractMethods[$methodLc])) {
-                    $flags |= \PHPCfg\Func::FLAG_ABSTRACT;
-                }
-                if (!self::methodMatchesReflectionFilter($flags, $filter)) {
-                    continue;
-                }
-                // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
-                if (($flags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
-                    continue;
-                }
-                // PDO_*_Ext / similar parent-only methods are not visible on subclasses (#21552).
-                if ($class !== $entry && isset($class->methodNotInherited[$methodLc])) {
-                    continue;
-                }
-                $byLc[$methodLc] = [
-                    'methodLc' => $methodLc,
-                    'display' => self::canonicalMethodDisplayName($class, $methodLc),
-                    'declaring' => $class,
-                ];
-            }
+            self::mergeClassMethodsIntoReflectionMap($class, $entry, $byLc, $filter, true);
         }
 
         return array_values($byLc);
+    }
+
+    /**
+     * Interface getMethods: own methods first, then parent-interface methods not yet seen (#25427).
+     *
+     * Matches SeekableIterator (seek then Iterator) and Throwable (__toString from Stringable last).
+     *
+     * @return list<array{methodLc: string, display: string, declaring: ClassEntry}>
+     */
+    private static function collectInterfaceMethodsForReflection(
+        ClassEntry $entry,
+        Context $ctx,
+        int $filter
+    ): array {
+        $byLc = [];
+        self::mergeClassMethodsIntoReflectionMap($entry, $entry, $byLc, $filter, true);
+        foreach (self::interfaceDeclarationChain($entry, $ctx) as $iface) {
+            if ($iface === $entry) {
+                continue;
+            }
+            self::mergeClassMethodsIntoReflectionMap($iface, $entry, $byLc, $filter, false);
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * @param array<string, array{methodLc: string, display: string, declaring: ClassEntry}> $byLc
+     */
+    private static function mergeClassMethodsIntoReflectionMap(
+        ClassEntry $class,
+        ClassEntry $reflected,
+        array &$byLc,
+        int $filter,
+        bool $overwrite
+    ): void {
+        $methodLcs = array_keys($class->methods);
+        foreach (array_keys($class->abstractMethods) as $abstractLc) {
+            if (!in_array($abstractLc, $methodLcs, true)) {
+                $methodLcs[] = $abstractLc;
+            }
+        }
+        foreach ($methodLcs as $methodLc) {
+            if (!$overwrite && isset($byLc[$methodLc])) {
+                continue;
+            }
+            $flags = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (isset($class->abstractMethods[$methodLc])) {
+                $flags |= \PHPCfg\Func::FLAG_ABSTRACT;
+            }
+            if (!self::methodMatchesReflectionFilter($flags, $filter)) {
+                continue;
+            }
+            // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
+            if (($flags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $reflected) {
+                continue;
+            }
+            // PDO_*_Ext / similar parent-only methods are not visible on subclasses (#21552).
+            if ($class !== $reflected && isset($class->methodNotInherited[$methodLc])) {
+                continue;
+            }
+            $byLc[$methodLc] = [
+                'methodLc' => $methodLc,
+                'display' => self::canonicalMethodDisplayName($class, $methodLc),
+                'declaring' => $class,
+            ];
+        }
     }
 
     /**

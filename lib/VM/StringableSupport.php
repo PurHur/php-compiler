@@ -21,6 +21,11 @@ final class StringableSupport
         $entry = new ClassEntry(self::INTERFACE_NAME);
         $entry->isInterface = true;
         BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['__toString']);
+        // php-src Zend/zend_interfaces.stub.php — __toString(): string (#25427).
+        $toStringReturn = ReflectionTypeSupport::cfgTypeFromLabel('string');
+        if (null !== $toStringReturn) {
+            $entry->methodReturnDeclaredTypes['__tostring'] = $toStringReturn;
+        }
         $ctx->classes[self::INTERFACE_LC] = $entry;
     }
 

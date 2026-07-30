@@ -9,6 +9,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPCompiler\VM\StringableSupport;
 use PHPUnit\Framework\TestCase;
 
 /** Issue #6736: Throwable hierarchy manifest is SSOT for VM registration. */
@@ -45,6 +46,28 @@ final class ThrowableManifestTest extends TestCase
 
         $this->assertArrayHasKey(ThrowableManifest::LC_THROWABLE, $ctx->classes);
         $this->assertTrue($ctx->classes[ThrowableManifest::LC_THROWABLE]->isInterface);
+        $throwable = $ctx->classes[ThrowableManifest::LC_THROWABLE];
+        $this->assertContains(StringableSupport::INTERFACE_LC, $throwable->interfaces);
+        foreach (
+            [
+                'getmessage',
+                'getcode',
+                'getfile',
+                'getline',
+                'gettrace',
+                'getprevious',
+                'gettraceasstring',
+            ] as $methodLc
+        ) {
+            $this->assertArrayHasKey($methodLc, $throwable->abstractMethods, $methodLc);
+            if ('getcode' !== $methodLc) {
+                $this->assertArrayHasKey($methodLc, $throwable->methodReturnDeclaredTypes, $methodLc);
+            }
+        }
+        $this->assertArrayNotHasKey('__tostring', $throwable->abstractMethods);
+        $stringable = $ctx->classes[StringableSupport::INTERFACE_LC];
+        $this->assertArrayHasKey('__tostring', $stringable->abstractMethods);
+        $this->assertArrayHasKey('__tostring', $stringable->methodReturnDeclaredTypes);
 
         foreach (ThrowableManifest::registrationOrder() as $className) {
             $lc = ThrowableManifest::lcKey($className);

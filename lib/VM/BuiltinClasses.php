@@ -1878,6 +1878,19 @@ final class BuiltinClasses
     {
         $throwable = new ClassEntry('Throwable');
         $throwable->isInterface = true;
+        // php-src Zend/zend_exceptions.stub.php — interface Throwable extends Stringable (#25427).
+        $throwable->interfaces = [StringableSupport::INTERFACE_LC];
+        self::registerBuiltinInterfaceMethods($throwable, [
+            'getMessage',
+            'getCode',
+            'getFile',
+            'getLine',
+            'getTrace',
+            'getPrevious',
+            'getTraceAsString',
+            // __toString comes from Stringable (zend_exceptions.stub extends Stringable; #25427).
+        ]);
+        self::applyThrowableMethodReturnTypes($throwable);
         $ctx->classes[ThrowableManifest::LC_THROWABLE] = $throwable;
 
         foreach (ThrowableManifest::registrationOrder() as $className) {
@@ -1890,6 +1903,31 @@ final class BuiltinClasses
                 ThrowableManifest::lcKey($className),
                 ThrowableManifest::parentLc($className)
             );
+        }
+    }
+
+    /**
+     * php-src Zend/zend_exceptions.stub.php — Throwable method return types (#25427).
+     *
+     * getCode() has no declared return in the stub. Applied on the interface only —
+     * concrete Exception/Error keep untyped Reflection under JIT (methodReturnDeclaredTypes
+     * + getReturnType still LLVM-verify-fails for builtins).
+     */
+    private static function applyThrowableMethodReturnTypes(ClassEntry $entry): void
+    {
+        $returns = [
+            'getmessage' => 'string',
+            'getfile' => 'string',
+            'getline' => 'int',
+            'gettrace' => 'array',
+            'getprevious' => '?Throwable',
+            'gettraceasstring' => 'string',
+        ];
+        foreach ($returns as $methodLc => $label) {
+            $type = ReflectionTypeSupport::cfgTypeFromLabel($label);
+            if (null !== $type) {
+                $entry->methodReturnDeclaredTypes[$methodLc] = $type;
+            }
         }
     }
 
