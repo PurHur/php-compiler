@@ -472,6 +472,28 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertTrue($dest->toBool());
     }
 
+    /** @covers issue #25392 */
+    public function testDateCreateDatetimeAndTimezoneDefaults(): void
+    {
+        $dest = new Variable();
+        foreach (['date_create', 'date_create_immutable'] as $fn) {
+            self::assertTrue(BuiltinInternalDefaultValues::materialize(
+                $dest,
+                $fn,
+                0,
+                ['name' => 'datetime', 'type' => 'string', 'isOptional' => true]
+            ), $fn);
+            self::assertSame('now', $dest->toString(), $fn);
+            self::assertTrue(BuiltinInternalDefaultValues::materialize(
+                $dest,
+                $fn,
+                1,
+                ['name' => 'timezone', 'type' => '?DateTimeZone', 'isOptional' => true]
+            ), $fn);
+            self::assertSame(Variable::TYPE_NULL, $dest->type, $fn);
+        }
+    }
+
     /** @covers issue #25400 */
     public function testDateTimeSetTimeSecondAndMicrosecondDefaultsAreZero(): void
     {

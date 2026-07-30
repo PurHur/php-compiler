@@ -868,6 +868,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #25392 */
+    public function testDateCreateReflectionNamedParametersAndArity(): void
+    {
+        foreach (['date_create', 'date_create_immutable'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['datetime=', 'timezone='], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timezone', $fn), $fn);
+            self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+        }
+        self::assertSame('DateTime|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('date_create'));
+        self::assertSame(
+            'DateTimeImmutable|false',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('date_create_immutable')
+        );
+    }
+
     /** @covers issue #25400 */
     public function testDateTimeSetTimeMicrosecondNamedParameters(): void
     {
@@ -1340,12 +1358,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertTrue($info['isOptional']);
     }
 
-    /** @covers issue #23276 */
+    /** @covers issue #23276 / #25392 */
     public function testDateCreateZendStubNamedParams(): void
     {
         foreach (['date_create', 'date_create_immutable'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
-            self::assertSame(['datetime', 'timezone'], $names, $fn);
+            self::assertSame(['datetime=', 'timezone='], $names, $fn);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timezone', $fn));
         }
