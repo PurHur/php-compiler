@@ -427,9 +427,11 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
                 continue;
             }
+            // Functional reflection_constant_forward_profile* cases set PROFILE via --ENV--; always
+            // include (#16837, #25504). Do not gate on advertisesReflectionConstantClass() in the
+            // parent — that skips the child before --ENV-- can enable registration.
             if (!CompilerVersion::advertisesReflectionConstantClass()
-                && (str_contains($name, 'reflection_constant_forward_profile')
-                    || str_contains($name, 'reflection_oop'))) {
+                && str_contains($name, 'reflection_oop')) {
                 continue;
             }
             if (CompilerVersion::advertisesReflectionConstantClass()

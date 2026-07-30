@@ -981,6 +981,38 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::advertisesReflectionConstantClass());
     }
 
+    public function testAdvertisesReflectionConstantClassFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesReflectionConstantClassTrueWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantClass());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantInNamespace());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testAdvertisesReflectionConstantClassTrueWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
