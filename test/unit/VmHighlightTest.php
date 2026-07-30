@@ -28,14 +28,43 @@ final class VmHighlightTest extends TestCase
         $this->assertGreaterThan(20, \strlen($html));
     }
 
-    public function testHighlightEngineDefaultProfileUsesPreCodeWrapper(): void
+    public function testHighlightEngineReferenceProfileUsesCodeSpanNbsp(): void
     {
-        // Default 8.4.0-dev ≥ 8.3 → modern wire format (#24874), not host Zend 8.2.
-        $this->assertTrue(HighlightEngine::usesPreCodeWrapper());
-        $html = HighlightEngine::render('<?php echo 1;');
-        $expected = '<pre><code style="color: #000000"><span style="color: #0000BB">&lt;?php </span><span style="color: #007700">echo </span><span style="color: #0000BB">1</span><span style="color: #007700">;</span></code></pre>';
-        $this->assertSame($expected, $html);
-        $this->assertStringNotContainsString('&nbsp;', $html);
+        // Unset PROFILE on 8.4.0-dev → Zend 8.2 wire (#25063); not bare languageProfile ≥ 8.3.
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(HighlightEngine::usesPreCodeWrapper());
+            $html = HighlightEngine::render('<?php echo 1;');
+            $this->assertMatchesRegularExpression('/<code><span/', $html);
+            $this->assertStringContainsString('&nbsp;', $html);
+            $this->assertStringNotContainsString('<pre>', $html);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testHighlightEngineForwardProfileUsesPreCodeWrapper(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(HighlightEngine::usesPreCodeWrapper());
+            $html = HighlightEngine::render('<?php echo 1;');
+            $expected = '<pre><code style="color: #000000"><span style="color: #0000BB">&lt;?php </span><span style="color: #007700">echo </span><span style="color: #0000BB">1</span><span style="color: #007700">;</span></code></pre>';
+            $this->assertSame($expected, $html);
+            $this->assertStringNotContainsString('&nbsp;', $html);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testHighlightEngineLegacyProfileUsesCodeSpanNbsp(): void
@@ -80,11 +109,21 @@ final class VmHighlightTest extends TestCase
 
     public function testHighlightEngineModernPreservesRawNewlines(): void
     {
-        $code = "line1\nline2\n";
-        $html = HighlightEngine::render($code);
-        $this->assertSame(0, substr_count($html, '<br'));
-        $this->assertStringContainsString("line1\nline2", $html);
-        $this->assertStringContainsString('<pre>', $html);
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $code = "line1\nline2\n";
+            $html = HighlightEngine::render($code);
+            $this->assertSame(0, substr_count($html, '<br'));
+            $this->assertStringContainsString("line1\nline2", $html);
+            $this->assertStringContainsString('<pre>', $html);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmHighlightReturnMode(): void

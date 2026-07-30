@@ -1,5 +1,7 @@
 --TEST--
-stdlib highlight_file() multi-line source preserves raw newlines in Zend 8.4 <pre> wrapper (#23733, ext/standard/highlight.c)
+stdlib highlight_file() multi-line source preserves raw newlines in Zend 8.4 <pre> wrapper (#23733 / #24874, ext/standard/highlight.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $f = tempnam(sys_get_temp_dir(), 'hl');

@@ -1,5 +1,7 @@
 --TEST--
-stdlib highlight_file() multiline — <br /> line breaks (#17557, ext/standard/highlight.c)
+stdlib highlight_file() multiline — Zend 8.4 <pre> raw newlines (#17557 / #24874, ext/standard/highlight.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $f = tempnam(sys_get_temp_dir(), 'hlbr');
