@@ -45,7 +45,8 @@ final class HighlightEngine
             return '<pre><code style="color: '.self::COLOR_DEFAULT.'"></code></pre>';
         }
 
-        return '<code><span style="color: '.self::COLOR_DEFAULT.'"></span>'."\n".'</code>';
+        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'
+            ."\n".'</span>'."\n".'</code>';
     }
 
     /**
@@ -91,7 +92,11 @@ final class HighlightEngine
         }
 
         // Pre-8.3 — <code><span>, &nbsp; for spaces, <br /> for newlines (#24662 / #24750).
-        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'.$body.'</span>'."\n".'</code>';
+        // Zend 8.2 places newlines after the outer open span and before </span></code> (#25264).
+        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n"
+            .$body."\n"
+            .'</span>'."\n"
+            .'</code>';
     }
 
     /**
