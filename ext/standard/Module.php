@@ -129,7 +129,7 @@ class Module extends ModuleAbstract
             new hypot(),
             new atan2(),
             new fmod(),
-            new modf(),
+            // modf() — phantom vs php-src math.stub.php (#25359); keep VmMath::modf / MathModf internal.
             // ldexp() — phantom vs php-src math.stub.php (#24607); keep VmMath::ldexp / MathLdexp internal.
             // frexp() — phantom vs php-src math.stub.php (#24133); keep VmMath::frexp / MathFrexp internal.
             new fdiv(),
@@ -230,7 +230,7 @@ class Module extends ModuleAbstract
             new str_starts_with(),
             new str_ends_with(),
             new strncmp(),
-            new memcmp(),
+            // memcmp() — phantom vs php-src string.stub.php (#25359); keep VmString::memcmp / NCompareJitHelper internal.
             new substr_compare(),
             new array_count(),
             new array_count('sizeof'),

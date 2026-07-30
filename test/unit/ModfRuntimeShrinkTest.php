@@ -9,26 +9,19 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * modf() NestedJIT via JitVmHelperLink::ensureCompiled (#22519 / peer #22495).
+ * Internal modf stays PHP-in-PHP via ModfJitHelper (#15200 / #22519).
+ * Userland modf() was a phantom vs php-src and was unregistered (#25359).
  */
 final class ModfRuntimeShrinkTest extends TestCase
 {
-    public function testModfUsesJitHelperNotLibcLookup(): void
+    public function testMathModfBridgeUsesJitHelperNotLibcLookup(): void
     {
-        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/modf.php');
-        $this->assertStringContainsString('MathModf::invoke', $builtin);
-        $this->assertStringNotContainsString("lookupFunction('modf')", $builtin);
-
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathModf.php');
         $this->assertStringContainsString('ModfJitHelper', $bridge);
         $this->assertStringContainsString('phpc_modf', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
-        $this->assertStringNotContainsString('parseAndCompile', $bridge);
-        $this->assertStringNotContainsString('new JIT(', $bridge);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString("lookupFunction('modf')", $bridge);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/modf.php');
     }
 
     public function testModfJitHelperDelegatesToVmMath(): void
@@ -54,5 +47,6 @@ final class ModfRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('ModfJitHelper.php', $spine);
         $this->assertStringContainsString('MathModf.php', $spine);
+        $this->assertStringNotContainsString('ext/standard/modf.php', $spine);
     }
 }

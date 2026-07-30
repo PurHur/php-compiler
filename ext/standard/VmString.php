@@ -1391,7 +1391,8 @@ final class VmString
     }
 
     /**
-     * memcmp() — zend_binary_strcmp (php-src ext/standard/string.c, #7118).
+     * Internal length-limited binary compare (zend_binary_strcmp; #7118 / #25359).
+     * Not a userland builtin — php-src string.stub.php has no memcmp().
      */
     public static function memcmp(string $a, string $b, int $length): int
     {

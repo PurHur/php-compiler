@@ -8,7 +8,8 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * JIT bridge for memcmp() builtin — delegates to {@see StringNCompare} (#15364).
+ * JIT bridge for internal length-limited binary compare — {@see StringNCompare} (#15364).
+ * Userland memcmp() is not registered (#25359).
  */
 final class StringMemcmp
 {

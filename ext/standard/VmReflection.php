@@ -623,8 +623,7 @@ final class VmReflection
         'get_declared_attributes',
         'get_declared_functions',
         'get_declared_variables',
-        'memcmp',
-        'modf',
+        // memcmp/modf unregistered as userland (#25359); keep hidden if residual registration appears
         'vfscanf',
     ];
 

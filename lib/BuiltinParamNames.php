@@ -475,8 +475,6 @@ final class BuiltinParamNames
                 return ['filename', 'line'];
             case 'number_format':
                 return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
-            case 'modf':
-                return ['num', 'num2'];
             case 'round':
                 return ['num', 'precision', 'mode'];
             case 'frexp':

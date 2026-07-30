@@ -11,12 +11,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for modf() via ModfJitHelper PHP (#15200, #22519).
+ * JIT/AOT link for internal modf via ModfJitHelper PHP (#15200, #22519).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Lcg #22495).
- * Replaces libc `modf` LLVM lookup in ext/standard/modf.php.
+ * Userland modf() is not registered (#25359); keep this for NestedJIT helpers.
  * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
- * php-src: ext/standard/math.c — PHP_FUNCTION(modf)
  */
 final class MathModf
 {
