@@ -694,11 +694,30 @@ final class CompilerVersion
         return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
-    /** PHP 8.3+ ReflectionConstant class advertisement (ext/reflection/php_reflection.c, #12385, #13497, #16837). */
+    /**
+     * PHP 8.3+ ReflectionConstant class advertisement (ext/reflection/php_reflection.c, #12385, #13497, #16837, #25504).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 class_exists gate). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Do not use {@see isForwardProfileAtLeast()} / bare languageProfileVersion()>=8.4 — that
+     * withholds the class under PROFILE=8.3 while php-src has had it since 8.3.0 (#25504).
+     */
     public static function advertisesReflectionConstantClass(): bool
     {
-        // Stable 8.4.0+ or forward profile — 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
