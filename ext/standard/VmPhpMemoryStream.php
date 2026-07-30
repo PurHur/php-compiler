@@ -239,10 +239,13 @@ final class VmPhpMemoryStream
             default => -1,
         };
         if ($pos < 0 || $pos > $len) {
+            $state->seekFailed = true;
+
             return -1;
         }
         $state->position = $pos;
         $state->atEof = false;
+        $state->seekFailed = false;
 
         return 0;
     }
@@ -253,7 +256,8 @@ final class VmPhpMemoryStream
         if (null === $state) {
             return false;
         }
-        if ($state->position > \strlen($state->buffer)) {
+        // php-src main/streams/memory.c — tell fails after rejected seek (#25299).
+        if ($state->seekFailed || $state->position > \strlen($state->buffer)) {
             return false;
         }
 
@@ -562,6 +566,9 @@ final class PhpMemoryStreamState
 
     /** Set after a read returns no data at end-of-file (php_stream_memory.c). */
     public bool $atEof = false;
+
+    /** Set when seek() rejects the target offset; tell() returns false until next successful seek (#25299). */
+    public bool $seekFailed = false;
 
     public bool $canRead;
 

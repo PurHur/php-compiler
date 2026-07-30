@@ -56,6 +56,7 @@ final class StreamIoRuntime
      * @var list<string>
      */
     private const HELPER_BUNDLE = [
+        '/ext/standard/JitMemoryStreamHelper.php',
         '/ext/standard/JitOpenStreamHandles.php',
         self::HELPER_PATH,
     ];
@@ -70,6 +71,10 @@ final class StreamIoRuntime
 
     private const FWRITE = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::fwriteArgv';
 
+    private const FSEEK = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::fseekArgv';
+
+    private const FTELL = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::ftellArgv';
+
     private const SUPPORTS = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::supportsArgv';
 
     /** @var list<string> */
@@ -79,6 +84,8 @@ final class StreamIoRuntime
         self::TMPFILE,
         self::FREAD,
         self::FWRITE,
+        self::FSEEK,
+        self::FTELL,
         self::SUPPORTS,
     ];
 

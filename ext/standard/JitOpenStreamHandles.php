@@ -11,15 +11,11 @@ namespace PHPCompiler\ext\standard;
  * class into the same module so alloc() and isOpen() share one static table. Without it, fopen
  * returns (int)null === 0 and ++$fh never TypeErrors because there is no live resource.
  *
+ * php://memory|temp buffer/seek state lives in {@see JitMemoryStreamHelper} (#25299).
  * php-src: ext/standard/file.c — php_stream resource lifetime
  */
 final class JitOpenStreamHandles
 {
-    private static int $nextId = 0;
-
-    /** @var array<int, true> */
-    private static array $open = [];
-
     public static function isMemoryUri(string $path): bool
     {
         if ('php://memory' === $path) {
@@ -42,19 +38,16 @@ final class JitOpenStreamHandles
 
     public static function alloc(): int
     {
-        $id = ++self::$nextId;
-        self::$open[$id] = true;
-
-        return $id;
+        return JitMemoryStreamHelper::alloc();
     }
 
     public static function isOpen(int $handle): bool
     {
-        return isset(self::$open[$handle]);
+        return JitMemoryStreamHelper::isOpen($handle);
     }
 
     public static function release(int $handle): void
     {
-        unset(self::$open[$handle]);
+        JitMemoryStreamHelper::release($handle);
     }
 }
