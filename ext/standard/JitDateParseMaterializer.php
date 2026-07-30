@@ -111,6 +111,16 @@ final class JitDateParseMaterializer
                 $i1->constInt($result['is_dst'] ? 1 : 0, false)
             );
         }
+        if (isset($result['tz_abbr'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('tz_abbr'));
+            $abbrStr = $context->builder->load($context->constantStringFromString($result['tz_abbr']));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyString'),
+                $ht,
+                $keyStr,
+                $abbrStr
+            );
+        }
         if (isset($result['tz_id'])) {
             $keyStr = $context->builder->load($context->constantStringFromString('tz_id'));
             $tzStr = $context->builder->load($context->constantStringFromString($result['tz_id']));

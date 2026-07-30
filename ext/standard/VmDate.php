@@ -560,18 +560,6 @@ final class VmDate
         self::hashSetLong($ht, 'warning_count', $result['warning_count']);
         self::hashSetLong($ht, 'error_count', $result['error_count']);
         self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
-        if (isset($result['zone_type'])) {
-            self::hashSetLong($ht, 'zone_type', $result['zone_type']);
-        }
-        if (isset($result['zone'])) {
-            self::hashSetLong($ht, 'zone', $result['zone']);
-        }
-        if (isset($result['is_dst'])) {
-            self::hashSetBool($ht, 'is_dst', $result['is_dst']);
-        }
-        if (isset($result['tz_id'])) {
-            self::hashSetString($ht, 'tz_id', $result['tz_id']);
-        }
 
         $warnings = new HashTable();
         foreach ($result['warnings'] as $pos => $message) {
@@ -588,6 +576,23 @@ final class VmDate
         $errorsVar = new Variable();
         $errorsVar->array($errors);
         $ht->add('errors', $errorsVar);
+
+        // php-src php_date.c — zone keys follow is_localtime/errors; tz_abbr before tz_id (#25487).
+        if (isset($result['zone_type'])) {
+            self::hashSetLong($ht, 'zone_type', $result['zone_type']);
+        }
+        if (isset($result['zone'])) {
+            self::hashSetLong($ht, 'zone', $result['zone']);
+        }
+        if (isset($result['is_dst'])) {
+            self::hashSetBool($ht, 'is_dst', $result['is_dst']);
+        }
+        if (isset($result['tz_abbr'])) {
+            self::hashSetString($ht, 'tz_abbr', $result['tz_abbr']);
+        }
+        if (isset($result['tz_id'])) {
+            self::hashSetString($ht, 'tz_id', $result['tz_id']);
+        }
 
         if (isset($result['relative']) && \is_array($result['relative'])) {
             $relative = new HashTable();
