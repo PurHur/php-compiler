@@ -1103,6 +1103,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #24578 — bcdivmod PHP 8.4 stub names; not in php-types InternalArgInfo */
+    public function testBcdivmodReflectionNamedParameters(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('bcdivmod');
+            self::assertSame(['num1', 'num2', 'scale='], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num1', 'bcdivmod'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'num2', 'bcdivmod'));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'scale', 'bcdivmod'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('bcdivmod'));
+            self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('bcdivmod'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #9990 */
     public function testFpowRoundingModeNamedParameters(): void
     {
