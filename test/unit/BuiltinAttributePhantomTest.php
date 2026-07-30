@@ -8,7 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #11902, #12328 */
+/** @covers issue #11902, #12328, #25502 */
 final class BuiltinAttributePhantomTest extends TestCase
 {
     protected function setUp(): void
@@ -36,5 +36,25 @@ final class BuiltinAttributePhantomTest extends TestCase
         $this->assertFalse(isset($ctx->classes['enumcases']));
         $this->assertFalse(isset($ctx->classes['delayedtargetvalidation']));
         $this->assertFalse(isset($ctx->classes['compiletime']));
+    }
+
+    /** @covers issue #25502 */
+    public function testDeprecatedAttributeIsInertOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export(class_exists('Deprecated', false));
+echo "\n";
+var_export(class_exists('Override', false));
+echo "\n";
+#[\Deprecated]
+function h25502_unit() {}
+var_export((new ReflectionFunction('h25502_unit'))->isDeprecated());
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'issue_25502_unit.php'));
+        $this->assertSame("false\nfalse\nfalse\n", ob_get_clean());
     }
 }
