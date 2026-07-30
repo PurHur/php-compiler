@@ -633,9 +633,10 @@ final class BuiltinParamNames
                 return ['stream', 'format', 'values'];
             case 'pack':
                 return ['format', 'values'];
+            // php-src ext/standard/array.stub.php — array ...$arrays (0 required); InternalArgInfo still arr1+... (#25382)
             case 'array_merge':
             case 'array_merge_recursive':
-                return ['arrays'];
+                return ['...arrays'];
             case 'var_dump':
             case 'debug_zval_dump':
             case 'max':

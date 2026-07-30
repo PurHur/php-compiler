@@ -13,17 +13,20 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayMergeRecursiveRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * array_merge_recursive() — deep merge with scalar→array promotion (ext/standard/array.c parity; #3297).
  *
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_merge_recursive)
+ * Zero args → empty array (same as array_merge; stub array ...$arrays, #25382).
  */
 final class array_merge_recursive extends Internal
 {
@@ -31,7 +34,9 @@ final class array_merge_recursive extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 1) {
-            throw new \ArgumentCountError('array_merge_recursive() expects at least 1 argument, 0 given');
+            BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->newArray());
+
+            return;
         }
         if (null === $frame->returnVar) {
             return;
@@ -62,7 +67,7 @@ final class array_merge_recursive extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 1) {
-            throw new \ArgumentCountError('array_merge_recursive() expects at least 1 argument, 0 given');
+            return HashTableHelper::emptyVariable($context)->value;
         }
 
         TypeErrorRaise::ensureLinked($context);
