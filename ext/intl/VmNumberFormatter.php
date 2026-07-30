@@ -598,8 +598,8 @@ final class VmNumberFormatter
             if ($hasOffset) {
                 $offset = $start + $consumed;
             }
-        } elseif (self::isRuleBasedStyle($style)) {
-            // SPELLOUT/ORDINAL/DURATION/PATTERN_RULEBASED — ICU unum_parseDouble (#25161).
+        } elseif (self::isRuleBasedStyle($style) || self::SCIENTIFIC === $style) {
+            // SPELLOUT/ORDINAL/DURATION/PATTERN_RULEBASED (#25161) + SCIENTIFIC (#25162).
             $parsed = self::icuParseDouble($state, $slice);
             if (null === $parsed) {
                 self::failParse($formatter);
@@ -1230,7 +1230,12 @@ final class VmNumberFormatter
             return $formatted;
         }
         if (self::SCIENTIFIC === $style) {
-            $body = self::formatScientificFromState($state, $num);
+            // Prefer ICU unum_formatDouble so `#E0` matches Zend (`1.234E3`; #25162).
+            $formatted = self::icuFormatDouble($state, $num);
+            if (null !== $formatted) {
+                return $formatted;
+            }
+            $body = self::formatScientificFromState($state, abs($num));
 
             return self::applyTextAffixes($state, $body, $num < 0);
         }
@@ -1606,9 +1611,24 @@ final class VmNumberFormatter
     {
         $decimal = $state['symbols'][self::DECIMAL_SEPARATOR_SYMBOL]
             ?? self::separatorsForLocale($state['locale'])[1];
-        $s = sprintf('%.6E', $num);
+        // PHP fallback for `#E0` when ICU FFI is unavailable (#25162).
+        if (0.0 === $num || -0.0 === $num) {
+            return '0E0';
+        }
+        $abs = abs($num);
+        $exp = (int) floor(log10($abs) + 1e-12);
+        $mant = $abs / (10.0 ** $exp);
+        if ($mant >= 10.0 - 1e-9) {
+            $mant = 1.0;
+            ++$exp;
+        }
+        $mantStr = rtrim(rtrim(sprintf('%.6F', $mant), '0'), '.');
+        if ('' === $mantStr) {
+            $mantStr = '0';
+        }
+        $mantStr = str_replace('.', $decimal, $mantStr);
 
-        return str_replace('.', $decimal, $s);
+        return $mantStr.'E'.$exp;
     }
 
     /** @deprecated kept for parse helpers that still take locale-only separators */
