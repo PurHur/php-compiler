@@ -343,6 +343,14 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_node_replacechild_identity.phpt',
             'dom_node_replacechild_identity.phpt'
         );
+        yield 'dom_getelementbyid_replacechild_same_id.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_getelementbyid_replacechild_same_id.phpt',
+            'dom_getelementbyid_replacechild_same_id.phpt'
+        );
+        yield 'dom_getelementbyid_duplicate_setidattribute.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_getelementbyid_duplicate_setidattribute.phpt',
+            'dom_getelementbyid_duplicate_setidattribute.phpt'
+        );
         yield 'dom_node_replacewith_middle_string_literal.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_node_replacewith_middle_string_literal.phpt',
             'dom_node_replacewith_middle_string_literal.phpt'
