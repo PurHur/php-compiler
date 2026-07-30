@@ -742,17 +742,16 @@ final class VmString
     }
 
     /**
-     * strtok() arg #2 ($token) — TypeError labels "?string" like php-src (#9207, ext/standard/string.c).
+     * strtok() arg #2 ($token) — Z_PARAM_STR_OR_NULL; null stays null (#25171, #9207, php-src string.c).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
-    public static function coerceStrtokTokenArg(Variable $var): string
+    public static function coerceStrtokTokenArg(Variable $var): ?string
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            VmNullStringParamDeprecation::emit(null, 'strtok', 1, 'token');
-
-            return '';
+            // php-src Z_PARAM_STR_OR_NULL — null token selects one-arg mode (tok = str), not "".
+            return null;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::nullableStringBuiltinTypeError('strtok', 1, 'token', 'array'));

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for phpc_strtok (#9812, php-in-PHP).
+ * Lowered into JIT/AOT modules for phpc_strtok (#9812, #25171, php-in-PHP).
+ *
+ * Non-nullable `string` params (+ null flags) keep NestedJIT on __string__* ABI;
+ * `string|false` return is boxed `__value__*` (bridge maps false → null __string__*).
  *
  * SSOT: {@see VmString::strtok()} (php-src ext/standard/string.c — PHP_FUNCTION(strtok)).
  */
@@ -16,9 +19,9 @@ final class StrtokJitHelper
         VmString::strtokResetState();
     }
 
-    public static function init(?string $str): void
+    public static function init(string $str, int $isNull): void
     {
-        if (null === $str) {
+        if (0 !== $isNull) {
             self::reset();
 
             return;
@@ -26,25 +29,19 @@ final class StrtokJitHelper
         VmString::strtokInitState($str);
     }
 
-    /**
-     * @return ?string null when strtok() would return false (JIT null __string__*)
-     */
-    public static function tokenize(?string $str, ?string $tok, int $init): ?string
-    {
+    public static function tokenize(
+        string $str,
+        string $tok,
+        int $init,
+        int $strIsNull,
+        int $tokIsNull
+    ): string|false {
+        $strArg = 0 !== $strIsNull ? null : $str;
+        $tokArg = 0 !== $tokIsNull ? null : $tok;
         if (0 !== $init) {
-            if (null === $str || null === $tok) {
-                self::reset();
-
-                return null;
-            }
-            $result = VmString::strtok($str, $tok);
-        } else {
-            if (null === $tok) {
-                return null;
-            }
-            $result = VmString::strtok($tok);
+            return VmString::strtok($strArg, $tokArg);
         }
 
-        return false === $result ? null : $result;
+        return VmString::strtok($tokArg);
     }
 }

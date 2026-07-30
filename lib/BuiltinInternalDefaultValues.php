@@ -274,6 +274,10 @@ final class BuiltinInternalDefaultValues
         'getopt' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/string.stub.php — ?string $token = null (#25171)
+        'strtok' => [
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

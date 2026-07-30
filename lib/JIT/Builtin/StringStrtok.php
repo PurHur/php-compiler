@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_strtok via StrtokJitHelper PHP (#9812).
+ * JIT/AOT link for phpc_strtok via StrtokJitHelper PHP (#9812, #25171).
  *
- * Replaces former ~480-line LLVM buffer/table walk with thin bridges into {@see VmString} SSOT.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringGetenv #20644).
+ * Manual bridges: null __string__* → null flags; string|false → null __string__* for false.
  * php-src: ext/standard/string.c — PHP_FUNCTION(strtok)
  */
 final class StringStrtok
@@ -46,25 +50,35 @@ final class StringStrtok
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('phpc_strtok');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'strtok_bridge_entry')) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#9812'
+        );
         self::implementResetBridge($context);
         self::implementInitBridge($context);
         self::implementTokenizeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementResetBridge(Context $context): void
     {
         $abiName = '__phpc_strtok_reset';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'strtok_reset_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -72,11 +86,8 @@ final class StringStrtok
 
         $voidTy = $context->getTypeFromString('void');
         $ft = $context->context->functionType($voidTy, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('strtok_reset_bridge_entry');
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, 'strtok_reset_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $context->builder->call(self::helperFunction($context, self::RESET_HELPER));
         $context->builder->returnVoid();
@@ -87,7 +98,7 @@ final class StringStrtok
     {
         $abiName = '__phpc_strtok_init';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'strtok_init_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -96,16 +107,28 @@ final class StringStrtok
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($voidTy, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('strtok_init_bridge_entry');
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, 'strtok_init_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(
-            self::helperFunction($context, self::INIT_HELPER),
-            $fn->getParam(0)
+
+        $helper = self::helperFunction($context, self::INIT_HELPER);
+        $strArg = $fn->getParam(0);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $strArg,
+            $strPtr->constNull()
         );
+        $strForHelper = $context->builder->select($isNull, $empty, $strArg);
+        $i64 = $context->getTypeFromString('int64');
+        $nullFlag = $context->builder->zext($isNull, $i64);
+        // string params are __string__* (QuotPrint peer); int may be boxed — coerce only flag.
+        $flagArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $nullFlag,
+            $helper->getParam(1)->typeOf()
+        );
+        $context->builder->call($helper, $strForHelper, $flagArg);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -114,7 +137,7 @@ final class StringStrtok
     {
         $abiName = 'phpc_strtok';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'strtok_bridge_entry')) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -123,60 +146,51 @@ final class StringStrtok
         $strPtr = $context->getTypeFromString('__string__*');
         $i8 = $context->getTypeFromString('int8');
         $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i8);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('strtok_bridge_entry');
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, 'strtok_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::TOKENIZE_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2)
+
+        $helper = self::helperFunction($context, self::TOKENIZE_HELPER);
+        $strArg = $fn->getParam(0);
+        $tokArg = $fn->getParam(1);
+        $initArg = $fn->getParam(2);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $strNull = $context->builder->icmp(Builder::INT_EQ, $strArg, $strPtr->constNull());
+        $tokNull = $context->builder->icmp(Builder::INT_EQ, $tokArg, $strPtr->constNull());
+        $strForHelper = $context->builder->select($strNull, $empty, $strArg);
+        $tokForHelper = $context->builder->select($tokNull, $empty, $tokArg);
+        $i64 = $context->getTypeFromString('int64');
+        $strNullFlag = $context->builder->zext($strNull, $i64);
+        $tokNullFlag = $context->builder->zext($tokNull, $i64);
+        $initI64 = $context->builder->zext($initArg, $i64);
+
+        $raw = $context->builder->call(
+            $helper,
+            $strForHelper,
+            $tokForHelper,
+            JitNestedHelperCoerce::coerceArgForHelper($context, $initI64, $helper->getParam(2)->typeOf()),
+            JitNestedHelperCoerce::coerceArgForHelper($context, $strNullFlag, $helper->getParam(3)->typeOf()),
+            JitNestedHelperCoerce::coerceArgForHelper($context, $tokNullFlag, $helper->getParam(4)->typeOf())
         );
-        $context->builder->returnValue($result);
+
+        $isFalse = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $fail = $fn->appendBasicBlock('strtok_bridge_false');
+        $ok = $fn->appendBasicBlock('strtok_bridge_ok');
+        $context->builder->branchIf($isFalse, $fail, $ok);
+
+        $context->builder->positionAtEnd($fail);
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
+        );
         $context->registerFunction($abiName, $fn);
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StrtokJitHelper compile (#9812)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StrtokJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('StrtokJitHelper.php parseAndCompile failed (#9812)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9812)');
-            }
-        }
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#9812');
     }
 
     private static function registerLinkedRuntime(Context $context): void

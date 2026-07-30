@@ -215,6 +215,8 @@ final class BuiltinInternalArgInfo
             'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
+            // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
+            'strtok' => 1 === $index ? '?string' : null,
             // ext/pcre/php_pcre.stub.php — string|array unions; &$count = null untyped (#23587)
             'preg_replace', 'preg_filter' => match ($index) {
                 0, 1, 2 => 'array|string',

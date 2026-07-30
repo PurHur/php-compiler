@@ -13,7 +13,7 @@ final class StrtokVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['strtok.phpt', 'strtok_null_continuation.phpt', 'strtok_type_error.phpt'] as $file) {
+        foreach (['strtok.phpt', 'strtok_null_continuation.phpt', 'strtok_null_token.phpt', 'strtok_type_error.phpt'] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file

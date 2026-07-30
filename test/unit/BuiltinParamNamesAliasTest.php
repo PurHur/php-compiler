@@ -1679,6 +1679,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #25171 */
+    public function testStrtokReflectionNullTokenDefaultNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('strtok');
+        self::assertSame(['string', 'token='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'strtok'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'token', 'strtok'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'strtok'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('strtok'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('strtok'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('strtok', 1));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('strtok', 1);
+        self::assertNotNull($info);
+        self::assertSame('?string', $info['type']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'strtok',
+            1,
+            ['name' => 'token', 'type' => '?string', 'isOptional' => true],
+            false
+        ));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'strtok',
+            1,
+            ['name' => 'token', 'type' => '?string', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
     /** @covers issue #23492 */
     public function testGethostbynameZendStubNamedParams(): void
     {

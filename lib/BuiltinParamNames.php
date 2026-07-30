@@ -1315,6 +1315,10 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/split_length (#23206)
             case 'str_split':
                 return ['string', 'length'];
+            // php-src ext/standard/string.stub.php — string $string, ?string $token = null (#25171)
+            // InternalArgInfo still says str / required non-nullable token typed "str".
+            case 'strtok':
+                return ['string', 'token='];
             // php-src ext/standard/password.stub.php — calleeParamMetadata uses forFunction; verify missing from InternalArgInfo (#23207)
             case 'password_hash':
                 return ['password', 'algo', 'options'];
