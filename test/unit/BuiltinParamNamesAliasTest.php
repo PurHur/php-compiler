@@ -3504,4 +3504,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #25381 */
+    public function testHeaderAndStreamContextStubParamTypes(): void
+    {
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('header_remove', 0));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('headers_sent', 0));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('headers_sent', 1));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride('header_register_callback', 0));
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_get_default', 0));
+
+        self::assertSame('?string', BuiltinInternalArgInfo::paramInfoForFunction('header_remove', 0)['type']);
+        self::assertSame('', BuiltinInternalArgInfo::paramInfoForFunction('headers_sent', 0)['type']);
+        self::assertSame('', BuiltinInternalArgInfo::paramInfoForFunction('headers_sent', 1)['type']);
+        self::assertSame('callable', BuiltinInternalArgInfo::paramInfoForFunction('header_register_callback', 0)['type']);
+        self::assertSame('?array', BuiltinInternalArgInfo::paramInfoForFunction('stream_context_get_default', 0)['type']);
+    }
+
 }

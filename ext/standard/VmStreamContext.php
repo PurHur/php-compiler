@@ -214,9 +214,10 @@ final class VmStreamContext
     public static function requireOptionsArray(
         Variable $var,
         string $functionName,
-        int $argNum = 2
+        int $argNum = 2,
+        string $expectedType = 'array'
     ): Variable {
-        return self::requireContextArrayArg($var, $functionName, $argNum, 'options');
+        return self::requireContextArrayArg($var, $functionName, $argNum, 'options', $expectedType);
     }
 
     public static function requireParamsArray(
@@ -231,15 +232,17 @@ final class VmStreamContext
         Variable $var,
         string $functionName,
         int $argNum,
-        string $label
+        string $label,
+        string $expectedType = 'array'
     ): Variable {
         $resolved = $var->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $resolved->type) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                '%s(): Argument #%d ($%s) must be of type %s, %s given',
                 $functionName,
                 $argNum,
                 $label,
+                $expectedType,
                 VmStreamArg::debugTypeName($resolved)
             ));
         }
@@ -249,15 +252,20 @@ final class VmStreamContext
 
     /**
      * stream_context_get_default() — lazy singleton with optional merge (ext/standard/streams.c, #6367).
+     *
+     * php-src basic_functions.stub.php — ?array $options = null (#25381).
      */
     public static function getDefault(?Variable $optionsVar = null): Variable
     {
         $context = self::ensureDefaultContext();
         if (null !== $optionsVar) {
-            self::setOptions(
-                $context,
-                self::requireOptionsArray($optionsVar, 'stream_context_get_default', 1)
-            );
+            $resolved = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_NULL !== $resolved->type) {
+                self::setOptions(
+                    $context,
+                    self::requireOptionsArray($optionsVar, 'stream_context_get_default', 1, '?array')
+                );
+            }
         }
 
         return $context;

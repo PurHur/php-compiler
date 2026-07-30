@@ -57,6 +57,11 @@ final class JitStreamContextGetDefault
 
     private static function loadOptionalArrayArg(Context $context, JITVariable $arg, int $position): Value
     {
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        // php-src basic_functions.stub.php — ?array $options = null (#25381)
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $htPtrTy->constNull();
+        }
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->helper->loadValue($arg);
         }
