@@ -45,6 +45,13 @@ final class json_encode extends Internal
                 $maxDepth
             );
         } catch (VmJsonExportException $e) {
+            // php-src: THROW without PARTIAL leaves JSON_G(error_code) unchanged (#25456).
+            if (
+                VmJsonFlags::throwsOnError($flags)
+                && !VmJsonFlags::partialOutputOnError($flags)
+            ) {
+                VmJson::throwExceptionPreservingLastError($e->errorCode);
+            }
             VmJson::setLastError($e->errorCode);
             if (VmJsonFlags::throwsOnError($flags)) {
                 throw new \JsonException(VmJson::lastErrorMsg(), $e->errorCode);
@@ -77,7 +84,8 @@ final class json_encode extends Internal
             $encoded = VmJsonFormat::encodeExported($literal, $knownFlags);
             if (false === $encoded) {
                 if (VmJsonFlags::throwsOnError($knownFlags)) {
-                    throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
+                    // encodeExported throws on THROW; false is soft-failure only.
+                    throw new \LogicException('json_encode() THROW path returned false');
                 }
                 throw new \LogicException('json_encode() failed');
             }

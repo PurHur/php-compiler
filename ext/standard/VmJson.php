@@ -57,6 +57,19 @@ final class VmJson
         self::$lastError = $code;
     }
 
+    /**
+     * JSON_THROW_ON_ERROR — throw without updating json_last_error (#25456).
+     *
+     * php-src ext/json/json.c: php_json_decode_ex / PHP_FUNCTION(json_encode) leave
+     * JSON_G(error_code) unchanged when throwing JsonException (neither set nor clear).
+     *
+     * @throws \JsonException
+     */
+    public static function throwExceptionPreservingLastError(int $code): never
+    {
+        throw new \JsonException(self::errorMsgForCode($code), $code);
+    }
+
     public static function lastErrorMsg(): string
     {
         return self::errorMsgForCode(self::$lastError);
