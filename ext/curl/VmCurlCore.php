@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\curl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -32,10 +33,11 @@ final class VmCurlCore
     }
 
     /**
-     * Zend-shaped curl_version() payload (php-src ext/curl/interface.c PHP_FUNCTION(curl_version); #24463).
+     * Zend-shaped curl_version() payload (php-src ext/curl/interface.c PHP_FUNCTION(curl_version); #24463, #25357).
      *
-     * Key order matches master php-src: version_number, age, features, feature_list, ssl_*, version,
+     * Key order matches php-src: version_number, age, features, [feature_list on 8.4+], ssl_*, version,
      * host, libz, protocols, then age-gated ares/libidn/iconv/libssh/brotli fields.
+     * {@code feature_list} is PHP 8.4+ only — withheld on the 8.2 reference profile (#25357).
      *
      * @return array<string, int|string|list<string>|array<string, bool>>
      */
@@ -48,14 +50,17 @@ final class VmCurlCore
             'version_number' => self::LIBCURL_VERSION_NUM,
             'age' => $age,
             'features' => $features,
-            'feature_list' => self::featureList($features),
-            'ssl_version_number' => 0,
-            'version' => self::LIBCURL_VERSION,
-            'host' => 'x86_64-pc-linux-gnu',
-            'ssl_version' => 'OpenSSL/3.0.13',
-            'libz_version' => '1.3',
-            'protocols' => self::bundledProtocols(),
         ];
+        // php-src 8.4.0+: feature_list between features and ssl_version_number (#25357).
+        if (CompilerVersion::advertisesCurlVersionFeatureList()) {
+            $info['feature_list'] = self::featureList($features);
+        }
+        $info['ssl_version_number'] = 0;
+        $info['version'] = self::LIBCURL_VERSION;
+        $info['host'] = 'x86_64-pc-linux-gnu';
+        $info['ssl_version'] = 'OpenSSL/3.0.13';
+        $info['libz_version'] = '1.3';
+        $info['protocols'] = self::bundledProtocols();
         if ($age >= 1) {
             $info['ares'] = '';
             $info['ares_num'] = 0;

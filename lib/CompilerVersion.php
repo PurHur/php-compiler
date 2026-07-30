@@ -1155,6 +1155,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ curl_version()['feature_list'] (php-src ext/curl/interface.c; #25357, #21337).
+     *
+     * Absent on Zend 8.2/8.3. Withhold on 8.4.0-dev reference / PROFILE≤8.3;
+     * enable via stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}.
+     */
+    public static function advertisesCurlVersionFeatureList(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ curl_multi_get_handles() (php-src ext/curl/multi.c; #20520).
      *
      * Withheld on 8.4.0-dev / PROFILE=8.4 so function_exists matches Zend 8.4. Enable via
