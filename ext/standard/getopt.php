@@ -27,11 +27,18 @@ final class getopt extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
+        // Named rest_index: alone leaves a hole at long_options (php-src basic_functions.stub.php; #25144).
+        $maxIndex = -1;
+        foreach (\array_keys($frame->calledArgs) as $index) {
+            if (\is_int($index) && $index > $maxIndex) {
+                $maxIndex = $index;
+            }
+        }
+        $argc = $maxIndex + 1;
+        if ($argc < 1 || $argc > 3 || !\array_key_exists(0, $frame->calledArgs)) {
             throw new \ArgumentCountError(\sprintf(
                 'getopt() expects between 1 and 3 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
             ));
         }
         if (null === $frame->returnVar) {
@@ -49,7 +56,7 @@ final class getopt extends Internal
         );
 
         $longOptions = [];
-        if ($argc >= 2) {
+        if (\array_key_exists(1, $frame->calledArgs) && null !== $frame->calledArgs[1]) {
             $longArg = $frame->calledArgs[1]->resolveIndirect();
             if (EnumCaseSupport::isEnumCaseVariable($longArg)) {
                 throw new \TypeError(\sprintf(
@@ -70,7 +77,7 @@ final class getopt extends Internal
         }
 
         $restIndexArg = null;
-        if ($argc >= 3) {
+        if (\array_key_exists(2, $frame->calledArgs) && null !== $frame->calledArgs[2]) {
             $restIndexArg = $frame->calledArgs[2];
             VmGetopt::validateRestIndexByRef($restIndexArg, 'getopt', 2);
         }
