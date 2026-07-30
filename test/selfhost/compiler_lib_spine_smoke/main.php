@@ -6384,6 +6384,7 @@ require_once __DIR__.'/../../../ext/pspell/pspell_store_replacement.php';
 require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
 require_once __DIR__.'/../../../ext/phar/bootstrap_pharexception.php';
+require_once __DIR__.'/../../../ext/apcu/ApcuExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
 require_once __DIR__.'/../../../ext/apcu/Module.php';
 require_once __DIR__.'/../../../ext/apcu/VmApcu.php';

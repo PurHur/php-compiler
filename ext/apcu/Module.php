@@ -7,9 +7,10 @@ namespace PHPCompiler\ext\apcu;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * apcu extension module entry (PECL apcu / php-src ext/apcu; #6574).
+ * apcu extension module entry (PECL apcu / php-src ext/apcu; #6574, #24909).
  *
- * PHP-in-PHP in-process user cache — no runtime/*.c growth.
+ * PHP-in-PHP in-process user cache — no runtime/*.c growth. Advertise apcu_* /
+ * extension_loaded('apcu') only when {@see ApcuExtensionPolicy::advertisesExtension()}.
  */
 class Module extends ModuleAbstract
 {
@@ -23,6 +24,10 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!ApcuExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
         return [
             new apcu_store(),
             new apcu_fetch(),
