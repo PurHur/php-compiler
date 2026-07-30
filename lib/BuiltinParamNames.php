@@ -528,7 +528,9 @@ final class BuiltinParamNames
             case 'msg_queue_exists':
                 return ['key'];
             case 'spl_autoload_register':
-                return ['callback', 'throw', 'prepend'];
+                // php-src ext/spl/spl.stub.php — ?callable=null, throw=true, prepend=false (#25390)
+                // InternalArgInfo still says autoload_function + bool infer defaults throw to false.
+                return ['callback=', 'throw=', 'prepend='];
             // php-src ext/spl/spl.stub.php — InternalArgInfo still says autoload_function (#23680)
             case 'spl_autoload_unregister':
                 return ['callback'];

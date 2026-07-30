@@ -868,6 +868,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #25390 */
+    public function testSplAutoloadRegisterReflectionNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('spl_autoload_register');
+        self::assertSame(['callback=', 'throw=', 'prepend='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', 'spl_autoload_register'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('spl_autoload_register'));
+        self::assertSame('?callable', BuiltinInternalArgInfo::stubParamTypeOverride('spl_autoload_register', 0));
+        self::assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('spl_autoload_register', 1));
+    }
+
     /** @covers issue #25392 */
     public function testDateCreateReflectionNamedParametersAndArity(): void
     {
