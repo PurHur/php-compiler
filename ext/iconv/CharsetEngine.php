@@ -35,6 +35,14 @@ final class CharsetEngine
         return false;
     }
 
+    /** @return null Always null — utf8Codepoints() return type is ?array */
+    private static function failCodepoints(int $error): null
+    {
+        self::$lastError = $error;
+
+        return null;
+    }
+
     /**
      * @return array{0: string, 1: int}|null [canonical encoding, flags]
      */
@@ -89,11 +97,9 @@ final class CharsetEngine
         [$toCanon, $toFlags] = $to;
         $flags = $fromFlags | $toFlags;
 
+        // php-src iconv.c: same charset still validates the input sequence.
+        // Skipping that short-circuits illegal UTF-8/ASCII as a passthrough (#25167).
         if ($fromCanon === $toCanon) {
-            if (0 === $flags) {
-                return $input;
-            }
-
             return self::applySameEncodingFlags($fromCanon, $input, $flags);
         }
 
@@ -120,15 +126,32 @@ final class CharsetEngine
     }
 
     /**
-     * Same canonical encoding with //IGNORE or //TRANSLIT suffix (php-src iconv.c).
+     * Same canonical encoding — validate (and optionally //IGNORE/TRANSLIT) per php-src iconv.c.
      */
     private static function applySameEncodingFlags(string $canon, string $input, int $flags): string|false
     {
-        if ('UTF-8' === $canon) {
-            return self::normalizeUtf8($input, $flags);
+        return match ($canon) {
+            'UTF-8' => self::normalizeUtf8($input, $flags),
+            // High bytes are illegal in ASCII even when from==to (#25167).
+            'ASCII' => self::asciiToUtf8($input, $flags),
+            'ISO-8859-1' => $input,
+            'UTF-16LE' => self::normalizeUtf16($input, $flags, false),
+            'UTF-16BE' => self::normalizeUtf16($input, $flags, true),
+            default => $input,
+        };
+    }
+
+    private static function normalizeUtf16(string $input, int $flags, bool $be): string|false
+    {
+        $utf8 = self::utf16ToUtf8($input, $flags, $be);
+        if (false === $utf8) {
+            return false;
+        }
+        if (0 === ($flags & (self::FLAG_IGNORE | self::FLAG_TRANSLIT))) {
+            return $input;
         }
 
-        return $input;
+        return self::utf8ToUtf16($utf8, $flags, $be);
     }
 
     private static function normalizeUtf8(string $input, int $flags): string|false
@@ -217,7 +240,7 @@ final class CharsetEngine
             $len = \strlen($input);
             for ($i = 0; $i < $len; ++$i) {
                 if (\ord($input[$i]) > 0x7F) {
-                    return false;
+                    return self::failUtf8(self::ERROR_ILLEGAL);
                 }
             }
 
@@ -388,7 +411,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return self::failUtf8(self::ERROR_ILLEGAL);
+                    return self::failCodepoints(self::ERROR_ILLEGAL);
                 }
                 $out[] = (($b & 0x1F) << 6) | ($b2 & 0x3F);
                 $i += 2;
@@ -403,7 +426,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return self::failUtf8(self::ERROR_ILLEGAL);
+                    return self::failCodepoints(self::ERROR_ILLEGAL);
                 }
                 $out[] = (($b & 0x0F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
                 $i += 3;
@@ -419,7 +442,7 @@ final class CharsetEngine
                         continue;
                     }
 
-                    return self::failUtf8(self::ERROR_ILLEGAL);
+                    return self::failCodepoints(self::ERROR_ILLEGAL);
                 }
                 $out[] = (($b & 0x07) << 18) | (($b2 & 0x3F) << 12) | (($b3 & 0x3F) << 6) | ($b4 & 0x3F);
                 $i += 4;
@@ -430,7 +453,7 @@ final class CharsetEngine
                 continue;
             }
 
-            return self::failUtf8(self::classifyUtf8Failure($input, $i, $len));
+            return self::failCodepoints(self::classifyUtf8Failure($input, $i, $len));
         }
 
         return $out;

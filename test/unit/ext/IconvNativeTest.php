@@ -76,6 +76,23 @@ final class IconvNativeTest extends TestCase
         $this->assertSame('ab', VmIconv::iconv('UTF-8', 'UTF-8//IGNORE', $input));
     }
 
+    /** Same-charset illegal sequence must fail (php-src iconv.c / #25167). */
+    public function testSameCharsetIllegalUtf8ReturnsFalse(): void
+    {
+        $input = "a\x80b";
+        $this->assertFalse(CharsetEngine::convert('UTF-8', 'UTF-8', $input));
+        $this->assertSame(CharsetEngine::ERROR_ILLEGAL, CharsetEngine::lastError());
+        $this->assertFalse(VmIconv::iconv('UTF-8', 'UTF-8', $input));
+        $this->assertSame('ab', CharsetEngine::convert('UTF-8', 'UTF-8//IGNORE', $input));
+    }
+
+    public function testSameCharsetIllegalAsciiReturnsFalse(): void
+    {
+        $this->assertFalse(CharsetEngine::convert('ASCII', 'ASCII', "\x80"));
+        $this->assertSame(CharsetEngine::ERROR_ILLEGAL, CharsetEngine::lastError());
+        $this->assertSame("\x80", CharsetEngine::convert('ISO-8859-1', 'ISO-8859-1', "\x80"));
+    }
+
     public function testIconvStringHelpersLatin1(): void
     {
         $iso = "\xE9\xE8\xE7";
