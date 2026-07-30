@@ -89,6 +89,8 @@ final class BuiltinInternalArgInfo
             'simplexml_load_string', 'simplexml_load_file' => 'SimpleXMLElement|false',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
+            // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
+            'hash_pbkdf2' => 'string',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
@@ -289,6 +291,14 @@ final class BuiltinInternalArgInfo
             'hash_hkdf' => match ($index) {
                 0, 1, 3, 4 => 'string',
                 2 => 'int',
+                default => null,
+            },
+            // ext/hash/hash.stub.php — typed params; length/binary/options optional (#25469)
+            'hash_pbkdf2' => match ($index) {
+                0, 1, 2 => 'string',
+                3, 4 => 'int',
+                5 => 'bool',
+                6 => 'array',
                 default => null,
             },
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
