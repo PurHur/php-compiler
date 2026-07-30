@@ -3358,4 +3358,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #24562 */
+    public function testGetprotoProtocolReflectionNames(): void
+    {
+        foreach (['getprotobyname', 'getprotobynumber'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['protocol'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'protocol', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'name', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'proto', $fn));
+        }
+    }
+
 }

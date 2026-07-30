@@ -380,6 +380,10 @@ final class BuiltinParamNames
             case 'getmxrr':
                 // php-src basic_functions.stub.php — hosts/weights (InternalArgInfo mxhosts/weight) (#23353)
                 return ['hostname', 'hosts', 'weights='];
+            // php-src basic_functions.stub.php — protocol (InternalArgInfo name/proto) (#24562)
+            case 'getprotobyname':
+            case 'getprotobynumber':
+                return ['protocol'];
             // php-src ext/standard/basic_functions.stub.php — host→hostname (#23358)
             case 'checkdnsrr':
             case 'dns_check_record':
