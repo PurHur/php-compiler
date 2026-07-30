@@ -580,6 +580,24 @@ final class VmNumberFormatter
             if ($hasOffset) {
                 $offset = $start + $consumed;
             }
+        } elseif (self::PERCENT === $style) {
+            // PERCENT: consume percent symbol and scale /100 (inverse of format; #25160).
+            $parsed = self::parsePercentSlice($slice, $state);
+            if (null === $parsed) {
+                if ($hasOffset) {
+                    $bare = self::matchNumberPrefix($slice, $state['locale']);
+                    if (null !== $bare) {
+                        $offset = $start + $bare[1];
+                    }
+                }
+                self::failParse($formatter);
+
+                return false;
+            }
+            [$num, $consumed] = $parsed;
+            if ($hasOffset) {
+                $offset = $start + $consumed;
+            }
         } elseif ($hasOffset) {
             $prefix = self::matchNumberPrefix($slice, $state['locale']);
             if (null === $prefix) {
@@ -667,6 +685,35 @@ final class VmNumberFormatter
         IntlError::clear();
 
         return $num;
+    }
+
+    /**
+     * Parse a PERCENT amount prefix; return [fractionalValue, bytesConsumed] or null.
+     *
+     * Requires an immediate percent symbol after the numeric prefix (ICU percent
+     * style / php-src numfmt_parse; #25160). Scales by /100 to invert format().
+     *
+     * @param array{locale: string, symbols?: array<int, string>} $state
+     *
+     * @return array{0: float, 1: int}|null
+     */
+    private static function parsePercentSlice(string $slice, array $state): ?array
+    {
+        $prefix = self::matchNumberPrefix($slice, $state['locale']);
+        if (null === $prefix) {
+            return null;
+        }
+        [$num, $numBytes] = $prefix;
+        $pct = $state['symbols'][self::PERCENT_SYMBOL] ?? '%';
+        if ('' === $pct) {
+            $pct = '%';
+        }
+        $after = \substr($slice, $numBytes);
+        if (!str_starts_with($after, $pct)) {
+            return null;
+        }
+
+        return [$num / 100.0, $numBytes + \strlen($pct)];
     }
 
     /**
