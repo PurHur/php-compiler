@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_iconv via IconvJitHelper PHP (#9345).
+ * JIT/AOT link for __compiler_iconv via IconvJitHelper PHP (#9345, #25570).
  *
  * Replaces ~750-line CharsetEngine LLVM monolith. SSOT: {@see \PHPCompiler\ext\iconv\VmIconv}.
  * php-src: ext/iconv/iconv.c — PHP_FUNCTION(iconv)
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MimeContentTypeRuntime #25544).
  */
 final class IconvRuntime
 {
@@ -116,7 +117,7 @@ final class IconvRuntime
         $context->builder->positionAtEnd($body);
         $resultRaw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::CONVERT_HELPER),
+            self::helperFunction($context),
             [$from, $to, $input]
         );
         $result = JitNestedHelperCoerce::coerceBridgeResult($context, $resultRaw, $strPtr);
@@ -126,47 +127,21 @@ final class IconvRuntime
         $context->builder->returnValue($strPtr->constNull());
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after IconvJitHelper compile (#9345)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::CONVERT_HELPER, '#25570');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'IconvJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('IconvJitHelper.php parseAndCompile failed (#9345)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT iconv (#9345)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25570'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -174,7 +149,7 @@ final class IconvRuntime
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after IconvRuntime bridge (#9345)');
+                throw new \LogicException($name.' missing after IconvRuntime bridge (#25570)');
             }
             $context->registerFunction($name, $fn);
         }
