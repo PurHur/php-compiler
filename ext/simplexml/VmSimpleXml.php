@@ -211,7 +211,12 @@ final class VmSimpleXml
         }
         $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
-            self::warn($ctx, 'simplexml_load_file(): Failed to open stream: No such file or directory', $frame);
+            // php-src php_sxe_load_file / libxml error handler — I/O warning + entity path (#25295).
+            self::warn(
+                $ctx,
+                'simplexml_load_file(): I/O warning : failed to load external entity "'.$filename.'"',
+                $frame
+            );
 
             return null;
         }
