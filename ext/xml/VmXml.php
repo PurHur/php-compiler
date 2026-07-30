@@ -252,8 +252,9 @@ final class VmXml
     private static function clearParserDiagnostics(int $parser): void
     {
         self::$parsers[$parser]['errorCode'] = 0;
-        self::$parsers[$parser]['line'] = 0;
-        self::$parsers[$parser]['column'] = 0;
+        // Match Expat fresh-parser defaults (line/column start at 1; #25286).
+        self::$parsers[$parser]['line'] = 1;
+        self::$parsers[$parser]['column'] = 1;
         self::$parsers[$parser]['byteIndex'] = 0;
     }
 
