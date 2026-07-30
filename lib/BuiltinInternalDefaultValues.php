@@ -378,6 +378,16 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'null'],
             1 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/date/php_date.stub.php — string $datetime = "now", ?DateTimeZone $timezone = null (#25392)
+        // Functions absent from InternalArgInfo entirely.
+        'date_create' => [
+            0 => ['kind' => 'string', 'value' => 'now'],
+            1 => ['kind' => 'null'],
+        ],
+        'date_create_immutable' => [
+            0 => ['kind' => 'string', 'value' => 'now'],
+            1 => ['kind' => 'null'],
+        ],
         // php-src ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (#25166)
         'datetime::createfromformat' => [
             2 => ['kind' => 'null'],

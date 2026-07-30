@@ -31,6 +31,10 @@ final class BuiltinInternalArgInfo
     public static function returnTypeLabelForFunction(string $name): ?string
     {
         $lc = strtolower($name);
+        $stub = self::stubReturnTypeLabelForFunction($lc);
+        if (null !== $stub) {
+            return $stub;
+        }
         $info = self::instance()->functions[$lc] ?? null;
         if (null === $info) {
             return null;
@@ -45,6 +49,19 @@ final class BuiltinInternalArgInfo
         }
 
         return $ret;
+    }
+
+    /**
+     * php-src stub return when InternalArgInfo omits the function entirely (#25392).
+     */
+    public static function stubReturnTypeLabelForFunction(string $callableLc): ?string
+    {
+        return match ($callableLc) {
+            // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
+            'date_create' => 'DateTime|false',
+            'date_create_immutable' => 'DateTimeImmutable|false',
+            default => null,
+        };
     }
 
     public static function paramCountForFunction(string $name): ?int
@@ -195,6 +212,12 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
+            // ext/date/php_date.stub.php — absent from InternalArgInfo (#25392)
+            'date_create', 'date_create_immutable' => match ($index) {
+                0 => 'string',
+                1 => '?DateTimeZone',
+                default => null,
+            },
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string required) (#25173)
             'timezone_identifiers_list' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#25276)

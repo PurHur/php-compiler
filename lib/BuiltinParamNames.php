@@ -286,10 +286,10 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — ?int $baseTimestamp = null (#23216 / #24845)
             case 'strtotime':
                 return ['datetime', 'baseTimestamp='];
-            // php-src ext/date/php_date.stub.php — Reflection had empty params (#23276)
+            // php-src ext/date/php_date.stub.php — Reflection empty / InternalArgInfo absent (#23276 / #25392)
             case 'date_create':
             case 'date_create_immutable':
-                return ['datetime', 'timezone'];
+                return ['datetime=', 'timezone='];
             // php-src ext/date/php_date.stub.php — Reflection empty / InternalArgInfo pre-stub (#23289)
             case 'date_create_from_format':
             case 'date_create_immutable_from_format':
