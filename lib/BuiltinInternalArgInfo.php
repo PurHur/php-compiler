@@ -92,6 +92,8 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
+            'class_implements', 'class_parents', 'class_uses' => 'array|false',
             default => null,
         };
     }
@@ -263,6 +265,8 @@ final class BuiltinInternalArgInfo
             'unixtojd' => 0 === $index ? '?int' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
+            // Zend/zend_builtin_functions.stub.php — object|string untyped in Reflection (InternalArgInfo object) (#25498)
+            'class_parents' => 0 === $index ? '' : null,
             // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)
             'user_error' => match ($index) {
                 0 => 'string',

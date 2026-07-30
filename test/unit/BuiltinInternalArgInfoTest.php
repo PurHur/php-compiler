@@ -131,6 +131,16 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzdecode'));
     }
 
+    /** php-src Zend/zend_builtin_functions.stub.php — array|false + untyped object_or_class (#25498). */
+    public function testClassImplementsFamilyReflectionStubs(): void
+    {
+        foreach (['class_implements', 'class_parents', 'class_uses'] as $f) {
+            $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('class_parents', 0));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('class_implements', 0));
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));
