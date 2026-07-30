@@ -110,11 +110,12 @@ final class VmIteratorWalk
         $count = 0;
         $iterable = $iterable->resolveIndirect();
         if (Variable::TYPE_ARRAY === $iterable->type) {
+            // php-src ext/spl/php_spl.c — count each invoked iteration before checking callback (#25326).
             foreach ($iterable->toArray()->iterateKeyed(true) as $pair) {
+                ++$count;
                 if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
-                ++$count;
             }
 
             return $count;
@@ -123,10 +124,10 @@ final class VmIteratorWalk
             $gen = $iterable->toObject()->generatorState;
             $gen->rewind();
             while ($gen->hasCurrent && !$gen->done) {
+                ++$count;
                 if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
-                ++$count;
                 if (!$vm->resumeGenerator($gen)) {
                     break;
                 }
@@ -138,10 +139,10 @@ final class VmIteratorWalk
         $object = ForeachIterator::resolveTraversableObject($vm, $frame, $iterable);
         $vm->invokeForeachInstanceMethod($frame, $object, 'rewind');
         while ($vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+            ++$count;
             if (!self::invokeApplyCallback($frame, $callback, $params)) {
                 break;
             }
-            ++$count;
             $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
             if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
