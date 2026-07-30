@@ -3183,4 +3183,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #25261 */
+    public function testPhpUnameReflectionModeDefault(): void
+    {
+        $info = ['name' => 'mode', 'type' => 'string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('php_uname', 0, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'php_uname', 0, $info));
+        self::assertSame('a', $dest->toString());
+    }
+
 }
