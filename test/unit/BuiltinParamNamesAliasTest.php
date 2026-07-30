@@ -2722,6 +2722,43 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($file, 'ns', 'simplexml_load_file'));
     }
 
+    /** @covers issue #25510 */
+    public function testSimpleXmlLoadReflectionStubTypesAndDefaults(): void
+    {
+        foreach (['simplexml_load_string', 'simplexml_load_file'] as $fn) {
+            self::assertSame(
+                'SimpleXMLElement|false',
+                BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn)
+            );
+            self::assertSame(
+                'SimpleXMLElement|false',
+                BuiltinInternalArgInfo::returnTypeLabelForFunction($fn)
+            );
+            self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+            self::assertNull(BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+
+            $classInfo = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            self::assertNotNull($classInfo);
+            self::assertSame('?string', $classInfo['type']);
+            self::assertTrue($classInfo['isOptional']);
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $classInfo, false));
+            $classDef = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($classDef, $fn, 1, $classInfo));
+            self::assertSame(Variable::TYPE_STRING, $classDef->type);
+            self::assertSame('SimpleXMLElement', $classDef->toString());
+
+            $nsInfo = BuiltinInternalArgInfo::paramInfoForFunction($fn, 3);
+            self::assertNotNull($nsInfo);
+            self::assertSame('string', $nsInfo['type']);
+            self::assertTrue($nsInfo['isOptional']);
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 3, $nsInfo, false));
+            $nsDef = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($nsDef, $fn, 3, $nsInfo));
+            self::assertSame(Variable::TYPE_STRING, $nsDef->type);
+            self::assertSame('', $nsDef->toString());
+        }
+    }
+
     /** @covers issue #23624 */
     public function testXmlSetElementHandlerStubNamedParamsResolve(): void
     {

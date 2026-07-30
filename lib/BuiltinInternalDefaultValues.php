@@ -509,6 +509,16 @@ final class BuiltinInternalDefaultValues
             4 => ['kind' => 'null'],
             5 => ['kind' => 'null'],
         ],
+        // php-src ext/simplexml/simplexml.stub.php — class_name=SimpleXMLElement::class; ns="" (#25510)
+        // ?string would infer null; plain string does not infer "" — both need explicit values.
+        'simplexml_load_string' => [
+            1 => ['kind' => 'string', 'value' => 'SimpleXMLElement'],
+            3 => ['kind' => 'string', 'value' => ''],
+        ],
+        'simplexml_load_file' => [
+            1 => ['kind' => 'string', 'value' => 'SimpleXMLElement'],
+            3 => ['kind' => 'string', 'value' => ''],
+        ],
     ];
 
     public static function isAvailable(
