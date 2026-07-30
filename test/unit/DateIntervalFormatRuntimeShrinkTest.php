@@ -7,7 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\DateIntervalFormatJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** DateIntervalFormatRuntime: embed + standalone route through DateIntervalFormatJitHelper PHP (#9499, #12800). */
+/**
+ * DateIntervalFormatRuntime routes through DateIntervalFormatJitHelper PHP via
+ * JitVmHelperLink::ensureCompiled (#9499 / #25121 / peer #25042 / #25116).
+ */
 final class DateIntervalFormatRuntimeShrinkTest extends TestCase
 {
     public function testDateIntervalFormatRuntimeUsesJitHelperBridgeOnly(): void
@@ -15,10 +18,17 @@ final class DateIntervalFormatRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatRuntime.php');
         $this->assertStringContainsString('formatFromScalars', $source);
         $this->assertStringContainsString('DateIntervalFormatJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('DateIntervalFormatStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitFormatCode', $source);
         $this->assertStringNotContainsString('implementFormat(', $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php');
     }
