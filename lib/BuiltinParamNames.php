@@ -18,7 +18,7 @@ final class BuiltinParamNames
     {
         return match (strtolower($qualifiedMethod)) {
             'datetime::createfromformat',
-            'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone'],
+            'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone='],
             'datetime::__construct',
             'datetimeimmutable::__construct' => ['datetime', 'timezone'],
             'datetime::format' => ['format'],

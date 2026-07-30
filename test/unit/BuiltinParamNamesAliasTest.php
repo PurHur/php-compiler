@@ -813,14 +813,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', 'round'));
     }
 
-    /** @covers issue #11785 */
+    /** @covers issue #11785 / #25166 */
     public function testDateTimeClassMethodNamedParameters(): void
     {
         $names = BuiltinParamNames::forClassMethod('DateTime::createFromFormat');
-        self::assertSame(['format', 'datetime', 'timezone'], $names);
+        self::assertSame(['format', 'datetime', 'timezone='], $names);
         self::assertSame(
             1,
             BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'DateTime::createFromFormat')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('DateTime', 'createFromFormat'));
+        self::assertSame(
+            ['format', 'datetime', 'timezone='],
+            BuiltinParamNames::forClassMethod('DateTimeImmutable::createFromFormat')
         );
 
         $ctor = BuiltinParamNames::forClassMethod('DateTimeImmutable::__construct');

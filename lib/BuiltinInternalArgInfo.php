@@ -307,6 +307,9 @@ final class BuiltinInternalArgInfo
             'splfileobject::fputcsv' => 4 === $index ? 'string' : null,
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string) (#25172)
             'datetimezone::listidentifiers' => 1 === $index ? '?string' : null,
+            // ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (InternalArgInfo datetimezone) (#25166)
+            'datetime::createfromformat',
+            'datetimeimmutable::createfromformat' => 2 === $index ? '?DateTimeZone' : null,
             default => null,
         };
     }
