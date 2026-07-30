@@ -395,12 +395,6 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
-            throw new \ValueError(sprintf(
-                'XMLWriter::writeAttributeNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
-                var_export($prefix, true)
-            ));
-        }
         self::endOpenAttributeIfNeeded($state);
         $qname = self::composeQName($prefix, $name);
         $state->buffer .= ' '.self::escapeElementName($qname).'="'.self::escapeAttribute($content).'"';
@@ -427,12 +421,6 @@ final class VmXmlWriter
             throw new \ValueError(sprintf(
                 'XMLWriter::startElementNs(): Argument #2 ($name) must be a valid element name, %s given',
                 var_export($name, true)
-            ));
-        }
-        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
-            throw new \ValueError(sprintf(
-                'XMLWriter::startElementNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
-                var_export($prefix, true)
             ));
         }
         self::closeStartTagIfOpen($state);
@@ -474,12 +462,6 @@ final class VmXmlWriter
             throw new \ValueError(sprintf(
                 'XMLWriter::startAttributeNs(): Argument #2 ($name) must be a valid attribute name, %s given',
                 var_export($name, true)
-            ));
-        }
-        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
-            throw new \ValueError(sprintf(
-                'XMLWriter::startAttributeNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
-                var_export($prefix, true)
             ));
         }
         self::endOpenAttributeIfNeeded($state);
@@ -562,12 +544,6 @@ final class VmXmlWriter
             throw new \ValueError(sprintf(
                 'XMLWriter::writeElementNs(): Argument #2 ($name) must be a valid element name, %s given',
                 var_export($name, true)
-            ));
-        }
-        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
-            throw new \ValueError(sprintf(
-                'XMLWriter::writeElementNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
-                var_export($prefix, true)
             ));
         }
         self::closeStartTagIfOpen($state);
@@ -1437,16 +1413,6 @@ final class VmXmlWriter
     private static function isValidAttributeName(string $name): bool
     {
         return self::isValidElementName($name);
-    }
-
-    /** NCName for namespace prefixes (no colon). */
-    private static function isValidNcName(string $name): bool
-    {
-        if ('' === $name) {
-            return false;
-        }
-
-        return (bool) preg_match('/^[A-Za-z_][A-Za-z0-9._-]*$/', $name);
     }
 
     private static function composeQName(?string $prefix, string $localName): string
