@@ -266,9 +266,9 @@ if (null !== $unitPath) {
         '/ext/standard/HashEqualsJitHelper.php' => true,
         // Peer always-helper (#21026); NestedJIT digest path until unit.o green.
         '/ext/standard/HashCryptoJitHelper.php' => true,
-        // HtmlspecialcharsJitHelper is self-contained (#20487); allow HELPER_RUNTIME_O
-        // so user-script AOT (MiniWebApp htmlspecialchars on include-bound locals, #22845)
-        // does not fall through to an empty NestedJIT stub.
+        // unit.o returns "" for method-return / dynamic string args; NestedJIT recursive
+        // escapeFrom works (#25345 MiniWebApp $appName). Re-enable when unit.o matches.
+        '/ext/standard/HtmlspecialcharsJitHelper.php' => true,
         // Peer always-helper (#20589); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/VarExportJitHelper.php' => true,
         // var_dump/print_r need consumer-module NestedJIT + live VM (#16075 / #23540).

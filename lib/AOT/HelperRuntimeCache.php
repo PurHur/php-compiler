@@ -71,6 +71,10 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\strreplacejithelper::replaceargv' => true,
         'phpcompiler\\ext\\standard\\strreplacejithelper::ireplaceargv' => true,
         'phpcompiler\\ext\\standard\\strreplacejithelper::takelastcount' => true,
+        // #25345 — helper-runtime unit.o returns "" for method-return / dynamic string args;
+        // NestedJIT recursive escapeFrom works (MiniWebApp $appName).
+        'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::htmlspecialchars' => true,
+        'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::escapefrom' => true,
         // #24156 — prelinked helper TUs lack main-module {closure}_* proxies; NestedJIT
         // closure helpers into the user AOT module so NestedClosureInvoke can dispatch.
         'phpcompiler\\ext\\standard\\arrayreducejithelper::reducewithclosure' => true,
