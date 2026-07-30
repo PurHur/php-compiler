@@ -517,7 +517,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testPregSplitNamedParameters(): void
     {
         $names = BuiltinParamNames::forFunction('preg_split');
-        self::assertSame(['pattern', 'subject', 'limit', 'flags'], $names);
+        self::assertSame(['pattern', 'subject', 'limit=', 'flags='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'pattern', 'preg_split'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'subject', 'preg_split'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'preg_split'));
@@ -590,13 +590,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testPregReplaceCallbackArrayNamedParameters(): void
     {
         $names = BuiltinParamNames::forFunction('preg_replace_callback_array');
-        self::assertSame(['pattern', 'subject', 'limit', 'count', 'flags='], $names);
+        self::assertSame(['pattern', 'subject', 'limit=', 'count=', 'flags='], $names);
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'preg_replace_callback_array'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'count', 'preg_replace_callback_array'));
         self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'preg_replace_callback_array'));
 
         $cb = BuiltinParamNames::forFunction('preg_replace_callback');
-        self::assertSame(['pattern', 'callback', 'subject', 'limit', 'count', 'flags='], $cb);
+        self::assertSame(['pattern', 'callback', 'subject', 'limit=', 'count=', 'flags='], $cb);
         self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($cb, 'count', 'preg_replace_callback'));
         self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($cb, 'flags', 'preg_replace_callback'));
     }

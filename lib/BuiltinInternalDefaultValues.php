@@ -120,6 +120,29 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'int', 'value' => 0],
             4 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/pcre/php_pcre.stub.php — int $limit = -1; &$count = null (#24969)
+        'preg_replace' => [
+            3 => ['kind' => 'int', 'value' => -1],
+            4 => ['kind' => 'null'],
+        ],
+        'preg_filter' => [
+            3 => ['kind' => 'int', 'value' => -1],
+            4 => ['kind' => 'null'],
+        ],
+        'preg_replace_callback' => [
+            3 => ['kind' => 'int', 'value' => -1],
+            4 => ['kind' => 'null'],
+            5 => ['kind' => 'int', 'value' => 0],
+        ],
+        'preg_replace_callback_array' => [
+            2 => ['kind' => 'int', 'value' => -1],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'int', 'value' => 0],
+        ],
+        'preg_split' => [
+            2 => ['kind' => 'int', 'value' => -1],
+            3 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/hash/hash.stub.php — binary=false, options=[] (#25068)
         'hash' => [
             2 => ['kind' => 'bool', 'value' => false],
