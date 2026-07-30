@@ -96,6 +96,8 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
+            // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046)
+            'filter_var' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
             default => null,
@@ -311,6 +313,12 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
+            // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
+            'filter_var' => match ($index) {
+                0 => 'mixed',
+                2 => 'array|int',
+                default => null,
+            },
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
             'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)

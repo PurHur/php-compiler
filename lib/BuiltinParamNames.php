@@ -1088,8 +1088,9 @@ final class BuiltinParamNames
             // php-src ext/json/json.stub.php — missing from InternalArgInfo (#23876)
             case 'json_validate':
                 return ['json', 'depth=', 'flags='];
+            // php-src ext/filter/filter.stub.php — filter=FILTER_DEFAULT, options=0 (#25046)
             case 'filter_var':
-                return ['value', 'filter', 'options'];
+                return ['value', 'filter=', 'options='];
             // php-src ext/filter/filter.stub.php — InternalArgInfo still says filtername (#23658)
             case 'filter_id':
                 return ['name'];
