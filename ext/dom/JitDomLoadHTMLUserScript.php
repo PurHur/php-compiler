@@ -146,10 +146,12 @@ final class JitDomLoadHTMLUserScript
         if (null !== $optionsArg->compileTimeLong) {
             return $optionsArg->compileTimeLong;
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $optionsArg->type && JITVariable::KIND_VALUE === $optionsArg->kind) {
+        // Bitwise-OR of LIBXML_* constants often lands as LLVM ConstantInt (#25547 AOT).
+        $llvmValue = $optionsArg->value ?? null;
+        if (null !== $llvmValue && isset($llvmValue->value)) {
             $lib = $context->llvm->lib;
-            if (null !== $lib->LLVMIsAConstantInt($optionsArg->value->value)) {
-                return (int) $lib->LLVMConstIntGetZExtValue($optionsArg->value->value);
+            if (null !== $lib->LLVMIsAConstantInt($llvmValue->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($llvmValue->value);
             }
         }
         $literal = $optionsArg->compileTimeString ?? null;
@@ -161,6 +163,11 @@ final class JitDomLoadHTMLUserScript
             $lookup = strtolower($name);
             if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
                 return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            foreach (LibxmlConstants::parseFlagConstants() as $constName => $constValue) {
+                if (strtolower($constName) === $lookup) {
+                    return $constValue;
+                }
             }
             $vm = $context->runtime->vmContext;
             if (null !== $vm) {
