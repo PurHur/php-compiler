@@ -5430,9 +5430,18 @@ restart:
 
                         return null;
                     } catch (\CompileError $e) {
-                        // Zend inheritance compile fatals during eval are uncatchable
-                        // E_COMPILE_ERROR (zend_error_noreturn), not try/catch (#22922, #22329).
-                        $this->raiseEvalCompileFatal($e, $frame);
+                        // php-src: zend_throw_exception(CompileError) is catchable in eval (#25114);
+                        // zend_inheritance.c zend_error_noreturn(E_COMPILE_ERROR) is not (#22922, #22329).
+                        if (!VmEval::isCatchableCompileError($e)) {
+                            $this->raiseEvalCompileFatal($e, $frame);
+                        }
+                        $catchFrame = $this->dispatchVmEvalCompileError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return null;
                     }
                     $dest->copyFrom($evalResult);
                     break;
@@ -11043,6 +11052,31 @@ restart:
     private function dispatchVmCompileError(\CompileError $error, Frame $frame): ?Frame
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeCompileError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /**
+     * Catchable CompileError from eval() — Zend zend_throw_exception file shape (#25114).
+     *
+     * php-src: zif_eval / zend_eval_string — exception file is parent(line) : eval()'d code.
+     */
+    private function dispatchVmEvalCompileError(\CompileError $error, Frame $frame): ?Frame
+    {
+        $evalLine = 1;
+        if ($error instanceof \PHPCompiler\Compiler\CompileFatal && $error->sourceLine > 0) {
+            // wrapEvalCode prepends "<?php\n" — map compiler line back to eval body (#22796).
+            $evalLine = $error->sourceLine > 1 ? $error->sourceLine - 1 : max(1, $error->sourceLine);
+        } elseif ($error->getCode() > 0) {
+            $evalLine = $error->getCode();
+        }
+        [$file, $line] = VM\ExceptionSupport::evalFatalSite($frame, $evalLine);
         $thrown = VM\BuiltinExceptionSupport::materializeCompileError(
             $this->context,
             $error->getMessage(),

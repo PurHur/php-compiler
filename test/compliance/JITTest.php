@@ -1480,6 +1480,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_method_eval_override')) {
                 continue;
             }
+            // eval() catchable CompileError (zend_throw_exception): VM TYPE_EVAL (#25114); MCJIT TYPE_SMALLER / inline eval pending.
+            if (str_contains($name, 'eval_compile_error_catchable')) {
+                continue;
+            }
             // final plain property override/child_override _84: host PHP 8.2 parser rejects `final` on plain properties (#24687).
             if (str_contains($name, 'final_plain_property_override_84')
                 || str_contains($name, 'final_plain_property_child_override_84')
