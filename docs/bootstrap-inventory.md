@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6638 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21373 |
+| Source constructs flagged (warnings) | 21372 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5263,7 +5263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringConvertUu.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCountChars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringDateTime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
@@ -6517,7 +6517,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/WeakMapIterator.php` | 0 | 2 |
 | `lib/VM/WeakRefRegistry.php` | 0 | 3 |
 | `lib/VM/WeakRefSupport.php` | 0 | 12 |
-| `lib/VM/ZendDeclaredInterfaces.php` | 0 | 2 |
+| `lib/VM/ZendDeclaredInterfaces.php` | 0 | 3 |
 | `lib/Visitor/ExitFunctionResolver.php` | 0 | 1 |
 | `lib/Visitor/InOperatorResolver.php` | 0 | 2 |
 | `lib/Visitor/VoidCastResolver.php` | 0 | 2 |
@@ -41586,7 +41586,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 539)
+- new InternalArgInfo (line 546)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -41602,8 +41602,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1842)
-- new ArgumentCountError (line 1853)
+- new ArgumentCountError (line 1844)
+- new ArgumentCountError (line 1855)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -45138,9 +45138,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringDateTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 125)
 - 6 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringDeployPath.php`
 
@@ -53834,8 +53832,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ZendDeclaredInterfaces.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 43)
-- 2 class method(s)
+- new ParameterMetadata (line 87)
+- new ClassEntry (line 109)
+- 5 class method(s)
 
 ### `lib/Visitor/ExitFunctionResolver.php`
 
