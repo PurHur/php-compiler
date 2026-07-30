@@ -27,7 +27,7 @@ final class ini_restore extends Internal
         if (null === $frame->vmContext) {
             return;
         }
-        $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ini_restore', 0, 'varname');
+        $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ini_restore', 0, 'option');
         VmIni::restore($frame->vmContext, $option);
     }
 
@@ -36,7 +36,7 @@ final class ini_restore extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ini_restore() requires exactly one argument');
         }
-        $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_restore', 0, 'varname');
+        $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_restore', 0, 'option');
         JitIni::restore($context, $optionStr);
 
         return $context->getTypeFromString('int32')->constInt(0, false);

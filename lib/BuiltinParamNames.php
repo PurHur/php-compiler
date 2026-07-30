@@ -540,6 +540,15 @@ final class BuiltinParamNames
                 return ['option'];
             case 'ini_set':
                 return ['option', 'value'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says varname (#23568)
+            case 'ini_restore':
+                return ['option'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says value (#23568)
+            case 'ignore_user_abort':
+                return ['enable='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says new_include_path (#23568)
+            case 'set_include_path':
+                return ['include_path'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says new_error_level (#23436)
             case 'error_reporting':
                 return ['error_level'];
