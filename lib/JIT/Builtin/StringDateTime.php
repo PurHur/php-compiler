@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_format_datetime via FormatDatetimeJitHelper PHP (#15243).
+ * JIT/AOT link for __compiler_format_datetime via FormatDatetimeJitHelper PHP (#15243, #25433).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrftime #25365 / StringStrptime #25409).
  * Replaces gmtime/localtime/format-char LLVM monolith; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date), PHP_FUNCTION(gmdate)
  */
@@ -93,51 +93,25 @@ final class StringDateTime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after FormatDatetimeJitHelper compile (#15243)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25433');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FormatDatetimeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('FormatDatetimeJitHelper.php parseAndCompile failed (#15243)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#15243)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25433'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__compiler_format_datetime');
         if (null === $fn) {
-            throw new \LogicException('__compiler_format_datetime missing after StringDateTime bridge (#15243)');
+            throw new \LogicException('__compiler_format_datetime missing after StringDateTime bridge (#15243/#25433)');
         }
         $context->registerFunction('__compiler_format_datetime', $fn);
     }
