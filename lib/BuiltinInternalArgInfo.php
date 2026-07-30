@@ -74,6 +74,8 @@ final class BuiltinInternalArgInfo
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
+            // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#25510)
+            'simplexml_load_string', 'simplexml_load_file' => 'SimpleXMLElement|false',
             default => null,
         };
     }
@@ -293,6 +295,8 @@ final class BuiltinInternalArgInfo
                 1 => 'string',
                 default => null,
             },
+            // ext/simplexml/simplexml.stub.php — ?string $class_name (InternalArgInfo string) (#25510)
+            'simplexml_load_string', 'simplexml_load_file' => 1 === $index ? '?string' : null,
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
