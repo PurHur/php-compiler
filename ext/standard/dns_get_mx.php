@@ -39,7 +39,7 @@ final class dns_get_mx extends Internal
         }
 
         $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'dns_get_mx', 0, 'hostname');
-        VmDnsMx::validateArrayByRefArg($frame->calledArgs[1], 'dns_get_mx', 1, 'mxhosts');
+        VmDnsMx::validateArrayByRefArg($frame->calledArgs[1], 'dns_get_mx', 1, 'hosts');
         $weightsArg = null;
         if ($argc >= 3) {
             // php-src dns.c — &$weight is overwritten; non-arrays are not TypeError (#22707).

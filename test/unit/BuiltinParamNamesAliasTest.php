@@ -3341,4 +3341,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse($rawDest->toBool());
     }
 
+    /** @covers issue #23353 */
+    public function testGetmxrrHostsWeightsReflectionNames(): void
+    {
+        foreach (['getmxrr', 'dns_get_mx'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['hostname', 'hosts', 'weights='], $names, $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'hosts', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'weights', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mxhosts', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'weight', $fn));
+        }
+        $info = ['name' => 'weights', 'type' => 'array', 'isOptional' => true];
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'getmxrr', 2, $info));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
 }
