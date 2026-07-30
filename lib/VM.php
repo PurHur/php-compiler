@@ -9272,8 +9272,19 @@ restart:
             $frame = $this->resumeEphemeralCallerFrame($frame);
             goto restart;
         }
-        $this->releaseFrameObjectRefs($frame);
-        goto nextframe;
+        // Match return_value_complete: clear caller callSiteLine so later opcodes
+        // (readonly property writes, etc.) do not cite the prior call (#25556, #21953).
+        $callee = $frame;
+        $caller = $this->context->pop();
+        $this->releaseFrameObjectRefs($callee);
+        if (null !== $caller) {
+            $this->clearOutgoingCallState($caller);
+            $this->restorePendingOutboundCallAfterInlineNew($caller);
+            $frame = $caller;
+            goto restart;
+        }
+
+        return self::SUCCESS;
 
         return_value_complete:
         if ($frame->ephemeral) {
@@ -13495,17 +13506,11 @@ restart:
     private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
         if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
-            $thrown = VM\BuiltinExceptionSupport::materializeError(
-                $this->context,
-                VM\ObjectReadonlySupport::unsetObjectMessage($object)
+            // Stamp user site via dispatchVmError (#25556 / #7343).
+            return $this->dispatchVmError(
+                VM\ObjectReadonlySupport::unsetObjectMessage($object),
+                $frame
             );
-            $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-            if (null !== $catchFrame) {
-                return $catchFrame;
-            }
-            $this->raiseUncaughtException($thrown);
-
-            return null;
         }
 
         $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
@@ -13513,17 +13518,10 @@ restart:
             return null;
         }
 
-        $thrown = VM\BuiltinExceptionSupport::materializeError(
-            $this->context,
-            sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName)
+        return $this->dispatchVmError(
+            sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName),
+            $frame
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
     }
 
     /**
@@ -14136,30 +14134,23 @@ restart:
         unset($object, $propName);
     }
 
-    /** Reject readonly property writes; returns catch frame or throws when uncaught. */
+    /**
+     * Reject readonly property writes; returns catch frame or throws when uncaught.
+     *
+     * Route through {@see dispatchVmError} so file/line stamp the user assignment site
+     * (php-src zend_readonly_property_modification_error / #25556, re-#7343).
+     */
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
         if ($this->shouldDeferReadonlyForPropertySetHook($lvalue, $frame)) {
             return null;
         }
-        $target = $lvalue->resolveIndirect();
         $owner = $this->resolvePropertyWriteOwner($lvalue);
         if (null !== $owner && VM\ObjectReadonlySupport::isDynamicReadonly($owner)) {
-            $thrown = VM\BuiltinExceptionSupport::materializeError(
-                $this->context,
-                VM\ObjectReadonlySupport::modifyObjectMessage($owner)
+            return $this->dispatchVmError(
+                VM\ObjectReadonlySupport::modifyObjectMessage($owner),
+                $frame
             );
-            $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-            if (null !== $catchFrame) {
-                if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                    return null;
-                }
-
-                return $catchFrame;
-            }
-            $this->raiseUncaughtException($thrown);
-
-            return null;
         }
 
         if (null === $owner) {
@@ -14174,45 +14165,23 @@ restart:
             $declaringClassLc = $this->readonlyPropertyDeclaringClassLc($owner, $prop);
             $callerClassLc = $this->callerClassLc($frame);
             if (null !== $declaringClassLc && null !== $callerClassLc && $callerClassLc !== $declaringClassLc) {
-                $thrown = VM\BuiltinExceptionSupport::materializeError(
-                    $this->context,
+                return $this->dispatchVmError(
                     sprintf(
                         'Cannot initialize readonly property %s::$%s from %s',
                         $declaringClass,
                         $prop,
                         $this->propertyWriteScopeLabel($frame)
-                    )
+                    ),
+                    $frame
                 );
-                $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-                if (null !== $catchFrame) {
-                    if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                        return null;
-                    }
-
-                    return $catchFrame;
-                }
-                $this->raiseUncaughtException($thrown);
-
-                return null;
             }
             if ($owner->hasProperty($prop)) {
                 $slot = $owner->getProperty($prop);
                 if (!VM\TypedPropertyCheck::isUninitialized($slot)) {
-                    $thrown = VM\BuiltinExceptionSupport::materializeError(
-                        $this->context,
-                        $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame)
+                    return $this->dispatchVmError(
+                        $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame),
+                        $frame
                     );
-                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-                    if (null !== $catchFrame) {
-                        if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                            return null;
-                        }
-
-                        return $catchFrame;
-                    }
-                    $this->raiseUncaughtException($thrown);
-
-                    return null;
                 }
             }
 
@@ -14226,21 +14195,10 @@ restart:
             return null;
         }
 
-        $thrown = VM\BuiltinExceptionSupport::materializeError(
-            $this->context,
-            $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame)
+        return $this->dispatchVmError(
+            $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame),
+            $frame
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                return null;
-            }
-
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
     }
 
     /**

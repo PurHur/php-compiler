@@ -65,6 +65,67 @@ PHP
         $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
     }
 
+    public function testUncaughtReadonlyPropertyWriteFatalAtUserSite(): void
+    {
+        $stderr = $this->runVmCliFile(<<<'PHP'
+<?php
+class C {
+    public function __construct(public readonly int $x) {}
+}
+$c = new C(1);
+$c->x = 2;
+PHP
+            , 'readonly_uncaught_site.php');
+        $this->assertStringContainsString('Cannot modify readonly property C::$x', $stderr);
+        $this->assertStringContainsString('readonly_uncaught_site.php', $stderr);
+        $this->assertMatchesRegularExpression('/readonly_uncaught_site\.php:6\b/', $stderr);
+        $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
+    }
+
+    public function testCaughtReadonlyPropertyWriteReportsUserSite(): void
+    {
+        $bin = realpath(__DIR__ . '/../../bin/vm.php');
+        $this->assertNotFalse($bin);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_vm_ro_');
+        $this->assertNotFalse($tmp);
+        $script = $tmp . '.php';
+        rename($tmp, $script);
+        file_put_contents($script, <<<'PHP'
+<?php
+class C {
+    public function __construct(public readonly int $x) {}
+}
+try {
+    $c = new C(1);
+    $c->x = 2;
+} catch (Error $e) {
+    echo basename($e->getFile()) . ':' . $e->getLine() . "\n";
+    echo $e->getMessage() . "\n";
+}
+PHP
+        );
+        $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$php, $bin, $script], $descriptor, $pipes, dirname(__DIR__, 2));
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($script);
+        $this->assertSame(0, $exit);
+        $this->assertIsString($stdout);
+        $this->assertStringContainsString('Cannot modify readonly property C::$x', $stdout);
+        $this->assertMatchesRegularExpression('/^[^\n]+:7\n/', $stdout);
+        $this->assertStringNotContainsString('ExceptionSupport.php', $stdout);
+    }
+
     private function runVmCliFile(string $code, ?string $basename = null): string
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
