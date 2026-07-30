@@ -8,18 +8,26 @@ use PHPCompiler\ext\standard\SyslogJitHelper;
 use PHPCompiler\ext\standard\VmSyslog;
 use PHPUnit\Framework\TestCase;
 
-/** StringSyslog routes through SyslogJitHelper PHP not libc LLVM (#9254). */
+/**
+ * StringSyslog NestedJIT via JitVmHelperLink::ensureCompiled (#25461 / peer #25443 / #9254).
+ */
 final class StringSyslogRuntimeShrinkTest extends TestCase
 {
     public function testStringSyslogRoutesThroughSyslogJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSyslog.php');
         $this->assertStringContainsString('SyslogJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString("lookupFunction('openlog')", $source);
         $this->assertStringNotContainsString("lookupFunction('syslog')", $source);
         $this->assertStringNotContainsString("lookupFunction('closelog')", $source);
         $this->assertStringNotContainsString('phpc_syslog_opened', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
     }
 
     public function testJitSyslogPassesStringPointersNotCStrings(): void

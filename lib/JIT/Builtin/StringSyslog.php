@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_syslog_* via SyslogJitHelper PHP (#9254).
+ * JIT/AOT link for __compiler_syslog_* via SyslogJitHelper PHP (#9254, #25461).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringImageTypeToExtension #25443).
  * Replaces libc openlog/syslog/closelog LLVM; SSOT {@see \PHPCompiler\ext\standard\VmSyslog}.
  * php-src: ext/standard/syslog.c
  */
@@ -157,44 +157,18 @@ final class StringSyslog
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SyslogJitHelper compile (#9254)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25461');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SyslogJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SyslogJitHelper.php parseAndCompile failed (#9254)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9254)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25461'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -202,7 +176,7 @@ final class StringSyslog
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringSyslog PHP bridge (#9254)');
+                throw new \LogicException($name.' missing after StringSyslog PHP bridge (#25461)');
             }
             $context->registerFunction($name, $fn);
         }
