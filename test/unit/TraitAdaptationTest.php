@@ -143,6 +143,36 @@ PHP;
         $this->assertSame('1', $this->runVm($code));
     }
 
+    /** Alias onto an existing composed name uses Zend collision wording (#25080). */
+    public function testTraitAsAliasOntoExistingNameIsCollisionFatal(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T {
+    public function f() { return 1; }
+    public function g() { return 2; }
+}
+class A {
+    use T {
+        f as private hid;
+        g as f;
+    }
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_alias_collision.php');
+        try {
+            $rt->run($block);
+            $this->fail('expected trait alias collision fatal');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString(
+                'Trait method T::g has not been applied as A::f, because of collision with T::f',
+                $e->getMessage()
+            );
+            $this->assertStringNotContainsString('Cannot redefine method', $e->getMessage());
+        }
+    }
+
     private function runVm(string $code): string
     {
         $rt = new Runtime();
