@@ -52,20 +52,20 @@
           This is <em>not</em> a full php-src inventory — only items we measure in
           <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities-syntax.md"><code>capabilities-syntax.md</code></a>
           and <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md"><code>capabilities.md</code></a>.
-          Generated 2026-07-29 (matrix mtime).
+          Generated 2026-07-30 (matrix mtime).
         </p>
       </header>
 
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>81</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">3 partial · 5 gaps</p>
+          <strong>82</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">2 partial · 5 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>1096</strong> / 1355 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">226 partial · 33 gaps</p>
+          <strong>1090</strong> / 1293 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">169 partial · 34 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -115,7 +115,7 @@
 <tr data-support="full"><td><code>Fibers (`Fiber`, `Fiber::suspend()`, start/resume)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3130">#3130</a></td></tr>
 <tr data-support="full"><td><code>`ClassName::class` / `static::class`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/740">#740</a></td></tr>
 <tr data-support="full"><td><code>Class member constants `public` / `private` / `protected const`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2199">#2199</a></td></tr>
-<tr data-support="partial"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
+<tr data-support="full"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
 <tr data-support="partial"><td><code>PHP 8.3+ file/namespace typed constants (`const string X = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/7081">#7081</a></td></tr>
 <tr data-support="full"><td><code>PHP 8.3 typed interface constants (`interface I { public const string X = &#039;a&#039;; }`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/5980">#5980</a></td></tr>
 <tr data-support="gap"><td><code>Class constants with `new` object expressions</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/21493">#21493</a></td></tr>
@@ -194,22 +194,6 @@
 <tr data-support="full"><td><code>`acosh`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`addcslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`addslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_add`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_cache_info`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_cas`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_clear_cache`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_dec`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_delete`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_enabled`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_entry`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_fetch`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_inc`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_key_info`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_sma_info`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`apcu_store`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="full"><td><code>`array_all`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`array_any`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_change_key_case`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_chunk`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_column`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -223,8 +207,6 @@
 <tr data-support="full"><td><code>`array_fill`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_fill_keys`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_filter`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`array_find`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`array_find_key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_flip`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_intersect`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_intersect_assoc`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -367,7 +349,7 @@
 <tr data-support="partial"><td><code>`curl_strerror`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`curl_unescape`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`curl_upkeep`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`curl_version`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="full"><td><code>`curl_version`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`current`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`date`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`date_add`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -434,29 +416,6 @@
 <tr data-support="full"><td><code>`dns_get_mx`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`dns_get_record`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`doubleval`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_describe`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_dict_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_free`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_free_dict`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_get_error`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_init`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_list_dicts`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_request_dict`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_request_pwl_dict`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_broker_set_ordering`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_add`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_add_to_personal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_add_to_session`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_check`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_describe`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_get_error`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_is_added`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_is_in_session`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_quick_check`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_remove`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_remove_from_session`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_store_replacement`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`enchant_dict_suggest`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`end`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`enum_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`error_clear_last`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -720,7 +679,7 @@
 <tr data-support="full"><td><code>`json_encode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`json_last_error`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`json_last_error_msg`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`json_validate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`json_validate`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`key_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`krsort`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1084,25 +1043,6 @@
 <tr data-support="full"><td><code>`proc_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`proc_terminate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`property_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_add_to_personal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_add_to_session`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_check`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_clear_session`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_create`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_data_dir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_dict_dir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_ignore`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_mode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_personal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_repl`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_runtogether`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_config_save_repl`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_new`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_new_config`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_new_personal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_save_wordlist`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_store_replacement`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`pspell_suggest`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`putenv`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`quoted_printable_decode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`quoted_printable_encode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1371,10 +1311,8 @@
 <tr data-support="full"><td><code>`stats_standard_deviation`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stats_variance`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`str_contains`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`str_decrement`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`str_ends_with`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`str_getcsv`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`str_increment`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`str_ireplace`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`str_pad`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`str_repeat`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
