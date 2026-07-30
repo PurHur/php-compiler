@@ -630,7 +630,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).
-            // override_property_invalid uses --ENV PROFILE=8.5 (#25138) — keep it runnable.
+            // override_property_invalid uses SKIPIF + --ENV-- PROFILE=8.5 (#25138) — do not
+            // drop it here or --ENV-- never runs.
             if (!CompilerVersion::supportsOverrideAttribute()
                 && (str_contains($name, 'override_attribute_invalid')
                     || str_contains($name, 'override_attribute_fatal')

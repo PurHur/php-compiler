@@ -108,11 +108,12 @@ final class AttributeNamesDuplicateTest extends TestCase
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target class (allowed targets: method)'
+                'Attribute "Override" cannot target class (allowed targets: method, class constant)'
             );
-
             AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'class');
         } finally {
             if (false === $prev) {
@@ -128,11 +129,12 @@ final class AttributeNamesDuplicateTest extends TestCase
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target parameter (allowed targets: method)'
+                'Attribute "Override" cannot target parameter (allowed targets: method, class constant)'
             );
-
             AttributeNames::assertOverrideMethodTargetOnly(['\\Override'], 'parameter');
         } finally {
             if (false === $prev) {
@@ -143,16 +145,16 @@ final class AttributeNamesDuplicateTest extends TestCase
         }
     }
 
-    public function testRejectsOverrideOnPropertyUnderProfile84(): void
+    public function testRejectsOverrideOnPropertyBefore85(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target property (allowed targets: method)'
+                'Attribute "Override" cannot target property (allowed targets: method, class constant)'
             );
-
             AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'property');
         } finally {
             if (false === $prev) {
@@ -163,11 +165,12 @@ final class AttributeNamesDuplicateTest extends TestCase
         }
     }
 
-    public function testAllowsOverrideOnPropertyUnderProfile85(): void
+    public function testAllowsOverrideOnPropertyAt85(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.5');
         try {
+            $this->assertTrue(CompilerVersion::supportsOverridePropertyTarget());
             AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'property');
             $this->addToAssertionCount(1);
         } finally {
