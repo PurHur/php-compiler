@@ -308,7 +308,9 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame($total, BuiltinParamNames::paramCountForInternalFunction($fn), $fn.' total');
         }
         self::assertSame(['format', 'values'], BuiltinParamNames::forFunction('sprintf'));
-        self::assertSame(['arrays'], BuiltinParamNames::forFunction('array_merge'));
+        self::assertSame(['...arrays'], BuiltinParamNames::forFunction('array_merge'));
+        self::assertSame(['...arrays'], BuiltinParamNames::forFunction('array_merge_recursive'));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('...arrays'));
         self::assertNull(BuiltinParamNames::variadicParamIndexForFunction('strlen'));
     }
 
