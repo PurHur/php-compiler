@@ -1950,17 +1950,8 @@ final class BuiltinParamNames
                 'input' => 0,
             ];
         }
-        if ('fgetcsv' === $lc) {
-            // php-src 8.2 arginfo `delimiter` → 8.4 stub `separator` (#12018).
-            return [
-                'delimiter' => 2,
-            ];
-        }
-        if ('str_getcsv' === $lc) {
-            return [
-                'delimiter' => 1,
-            ];
-        }
+        // fgetcsv/str_getcsv: do NOT alias delimiter→separator — Zend 8.2+ stubs already use
+        // separator; named delimiter is Unknown named parameter (#25590, reverts #12018 over-accept).
 
         return [];
     }
@@ -1976,10 +1967,7 @@ final class BuiltinParamNames
         if (str_ends_with($lc, '::createfromformat')) {
             return ['datetime' => 1];
         }
-        if (str_ends_with($lc, '::fgetcsv') || str_ends_with($lc, '::fputcsv')) {
-            // php-src arginfo `delimiter` → stub `separator` (#12018, #22097).
-            return ['delimiter' => str_ends_with($lc, '::fputcsv') ? 1 : 0];
-        }
+        // SplFileObject::fgetcsv/fputcsv: Zend stubs use separator; delimiter is rejected (#25590).
 
         return [];
     }
