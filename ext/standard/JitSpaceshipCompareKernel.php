@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -1052,9 +1053,15 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelperScalars::stringSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
+        // NestedJIT types string params as by-value __value__; kernel holds __string__* (#25255).
+        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
+        $cmpI64 = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            $cmp,
+            $context->getTypeFromString('int64')
+        );
 
-        return $context->builder->trunc($cmp, $context->getTypeFromString('int32'));
+        return $context->builder->trunc($cmpI64, $context->getTypeFromString('int32'));
     }
 
     private static function stringToBool(Context $context, Value $str): Value
@@ -1084,14 +1091,21 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelperScalars::spaceshipNumberString'
         );
-        $cmp = $context->builder->call(
+        $cmp = JitNestedHelperCoerce::callHelper(
+            $context,
             $fn,
-            $num,
-            $str,
-            $context->getTypeFromString('int64')->constInt($numOnLeft ? 1 : 0, false)
+            [
+                $num,
+                $str,
+                $context->getTypeFromString('int64')->constInt($numOnLeft ? 1 : 0, false),
+            ]
         );
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            $cmp,
+            $context->getTypeFromString('int64')
+        );
     }
 
     private static function longSpaceship(Context $context, Value $left, Value $right): Value
@@ -1100,9 +1114,13 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelperScalars::longSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
+        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            $cmp,
+            $context->getTypeFromString('int64')
+        );
     }
 
     private static function kindSpaceship(Context $context, Value $left, Value $right): Value
@@ -1111,9 +1129,13 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelperScalars::kindSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
+        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            $cmp,
+            $context->getTypeFromString('int64')
+        );
     }
 
     private static function doubleSpaceship(Context $context, Value $left, Value $right): Value
@@ -1122,9 +1144,13 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelperScalars::doubleSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
+        $cmp = JitNestedHelperCoerce::callHelper($context, $fn, [$left, $right]);
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            $cmp,
+            $context->getTypeFromString('int64')
+        );
     }
 
     private static function doubleToLong(Context $context, Value $num): Value
