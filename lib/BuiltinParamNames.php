@@ -1461,6 +1461,15 @@ final class BuiltinParamNames
                 return ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
             case 'simplexml_load_file':
                 return ['filename', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says file_name (#23785)
+            case 'highlight_file':
+            case 'show_source':
+                return ['filename', 'return='];
+            case 'php_strip_whitespace':
+                return ['filename'];
+            // php-src stub string/return; ensure named string: binds (#23785)
+            case 'highlight_string':
+                return ['string', 'return='];
             // php-src ext/standard/info.stub.php — InternalArgInfo still says what (#24550)
             case 'phpinfo':
                 return ['flags'];
