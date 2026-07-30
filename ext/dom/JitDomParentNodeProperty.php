@@ -86,10 +86,12 @@ final class JitDomParentNodeProperty
 
         $context->builder->positionAtEnd($fatalBlock);
         self::emitFreedNodeError($context);
-        // emitFreedNodeError branches to catch or aborts; keep a dead block for IR validity.
-        $dead = BasicBlockHelper::append($context, 'dom_parent_freed_dead');
-        $context->builder->positionAtEnd($dead);
-        $context->builder->branch($merge);
+        // emitFreedNodeError terminates via catch dispatch or abort. Do not connect
+        // this path to $merge → fetchDeclaredParent (that returned the freed sentinel
+        // as the property value and broke thin-AOT catch / getMessage; #25475).
+        if (!$context->builder->getInsertBlock()->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
 
         $context->builder->positionAtEnd($okBlock);
         $context->builder->branch($merge);

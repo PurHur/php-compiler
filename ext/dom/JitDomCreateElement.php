@@ -155,38 +155,51 @@ final class JitDomCreateElement
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_NODE_NAME, $nameStr);
         self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
         self::storeNullProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_ATTRIBUTES);
+        // Always seed textContent/nodeValue — defineProperty alone leaves a null
+        // __string__* and pure-user-script fetches segfault (#25475 / re-#23251).
+        self::storeTextContentSlots($context, $obj, '');
 
         return $obj;
     }
 
-    /** User-script AOT: materialize DOMElement with textContent (#18493). */
+    /** User-script AOT: materialize DOMElement with textContent (#18493, #25475). */
     public static function materializeElementWithTextContent(
         Context $context,
         string $tag,
         string $textContent
     ): Value {
         $obj = self::materializeElementFromLiteral($context, $tag);
-        if ('' === $textContent) {
-            return $obj;
-        }
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
-        if (!$objectType->hasProperty($classId, 'textContent')) {
-            $objectType->defineProperty($classId, 'textContent', JITVariable::TYPE_STRING);
-        }
-        $textStr = $context->builder->load($context->constantStringFromString($textContent));
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $textStr
-        );
-        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, 'textContent'),
-            $propVar,
-            JITVariable::TYPE_STRING
-        );
+        self::storeTextContentSlots($context, $obj, $textContent);
 
         return $obj;
+    }
+
+    /** Store textContent + nodeValue string slots (empty string is a real store; #25475). */
+    public static function storeTextContentSlots(
+        Context $context,
+        Value $element,
+        string $textContent
+    ): void {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue'] as $prop) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+        $textStr = $context->builder->load($context->constantStringFromString($textContent));
+        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue'] as $prop) {
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $textStr
+            );
+            $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
+                $propVar,
+                JITVariable::TYPE_STRING
+            );
+        }
     }
 
     private static function materializeElementFromRuntimeName(Context $context, JITVariable $nameArg): Value
@@ -219,8 +232,9 @@ final class JitDomCreateElement
             // #21687: contains()/getRootNode without DomRegistry.
             VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
             VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
-            // initTextContentSlot / saveXML / getElementById helpers.
+            // initTextContentSlot / saveXML / getElementById helpers (#25475).
             VmDom::PROP_TEXT_CONTENT => JITVariable::TYPE_STRING,
+            'nodeValue' => JITVariable::TYPE_STRING,
             // DomNodeLiveMutationRuntime::syncElementNavSlots (appendChild path).
             VmDom::PROP_FIRST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
             VmDom::PROP_LAST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,

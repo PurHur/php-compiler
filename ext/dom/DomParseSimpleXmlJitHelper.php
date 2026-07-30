@@ -329,6 +329,33 @@ final class DomParseSimpleXmlJitHelper
         return 'root';
     }
 
+    /**
+     * Document-element textContent for user-script AOT (#25475).
+     *
+     * Concatenates descendant character data (tags stripped) — matches Zend
+     * {@code DOMNode::textContent} for the thin loadXML literal path.
+     */
+    public static function rootTextContentArgv(string $xml): string
+    {
+        if (!preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?(\/?)>/', $xml, $root, PREG_OFFSET_CAPTURE)) {
+            return '';
+        }
+        if ('/' === ($root[2][0] ?? '')) {
+            return '';
+        }
+        $tag = $root[1][0];
+        $afterRoot = (int) $root[0][1] + \strlen($root[0][0]);
+        $close = stripos($xml, '</'.$tag.'>', $afterRoot);
+        $inner = false === $close
+            ? substr($xml, $afterRoot)
+            : substr($xml, $afterRoot, $close - $afterRoot);
+        if ('' === $inner) {
+            return '';
+        }
+
+        return preg_replace('/<[^>]*>/', '', $inner) ?? '';
+    }
+
     /** First element child tag under the document element (#19268). */
     public static function firstChildTagArgv(string $xml): ?string
     {
