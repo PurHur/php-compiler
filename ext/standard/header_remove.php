@@ -32,6 +32,16 @@ final class header_remove extends Internal
                 'header_remove() expects at most 1 argument, '.$argc.' given'
             );
         }
+        // php-src ZEND_PARSE_PARAMETERS before sapi headers_sent (ext/standard/head.c, #25381).
+        $name = null;
+        if ($argc >= 1) {
+            $name = VmString::coerceNullableStringBuiltinArg(
+                $frame->calledArgs[0],
+                'header_remove',
+                0,
+                'name'
+            );
+        }
         if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
             VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
             if (null !== $frame->returnVar) {
@@ -40,20 +50,6 @@ final class header_remove extends Internal
 
             return;
         }
-        if (0 === $argc) {
-            ResponseContext::removeHeader(null);
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->null();
-            }
-
-            return;
-        }
-        $name = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'header_remove',
-            0,
-            'name'
-        );
         ResponseContext::removeHeader($name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
@@ -73,6 +69,9 @@ final class header_remove extends Internal
             return $context->getTypeFromString('int32')->constInt(0, false);
         }
         if (0 === $argc) {
+            JitPendingHeaders::remove($context);
+        } elseif (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            // php-src head.stub.php — ?string $name = null → remove all (#25381)
             JitPendingHeaders::remove($context);
         } else {
             $this->jitString($context, $args[0], 'header_remove() name');

@@ -357,6 +357,14 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/basic_functions.stub.php — array $options (context untyped; #25453)
             'stream_context_set_options' => 1 === $index ? 'array' : null,
+            // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
+            'header_remove' => 0 === $index ? '?string' : null,
+            // ext/standard/head.stub.php — &$filename / &$line untyped (InternalArgInfo string/int) (#25381)
+            'headers_sent' => ($index >= 0 && $index <= 1) ? '' : null,
+            // ext/standard/head.stub.php — callable $callback (InternalArgInfo empty) (#25381)
+            'header_register_callback' => 0 === $index ? 'callable' : null,
+            // ext/standard/basic_functions.stub.php — ?array $options = null (InternalArgInfo array) (#25381)
+            'stream_context_get_default' => 0 === $index ? '?array' : null,
             // ext/standard/basic_functions.stub.php — trailing bool $raw = false (#23358)
             'dns_get_record' => 4 === $index ? 'bool' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24846)
