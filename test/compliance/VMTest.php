@@ -724,6 +724,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\pspell\PspellExtensionPolicy::isPspellComplianceCase($name)) {
                 continue;
             }
+            // Functional enchant cases set PHP_COMPILER_ENABLE_ENCHANT via --ENV--; phantoms when withheld (#23963).
+            if (!\PHPCompiler\ext\enchant\EnchantExtensionPolicy::runsEnchantCompliance($name)
+                && \PHPCompiler\ext\enchant\EnchantExtensionPolicy::isEnchantComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

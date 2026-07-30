@@ -244,6 +244,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'pspell_')) {
             return \PHPCompiler\ext\pspell\PspellExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'enchant_')) {
+            return \PHPCompiler\ext\enchant\EnchantExtensionPolicy::advertisesExtension();
+        }
         if (str_starts_with($lc, 'uuid_')) {
             return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
         }
@@ -325,6 +328,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('pspell' === $ext) {
             return \PHPCompiler\ext\pspell\PspellExtensionPolicy::advertisesExtension();
+        }
+        if ('enchant' === $ext) {
+            return \PHPCompiler\ext\enchant\EnchantExtensionPolicy::advertisesExtension();
         }
         if ('uuid' === $ext) {
             return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
