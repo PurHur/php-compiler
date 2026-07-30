@@ -6,6 +6,8 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\VmDomCollectionDimension;
+use PHPCompiler\ext\simplexml\SimpleXmlRegistry;
+use PHPCompiler\ext\simplexml\VmSimpleXml;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\Frame;
 
@@ -64,6 +66,19 @@ final class VmEmptyDimension
                     }
                     // empty($list[$i]) — has_dimension; nodes are never empty (php-src php_dom.c; #20311).
                     $dst->bool(!VmDomCollectionDimension::hasDimension($object, $dim));
+                } catch (\TypeError $e) {
+                    return $vm->propagateEmptyDimensionTypeError($e, $frame);
+                }
+
+                return null;
+            }
+            // SimpleXMLElement: empty($sxe[$dim]) uses string emptiness, not object truthiness (#25338).
+            if (
+                VmSimpleXml::CLASS_LC === strtolower($object->class->name)
+                && SimpleXmlRegistry::has($object)
+            ) {
+                try {
+                    $dst->bool(VmSimpleXml::dimensionIsEmpty($object, $dim));
                 } catch (\TypeError $e) {
                     return $vm->propagateEmptyDimensionTypeError($e, $frame);
                 }
