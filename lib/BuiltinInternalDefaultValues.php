@@ -303,6 +303,19 @@ final class BuiltinInternalDefaultValues
         'user_error' => [
             1 => ['kind' => 'int', 'value' => 1024],
         ],
+        // php-src ext/zlib/zlib.stub.php — level=-1; encoding=GZIP/DEFLATE/RAW (int infer → 0) (#25012)
+        'gzencode' => [
+            1 => ['kind' => 'int', 'value' => -1],
+            2 => ['kind' => 'int', 'value' => 31], // ZLIB_ENCODING_GZIP
+        ],
+        'gzcompress' => [
+            1 => ['kind' => 'int', 'value' => -1],
+            2 => ['kind' => 'int', 'value' => 15], // ZLIB_ENCODING_DEFLATE
+        ],
+        'gzdeflate' => [
+            1 => ['kind' => 'int', 'value' => -1],
+            2 => ['kind' => 'int', 'value' => -15], // ZLIB_ENCODING_RAW
+        ],
         // php-src ext/date/php_date.stub.php — ?int minute…year = null (InternalArgInfo int → 0) (#25147)
         'mktime' => [
             1 => ['kind' => 'null'],

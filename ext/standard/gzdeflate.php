@@ -28,10 +28,11 @@ final class gzdeflate extends Internal
         $data = VmZlibArg::resolveDataString($frame, 'gzdeflate');
         $level = -1;
         $encoding = \ZLIB_ENCODING_RAW;
-        if ($argc >= 2) {
+        // Named encoding without level — sparse calledArgs (#25012 sibling).
+        if (isset($frame->calledArgs[1])) {
             $level = VmZlibArg::coerceLevel($frame, 1, 'gzdeflate');
         }
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $encoding = VmZlibArg::coerceInt($frame, 2, 'gzdeflate', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
