@@ -1,5 +1,14 @@
 --TEST--
-Language: #[\Override] on properties — parent override compiles under PROFILE=8.5 (#9822, #25138)
+Language: #[\Override] on properties — parent override compiles (#9822, #25138 PHP 8.5+)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsOverridePropertyTarget()) {
+    echo "skip — #[\\Override] on properties requires PROFILE≥8.5 (#25138)\n";
+}
+?>
 --ENV--
 PHP_COMPILER_PROFILE=8.5
 --FILE--

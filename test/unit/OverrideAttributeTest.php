@@ -337,10 +337,8 @@ PHP;
     public function testOverrideOnClassFailsAtCompileTime(): void
     {
         $this->requireOverrideValidation();
-        $prev = $this->pushCompilerProfile('8.4');
-        try {
-            $runtime = new Runtime();
-            $code = <<<'PHP'
+        $runtime = new Runtime();
+        $code = <<<'PHP'
 <?php
 class Base {
     public function foo(): void {}
@@ -350,31 +348,29 @@ class Child extends Base {
     public function foo(): void {}
 }
 PHP;
-            $this->expectException(\CompileError::class);
-            $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
-            $runtime->parseAndCompile($code, 'override_on_class.php');
-        } finally {
-            $this->popCompilerProfile($prev);
-        }
+        $this->expectException(\CompileError::class);
+        $allowed = CompilerVersion::supportsOverridePropertyTarget()
+            ? 'method, class constant, property'
+            : 'method, class constant';
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: '.$allowed.')');
+        $runtime->parseAndCompile($code, 'override_on_class.php');
     }
 
     public function testOverrideOnTraitDeclarationFailsAtCompileTime(): void
     {
         $this->requireOverrideValidation();
-        $prev = $this->pushCompilerProfile('8.4');
-        try {
-            $runtime = new Runtime();
-            $code = <<<'PHP'
+        $runtime = new Runtime();
+        $code = <<<'PHP'
 <?php
 #[\Override]
 trait T {}
 PHP;
-            $this->expectException(\CompileError::class);
-            $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
-            $runtime->parseAndCompile($code, 'override_on_trait.php');
-        } finally {
-            $this->popCompilerProfile($prev);
-        }
+        $this->expectException(\CompileError::class);
+        $allowed = CompilerVersion::supportsOverridePropertyTarget()
+            ? 'method, class constant, property'
+            : 'method, class constant';
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: '.$allowed.')');
+        $runtime->parseAndCompile($code, 'override_on_trait.php');
     }
 
     public function testOverrideFailsWhenParentMethodIsPrivate(): void
@@ -497,6 +493,7 @@ PHP;
     {
         $prev = $this->pushCompilerProfile('8.5');
         try {
+            $this->assertTrue(CompilerVersion::supportsOverridePropertyTarget());
             $runtime = new Runtime();
             $code = <<<'PHP'
 <?php
@@ -512,10 +509,13 @@ PHP;
         }
     }
 
+    /** #25138: PROFILE=8.4 rejects #[\Override] on properties (TARGET_METHOD only). */
     public function testOverrideOnPropertyRejectedUnderProfile84(): void
     {
         $prev = $this->pushCompilerProfile('8.4');
         try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $runtime = new Runtime();
             $code = <<<'PHP'
 <?php
@@ -524,7 +524,9 @@ class Child extends Base { #[\Override] public int $x = 2; }
 echo "OK\n";
 PHP;
             $this->expectException(\CompileError::class);
-            $this->expectExceptionMessage('Attribute "Override" cannot target property (allowed targets: method)');
+            $this->expectExceptionMessage(
+                'Attribute "Override" cannot target property (allowed targets: method, class constant)'
+            );
             $runtime->parseAndCompile($code, 'override_prop_84.php');
         } finally {
             $this->popCompilerProfile($prev);
@@ -535,6 +537,7 @@ PHP;
     {
         $prev = $this->pushCompilerProfile('8.5');
         try {
+            $this->assertTrue(CompilerVersion::supportsOverridePropertyTarget());
             $runtime = new Runtime();
             $code = <<<'PHP'
 <?php
