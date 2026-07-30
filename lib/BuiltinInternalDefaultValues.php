@@ -307,6 +307,11 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'int', 'value' => 2047],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — ?string $extension = null, bool $details = true (#25276)
+        'ini_get_all' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (#25166)
         'datetime::createfromformat' => [
             2 => ['kind' => 'null'],

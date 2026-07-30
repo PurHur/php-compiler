@@ -550,6 +550,9 @@ final class BuiltinParamNames
                 return ['assignment'];
             case 'ini_get':
                 return ['option'];
+            // php-src ext/standard/basic_functions.stub.php — ?string $extension = null, bool $details = true (#25276)
+            case 'ini_get_all':
+                return ['extension=', 'details='];
             case 'ini_set':
                 return ['option', 'value'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says varname (#23568)

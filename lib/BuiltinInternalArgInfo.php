@@ -197,6 +197,8 @@ final class BuiltinInternalArgInfo
             'strtotime' => 1 === $index ? '?int' : null,
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string required) (#25173)
             'timezone_identifiers_list' => 1 === $index ? '?string' : null,
+            // ext/standard/basic_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#25276)
+            'ini_get_all' => 0 === $index ? '?string' : null,
             // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)

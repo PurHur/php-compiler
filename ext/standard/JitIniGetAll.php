@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -253,7 +254,12 @@ final class JitIniGetAll
 
     private static function isNullExtensionArg(JITVariable $arg): bool
     {
-        return JITVariable::TYPE_VALUE === $arg->type && ($arg->isNullConstant ?? false);
+        if (NamedOptionalCallArgs::isOmittedOptional($arg)) {
+            return true;
+        }
+
+        return JITVariable::TYPE_NULL === $arg->type
+            || (JITVariable::TYPE_VALUE === $arg->type && ($arg->isNullConstant ?? false));
     }
 
     private static function isInvalidExtensionScalar(Context $context, JITVariable $arg): bool
