@@ -65,6 +65,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'null'],
             2 => ['kind' => 'int', 'value' => -1],
         ],
+        // php-src ext/standard/basic_functions.stub.php — string $mode = "a" (#25261)
+        'php_uname' => [
+            0 => ['kind' => 'string', 'value' => 'a'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — bool $return = false (#23785)
         'highlight_string' => [
             1 => ['kind' => 'bool', 'value' => false],
