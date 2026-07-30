@@ -7,13 +7,24 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\VM\VmVarFetch;
 use PHPUnit\Framework\TestCase;
 
-/** VarFetch JIT routes binding resolution through VmVarFetch PHP (#10289). */
+/** VarFetch JIT routes binding resolution through VmVarFetch PHP (#10289, #25328). */
 final class VarFetchRuntimeShrinkTest extends TestCase
 {
-    public function testVarFetchRuntimeUsesVmVarFetchJitHelper(): void
+    public function testVarFetchRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/VarFetchRuntime.php');
         $this->assertStringContainsString('VmVarFetchJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+    }
+
+    public function testVarFetchRuntimeUsesVmVarFetchJitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/VarFetchRuntime.php');
         $this->assertStringContainsString('isSuperglobalName', $source);
         $this->assertStringNotContainsString('operandBindingRank', $source);
         $this->assertFileExists(__DIR__.'/../../lib/VM/VmVarFetchJitHelper.php');
@@ -45,5 +56,12 @@ final class VarFetchRuntimeShrinkTest extends TestCase
         $this->assertTrue(VmVarFetch::isSuperglobalName('_POST'));
         $this->assertFalse(VmVarFetch::isSuperglobalName('x'));
         $this->assertFalse(VmVarFetch::isSuperglobalName('this'));
+    }
+
+    public function testSpineBundleIncludesVmVarFetchJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('VmVarFetchJitHelper.php', $spine);
+        $this->assertStringContainsString('VarFetchRuntime.php', $spine);
     }
 }
