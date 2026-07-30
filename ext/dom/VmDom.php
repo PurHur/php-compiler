@@ -7674,13 +7674,32 @@ final class VmDom
     /**
      * HTML text/attr escape modes for serializeHtmlNode (libxml htmlNodeDump / htmlDocDump).
      *
-     * UTF8: &<> only — HTML document node-scoped saveHTML (#24152).
-     * NAMED: HTML 4.01 named entities — HTML document-wide saveHTML (#23684).
-     * NUMERIC: &#xHH; hex refs — XML documents via saveHTML (#25208 / libxml HTML serializer).
+     * UTF8: &<> only — HTML document node-scoped saveHTML (#24152); also XML docs with
+     * a non-empty $encoding (#25246).
+     * NAMED: HTML 4.01 named entities — HTML document-wide saveHTML (#23684); also XML
+     * docs with a non-empty $encoding (#25246).
+     * NUMERIC: &#xHH; hex refs — XML documents with null/empty encoding (#25208).
      */
     private const HTML_ESCAPE_UTF8 = 0;
     private const HTML_ESCAPE_NAMED = 1;
     private const HTML_ESCAPE_NUMERIC = 2;
+
+    /**
+     * Whether saveHTML should use the UTF-8 node / named-entity document split.
+     *
+     * libxml htmlNodeDump/htmlDocDump: when the document has a non-empty encoding
+     * (XML decl, DOMDocument ctor, or $doc->encoding=…), non-ASCII stays UTF-8 on
+     * node dumps and becomes HTML 4.01 named entities on document dumps. When
+     * encoding is null/empty, both dumps use &#xHH; (#25208 / #25246).
+     */
+    private static function saveHtmlUsesNamedOrUtf8Split(DomNodeState $state): bool
+    {
+        if ($state->isHtmlDocument) {
+            return true;
+        }
+
+        return null !== $state->encoding && '' !== $state->encoding;
+    }
 
     public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null, int $options = 0): string
     {
@@ -7689,10 +7708,10 @@ final class VmDom
             throw new \LogicException('DOMDocument::saveHTML() called on non-document node in this compiler build');
         }
 
-        // XML docs: libxml HTML dump uses numeric hex character references for both
-        // node-scoped and document-wide saveHTML (#25208). HTML docs keep the
-        // node UTF-8 / document named-entity split (#24152 / #23684).
-        $escapeMode = $state->isHtmlDocument
+        // Encoded / HTML docs: named entities document-wide (#23684 / #25246).
+        // Unencoded XML: numeric hex for both dumps (#25208).
+        $useSplit = self::saveHtmlUsesNamedOrUtf8Split($state);
+        $escapeMode = $useSplit
             ? self::HTML_ESCAPE_NAMED
             : self::HTML_ESCAPE_NUMERIC;
 
@@ -7702,9 +7721,9 @@ final class VmDom
             }
 
             // libxml htmlNodeDump: never XML self-close; HTML_EMPTY → <br>; else <tag></tag> (#20625).
-            // HTML docs: Non-ASCII stays UTF-8 — only &<> escaped (#24152).
-            // XML docs: numeric hex refs (#25208).
-            $nodeMode = $state->isHtmlDocument ? self::HTML_ESCAPE_UTF8 : self::HTML_ESCAPE_NUMERIC;
+            // Encoded/HTML: Non-ASCII stays UTF-8 — only &<> escaped (#24152 / #25246).
+            // Unencoded XML: numeric hex refs (#25208).
+            $nodeMode = $useSplit ? self::HTML_ESCAPE_UTF8 : self::HTML_ESCAPE_NUMERIC;
 
             return self::serializeHtmlNode($node, false, $nodeMode);
         }
@@ -12246,16 +12265,26 @@ final class VmDom
     }
 
     /**
-     * Attribute escape for HTML serializer modes. NUMERIC maps non-ASCII to &#xHH; (#25208);
-     * other modes keep escapeAttr (UTF-8 non-ASCII) to match prior HTML dump behaviour.
+     * Attribute escape for HTML serializer modes.
+     * NUMERIC → &#xHH; (#25208); NAMED → HTML 4.01 named entities (#23684 / #25246);
+     * UTF8 → escapeAttr (UTF-8 non-ASCII; #24152 node dumps).
      */
     private static function escapeHtmlAttrForMode(string $value, int $mode): string
     {
-        if (self::HTML_ESCAPE_NUMERIC === $mode) {
-            return self::escapeHtmlNumericAttr($value);
-        }
+        return match ($mode) {
+            self::HTML_ESCAPE_NUMERIC => self::escapeHtmlNumericAttr($value),
+            self::HTML_ESCAPE_NAMED => self::escapeHtmlNamedAttr($value),
+            default => self::escapeAttr($value),
+        };
+    }
 
-        return self::escapeAttr($value);
+    /**
+     * Document-wide saveHTML attribute escape: &/" plus HTML 4.01 named entities for
+     * non-ASCII (libxml htmlDocDump; #25246). ENT_COMPAT matches double-quoted attrs.
+     */
+    private static function escapeHtmlNamedAttr(string $value): string
+    {
+        return htmlentities($value, ENT_COMPAT | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true);
     }
 
     /**
