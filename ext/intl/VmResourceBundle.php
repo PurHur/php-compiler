@@ -16,7 +16,8 @@ use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * ResourceBundle create/get/locales/errors — ICU ures_* via thin FFI (#6187, #20739, #20916).
+ * ResourceBundle create/get/locales/errors + read_dimension — ICU ures_* via thin FFI
+ * (#6187, #20739, #20916, #25145).
  *
  * php-src: ext/intl/resourcebundle/resourcebundle_class.cpp
  *          ext/intl/resourcebundle/resourcebundle_iterator.cpp
@@ -201,9 +202,11 @@ final class VmResourceBundle
     }
 
     /**
+     * @param int|string $index numeric → ures_getByIndex; string → ures_getByKey (php-src resourcebundle_array_fetch)
+     *
      * @return string|int|ObjectEntry|HashTable|null null = missing/failed lookup (php-src returns null)
      */
-    public static function get(Context $ctx, ObjectEntry $bundle, string $index)
+    public static function get(Context $ctx, ObjectEntry $bundle, int|string $index)
     {
         $state = self::$state[$bundle->id] ?? null;
         if (null === $state) {
@@ -218,7 +221,9 @@ final class VmResourceBundle
         self::clearObjectError($bundle);
         IntlError::clear();
         if (null !== $state['handle']) {
-            $extracted = self::extractByKey($ctx, $state['handle'], $index);
+            $extracted = \is_int($index)
+                ? self::extractValueByIndex($ctx, $state['handle'], $index)
+                : self::extractByKey($ctx, $state['handle'], $index);
             if (null !== $extracted) {
                 self::clearObjectError($bundle);
                 IntlError::clear();
@@ -227,17 +232,69 @@ final class VmResourceBundle
             }
             // Fall through for Version when key lookup fails with warning-only.
         }
-        if ($state['fallback'] || 'Version' === $index) {
+        if ($state['fallback'] || (!\is_int($index) && 'Version' === $index)) {
             self::clearObjectError($bundle);
             IntlError::clear();
-            if ('Version' === $index) {
+            if (!\is_int($index) && 'Version' === $index) {
                 return self::fallbackVersion();
             }
         }
-        $message = "Cannot load resource element '".$index."': U_MISSING_RESOURCE_ERROR";
+        $message = \is_int($index)
+            ? "Cannot load resource element {$index}: U_MISSING_RESOURCE_ERROR"
+            : "Cannot load resource element '".$index."': U_MISSING_RESOURCE_ERROR";
         self::fail($bundle, IntlError::U_MISSING_RESOURCE_ERROR, $message);
 
         return null;
+    }
+
+    /**
+     * Engine read_dimension — php-src resourcebundle_array_get (#25145).
+     * Not ArrayAccess; writes/isset/unset stay "Cannot use object of type ResourceBundle as array".
+     */
+    public static function readDimension(Context $ctx, ObjectEntry $object, Variable $offset, Variable $out): void
+    {
+        $offset = $offset->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $offset->type) {
+            $index = $offset->toInt();
+        } elseif (Variable::TYPE_STRING === $offset->type) {
+            $index = $offset->toString();
+        } else {
+            // php-src resourcebundle_array_fetch: non-int/non-string → U_ILLEGAL_ARGUMENT + null
+            self::fail(
+                $object,
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'resourcebundle_get: index should be integer or string: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'resourcebundle_get: index should be integer or string: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+            $out->null();
+
+            return;
+        }
+        $result = self::get($ctx, $object, $index);
+        if (null === $result) {
+            $out->null();
+
+            return;
+        }
+        if (\is_int($result)) {
+            $out->int($result);
+
+            return;
+        }
+        if ($result instanceof ObjectEntry) {
+            $out->object($result);
+
+            return;
+        }
+        if ($result instanceof HashTable) {
+            $out->array($result);
+
+            return;
+        }
+        $out->string($result);
     }
 
     public static function count(ObjectEntry $bundle): int
@@ -306,11 +363,14 @@ final class VmResourceBundle
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'bundlename');
     }
 
-    public static function coerceIndexArg(Variable $var, string $function, int $position): string
+    /**
+     * @return int|string php-src resourcebundle_get accepts int (by-index) or string (by-key)
+     */
+    public static function coerceIndexArg(Variable $var, string $function, int $position): int|string
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_INTEGER === $var->type) {
-            return (string) $var->toInt();
+            return $var->toInt();
         }
 
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'index');
@@ -425,6 +485,19 @@ final class VmResourceBundle
         if (null === $child) {
             // Legacy string-only path (Version via ures_getStringByKey / getVersionNumber).
             return self::getStringByKey($handle, $key);
+        }
+
+        return self::extractChildValue($ctx, $child);
+    }
+
+    /**
+     * @return string|int|ObjectEntry|HashTable|null
+     */
+    private static function extractValueByIndex(Context $ctx, object $handle, int $index)
+    {
+        $child = self::uresGetByIndex($handle, $index);
+        if (null === $child) {
+            return null;
         }
 
         return self::extractChildValue($ctx, $child);
