@@ -318,6 +318,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['...arrays'], BuiltinParamNames::forFunction('array_merge'));
         self::assertSame(['...arrays'], BuiltinParamNames::forFunction('array_merge_recursive'));
         self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('...arrays'));
+        self::assertSame(['array', '...replacements'], BuiltinParamNames::forFunction('array_replace'));
+        self::assertSame(['array', '...replacements'], BuiltinParamNames::forFunction('array_replace_recursive'));
+        self::assertTrue(BuiltinParamNames::overrideEntryIsOptional('...replacements'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_replace'));
+        self::assertSame('int|float', BuiltinInternalArgInfo::stubParamTypeOverride('range', 2));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('dirname', 1));
+        self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('restore_error_handler'));
         self::assertNull(BuiltinParamNames::variadicParamIndexForFunction('strlen'));
     }
 
