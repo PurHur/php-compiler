@@ -22,7 +22,7 @@ final class NumberCompare extends BcMathNumberMethod
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::compare', 'num');
         $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::compare');
-        $result = VmBcmath::comp(VmBcMathNumber::valueString($receiver), $right, $scale);
+        $result = VmBcmath::compNumber(VmBcMathNumber::valueString($receiver), $right, $scale);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($result);
         }

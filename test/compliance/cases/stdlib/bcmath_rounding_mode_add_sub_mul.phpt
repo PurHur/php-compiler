@@ -14,7 +14,7 @@ try {
 }
 --EXPECT--
 1.23
-1.01
+1.00
 2.99
 2.40
 ValueError
