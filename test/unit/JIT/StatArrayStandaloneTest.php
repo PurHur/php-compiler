@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9585: __phpc_stat routes through StatArrayRuntime PHP + standalone LLVM quarantine.
+ * Issue #9585 / #25490: __phpc_stat routes through StatArrayRuntime + JitVmHelperLink.
  *
  * @group aot-lint
  */
@@ -22,7 +22,8 @@ final class StatArrayStandaloneTest extends TestCase
 
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StatArrayRuntime.php');
         $this->assertStringContainsString('StatArrayJitHelper', $runtime);
-        $this->assertStringContainsString('NestedJitCompileScope', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('StatArrayLlvm', $runtime);
         $this->assertStringContainsString('__phpc_stat', $runtime);
 
