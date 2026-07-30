@@ -2822,13 +2822,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ parse_str() optional $separator (ext/standard/quot_print.c, #17320).
+     * parse_str() optional $separator — never advertised.
      *
-     * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile.
+     * php-src stubs keep arity 2 through PHP 8.4+ (`basic_functions.stub.php`:
+     * `parse_str(string $string, &$result): void`). #17320 added a phantom 3rd
+     * parameter under PROFILE=8.4; #23949 gates it off to restore php-src-strict.
      */
     public static function supportsParseStrSeparator(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

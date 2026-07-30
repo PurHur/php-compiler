@@ -371,9 +371,8 @@ final class BuiltinParamNames
                 // php-src ext/standard/string.stub.php — &$count = null (#24886)
                 return ['search', 'replace', 'subject', 'count='];
             case 'parse_str':
-                return \PHPCompiler\CompilerVersion::supportsParseStrSeparator()
-                    ? ['string', 'result', 'separator']
-                    : ['string', 'result'];
+                // php-src basic_functions.stub.php — arity 2 only (#23949; reverts #17320 phantom)
+                return ['string', 'result'];
             case 'mb_parse_str':
                 return ['string', 'result'];
             case 'dns_get_mx':
