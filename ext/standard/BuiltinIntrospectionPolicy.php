@@ -238,6 +238,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'gmp_')) {
             return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'pspell_')) {
+            return \PHPCompiler\ext\pspell\PspellExtensionPolicy::advertisesExtension();
+        }
         if (str_starts_with($lc, 'uuid_')) {
             return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
         }
@@ -313,6 +316,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('gmp' === $ext) {
             return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
+        }
+        if ('pspell' === $ext) {
+            return \PHPCompiler\ext\pspell\PspellExtensionPolicy::advertisesExtension();
         }
         if ('uuid' === $ext) {
             return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();

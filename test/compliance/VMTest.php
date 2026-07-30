@@ -719,6 +719,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\bz2\Bz2ExtensionPolicy::isBz2ComplianceCase($name)) {
                 continue;
             }
+            // Functional pspell cases set PHP_COMPILER_ENABLE_PSPELL via --ENV--; phantoms when withheld (#23968).
+            if (!\PHPCompiler\ext\pspell\PspellExtensionPolicy::runsPspellCompliance($name)
+                && \PHPCompiler\ext\pspell\PspellExtensionPolicy::isPspellComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {
