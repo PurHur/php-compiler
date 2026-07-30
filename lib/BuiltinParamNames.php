@@ -1235,6 +1235,7 @@ final class BuiltinParamNames
             case 'gzuncompress':
             case 'gzdecode':
             case 'gzinflate':
+            case 'zlib_decode': // InternalArgInfo max_decoded_len required; stub max_length=0 (#25132)
                 return ['data', 'max_length='];
             // php-src ext/zlib/zlib.stub.php — encoding/level optional (#23447)
             case 'gzencode':
