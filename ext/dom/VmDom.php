@@ -12262,15 +12262,19 @@ final class VmDom
 
     /**
      * HTML text escape matching libxml htmlDocDump: &/</> plus named HTML 4.01 entity references
-     * for non-ASCII codepoints (e.g. \xC2\xA0 → &nbsp;, \xC3\xA9 → &eacute;).
+     * for non-ASCII codepoints (e.g. \xC2\xA0 → &nbsp;, \xC3\xA9 → &eacute;), with decimal
+     * NCRs (&#128512;) for codepoints that have no HTML 4.01 name (#25547).
      *
      * Used for HTML document-wide saveHTML() only. Node-scoped saveHTML($node) on HTML docs
      * uses escapeText (libxml htmlNodeDump keeps UTF-8; #24152). php-src ext/dom/document.c;
-     * PHP's htmlentities(…, ENT_HTML401) uses the same codepoint→name table (#23684).
+     * PHP's htmlentities(…, ENT_HTML401) covers the named table (#23684) but leaves unnamed
+     * Unicode as UTF-8 — libxml uses decimal &#N; instead.
      */
     private static function escapeHtmlText(string $value): string
     {
-        return htmlentities($value, ENT_NOQUOTES | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true);
+        return self::encodeNonAsciiHtmlDecimal(
+            htmlentities($value, ENT_NOQUOTES | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true)
+        );
     }
 
     /**
@@ -12301,11 +12305,14 @@ final class VmDom
 
     /**
      * Document-wide saveHTML attribute escape: &/" plus HTML 4.01 named entities for
-     * non-ASCII (libxml htmlDocDump; #25246). ENT_COMPAT matches double-quoted attrs.
+     * non-ASCII, with decimal NCRs for unnamed codepoints (libxml htmlDocDump; #25246 / #25547).
+     * ENT_COMPAT matches double-quoted attrs.
      */
     private static function escapeHtmlNamedAttr(string $value): string
     {
-        return htmlentities($value, ENT_COMPAT | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true);
+        return self::encodeNonAsciiHtmlDecimal(
+            htmlentities($value, ENT_COMPAT | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true)
+        );
     }
 
     /**
@@ -12325,10 +12332,30 @@ final class VmDom
     }
 
     /**
+     * After htmlentities(ENT_HTML401): map leftover non-ASCII UTF-8 to decimal &#N;
+     * (libxml htmlDocDump for emoji/CJK/etc.; #25547). Named entities already in the
+     * string are ASCII (&…;) and are left unchanged.
+     */
+    private static function encodeNonAsciiHtmlDecimal(string $value): string
+    {
+        return self::encodeNonAsciiHtmlRefs($value, false);
+    }
+
+    /**
      * Map non-ASCII UTF-8 codepoints to uppercase hex character references (&#xE9;).
      * ASCII bytes (including already-escaped &amp;/&lt;/&gt;/&quot;) are left unchanged.
      */
     private static function encodeNonAsciiHtmlNumeric(string $value): string
+    {
+        return self::encodeNonAsciiHtmlRefs($value, true);
+    }
+
+    /**
+     * Walk UTF-8 and replace non-ASCII codepoints with character references.
+     *
+     * @param bool $hex true → &#xHH; (unencoded XML saveHTML); false → &#N; (HTML named dump)
+     */
+    private static function encodeNonAsciiHtmlRefs(string $value, bool $hex): string
     {
         $out = '';
         $len = \strlen($value);
@@ -12359,7 +12386,9 @@ final class VmDom
                 ++$i;
                 continue;
             }
-            $out .= '&#x'.\strtoupper(\dechex($cp)).';';
+            $out .= $hex
+                ? '&#x'.\strtoupper(\dechex($cp)).';'
+                : '&#'.$cp.';';
         }
 
         return $out;

@@ -12,11 +12,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * User-script standalone AOT: pure-LLVM DOMDocument::saveHTML() (#18268, #24580).
+ * User-script standalone AOT: pure-LLVM DOMDocument::saveHTML() (#18268, #24580, #25547).
  *
- * loadHTML() fixtures stay compile-time HTML constants. loadXML() literals (including
- * CDATA) are folded through host DOMDocument::saveHTML() so CDATA dumps as text like
- * php-src / libxml htmlNodeDump — without a DomRegistry tree.
+ * loadHTML() / loadXML() literals are folded through host DOMDocument::saveHTML() so
+ * document dumps match libxml htmlDocDump (named entities + decimal NCRs) and node
+ * dumps match htmlNodeDump (UTF-8) — without a DomRegistry tree.
  */
 final class JitDomSaveHTMLUserScript
 {
@@ -32,22 +32,33 @@ final class JitDomSaveHTMLUserScript
      */
     public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
-        $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        $nodeScoped = \count($args) >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
         $options = JitDomLoadHTMLUserScript::lastCompileTimeOptions() ?? 0;
+
+        // Prefer the original HTML literal so NCRs re-parse through host htmlDocDump (#25547).
+        $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
+        if (null !== $htmlLit && '' !== trim($htmlLit)) {
+            $html = self::htmlDumpFromHtmlLiteral($htmlLit, $options, $nodeScoped);
+            if (null !== $html) {
+                return self::boxConstantString($context, $html);
+            }
+
+            return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral($htmlLit, $options));
+        }
+
+        $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         if (null !== $parsed) {
             $body = '<'.$parsed['tag'].'>'.$parsed['text'].'</'.$parsed['tag'].'>';
+            $html = self::htmlDumpFromHtmlLiteral($body, $options, $nodeScoped);
+            if (null !== $html) {
+                return self::boxConstantString($context, $html);
+            }
 
             return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral($body, $options));
         }
 
-        $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
-        if (null !== $htmlLit && '' !== trim($htmlLit)) {
-            return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral($htmlLit, $options));
-        }
-
         $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null !== $xmlLit && '' !== trim($xmlLit)) {
-            $nodeScoped = \count($args) >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
             $html = self::htmlDumpFromXmlLiteral($xmlLit, $nodeScoped);
             if (null !== $html) {
                 return self::boxConstantString($context, $html);
@@ -65,6 +76,47 @@ final class JitDomSaveHTMLUserScript
         }
 
         return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral('', 0));
+    }
+
+    /**
+     * Fold loadHTML literal → HTML via host Zend DOM (php-src htmlDocDump / htmlNodeDump; #25547).
+     *
+     * Ensures document-wide dumps emit decimal NCRs for unnamed Unicode and honor
+     * LIBXML_HTML_NOIMPLIED / LIBXML_HTML_NODEFDTD the same way as VM/JIT.
+     */
+    private static function htmlDumpFromHtmlLiteral(string $html, int $options, bool $nodeScoped): ?string
+    {
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $doc = new \DOMDocument();
+            if (!@$doc->loadHTML($html, $options)) {
+                restore_error_handler();
+
+                return null;
+            }
+            if (!$nodeScoped) {
+                $out = $doc->saveHTML();
+                restore_error_handler();
+
+                return false === $out ? null : $out;
+            }
+            $root = $doc->documentElement;
+            if (null === $root) {
+                restore_error_handler();
+
+                return null;
+            }
+            $out = $doc->saveHTML($root);
+            restore_error_handler();
+
+            return false === $out ? null : $out;
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
     }
 
     /**
