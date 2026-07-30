@@ -513,12 +513,21 @@ final class BuiltinClasses
         $ctx->classes['countable'] = $entry;
     }
 
-    /** Zend zend_interfaces.c — ArrayAccess for $obj[$key] dispatch (#3331, #5433). */
+    /** Zend zend_interfaces.c / zend_interfaces.stub.php — ArrayAccess (#3331, #5433, #25425). */
     private static function registerArrayAccess(Context $ctx): void
     {
         $entry = new ClassEntry('ArrayAccess');
         $entry->isInterface = true;
         self::registerBuiltinInterfaceMethods($entry, ['offsetExists', 'offsetGet', 'offsetSet', 'offsetUnset']);
+        // Stub arginfo for LSP/Reflection — without params, implements fatals (#25425).
+        // mixed dump types parse as untyped for variance (TypeSig::fromDumpTypeString).
+        // Omit methodReturnDeclaredTypes so untyped implementors stay Zend-compatible.
+        $offset = new ParameterMetadata('offset', [], false, false, false, false, 'mixed', null);
+        $value = new ParameterMetadata('value', [], false, false, false, false, 'mixed', null);
+        $entry->methodParameterMetadata['offsetexists'] = [$offset];
+        $entry->methodParameterMetadata['offsetget'] = [$offset];
+        $entry->methodParameterMetadata['offsetset'] = [$offset, $value];
+        $entry->methodParameterMetadata['offsetunset'] = [$offset];
         $ctx->classes['arrayaccess'] = $entry;
     }
 
