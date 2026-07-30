@@ -256,6 +256,32 @@ try {
         );
     }
 
+    /** Issue #25239: return in finally overrides try return and suppresses pending exception. */
+    public function testFinallyReturnOverridesTryReturnAndSuppressesException(): void
+    {
+        $this->assertVmOutput(
+            <<<'PHP'
+<?php
+function from_try() {
+    try { return "try"; } finally { return "finally"; }
+}
+function from_throw() {
+    try { throw new RuntimeException("x"); } finally { return "suppressed"; }
+}
+function from_catch() {
+    try { throw new RuntimeException("x"); }
+    catch (RuntimeException $e) { return "catch"; }
+    finally { return "finally"; }
+}
+echo from_try(), "\n";
+echo from_throw(), "\n";
+echo from_catch(), "\n";
+PHP
+            ,
+            "finally\nsuppressed\nfinally\n"
+        );
+    }
+
     /** Issue #5331: finally throw must discard pending return, not relaunch finally. */
     public function testFinallyThrowOverridesPendingReturn(): void
     {
