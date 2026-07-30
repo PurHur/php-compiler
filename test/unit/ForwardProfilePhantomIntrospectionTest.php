@@ -567,6 +567,15 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'die')
             );
+            // is_callable must match function_exists on PROFILE=8.2 (#25421).
+            foreach (['exit', 'die'] as $name) {
+                $v = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_STRING);
+                $v->string($name);
+                $this->assertFalse(
+                    \PHPCompiler\ext\standard\VmCallable::isCallable($ctx, $v),
+                    $name
+                );
+            }
 
             // ReflectionFunction must match function_exists — Zend ReflectionException (#23687).
             foreach (['exit', 'die'] as $name) {
