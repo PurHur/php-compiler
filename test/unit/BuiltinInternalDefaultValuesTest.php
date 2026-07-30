@@ -439,4 +439,22 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('\\', $dest->toString());
     }
 
+    /** @covers issue #24791 */
+    public function testLevenshteinCostDefaultsAreOne(): void
+    {
+        $dest = new Variable();
+        foreach ([2 => 'insertion_cost', 3 => 'replacement_cost', 4 => 'deletion_cost'] as $index => $name) {
+            $info = ['name' => $name, 'type' => 'int', 'isOptional' => true];
+            self::assertTrue(
+                BuiltinInternalDefaultValues::isAvailable('levenshtein', $index, $info, false),
+                $name
+            );
+            self::assertTrue(
+                BuiltinInternalDefaultValues::materialize($dest, 'levenshtein', $index, $info),
+                $name
+            );
+            self::assertSame(1, $dest->toInt(), $name);
+        }
+    }
+
 }

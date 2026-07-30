@@ -223,6 +223,13 @@ final class BuiltinInternalDefaultValues
         'similar_text' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/string.stub.php — insertion/replacement/deletion_cost = 1 (#24791)
+        // InternalArgInfo "levenshtein 1" marks cost params required with no defaults.
+        'levenshtein' => [
+            2 => ['kind' => 'int', 'value' => 1],
+            3 => ['kind' => 'int', 'value' => 1],
+            4 => ['kind' => 'int', 'value' => 1],
+        ],
         // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
         'setcookie' => [
             1 => ['kind' => 'string', 'value' => ''],
