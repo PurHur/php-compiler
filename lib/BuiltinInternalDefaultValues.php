@@ -554,6 +554,11 @@ final class BuiltinInternalDefaultValues
         'flock' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/dir.stub.php — sorting_order=0, context=null (#23448)
+        'scandir' => [
+            1 => ['kind' => 'int', 'value' => 0],
+            2 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
