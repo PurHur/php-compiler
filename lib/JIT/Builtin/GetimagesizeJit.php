@@ -4,77 +4,70 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
-/** JIT/AOT link hook for getimagesize*() — compiles GetimagesizeJitHelper into the module (#3271). */
+/**
+ * JIT/AOT link hook for getimagesize*() — compiles GetimagesizeJitHelper into the module (#3271, #25527).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringIncludePathResolver #25519).
+ */
 final class GetimagesizeJit
 {
+    private const HELPER_PATH = '/ext/standard/GetimagesizeJitHelper.php';
+
     private const HELPER_LOGICAL = 'PHPCompiler\\ext\\standard\\GetimagesizeJitHelper::fromBytes';
+
     private const SHOULD_NOTICE_PATH_LOGICAL = 'PHPCompiler\\ext\\standard\\GetimagesizeJitHelper::shouldEmitReadNoticeForPath';
+
     private const SHOULD_NOTICE_BYTES_LOGICAL = 'PHPCompiler\\ext\\standard\\GetimagesizeJitHelper::shouldEmitReadNoticeForBytes';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER_LOGICAL,
+        self::SHOULD_NOTICE_PATH_LOGICAL,
+        self::SHOULD_NOTICE_BYTES_LOGICAL,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
         self::ensureJitHelperCompiled($context);
     }
 
-    public static function helperFunction(Context $context): \PHPLLVM\Value\Function_
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
+    }
+
+    public static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
 
-        return self::lookupHelper($context, self::HELPER_LOGICAL);
+        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#25527');
     }
 
-    public static function shouldNoticeForPathHelper(Context $context): \PHPLLVM\Value\Function_
+    public static function shouldNoticeForPathHelper(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
 
-        return self::lookupHelper($context, self::SHOULD_NOTICE_PATH_LOGICAL);
+        return JitVmHelperLink::lookupCompiled($context, self::SHOULD_NOTICE_PATH_LOGICAL, '#25527');
     }
 
-    public static function shouldNoticeForBytesHelper(Context $context): \PHPLLVM\Value\Function_
+    public static function shouldNoticeForBytesHelper(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
 
-        return self::lookupHelper($context, self::SHOULD_NOTICE_BYTES_LOGICAL);
-    }
-
-    private static function lookupHelper(Context $context, string $logical): \PHPLLVM\Value\Function_
-    {
-        $lc = strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after compile (#3271)');
-        }
-
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::SHOULD_NOTICE_BYTES_LOGICAL, '#25527');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = strtolower(self::HELPER_LOGICAL);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        $runtime = $context->runtime;
-        $path = dirname(__DIR__, 3).'/ext/standard/GetimagesizeJitHelper.php';
-        $block = $runtime->parseAndCompile((string) file_get_contents($path), 'GetimagesizeJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('GetimagesizeJitHelper.php parseAndCompile failed (#3271)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('GetimagesizeJitHelper::fromBytes was not compiled for JIT (#3271)');
-        }
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25527'
+        );
     }
 }
