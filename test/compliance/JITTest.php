@@ -466,9 +466,11 @@ class JITTest extends BaseTest {
                     && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom'))) {
                 continue;
             }
-            // JIT: method_exists(ReflectionClass/Property::class, …) fails (pcreJit); profile phantoms are VM-only (#22599, #22601).
+            // JIT: method_exists(ReflectionClass/Property::class, …) fails (pcreJit); profile phantoms are VM-only (#22599, #22601, #25503).
             if (str_contains($name, 'reflectionclass_84_phantoms_profile82')
                 || str_contains($name, 'reflectionclass_84_apis_forward_profile')
+                || str_contains($name, 'reflectionclass_lazy_apis_phantom_profile82')
+                || str_contains($name, 'reflectionclass_lazy_apis_forward_84')
                 || str_contains($name, 'reflectionproperty_phantoms_profile82')
                 || str_contains($name, 'reflectionproperty_raw_value_forward_profile')) {
                 continue;
