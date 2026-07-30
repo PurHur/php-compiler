@@ -385,6 +385,15 @@ final class BuiltinInternalDefaultValues
         'datetimeimmutable::createfromformat' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — int $second = 0, int $microsecond = 0 (#25400)
+        'datetime::settime' => [
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'int', 'value' => 0],
+        ],
+        'datetimeimmutable::settime' => [
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src Zend/zend_builtin_functions.stub.php — int $error_level = E_USER_NOTICE (1024) (#25174)
         // InternalArgInfo int → 0; user_error absent from InternalArgInfo entirely.
         'trigger_error' => [

@@ -343,6 +343,9 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (InternalArgInfo datetimezone) (#25166)
             'datetime::createfromformat',
             'datetimeimmutable::createfromformat' => 2 === $index ? '?DateTimeZone' : null,
+            // ext/date/php_date.stub.php — int $microsecond = 0 missing from InternalArgInfo (#25400)
+            'datetime::settime',
+            'datetimeimmutable::settime' => 3 === $index ? 'int' : null,
             // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
             'dateperiod::__construct' => '',
             default => null,
