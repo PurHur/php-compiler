@@ -20,6 +20,9 @@ final class VmProcessProcOpenNative
 
     private const WNOHANG = 1;
 
+    /** waitpid: report stopped children (Linux WUNTRACED). */
+    private const WUNTRACED = 2;
+
     /** Linux SIGCONT / SIGSTOP — pause child until parent pipe setup completes (php-src proc_open race). */
     private const SIGCONT = 18;
 
@@ -123,6 +126,18 @@ final class VmProcessProcOpenNative
                 }
                 self::execArgv($ffi, $argv, $env);
                 $ffi->_exit(self::EXIT_127);
+            }
+
+            // Wait until raise(SIGSTOP) lands — an early SIGCONT is lost and leaves the
+            // child stopped with the parent's stdout still open (#25195 / #24481).
+            if (!self::waitForChildStopped($ffi, $pid)) {
+                self::killAndWait($ffi, $pid);
+                self::closePipePair($ffi, $stdinPipe);
+                self::closePipePair($ffi, $stdoutPipe);
+                self::closePipePair($ffi, $stderrPipe);
+                self::releaseSlot($slot);
+
+                return false;
             }
 
             self::closePipeRead($ffi, $stdinPipe);
@@ -254,6 +269,18 @@ final class VmProcessProcOpenNative
                 }
                 self::execArgv($ffi, ['sh', '-c', $command], $env);
                 $ffi->_exit(self::EXIT_127);
+            }
+
+            // Wait until raise(SIGSTOP) lands — an early SIGCONT is lost and leaves the
+            // child stopped with the parent's stdout still open (#25195 / #24481).
+            if (!self::waitForChildStopped($ffi, $pid)) {
+                self::killAndWait($ffi, $pid);
+                self::closePipePair($ffi, $stdinPipe);
+                self::closePipePair($ffi, $stdoutPipe);
+                self::closePipePair($ffi, $stderrPipe);
+                self::releaseSlot($slot);
+
+                return false;
             }
 
             self::closePipeRead($ffi, $stdinPipe);
@@ -580,7 +607,11 @@ final class VmProcessProcOpenNative
             return false;
         }
 
-        self::resumeChildIfPaused($ffi, $slot);
+        // Always SIGCONT before the requested signal. open()'s resume can race ahead of
+        // raise(SIGSTOP); SIGTERM alone does not wake a stopped child, so the orphan keeps
+        // the parent's stdout open and the compliance harness blocks on EOF (#25195).
+        self::sendSigcont($ffi, $slot);
+        self::$slots[$handle] = $slot;
 
         try {
             return 0 === (int) $ffi->kill($slot['pid'], $signal);
@@ -764,15 +795,46 @@ final class VmProcessProcOpenNative
         }
     }
 
+    /**
+     * Block until the fork child has stopped for raise(SIGSTOP).
+     * Prevents a lost SIGCONT race that leaves the child in T with parent FDs (#25195).
+     */
+    private static function waitForChildStopped(\FFI $ffi, int $pid): bool
+    {
+        if ($pid <= 0) {
+            return false;
+        }
+        try {
+            $status = $ffi->new('int');
+            $waitRc = (int) $ffi->waitpid($pid, \FFI::addr($status), self::WUNTRACED);
+            if ($waitRc !== $pid) {
+                return false;
+            }
+            // WIFSTOPPED: (status & 0xff) == 0x7f
+            return 0x7f === ((int) $status->cdata & 0xff);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     /** Child raises SIGSTOP at fork; resume on blocking pipe I/O or proc_close() (#14685, #15035). */
     private static function resumeChildIfPaused(\FFI $ffi, array &$slot): void
     {
         if (!($slot['childPaused'] ?? false)) {
             return;
         }
+        self::sendSigcont($ffi, $slot);
+    }
+
+    /** @param array{pid: int, childPaused?: bool} $slot */
+    private static function sendSigcont(\FFI $ffi, array &$slot): void
+    {
         $pid = $slot['pid'];
         if ($pid > 0) {
-            $ffi->kill($pid, self::SIGCONT);
+            try {
+                $ffi->kill($pid, self::SIGCONT);
+            } catch (\Throwable) {
+            }
         }
         $slot['childPaused'] = false;
     }
