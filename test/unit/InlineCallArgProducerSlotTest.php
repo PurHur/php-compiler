@@ -8656,6 +8656,42 @@ PHP;
         self::assertSame("3\n", ob_get_clean());
     }
 
+    /**
+     * Issue #25605 — importNode(getElementsByTagName()->item(), true) must not drop preceding loadXML
+     * (re-#20284; regression from #25563 dead-temp multi-arg feed matching loadXML).
+     */
+    public function testDomImportNodeAfterLoadXmlKeepsDocumentElementAndBothLoadXmlInits(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d1 = new DOMDocument();
+$d1->loadXML('<root><a><b>x</b></a></root>');
+$d2 = new DOMDocument();
+$d2->loadXML('<root/>');
+$n = $d2->importNode($d1->getElementsByTagName('a')->item(0), true);
+$d2->documentElement->appendChild($n);
+echo $d2->saveXML();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_importnode_loadxml_25605.php');
+
+        $loadXmlInits = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'loadXML' === $block->constants[$op->arg2]->toString()
+            ) {
+                ++$loadXmlInits;
+            }
+        }
+        self::assertSame(2, $loadXmlInits, 'both loadXML calls must remain METHODCALL_INIT');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("<?xml version=\"1.0\"?>\n<root><a><b>x</b></a></root>\n", ob_get_clean());
+    }
+
     /** Issue #18410 — documentElement->appendChild(createElement) must not feed receiver fetch into inner arg. */
     public function testDomDocumentElementAppendChildCreateElementUsesDistinctArgSlots(): void
     {
