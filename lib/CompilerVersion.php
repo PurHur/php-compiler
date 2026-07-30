@@ -362,10 +362,10 @@ final class CompilerVersion
     /**
      * Version profile for builtin advertisement / function_exists parity (#11842).
      *
-     * On the 8.4 development line, advertise implemented forward-compat builtins
-     * (array_find family, …) even while VERSION is 8.4.0-dev — version_compare treats
-     * -dev below stable (#12327, #12328). Profile-gated 8.3+ surfaces such as
-     * json_validate / str_increment still withhold on the unset-PROFILE reference harness (#22544, #24820).
+     * On the 8.4 development line, some forward-compat builtins use explicit PROFILE gates
+     * (array_find family, json_validate, str_increment, …) and withhold on the unset-PROFILE
+     * reference harness while VERSION is 8.4.0-dev — version_compare treats -dev below stable
+     * (#12327, #12328, #22544, #24808, #24820, #24821).
      */
     public static function builtinAdvertisementVersion(): string
     {
@@ -2491,26 +2491,44 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ array_all/any/find/find_key only (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675, #24000).
+     * PHP 8.4+ array_all/any/find/find_key only (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675, #24000, #24821).
      *
      * php-src never ships array_any_key()/array_all_key() — those phantoms were removed (#24000).
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
      * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      * array_first()/array_last() are PHP 8.5+ — see {@see supportsPhp85ArrayFirstLast()} (#21173).
+     *
+     * Do not use {@see isForwardProfileAtLeast()} here — that would re-advertise on unset PROFILE
+     * while {@see phpversion()} still reports {@see REFERENCE_PHP_VERSION} (#24821).
      */
     public static function supportsPhp84ArraySearchFunctions(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
-     * PHP 8.4 array_all/any/find family visible to function_exists() (#17007).
+     * PHP 8.4 array_all/any/find family visible to function_exists() (#17007, #24821).
      *
      * Does not include array_first()/array_last() — those are PHP 8.5 (#21173).
+     *
+     * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
      */
     public static function advertisesPhp84ArraySearchFunctions(): bool
     {
-        return self::isForwardProfileAtLeast('8.4.0');
+        return self::supportsPhp84ArraySearchFunctions();
     }
 
     /**

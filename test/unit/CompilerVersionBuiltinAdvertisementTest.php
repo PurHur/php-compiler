@@ -698,9 +698,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp84ArraySearchFunctionsEnabledOnDevProfile(): void
+    public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertFalse(CompilerVersion::advertisesPhp84ArraySearchFunctions());
     }
 
     public function testGeneratorToArrayEnabledOnDefaultDevProfile(): void
