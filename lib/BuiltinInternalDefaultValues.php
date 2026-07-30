@@ -60,6 +60,16 @@ final class BuiltinInternalDefaultValues
         'array_search' => [
             2 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/standard/basic_functions.stub.php — bool $return = false (#23785)
+        'highlight_string' => [
+            1 => ['kind' => 'bool', 'value' => false],
+        ],
+        'highlight_file' => [
+            1 => ['kind' => 'bool', 'value' => false],
+        ],
+        'show_source' => [
+            1 => ['kind' => 'bool', 'value' => false],
+        ],
         // php-src stubs — InternalArgInfo types omit nullability / non-zero sentinels (#23181)
         'substr' => [
             2 => ['kind' => 'null'],

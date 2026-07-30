@@ -727,6 +727,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'separator', 'fputcsv'));
         self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'eol', 'fputcsv'));
 
+        // php-src basic_functions.stub.php — InternalArgInfo still file_name (#23785)
+        $hf = BuiltinParamNames::forFunction('highlight_file');
+        self::assertSame(['filename', 'return='], $hf);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hf, 'filename', 'highlight_file'));
+        $ss = BuiltinParamNames::forFunction('show_source');
+        self::assertSame(['filename', 'return='], $ss);
+        $psw = BuiltinParamNames::forFunction('php_strip_whitespace');
+        self::assertSame(['filename'], $psw);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($psw, 'filename', 'php_strip_whitespace'));
+
         $splFputcsv = BuiltinParamNames::paramNamesForInternalFunction('SplFileObject::fputcsv');
         self::assertSame(['fields', 'separator=', 'enclosure=', 'escape=', 'eol='], $splFputcsv);
         self::assertSame(
