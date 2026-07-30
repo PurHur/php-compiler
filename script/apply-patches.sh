@@ -181,6 +181,10 @@ patch_already_applied() {
     php-types-gc-enabled-bool.patch)
       grep -q "'gc_enabled' => \['bool'\]" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-curl-version-arity.patch)
+      # php-src ext/curl/curl.stub.php — function curl_version(): array|false (#25585)
+      grep -qF "'curl_version' => ['array|false']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-sem-get-auto-release-bool.patch)
       grep -qF "'sem_get' => ['SysvSemaphore|false', 'key' => 'int', 'max_acquire=' => 'int', 'permissions=' => 'int', 'auto_release=' => 'bool']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -6690,6 +6694,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-round-float.patch"
   apply_patch "$PATCH_DIR/php-types-link-bool.patch"
   apply_patch "$PATCH_DIR/php-types-gc-enabled-bool.patch"
+  apply_patch "$PATCH_DIR/php-types-curl-version-arity.patch"
   apply_patch "$PATCH_DIR/php-types-sem-get-auto-release-bool.patch"
   apply_patch "$PATCH_DIR/php-types-openssl-encrypt-aead-args.patch"
   apply_patch "$PATCH_DIR/php-types-openssl-cms-verify-arginfo.patch"

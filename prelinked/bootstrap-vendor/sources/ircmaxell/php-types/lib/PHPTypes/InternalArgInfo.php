@@ -928,7 +928,7 @@ class InternalArgInfo
         'curl_share_setopt' => ['bool', 'sh' => '', 'option' => 'int', 'value' => ''],
         'curl_strerror' => ['bool', 'code' => 'int'],
         'curl_unescape' => ['', 'ch' => '', 'str' => 'string'],
-        'curl_version' => ['array', 'version=' => 'int'],
+        'curl_version' => ['array|false'],
         'current' => ['', 'array_arg' => 'array'],
         'cyrus_authenticate' => ['', 'connection' => '', 'mechlist=' => 'string', 'service=' => 'string', 'user=' => 'string', 'minssf=' => 'int', 'maxssf=' => 'int', 'authname=' => 'string', 'password=' => 'string'],
         'cyrus_bind' => ['bool', 'connection' => '', 'callbacks' => 'array'],
