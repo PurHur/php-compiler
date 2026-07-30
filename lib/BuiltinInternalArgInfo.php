@@ -455,6 +455,11 @@ final class BuiltinInternalArgInfo
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
             // ext/spl/spl_directory.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
             'splfileobject::fputcsv' => 4 === $index ? 'string' : null,
+            // ext/spl/spl_heap.stub.php — mixed $value1/$value2 / $priority1/$priority2 (#25555)
+            'splheap::compare',
+            'splminheap::compare',
+            'splmaxheap::compare' => ($index === 0 || $index === 1) ? 'mixed' : null,
+            'splpriorityqueue::compare' => ($index === 0 || $index === 1) ? 'mixed' : null,
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string) (#25172)
             'datetimezone::listidentifiers' => 1 === $index ? '?string' : null,
             // ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (InternalArgInfo datetimezone) (#25166)

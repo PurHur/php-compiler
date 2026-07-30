@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -65,6 +66,8 @@ final class SplHeapBuiltin
         unset($entry->methods['__construct'], $entry->methodVisibility['__construct']);
         $entry->methods['compare'] = new SplHeapCompareAbstract();
         $entry->methodVisibility['compare'] = $prot;
+        // php-src ext/spl/spl_heap.stub.php — compare(mixed $value1, mixed $value2) (#25555)
+        $entry->methodParameterMetadata['compare'] = self::compareValueParamMetadata();
         foreach ([
             'insert' => SplHeapInsert::class,
             'extract' => SplHeapExtract::class,
@@ -101,6 +104,32 @@ final class SplHeapBuiltin
             $entry->methods['iscorrupted'],
             $entry->methods['__debuginfo']
         );
+    }
+
+    /**
+     * Zend stub params for SplHeap / SplMinHeap / SplMaxHeap::compare (#25555).
+     *
+     * @return list<ParameterMetadata>
+     */
+    public static function compareValueParamMetadata(): array
+    {
+        return [
+            new ParameterMetadata('value1', [], false, false, false, false, 'mixed', null),
+            new ParameterMetadata('value2', [], false, false, false, false, 'mixed', null),
+        ];
+    }
+
+    /**
+     * Zend stub params for SplPriorityQueue::compare (#25555).
+     *
+     * @return list<ParameterMetadata>
+     */
+    public static function comparePriorityParamMetadata(): array
+    {
+        return [
+            new ParameterMetadata('priority1', [], false, false, false, false, 'mixed', null),
+            new ParameterMetadata('priority2', [], false, false, false, false, 'mixed', null),
+        ];
     }
 
     public static function init(ObjectEntry $object, int $kind): void
@@ -433,6 +462,8 @@ final class SplMinHeapBuiltin
         $entry->methods['compare'] = new SplMinHeapCompare();
         $entry->methodVisibility['compare'] = $prot;
         $entry->methodNames['compare'] = 'compare';
+        // php-src ext/spl/spl_heap.stub.php — not InternalArgInfo a/b (#25555)
+        $entry->methodParameterMetadata['compare'] = SplHeapBuiltin::compareValueParamMetadata();
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -463,6 +494,8 @@ final class SplMaxHeapBuiltin
         $entry->methods['compare'] = new SplMaxHeapCompare();
         $entry->methodVisibility['compare'] = $prot;
         $entry->methodNames['compare'] = 'compare';
+        // php-src ext/spl/spl_heap.stub.php — not InternalArgInfo a/b (#25555)
+        $entry->methodParameterMetadata['compare'] = SplHeapBuiltin::compareValueParamMetadata();
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -522,7 +555,9 @@ final class SplPriorityQueueBuiltin
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
-        $entry->methodVisibility['compare'] = CfgFunc::FLAG_PROTECTED;
+        $entry->methodVisibility['compare'] = $pub;
+        // php-src ext/spl/spl_heap.stub.php — public compare(mixed $priority1, $priority2) (#25555)
+        $entry->methodParameterMetadata['compare'] = SplHeapBuiltin::comparePriorityParamMetadata();
         $entry->methodNames['isempty'] = 'isEmpty';
         $entry->methodNames['iscorrupted'] = 'isCorrupted';
         $entry->methodNames['setextractflags'] = 'setExtractFlags';

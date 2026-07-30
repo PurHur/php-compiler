@@ -59,6 +59,11 @@ final class BuiltinParamNames
             'splfileobject::fgetcsv' => ['separator', 'enclosure', 'escape'],
             // php-src ext/spl/spl_directory.stub.php — trailing CSV args optional; InternalArgInfo omits `=`/`eol` (#25135)
             'splfileobject::fputcsv' => ['fields', 'separator=', 'enclosure=', 'escape=', 'eol='],
+            // php-src ext/spl/spl_heap.stub.php — InternalArgInfo still a/b (#25555)
+            'splheap::compare',
+            'splminheap::compare',
+            'splmaxheap::compare' => ['value1', 'value2'],
+            'splpriorityqueue::compare' => ['priority1', 'priority2'],
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],
