@@ -4935,7 +4935,15 @@ final class ReflectionSupport
             return;
         }
         $returnVar->newArray();
-        $ht = $returnVar->toArray();
+        self::addClosureUsedVariablesToHashTable($returnVar->toArray(), $state);
+    }
+
+    /**
+     * Bound `use` captures for a live ClosureState (php-src closure static table).
+     * Shared by getClosureUsedVariables() and getStaticVariables() (#25558).
+     */
+    private static function addClosureUsedVariablesToHashTable(HashTable $ht, ClosureState $state): void
+    {
         $block = $state->func->block;
         /** @var array<int, Variable> $bySlot */
         $bySlot = [];
@@ -5051,6 +5059,10 @@ final class ReflectionSupport
         }
         $returnVar->newArray();
         $ht = $returnVar->toArray();
+        // php-src: closure getStaticVariables() = use captures then function-static locals (#25558).
+        if (null !== $closureState) {
+            self::addClosureUsedVariablesToHashTable($ht, $closureState);
+        }
         foreach (self::collectFunctionStaticVarDeclarations($func->block) as $varName => $info) {
             $copy = self::resolveStaticVarReflectionValue(
                 $ctx,
