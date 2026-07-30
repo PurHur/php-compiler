@@ -851,9 +851,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
             3,
             BuiltinParamNames::lookupNamedParamIndex($splFputcsv, 'escape', 'SplFileObject::fputcsv')
         );
+        // Zend stubs use separator; delimiter is Unknown named parameter (#25590)
+        self::assertFalse(
+            BuiltinParamNames::lookupNamedParamIndex($splFputcsv, 'delimiter', 'SplFileObject::fputcsv')
+        );
         self::assertSame(
             1,
-            BuiltinParamNames::lookupNamedParamIndex($splFputcsv, 'delimiter', 'SplFileObject::fputcsv')
+            BuiltinParamNames::lookupNamedParamIndex($splFputcsv, 'separator', 'SplFileObject::fputcsv')
         );
 
         $ctx = BuiltinParamNames::forFunction('stream_context_create');
@@ -875,6 +879,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ssc, 'address', 'stream_socket_client'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($ssc, 'timeout', 'stream_socket_client'));
+    }
+
+    /** @covers issue #25590 */
+    public function testCsvRejectDelimiterNamedAlias(): void
+    {
+        $str = BuiltinParamNames::forFunction('str_getcsv');
+        self::assertSame(['string', 'separator=', 'enclosure=', 'escape='], $str);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($str, 'separator', 'str_getcsv'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($str, 'delimiter', 'str_getcsv'));
+        self::assertSame([], BuiltinParamNames::aliasesForFunction('str_getcsv'));
+
+        $fget = BuiltinParamNames::forFunction('fgetcsv');
+        self::assertSame(['stream', 'length', 'separator', 'enclosure', 'escape'], $fget);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fget, 'separator', 'fgetcsv'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fget, 'delimiter', 'fgetcsv'));
+        self::assertSame([], BuiltinParamNames::aliasesForFunction('fgetcsv'));
+
+        $splGet = BuiltinParamNames::paramNamesForInternalFunction('SplFileObject::fgetcsv');
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($splGet, 'delimiter', 'SplFileObject::fgetcsv'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($splGet, 'separator', 'SplFileObject::fgetcsv'));
     }
 
     /** @covers issue #11576 */
