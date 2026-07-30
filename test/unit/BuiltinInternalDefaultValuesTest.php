@@ -395,4 +395,33 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(1, $dest->toInt());
     }
 
+    /** @covers issue #24813 */
+    public function testStrGetcsvReflectionDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'str_getcsv',
+            1,
+            ['name' => 'separator', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame(',', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'str_getcsv',
+            2,
+            ['name' => 'enclosure', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame('"', $dest->toString());
+
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'str_getcsv',
+            3,
+            ['name' => 'escape', 'type' => 'string', 'isOptional' => true]
+        ));
+        self::assertSame('\\', $dest->toString());
+    }
+
 }

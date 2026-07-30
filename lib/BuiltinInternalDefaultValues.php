@@ -119,6 +119,12 @@ final class BuiltinInternalDefaultValues
         'str_split' => [
             1 => ['kind' => 'int', 'value' => 1],
         ],
+        // php-src ext/standard/basic_functions.stub.php — separator/enclosure/escape string defaults (#24813)
+        'str_getcsv' => [
+            1 => ['kind' => 'string', 'value' => ','],
+            2 => ['kind' => 'string', 'value' => '"'],
+            3 => ['kind' => 'string', 'value' => '\\'],
+        ],
         'preg_match' => [
             2 => ['kind' => 'null'],
             3 => ['kind' => 'int', 'value' => 0],
