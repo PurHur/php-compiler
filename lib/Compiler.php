@@ -54193,6 +54193,27 @@ class Compiler {
                 if (null !== $comparisonProducer) {
                     return;
                 }
+                // var_export((string)$xml['a']) — Cast feeds arg #0; dim-fetch is the Cast operand (#25339).
+                // Skip trailing true/false return-flag ConstFetch so two-arg form still sees the Cast.
+                $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+                if (\is_int($callIndex) && $callIndex > 0) {
+                    $probeIndex = $callIndex - 1;
+                    while ($probeIndex >= 0) {
+                        $probe = $block->orig->children[$probeIndex] ?? null;
+                        if ($probe instanceof Op\Expr\ConstFetch) {
+                            $flagName = strtolower($this->staticNameFromOperand($probe->name) ?? '');
+                            if (\in_array($flagName, ['true', 'false'], true)) {
+                                --$probeIndex;
+                                continue;
+                            }
+                        }
+                        break;
+                    }
+                    $castPrelude = $block->orig->children[$probeIndex] ?? null;
+                    if ($castPrelude instanceof Op\Expr\Cast) {
+                        return;
+                    }
+                }
             }
             $trueSlot = null;
             foreach (array_reverse(array_merge($block->opCodes, $nestedProducerOps, $outerArgSends)) as $op) {
