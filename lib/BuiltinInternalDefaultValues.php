@@ -219,6 +219,10 @@ final class BuiltinInternalDefaultValues
         'str_ireplace' => [
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/string.stub.php — &$percent = null (InternalArgInfo float → 0.0) (#25361)
+        'similar_text' => [
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
         'setcookie' => [
             1 => ['kind' => 'string', 'value' => ''],

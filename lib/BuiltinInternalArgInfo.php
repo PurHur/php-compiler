@@ -233,6 +233,8 @@ final class BuiltinInternalArgInfo
             'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
+            // ext/standard/string.stub.php — &$percent = null (untyped; InternalArgInfo float) (#25361)
+            'similar_text' => 2 === $index ? '' : null,
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)
