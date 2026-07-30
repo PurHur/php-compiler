@@ -12,12 +12,13 @@ final class SoapExtensionPolicyTest extends TestCase
 {
     public function testWithholdsOnReferenceWithoutHostSoap(): void
     {
-        if (\extension_loaded('soap') || \PHPCompiler\CompilerVersion::supportsSoap()) {
-            $this->markTestSkipped('soap advertised on this host/profile');
+        if (\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap present');
         }
 
         self::assertFalse(SoapExtensionPolicy::advertisesExtension());
         self::assertFalse(SoapExtensionPolicy::advertisesExceptionClass());
+        self::assertFalse(CompilerVersion::supportsSoap());
 
         $runtime = new Runtime();
         self::assertFalse(
@@ -44,8 +45,48 @@ final class SoapExtensionPolicyTest extends TestCase
         self::assertFalse(SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes());
     }
 
-    public function testSoapUrlSdlOnForwardProfile84(): void
+    /** PROFILE=8.4 must not invent soap when host Zend lacks php-soap (#25165). */
+    public function testWithholdsOnForwardProfile84WithoutHostSoap(): void
     {
+        if (\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap present');
+        }
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertFalse(CompilerVersion::supportsSoap());
+            self::assertFalse(SoapExtensionPolicy::advertisesExtension());
+            self::assertFalse(SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes());
+
+            $runtime = new Runtime();
+            self::assertFalse(
+                ext\standard\ModuleRegistry::extensionLoaded('soap')
+            );
+            self::assertFalse(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'SoapClient')
+            );
+            self::assertFalse(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'Soap\\Url')
+            );
+            self::assertFalse(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'Soap\\Sdl')
+            );
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSoapUrlSdlWhenHostSoapAndForwardProfile84(): void
+    {
+        if (!\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap required for Soap\\Url / Soap\\Sdl surface');
+        }
+
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
@@ -78,6 +119,10 @@ final class SoapExtensionPolicyTest extends TestCase
 
     public function testSoapClientHttpurlPropertyOnForwardProfile84(): void
     {
+        if (!\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap required');
+        }
+
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
@@ -141,6 +186,10 @@ final class SoapExtensionPolicyTest extends TestCase
 
     public function testSoapClientSdlPropertyOnForwardProfile84(): void
     {
+        if (!\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap required');
+        }
+
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
@@ -191,6 +240,10 @@ final class SoapExtensionPolicyTest extends TestCase
 
     public function testSoapClientCoreOptionProperties(): void
     {
+        if (!\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap required');
+        }
+
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
@@ -237,6 +290,10 @@ final class SoapExtensionPolicyTest extends TestCase
 
     public function testSoapClientTraceFaultProperties(): void
     {
+        if (!\extension_loaded('soap')) {
+            $this->markTestSkipped('host php-soap required');
+        }
+
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {

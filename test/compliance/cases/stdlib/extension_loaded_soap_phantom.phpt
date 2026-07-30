@@ -1,5 +1,5 @@
 --TEST--
-stdlib extension_loaded('soap') false without host php-soap / forward profile (#22859, ext/soap/soap.c)
+stdlib extension_loaded('soap') false without host php-soap (#22859/#25165, ext/soap/soap.c)
 --FILE--
 <?php
 declare(strict_types=1);

@@ -3150,15 +3150,15 @@ final class CompilerVersion
     }
 
     /**
-     * ext/soap SoapClient/SoapServer/SoapFault — withheld on reference profile (#22859 / #3724).
+     * ext/soap SoapClient/SoapServer/SoapFault — host php-soap only (#22859 / #25165 / #3724).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
-     * Zend 8.2 phantom gate (host php-soap absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`
-     * or install host ext/soap ({@see \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension()}).
+     * Always false: language profile must not invent soap when Zend lacks php-soap (#25165).
+     * Advertisement is {@see \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension()}
+     * (`extension_loaded('soap')` on the host).
      */
     public static function supportsSoap(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
