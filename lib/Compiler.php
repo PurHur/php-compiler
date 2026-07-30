@@ -243,6 +243,9 @@ class Compiler {
     /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
     private array $neverFunctionNames = [];
 
+    /** @var array<string, array<int, true>> lowercase user function => by-ref param indices (#25301). */
+    private array $userFunctionParamByRef = [];
+
     /** True while lowering switch to JUMPIF/EQUAL — skip ?: merge slot bridging (#878). */
     private bool $compilingSwitchJumpIfChain = false;
 
@@ -543,6 +546,7 @@ class Compiler {
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
         $this->neverFunctionNames = [];
+        $this->userFunctionParamByRef = [];
         $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
@@ -10619,8 +10623,14 @@ class Compiler {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
         NoDiscardMetadata::applyToBlock($funcBlock, $function);
         $this->markGeneratorIfNeeded($function, $funcBlock);
+        $funcLc = strtolower($function->func->name);
         if ($this->funcDeclReturnTypeIsNever($function->func)) {
-            $this->neverFunctionNames[strtolower($function->func->name)] = true;
+            $this->neverFunctionNames[$funcLc] = true;
+        }
+        foreach ($function->func->params as $paramIdx => $param) {
+            if ($param->byRef) {
+                $this->userFunctionParamByRef[$funcLc][(int) $paramIdx] = true;
+            }
         }
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
@@ -16310,6 +16320,144 @@ class Compiler {
     }
 
     /**
+     * bump($obj->prop) — by-ref call args need FETCH_OBJ_W (#25301, zend_execute.c ZEND_SEND_REF).
+     */
+    private function propertyFetchUsedAsByRefCallArg(
+        Op\Expr\PropertyFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Expr\FuncCall && !$usage instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!property_exists($usage, 'args') || !is_array($usage->args)) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($usage);
+        if (null === $calleeName) {
+            return false;
+        }
+        $argIndex = $this->propertyFetchByRefCallArgIndex($fetch, $usage, $block);
+        if (null === $argIndex) {
+            return false;
+        }
+
+        return $this->callArgRequiresByRef($calleeName, $argIndex, null, $block);
+    }
+
+    /**
+     * @return ?int call arg index when $fetch is a by-ref actual (operand temps may differ, #25301).
+     */
+    private function propertyFetchByRefCallArgIndex(
+        Op\Expr\PropertyFetch $fetch,
+        Op\Expr\FuncCall|Op\Expr\NsFuncCall $call,
+        ?Block $block = null,
+        ?array $children = null
+    ): ?int {
+        if (!property_exists($call, 'args') || !is_array($call->args)) {
+            return null;
+        }
+        foreach ($call->args as $argIndex => $callArg) {
+            if (
+                null !== $callArg
+                && (
+                    $callArg === $fetch->result
+                    || $this->operandsReferToSameVariable($callArg, $fetch->result)
+                )
+            ) {
+                return (int) $argIndex;
+            }
+        }
+        if (null === $children && null !== $block?->orig) {
+            $children = $block->orig->children;
+        }
+        if (null === $children) {
+            return null;
+        }
+        $fetchIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $fetch) {
+                $fetchIndex = $i;
+                break;
+            }
+        }
+        if (null === $fetchIndex) {
+            return null;
+        }
+        /** @var list<Op\Expr\PropertyFetch> $propFetches */
+        $propFetches = [];
+        for ($j = $fetchIndex; $j >= 0; --$j) {
+            $child = $children[$j];
+            if ($child instanceof Op\Expr\PropertyFetch) {
+                array_unshift($propFetches, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            break;
+        }
+        if ([] === $propFetches) {
+            return null;
+        }
+        $propFetchIndex = array_search($fetch, $propFetches, true);
+        if (false === $propFetchIndex) {
+            return null;
+        }
+        $callIndex = $fetchIndex + 1;
+        if ($callIndex >= \count($children) || $children[$callIndex] !== $call) {
+            return null;
+        }
+        $callArgs = $call->args;
+        $argIndex = (int) $propFetchIndex;
+        if (\count($propFetches) < \count($callArgs)) {
+            $nonEmbeddedArgIndices = [];
+            foreach ($callArgs as $idx => $callArg) {
+                if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                    $nonEmbeddedArgIndices[] = $idx;
+                }
+            }
+            if (!isset($nonEmbeddedArgIndices[$propFetchIndex])) {
+                return null;
+            }
+            $argIndex = (int) $nonEmbeddedArgIndices[$propFetchIndex];
+        }
+
+        return $argIndex;
+    }
+
+    /**
+     * php-cfg: PropertyFetch immediately precedes by-ref FuncCall when usages are empty (#25301).
+     *
+     * @param list<Op> $children
+     */
+    private function propertyFetchPrecedesByRefCall(
+        Op\Expr\PropertyFetch $fetch,
+        Op $maybeCall,
+        Block $block,
+        int $fetchChildIndex,
+        array $children
+    ): bool {
+        if (!$maybeCall instanceof Op\Expr\FuncCall && !$maybeCall instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $callIndex = $fetchChildIndex + 1;
+        if ($callIndex >= \count($children) || $children[$callIndex] !== $maybeCall) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($maybeCall);
+        if (null === $calleeName) {
+            return false;
+        }
+        $argIndex = $this->propertyFetchByRefCallArgIndex($fetch, $maybeCall, $block, $children);
+        if (null === $argIndex) {
+            return false;
+        }
+
+        return $this->callArgRequiresByRef($calleeName, $argIndex, null, $block);
+    }
+
+    /**
      * True when property fetch is only used as write/ref lvalue (assign, AssignRef, unset, ++/--; #13559).
      */
     protected function isPropertyFetchForWrite(Op\Expr\PropertyFetch $fetch, Block $block): bool
@@ -16331,6 +16479,9 @@ class Compiler {
                 continue;
             }
             if ($this->isIncDecUsingOperand($usage, $fetch->result)) {
+                continue;
+            }
+            if ($this->propertyFetchUsedAsByRefCallArg($fetch, $usage, $block)) {
                 continue;
             }
             // $obj->prop[] = must read through get hook first; dim write uses FETCH not FETCH_W (#6775, #19171).
@@ -16374,6 +16525,9 @@ class Compiler {
                 return true;
             }
             if ($this->isIncDecUsingOperand($next, $fetch->result)) {
+                return true;
+            }
+            if ($this->propertyFetchPrecedesByRefCall($fetch, $next, $block, $i, $children)) {
                 return true;
             }
             // $obj->prop[] = — read fetch + dim write container (#6775, #19171).
@@ -51555,6 +51709,10 @@ class Compiler {
                 return false;
             }
 
+            return true;
+        }
+        $lc = strtolower($calleeName);
+        if (isset($this->userFunctionParamByRef[$lc][$argIndex])) {
             return true;
         }
         if (\in_array($argIndex, BuiltinByRefParams::forFunction($calleeName), true)) {
