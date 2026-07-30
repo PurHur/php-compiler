@@ -1,5 +1,7 @@
 --TEST--
-Language: #[\Override] on properties — parent override compiles (#9822)
+Language: #[\Override] on properties — parent override compiles under PROFILE=8.5 (#9822, #25138)
+--ENV--
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,9 +1,11 @@
 --TEST--
-Language: #[\Override] on property without parent — compile-time fatal (#9822)
+Language: #[\Override] on property without parent — compile-time fatal under PROFILE=8.5 (#9822, #25138)
+--ENV--
+PHP_COMPILER_PROFILE=8.5
 --SKIPIF--
 <?php
-if (!PHPCompiler\CompilerVersion::supportsOverrideAttribute()) {
-    echo "skip — Override validation disabled on reference profile\n";
+if (!PHPCompiler\CompilerVersion::supportsOverridePropertyAttribute()) {
+    echo "skip — Override property target requires PROFILE≥8.5\n";
 }
 ?>
 --FILE--

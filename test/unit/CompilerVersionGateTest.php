@@ -2180,6 +2180,36 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsOverridePropertyAttributeFalseWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsOverridePropertyAttribute());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsOverridePropertyAttributeTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverridePropertyAttribute());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsFinalGlobalTypedConstantsWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());

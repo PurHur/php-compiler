@@ -599,6 +599,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ #[\Override] on properties (Zend/zend_attributes.stub.php TARGET_PROPERTY, #25138).
+     *
+     * php-src 8.3/8.4: Override = TARGET_METHOD only. 8.5 adds TARGET_PROPERTY (hooked / plain).
+     * Withheld on ≤8.4 profiles. Enable via stable 8.5.0+ or `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsOverridePropertyAttribute(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ forward-profile builtin attribute classes on 8.4.0-dev reference builds (#13706, #16977).
      *
      * Withheld when {@see PHP_COMPILER_PROFILE} is unset (matches Zend 8.2 phantom gate even if the

@@ -71,8 +71,10 @@ final class AttributeNames
     }
 
     /**
-     * Zend compile-time target guard (zend_attributes.c, issue #6864, #9821, #9822).
-     * `#[\Override]` is valid on methods, class constants (PHP 8.3+), and properties (PHP 8.3+).
+     * Zend compile-time target guard (zend_attributes.c, issue #6864, #9821, #9822, #25138).
+     *
+     * php-src: Override = TARGET_METHOD on 8.3/8.4; 8.5 adds TARGET_PROPERTY.
+     * Class-constant targeting remains accepted here for existing #9821 coverage (not in php-src stubs).
      *
      * @param list<string> $names
      */
@@ -86,12 +88,18 @@ final class AttributeNames
             return;
         }
 
-        if ('method' === $target || 'class constant' === $target || 'property' === $target) {
+        $allowed = ['method'];
+        if (CompilerVersion::supportsOverridePropertyAttribute()) {
+            $allowed[] = 'property';
+        }
+
+        if (\in_array($target, $allowed, true) || 'class constant' === $target) {
             return;
         }
 
         throw new \CompileError(
-            'Attribute "'.self::messageName('Override').'" cannot target '.$target.' (allowed targets: method, class constant, property)'
+            'Attribute "'.self::messageName('Override').'" cannot target '.$target
+            .' (allowed targets: '.implode(', ', $allowed).')'
         );
     }
 
