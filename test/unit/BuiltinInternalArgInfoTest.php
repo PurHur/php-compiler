@@ -43,6 +43,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('not_a_real_builtin_xyz'));
     }
 
+    /** php-src string.stub.php — InternalArgInfo omits |false (#25442). */
+    public function testStrposFamilyReturnTypeIncludesFalse(): void
+    {
+        foreach (['strpos', 'stripos', 'strrpos', 'strripos'] as $f) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        foreach (['strstr', 'stristr'] as $f) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));
