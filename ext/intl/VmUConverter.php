@@ -66,6 +66,7 @@ final class VmUConverter
      *     destOk: bool,
      *     srcOk: bool,
      *     substChars: string,
+     *     substCharsExplicit: bool,
      *     errorCode: int,
      *     errorMessage: string,
      *     openOk: bool
@@ -152,10 +153,11 @@ final class VmUConverter
     }
 
     /**
-     * UConverter::transcode() — one-shot charset conversion (php-src ext/intl/converter; #6401 / #21978).
+     * UConverter::transcode() — one-shot charset conversion (php-src ext/intl/converter; #6401 / #21978 / #25201).
      *
      * Unmappable codepoints use ICU-like substitution (ASCII → 0x1A), matching instance {@see convert()} —
-     * not bare {@see VmIconv::iconv()} hard-fail.
+     * not bare {@see VmIconv::iconv()} hard-fail. Optional {@code $options['to_subst']} /
+     * {@code $options['from_subst']} mirror php-src {@code ucnv_setSubstChars} on dest/src converters.
      */
     public static function transcode(
         string $str,
@@ -163,10 +165,12 @@ final class VmUConverter
         string $fromEncoding,
         ?array $options = null
     ): string|false {
-        unset($options);
-
         $to = '' !== $toEncoding ? $toEncoding : 'UTF-8';
         $from = '' !== $fromEncoding ? $fromEncoding : 'UTF-8';
+        $toSubst = self::optionSubstString($options, 'to_subst');
+        // from_subst applies to the source converter; for UTF-8→SBCS illegal input, ICU still
+        // surfaces via the dest subst path after U+FFFD (php-src converter.cpp) — honor to_subst.
+        unset($options);
         $result = VmIconv::iconv($from, $to, $str);
         if (false !== $result) {
             return $result;
@@ -177,7 +181,25 @@ final class VmUConverter
             return false;
         }
 
-        return self::nativeSubstConvert($str, $from, $to, '');
+        return self::nativeSubstConvert($str, $from, $to, $toSubst ?? '');
+    }
+
+    /**
+     * Extract a string option from UConverter::transcode() $options (php-src converter.cpp).
+     *
+     * @param array<mixed>|null $options
+     */
+    private static function optionSubstString(?array $options, string $key): ?string
+    {
+        if (null === $options || !\array_key_exists($key, $options)) {
+            return null;
+        }
+        $value = $options[$key];
+        if (!\is_string($value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     public static function isUConverterObject(?ObjectEntry $object, ?Context $ctx = null): bool
@@ -220,6 +242,7 @@ final class VmUConverter
             'destOk' => $destOk,
             'srcOk' => $srcOk,
             'substChars' => $srcOk ? self::defaultSubstChars($src) : '',
+            'substCharsExplicit' => false,
             'errorCode' => $openOk ? IntlError::U_ZERO_ERROR : self::U_FILE_ACCESS_ERROR,
             'errorMessage' => $openOk
                 ? 'U_ZERO_ERROR'
@@ -267,7 +290,10 @@ final class VmUConverter
         string $from,
         string $to
     ): string {
-        $configured = self::$state[$object->id]['substChars'] ?? '';
+        $state = self::$state[$object->id];
+        // Source-default U+FFFD must not become the ASCII dest subst (Zend: getSubstChars=FFFD
+        // but convert→0x1A until setSubstChars). Explicit setSubstChars / transcode to_subst do.
+        $configured = !empty($state['substCharsExplicit']) ? ($state['substChars'] ?? '') : '';
         $out = self::nativeSubstConvert($str, $from, $to, $configured);
         self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
         self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
@@ -276,9 +302,10 @@ final class VmUConverter
     }
 
     /**
-     * Shared ICU-like substitution for convert() and static transcode() (#21978).
+     * Shared ICU-like substitution for convert() and static transcode() (#21978 / #25201).
      *
-     * @param string $configuredSubstChars empty → charset defaults (ASCII 0x1A / Unicode U+FFFD)
+     * @param string $configuredSubstChars empty → charset defaults (ASCII 0x1A / Unicode U+FFFD);
+     *                                     non-empty honors transcode() {@code to_subst} / setSubstChars()
      */
     private static function nativeSubstConvert(
         string $str,
@@ -290,15 +317,14 @@ final class VmUConverter
             $out = '';
             $len = \strlen($str);
             $i = 0;
-            $subst = self::isUnicodeCharset($to)
-                ? ($configuredSubstChars !== ''
-                    ? $configuredSubstChars
-                    : self::defaultSubstChars($to))
-                : "\x1a";
+            $subst = self::resolveDestSubstChars($to, $configuredSubstChars);
             while ($i < $len) {
                 $cp = self::utf8NextCodepoint($str, $i, $next);
                 if (null === $cp) {
-                    $out .= $subst;
+                    // Illegal UTF-8: Unicode dest keeps U+FFFD (to_subst does not override —
+                    // Zend UConverter::transcode UTF-8→UTF-8); SBCS dest uses to_subst / 0x1A
+                    // after the U+FFFD pivot fails to encode (php-src converter.cpp).
+                    $out .= self::isUnicodeCharset($to) ? "\xef\xbf\xbd" : $subst;
                     $i = $next > $i ? $next : $i + 1;
                     continue;
                 }
@@ -315,9 +341,17 @@ final class VmUConverter
             return $out;
         }
 
-        return self::isUnicodeCharset($to)
-            ? ($configuredSubstChars !== '' ? $configuredSubstChars : "\xef\xbf\xbd")
-            : "\x1a";
+        return self::resolveDestSubstChars($to, $configuredSubstChars);
+    }
+
+    /** Dest-side substitution for unmappable / illegal after Unicode pivot (#25201). */
+    private static function resolveDestSubstChars(string $toEncoding, string $configuredSubstChars): string
+    {
+        if ('' !== $configuredSubstChars) {
+            return $configuredSubstChars;
+        }
+
+        return self::isUnicodeCharset($toEncoding) ? self::defaultSubstChars($toEncoding) : "\x1a";
     }
 
     /**
@@ -751,6 +785,7 @@ final class VmUConverter
         self::$state[$object->id]['src'] = $enc;
         self::$state[$object->id]['srcOk'] = true;
         self::$state[$object->id]['substChars'] = self::defaultSubstChars($enc);
+        self::$state[$object->id]['substCharsExplicit'] = false;
         self::$state[$object->id]['openOk'] = (bool) self::$state[$object->id]['destOk'];
         self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
         self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
@@ -827,6 +862,7 @@ final class VmUConverter
             return false;
         }
         self::$state[$object->id]['substChars'] = $chars;
+        self::$state[$object->id]['substCharsExplicit'] = true;
         self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
         self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
 
@@ -1374,6 +1410,7 @@ final class UConverterTranscode extends VmClassMethod
             2,
             'fromEncoding'
         );
+        $options = null;
         if (4 === $argc) {
             $optVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_NULL !== $optVar->type && Variable::TYPE_ARRAY !== $optVar->type) {
@@ -1382,11 +1419,22 @@ final class UConverterTranscode extends VmClassMethod
                     ReflectionSupport::valueTypeLabelPublic($optVar)
                 ));
             }
+            if (Variable::TYPE_ARRAY === $optVar->type) {
+                $options = [];
+                foreach ($optVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    $keyVar = $keyVar->resolveIndirect();
+                    $valueVar = $valueVar->resolveIndirect();
+                    if (Variable::TYPE_STRING !== $keyVar->type || Variable::TYPE_STRING !== $valueVar->type) {
+                        continue;
+                    }
+                    $options[$keyVar->toString()] = $valueVar->toString();
+                }
+            }
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmUConverter::transcode($str, $toEncoding, $fromEncoding);
+        $result = VmUConverter::transcode($str, $toEncoding, $fromEncoding, $options);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
