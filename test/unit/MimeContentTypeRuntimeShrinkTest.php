@@ -7,7 +7,11 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\MimeContentTypeJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** mime_content_type JIT routes through MimeContentTypeJitHelper PHP, not LLVM sniff (#9236). */
+/**
+ * mime_content_type JIT routes through MimeContentTypeJitHelper PHP (#9236 / #25544).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #25541).
+ */
 final class MimeContentTypeRuntimeShrinkTest extends TestCase
 {
     public function testMimeContentTypeJitHelperDelegatesToVmMime(): void
@@ -17,15 +21,22 @@ final class MimeContentTypeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('strncmp', $source);
     }
 
-    public function testMimeContentTypeRuntimeUsesJitHelperNotLlvmSniff(): void
+    public function testMimeContentTypeRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MimeContentTypeRuntime.php');
         $this->assertStringContainsString('MimeContentTypeJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString("lookupFunction('strncmp')", $source);
         $this->assertStringNotContainsString('__compiler_file_get_contents', $source);
         $this->assertStringNotContainsString('literalString', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $lineCount = \substr_count($source, "\n") + 1;
-        $this->assertLessThan(120, $lineCount);
+        $this->assertLessThan(100, $lineCount);
         $this->assertGreaterThan(60, 186 - $lineCount);
     }
 
