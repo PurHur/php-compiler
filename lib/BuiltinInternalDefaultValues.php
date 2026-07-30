@@ -284,6 +284,13 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'int', 'value' => 2047],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (#25166)
+        'datetime::createfromformat' => [
+            2 => ['kind' => 'null'],
+        ],
+        'datetimeimmutable::createfromformat' => [
+            2 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
