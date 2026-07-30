@@ -399,7 +399,7 @@ final class SplCachingIteratorStorage
         return '';
     }
 
-    /** convert_to_string / zval_get_string for cached current or key (#24256 / #24907). */
+    /** convert_to_string / zval_get_string for cached current or key (#24256 / #24907 / #25358). */
     private static function stringifyVariable(Frame $frame, Variable $resolved): string
     {
         return match ($resolved->type) {
@@ -408,10 +408,28 @@ final class SplCachingIteratorStorage
             Variable::TYPE_FLOAT => (string) $resolved->toFloat(),
             Variable::TYPE_BOOLEAN => $resolved->toBool() ? '1' : '',
             Variable::TYPE_NULL => '',
-            Variable::TYPE_ARRAY => 'Array',
+            Variable::TYPE_ARRAY => self::stringifyArray($frame),
             Variable::TYPE_OBJECT => self::stringifyObjectCurrent($frame, $resolved->toObject()),
             default => 'Object',
         };
+    }
+
+    /**
+     * Zend _convert_to_string() array branch (zend_operators.c) — E_WARNING then "Array" (#25358).
+     */
+    private static function stringifyArray(Frame $frame): string
+    {
+        if (null !== $frame->vmContext) {
+            $frame->vmContext->errors->languageWarning(
+                'Array to string conversion',
+                null,
+                0,
+                $frame->vmContext,
+                $frame
+            );
+        }
+
+        return 'Array';
     }
 
     private static function stringifyObjectCurrent(Frame $frame, ObjectEntry $current): string

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6640 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21377 |
+| Source constructs flagged (warnings) | 21375 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5388,7 +5388,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrcoll.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStreamCsv.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringStrftime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrftime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStripTags.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStripcslashesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStripslashes.php` | 0 | 1 |
@@ -23746,20 +23746,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 320)
 - new Variable (line 326)
 - new BadMethodCallException (line 371)
-- new Variable (line 450)
-- new Variable (line 505)
-- new Variable (line 511)
-- new Variable (line 517)
+- new Variable (line 468)
 - new Variable (line 523)
 - new Variable (line 529)
-- new BadMethodCallException (line 542)
-- new ArgumentCountError (line 589)
-- new ArgumentCountError (line 833)
-- new ArgumentCountError (line 943)
-- new ArgumentCountError (line 973)
-- new ArgumentCountError (line 1004)
-- new ArgumentCountError (line 1033)
-- 50 class method(s)
+- new Variable (line 535)
+- new Variable (line 541)
+- new Variable (line 547)
+- new BadMethodCallException (line 560)
+- new ArgumentCountError (line 607)
+- new ArgumentCountError (line 851)
+- new ArgumentCountError (line 961)
+- new ArgumentCountError (line 991)
+- new ArgumentCountError (line 1022)
+- new ArgumentCountError (line 1051)
+- 51 class method(s)
 
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
 
@@ -41619,8 +41619,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1831)
-- new ArgumentCountError (line 1842)
+- new ArgumentCountError (line 1832)
+- new ArgumentCountError (line 1843)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -45804,9 +45804,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrftime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 125)
 - 6 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringStripTags.php`
 
