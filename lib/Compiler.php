@@ -34264,6 +34264,120 @@ class Compiler {
         return false;
     }
 
+
+    /**
+     * Sole writer on a dead call-arg temp — Array_ / ConstFetch / ClassConstFetch (#25337).
+     *
+     * When a sibling arg is ?: Phi-written, JumpIf merge prebind can make compileOperand
+     * resolve the non-Phi temp to the ternary phi slot (array_merge([1], $x?[2]:[3]),
+     * twoway(FLAG, 'C'?:'D')). Prefer the embedded writer instead.
+     */
+    private function soleEmbeddedWriterOnCallArgTemp(?Operand $arg): ?Op\Expr
+    {
+        if (null === $arg || !$this->callArgIsDeadInlineTemporary($arg)) {
+            return null;
+        }
+        if ($this->callArgTemporaryIsPhiWritten($arg)) {
+            return null;
+        }
+        $ops = $arg->ops ?? [];
+        if (1 !== \count($ops) || !($ops[0] instanceof Op\Expr)) {
+            return null;
+        }
+        $writer = $ops[0];
+        if (
+            $writer instanceof Op\Expr\Array_
+            || $writer instanceof Op\Expr\ConstFetch
+            || $writer instanceof Op\Expr\ClassConstFetch
+        ) {
+            return $writer;
+        }
+
+        return null;
+    }
+
+    /** True when another dead call arg on this call is ?: Phi-written (#25337). */
+    private function cfgCallHasPhiWrittenDeadTempSibling(Op $cfgCallOp, int $argIndex): bool
+    {
+        if (!property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        foreach ($cfgCallOp->args as $i => $candidate) {
+            if ((int) $i === $argIndex || !($candidate instanceof Operand)) {
+                continue;
+            }
+            if (
+                $this->callArgIsDeadInlineTemporary($candidate)
+                && $this->callArgTemporaryIsPhiWritten($candidate)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Wire non-Phi dead temps beside ?: to their sole embedded writer slot (#25337).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function resolveNonPhiSiblingOfTernaryCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg,
+        array &$emitOps
+    ): ?string {
+        if (!$this->cfgCallHasPhiWrittenDeadTempSibling($cfgCallOp, $argIndex)) {
+            return null;
+        }
+        $writer = $this->soleEmbeddedWriterOnCallArgTemp($arg);
+        if (null === $writer || null === $writer->result) {
+            return null;
+        }
+        $ternaryPhiSlots = [];
+        foreach ($this->ternaryMergePhiRhsSlots as $mergeCfg) {
+            $phi = $this->ternaryMergePhiRhsSlots[$mergeCfg];
+            if (null !== $phi) {
+                $ternaryPhiSlots[(string) $phi] = true;
+            }
+        }
+        if ($writer instanceof Op\Expr\Array_) {
+            $slot = $block->slotForOperand($writer->result);
+            // Prebind may alias the Array_ result onto the ternary phi — emit a fresh INIT_ARRAY.
+            if (null === $slot || isset($ternaryPhiSlots[(string) $slot])) {
+                $arrayOps = $this->compileArrayLiteral($writer, $block);
+                if ([] !== $arrayOps) {
+                    $emitOps = array_merge($emitOps, $arrayOps);
+                }
+                $slot = $this->slotFromInitArrayLiteralOps($arrayOps)
+                    ?? $block->slotForOperand($writer->result);
+            }
+
+            return null !== $slot ? (string) $slot : null;
+        }
+        if ($writer instanceof Op\Expr\ConstFetch) {
+            $folded = $this->tryFoldGlobalConstFetch($writer);
+            if (null !== $folded) {
+                return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+            }
+        }
+        $slot = $block->slotForOperand($writer->result);
+        if (null !== $slot && !isset($ternaryPhiSlots[(string) $slot])) {
+            return (string) $slot;
+        }
+        foreach ($this->compileExpr($writer, $block) as $op) {
+            $emitOps[] = $op;
+        }
+        $slot = $block->slotForOperand($writer->result);
+        if (null !== $slot && !isset($ternaryPhiSlots[(string) $slot])) {
+            return (string) $slot;
+        }
+
+        return null;
+    }
+
     /**
      * Hoisted ConstFetch wired to this positional arg must keep its slot (#15833).
      * probe('label', in_array(..., g(), true)) — ConstFetch feeds inner callee, not outer (#14237).
@@ -50552,6 +50666,23 @@ class Compiler {
                 $spreadResultSlot = $this->slotForArraySpreadResultAfterLastExecReturn($block, $sends);
                 if (null !== $spreadResultSlot) {
                     $valueSlot = $spreadResultSlot;
+                }
+            }
+            // array_merge([1], $x ? [2] : [3]) / twoway(FLAG, 'C' ?: 'D') — non-Phi sibling of
+            // ?: must keep Array_/ConstFetch writer slot, not the merge phi (#25337).
+            if (null !== $cfgCallOp && \is_array($cfgCallOp->args ?? null)) {
+                $ternarySiblingProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($ternarySiblingProbe instanceof Operand) {
+                    $ternarySiblingSlot = $this->resolveNonPhiSiblingOfTernaryCallArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $ternarySiblingProbe,
+                        $sends
+                    );
+                    if (null !== $ternarySiblingSlot) {
+                        $valueSlot = $ternarySiblingSlot;
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
