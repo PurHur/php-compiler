@@ -457,7 +457,8 @@ final class BuiltinParamNames
             case 'settype':
                 return ['var', 'type'];
             case 'register_shutdown_function':
-                return ['function', 'parameter'];
+                // php-src ext/standard/basic_functions.stub.php — callable $callback, mixed ...$args (#23380)
+                return ['callback', 'args'];
             case 'header':
                 return ['header', 'replace', 'response_code'];
             case 'header_register_callback':
