@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_image_type_to_extension via ImageTypeToExtensionJitHelper PHP (#14851).
+ * JIT/AOT link for __compiler_image_type_to_extension via ImageTypeToExtensionJitHelper PHP (#14851, #25443).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringDateTime #25433).
  * Replaces lookup LLVM in JitImageTypeToExtension.php.
  * SSOT: {@see \PHPCompiler\ext\standard\VmImage}.
  * php-src: ext/standard/image.c — PHP_FUNCTION(image_type_to_extension)
@@ -159,43 +159,18 @@ final class StringImageTypeToExtension
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ImageTypeToExtensionJitHelper compile (#14851)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25443');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ImageTypeToExtensionJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ImageTypeToExtensionJitHelper.php parseAndCompile failed (#14851)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#14851)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25443'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -203,7 +178,7 @@ final class StringImageTypeToExtension
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringImageTypeToExtension bridge (#14851)');
+                throw new \LogicException($name.' missing after StringImageTypeToExtension bridge (#14851/#25443)');
             }
             $context->registerFunction($name, $fn);
         }
