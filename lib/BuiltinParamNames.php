@@ -792,7 +792,8 @@ final class BuiltinParamNames
             case 'get_headers':
                 return ['url', 'associative', 'context'];
             case 'flock':
-                return ['stream', 'operation', 'wouldblock'];
+                // php-src ext/standard/file.stub.php — ?bool &$would_block = null (#23352)
+                return ['stream', 'operation', '&would_block='];
             case 'get_resources':
                 return ['resource_type'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says res (#23342)

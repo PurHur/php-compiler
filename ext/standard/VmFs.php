@@ -1542,14 +1542,32 @@ final class VmFs
         return true;
     }
 
-    public static function flock(int $handle, int $operation): bool
+    public static function flock(int $handle, int $operation, ?int &$wouldBlock = null): bool
     {
+        $captureWouldBlock = \func_num_args() > 2;
         if (VmPhpFdStream::isValidHandle($handle)) {
-            return VmPhpFdStream::flock($handle, $operation);
+            $ok = VmPhpFdStream::flock($handle, $operation);
+            if ($captureWouldBlock) {
+                // libc flock has no wouldblock out; approximate php-src EWOULDBLOCK path.
+                $wouldBlock = (!$ok && (0 !== ($operation & 4))) ? 1 : 0;
+            }
+
+            return $ok;
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
+            if ($captureWouldBlock) {
+                $wouldBlock = 0;
+            }
+
             return false;
+        }
+        if ($captureWouldBlock) {
+            $wb = null;
+            $ok = @\flock($fp, $operation, $wb);
+            $wouldBlock = null === $wb ? 0 : (int) $wb;
+
+            return $ok;
         }
 
         return @\flock($fp, $operation);

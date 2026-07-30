@@ -550,6 +550,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 516], // FILTER_DEFAULT
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/standard/file.stub.php — ?bool &$would_block = null (InternalArgInfo int → 0) (#23352)
+        'flock' => [
+            2 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

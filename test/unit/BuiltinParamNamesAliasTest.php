@@ -901,6 +901,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($splGet, 'separator', 'SplFileObject::fgetcsv'));
     }
 
+    /** @covers issue #23352 */
+    public function testFlockWouldBlockNamedParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('flock');
+        self::assertSame(['stream', 'operation', '&would_block='], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'would_block', 'flock'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'wouldblock', 'flock'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('flock'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('flock'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('flock', 2));
+        $info = ['name' => 'would_block', 'type' => '', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('flock', 2, $info, false));
+        $wb = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($wb, 'flock', 2, $info));
+        self::assertSame(Variable::TYPE_NULL, $wb->type);
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {
