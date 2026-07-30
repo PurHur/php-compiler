@@ -557,10 +557,8 @@ final class VmDate
             $var->float((float) $fraction);
             $ht->add('fraction', $var);
         }
+        // php-src zval_from_error_container(): warning_count → warnings → error_count → errors (#25485)
         self::hashSetLong($ht, 'warning_count', $result['warning_count']);
-        self::hashSetLong($ht, 'error_count', $result['error_count']);
-        self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
-
         $warnings = new HashTable();
         foreach ($result['warnings'] as $pos => $message) {
             self::hashSetString($warnings, (string) $pos, $message);
@@ -569,6 +567,7 @@ final class VmDate
         $warningsVar->array($warnings);
         $ht->add('warnings', $warningsVar);
 
+        self::hashSetLong($ht, 'error_count', $result['error_count']);
         $errors = new HashTable();
         foreach ($result['errors'] as $pos => $message) {
             self::hashSetString($errors, (string) $pos, $message);
@@ -577,7 +576,9 @@ final class VmDate
         $errorsVar->array($errors);
         $ht->add('errors', $errorsVar);
 
-        // php-src php_date.c — zone keys follow is_localtime/errors; tz_abbr before tz_id (#25487).
+        // php-src date_parse: is_localtime after error container, then zone / relative (#25485)
+        self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
+        // php-src php_date.c — zone keys follow is_localtime; tz_abbr before tz_id (#25487).
         if (isset($result['zone_type'])) {
             self::hashSetLong($ht, 'zone_type', $result['zone_type']);
         }
@@ -622,9 +623,8 @@ final class VmDate
     public static function lastErrorsToHashTable(array $result): HashTable
     {
         $ht = new HashTable();
+        // php-src zval_from_error_container(): warning_count → warnings → error_count → errors (#25485)
         self::hashSetLong($ht, 'warning_count', $result['warning_count']);
-        self::hashSetLong($ht, 'error_count', $result['error_count']);
-
         $warnings = new HashTable();
         foreach ($result['warnings'] as $pos => $message) {
             self::hashSetString($warnings, (string) $pos, $message);
@@ -633,6 +633,7 @@ final class VmDate
         $warningsVar->array($warnings);
         $ht->add('warnings', $warningsVar);
 
+        self::hashSetLong($ht, 'error_count', $result['error_count']);
         $errors = new HashTable();
         foreach ($result['errors'] as $pos => $message) {
             self::hashSetString($errors, (string) $pos, $message);

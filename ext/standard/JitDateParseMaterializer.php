@@ -39,6 +39,7 @@ final class JitDateParseMaterializer
         }
         self::setFloatOrFalse($context, $ht, 'fraction', $result['fraction'], $dbl, $i1);
 
+        // php-src zval_from_error_container(): warning_count → warnings → error_count → errors (#25485)
         $keyStr = $context->builder->load($context->constantStringFromString('warning_count'));
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyLong'),
@@ -46,6 +47,7 @@ final class JitDateParseMaterializer
             $keyStr,
             $i64->constInt($result['warning_count'], false)
         );
+        self::setNestedMessages($context, $ht, 'warnings', $result['warnings']);
         $keyStr = $context->builder->load($context->constantStringFromString('error_count'));
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyLong'),
@@ -53,6 +55,9 @@ final class JitDateParseMaterializer
             $keyStr,
             $i64->constInt($result['error_count'], false)
         );
+        self::setNestedMessages($context, $ht, 'errors', $result['errors']);
+
+        // php-src date_parse: is_localtime, then zone metadata, then relative (#25485)
         $keyStr = $context->builder->load($context->constantStringFromString('is_localtime'));
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyBool'),
@@ -60,29 +65,6 @@ final class JitDateParseMaterializer
             $keyStr,
             $i1->constInt($result['is_localtime'] ? 1 : 0, false)
         );
-
-        self::setNestedMessages($context, $ht, 'warnings', $result['warnings']);
-        self::setNestedMessages($context, $ht, 'errors', $result['errors']);
-
-        if (isset($result['relative']) && \is_array($result['relative'])) {
-            $relative = HashTableHelper::alloc($context);
-            foreach (['year', 'month', 'day', 'hour', 'minute', 'second', 'weekday'] as $relKey) {
-                $keyStr = $context->builder->load($context->constantStringFromString($relKey));
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyLong'),
-                    $relative,
-                    $keyStr,
-                    $i64->constInt((int) $result['relative'][$relKey], false)
-                );
-            }
-            $keyStr = $context->builder->load($context->constantStringFromString('relative'));
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
-                $ht,
-                $keyStr,
-                $relative
-            );
-        }
 
         if (isset($result['zone_type'])) {
             $keyStr = $context->builder->load($context->constantStringFromString('zone_type'));
@@ -129,6 +111,26 @@ final class JitDateParseMaterializer
                 $ht,
                 $keyStr,
                 $tzStr
+            );
+        }
+
+        if (isset($result['relative']) && \is_array($result['relative'])) {
+            $relative = HashTableHelper::alloc($context);
+            foreach (['year', 'month', 'day', 'hour', 'minute', 'second', 'weekday'] as $relKey) {
+                $keyStr = $context->builder->load($context->constantStringFromString($relKey));
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyLong'),
+                    $relative,
+                    $keyStr,
+                    $i64->constInt((int) $result['relative'][$relKey], false)
+                );
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString('relative'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                $ht,
+                $keyStr,
+                $relative
             );
         }
 
