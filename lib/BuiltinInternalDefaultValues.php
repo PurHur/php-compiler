@@ -293,6 +293,17 @@ final class BuiltinInternalDefaultValues
         'is_subclass_of' => [
             2 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — bool $autoload = true (#25498)
+        // InternalArgInfo marks autoload optional with bool infer → false.
+        'class_implements' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
+        'class_parents' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
+        'class_uses' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/standard/basic_functions.stub.php — value/path/domain = "" (#24968)
         'setcookie' => [
             1 => ['kind' => 'string', 'value' => ''],
