@@ -1,5 +1,13 @@
 --TEST--
 stdlib zmq_context/socket/bind inproc PAIR smoke (#6443, pecl-networking-zmq)
+--ENV--
+PHP_COMPILER_ENABLE_ZMQ=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\zmq\ZmqExtensionPolicy::advertisesExtension()) {
+    die('skip zmq withheld (#23964)');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);
