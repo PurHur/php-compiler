@@ -54,6 +54,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
+    public function testCeilFloorReflectionStubTypes(): void
+    {
+        foreach (['ceil', 'floor'] as $f) {
+            $this->assertSame('float', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('int|float', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($info, $f);
+            $this->assertSame('int|float', $info['type'], $f);
+        }
+    }
+
     /** php-src basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472). */
     public function testHighlightFamilyReturnTypeIsStringOrBool(): void
     {

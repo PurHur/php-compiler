@@ -100,6 +100,8 @@ final class BuiltinInternalArgInfo
             'filter_var' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
+            // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
+            'ceil', 'floor' => 'float',
             default => null,
         };
     }
@@ -418,6 +420,8 @@ final class BuiltinInternalArgInfo
             'range' => 2 === $index ? 'int|float' : null,
             // ext/standard/basic_functions.stub.php — int $levels = 1 (missing from InternalArgInfo) (#25480)
             'dirname' => 1 === $index ? 'int' : null,
+            // ext/standard/math.stub.php — int|float $num (InternalArgInfo float) (#25595)
+            'ceil', 'floor' => 0 === $index ? 'int|float' : null,
             default => null,
         };
     }
