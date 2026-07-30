@@ -13722,6 +13722,12 @@ class Compiler {
             }
             $propertyDeadTempArgIndices[] = $deadIdx;
         }
+        // trailingScalarPreludeCount already subtracts ConstFetch/ClassConstFetch (incl. LIBXML_*),
+        // but tryFold only drops true/false/null — trim so saveXML($el->prop, LIBXML_*) does not
+        // bind the PropertyFetch slot to the options arg (#25292).
+        if (\count($propertyDeadTempArgIndices) > $propertyArgCount) {
+            $propertyDeadTempArgIndices = \array_slice($propertyDeadTempArgIndices, 0, $propertyArgCount);
+        }
         $deadOrdinal = array_search($argIndex, $propertyDeadTempArgIndices, true);
         if (!\is_int($deadOrdinal)) {
             return null;
@@ -36157,16 +36163,8 @@ class Compiler {
         $probeIndex = $consumerIndex - 1;
         while ($probeIndex >= 0) {
             $probe = $cfgChildren[$probeIndex] ?? null;
-            if ($probe instanceof Op\Expr\ConstFetch) {
-                $name = $this->staticNameFromOperand($probe->name);
-                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
-                    --$probeIndex;
-                    continue;
-                }
-
-                return null;
-            }
-            if ($probe instanceof Op\Expr\ClassConstFetch) {
+            // Skip any trailing ConstFetch (true/false/null or LIBXML_*, PATH_SEPARATOR, …) (#25292).
+            if ($probe instanceof Op\Expr\ConstFetch || $probe instanceof Op\Expr\ClassConstFetch) {
                 --$probeIndex;
                 continue;
             }
