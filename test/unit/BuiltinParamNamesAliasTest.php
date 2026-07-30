@@ -813,14 +813,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', 'round'));
     }
 
-    /** @covers issue #11785 */
+    /** @covers issue #11785 / #25166 */
     public function testDateTimeClassMethodNamedParameters(): void
     {
         $names = BuiltinParamNames::forClassMethod('DateTime::createFromFormat');
-        self::assertSame(['format', 'datetime', 'timezone'], $names);
+        self::assertSame(['format', 'datetime', 'timezone='], $names);
         self::assertSame(
             1,
             BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'DateTime::createFromFormat')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('DateTime', 'createFromFormat'));
+        self::assertSame(
+            ['format', 'datetime', 'timezone='],
+            BuiltinParamNames::forClassMethod('DateTimeImmutable::createFromFormat')
         );
 
         $ctor = BuiltinParamNames::forClassMethod('DateTimeImmutable::__construct');
@@ -914,6 +919,37 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'object', 'DateTimeZone::getTransitions'));
         self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('DateTimeZone', 'getTransitions'));
         self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DateTimeZone', 'getTransitions'));
+    }
+
+    /** @covers issue #25172 */
+    public function testDateTimeZoneListIdentifiersStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DateTimeZone::listIdentifiers');
+        self::assertSame(['timezoneGroup=', 'countryCode='], $names);
+        self::assertSame(
+            ['timezoneGroup=', 'countryCode='],
+            BuiltinParamNames::paramNamesForInternalFunction('DateTimeZone::listIdentifiers')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'timezoneGroup', 'DateTimeZone::listIdentifiers'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'countryCode', 'DateTimeZone::listIdentifiers'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'DateTimeZone::listIdentifiers'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'country', 'DateTimeZone::listIdentifiers'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('DateTimeZone', 'listIdentifiers'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DateTimeZone', 'listIdentifiers'));
+    }
+
+    /** @covers issue #25164 */
+    public function testDatePeriodConstructStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DatePeriod::__construct');
+        self::assertSame(['start', 'interval=', 'end=', 'options='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'DatePeriod::__construct'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'interval', 'DatePeriod::__construct'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'end', 'DatePeriod::__construct'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'DatePeriod::__construct'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'recur', 'DatePeriod::__construct'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('DatePeriod', '__construct'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('DatePeriod', '__construct'));
     }
 
     /** @covers issue #10059 */
@@ -1246,16 +1282,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'timezone_identifier', 'date_default_timezone_set'));
     }
 
-    /** @covers issue #23446 */
+    /** @covers issue #23446 / #25173 */
     public function testTimezoneIdentifiersListZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('timezone_identifiers_list');
-        self::assertSame(['timezoneGroup', 'countryCode'], $names);
+        self::assertSame(['timezoneGroup=', 'countryCode='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'timezoneGroup', 'timezone_identifiers_list'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'countryCode', 'timezone_identifiers_list'));
         // Legacy InternalArgInfo names must not resolve (Zend rejects $what / $country)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'timezone_identifiers_list'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'country', 'timezone_identifiers_list'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('timezone_identifiers_list'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('timezone_identifiers_list'));
     }
 
     /** @covers issue #24359 */
@@ -1312,10 +1350,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'phpinfo'));
     }
 
-    /** @covers issue #23275 */
+    /** @covers issue #23275 / #25147 */
     public function testMktimeGmmktimeZendStubNamedParams(): void
     {
-        $expected = ['hour', 'minute', 'second', 'month', 'day', 'year'];
+        $expected = ['hour', 'minute=', 'second=', 'month=', 'day=', 'year='];
         foreach (['mktime', 'gmmktime'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame($expected, $names, $fn);
@@ -1329,6 +1367,8 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'min', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'sec', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mon', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+            self::assertSame(6, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
         }
     }
 
@@ -2153,7 +2193,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($te, 'error_type', 'trigger_error'));
 
         $ue = BuiltinParamNames::forFunction('user_error');
-        self::assertSame(['message', 'error_level'], $ue);
+        // Absent from InternalArgInfo — `=` encodes optional error_level (#25174)
+        self::assertSame(['message', 'error_level='], $ue);
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('user_error'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ue, 'error_level', 'user_error'));
 
         $sid = BuiltinParamNames::forFunction('session_id');
         self::assertSame(['id'], $sid);

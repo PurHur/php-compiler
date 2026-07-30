@@ -18,7 +18,7 @@ final class BuiltinParamNames
     {
         return match (strtolower($qualifiedMethod)) {
             'datetime::createfromformat',
-            'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone'],
+            'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone='],
             'datetime::__construct',
             'datetimeimmutable::__construct' => ['datetime', 'timezone'],
             'datetime::format' => ['format'],
@@ -29,6 +29,10 @@ final class BuiltinParamNames
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still what/country (#25172)
+            'datetimezone::listidentifiers' => ['timezoneGroup=', 'countryCode='],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still recur; UNKNOWN optionals (#25164)
+            'dateperiod::__construct' => ['start', 'interval=', 'end=', 'options='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
             // php-src ext/reflection/php_reflection.stub.php — ...$args; Z_PARAM_VARIADIC_WITH_NAMED (#24949)
@@ -294,9 +298,9 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says timezone_identifier (#23446)
             case 'date_default_timezone_set':
                 return ['timezoneId'];
-            // php-src ext/date/php_date.stub.php — InternalArgInfo still says what/country (#23446)
+            // php-src ext/date/php_date.stub.php — InternalArgInfo required what/country (#23446, #25173)
             case 'timezone_identifiers_list':
-                return ['timezoneGroup', 'countryCode'];
+                return ['timezoneGroup=', 'countryCode='];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still gmtoffset/isdst (#24359)
             case 'timezone_name_from_abbr':
                 return ['abbr', 'utcOffset=', 'isDST='];
@@ -313,10 +317,10 @@ final class BuiltinParamNames
             case 'date_sunrise':
             case 'date_sunset':
                 return ['timestamp', 'returnFormat=', 'latitude=', 'longitude=', 'zenith=', 'utcOffset='];
-            // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still min/sec/mon; hour required (#23275, #25147)
             case 'mktime':
             case 'gmmktime':
-                return ['hour', 'minute', 'second', 'month', 'day', 'year'];
+                return ['hour', 'minute=', 'second=', 'month=', 'day=', 'year='];
             // php-src ext/date/php_date.stub.php — associative_array→associative (#23447)
             case 'localtime':
                 return ['timestamp=', 'associative='];
@@ -550,8 +554,10 @@ final class BuiltinParamNames
                 ];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says error_type (#23402)
             case 'trigger_error':
-            case 'user_error':
                 return ['message', 'error_level'];
+            // user_error is absent from InternalArgInfo — encode optionality here (#25174)
+            case 'user_error':
+                return ['message', 'error_level='];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says arg_num (#24456)
             case 'func_get_arg':
                 return ['position'];
@@ -1631,7 +1637,7 @@ final class BuiltinParamNames
      *
      * @param list<int|string> $names
      */
-    private static function namesEncodeOptionalParams(array $names): bool
+    public static function namesEncodeOptionalParams(array $names): bool
     {
         foreach ($names as $name) {
             $label = (string) $name;
@@ -1641,6 +1647,19 @@ final class BuiltinParamNames
         }
 
         return false;
+    }
+
+    /**
+     * Optionality from a stub override entry (`=` / `...`), ignoring InternalArgInfo (#25147).
+     */
+    public static function overrideEntryIsOptional(string $rawName): bool
+    {
+        if (str_ends_with($rawName, '=')) {
+            return true;
+        }
+        $n = ltrim($rawName, '&');
+
+        return str_starts_with($n, '...');
     }
 
     /**

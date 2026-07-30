@@ -278,6 +278,46 @@ final class BuiltinInternalDefaultValues
         'strtok' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — timezoneGroup=DateTimeZone::ALL (2047), countryCode=null (#25172)
+        'datetimezone::listidentifiers' => [
+            0 => ['kind' => 'int', 'value' => 2047],
+            1 => ['kind' => 'null'],
+        ],
+        // php-src ext/date/php_date.stub.php — same defaults; InternalArgInfo marks both required (#25173)
+        'timezone_identifiers_list' => [
+            0 => ['kind' => 'int', 'value' => 2047],
+            1 => ['kind' => 'null'],
+        ],
+        // php-src ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (#25166)
+        'datetime::createfromformat' => [
+            2 => ['kind' => 'null'],
+        ],
+        'datetimeimmutable::createfromformat' => [
+            2 => ['kind' => 'null'],
+        ],
+        // php-src Zend/zend_builtin_functions.stub.php — int $error_level = E_USER_NOTICE (1024) (#25174)
+        // InternalArgInfo int → 0; user_error absent from InternalArgInfo entirely.
+        'trigger_error' => [
+            1 => ['kind' => 'int', 'value' => 1024],
+        ],
+        'user_error' => [
+            1 => ['kind' => 'int', 'value' => 1024],
+        ],
+        // php-src ext/date/php_date.stub.php — ?int minute…year = null (InternalArgInfo int → 0) (#25147)
+        'mktime' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+            5 => ['kind' => 'null'],
+        ],
+        'gmmktime' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+            5 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

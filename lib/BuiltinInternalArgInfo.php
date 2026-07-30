@@ -195,10 +195,20 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
+            // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string required) (#25173)
+            'timezone_identifiers_list' => 1 === $index ? '?string' : null,
+            // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
+            'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
+            // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)
+            'user_error' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
             // ext/standard/array.stub.php — ?callable $callback; mode missing from InternalArgInfo (#24843)
             'array_filter' => match ($index) {
                 1 => '?callable',
@@ -305,6 +315,13 @@ final class BuiltinInternalArgInfo
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
             // ext/spl/spl_directory.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
             'splfileobject::fputcsv' => 4 === $index ? 'string' : null,
+            // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string) (#25172)
+            'datetimezone::listidentifiers' => 1 === $index ? '?string' : null,
+            // ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (InternalArgInfo datetimezone) (#25166)
+            'datetime::createfromformat',
+            'datetimeimmutable::createfromformat' => 2 === $index ? '?DateTimeZone' : null,
+            // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
+            'dateperiod::__construct' => '',
             default => null,
         };
     }

@@ -2672,11 +2672,17 @@ final class ReflectionSupport
                 if (str_starts_with($name, '...')) {
                     $name = substr($name, 3);
                 }
+                $optionalFromOverride = BuiltinParamNames::overrideEntryIsOptional($override[$index]);
                 if (null !== $info) {
+                    // When the stub table encodes `=`, trust it over InternalArgInfo optionality (#25147).
+                    $isOptional = BuiltinParamNames::namesEncodeOptionalParams($override)
+                        ? $optionalFromOverride
+                        : ($info['isOptional'] || $optionalFromOverride);
+
                     return [
                         'name' => $name,
                         'type' => $info['type'],
-                        'isOptional' => $info['isOptional'] || str_ends_with($override[$index], '='),
+                        'isOptional' => $isOptional,
                     ];
                 }
 
@@ -2691,7 +2697,7 @@ final class ReflectionSupport
                 return [
                     'name' => $name,
                     'type' => $typeOverride ?? '',
-                    'isOptional' => str_ends_with($override[$index], '='),
+                    'isOptional' => $optionalFromOverride,
                 ];
             }
 
@@ -2704,12 +2710,18 @@ final class ReflectionSupport
             if (str_starts_with($name, '...')) {
                 $name = substr($name, 3);
             }
+            $optionalFromOverride = BuiltinParamNames::overrideEntryIsOptional($override[$index]);
             $info = BuiltinInternalArgInfo::paramInfoForFunction($functionName, $index);
             if (null !== $info) {
+                // When the stub table encodes `=`, trust it over InternalArgInfo optionality (#25147).
+                $isOptional = BuiltinParamNames::namesEncodeOptionalParams($override)
+                    ? $optionalFromOverride
+                    : ($info['isOptional'] || $optionalFromOverride);
+
                 return [
                     'name' => $name,
                     'type' => $info['type'],
-                    'isOptional' => $info['isOptional'] || str_ends_with($override[$index], '='),
+                    'isOptional' => $isOptional,
                 ];
             }
 
@@ -2725,7 +2737,7 @@ final class ReflectionSupport
             return [
                 'name' => $name,
                 'type' => $type,
-                'isOptional' => str_ends_with($override[$index], '='),
+                'isOptional' => $optionalFromOverride,
             ];
         }
 

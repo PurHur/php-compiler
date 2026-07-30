@@ -28,7 +28,14 @@ final class timezone_identifiers_list extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
+        // Named countryCode alone leaves a hole at timezoneGroup (php-src php_date.stub.php; #25173).
+        $maxIndex = -1;
+        foreach (\array_keys($frame->calledArgs) as $index) {
+            if (\is_int($index) && $index > $maxIndex) {
+                $maxIndex = $index;
+            }
+        }
+        $argc = $maxIndex + 1;
         if ($argc > 2) {
             throw new \ArgumentCountError(
                 \sprintf('timezone_identifiers_list() expects at most 2 arguments, %d given', $argc)
@@ -37,7 +44,7 @@ final class timezone_identifiers_list extends Internal
 
         $timezoneGroup = DateTimeZoneSupport::GROUP_ALL;
         $countryCode = null;
-        if ($argc >= 1) {
+        if (\array_key_exists(0, $frame->calledArgs) && null !== $frame->calledArgs[0]) {
             $timezoneGroup = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[0],
                 'timezone_identifiers_list',
@@ -45,7 +52,7 @@ final class timezone_identifiers_list extends Internal
                 'timezoneGroup'
             );
         }
-        if ($argc >= 2) {
+        if (\array_key_exists(1, $frame->calledArgs) && null !== $frame->calledArgs[1]) {
             $countryArg = $frame->calledArgs[1]->resolveIndirect();
             if (EnumCaseSupport::isEnumCaseVariable($countryArg)) {
                 throw new \TypeError(\sprintf(

@@ -23,15 +23,17 @@
 # later mixed with ~100 other commits, each needing a bisect to attribute.
 name: Compliance (PR)
 
+# DISPATCH-ONLY. This ran on every pull_request touching lib/ext/bin/test-compliance and it
+# saturated the runner pool: 48 jobs per PR against a repo that had 59 PRs open or updated at once
+# is ~2,830 queued jobs. Measured 2026-07-30T03:51Z — 112 runs queued, ZERO in progress, the oldest
+# queued 7 hours, and 33 Compiler gate + 7 Bootstrap spine gate runs starved behind it. Nothing in
+# the repo could start a job.
+#
+# Per-PR whole-corpus compliance is not affordable at this repo's PR rate on hosted runners. The
+# cheap per-PR tier stays in compiler-gate.yml (preflight + aot-smoke + VM differential, one job);
+# whole-corpus coverage stays in compliance-nightly.yml. This workflow remains available on demand
+# when a specific PR needs exact merge-base attribution, which is what it is genuinely good at.
 on:
-  pull_request:
-    paths:
-      - 'lib/**'
-      - 'ext/**'
-      - 'bin/**'
-      - 'test/compliance/**'
-      - 'script/shard-compliance.sh'
-      - 'script/compliance-baseline.sh'
   workflow_dispatch:
     inputs:
       suite:
