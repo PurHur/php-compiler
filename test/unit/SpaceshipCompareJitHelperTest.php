@@ -32,6 +32,7 @@ final class SpaceshipCompareJitHelperTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitSpaceshipCompareKernel.php');
         $this->assertStringContainsString('CompareJitHelperScalars::longSpaceship', $source);
         $this->assertStringContainsString('CompareJitHelperScalars::stringSpaceship', $source);
+        $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $source);
         $this->assertStringContainsString('emitObjectCompareSpaceship(', $source);
         $this->assertStringContainsString('emitHashtableCompareSpaceship(', $source);
         $this->assertStringNotContainsString('emitObjectCompareSpaceshipBridge', $source);
