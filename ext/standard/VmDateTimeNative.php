@@ -3594,23 +3594,28 @@ final class VmDateTimeNative
                 continue;
             }
             $path = $file->getPathname();
-            if (str_contains($path, '.') && !str_ends_with($path, 'posixrules')) {
-                $base = \basename($path);
-                if (str_contains($base, '.')) {
-                    continue;
-                }
+            $base = \basename($path);
+            // Skip dotted metadata files, but keep tzdata.zi which Zend lists under ALL_WITH_BC (#25085).
+            if (str_contains($base, '.') && 'tzdata.zi' !== $base && 'posixrules' !== $base) {
+                continue;
             }
             $id = \str_replace(\DIRECTORY_SEPARATOR, '/', \substr($path, $rootLen));
             if (isset($known[$id])) {
                 continue;
             }
-            if (!self::timezoneGroupAllowsIdentifier($id, DateTimeZoneSupport::GROUP_ALL)) {
+            // Packaging trees only — Zend ALL_WITH_BC still lists Factory/localtime/tzdata.zi (#25085).
+            if (
+                str_starts_with($id, 'posix/')
+                || str_starts_with($id, 'right/')
+                || 'posixrules' === $id
+                || str_ends_with($id, '/posixrules')
+            ) {
                 continue;
             }
-            if (\is_link($path) || !str_contains($id, '/')) {
-                $ids[] = $id;
-                $known[$id] = true;
-            }
+            // Include legacy aliases (Brazil/*, CET, Etc/GMT*, Factory, …) beyond zone.tab (#25085).
+            // Prior code filtered GROUP_ALL prefixes and required symlink-or-topline, under-counting vs Zend.
+            $ids[] = $id;
+            $known[$id] = true;
         }
         \sort($ids);
 
