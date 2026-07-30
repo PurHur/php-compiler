@@ -16916,9 +16916,6 @@ restart:
             }
 
             $newNameLc = strtolower((string) $newName);
-            if (isset($merged[$newNameLc])) {
-                throw new \LogicException('Cannot redefine method ' . $newName);
-            }
 
             if (null !== $traitLcFilter) {
                 if (!isset($usedTraitNameByLc[$traitLcFilter]) || !isset($perTraitMethods[$traitLcFilter][$methodLc])) {
@@ -16959,6 +16956,18 @@ restart:
                     }
                     $data = $source;
                 }
+            }
+
+            // Zend zend_traits.c: alias onto an existing composed name is a trait collision
+            // fatal (not "Cannot redefine method") — #25080.
+            if (isset($merged[$newNameLc])) {
+                $prev = $merged[$newNameLc];
+                $aliasName = (string) $newName;
+                $sourceMethod = (string) ($adaptation['method'] ?? '');
+                throw new \LogicException(
+                    "Trait method {$data['traitName']}::{$sourceMethod} has not been applied as {$entry->name}::{$aliasName}, "
+                    ."because of collision with {$prev['traitName']}::{$aliasName}"
+                );
             }
 
             if (null !== $newModifier) {
