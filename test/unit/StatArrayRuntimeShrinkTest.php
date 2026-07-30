@@ -8,7 +8,9 @@ use PHPCompiler\ext\standard\StatArrayJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** stat()/lstat() JIT routes through StatArrayJitHelper PHP not StringFsDirJit LLVM (#9585). */
+/**
+ * stat()/lstat() NestedJIT via JitVmHelperLink::ensureCompiled (#9585 / #25490 / peer #25121).
+ */
 final class StatArrayRuntimeShrinkTest extends TestCase
 {
     public function testStatArrayJitHelperDelegatesToVmFs(): void
@@ -34,8 +36,15 @@ final class StatArrayRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StatArrayRuntime.php');
         $this->assertStringContainsString('StatArrayJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('StatCacheRuntime::ensureLinked', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
     }
 
     public function testStatArrayJitHelperMatchesVmFs(): void
