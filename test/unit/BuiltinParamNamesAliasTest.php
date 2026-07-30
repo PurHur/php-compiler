@@ -1790,17 +1790,39 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'hash_init'));
     }
 
-    /** @covers issue #23595 */
+    /** @covers issue #23595 / #25469 */
     public function testHashPbkdf2ZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('hash_pbkdf2');
         self::assertSame(
-            ['algo', 'password', 'salt', 'iterations', 'length', 'binary', 'options'],
+            ['algo', 'password', 'salt', 'iterations', 'length=', 'binary=', 'options='],
             $names
         );
         self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($names, 'binary', 'hash_pbkdf2'));
         self::assertSame(6, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'hash_pbkdf2'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_pbkdf2'));
+        self::assertSame(4, BuiltinParamNames::requiredParamCountForInternalFunction('hash_pbkdf2'));
+        self::assertSame(7, BuiltinParamNames::paramCountForInternalFunction('hash_pbkdf2'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_pbkdf2'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('hash_pbkdf2', 0));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('hash_pbkdf2', 4));
+        self::assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('hash_pbkdf2', 5));
+        self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('hash_pbkdf2', 6));
+        $infoLength = ['name' => 'length', 'type' => 'int', 'isOptional' => true];
+        $infoBinary = ['name' => 'binary', 'type' => 'bool', 'isOptional' => true];
+        $infoOptions = ['name' => 'options', 'type' => 'array', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash_pbkdf2', 4, $infoLength, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash_pbkdf2', 5, $infoBinary, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash_pbkdf2', 6, $infoOptions, false));
+        $length = new Variable();
+        $binary = new Variable();
+        $options = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($length, 'hash_pbkdf2', 4, $infoLength));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($binary, 'hash_pbkdf2', 5, $infoBinary));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($options, 'hash_pbkdf2', 6, $infoOptions));
+        self::assertSame(0, $length->toInt());
+        self::assertFalse($binary->toBool());
+        self::assertSame(Variable::TYPE_ARRAY, $options->type);
     }
 
     /** @covers issue #24377 */

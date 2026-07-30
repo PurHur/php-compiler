@@ -220,6 +220,12 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'string', 'value' => ''],
             4 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/hash/hash.stub.php — length=0, binary=false, options=[] (#25469)
+        'hash_pbkdf2' => [
+            4 => ['kind' => 'int', 'value' => 0],
+            5 => ['kind' => 'bool', 'value' => false],
+            6 => ['kind' => 'array'],
+        ],
         'openssl_encrypt' => [
             3 => ['kind' => 'int', 'value' => 0],
             4 => ['kind' => 'string', 'value' => ''],
