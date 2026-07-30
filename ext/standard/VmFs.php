@@ -594,8 +594,8 @@ final class VmFs
         );
         if (null !== $wrapperOk) {
             if ($wrapperOk) {
-                // #7436: clear negative miss so new file is visible; keep positive stale (#22841).
-                VmStatCache::invalidateNegative($path);
+                // php-src php_touch() → php_clear_stat_cache() on success (ext/standard/filestat.c, #25308).
+                VmStatCache::invalidatePath($path);
             }
 
             return $wrapperOk;
@@ -603,7 +603,7 @@ final class VmFs
 
         $ok = VmFsTouchNative::touch($path, $mtime, $atime);
         if ($ok) {
-            VmStatCache::invalidateNegative($path);
+            VmStatCache::invalidatePath($path);
         }
 
         return $ok;

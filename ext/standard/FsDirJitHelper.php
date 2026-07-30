@@ -19,7 +19,7 @@ final class FsDirJitHelper
 
     public static function touch(string $path, int $mtime, int $atime): bool
     {
-        return VmFsTouchNative::touch(
+        return VmFs::touch(
             $path,
             self::decodeTouchTime($mtime),
             self::decodeTouchTime($atime)

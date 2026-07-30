@@ -89,6 +89,22 @@ final class VmStatCacheTest extends TestCase
         }
     }
 
+    public function testTouchInvalidatesPositiveMtimeCache(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'phpc_vm_statcache_touch_mtime_');
+        $this->assertNotFalse($path);
+        try {
+            VmStatCache::reset();
+            $this->assertIsArray(VmStatCache::stat($path));
+            $this->assertTrue(\PHPCompiler\ext\standard\VmFs::touch($path, 100));
+            $fresh = VmStatCache::stat($path);
+            $this->assertIsArray($fresh);
+            $this->assertSame(100, (int) $fresh['mtime']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function testPositiveCacheRetainedAcrossRewriteUntilClear(): void
     {
         $path = tempnam(sys_get_temp_dir(), 'phpc_vm_statcache_pos_');
