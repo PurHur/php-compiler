@@ -8,7 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ProcessOpen;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -25,7 +25,17 @@ final class JitProcOpen
             throw new \LogicException('proc_open() requires at least three arguments in this compiler build');
         }
 
-        $commandStr = JitStringArg::lower($context, $args[0], 'proc_open() command');
+        // Z_PARAM_STR_OR_ARRAY — null soft-deprecates + coerce to "" like popen (#25113).
+        $commandStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[0],
+            'proc_open',
+            0,
+            'command',
+            'array|string',
+            null,
+            false
+        );
         $pipesHt = HashTableHelper::ensureHashtablePointer($context, $args[2]);
 
         $handle = $context->builder->call(
