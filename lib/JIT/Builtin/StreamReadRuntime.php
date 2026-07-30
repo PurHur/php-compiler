@@ -33,7 +33,7 @@ final class StreamReadRuntime
 
     public const FTRUNCATE = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::ftruncateArgv';
 
-    public const FTELL = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::ftellArgv';
+    public const FTELL = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::ftellArgv';
 
     public const FGETC = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::fgetcArgv';
 
@@ -41,7 +41,7 @@ final class StreamReadRuntime
 
     public const STREAM_GET_LINE = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::streamGetLineArgv';
 
-    public const FSEEK = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::fseekArgv';
+    public const FSEEK = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::fseekArgv';
 
     public const STREAM_GET_CONTENTS = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::streamGetContentsArgv';
 
@@ -113,6 +113,7 @@ final class StreamReadRuntime
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         StreamFilter::ensureLinked($context);
+        StreamIoRuntime::ensureLinked($context);
         if ($withLifecycleDeps) {
             StreamLifecycleRuntime::ensureLinked($context);
             ObOutputRuntime::ensureLinked($context);

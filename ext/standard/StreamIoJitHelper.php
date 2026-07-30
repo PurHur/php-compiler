@@ -87,6 +87,30 @@ final class StreamIoJitHelper
         return (int) $written;
     }
 
+    /** @return int ABI for __compiler_fseek (0 success, -1 failure) — memory streams under AOT (#25299). */
+    public static function fseekArgv(int $handle, int $offset, int $whence): int
+    {
+        if (JitMemoryStreamHelper::isOpen($handle)) {
+            return JitMemoryStreamHelper::seek($handle, $offset, $whence);
+        }
+
+        return VmFs::fseek($handle, $offset, $whence);
+    }
+
+    /** @return int ABI for __compiler_ftell (-1 on failure) — memory streams under AOT (#25299). */
+    public static function ftellArgv(int $handle): int
+    {
+        if (JitMemoryStreamHelper::isOpen($handle)) {
+            return JitMemoryStreamHelper::tellArgv($handle);
+        }
+        $result = VmFs::ftell($handle);
+        if (false === $result) {
+            return -1;
+        }
+
+        return (int) $result;
+    }
+
     /** @return 0|1 ABI for __compiler_stream_supports (issue #19462 — same VmFs table as fopen/tmpfile) */
     public static function supportsArgv(int $handle, int $feature): int
     {
