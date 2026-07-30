@@ -95,6 +95,7 @@ final class ShmopArgs
         return $var->toInt();
     }
 
+    /** Third arg of shmop_read — php-src stub name is $size (not legacy $count; #24391). */
     public static function parseCount(Frame $frame, string $fn, int $index): int
     {
         $var = $frame->calledArgs[$index]->resolveIndirect();
@@ -103,7 +104,7 @@ final class ShmopArgs
                 '%s(): Argument #%d ($%s) must be of type int, %s given',
                 $fn,
                 $index + 1,
-                'count',
+                'size',
                 VmStreamArg::debugTypeName($var)
             ));
         }
