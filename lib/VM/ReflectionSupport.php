@@ -2465,9 +2465,22 @@ final class ReflectionSupport
         );
     }
 
-    /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337, #22064). */
+    /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337, #22064, #25406). */
     public static function declaredParamTypeForReflection(Context $ctx, ObjectEntry $reflection): ?CfgType
     {
+        $className = self::parameterDeclaringClassNameOrNull($reflection);
+        if (null !== $className) {
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null !== $entry) {
+                $methodLc = strtolower(self::methodNameFromReflection($reflection));
+                $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+                $index = self::parameterIndexForReflection($reflection);
+                $meta = $params[$index] ?? null;
+                if (null !== $meta && null !== $meta->typeString && '' !== $meta->typeString) {
+                    return ReflectionTypeSupport::cfgTypeFromLabel($meta->typeString);
+                }
+            }
+        }
         if (self::parameterIsInternal($ctx, $reflection)) {
             return self::internalDeclaredParamType($reflection);
         }
@@ -3551,12 +3564,15 @@ final class ReflectionSupport
 
     /**
      * ReflectionMethod::returnsReference() (#22171).
+     *
+     * Abstract interface stubs (Serializable etc.) live only in abstractMethods — no Func (#25406).
      */
     public static function methodReturnsReference(Context $ctx, ObjectEntry $reflection): bool
     {
-        [, , $func] = self::resolveReflectedMethod($ctx, $reflection);
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        $func = $declaring->methods[$methodLc] ?? null;
 
-        return self::phpFuncReturnsReference($func);
+        return self::phpFuncReturnsReference($func instanceof Func ? $func : null);
     }
 
     private static function phpFuncReturnsReference(?Func $func): bool
