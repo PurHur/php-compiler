@@ -142,7 +142,7 @@ class B extends A {
     public static $x = 2;
 }
 PHP;
-        $this->expectException(\CompileError::class);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage('Cannot override final property A::$x');
         $runtime->parseAndCompile($code, 'final_static_override.php');
     }
@@ -159,9 +159,14 @@ class ChildF extends ParentF {
     public string $name = 'b';
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Cannot override final property ParentF::$name');
-        $runtime->parseAndCompile($code, 'final_plain_override.php');
+        try {
+            $runtime->parseAndCompile($code, 'final_plain_override.php');
+            $this->fail('Expected CompileFatal on final property override');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString('Cannot override final property ParentF::$name', $e->getMessage());
+            self::assertStringStartsWith('Fatal error:', $e->zendStderrLine());
+            self::assertStringContainsString('on line', $e->zendStderrLine());
+        }
     }
 
     public function testHookedFinalPropertyStillWorks(): void
@@ -226,7 +231,7 @@ class C extends P {
     }
 }
 PHP;
-        $this->expectException(\CompileError::class);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage('Cannot override final property hook P::$x::set()');
         $runtime->parseAndCompile($code, 'final_hook_set_override.php');
     }
@@ -253,7 +258,7 @@ class C extends P {
     }
 }
 PHP;
-        $this->expectException(\CompileError::class);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage('Cannot override final property hook P::$x::get()');
         $runtime->parseAndCompile($code, 'final_hook_get_override.php');
     }
@@ -309,7 +314,7 @@ class B extends A {
 }
 echo "override_allowed=1\n";
 PHP;
-        $this->expectException(\CompileError::class);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage('Cannot override final property A::$x');
         $runtime->parseAndCompile($code, 'final_plain_override_after_ternary.php');
     }

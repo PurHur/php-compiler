@@ -22,4 +22,4 @@ echo "override_allowed=1\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Cannot override final property A::$x
+Fatal error: Cannot override final property A::$x in %s on line %d

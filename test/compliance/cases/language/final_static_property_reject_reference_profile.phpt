@@ -24,4 +24,4 @@ echo "parsed_ok\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Cannot declare property A::$x final, the final modifier is allowed only for methods, classes, and class constants
+Fatal error: Cannot declare property A::$x final, the final modifier is allowed only for methods, classes, and class constants in %s on line %d

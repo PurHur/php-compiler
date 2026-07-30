@@ -29,4 +29,4 @@ echo "ok\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Cannot override final property hook P::$x::set()
+Fatal error: Cannot override final property hook P::$x::set() in %s on line %d

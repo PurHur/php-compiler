@@ -19,6 +19,9 @@ use PHPCompiler\VM\ClassFinal;
  * php-src: Zend/zend_compile.c — final property / hook flags / pre-8.4 reject;
  * Zend/zend_inheritance.c — "Cannot override final property %s::$%s",
  * "Cannot override final property hook %s::$%s::%s()".
+ *
+ * Override rejects throw {@see CompileFatal} so CLI emits Zend-shaped
+ * "Fatal error: … in file on line N" (#25457), not bare parseAndCompile failure.
  */
 final class FinalPropertyOverrideCheck
 {
@@ -252,11 +255,16 @@ final class FinalPropertyOverrideCheck
                 if (!$parentProp['fromFlags'] && !CompilerVersion::supportsPropertyHooks()) {
                     continue;
                 }
-                throw new \CompileError(sprintf(
-                    'Cannot override final property %s::$%s',
-                    $parentProp['ownerDisplay'],
-                    $parentProp['display']
-                ));
+                // CompileFatal → Zend-shaped "Fatal error: … in file on line N" (#25457).
+                throw new CompileFatal(
+                    $childProp['file'],
+                    max(1, (int) $childProp['line']),
+                    sprintf(
+                        'Cannot override final property %s::$%s',
+                        $parentProp['ownerDisplay'],
+                        $parentProp['display']
+                    )
+                );
             }
         }
     }
@@ -317,12 +325,20 @@ final class FinalPropertyOverrideCheck
                     if (!$this->childDeclaresHook($childDecl['hooks'], $kind)) {
                         continue;
                     }
-                    throw new \CompileError(sprintf(
-                        'Cannot override final property hook %s::$%s::%s()',
-                        $parentHook['ownerDisplay'],
-                        $parentHook['display'],
-                        $kind
-                    ));
+                    $childPropMeta = $class['properties'][$propLc] ?? null;
+                    $file = is_array($childPropMeta) ? ($childPropMeta['file'] ?? 'unknown') : 'unknown';
+                    $line = is_array($childPropMeta) ? max(1, (int) ($childPropMeta['line'] ?? 1)) : 1;
+                    // CompileFatal → Zend-shaped Fatal error (#25457, same as plain override).
+                    throw new CompileFatal(
+                        $file,
+                        $line,
+                        sprintf(
+                            'Cannot override final property hook %s::$%s::%s()',
+                            $parentHook['ownerDisplay'],
+                            $parentHook['display'],
+                            $kind
+                        )
+                    );
                 }
             }
         }
