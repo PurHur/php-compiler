@@ -33,8 +33,14 @@ final class JitJsonEncodeCompileTime
         try {
             $exported = VmJson::export($vmArray);
         } catch (VmJsonExportException $e) {
+            if (
+                VmJsonFlags::throwsOnError($flags)
+                && !VmJsonFlags::partialOutputOnError($flags)
+            ) {
+                VmJson::throwExceptionPreservingLastError($e->errorCode);
+            }
             if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), $e->errorCode);
+                throw new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode);
             }
 
             return null;
@@ -42,7 +48,7 @@ final class JitJsonEncodeCompileTime
         $encoded = VmJsonFormat::encodeExported($exported, $flags);
         if (false === $encoded) {
             if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
+                throw new \LogicException('json_encode() THROW path returned false');
             }
 
             return null;

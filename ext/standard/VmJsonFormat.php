@@ -16,10 +16,27 @@ final class VmJsonFormat
      */
     public static function encodeExported(mixed $exported, int $flags = 0, int $maxDepth = 512): string|false
     {
-        VmJson::setLastError(0);
+        // php-src: THROW without PARTIAL leaves JSON_G(error_code) unchanged (#25456).
+        $preserveLastError = VmJsonFlags::throwsOnError($flags)
+            && !VmJsonFlags::partialOutputOnError($flags);
+        $previous = VmJson::lastError();
+        if (!$preserveLastError) {
+            VmJson::setLastError(0);
+        }
         try {
-            return self::encodeValue($exported, $flags, 0, $maxDepth);
+            $encoded = self::encodeValue($exported, $flags, 0, $maxDepth);
+            if ($preserveLastError) {
+                VmJson::setLastError($previous);
+            } else {
+                VmJson::setLastError(0);
+            }
+
+            return $encoded;
         } catch (VmJsonExportException $e) {
+            if ($preserveLastError) {
+                VmJson::setLastError($previous);
+                VmJson::throwExceptionPreservingLastError($e->errorCode);
+            }
             VmJson::setLastError($e->errorCode);
             if (VmJsonFlags::throwsOnError($flags)) {
                 throw new \JsonException(VmJson::lastErrorMsg(), $e->errorCode);
@@ -27,6 +44,10 @@ final class VmJsonFormat
 
             return false;
         } catch (\Throwable) {
+            if ($preserveLastError) {
+                VmJson::setLastError($previous);
+                VmJson::throwExceptionPreservingLastError(VmJson::ERROR_UNSUPPORTED_TYPE);
+            }
             VmJson::setLastError(VmJson::ERROR_UNSUPPORTED_TYPE);
             if (VmJsonFlags::throwsOnError($flags)) {
                 throw new \JsonException(VmJson::lastErrorMsg(), VmJson::ERROR_UNSUPPORTED_TYPE);
@@ -41,27 +62,35 @@ final class VmJsonFormat
      */
     public static function decode(string $json, bool $assoc = false, int $maxDepth = 512, int $flags = 0): mixed
     {
+        // php-src json_decode: only clears JSON_G(error_code) when not THROW (#25456).
+        $throws = VmJsonFlags::throwsOnError($flags);
+        $previous = VmJson::lastError();
+        // Scratch lastError for the parser; restore $previous when THROW (success or throw).
         VmJson::setLastError(0);
         if (!VmJsonFlags::ignoreInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($json)) {
-            VmJson::setLastError(5);
-            if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), 5);
+            if ($throws) {
+                VmJson::setLastError($previous);
+                VmJson::throwExceptionPreservingLastError(5);
             }
+            VmJson::setLastError(5);
 
             return null;
         }
         $parser = new VmJsonParser($json, $maxDepth, $assoc, $flags);
         $value = $parser->parseTop();
         if (VmJson::lastError() !== 0) {
-            self::applyDecodeLastError($json, $flags);
+            self::applyDecodeLastError($json, $flags, $throws, $previous);
 
             return null;
         }
         if (!$parser->atEnd()) {
             VmJson::setLastError(4);
-            self::applyDecodeLastError($json, $flags);
+            self::applyDecodeLastError($json, $flags, $throws, $previous);
 
             return null;
+        }
+        if ($throws) {
+            VmJson::setLastError($previous);
         }
 
         return $value;
@@ -70,16 +99,25 @@ final class VmJsonFormat
     /**
      * php-src ext/json/php_json.c — JSON_INVALID_UTF8_* still reports JSON_ERROR_UTF8 (5)
      * when the input buffer contains malformed UTF-8 and decode fails (#14145).
+     *
+     * THROW path restores {@see $previousLastError} before throwing (#25456).
      */
-    private static function applyDecodeLastError(string $json, int $flags): void
-    {
+    private static function applyDecodeLastError(
+        string $json,
+        int $flags,
+        bool $throws,
+        int $previousLastError
+    ): void {
         $code = VmJson::lastError();
         if (4 === $code && VmJsonFlags::ignoreInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($json)) {
-            VmJson::setLastError(5);
             $code = 5;
+            if (!$throws) {
+                VmJson::setLastError(5);
+            }
         }
-        if (VmJsonFlags::throwsOnError($flags)) {
-            throw new \JsonException(VmJson::lastErrorMsg(), $code);
+        if ($throws) {
+            VmJson::setLastError($previousLastError);
+            VmJson::throwExceptionPreservingLastError($code);
         }
     }
 
