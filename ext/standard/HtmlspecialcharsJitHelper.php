@@ -10,40 +10,44 @@ namespace PHPCompiler\ext\standard;
  * Escape subset mirrors {@see VmString::htmlspecialchars()} / php-src ext/standard/html.c
  * for & < > " '. Self-contained for NestedJIT (#16075).
  *
- * Full UTF-8 structural validation is deferred: NestedJIT segfaults on the trail-byte
- * helper shape (#22845). Escape accumulation uses `$out .=` (method/helper CONCAT alloca
- * fix in the same issue). Invalid-UTF-8 empty/substitute parity stays on VmString until
- * NestedJIT can lower those checks; MiniWebApp / ASCII titles are covered.
+ * NestedJIT / AOT cannot lower a loop-carried string accumulator when branches
+ * compare string offsets (method-return / dynamic args returned empty — #25345).
+ * Recurse with `$ch.$rest` / entity.'.'.$rest instead of mutating an accumulator.
  */
 final class HtmlspecialcharsJitHelper
 {
     public static function htmlspecialchars(string $string, int $flags): string
     {
+        return self::escapeFrom($string, $flags, 0);
+    }
+
+    /** Public so NestedJIT helper TUs bind the recursive callee (#25345). */
+    public static function escapeFrom(string $string, int $flags, int $i): string
+    {
+        if (!isset($string[$i])) {
+            return '';
+        }
+        $ch = $string[$i];
+        $rest = self::escapeFrom($string, $flags, $i + 1);
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
-        $out = '';
-        $len = 0;
-        while (isset($string[$len])) {
-            ++$len;
+        if ('&' === $ch) {
+            return '&amp;'.$rest;
         }
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = $string[$i];
-            if ('&' === $ch) {
-                $out .= '&amp;';
-            } elseif ('<' === $ch) {
-                $out .= '&lt;';
-            } elseif ('>' === $ch) {
-                $out .= '&gt;';
-            } elseif ('"' === $ch) {
-                $out .= ($quoteBoth || $quoteDouble) ? '&quot;' : '"';
-            } elseif ("'" === $ch) {
-                $out .= $quoteBoth ? ($entHtml5 ? '&apos;' : '&#039;') : "'";
-            } else {
-                $out .= $ch;
-            }
+        if ('<' === $ch) {
+            return '&lt;'.$rest;
+        }
+        if ('>' === $ch) {
+            return '&gt;'.$rest;
+        }
+        if ('"' === $ch) {
+            return (($quoteBoth || $quoteDouble) ? '&quot;' : '"').$rest;
+        }
+        if ("'" === $ch) {
+            return ($quoteBoth ? ($entHtml5 ? '&apos;' : '&#039;') : "'").$rest;
         }
 
-        return $out;
+        return $ch.$rest;
     }
 }

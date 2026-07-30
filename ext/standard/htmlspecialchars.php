@@ -89,8 +89,11 @@ final class htmlspecialchars extends Internal
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $maybeLiteral = $args[0]->compileTimeString ?? null;
-            // Stack locals (KIND_VARIABLE) may be reassigned in catch before merge (#2387).
-            if (null !== $maybeLiteral && JITVariable::KIND_VALUE === $args[0]->kind) {
+            // Fold proven compile-time strings: KIND_VALUE immediates and TYPE_STRING
+            // stack slots (literal args / assigned locals keep KIND_VARIABLE with
+            // compileTimeString). Avoids the helper-runtime object for MiniWebApp
+            // titles (#25345). Catch-reassign paths clear compileTimeString (#2387).
+            if (null !== $maybeLiteral && self::isCompileTimeFoldableString($args[0])) {
                 $literal = $maybeLiteral;
             }
         }
@@ -198,13 +201,32 @@ final class htmlspecialchars extends Internal
     }
 
     /**
+     * Proven compile-time string for htmlspecialchars fold (#25345).
+     *
+     * Literal call args and assigned locals are often TYPE_STRING + KIND_VARIABLE with
+     * compileTimeString set; requiring KIND_VALUE alone skipped the fold.
+     */
+    private static function isCompileTimeFoldableString(JITVariable $arg): bool
+    {
+        if (null === ($arg->compileTimeString ?? null)) {
+            return false;
+        }
+        if (JITVariable::KIND_VALUE === $arg->kind) {
+            return true;
+        }
+
+        return JITVariable::TYPE_STRING === $arg->type
+            && JITVariable::KIND_VARIABLE === $arg->kind;
+    }
+
+    /**
      * @param list<JITVariable> $args
      */
     private static function tryCompileTimeHtmlspecialchars(Context $context, array $args): ?Value
     {
         $argc = count($args);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
-        if (null === $literal || JITVariable::KIND_VALUE !== $args[0]->kind) {
+        if (null === $literal || !self::isCompileTimeFoldableString($args[0])) {
             return null;
         }
 
