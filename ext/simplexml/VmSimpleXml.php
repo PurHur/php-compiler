@@ -921,7 +921,11 @@ final class VmSimpleXml
         );
     }
 
-    public static function attributes(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ObjectEntry
+    /**
+     * @return ObjectEntry|null null when the receiver has no element node (empty children()/
+     *                      named-child view) — php-src sxe.c; #25148
+     */
+    public static function attributes(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ?ObjectEntry
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));
@@ -929,7 +933,25 @@ final class VmSimpleXml
         if (SimpleXmlRegistry::isNamedChildView($entry)) {
             $matches = self::namedChildViewElements($entry);
             if ([] === $matches) {
-                return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));
+                // php-src: attributes() on an empty node list returns null (#25148).
+                return null;
+            }
+
+            return self::wrapAttributesView(
+                $ctx,
+                $entry->class,
+                $matches[0],
+                SimpleXmlRegistry::documentKey($entry),
+                $namespaceOrPrefix,
+                $isPrefix
+            );
+        }
+        // children() views: php-src applies attributes() to the first matching child
+        // (same first-element context as getName()/__toString); empty ⇒ null (#25148).
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $matches = self::childrenViewElements($entry);
+            if ([] === $matches) {
+                return null;
             }
 
             return self::wrapAttributesView(
