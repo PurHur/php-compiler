@@ -67,6 +67,8 @@ final class BuiltinInternalArgInfo
             'strstr', 'stristr' => 'string|false',
             // ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
             'stream_context_set_options' => 'bool',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
+            'restore_error_handler' => 'true',
             default => null,
         };
     }
@@ -329,6 +331,10 @@ final class BuiltinInternalArgInfo
                 1, 2 => 'bool',
                 default => null,
             },
+            // ext/standard/array.stub.php — int|float $step = 1 (InternalArgInfo int) (#25480)
+            'range' => 2 === $index ? 'int|float' : null,
+            // ext/standard/basic_functions.stub.php — int $levels = 1 (missing from InternalArgInfo) (#25480)
+            'dirname' => 1 === $index ? 'int' : null,
             default => null,
         };
     }

@@ -456,9 +456,10 @@ final class BuiltinParamNames
             case 'prev':
             case 'reset':
                 return ['array'];
+            // php-src ext/standard/array.stub.php — array $array, array ...$replacements (variadic optional) (#25480)
             case 'array_replace':
             case 'array_replace_recursive':
-                return ['array', 'replacements'];
+                return ['array', '...replacements'];
             case 'array_walk':
             case 'array_walk_recursive':
                 return ['array', 'callback', 'arg'];
