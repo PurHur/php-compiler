@@ -220,7 +220,8 @@ final class InternalStrictArg
     {
         $walker = $frame->parent;
         while (null !== $walker) {
-            if ($walker->block->strictTypes) {
+            // Reflection invoke frames have no user block (#25293).
+            if (null !== $walker->block && $walker->block->strictTypes) {
                 return true;
             }
             $walker = $walker->parent;
