@@ -2156,6 +2156,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sn, 'newname', 'session_name'));
     }
 
+    /** @covers issue #23568 */
+    public function testIgnoreUserAbortIncludePathIniRestoreZendStubNamedParams(): void
+    {
+        $abort = BuiltinParamNames::forFunction('ignore_user_abort');
+        self::assertSame(['enable='], $abort);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($abort, 'enable', 'ignore_user_abort'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ignore_user_abort'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $value)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($abort, 'value', 'ignore_user_abort'));
+
+        $path = BuiltinParamNames::forFunction('set_include_path');
+        self::assertSame(['include_path'], $path);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($path, 'include_path', 'set_include_path'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($path, 'new_include_path', 'set_include_path'));
+
+        $restore = BuiltinParamNames::forFunction('ini_restore');
+        self::assertSame(['option'], $restore);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($restore, 'option', 'ini_restore'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($restore, 'varname', 'ini_restore'));
+    }
+
     /** @covers issue #24583 */
     public function testSessionCacheLimiterExpireZendStubNamedParams(): void
     {
