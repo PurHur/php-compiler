@@ -47,7 +47,13 @@ final class SimpleXmlElementAttributes extends VmClassMethod
             $isPrefix = $arg->toBool();
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->object(VmSimpleXml::attributes($frame->vmContext, $entry, $namespaceOrPrefix, $isPrefix));
+            $view = VmSimpleXml::attributes($frame->vmContext, $entry, $namespaceOrPrefix, $isPrefix);
+            if (null === $view) {
+                // Empty children()/named-child receiver — php-src returns null (#25148).
+                $frame->returnVar->null();
+            } else {
+                $frame->returnVar->object($view);
+            }
         }
     }
 }
