@@ -138,8 +138,9 @@ final class ThrowableManifest
         'FiberError' => 'Error',
         'FiberStackOverflow' => 'Error',
         'ArgumentCountError' => 'TypeError',
-        'ParseError' => 'Error',
+        // php-src Zend/zend_exceptions.stub.php — ParseError extends CompileError (#25420).
         'CompileError' => 'Error',
+        'ParseError' => 'CompileError',
         'UnhandledMatchError' => 'Error',
         'ArithmeticError' => 'Error',
         'DivisionByZeroError' => 'ArithmeticError',

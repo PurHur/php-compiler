@@ -91,6 +91,12 @@ final class VmEval
         } catch (\CompileError $e) {
             throw $e;
         } catch (\Throwable $e) {
+            // php-parser Error for modifier lists uses the same text as zend_throw_exception
+            // (CompileError), not E_PARSE — rethrow as CompileError for eval catch (#25420, #25114).
+            $message = self::stripParserLineSuffix($e->getMessage());
+            if (self::isCatchableCompileErrorMessage($message)) {
+                throw new \CompileError($message);
+            }
             self::failEvalParse($ctx, $e->getMessage(), self::lineFromThrowable($e));
         }
 
@@ -113,7 +119,15 @@ final class VmEval
      */
     public static function isCatchableCompileError(\CompileError $error): bool
     {
-        $message = trim($error->getMessage());
+        return self::isCatchableCompileErrorMessage($error->getMessage());
+    }
+
+    /**
+     * Message-only form for php-parser Error remapping before materializing ParseError (#25420).
+     */
+    public static function isCatchableCompileErrorMessage(string $message): bool
+    {
+        $message = self::stripParserLineSuffix($message);
         if (self::MULTIPLE_ACCESS_MODIFIERS_MESSAGE === $message) {
             return true;
         }
@@ -127,6 +141,17 @@ final class VmEval
         }
 
         return false;
+    }
+
+    /** php-parser appends " on line N"; Zend CompileError messages do not. */
+    private static function stripParserLineSuffix(string $message): string
+    {
+        $message = trim($message);
+        if (1 === preg_match('/^(.*) on line \d+$/', $message, $m)) {
+            return trim($m[1]);
+        }
+
+        return $message;
     }
 
     /**
