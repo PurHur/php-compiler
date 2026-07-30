@@ -1502,6 +1502,17 @@ final class VmIntlDateFormatter
         ];
         $formatLen = \strlen($format);
         for ($i = 0; $i < $formatLen; ++$i) {
+            // ICU treats U+0020 and U+202F (NNBSP before en_US "a") as equivalent (#23960).
+            $fmtWs = self::whitespaceByteLen($format, $i, $formatLen);
+            if (0 !== $fmtWs) {
+                $inWs = self::whitespaceByteLen($time, $pos, $timeLen);
+                if (0 === $inWs) {
+                    return null;
+                }
+                $i += $fmtWs - 1; // for-loop increments once more
+                $pos += $inWs;
+                continue;
+            }
             $fc = $format[$i];
             if ('\\' === $fc) {
                 if ($i + 1 >= $formatLen) {
@@ -1668,6 +1679,29 @@ final class VmIntlDateFormatter
         $components['consumed'] = $pos;
 
         return $components;
+    }
+
+    /**
+     * Byte length of one ICU-flexible whitespace token at $offset: ASCII space or U+202F NNBSP (#23960).
+     */
+    private static function whitespaceByteLen(string $s, int $offset, int $len): int
+    {
+        if ($offset >= $len) {
+            return 0;
+        }
+        if (' ' === $s[$offset]) {
+            return 1;
+        }
+        // U+202F NARROW NO-BREAK SPACE as UTF-8
+        if ($offset + 2 < $len
+            && "\xE2" === $s[$offset]
+            && "\x80" === $s[$offset + 1]
+            && "\xAF" === $s[$offset + 2]
+        ) {
+            return 3;
+        }
+
+        return 0;
     }
 
     /**
