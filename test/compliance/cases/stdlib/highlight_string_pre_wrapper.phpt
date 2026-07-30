@@ -1,5 +1,7 @@
 --TEST--
-stdlib highlight_string() — Zend 8.4 <pre><code> wrapper and literal spaces (#23733, ext/standard/highlight.c)
+stdlib highlight_string() — Zend 8.4 <pre><code> wrapper and literal spaces (#23733 / #24874, ext/standard/highlight.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $html = highlight_string('<?php echo 1;', true);

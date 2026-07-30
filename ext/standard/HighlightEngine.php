@@ -12,8 +12,11 @@ use PHPCompiler\ext\tokenizer\TokenConstantsData;
  * Native syntax highlighter for highlight_string() / highlight_file() (#4824).
  *
  * php-src: Zend/zend_highlight.c — tokenizer → HTML color spans.
- * PHP 8.3+ wire format (GH-11913 / #24874): {@code <pre><code>}, literal spaces/newlines.
- * Pre-8.3: {@code <code><span>}, {@code &nbsp;} spaces, {@code <br />} newlines.
+ * PHP 8.3+ wire format (GH-11913): {@code <pre><code>}, literal spaces/newlines.
+ * Pre-8.3 / reference harness: {@code <code><span>}, {@code &nbsp;} spaces, {@code <br />} newlines.
+ *
+ * The 8.4.0-dev reference profile withholds the 8.3+ wrapper so default php-src-strict
+ * matches host Zend 8.2 (#25063). Forward {@code PHP_COMPILER_PROFILE=8.3}/{@code 8.4} keeps #24874.
  */
 final class HighlightEngine
 {
@@ -48,12 +51,29 @@ final class HighlightEngine
     /**
      * PHP 8.3+ highlight HTML (zend_highlight.c GH-11913).
      *
-     * Default {@see CompilerVersion::VERSION} {@code 8.4.0-dev} compares ≥ 8.3.0, so the
-     * default profile emits the modern wire format even when the host Zend is 8.2 (#24874).
-     * Set {@code PHP_COMPILER_PROFILE=8.2} for the legacy {@code <code><span>} / {@code &nbsp;} shape.
+     * Withheld on the 8.4.0-dev reference harness (unset {@code PHP_COMPILER_PROFILE}) so
+     * default php-src-strict matches Zend 8.2 {@code <code><span>} / {@code &nbsp;} (#25063).
+     * Do not bare-compare {@see CompilerVersion::languageProfileVersion()} to 8.3 — VERSION
+     * {@code 8.4.0-dev} is ≥ 8.3 and would re-enable the modern wrapper on reference (#24874 regression).
+     * Enable via stable {@code 8.4.0+} or explicit {@code PHP_COMPILER_PROFILE=8.3}/{@code 8.4}.
      */
     public static function usesPreCodeWrapper(): bool
     {
+        if (version_compare(CompilerVersion::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        // version_compare treats 8.4.0-dev as below stable 8.4.0 — same gate family as
+        // CompilerVersion::supportsTypedClassConstants() (#24809 / #25063).
+        if (version_compare(CompilerVersion::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
         return version_compare(CompilerVersion::languageProfileVersion(), '8.3.0', '>=');
     }
 
