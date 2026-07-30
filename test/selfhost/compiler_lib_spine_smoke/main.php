@@ -2428,6 +2428,7 @@ require_once __DIR__.'/../../../ext/standard/JitLocaltime.php';
 require_once __DIR__.'/../../../ext/standard/JitMathNumberArg.php';
 require_once __DIR__.'/../../../ext/standard/JitMd5.php';
 require_once __DIR__.'/../../../ext/standard/JitMemory.php';
+require_once __DIR__.'/../../../ext/standard/JitMemoryStreamHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitMethodExists.php';
 require_once __DIR__.'/../../../ext/standard/JitMimeContentType.php';
 require_once __DIR__.'/../../../ext/standard/JitMinMax.php';
