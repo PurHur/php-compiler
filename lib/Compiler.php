@@ -41362,6 +41362,37 @@ class Compiler {
         return $this->unwrapOperandChain($arg) instanceof Op\Expr\ArrayDimFetch;
     }
 
+    /** Call args rooted at property fetch must use their own producer slot (#25301). */
+    private function isCallArgDirectPropertyFetch(Operand $arg): bool
+    {
+        return $this->unwrapOperandChain($arg) instanceof Op\Expr\PropertyFetch;
+    }
+
+    /**
+     * bump($obj->prop) — by-ref call args need FETCH_OBJ_W (#25301, zend_execute.c ZEND_SEND_REF).
+     *
+     * @return list<OpCode>
+     */
+    private function compileCallArgPropertyFetch(
+        Op\Expr\PropertyFetch $fetch,
+        Block $block,
+        ?string $calleeName,
+        int $argIndex
+    ): array {
+        $forceWrite = null !== $calleeName
+            && $this->callArgRequiresByRef($calleeName, $argIndex, $fetch->result, $block);
+        if ($forceWrite) {
+            ++$this->forcePropertyFetchForWrite;
+        }
+        try {
+            return $this->compileExpr($fetch, $block);
+        } finally {
+            if ($forceWrite) {
+                --$this->forcePropertyFetchForWrite;
+            }
+        }
+    }
+
     /**
      * php-cfg may wire FuncCall args to dead temps while dim-fetch producers sit immediately
      * before the call (#10212, ext/standard/array.c usort comparators).
@@ -44763,7 +44794,15 @@ class Compiler {
                             );
                         if (!$propertyFetchIsMethodReceiver && $preludeFetchFeedsCallArg) {
                             if (null === $this->lastPropertyFetchResultSlotBeforePendingCall($block)) {
-                                foreach ($this->compileExpr($prelude, $block) as $op) {
+                                $preludeOps = $prelude instanceof Op\Expr\PropertyFetch
+                                    ? $this->compileCallArgPropertyFetch(
+                                        $prelude,
+                                        $block,
+                                        $calleeName,
+                                        (int) $argIndex
+                                    )
+                                    : $this->compileExpr($prelude, $block);
+                                foreach ($preludeOps as $op) {
                                     $block->addOpCode($op);
                                 }
                             }
@@ -46716,6 +46755,27 @@ class Compiler {
                     if ($fetch instanceof Op\Expr\ArrayDimFetch && null !== $fetch->result) {
                         if (null === $block->slotForOperand($fetch->result)) {
                             foreach ($this->compileExpr($fetch, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                        }
+                        $fetchSlot = $block->slotForOperand($fetch->result);
+                        if (null !== $fetchSlot) {
+                            $valueSlot = $fetchSlot;
+                        }
+                    }
+                }
+                if (null === $valueSlot && $this->isCallArgDirectPropertyFetch($arg)) {
+                    $fetch = $this->unwrapOperandChain($arg);
+                    if ($fetch instanceof Op\Expr\PropertyFetch && null !== $fetch->result) {
+                        if (null === $block->slotForOperand($fetch->result)) {
+                            foreach (
+                                $this->compileCallArgPropertyFetch(
+                                    $fetch,
+                                    $block,
+                                    $calleeName,
+                                    (int) $argIndex
+                                ) as $op
+                            ) {
                                 $sends[] = $op;
                             }
                         }
