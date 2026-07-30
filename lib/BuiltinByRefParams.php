@@ -43,8 +43,6 @@ final class BuiltinByRefParams
             case 'extract':
                 // php-src basic_functions.stub.php — extract(array &$array, ...) (#23572)
                 return [0];
-            case 'modf':
-                return [1];
             case 'frexp':
                 return [1];
             case 'parse_str':

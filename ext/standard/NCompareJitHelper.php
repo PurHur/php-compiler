@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * memcmp() / strncmp() for compiled JIT/AOT modules (#15364, php-in-PHP).
+ * Internal memcmp / strncmp for compiled JIT/AOT modules (#15364, php-in-PHP).
  *
  * SSOT: {@see VmString::memcmp()} / {@see VmString::strncmp()}
- * php-src: ext/standard/string.c — PHP_FUNCTION(memcmp|strncmp)
+ * php-src: ext/standard/string.c — PHP_FUNCTION(strncmp); memcmp is not a userland builtin (#25359)
  */
 final class NCompareJitHelper
 {

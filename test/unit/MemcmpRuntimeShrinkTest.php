@@ -8,21 +8,12 @@ use PHPCompiler\ext\standard\NCompareJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** memcmp()/strncmp() JIT routes through NCompareJitHelper PHP not libc LLVM (#15364). */
+/**
+ * Internal memcmp stays PHP-in-PHP via NCompareJitHelper (#15364).
+ * Userland memcmp() was a phantom vs php-src and was unregistered (#25359).
+ */
 final class MemcmpRuntimeShrinkTest extends TestCase
 {
-    public function testMemcmpUsesPhpBridgeNotLibcOnly(): void
-    {
-        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/memcmp.php');
-        $this->assertStringContainsString('StringMemcmp::invoke', $builtin);
-        $this->assertStringNotContainsString("lookupFunction('memcmp')", $builtin);
-
-        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringNCompare.php');
-        $this->assertStringContainsString('NCompareJitHelper', $bridge);
-        $this->assertStringContainsString('phpc_memcmp', $bridge);
-        $this->assertStringContainsString('memcmpArgv', $bridge);
-    }
-
     public function testStrncmpUsesPhpBridgeNotLibcOnly(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/strncmp.php');
@@ -30,6 +21,7 @@ final class MemcmpRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('strncmp')", $builtin);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringNCompare.php');
+        $this->assertStringContainsString('NCompareJitHelper', $bridge);
         $this->assertStringContainsString('phpc_strncmp', $bridge);
         $this->assertStringContainsString('strncmpArgv', $bridge);
     }
@@ -45,6 +37,12 @@ final class MemcmpRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('NCompareJitHelper.php', $spine);
         $this->assertStringContainsString('StringNCompare.php', $spine);
+        $this->assertStringNotContainsString('ext/standard/memcmp.php', $spine);
+    }
+
+    public function testUserlandMemcmpWrapperRemoved(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/memcmp.php');
     }
 
     public function testVmStringCompareKeepsLibcMemcmpForInternalLowering(): void

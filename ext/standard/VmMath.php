@@ -1219,7 +1219,7 @@ final class VmMath
         return $a > $b ? $a : $b;
     }
 
-    /** @return float fractional part; writes integer part to $intPart (php-src modf). */
+    /** Internal fractional/integer split (C modf); not a userland builtin (#25359). */
     public static function modf(float $num, float &$intPart): float
     {
         if (\is_nan($num) || \is_infinite($num)) {
