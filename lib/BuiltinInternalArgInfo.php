@@ -258,6 +258,13 @@ final class BuiltinInternalArgInfo
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
             // ext/standard/string.stub.php — &$percent = null (untyped; InternalArgInfo float) (#25361)
             'similar_text' => 2 === $index ? '' : null,
+            // ext/standard/string.stub.php — array|string $separator, ?array $array = null (#24811)
+            // InternalArgInfo: implode glue:string/pieces:array; join src:array/glue:string (inverted).
+            'implode', 'join' => match ($index) {
+                0 => 'array|string',
+                1 => '?array',
+                default => null,
+            },
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $name = null, bool $local_only = false (#24855)

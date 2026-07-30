@@ -31,11 +31,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testImplodeNamedSeparatorAndArrayResolve(): void
     {
         $names = BuiltinParamNames::forFunction('implode');
-        self::assertSame(['separator', 'array'], $names);
+        // php-src string.stub.php — ?array $array = null (#24811)
+        self::assertSame(['separator', 'array='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'separator', 'implode'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'implode'));
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'glue', 'implode'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'pieces', 'implode'));
+        self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('implode', 0));
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('implode', 1));
+        $join = BuiltinParamNames::forFunction('join');
+        self::assertSame(['separator', 'array='], $join);
+        self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('join', 0));
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('join', 1));
     }
 
     public function testHtmlspecialcharsDoubleEncodeNamedParamResolves(): void
