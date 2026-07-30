@@ -428,8 +428,9 @@ final class BuiltinParamNames
                 return ['array', 'callback', 'arg'];
             case 'array_slice':
                 return ['array', 'offset', 'length', 'preserve_keys'];
+            // php-src ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
             case 'array_splice':
-                return ['array', 'offset', 'length', 'replacement'];
+                return ['array', 'offset', 'length=', 'replacement='];
             case 'array_multisort':
                 return ['array', 'rest'];
             case 'array_map':

@@ -961,11 +961,43 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('array_multisort'));
 
         $splice = BuiltinParamNames::forFunction('array_splice');
-        self::assertSame(['array', 'offset', 'length', 'replacement'], $splice);
+        self::assertSame(['array', 'offset', 'length=', 'replacement='], $splice);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($splice, 'array', 'array_splice'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($splice, 'offset', 'array_splice'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($splice, 'length', 'array_splice'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($splice, 'replacement', 'array_splice'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('array_splice'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('array_splice'));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('array_splice', 2));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('array_splice', 3));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'array_splice',
+            2,
+            ['name' => 'length', 'type' => '?int', 'isOptional' => true],
+            false
+        ));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'array_splice',
+            3,
+            ['name' => 'replacement', 'type' => 'mixed', 'isOptional' => true],
+            false
+        ));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'array_splice',
+            2,
+            ['name' => 'length', 'type' => '?int', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'array_splice',
+            3,
+            ['name' => 'replacement', 'type' => 'mixed', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_ARRAY, $dest->type);
+        self::assertSame(0, $dest->toArray()->getNumElements());
     }
 
     /** @covers issue #10047 */

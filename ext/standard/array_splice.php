@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArraySpliceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -27,11 +28,13 @@ final class array_splice extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2) {
+        // Named length:/replacement: can leave sparse holes (php-src array.stub.php; #24824).
+        $keys = \array_keys($frame->calledArgs);
+        $argc = [] === $keys ? 0 : ((int) \max($keys) + 1);
+        if ($argc < 2 || !\array_key_exists(0, $frame->calledArgs) || !\array_key_exists(1, $frame->calledArgs)) {
             throw new \ArgumentCountError(\sprintf(
                 'array_splice() expects at least 2 arguments, %d given',
-                $argc
+                \count($frame->calledArgs)
             ));
         }
         if ($argc > 4) {
@@ -47,12 +50,12 @@ final class array_splice extends Internal
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_splice', 2, 'offset');
 
         $length = null;
-        if ($argc >= 3) {
+        if (\array_key_exists(2, $frame->calledArgs) && null !== $frame->calledArgs[2]) {
             $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 2, 'array_splice', 3, 'length');
         }
 
         $replacement = null;
-        if (4 === $argc) {
+        if (\array_key_exists(3, $frame->calledArgs) && null !== $frame->calledArgs[3]) {
             $replacementArg = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_NULL !== $replacementArg->type) {
                 if (Variable::TYPE_ARRAY === $replacementArg->type) {
@@ -92,7 +95,8 @@ final class array_splice extends Internal
         $i1 = $context->getTypeFromString('int1');
         JitInternalStrictArg::requireInt($context, $args[1], 'array_splice', 'offset', 2);
         $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_splice', 2, 'offset');
-        if ($argc >= 3) {
+        $hasLengthArg = isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2]);
+        if ($hasLengthArg) {
             [$hasLength, $length] = JitIntdiv::lowerSpliceLengthArg(
                 $context,
                 $args[2],
@@ -104,7 +108,8 @@ final class array_splice extends Internal
             $hasLength = $i1->constInt(0, false);
             $length = $i64->constInt(0, false);
         }
-        $replacement = 4 === $argc ? $args[3] : null;
+        $hasReplacement = isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3]);
+        $replacement = $hasReplacement ? $args[3] : null;
 
         return ArraySpliceRuntime::splice(
             $context,
@@ -113,7 +118,7 @@ final class array_splice extends Internal
             $hasLength,
             $length,
             $replacement,
-            4 === $argc
+            $hasReplacement
         );
     }
 }
