@@ -345,4 +345,44 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         );
     }
 
+    /** @covers issue #24969 */
+    public function testPregFamilyReflectionLimitAndCountDefaults(): void
+    {
+        $limitInfo = ['name' => 'limit', 'type' => 'int', 'isOptional' => true];
+        $countInfo = ['name' => 'count', 'type' => '', 'isOptional' => true];
+        $flagsInfo = ['name' => 'flags', 'type' => 'int', 'isOptional' => true];
+
+        foreach (['preg_replace', 'preg_filter'] as $fn) {
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 3, $limitInfo, false), $fn);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, 3, $limitInfo), $fn);
+            self::assertSame(-1, $dest->toInt(), $fn.' limit');
+
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 4, $countInfo, false), $fn);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, 4, $countInfo), $fn);
+            self::assertSame(Variable::TYPE_NULL, $dest->type, $fn.' count');
+        }
+
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('preg_replace_callback', 3, $limitInfo, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'preg_replace_callback', 3, $limitInfo));
+        self::assertSame(-1, $dest->toInt());
+
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('preg_replace_callback', 4, $countInfo, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'preg_replace_callback', 4, $countInfo));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('preg_replace_callback', 5, $flagsInfo, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'preg_replace_callback', 5, $flagsInfo));
+        self::assertSame(0, $dest->toInt());
+
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('preg_split', 2, $limitInfo, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'preg_split', 2, $limitInfo));
+        self::assertSame(-1, $dest->toInt());
+    }
+
 }
