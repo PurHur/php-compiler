@@ -1350,10 +1350,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'phpinfo'));
     }
 
-    /** @covers issue #23275 */
+    /** @covers issue #23275 / #25147 */
     public function testMktimeGmmktimeZendStubNamedParams(): void
     {
-        $expected = ['hour', 'minute', 'second', 'month', 'day', 'year'];
+        $expected = ['hour', 'minute=', 'second=', 'month=', 'day=', 'year='];
         foreach (['mktime', 'gmmktime'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame($expected, $names, $fn);
@@ -1367,6 +1367,8 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'min', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'sec', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mon', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+            self::assertSame(6, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
         }
     }
 

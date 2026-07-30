@@ -317,10 +317,10 @@ final class BuiltinParamNames
             case 'date_sunrise':
             case 'date_sunset':
                 return ['timestamp', 'returnFormat=', 'latitude=', 'longitude=', 'zenith=', 'utcOffset='];
-            // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still min/sec/mon; hour required (#23275, #25147)
             case 'mktime':
             case 'gmmktime':
-                return ['hour', 'minute', 'second', 'month', 'day', 'year'];
+                return ['hour', 'minute=', 'second=', 'month=', 'day=', 'year='];
             // php-src ext/date/php_date.stub.php — associative_array→associative (#23447)
             case 'localtime':
                 return ['timestamp=', 'associative='];
@@ -1633,7 +1633,7 @@ final class BuiltinParamNames
      *
      * @param list<int|string> $names
      */
-    private static function namesEncodeOptionalParams(array $names): bool
+    public static function namesEncodeOptionalParams(array $names): bool
     {
         foreach ($names as $name) {
             $label = (string) $name;
@@ -1643,6 +1643,19 @@ final class BuiltinParamNames
         }
 
         return false;
+    }
+
+    /**
+     * Optionality from a stub override entry (`=` / `...`), ignoring InternalArgInfo (#25147).
+     */
+    public static function overrideEntryIsOptional(string $rawName): bool
+    {
+        if (str_ends_with($rawName, '=')) {
+            return true;
+        }
+        $n = ltrim($rawName, '&');
+
+        return str_starts_with($n, '...');
     }
 
     /**
