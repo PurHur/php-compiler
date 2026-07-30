@@ -243,6 +243,9 @@ class Compiler {
     /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
     private array $neverFunctionNames = [];
 
+    /** @var array<string, array<int, true>> lowercase user function => by-ref param indices (#25301). */
+    private array $userFunctionByRefParams = [];
+
     /** True while lowering switch to JUMPIF/EQUAL — skip ?: merge slot bridging (#878). */
     private bool $compilingSwitchJumpIfChain = false;
 
@@ -543,6 +546,7 @@ class Compiler {
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
         $this->neverFunctionNames = [];
+        $this->userFunctionByRefParams = [];
         $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
@@ -10622,6 +10626,7 @@ class Compiler {
         if ($this->funcDeclReturnTypeIsNever($function->func)) {
             $this->neverFunctionNames[strtolower($function->func->name)] = true;
         }
+        $this->registerUserFunctionByRefParams($function->func->name, $function->func->params);
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(
@@ -12639,6 +12644,19 @@ class Compiler {
         }
 
         return isset($this->neverFunctionNames[strtolower($name)]);
+    }
+
+    /**
+     * @param list<Op\Expr\Param> $params
+     */
+    private function registerUserFunctionByRefParams(string $name, array $params): void
+    {
+        $lc = strtolower($name);
+        foreach ($params as $paramIdx => $param) {
+            if ($param->byRef) {
+                $this->userFunctionByRefParams[$lc][(int) $paramIdx] = true;
+            }
+        }
     }
 
     /**
@@ -16310,6 +16328,84 @@ class Compiler {
     }
 
     /**
+     * bump($obj->prop) — by-ref user-function args need FETCH_OBJ_W (#25301, zend_execute.c ZEND_SEND_REF).
+     */
+    private function propertyFetchUsedAsByRefCallArg(
+        Op\Expr\PropertyFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Expr\FuncCall && !$usage instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!property_exists($usage, 'args') || !is_array($usage->args)) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($usage);
+        if (null === $calleeName) {
+            return false;
+        }
+        foreach ($usage->args as $argIndex => $callArg) {
+            if (!$callArg instanceof Operand) {
+                continue;
+            }
+            $matchesFetch = $callArg === $fetch->result
+                || $this->operandsReferToSameVariable($callArg, $fetch->result)
+                || $this->propertyFetchFuncCallArgUsesHoistedFetch($callArg, (int) $argIndex, $fetch, $usage);
+            if (!$matchesFetch) {
+                continue;
+            }
+            if ($this->callArgRequiresByRef($calleeName, (int) $argIndex, $callArg, $block)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg dead arg temps — property fetch immediately precedes by-ref call (#25301).
+     */
+    private function propertyFetchPrecedesByRefCall(
+        Op\Expr\PropertyFetch $fetch,
+        Op $maybeCall,
+        Block $block,
+        int $fetchChildIndex,
+        array $children
+    ): bool {
+        if (!$maybeCall instanceof Op\Expr\FuncCall && !$maybeCall instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $callIndex = $fetchChildIndex + 1;
+        if ($callIndex >= \count($children) || $children[$callIndex] !== $maybeCall) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($maybeCall);
+        if (null === $calleeName) {
+            return false;
+        }
+        $callArgs = property_exists($maybeCall, 'args') && is_array($maybeCall->args)
+            ? $maybeCall->args
+            : [];
+        foreach ($callArgs as $argIndex => $callArg) {
+            if (!$callArg instanceof Operand) {
+                continue;
+            }
+            $matchesFetch = $callArg === $fetch->result
+                || $this->operandsReferToSameVariable($callArg, $fetch->result)
+                || $this->propertyFetchFuncCallArgUsesHoistedFetch($callArg, (int) $argIndex, $fetch, $maybeCall);
+            if (!$matchesFetch) {
+                continue;
+            }
+            if ($this->callArgRequiresByRef($calleeName, (int) $argIndex, $callArg, $block)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * True when property fetch is only used as write/ref lvalue (assign, AssignRef, unset, ++/--; #13559).
      */
     protected function isPropertyFetchForWrite(Op\Expr\PropertyFetch $fetch, Block $block): bool
@@ -16339,6 +16435,9 @@ class Compiler {
                 && $usage->var === $fetch->result
                 && $this->isArrayDimFetchForWrite($usage, $block)
             ) {
+                continue;
+            }
+            if ($this->propertyFetchUsedAsByRefCallArg($fetch, $usage, $block)) {
                 continue;
             }
 
@@ -16383,6 +16482,9 @@ class Compiler {
                 && $this->isArrayDimFetchForWrite($next, $block)
             ) {
                 return false;
+            }
+            if ($this->propertyFetchPrecedesByRefCall($fetch, $next, $block, $i, $children)) {
+                return true;
             }
 
             return false;
@@ -51550,6 +51652,9 @@ class Compiler {
 
     private function callArgRequiresByRef(string $calleeName, int $argIndex, ?Operand $arg = null, ?Block $block = null): bool
     {
+        if (isset($this->userFunctionByRefParams[strtolower($calleeName)][$argIndex])) {
+            return true;
+        }
         if ('array_multisort' === strtolower($calleeName)) {
             if (null !== $arg && null !== $block && $this->isArrayMultisortSortFlagOperand($arg, $block)) {
                 return false;
