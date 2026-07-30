@@ -53,8 +53,9 @@ final class JitDomSaveXMLUserScript
 
     private static function trySerializeNode(Context $context, JITVariable $nodeVar): ?Value
     {
-        // Only typed object receivers — null / VALUE null mean document-wide save (#25182).
-        if (JITVariable::TYPE_OBJECT !== $nodeVar->type) {
+        // null / omitted mean document-wide save (#25182). documentElement temps are often
+        // TYPE_VALUE after assign — still serialize from slots (#25271 / re-#23892).
+        if (!\in_array($nodeVar->type, [JITVariable::TYPE_OBJECT, JITVariable::TYPE_VALUE], true)) {
             return null;
         }
         if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
