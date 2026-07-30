@@ -716,6 +716,9 @@ final class BuiltinParamNames
             case 'ftell':
             case 'rewind':
             case 'fflush':
+            // php-src ext/standard/file.stub.php — absent from InternalArgInfo (#23406)
+            case 'fsync':
+            case 'fdatasync':
                 return ['stream'];
             // php-src ext/standard/file.stub.php — InternalArgInfo still says fp (#24534)
             case 'ftruncate':

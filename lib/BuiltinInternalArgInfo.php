@@ -73,6 +73,8 @@ final class BuiltinInternalArgInfo
             'highlight_string', 'highlight_file', 'show_source' => 'string|bool',
             // ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
             'stream_context_set_options' => 'bool',
+            // ext/standard/file.stub.php — absent from InternalArgInfo (#23406)
+            'fsync', 'fdatasync' => 'bool',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says array (#25508)
             'stream_context_create' => '',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
