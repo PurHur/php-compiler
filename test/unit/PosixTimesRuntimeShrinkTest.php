@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\posix\VmPosixTimesPure;
 use PHPUnit\Framework\TestCase;
 
-/** posix_times JIT routes through PosixTimesJitHelper PHP not JIT stub (#9218). */
+/** posix_times JIT NestedJIT via JitVmHelperLink::ensureCompiled (#9218 / #25600). */
 final class PosixTimesRuntimeShrinkTest extends TestCase
 {
     public function testPosixTimesCallUsesJitPosixTimes(): void
@@ -36,7 +36,15 @@ final class PosixTimesRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixTimesRuntime.php');
         $this->assertStringContainsString('PosixTimesJitHelper::resolve', $source);
         $this->assertStringContainsString('__compiler_posix_times', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('PHP_COMPILER_SELFHOST_AOT', $source);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
     }
 
     public function testVmPosixTimesUsesPureProcPathNotLibcTimes(): void
