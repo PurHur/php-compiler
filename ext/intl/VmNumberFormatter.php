@@ -557,7 +557,30 @@ final class VmNumberFormatter
 
                 return false;
             }
-            $slice = \substr($value, $start);
+        }
+        $slice = $hasOffset ? \substr($value, $start) : $value;
+        $style = (int) ($state['style'] ?? self::DECIMAL);
+        // CURRENCY / CURRENCY_ACCOUNTING: ICU unum_parseDouble requires a currency
+        // affix — share the parseCurrencySlice path (#25159). Bare numerics fail
+        // with U_PARSE_ERROR; Zend still advances $offset through a numeric prefix.
+        if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
+            $parsed = self::parseCurrencySlice($slice, $state['locale']);
+            if (null === $parsed) {
+                if ($hasOffset) {
+                    $bare = self::matchNumberPrefix($slice, $state['locale']);
+                    if (null !== $bare) {
+                        $offset = $start + $bare[1];
+                    }
+                }
+                self::failParse($formatter);
+
+                return false;
+            }
+            [$num, /* $currency */, $consumed] = $parsed;
+            if ($hasOffset) {
+                $offset = $start + $consumed;
+            }
+        } elseif ($hasOffset) {
             $prefix = self::matchNumberPrefix($slice, $state['locale']);
             if (null === $prefix) {
                 self::failParse($formatter);
