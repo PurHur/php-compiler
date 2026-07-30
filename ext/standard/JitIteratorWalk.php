@@ -197,6 +197,12 @@ final class JitIteratorWalk
         $valid = GeneratorHelper::compileIterValid($context, $gen);
         $context->builder->branchIf($valid, $body, $done);
         $context->builder->positionAtEnd($body);
+        // php-src — count each invoked iteration before checking callback (#25326).
+        $cur = $context->builder->load($countSlot);
+        $context->builder->store(
+            $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
+            $countSlot
+        );
         $value = GeneratorHelper::compileIterValue($context, $gen);
         $key = GeneratorHelper::compileIterKey($context, $gen);
         $result = $closureCall->call($context, $value, $key);
@@ -204,11 +210,6 @@ final class JitIteratorWalk
         $advance = $fn->appendBasicBlock('iterator_apply_gen_advance');
         $context->builder->branchIf($keep, $advance, $done);
         $context->builder->positionAtEnd($advance);
-        $cur = $context->builder->load($countSlot);
-        $context->builder->store(
-            $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
-            $countSlot
-        );
         $context->builder->branch($head);
         $context->builder->positionAtEnd($done);
 
@@ -233,6 +234,12 @@ final class JitIteratorWalk
         $valid = IteratorProtocolHelper::invokeIteratorMethodBool($context, $receiver, 'valid');
         $context->builder->branchIf($valid, $body, $done);
         $context->builder->positionAtEnd($body);
+        // php-src — count each invoked iteration before checking callback (#25326).
+        $cur = $context->builder->load($countSlot);
+        $context->builder->store(
+            $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
+            $countSlot
+        );
         $value = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'current');
         $key = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'key');
         $result = $closureCall->call($context, $value, $key);
@@ -240,11 +247,6 @@ final class JitIteratorWalk
         $advance = $fn->appendBasicBlock('iterator_apply_obj_advance');
         $context->builder->branchIf($keep, $advance, $done);
         $context->builder->positionAtEnd($advance);
-        $cur = $context->builder->load($countSlot);
-        $context->builder->store(
-            $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
-            $countSlot
-        );
         IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'next');
         $context->builder->branch($head);
         $context->builder->positionAtEnd($done);
