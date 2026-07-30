@@ -93,7 +93,17 @@ function run(string $filename, string $code, array $options): void
 
     if (! isset($options['-l'])) {
         $runtime->syncJitSuperglobals($queryArg, $postArg, $scriptFilename);
-        $runtime->run($block);
+        // bubbleUncaught=false — same as bin/vm.php. With true, raiseEvalCompileFatal
+        // rethrows CompileError and cli_driver exits 255 without Zend-shaped stderr
+        // (silent red on final-property eval overrides under JITTest, #25501).
+        try {
+            $runtime->run($block, false);
+        } catch (PHPCompiler\VM\ScriptExit $e) {
+            exit($e->status);
+        } catch (\LogicException $e) {
+            echo $e->getMessage(), "\n";
+            exit(255);
+        }
     }
 }
 
