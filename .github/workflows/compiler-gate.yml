@@ -46,8 +46,17 @@ on:
         options: ['false', 'true']
 
 concurrency:
-  group: compiler-gate-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # PR runs are keyed on the ref and DO supersede each other: once a branch is pushed again, the
+  # previous tree is nobody's concern. Master runs are keyed on the SHA instead, so each merge gets
+  # its own verdict.
+  #
+  # Why: master takes ~12 commits/hour and this gate needs ~25 min. With every master push sharing
+  # one concurrency group, each run was cancelled by the next merge before it could finish. Measured
+  # over the 60 most recent runs of this workflow: 31 cancelled, 29 in flight, ZERO completed. The
+  # gate had produced no master verdict at all — a check that looks like it is running and never
+  # reports is the same failure as one that reports without running (#24888, #24726, #24933).
+  group: compiler-gate-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   compiler-gate:
