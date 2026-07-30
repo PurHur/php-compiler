@@ -8,17 +8,29 @@ use PHPCompiler\ext\iconv\IconvJitHelper;
 use PHPCompiler\ext\iconv\VmIconv;
 use PHPUnit\Framework\TestCase;
 
-/** iconv() JIT routes through IconvJitHelper PHP not IconvRuntime LLVM (#9345). */
+/**
+ * iconv() JIT routes through IconvJitHelper PHP (#9345 / #25570).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #25544).
+ */
 final class IconvRuntimeShrinkTest extends TestCase
 {
-    public function testIconvRuntimeUsesJitHelperNotCharsetLlvm(): void
+    public function testIconvRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IconvRuntime.php');
         $this->assertStringContainsString('IconvJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('ENC_UTF8', $source);
         $this->assertStringNotContainsString('UTF8_ALIASES', $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $lineCount = \substr_count($source, "\n") + 1;
+        $this->assertLessThan(170, $lineCount);
+        $this->assertGreaterThan(10, 182 - $lineCount);
     }
 
     public function testJitIconvUsesRuntimeBridge(): void
