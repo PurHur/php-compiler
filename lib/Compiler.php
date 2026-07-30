@@ -23786,6 +23786,9 @@ class Compiler {
      * array_merge((object)[...], [...]) — hoisted Cast feeds arg #0, not stmt-before Array_ (#15858).
      * array_walk((object)[...], fn) — same for by-ref arg #0 (#15874).
      *
+     * Nested casts inside a later array arg must not claim arg #0:
+     * array_replace_recursive(['a'=>['b'=>1]], ['a'=>(object)['c'=>2]]) (#25098).
+     *
      * @param list<Op\Node> $cfgChildren
      */
     private function inlineCallArgZeroFedByHoistedCastProducer(array $cfgChildren, Op $callOp): bool
@@ -23808,13 +23811,48 @@ class Compiler {
         )) {
             return false;
         }
-        foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp) as $producer) {
-            if ($producer instanceof Op\Expr\Cast) {
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp);
+        $callArg0 = $callOp->args[0] ?? null;
+        foreach ($producers as $producer) {
+            if (
+                $producer instanceof Op\Expr\Cast
+                && $this->hoistedCastFeedsCallArgZero($producer, $callArg0, $producers)
+            ) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * True when a hoisted Cast is the top-level value of call arg #0 — not an array element (#25098).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function hoistedCastFeedsCallArgZero(Op\Expr\Cast $cast, mixed $callArg0, array $producers): bool
+    {
+        if (
+            $callArg0 instanceof Operand
+            && null !== $cast->result
+            && $this->operandsReferToSameVariable($cast->result, $callArg0)
+        ) {
+            return true;
+        }
+        // Cast embedded as an Array_ value (nested (object)[...]) is not arg #0 (#25098).
+        if (null !== $cast->result) {
+            foreach ($producers as $producer) {
+                if (
+                    $producer instanceof Op\Expr\Array_
+                    && $this->cfgExprUsesOperand($producer, $cast->result)
+                ) {
+                    return false;
+                }
+            }
+        }
+
+        // Top-level (object)[...] — Cast precedes trailing Array_ args; operand identity may differ (#15858).
+        return true;
     }
 
     /**
@@ -23915,6 +23953,10 @@ class Compiler {
             }
         }
         if (null === $cast) {
+            return null;
+        }
+        if (!$this->hoistedCastFeedsCallArgZero($cast, $callArg0, $producers)) {
+            // Nested (object) inside a later array arg — do not steal arg #0 (#25098).
             return null;
         }
         if (null === $block->slotForOperand($cast->result)) {

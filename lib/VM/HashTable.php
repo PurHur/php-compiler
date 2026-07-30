@@ -1220,47 +1220,31 @@ final class HashTable {
     {
         $existing = $existing->resolveIndirect();
         $overlay = $overlay->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
-            $merged = $existing->toArray()->mergeRecursiveCopy($overlay->toArray());
-            $out = new Variable();
-            $out->array($merged);
-
-            return $out;
-        }
-        $out = new Variable();
-        $out->array(new self());
-        $ht = $out->toArray();
-        if (Variable::TYPE_ARRAY === $existing->type) {
-            foreach ($existing->toArray()->iterateKeyed(true) as [$key, $element]) {
-                $elementCopy = new Variable();
-                $elementCopy->copyFrom($element);
-                if (Variable::TYPE_INTEGER === $key->type) {
-                    $ht->addIndex($key->toInt(), $elementCopy);
-                } else {
-                    $ht->add($key->toString(), $elementCopy);
-                }
-            }
-            $elementCopy = new Variable();
-            $elementCopy->copyFrom($overlay);
-            $ht->append($elementCopy);
-        } elseif (Variable::TYPE_ARRAY === $overlay->type) {
-            $base = new self();
-            $scalarCopy = new Variable();
-            $scalarCopy->copyFrom($existing);
-            $base->addIndex(0, $scalarCopy);
-            $merged = $base->mergeRecursiveCopy($overlay->toArray());
-            $out = new Variable();
-            $out->array($merged);
-
-            return $out;
+        // php-src php_array_merge_recursive: convert_to_array(dest); object src → convert_to_array (#25098).
+        if (Variable::TYPE_NULL === $existing->type) {
+            $destHt = new self();
+            $nullEl = new Variable();
+            $nullEl->null();
+            $destHt->append($nullEl);
         } else {
-            $elementCopy = new Variable();
-            $elementCopy->copyFrom($existing);
-            $ht->append($elementCopy);
-            $elementCopy = new Variable();
-            $elementCopy->copyFrom($overlay);
-            $ht->append($elementCopy);
+            $destHt = CastSupport::toArray($existing)->toArray();
         }
+        $src = $overlay;
+        if (Variable::TYPE_OBJECT === $overlay->type || Variable::TYPE_ENUM_CASE === $overlay->type) {
+            $src = CastSupport::toArray($overlay)->resolveIndirect();
+        }
+        if (Variable::TYPE_ARRAY === $src->type) {
+            $merged = $destHt->mergeRecursiveCopy($src->toArray());
+            $out = new Variable();
+            $out->array($merged);
+
+            return $out;
+        }
+        $elementCopy = new Variable();
+        $elementCopy->copyFrom($overlay);
+        $destHt->append($elementCopy);
+        $out = new Variable();
+        $out->array($destHt);
 
         return $out;
     }
