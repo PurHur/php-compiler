@@ -125,6 +125,14 @@ final class BuiltinInternalDefaultValues
         'str_split' => [
             1 => ['kind' => 'int', 'value' => 1],
         ],
+        // php-src ext/standard/string.stub.php — ?array $array = null (#24811)
+        // InternalArgInfo marks pieces/glue required without a nullable default.
+        'implode' => [
+            1 => ['kind' => 'null'],
+        ],
+        'join' => [
+            1 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — separator/enclosure/escape string defaults (#24813)
         'str_getcsv' => [
             1 => ['kind' => 'string', 'value' => ','],

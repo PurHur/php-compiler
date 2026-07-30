@@ -410,6 +410,20 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(1, $dest->toInt());
     }
 
+    /** @covers issue #24811 */
+    public function testImplodeJoinArrayDefaultIsNull(): void
+    {
+        $info = ['name' => 'array', 'type' => '?array', 'isOptional' => true];
+        foreach (['implode', 'join'] as $fn) {
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $info, false), $fn);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, 1, $info), $fn);
+            self::assertSame(Variable::TYPE_NULL, $dest->type, $fn);
+            self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1), $fn);
+        }
+    }
+
     /** @covers issue #24813 */
     public function testStrGetcsvReflectionDefaults(): void
     {

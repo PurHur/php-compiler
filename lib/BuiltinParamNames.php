@@ -1043,9 +1043,11 @@ final class BuiltinParamNames
                 return ['type', 'var_name', 'filter', 'options'];
             case 'explode':
                 return ['separator', 'string', 'limit'];
+            // php-src ext/standard/string.stub.php — array|string $separator, ?array $array = null (#24811)
+            // InternalArgInfo still glue/pieces (implode) or inverted src/glue (join).
             case 'implode':
             case 'join':
-                return ['separator', 'array'];
+                return ['separator', 'array='];
             case 'nl2br':
                 return ['string', 'use_xhtml'];
             case 'str_contains':
