@@ -625,6 +625,15 @@ final class VmDateTimeNative
             // php-src ext/date/php_date.c — @ unix timestamps use offset timezone +00:00 (zone_type 1).
             return ['timestamp' => (int) $unix, 'microsecond' => 0, 'timezone' => '+00:00'];
         }
+        // php-src parse_date.re — ISO week / ordinal day before numeric-timestamp fallback (#25263).
+        $isoOrOrdinal = self::tryParseIsoWeekOrOrdinalAbsolute($time, $tzName);
+        if (null !== $isoOrOrdinal) {
+            return $isoOrOrdinal;
+        }
+        // Seven-digit YYYYDDD with invalid day must not become a unix timestamp (#25263).
+        if (1 === preg_match('/^\d{7}$/', $time)) {
+            self::throwMalformedDateTime($time);
+        }
         if (1 === preg_match('/^\d+$/', $time)) {
             return ['timestamp' => (int) $time, 'microsecond' => 0];
         }
@@ -738,6 +747,57 @@ final class VmDateTimeNative
         }
 
         self::throwMalformedDateTime($time);
+    }
+
+    /**
+     * php-src parse_date.re — absolute ISO week (YYYYWww / YYYY-Www[-D]) and ordinal day (YYYYDDD / YYYY-DDD) (#25263).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function tryParseIsoWeekOrOrdinalAbsolute(string $time, string $tzName): ?array
+    {
+        // Compact / hyphenated ISO week: YYYYWww, YYYYWwwD, YYYYWww-D, YYYY-Www, YYYY-Www-D.
+        if (1 === preg_match('/^(\d{4})W(\d{2})([1-7])?$/i', $time, $matches)
+            || 1 === preg_match('/^(\d{4})W(\d{2})-([0-7])$/i', $time, $matches)
+            || 1 === preg_match('/^(\d{4})-W(\d{2})(?:-([0-7]))?$/i', $time, $matches)
+        ) {
+            $isoYear = (int) $matches[1];
+            $isoWeek = (int) $matches[2];
+            if ($isoWeek < 1 || $isoWeek > 53) {
+                return null;
+            }
+            $isoDay = isset($matches[3]) && '' !== $matches[3] ? (int) $matches[3] : 1;
+            [$year, $month, $day] = self::ymdFromIsoDate($isoYear, $isoWeek, $isoDay);
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+                'microsecond' => 0,
+            ];
+        }
+
+        // Ordinal day-of-year: YYYYDDD or YYYY-DDD (day 001–366; 366 may overflow non-leap years).
+        $ordinalMatch = null;
+        if (7 === \strlen($time) && 1 === preg_match('/^(\d{4})(\d{3})$/', $time, $ordinalMatch)) {
+            // compact YYYYDDD
+        } elseif (1 === preg_match('/^(\d{4})-(\d{3})$/', $time, $ordinalMatch)) {
+            // hyphenated YYYY-DDD
+        } else {
+            $ordinalMatch = null;
+        }
+        if (null !== $ordinalMatch) {
+            $year = (int) $ordinalMatch[1];
+            $ordinal = (int) $ordinalMatch[2];
+            if ($ordinal < 1 || $ordinal > 366) {
+                return null;
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, 1, $ordinal, 0, 0, 0, $tzName),
+                'microsecond' => 0,
+            ];
+        }
+
+        return null;
     }
 
     /**
