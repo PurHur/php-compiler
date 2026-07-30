@@ -97,6 +97,22 @@ PHP;
         $this->assertSame('1', $this->runVm($code));
     }
 
+    /** Visibility adaptation + same-name class method — Zend composes then overrides (#25577). */
+    public function testTraitAsPrivateWithClassMethodOverride(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T { public function f() { return 'T'; } public function g() { return 'G'; } }
+class C {
+    use T { g as private; }
+    public function g() { return 'C'; }
+}
+$c = new C();
+echo $c->f(), ',', $c->g();
+PHP;
+        $this->assertSame('T,C', $this->runVm($code));
+    }
+
     public function testTraitMethodAsPrivateBlocksExternalCall(): void
     {
         $code = <<<'PHP'
