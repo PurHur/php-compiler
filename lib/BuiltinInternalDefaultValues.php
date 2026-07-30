@@ -316,6 +316,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => -1],
             2 => ['kind' => 'int', 'value' => -15], // ZLIB_ENCODING_RAW
         ],
+        // php-src ext/zlib/zlib.stub.php — int $max_length = 0 (#25132)
+        'zlib_decode' => [
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/date/php_date.stub.php — ?int minute…year = null (InternalArgInfo int → 0) (#25147)
         'mktime' => [
             1 => ['kind' => 'null'],
