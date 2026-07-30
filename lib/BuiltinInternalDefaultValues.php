@@ -291,6 +291,14 @@ final class BuiltinInternalDefaultValues
         'datetimeimmutable::createfromformat' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — int $error_level = E_USER_NOTICE (1024) (#25174)
+        // InternalArgInfo int → 0; user_error absent from InternalArgInfo entirely.
+        'trigger_error' => [
+            1 => ['kind' => 'int', 'value' => 1024],
+        ],
+        'user_error' => [
+            1 => ['kind' => 'int', 'value' => 1024],
+        ],
     ];
 
     public static function isAvailable(

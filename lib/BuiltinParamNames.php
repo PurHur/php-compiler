@@ -552,8 +552,10 @@ final class BuiltinParamNames
                 ];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says error_type (#23402)
             case 'trigger_error':
-            case 'user_error':
                 return ['message', 'error_level'];
+            // user_error is absent from InternalArgInfo — encode optionality here (#25174)
+            case 'user_error':
+                return ['message', 'error_level='];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says arg_num (#24456)
             case 'func_get_arg':
                 return ['position'];

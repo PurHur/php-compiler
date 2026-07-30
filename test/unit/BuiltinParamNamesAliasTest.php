@@ -2147,7 +2147,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($te, 'error_type', 'trigger_error'));
 
         $ue = BuiltinParamNames::forFunction('user_error');
-        self::assertSame(['message', 'error_level'], $ue);
+        // Absent from InternalArgInfo — `=` encodes optional error_level (#25174)
+        self::assertSame(['message', 'error_level='], $ue);
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('user_error'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ue, 'error_level', 'user_error'));
 
         $sid = BuiltinParamNames::forFunction('session_id');
         self::assertSame(['id'], $sid);
