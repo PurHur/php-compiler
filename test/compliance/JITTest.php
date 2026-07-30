@@ -55,6 +55,10 @@ class JITTest extends BaseTest {
             }
             // extension_loaded / class_exists sqlite3 phantoms — VM-only (JIT module-verify; #22791).
             // extension_loaded / class_exists zip phantoms — VM-only (JIT module-verify; #18137/#25010).
+            // Throwable Reflection getMethods — VM-only (JIT ReflectionClass module-verify; #25427).
+            if (str_contains($name, 'throwable_reflection_methods')) {
+                continue;
+            }
             if (str_contains($name, 'extension_loaded_zip_phantom')
                 || str_contains($name, 'zip/extension_loaded_zip_phantom')) {
                 continue;
