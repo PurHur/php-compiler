@@ -598,6 +598,18 @@ final class VmNumberFormatter
             if ($hasOffset) {
                 $offset = $start + $consumed;
             }
+        } elseif (self::isRuleBasedStyle($style)) {
+            // SPELLOUT/ORDINAL/DURATION/PATTERN_RULEBASED — ICU unum_parseDouble (#25161).
+            $parsed = self::icuParseDouble($state, $slice);
+            if (null === $parsed) {
+                self::failParse($formatter);
+
+                return false;
+            }
+            [$num, $consumed] = $parsed;
+            if ($hasOffset) {
+                $offset = $start + $consumed;
+            }
         } elseif ($hasOffset) {
             $prefix = self::matchNumberPrefix($slice, $state['locale']);
             if (null === $prefix) {
@@ -1779,6 +1791,75 @@ final class VmNumberFormatter
     }
 
     /**
+     * Parse via ICU unum_parseDouble for rule-based styles (#25161, #25169).
+     *
+     * @param array{locale: string, style: int, pattern: ?string} $state
+     *
+     * @return array{0: float, 1: int}|null value + UTF-8 bytes consumed
+     */
+    private static function icuParseDouble(array $state, string $text): ?array
+    {
+        if ('' === $text) {
+            return null;
+        }
+        $fmt = self::icuOpen($state);
+        if (null === $fmt) {
+            return null;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $u = self::utf8ToUChar($text);
+        if (null === $u) {
+            try {
+                $ffi->{'unum_close'.self::$symSuffix}($fmt[0]);
+            } catch (\Throwable) {
+            }
+
+            return null;
+        }
+        $suffix = self::$symSuffix;
+        $parse = 'unum_parseDouble'.$suffix;
+        $close = 'unum_close'.$suffix;
+        $toUtf8 = 'u_strToUTF8'.$suffix;
+        try {
+            $parsePos = \FFI::new('int32_t');
+            $parsePos->cdata = 0;
+            $status = \FFI::new('int32_t');
+            $status->cdata = 0;
+            $val = (float) $ffi->$parse($fmt[0], $u[0], $u[1], \FFI::addr($parsePos), \FFI::addr($status));
+            $consumedU = (int) $parsePos->cdata;
+            // Warnings (<0) ok; positive = failure. Require progress.
+            if ($status->cdata > 0 || $consumedU <= 0) {
+                $ffi->$close($fmt[0]);
+
+                return null;
+            }
+            $byteCap = max(16, $consumedU * 3 + 8);
+            $utf8len = \FFI::new('int32_t');
+            $cbuf = \FFI::new('char['.$byteCap.']');
+            $st2 = \FFI::new('int32_t');
+            $st2->cdata = 0;
+            $ffi->$toUtf8($cbuf, $byteCap, \FFI::addr($utf8len), $u[0], $consumedU, \FFI::addr($st2));
+            $ffi->$close($fmt[0]);
+            if ($st2->cdata > 0 || $utf8len->cdata < 0) {
+                // ASCII-safe fallback: UChar index equals byte index for BMP ASCII.
+                return [$val, min($consumedU, \strlen($text))];
+            }
+
+            return [$val, (int) $utf8len->cdata];
+        } catch (\Throwable) {
+            try {
+                $ffi->$close($fmt[0]);
+            } catch (\Throwable) {
+            }
+
+            return null;
+        }
+    }
+
+    /**
      * unum_toPattern for rule-based formatters (#21110 / #21113).
      *
      * @param array{locale: string, style: int, pattern: ?string} $state
@@ -1959,6 +2040,7 @@ typedef struct UParseError UParseError;
 UNumberFormat *unum_open{$suffix}(int32_t style, const UChar *pattern, int32_t patternLength, const char *locale, UParseError *parseErr, UErrorCode *status);
 void unum_close{$suffix}(UNumberFormat *fmt);
 int32_t unum_formatDouble{$suffix}(const UNumberFormat *fmt, double number, UChar *result, int32_t resultLength, void *pos, UErrorCode *status);
+double unum_parseDouble{$suffix}(const UNumberFormat *fmt, const UChar *text, int32_t textLength, int32_t *parsePos, UErrorCode *status);
 int32_t unum_toPattern{$suffix}(const UNumberFormat *fmt, int8_t isPatternLocalized, UChar *result, int32_t resultLength, UErrorCode *status);
 UChar *u_strFromUTF8{$suffix}(UChar *dest, int32_t destCapacity, int32_t *pDestLength, const char *src, int32_t srcLength, UErrorCode *pErrorCode);
 char *u_strToUTF8{$suffix}(char *dest, int32_t destCapacity, int32_t *pDestLength, const UChar *src, int32_t srcLength, UErrorCode *pErrorCode);
