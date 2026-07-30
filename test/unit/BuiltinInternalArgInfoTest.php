@@ -85,6 +85,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('hash_equals', 1));
     }
 
+    /** php-src basic_functions.stub.php — no return; InternalArgInfo says array (#25508). */
+    public function testStreamContextCreateHasNoReturnType(): void
+    {
+        $this->assertSame('', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('stream_context_create'));
+        $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_create'));
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));
