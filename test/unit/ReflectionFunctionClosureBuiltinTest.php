@@ -24,11 +24,20 @@ $x = 42;
 $g = function () use ($x) { return $x; };
 var_export((new ReflectionFunction($g))->getClosureUsedVariables()['x']);
 echo "\n";
+var_export((new ReflectionFunction($g))->getStaticVariables()['x']);
+echo "\n";
+$y = 7;
+$h = function () use ($y) { static $n = 0; $n++; return $y + $n; };
+$h();
+$sv = (new ReflectionFunction($h))->getStaticVariables();
+ksort($sv);
+echo json_encode($sv);
+echo "\n";
 PHP;
         $block = $rt->parseAndCompile($code, 'reflection_function_closure.php');
         ob_start();
         $rt->run($block);
         $out = ob_get_clean();
-        $this->assertSame("true\nNULL\n42\n", $out);
+        $this->assertSame("true\nNULL\n42\n42\n{\"n\":1,\"y\":7}\n", $out);
     }
 }
