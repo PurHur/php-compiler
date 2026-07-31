@@ -923,6 +923,44 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsSocketAtmarkFalseOnDefault84DevReference(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsSocketAtmark());
+        $this->assertFalse(CompilerVersion::advertisesSocketAtmark());
+    }
+
+    public function testSupportsSocketAtmarkFalseOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsSocketAtmark());
+            $this->assertFalse(CompilerVersion::advertisesSocketAtmark());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsSocketAtmarkTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSocketAtmark());
+            $this->assertTrue(CompilerVersion::advertisesSocketAtmark());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testJsonEncodeUnitEnumValueErrorAlwaysFalse(): void
     {
         // Zend never ValueError for unit enums (#22681/#22688) — gate retired to always-false.
@@ -2650,6 +2688,44 @@ final class CompilerVersionGateTest extends TestCase
         try {
             $runtime = new Runtime();
             $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterSocketAtmarkOnDefault84DevReference(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['socket_atmark']));
+    }
+
+    public function testVmDoesNotRegisterSocketAtmarkOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['socket_atmark']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersSocketAtmarkOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['socket_atmark']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

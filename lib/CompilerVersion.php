@@ -1928,6 +1928,45 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ socket_atmark() (ext/sockets/sockets.c, issue #6544, #9215, #25874).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate when reported
+     * PHP_VERSION is the 8.2 reference string). Enable via stable 8.4.0+ or explicit
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     *
+     * Same shape as {@see supportsJsonValidate()} — do not use {@see isForwardProfileAtLeast()}
+     * or {@see advertisesBuiltinSince()} alone (both re-advertise on unset PROFILE while
+     * {@see phpversion()} still reports {@see REFERENCE_PHP_VERSION}).
+     */
+    public static function supportsSocketAtmark(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * socket_atmark() visible to function_exists() — same gate as registration (#25874).
+     *
+     * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
+     */
+    public static function advertisesSocketAtmark(): bool
+    {
+        return self::supportsSocketAtmark();
+    }
+
+    /**
      * Formerly gated a mistaken ValueError for json_encode(unit enum) on forward profiles (#5683).
      *
      * php-src (8.2–8.4) always returns false + JSON_ERROR_NON_BACKED_ENUM; never ValueError

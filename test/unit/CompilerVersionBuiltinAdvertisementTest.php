@@ -191,6 +191,44 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testSocketAtmarkWithheldOnDefault84DevReference(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsSocketAtmark());
+        $this->assertFalse(CompilerVersion::advertisesSocketAtmark());
+    }
+
+    public function testSocketAtmarkWithheldOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsSocketAtmark());
+            $this->assertFalse(CompilerVersion::advertisesSocketAtmark());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSocketAtmarkAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSocketAtmark());
+            $this->assertTrue(CompilerVersion::advertisesSocketAtmark());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testMbStrPadWithheldOnDefault84DevReference(): void
     {
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
@@ -1081,6 +1119,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
     }
 
+    public function testVmDoesNotRegisterSocketAtmarkOnDefault84DevReference(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['socket_atmark']));
+    }
+
     public function testVmDoesNotRegisterPosixSysconfApisOnReferenceProfile(): void
     {
         $runtime = new Runtime();
@@ -1149,6 +1193,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersSocketAtmarkOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['socket_atmark']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

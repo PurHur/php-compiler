@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sockets;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * sockets extension module entry (php-src ext/sockets/sockets.c; issue #6544, #19286).
+ * sockets extension module entry (php-src ext/sockets/sockets.c; issue #6544, #19286, #25874).
  *
  * Registers as extension "sockets" once socket_create() is available (#11820).
+ * socket_atmark() is PHP 8.3+ — gated like json_validate (#25874).
  */
 class Module extends ModuleAbstract
 {
@@ -38,7 +40,7 @@ class Module extends ModuleAbstract
         }
 
         return [
-            new socket_atmark(),
+            ...(CompilerVersion::supportsSocketAtmark() ? [new socket_atmark()] : []),
             new socket_import_stream(),
             new socket_export_stream(),
             new socket_set_nonblock(),
