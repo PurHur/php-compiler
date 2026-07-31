@@ -70,6 +70,7 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['offsetexists'] = $pub;
         $entry->methods['offsetunset'] = new ArrayObjectOffsetUnset();
         $entry->methodVisibility['offsetunset'] = $pub;
+        SplArrayStorage::attachArrayAccessArginfo($entry);
         $entry->methods['append'] = new ArrayObjectAppend();
         $entry->methodVisibility['append'] = $pub;
         $entry->methods['exchangearray'] = new ArrayObjectExchangeArray();

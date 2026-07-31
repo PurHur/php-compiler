@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\ext\standard\VmSerializeRefState;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -28,6 +29,13 @@ final class SplLegacySerializableMethods
         $entry->methodVisibility['serialize'] = $pub;
         $entry->methods['unserialize'] = new SplLegacySerializableUnserialize($ownerLc, $displayName);
         $entry->methodVisibility['unserialize'] = $pub;
+        // php-src stub arginfo — required for subclass LSP vs Serializable (#25840, #25406).
+        $entry->methodParameterMetadata['serialize'] = [];
+        $entry->methodParameterMetadata['unserialize'] = [
+            new ParameterMetadata('data', [], false, false, false, false, 'string', null),
+        ];
+        $entry->methodNames['serialize'] = 'serialize';
+        $entry->methodNames['unserialize'] = 'unserialize';
     }
 }
 

@@ -76,6 +76,7 @@ final class ArrayIteratorBuiltin
         $entry->methodVisibility['offsetexists'] = $pub;
         $entry->methods['offsetunset'] = new ArrayIteratorOffsetUnset();
         $entry->methodVisibility['offsetunset'] = $pub;
+        SplArrayStorage::attachArrayAccessArginfo($entry);
         // php-src ext/spl/spl_array.stub.php — ArrayIterator has asort/ksort/natsort/…
         // but not arsort/krsort (those are procedural-only / ArrayObject also omits them). #22594
         foreach ([

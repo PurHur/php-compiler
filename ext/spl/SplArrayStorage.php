@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\ext\standard\array_map;
 use PHPCompiler\ext\standard\KeySortJitHelper;
 use PHPCompiler\ext\standard\NaturalSortJitHelper;
@@ -13,6 +14,7 @@ use PHPCompiler\ext\standard\VmArraySortCallback;
 use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -26,6 +28,29 @@ final class SplArrayStorage
     public const FLAG_STD_PROP_LIST = 1;
 
     public const FLAG_ARRAY_AS_PROPS = 2;
+
+    /**
+     * php-src ext/spl/spl_array.stub.php — ArrayAccess methods use mixed $key / $value
+     * (not legacy InternalArgInfo index/newval). Stub arginfo is required for LSP when
+     * subclasses override or anonymously extend ArrayObject/ArrayIterator (#25840).
+     *
+     * Omit methodReturnDeclaredTypes — returns are @tentative-return-type in Zend
+     * (see BuiltinInternalTentativeReturnInfo). mixed dump types parse as untyped for
+     * variance (TypeSig::fromDumpTypeString), matching ArrayAccess (#25425).
+     */
+    public static function attachArrayAccessArginfo(ClassEntry $entry): void
+    {
+        $key = new ParameterMetadata('key', [], false, false, false, false, 'mixed', null);
+        $value = new ParameterMetadata('value', [], false, false, false, false, 'mixed', null);
+        $entry->methodParameterMetadata['offsetexists'] = [$key];
+        $entry->methodParameterMetadata['offsetget'] = [$key];
+        $entry->methodParameterMetadata['offsetset'] = [$key, $value];
+        $entry->methodParameterMetadata['offsetunset'] = [$key];
+        $entry->methodNames['offsetexists'] = 'offsetExists';
+        $entry->methodNames['offsetget'] = 'offsetGet';
+        $entry->methodNames['offsetset'] = 'offsetSet';
+        $entry->methodNames['offsetunset'] = 'offsetUnset';
+    }
 
     /**
      * @var array<int, array{
