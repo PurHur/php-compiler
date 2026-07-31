@@ -890,7 +890,8 @@ final class VmFs
         if (\is_array($data)) {
             $data = implode('', $data);
         }
-        if (VmPhpMemoryStream::isSupportedUri($path)) {
+        if (VmPhpMemoryStream::isSupportedUri($path)
+            || VmStreamWrapperRegistry::isCustomProtocol($path)) {
             return self::filePutContentsViaOpen($path, $data, $flags);
         }
 
@@ -987,6 +988,10 @@ final class VmFs
             return self::finalizeStreamOpen(self::openPharUri($path, $mode), $mode);
         }
         if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
+            if (null === $ctx) {
+                $vm = VM::running();
+                $ctx = null !== $vm ? $vm->context : null;
+            }
             if (null === $ctx) {
                 return false;
             }
