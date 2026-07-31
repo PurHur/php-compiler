@@ -522,6 +522,12 @@ final class VmNumberFormatter
 
             return false;
         }
+        // php-src numfmt_format_currency / unum_formatDoubleCurrency: non-currency
+        // construction styles format like format() (ignore ISO currency wire) (#25015).
+        $style = (int) ($state['style'] ?? self::DECIMAL);
+        if (self::CURRENCY !== $style && self::CURRENCY_ACCOUNTING !== $style) {
+            return self::format($formatter, $amount);
+        }
         $currency = strtoupper($currency);
         $symbol = self::currencySymbol($currency);
         $body = self::formatDecimalFromState($state, $amount, 2);
@@ -529,7 +535,7 @@ final class VmNumberFormatter
         IntlError::clear();
         // CURRENCY_ACCOUNTING negatives use parentheses like format() / ICU
         // unum_formatDoubleCurrency (php-src formatter_format.c; #22699).
-        $accountingNeg = self::CURRENCY_ACCOUNTING === (int) ($state['style'] ?? self::DECIMAL)
+        $accountingNeg = self::CURRENCY_ACCOUNTING === $style
             && $amount < 0;
         if ('$' === $symbol || '£' === $symbol || '€' === $symbol || '¥' === $symbol) {
             if ($accountingNeg) {
