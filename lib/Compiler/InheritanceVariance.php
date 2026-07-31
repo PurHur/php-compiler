@@ -15,8 +15,9 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time parameter contravariance / return covariance, staticness, and
- * visibility (Zend zend_inheritance.c, issues #3323, #25634).
+ * Compile-time parameter contravariance / return covariance, staticness,
+ * abstract-from-concrete, and visibility (Zend zend_inheritance.c, issues
+ * #3323, #25634, #25660).
  */
 final class InheritanceVariance
 {
@@ -95,7 +96,7 @@ final class InheritanceVariance
         }
         $this->units[$lc] = $iface;
         $this->interfaceExtends[$lc] = $this->interfaceNamesFromOperands($iface->extends);
-        $this->methods[$lc] = $this->extractMethods($iface, $lc);
+        $this->methods[$lc] = $this->extractMethods($iface, $lc, true);
     }
 
     private function indexTrait(Trait_ $trait): void
@@ -111,7 +112,7 @@ final class InheritanceVariance
     /**
      * @return array<string, MethodSig>
      */
-    private function extractMethods(ClassLike $unit, string $ownerLc): array
+    private function extractMethods(ClassLike $unit, string $ownerLc, bool $forceAbstract = false): array
     {
         $methods = [];
         foreach ($unit->stmts->children as $child) {
@@ -119,7 +120,12 @@ final class InheritanceVariance
                 continue;
             }
             $name = strtolower($child->func->name);
-            $methods[$name] = MethodSig::fromFunc($child->func, $ownerLc);
+            $sig = MethodSig::fromFunc($child->func, $ownerLc);
+            if ($forceAbstract) {
+                // Interface methods are always abstract in zend_inheritance.c; PHPCfg may omit FLAG_ABSTRACT.
+                $sig->isAbstract = true;
+            }
+            $methods[$name] = $sig;
         }
 
         return $methods;
@@ -165,7 +171,7 @@ final class InheritanceVariance
                     $parentMethods[$methodLc]
                 );
                 if (null !== $msg) {
-                    $report($msg);
+                    $this->reportWithLocation($iface, $methodLc, $msg, $report);
                 }
             }
         }
@@ -195,10 +201,34 @@ final class InheritanceVariance
                     $parentSig
                 );
                 if (null !== $msg) {
-                    $report($msg);
+                    $this->reportWithLocation($class, $methodLc, $msg, $report);
                 }
             }
         }
+    }
+
+    /**
+     * Prefer CompileFatal (Zend-shaped "Fatal error: … in file on line N") when the method Op
+     * has source location; otherwise fall back to the caller callback.
+     *
+     * @param callable(string): void $report
+     */
+    private function reportWithLocation(ClassLike $unit, string $methodLc, string $msg, callable $report): void
+    {
+        foreach ($unit->stmts->children as $child) {
+            if (!$child instanceof ClassMethod) {
+                continue;
+            }
+            if (strtolower($child->func->name) !== $methodLc) {
+                continue;
+            }
+            $file = $child->getFile();
+            if ('' === $file) {
+                $file = 'unknown';
+            }
+            throw new CompileFatal($file, max(1, $child->getLine()), $msg);
+        }
+        $report($msg);
     }
 
     /**
@@ -233,12 +263,24 @@ final class InheritanceVariance
         callable $isClassSubtypeOf,
         callable $classImplementsInterface
     ): ?string {
-        if ('__construct' === $methodLc && !$parent->isAbstract) {
+        // Private parent methods are not overridden (zend_inheritance.c).
+        if (0 !== ($parent->visibilityFlags & Func::FLAG_PRIVATE)) {
             return null;
         }
 
-        // Private parent methods are not overridden (zend_inheritance.c).
-        if (0 !== ($parent->visibilityFlags & Func::FLAG_PRIVATE)) {
+        // Cannot redeclare a concrete parent method as abstract (zend_inheritance.c, #25660).
+        // Before the __construct signature skip so abstractizing a concrete ctor still fatals.
+        if ($child->isAbstract && !$parent->isAbstract) {
+            return sprintf(
+                'Cannot make non abstract method %s::%s() abstract in class %s',
+                $parentClass,
+                $methodLc,
+                $childClass
+            );
+        }
+
+        // Concrete parent __construct signatures are not enforced on children.
+        if ('__construct' === $methodLc && !$parent->isAbstract) {
             return null;
         }
 
