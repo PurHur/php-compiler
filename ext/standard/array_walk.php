@@ -119,6 +119,9 @@ final class array_walk extends Internal
                 $userdata
             );
         }
+        if (VmArrayWalk::isGeneralVmCallable($callback)) {
+            return VmArrayWalk::walkArrayFlatVmCallable($frame, $src, $callback, $userdata, 'array_walk');
+        }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
@@ -186,6 +189,51 @@ final class array_walk extends Internal
                 VmClosureCall::resolve($callback),
                 $userdata
             );
+        }
+        if (VmArrayWalk::isGeneralVmCallable($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_walk() requires VM context in this compiler build');
+            }
+            VmArrayWalk::requireVmCallable($frame, $callback, 'array_walk');
+            $vm = $frame->vmContext->runtime->vm();
+            $iterator = new \PHPCompiler\VM\ObjectPropertyIterator(
+                $object,
+                $vm,
+                $frame,
+                \PHPCompiler\VM\ObjectPropertyIterator::PURPOSE_ARRAY_WALK
+            );
+            $iterator->reset();
+            while ($iterator->valid()) {
+                $value = $iterator->currentValue(true);
+                $keyCopy = $iterator->currentKey();
+                if (null !== $userdata) {
+                    $userdataCopy = new Variable();
+                    $userdataCopy->copyFrom($userdata);
+                    $result = VmCallable::invokeAsWithScope(
+                        'array_walk',
+                        $frame->vmContext,
+                        $frame,
+                        $callback,
+                        $value,
+                        $keyCopy,
+                        $userdataCopy
+                    );
+                } else {
+                    $result = VmCallable::invokeAsWithScope(
+                        'array_walk',
+                        $frame->vmContext,
+                        $frame,
+                        $callback,
+                        $value,
+                        $keyCopy
+                    );
+                }
+                if (VmArrayWalkCallback::callbackFailed($result)) {
+                    return false;
+                }
+            }
+
+            return true;
         }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
