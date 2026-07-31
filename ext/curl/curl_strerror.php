@@ -8,7 +8,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmMath;
 
 /**
- * curl_strerror() — libcurl easy error string (php-src ext/curl/interface.c; #16659).
+ * curl_strerror() — libcurl easy error string (php-src ext/curl/interface.c; #16659, #25813).
+ *
+ * Delegates to {@see VmCurlNative::easyStrerror()} → curl_easy_strerror(), matching Zend.
  */
 final class curl_strerror extends CurlFunction
 {
@@ -29,11 +31,7 @@ final class curl_strerror extends CurlFunction
             return;
         }
         $code = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'curl_strerror', 0, 'error_code');
-        $message = VmCurlCore::easyStrerror($code);
-        if (null === $message) {
-            $frame->returnVar->null();
-        } else {
-            $frame->returnVar->string($message);
-        }
+        // php-src PHP_FUNCTION(curl_strerror) → curl_easy_strerror; never NULL (#25813).
+        $frame->returnVar->string(VmCurlNative::easyStrerror($code));
     }
 }

@@ -142,11 +142,6 @@ final class VmCurlCore
         return $ht;
     }
 
-    public static function easyStrerror(int $code): ?string
-    {
-        return self::EASY_ERRORS[$code] ?? null;
-    }
-
     public static function multiStrerror(int $code): ?string
     {
         return self::MULTI_ERRORS[$code] ?? null;
@@ -161,24 +156,6 @@ final class VmCurlCore
     {
         return self::SHARE_ERRORS[$code] ?? 'CURLSHcode unknown';
     }
-
-    /** @var array<int, string> php-src curl_easy_strerror / libcurl CURLE_* */
-    private const EASY_ERRORS = [
-        0 => 'No error',
-        1 => 'Unsupported protocol',
-        2 => 'Failed initialization',
-        3 => 'URL malformat',
-        5 => 'Could not resolve proxy',
-        6 => 'Could not resolve host',
-        7 => 'Could not connect',
-        22 => 'HTTP returned error',
-        23 => 'Failed writing received data to disk/application',
-        27 => 'Out of memory',
-        28 => 'Timeout was reached',
-        35 => 'SSL connect error',
-        47 => 'Too many redirects',
-        56 => 'Recv error',
-    ];
 
     /** @var array<int, string> php-src curl_multi_strerror / CURLM_* */
     private const MULTI_ERRORS = [
