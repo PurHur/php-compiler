@@ -1,6 +1,7 @@
 --TEST--
 ext ldap ldap_dn2ufn / ldap_explode_dn DN helpers (issue #22212, php-src ext/ldap/ldap.c)
 --ENV--
+PHP_COMPILER_ENABLE_LDAP=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

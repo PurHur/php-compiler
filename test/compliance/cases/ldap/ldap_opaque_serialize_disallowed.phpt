@@ -1,6 +1,7 @@
 --TEST--
 LDAP Connection/Result/ResultEntry serialize()/unserialize() reject (issue #23169, ext/ldap/ldap.stub.php)
 --ENV--
+PHP_COMPILER_ENABLE_LDAP=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

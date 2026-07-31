@@ -1,6 +1,7 @@
 --TEST--
 stdlib ldap_start_tls registration (#21852, ext/ldap/ldap.c)
 --ENV--
+PHP_COMPILER_ENABLE_LDAP=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

@@ -1,6 +1,7 @@
 --TEST--
 ext/ldap ldap_exop_sync/passwd withheld on PROFILE=8.2 (#22731)
 --ENV--
+PHP_COMPILER_ENABLE_LDAP=1
 PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
