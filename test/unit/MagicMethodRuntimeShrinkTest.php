@@ -31,5 +31,7 @@ final class MagicMethodRuntimeShrinkTest extends TestCase
         $this->assertFalse(MagicMethodJitHelper::propertyReadUsesMagicGet(true, true, true, false));
         $this->assertTrue(MagicMethodJitHelper::propertyReadUsesMagicGet(true, true, false, true));
         $this->assertFalse(MagicMethodJitHelper::propertyReadUsesMagicGet(true, true, false, false));
+        // Post-unset declared public → __get (#25810).
+        $this->assertTrue(MagicMethodJitHelper::propertyReadUsesMagicGet(true, true, true, false, true));
     }
 }

@@ -1035,11 +1035,14 @@ class VM {
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             // Declared but not visible from caller scope — do not leak the private/protected slot (#25668).
-            if (
-                null !== $frame
-                && null !== $meta
-                && $this->declaredPropertyIssetUsesOverload($object, $meta, $propName, $frame)
-            ) {
+            // Post-unset declared slots also route through __isset (zend_std_has_property; #25810).
+            $useOverload = $object->isPropertyExplicitlyUnset($propName)
+                || (
+                    null !== $frame
+                    && null !== $meta
+                    && $this->declaredPropertyIssetUsesOverload($object, $meta, $propName, $frame)
+                );
+            if ($useOverload) {
                 // Fall through to __isset / false (zend_std_has_property).
             } else {
                 return VmIsset::storedPropertyIsSet($props[$propName]);
@@ -1058,11 +1061,21 @@ class VM {
             return SplArrayStorage::offsetExists($object, $key);
         }
         if ($this->hasInstanceMethod($object->class, '__isset')) {
-            $key = new Variable();
-            $key->string($propName);
-            $result = $this->invokeInstanceMethod($object, '__isset', $key)->resolveIndirect();
+            if ($object->isPropertyGuardActive($propName, ObjectEntry::GUARD_IN_ISSET)) {
+                return false;
+            }
+            if (!$object->beginPropertyGuard($propName, ObjectEntry::GUARD_IN_ISSET)) {
+                return false;
+            }
+            try {
+                $key = new Variable();
+                $key->string($propName);
+                $result = $this->invokeInstanceMethod($object, '__isset', $key)->resolveIndirect();
 
-            return $result->toBool();
+                return $result->toBool();
+            } finally {
+                $object->endPropertyGuard($propName, ObjectEntry::GUARD_IN_ISSET);
+            }
         }
 
         return false;
@@ -3208,10 +3221,24 @@ class VM {
         if (!$this->hasInstanceMethod($object->class, '__get')) {
             throw new \LogicException('Undefined property access');
         }
-        $nameVar = new Variable(Variable::TYPE_STRING);
-        $nameVar->string($name);
+        if (!$object->beginPropertyGuard($name, ObjectEntry::GUARD_IN_GET)) {
+            // Already in __get for this prop — fall through to slot / undef path (zend guard).
+            if ($object->hasProperty($name)) {
+                return $object->getProperty($name);
+            }
+            $null = new Variable();
+            $null->null();
 
-        return $this->invokeInstanceMethod($object, '__get', $nameVar);
+            return $null;
+        }
+        try {
+            $nameVar = new Variable(Variable::TYPE_STRING);
+            $nameVar->string($name);
+
+            return $this->invokeInstanceMethod($object, '__get', $nameVar);
+        } finally {
+            $object->endPropertyGuard($name, ObjectEntry::GUARD_IN_GET);
+        }
     }
 
     /**
@@ -3222,37 +3249,63 @@ class VM {
         if (!$this->hasInstanceMethod($object->class, '__set')) {
             throw new \LogicException('Undefined property access');
         }
-        $nameVar = new Variable(Variable::TYPE_STRING);
-        $nameVar->string($name);
-        $valueCopy = new Variable();
-        $valueCopy->copyFrom($value);
-        $this->invokeInstanceMethod($object, '__set', $nameVar, $valueCopy);
+        if (!$object->beginPropertyGuard($name, ObjectEntry::GUARD_IN_SET)) {
+            // Already in __set — assign directly to slot / allocate (zend IN_SET guard; #25810).
+            $slot = $object->hasProperty($name)
+                ? $object->getProperty($name)
+                : $object->allocateProperty($name);
+            $object->clearPropertyExplicitlyUnset($name);
+            $slot->copyFrom($value);
+
+            return;
+        }
+        try {
+            $nameVar = new Variable(Variable::TYPE_STRING);
+            $nameVar->string($name);
+            $valueCopy = new Variable();
+            $valueCopy->copyFrom($value);
+            $this->invokeInstanceMethod($object, '__set', $nameVar, $valueCopy);
+        } finally {
+            $object->endPropertyGuard($name, ObjectEntry::GUARD_IN_SET);
+        }
     }
 
     /**
-     * True when zend_std_read_property must invoke __get (undeclared slot or inaccessible declared prop).
+     * True when zend_std_read_property must invoke __get (undeclared, inaccessible, or post-unset).
      * Scope-aware meta: in-frame private beats child shadow so __get does not recurse (#25795).
+     * Post-unset declared slots use __get like Zend (#25810, zend_object_handlers.c).
      */
     protected function propertyReadUsesMagicGet(ObjectEntry $object, string $name, Frame $frame): bool
     {
         if (!$this->hasInstanceMethod($object->class, '__get')) {
             return false;
         }
+        if ($object->isPropertyGuardActive($name, ObjectEntry::GUARD_IN_GET)) {
+            return false;
+        }
         $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null === $meta) {
             return true;
         }
+        if ($this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, $meta->getVisibility)) {
+            return true;
+        }
 
-        return $this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, $meta->getVisibility);
+        // unset($obj->prop) on a declared property → UNDEF; subsequent reads use __get (#25810).
+        return $object->isPropertyExplicitlyUnset($name);
     }
 
     /**
-     * True when zend_std_write_property must invoke __set (undeclared slot or inaccessible declared prop).
+     * True when zend_std_write_property must invoke __set (undeclared, inaccessible, or post-unset).
      * Shared by direct assign (#25686) and RMW ++/-- / assign-op (#25687).
+     * Post-unset declared slots use __set like Zend (#25810); IN_SET guard prevents re-entry.
      */
     protected function propertyWriteUsesMagicSet(ObjectEntry $object, string $name, Frame $frame): bool
     {
         if (!$this->hasInstanceMethod($object->class, '__set')) {
+            return false;
+        }
+        if ($object->isPropertyGuardActive($name, ObjectEntry::GUARD_IN_SET)) {
             return false;
         }
         $meta = $this->classPropertyMeta($object, $name, $frame);
@@ -3262,7 +3315,12 @@ class VM {
 
         // Symmetric visibility: inaccessible declared props route through __set (zend_object_handlers.c).
         // Asymmetric set visibility is handled separately via enforceAsymmetricPropertyWrite.
-        return $this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, 0);
+        if ($this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, 0)) {
+            return true;
+        }
+
+        // unset($obj->prop) → subsequent assigns use __set (#25810).
+        return $object->isPropertyExplicitlyUnset($name);
     }
 
     /**
@@ -3451,9 +3509,13 @@ class VM {
         }
         $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null !== $meta && $object->hasPropertyForMeta($meta)) {
+            $object->clearPropertyExplicitlyUnset($name);
+
             return $object->getPropertyForMeta($meta);
         }
         if ($object->hasProperty($name)) {
+            $object->clearPropertyExplicitlyUnset($name);
+
             return $object->getProperty($name);
         }
         if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
@@ -3471,6 +3533,10 @@ class VM {
             $this->raiseUncaughtException($thrown);
         }
         if ($this->hasInstanceMethod($object->class, '__set')) {
+            // IN_SET re-entry: allocate/assign directly (zend_get_property_guard; #25810).
+            if ($object->isPropertyGuardActive($name, ObjectEntry::GUARD_IN_SET)) {
+                return $object->allocateProperty($name);
+            }
             $proxy = new Variable();
             $proxy->magicSetTarget = $object;
             $proxy->magicSetName = $name;

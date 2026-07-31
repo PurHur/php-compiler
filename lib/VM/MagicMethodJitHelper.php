@@ -12,18 +12,24 @@ namespace PHPCompiler\VM;
 final class MagicMethodJitHelper
 {
     /**
-     * Whether a property read on $classId::$propertyName must route through __get (#4673).
+     * Whether a property read on $classId::$propertyName must route through __get (#4673, #25810).
+     *
+     * @param bool $explicitlyUnset declared slot after unset() — Zend routes through __get (#25810)
      */
     public static function propertyReadUsesMagicGet(
         bool $hasGetMethod,
         bool $hasDeclaredProperty,
         bool $isPublicProperty,
-        bool $visibilityDenied
+        bool $visibilityDenied,
+        bool $explicitlyUnset = false
     ): bool {
         if (!$hasGetMethod) {
             return false;
         }
         if (!$hasDeclaredProperty) {
+            return true;
+        }
+        if ($explicitlyUnset) {
             return true;
         }
         if ($isPublicProperty) {
