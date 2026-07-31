@@ -2306,6 +2306,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23262 */
+    public function testArrayIsListKeyFirstLastZendStubNamedParams(): void
+    {
+        foreach (['array_is_list', 'array_key_first', 'array_key_last'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array'], $names);
+            self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'arr', $fn));
+        }
+    }
+
     /** @covers issue #23460 */
     public function testEscapeshellZendStubNamedParams(): void
     {
