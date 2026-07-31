@@ -19,7 +19,6 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -45,8 +44,10 @@ final class explode extends Internal
                 $argc
             ));
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'explode', 'separator', 0, $frame);
-        $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
+        // Z_PARAM_STR: non-strict null → deprecate+coerce "" then ValueError empty separator
+        // (php-src 8.1–8.x; #25942 reverts incorrect always-TypeError from #24695/#24717).
+        // Caller strict_types still TypeError via stringBuiltinArgForFrame.
+        $delimiter = VmString::stringBuiltinArgForFrame($frame, 0, 'explode', 0, 'separator');
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189).
         $string = VmString::trimFamilyStringArgForFrame($frame, 1, 'explode', 1, 'string');
         $limit = \PHP_INT_MAX;
@@ -83,25 +84,34 @@ final class explode extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR: null separator is always TypeError (php-src string.c, #24695).
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            TypeErrorRaise::registerDeclarations($context);
-            TypeErrorRaise::ensureLinked($context);
-            $err = BasicBlockHelper::append($context, 'explode_null_sep_err');
-            $after = BasicBlockHelper::append($context, 'explode_null_sep_after');
-            $context->builder->branch($err);
-            $context->builder->positionAtEnd($err);
-            TypeErrorRaise::emitRaise(
-                $context,
-                'explode(): Argument #1 ($separator) must be of type string, null given'
-            );
-            $context->builder->call($context->lookupFunction('abort'));
-            $context->builder->positionAtEnd($after);
+        // Null separator: JitStringBuiltinArg::lower emits DEP+coerce (or TypeError under
+        // caller strict_types). Compile-time null/"" both hit empty-separator ValueError.
+        $sepIsNull = JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant;
+        if ($sepIsNull || '' === ($args[0]->compileTimeString ?? null)) {
+            if ($sepIsNull && $context->callerStrictTypes) {
+                TypeErrorRaise::registerDeclarations($context);
+                TypeErrorRaise::ensureLinked($context);
+                $err = BasicBlockHelper::append($context, 'explode_null_sep_strict_err');
+                $after = BasicBlockHelper::append($context, 'explode_null_sep_strict_after');
+                $context->builder->branch($err);
+                $context->builder->positionAtEnd($err);
+                TypeErrorRaise::emitRaise(
+                    $context,
+                    'explode(): Argument #1 ($separator) must be of type string, null given'
+                );
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->builder->positionAtEnd($after);
 
-            return HashTableHelper::alloc($context);
-        }
-
-        if ('' === ($args[0]->compileTimeString ?? null)) {
+                return HashTableHelper::alloc($context);
+            }
+            if ($sepIsNull && !$context->callerStrictTypes) {
+                JitStringBuiltinArg::emitNullStringParamDeprecation(
+                    $context,
+                    'explode',
+                    0,
+                    'separator'
+                );
+            }
             TypeErrorRaise::registerDeclarations($context);
             TypeErrorRaise::ensureLinked($context);
             $err = BasicBlockHelper::append($context, 'explode_empty_sep_err');
