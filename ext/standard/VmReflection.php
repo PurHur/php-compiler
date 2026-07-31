@@ -3424,6 +3424,10 @@ final class VmReflection
         $seenLc = [];
         foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             foreach ($class->properties as $prop) {
+                if ($prop->phpInvisible) {
+                    // C-level / engine storage — not in Zend's PHP property table (#22513, #26155).
+                    continue;
+                }
                 $declLc = '' !== $prop->declaringClassLc
                     ? $prop->declaringClassLc
                     : strtolower(ltrim($class->name, '\\'));
