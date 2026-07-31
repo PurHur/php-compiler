@@ -8,11 +8,15 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\AttributeSupport;
 
 /**
- * User attribute compile-time target validation (Zend zend_attributes.c, issue #5124).
+ * Attribute declaration-site guards (Zend zend_attributes.c).
  *
- * Promoted constructor parameters validate against TARGET_PROPERTY after the class body
- * is parsed (delayed remap). Builtin internal attributes keep dedicated guards in
- * {@see AttributeNames}.
+ * Builtin meta-attributes ({@see AttributeNames}, #[Attribute] TARGET_CLASS) still
+ * compile-fatal on wrong sites. User {@see Attribute::TARGET_*} mismatches are
+ * stored for Reflection and enforced only in {@see ReflectionAttribute::newInstance}
+ * (#25729, #23528) — matching php-src, not a compile-time fatal.
+ *
+ * Promoted constructor parameters still run this pass after the class body is parsed
+ * (remap to TARGET_PROPERTY) so #[Attribute] meta stays consistent (#5124 timing).
  */
 final class AttributeTargetValidator
 {
@@ -95,17 +99,9 @@ final class AttributeTargetValidator
                 continue;
             }
 
-            $allowed = $registry->getFlags($entry->name);
-            if (null === $allowed) {
-                continue;
-            }
-
-            if (!$registry->allowsTarget($entry->name, $targetFlag)) {
-                throw new \CompileError(
-                    'Attribute "'.self::messageName($entry->name).'" cannot target '.$targetLabel
-                    .' (allowed targets: '.self::formatAllowedTargets($allowed).')'
-                );
-            }
+            // User Attribute::TARGET_* mismatches are not compile-fatal (zend_attributes.c).
+            // Keep storing attributes for Reflection; newInstance() throws Error (#25729 / #23528).
+            // $registry remains available to callers for flags/repeatable checks elsewhere.
         }
     }
 
