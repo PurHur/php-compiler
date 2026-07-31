@@ -7,10 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #5124 */
+/** @covers issue #5124 / #25729 — user TARGET_* deferred to ReflectionAttribute::newInstance */
 final class DelayedAttributeTargetTest extends TestCase
 {
-    public function testRejectsMethodOnlyOnPromotedParameter(): void
+    public function testMethodOnlyOnPromotedParameterDefersToNewInstance(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -24,12 +24,20 @@ class C {
         public readonly string $x,
     ) {}
 }
+$attrs = (new ReflectionProperty(C::class, 'x'))->getAttributes();
+echo count($attrs), "\n";
+try {
+    $attrs[0]->newInstance();
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(
-            'Attribute "MethodOnly" cannot target property (allowed targets: method)'
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'delayed_attr_promoted_deferred.php'));
+        $this->assertSame(
+            "1\nError: Attribute \"MethodOnly\" cannot target property (allowed targets: method)\n",
+            ob_get_clean()
         );
-        $runtime->parseAndCompile($code, 'delayed_attr_promoted_invalid.php');
     }
 
     public function testAllowsPropertyOnlyOnPromotedParameter(): void

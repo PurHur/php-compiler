@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\AttributeSupport;
 
 /**
- * User attribute compile-time target validation (Zend zend_attributes.c, issue #5124).
+ * Attribute declaration-site helpers (Zend zend_attributes.c).
  *
- * Promoted constructor parameters validate against TARGET_PROPERTY after the class body
- * is parsed (delayed remap). Builtin internal attributes keep dedicated guards in
- * {@see AttributeNames}.
+ * User {@see Attribute::TARGET_*} mismatches are **not** compile-fatal: php-src stores the
+ * attribute and {@see \ReflectionAttribute::newInstance()} throws Error (#25729 / #23528).
+ * Builtin internal attributes keep dedicated compile-time guards in {@see AttributeNames}.
+ *
+ * Builtin {@see \Attribute} itself is TARGET_CLASS only — wrong sites still compile-fatal (#25723).
  */
 final class AttributeTargetValidator
 {
@@ -35,16 +36,14 @@ final class AttributeTargetValidator
     }
 
     /**
+     * Promoted constructor parameters: user TARGET_* mismatches deferred to newInstance (#25729).
+     *
      * @param list<AttributeEntry> $entries
      */
     public static function assertPromotedParameterTargets(
         array $entries,
         AttributeClassRegistry $registry
     ): void {
-        if (!CompilerVersion::supportsDelayedTargetValidationAttribute()) {
-            return;
-        }
-
         self::assertEntriesForTarget(
             $entries,
             AttributeSupport::TARGET_PROPERTY,
@@ -55,6 +54,12 @@ final class AttributeTargetValidator
     }
 
     /**
+     * Declaration-site hook for attribute lists on a given TARGET_* site.
+     *
+     * User attributes: no CompileError — Zend validates at ReflectionAttribute::newInstance (#25729).
+     * Builtin {@see \Attribute}: TARGET_CLASS only — wrong sites CompileError (#25723).
+     * Other builtin / meta attributes: {@see AttributeNames} enforces wrong-site fatals.
+     *
      * @param list<AttributeEntry> $entries
      */
     public static function assertEntriesForTarget(
@@ -68,23 +73,14 @@ final class AttributeTargetValidator
             return;
         }
 
-        $delayInternal = $delayInternalValidation
-            && CompilerVersion::supportsDelayedTargetValidationAttribute()
-            && self::hasDelayedTargetValidation($entries);
-
         foreach ($entries as $entry) {
             if (!$entry instanceof AttributeEntry) {
                 continue;
             }
             if (self::isBuiltinInternalAttribute($entry->name)) {
-                if ($delayInternal) {
-                    continue;
-                }
-
                 continue;
             }
             // Builtin #[Attribute] is TARGET_CLASS only (zend_attributes.c / #25723).
-            // Do not skip — wrong sites must compile-fatal like Zend.
             if (self::isAttributeMetaClass($entry->name)) {
                 if (AttributeSupport::TARGET_CLASS !== $targetFlag) {
                     throw new \CompileError(
@@ -95,36 +91,9 @@ final class AttributeTargetValidator
                 continue;
             }
 
-            $allowed = $registry->getFlags($entry->name);
-            if (null === $allowed) {
-                continue;
-            }
-
-            if (!$registry->allowsTarget($entry->name, $targetFlag)) {
-                throw new \CompileError(
-                    'Attribute "'.self::messageName($entry->name).'" cannot target '.$targetLabel
-                    .' (allowed targets: '.self::formatAllowedTargets($allowed).')'
-                );
-            }
+            // User Attribute::TARGET_* mismatches: defer to ReflectionAttribute::newInstance (#25729).
+            // Do not compile-fatal here under php-src-strict.
         }
-    }
-
-    /**
-     * @param list<AttributeEntry> $entries
-     */
-    private static function hasDelayedTargetValidation(array $entries): bool
-    {
-        foreach ($entries as $entry) {
-            if (!$entry instanceof AttributeEntry) {
-                continue;
-            }
-            $base = strtolower(ltrim($entry->name, '\\'));
-            if ('delayedtargetvalidation' === $base || str_ends_with($base, '\\delayedtargetvalidation')) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function isBuiltinInternalAttribute(string $name): bool

@@ -1,5 +1,5 @@
 --TEST--
-Language: delayed attribute target — promoted parameter invalid property target (#5124)
+Language: delayed attribute target — promoted parameter wrong TARGET_* deferred to newInstance (#5124, #25729)
 --FILE--
 <?php
 #[Attribute(Attribute::TARGET_METHOD)]
@@ -11,6 +11,13 @@ class C {
         public readonly string $x,
     ) {}
 }
-echo "ok\n";
---EXPECT_EXIT--
-255
+$attrs = (new ReflectionProperty(C::class, 'x'))->getAttributes();
+echo count($attrs), "\n";
+try {
+    $attrs[0]->newInstance();
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+1
+Error: Attribute "MethodOnly" cannot target property (allowed targets: method)
