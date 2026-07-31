@@ -4514,6 +4514,7 @@ require_once __DIR__.'/../../../lib/BuiltinTypeClassConstant.php';
 require_once __DIR__.'/../../../lib/Cfg/OpSubBlockAccess.php';
 require_once __DIR__.'/../../../lib/ClassConstBraceDerefRejector.php';
 require_once __DIR__.'/../../../lib/ClassConstDynamicFetchRejector.php';
+require_once __DIR__.'/../../../lib/ClassConstName.php';
 require_once __DIR__.'/../../../lib/ClassConstVisibility.php';
 require_once __DIR__.'/../../../lib/Cli/InvokeCwd.php';
 require_once __DIR__.'/../../../lib/Cli/PhpcBuild.php';

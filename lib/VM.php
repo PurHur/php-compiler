@@ -6058,7 +6058,12 @@ restart:
                             goto restart;
                         }
                         $constLc = strtolower($memberNameRaw);
-                        if (isset($classEntry->constants[$constLc])) {
+                        if (isset($classEntry->constants[$constLc])
+                            && ClassConstName::matchesDeclared(
+                                $memberNameRaw,
+                                $this->declaredClassConstName($classEntry, $constLc)
+                            )
+                        ) {
                             $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
                             if (null !== $visFrame) {
                                 $frame = $visFrame;
@@ -6162,7 +6167,12 @@ restart:
                         goto restart;
                     }
                     $constLc = strtolower($memberNameRaw);
-                    if (isset($classEntry->constants[$constLc])) {
+                    if (isset($classEntry->constants[$constLc])
+                        && ClassConstName::matchesDeclared(
+                            $memberNameRaw,
+                            $this->declaredClassConstName($classEntry, $constLc)
+                        )
+                    ) {
                         $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
                         if (null !== $visFrame) {
                             $frame = $visFrame;
@@ -19481,6 +19491,7 @@ restart:
                 $caseBacking
             );
             $entry->enumCaseCanonicalNames[$name] = $canonical;
+            $entry->constNames[$name] = $canonical;
             $entry->enumCases[] = [
                 'name' => $canonical,
                 'value' => $caseBacking,
@@ -21138,6 +21149,12 @@ restart:
             return true;
         }
         if (isset($classEntry->constants[$memberLc])) {
+            if (!ClassConstName::matchesDeclared(
+                $memberNameRaw,
+                $this->declaredClassConstName($classEntry, $memberLc)
+            )) {
+                return false;
+            }
             $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
@@ -21151,8 +21168,15 @@ restart:
 
             return true;
         }
-        $inheritedConst = $this->resolveInheritedClassConstant($classEntry, $memberLc);
-        if (null !== $inheritedConst) {
+        $holding = $this->resolveInheritedClassConstantHolding($classEntry, $memberLc);
+        if (null !== $holding) {
+            if (!ClassConstName::matchesDeclared(
+                $memberNameRaw,
+                $this->declaredClassConstName($holding, $memberLc)
+            )) {
+                return false;
+            }
+            $inheritedConst = $holding->constants[$memberLc];
             $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
@@ -21168,6 +21192,49 @@ restart:
         }
 
         return false;
+    }
+
+    /** Declared casing for a class constant / enum case (#25910, #5385). */
+    private function declaredClassConstName(ClassEntry $entry, string $memberLc): ?string
+    {
+        return $entry->constNames[$memberLc]
+            ?? $entry->enumCaseCanonicalNames[$memberLc]
+            ?? null;
+    }
+
+    /**
+     * Class entry that holds an inherited (parent/interface) constant value (#25910).
+     */
+    private function resolveInheritedClassConstantHolding(ClassEntry $entry, string $memberLc): ?ClassEntry
+    {
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($this->context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->context->classes[$ifaceLc];
+            if (isset($iface->constants[$memberLc])) {
+                return $iface;
+            }
+            $fromParentIface = $this->resolveInheritedClassConstantHolding($iface, $memberLc);
+            if (null !== $fromParentIface) {
+                return $fromParentIface;
+            }
+        }
+        if (null !== $entry->parentLc && isset($this->context->classes[$entry->parentLc])) {
+            $parent = $this->context->classes[$entry->parentLc];
+            if (isset($parent->constants[$memberLc])) {
+                $vis = $parent->constVisibility[$memberLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    return $this->resolveInheritedClassConstantHolding($parent, $memberLc);
+                }
+
+                return $parent;
+            }
+
+            return $this->resolveInheritedClassConstantHolding($parent, $memberLc);
+        }
+
+        return null;
     }
 
     /**
