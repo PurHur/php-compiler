@@ -3344,14 +3344,18 @@ class Object_ extends Type {
                 'exclude_start_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_EXCLUDE_START_DATE,
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
+            // php-src date.stub.php — public readonly; userland Assign rejects (#26146).
             foreach (['start', 'current', 'end', 'interval'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
+                $this->markPropertyReadonly($id, $prop);
             }
             foreach (['recurrences'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
+                $this->markPropertyReadonly($id, $prop);
             }
             foreach (['include_start_date', 'include_end_date'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_BOOL);
+                $this->markPropertyReadonly($id, $prop);
             }
             foreach (['__dp_iter_key'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
