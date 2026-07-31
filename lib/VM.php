@@ -17275,6 +17275,11 @@ restart:
                 $this->assertMethodCallableStatically($class, $methodLc);
             }
         } catch (\LogicException $e) {
+            // Missing __construct on a static/parent call is never __callStatic — Zend
+            // zend_std_get_constructor / INIT_STATIC_METHOD_CALL (#25909).
+            if ('__construct' === $methodLc) {
+                throw new \LogicException('Cannot call constructor');
+            }
             // Missing method → zend_std_get_static_method slow path → __callStatic (#3273).
             if ($this->tryDispatchCallStatic($frame, $lcClass, $methodName)) {
                 return;
