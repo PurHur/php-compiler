@@ -66,6 +66,14 @@ final class JitReferencableCheck
         if (\PHPCompiler\VM\ReferencableCheck::allowsEphemeralArrayLiteralByRef($fn)) {
             return true;
         }
+        // Call/method return temps: adaptByRefCallArgsForInternal already emitted E_NOTICE (#25815).
+        // Inline literals are Error+abort there before this runs — remaining ephemerals may mutate.
+        if (
+            \PHPCompiler\VM\ReferencableCheck::isArrayInternalPointerMutatorBuiltin($fn)
+            && !empty($array->nonVariableByRefTempAllowed)
+        ) {
+            return true;
+        }
         self::emitByRefError($context, $fn, 0);
         $context->builder->call($context->lookupFunction('abort'));
 

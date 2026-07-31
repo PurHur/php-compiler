@@ -19290,7 +19290,22 @@ class JIT {
                     );
                     continue;
                 }
+                // reset/end/next/prev on call/method return temps — E_NOTICE + mutate temp (#25815).
+                if (
+                    0 === $idx
+                    && VM\ReferencableCheck::isArrayInternalPointerMutatorBuiltin($name)
+                    && VM\ReferencableCheck::operandIsFuncCallReturn($operand, $block)
+                    && self::jitArgIsArrayOrObject($args[$idx])
+                ) {
+                    JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                    $args[$idx]->nonVariableByRefTempAllowed = true;
+                    continue;
+                }
                 JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+                // Mutator literals must not reach guardArrayMutatorByRefArg (#10295 / #25815).
+                if (VM\ReferencableCheck::isArrayInternalPointerMutatorBuiltin($name)) {
+                    $this->context->builder->call($this->context->lookupFunction('abort'));
+                }
 
                 continue;
             }
