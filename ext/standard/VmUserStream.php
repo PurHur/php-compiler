@@ -157,6 +157,25 @@ final class VmUserStream
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
     }
 
+    /**
+     * Userspace stream_flush / fflush (php-src userspace.c php_userstreamop_flush; #25986).
+     *
+     * Missing stream_flush → false (zend_call_method_if_exists FAILURE → -1 → fflush false).
+     */
+    public static function flush(int $handle): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_flush')) {
+            return false;
+        }
+        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'stream_flush')->resolveIndirect();
+
+        return boolval::isTruthy($result);
+    }
+
     public static function close(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;

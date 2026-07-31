@@ -1640,6 +1640,9 @@ final class VmFs
 
     public static function fflush(int $handle): bool
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::flush($handle);
+        }
         if (VmPhpFdStream::isValidHandle($handle)) {
             return VmPhpFdStream::fflush($handle);
         }
