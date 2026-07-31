@@ -89,6 +89,8 @@ final class BuiltinInternalArgInfo
             'file_put_contents', 'fwrite' => 'int|false',
             // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511)
             'gzencode', 'gzdecode' => 'string|false',
+            // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
+            'base64_decode', 'hex2bin' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
