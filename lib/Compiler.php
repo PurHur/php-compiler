@@ -22589,8 +22589,13 @@ class Compiler {
 
                     return $arrayChain[\count($arrayChain) - 1];
                 }
-                if ($this->producersAreNestedArrayLiteralChain($producers)) {
-                    // Nested inline array literal is one call arg — outer Array_ is the producer (#9305, #10042).
+                // Truly nested [[...]] is one call arg — outer Array_ is the producer (#9305, #10042).
+                // Sibling Array_ producers (array_reduce([...], [$this,'m'], 0)) must not collapse to
+                // the trailing Array_ (#25766); fall through to positional $paired mapping.
+                if (
+                    $this->producersAreNestedArrayLiteralChain($producers)
+                    && $this->arrayProducersFormNestedChain($producers)
+                ) {
                     return $producers[$producerCount - 1];
                 }
                 $lastArray = null;
@@ -22602,9 +22607,21 @@ class Compiler {
                     }
                 }
                 // array_merge([1], [2]) — one hoisted Array_ per arg; do not wire arg #0 to trailing (#10093, #15552).
+                // Also skip when sibling Array_ count differs from arity (embedded literal initial, #25766).
                 if (
                     null !== $lastArray
-                    && !($arrayProducerCount >= 2 && $argCount === $producerCount)
+                    && !(
+                        $arrayProducerCount >= 2
+                        && (
+                            $argCount === $producerCount
+                            || !$this->arrayProducersFormNestedChain(
+                                array_values(array_filter(
+                                    $producers,
+                                    static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
+                                ))
+                            )
+                        )
+                    )
                 ) {
                     $callArg = $callArgs[$argIndex] ?? null;
                     if (
@@ -23332,6 +23349,34 @@ class Compiler {
                 }
 
                 return null;
+            }
+            // array_reduce([...], [$this,'m'], 0) — input Array_ + object-array callable Array_;
+            // initial is often an embedded Literal (no ConstFetch producer). Without this, both
+            // dead temps bind the stmt-before Array_ and ARG_SEND duplicates the callback (#25766).
+            if (
+                'array_reduce' === $inlineFuncName
+                && null === $closureProducerIndex
+                && \count($callArgs) >= 2
+            ) {
+                $arrayProducerIndices = [];
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\Array_) {
+                        $arrayProducerIndices[] = $pi;
+                    }
+                }
+                if (2 === \count($arrayProducerIndices)) {
+                    if (0 === $argIndex) {
+                        return $producers[$arrayProducerIndices[0]];
+                    }
+                    if (1 === $argIndex) {
+                        return $producers[$arrayProducerIndices[1]];
+                    }
+                    if (2 === $argIndex && 1 === \count($constFetchIndices)) {
+                        return $producers[$constFetchIndices[0]];
+                    }
+
+                    return null;
+                }
             }
             if (null !== $arrayProducerIndex && 1 === \count($constFetchIndices) && \count($nonEmbeddedArgIndices) >= 3) {
                 $arrayArgIndex = $nonEmbeddedArgIndices[1] ?? null;
@@ -25130,6 +25175,7 @@ class Compiler {
         if (
             $argCount > $producerCount
             && $this->producersAreNestedArrayLiteralChain($producers)
+            && $this->arrayProducersFormNestedChain($producers)
         ) {
             $outer = $producers[$producerCount - 1] ?? null;
 
