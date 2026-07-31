@@ -35,6 +35,7 @@ final class VmCurlEasy
      *   headers_on_handle: bool,
      *   errno: int,
      *   error: string,
+     *   error_buf: ?\FFI\CData,
      *   http_code: int,
      *   effective_url: string,
      *   last_body: string,
@@ -66,6 +67,8 @@ final class VmCurlEasy
             throw new \LogicException('curl_init() requires libcurl FFI (issue #3325)');
         }
         $native = VmCurlNative::easyInit();
+        $errorBuf = VmCurlNative::allocErrorBuffer();
+        VmCurlNative::attachErrorBuffer($native, $errorBuf);
         $var = new Variable(Variable::TYPE_OBJECT);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
@@ -80,6 +83,7 @@ final class VmCurlEasy
             'headers_on_handle' => false,
             'errno' => 0,
             'error' => '',
+            'error_buf' => $errorBuf,
             'http_code' => 0,
             'effective_url' => '',
             'last_body' => '',
@@ -151,6 +155,10 @@ final class VmCurlEasy
             // PHP-only historical options — accept and ignore (php-src ext/curl/interface.c).
             return true;
         }
+        if (CurlConstants::CURLOPT_ERRORBUFFER === $option) {
+            // Keep compiler-owned err.str for curl_error() (php-src ch->err.str; #25814).
+            return true;
+        }
 
         // Forward remaining CURLOPT_* to libcurl (#21137).
         $optType = CurlConstants::easyOptionType($option);
@@ -217,8 +225,7 @@ final class VmCurlEasy
             return false;
         }
         if (null === $st['url'] || '' === $st['url']) {
-            $st['errno'] = 3; // CURLE_URL_MALFORMAT
-            $st['error'] = VmCurlNative::easyStrerror(3);
+            self::saveCurlError($st, 3); // CURLE_URL_MALFORMAT
             $st['http_code'] = 0;
             $st['last_body'] = '';
 
@@ -249,9 +256,11 @@ final class VmCurlEasy
                 $st['headers_on_handle'] = false;
             }
 
+            if (null !== $st['error_buf']) {
+                VmCurlNative::clearErrorBuffer($st['error_buf']);
+            }
             $rc = VmCurlNative::easyPerform($native);
-            $st['errno'] = $rc;
-            $st['error'] = 0 === $rc ? '' : VmCurlNative::easyStrerror($rc);
+            self::saveCurlError($st, $rc);
             $st['http_code'] = VmCurlNative::easyGetinfoLong($native, CurlConstants::CURLINFO_HTTP_CODE);
             $st['effective_url'] = VmCurlNative::easyGetinfoString($native, CurlConstants::CURLINFO_EFFECTIVE_URL);
 
@@ -433,6 +442,10 @@ final class VmCurlEasy
         }
         self::cleanupMultiWriteBuffers($easy);
         VmCurlNative::easyReset($native);
+        if (null !== $st['error_buf']) {
+            VmCurlNative::clearErrorBuffer($st['error_buf']);
+            VmCurlNative::attachErrorBuffer($native, $st['error_buf']);
+        }
         $st['url'] = null;
         $st['share_id'] = null;
         $st['return_transfer'] = false;
@@ -506,6 +519,8 @@ final class VmCurlEasy
             return null;
         }
         self::registerClass($ctx);
+        $errorBuf = VmCurlNative::allocErrorBuffer();
+        VmCurlNative::attachErrorBuffer($dup, $errorBuf);
         $var = new Variable(Variable::TYPE_OBJECT);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
@@ -520,6 +535,7 @@ final class VmCurlEasy
             'headers_on_handle' => false,
             'errno' => 0,
             'error' => '',
+            'error_buf' => $errorBuf,
             'http_code' => 0,
             'effective_url' => '',
             'last_body' => '',
@@ -537,6 +553,7 @@ final class VmCurlEasy
 
     /**
      * SAVE_CURL_ERROR after multi info_read (php-src multi.c; #20495).
+     * Prefer CURLOPT_ERRORBUFFER text over curl_easy_strerror (#25814).
      */
     public static function saveTransferResult(ObjectEntry $easy, int $result): void
     {
@@ -544,8 +561,7 @@ final class VmCurlEasy
             return;
         }
         $st = &self::$state[$easy->id];
-        $st['errno'] = $result;
-        $st['error'] = 0 === $result ? '' : VmCurlNative::easyStrerror($result);
+        self::saveCurlError($st, $result);
     }
 
     public static function isEasyObject(?ObjectEntry $object): bool
@@ -618,6 +634,9 @@ final class VmCurlEasy
         $st['last_body'] = '';
         $st['errno'] = 0;
         $st['error'] = '';
+        if (null !== $st['error_buf']) {
+            VmCurlNative::clearErrorBuffer($st['error_buf']);
+        }
         $st['http_code'] = 0;
         $st['effective_url'] = '';
 
@@ -675,8 +694,7 @@ final class VmCurlEasy
             return;
         }
         $st = &self::$state[$easy->id];
-        $st['errno'] = $errno;
-        $st['error'] = 0 === $errno ? '' : VmCurlNative::easyStrerror($errno);
+        self::saveCurlError($st, $errno);
     }
 
     public static function cleanupMultiWriteBuffers(ObjectEntry $easy): void
@@ -697,6 +715,32 @@ final class VmCurlEasy
             @unlink($st['write_tmp']);
             $st['write_tmp'] = null;
         }
+    }
+
+    /**
+     * php-src SAVE_CURL_ERROR + curl_error() buffer preference
+     * (ext/curl/interface.c; CURLOPT_ERRORBUFFER; #25814 / php-src #14984).
+     *
+     * @param array{
+     *   errno: int,
+     *   error: string,
+     *   error_buf: ?\FFI\CData,
+     *   ...
+     * } $st
+     */
+    private static function saveCurlError(array &$st, int $errno): void
+    {
+        $st['errno'] = $errno;
+        if (0 === $errno) {
+            $st['error'] = '';
+
+            return;
+        }
+        $bufMsg = '';
+        if (null !== $st['error_buf']) {
+            $bufMsg = VmCurlNative::errorBufferString($st['error_buf']);
+        }
+        $st['error'] = '' !== $bufMsg ? $bufMsg : VmCurlNative::easyStrerror($errno);
     }
 
     private static function ensureLive(ObjectEntry $easy, string $function): void

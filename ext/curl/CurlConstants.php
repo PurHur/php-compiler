@@ -128,6 +128,11 @@ final class CurlConstants
     public const CURLOPT_HTTPPROXYTUNNEL = 61;
     public const CURLOPT_HTTP_VERSION = 84;
     public const CURLOPT_INFILE = 10009;
+    /**
+     * CURLOPT_ERRORBUFFER — libcurl OBJECTPOINT+10; php-src attaches ch->err.str
+     * (ext/curl/interface.c _php_curl_set_default_options; #25814).
+     */
+    public const CURLOPT_ERRORBUFFER = 10010;
     public const CURLOPT_INFILESIZE = 14;
     public const CURLOPT_INTERFACE = 10062;
     public const CURLOPT_IPRESOLVE = 113;
@@ -331,6 +336,7 @@ final class CurlConstants
         self::CURLOPT_UPLOAD => true,
         self::CURLOPT_FILE => true,
         self::CURLOPT_INFILE => true,
+        self::CURLOPT_ERRORBUFFER => true,
         self::CURLOPT_INFILESIZE => true,
         self::CURLOPT_REFERER => true,
         self::CURLOPT_ENCODING => true,
@@ -546,6 +552,7 @@ final class CurlConstants
             'CURLOPT_UPLOAD' => self::CURLOPT_UPLOAD,
             'CURLOPT_FILE' => self::CURLOPT_FILE,
             'CURLOPT_INFILE' => self::CURLOPT_INFILE,
+            'CURLOPT_ERRORBUFFER' => self::CURLOPT_ERRORBUFFER,
             'CURLOPT_INFILESIZE' => self::CURLOPT_INFILESIZE,
             'CURLOPT_REFERER' => self::CURLOPT_REFERER,
             'CURLOPT_ENCODING' => self::CURLOPT_ENCODING,
