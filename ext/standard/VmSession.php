@@ -662,10 +662,10 @@ final class VmSession
         }
         $sessionVar = $ctx->getSuperglobal('_SESSION');
         if (null === $sessionVar || Variable::TYPE_ARRAY !== $sessionVar->type) {
-            return VmSessionSerializer::encodePhp($ctx, new HashTable());
+            return VmSessionSerializer::encode($ctx, new HashTable());
         }
 
-        return VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
+        return VmSessionSerializer::encode($ctx, $sessionVar->toArray());
     }
 
     /** session_decode() — hydrate $_SESSION from php handler blob (php-src php_session_decode). */
@@ -675,7 +675,7 @@ final class VmSession
             return false;
         }
 
-        return VmSessionSerializer::decodePhp($ctx, $payload);
+        return VmSessionSerializer::decode($ctx, $payload);
     }
 
     /** session_unset() — clear registered session variables (php-src php_session_unset). */
@@ -842,7 +842,7 @@ final class VmSession
         }
         if (SessionUserHandler::isActiveModule()) {
             $raw = SessionUserHandler::read($ctx, self::$id);
-            if ('' === $raw || !VmSessionSerializer::decodePhp($ctx, $raw)) {
+            if ('' === $raw || !VmSessionSerializer::decode($ctx, $raw)) {
                 self::$loadedPayload = '';
 
                 return;
@@ -863,7 +863,7 @@ final class VmSession
 
             return;
         }
-        if (!VmSessionSerializer::decodePhp($ctx, $raw)) {
+        if (!VmSessionSerializer::decode($ctx, $raw)) {
             self::$loadedPayload = '';
 
             return;
@@ -880,7 +880,7 @@ final class VmSession
         if (null === $sessionVar || Variable::TYPE_ARRAY !== $sessionVar->type) {
             return;
         }
-        $payload = VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
+        $payload = VmSessionSerializer::encode($ctx, $sessionVar->toArray());
         if (false === $payload) {
             return;
         }
