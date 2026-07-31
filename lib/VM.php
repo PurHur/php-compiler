@@ -16610,6 +16610,12 @@ restart:
                 $callerDisplay
             );
         } catch (\LogicException $e) {
+            // Inaccessible private/protected instance → __call fallback (zend_std_get_method /
+            // #25669, re-#146) — same shape as static get_static_method_fallback (#25670).
+            if ($this->tryDispatchCall($frame, $receiver, $class, $methodName)) {
+                return null;
+            }
+
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
         $frame->call = $declaringClass->methods[$methodLc];
@@ -16784,6 +16790,41 @@ restart:
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = $class->name.'::'.$declaredName;
+    }
+
+    /**
+     * Bind an instance call to __call when present (Zend zend_std_get_method fallback).
+     *
+     * Used for inaccessible private/protected instance methods (#25669, re-#146). Missing
+     * methods already dispatch __call in initMethodCall before visibility checks.
+     *
+     * @return bool true when the frame was bound to __call
+     */
+    private function tryDispatchCall(
+        Frame $frame,
+        Variable $receiver,
+        ClassEntry $class,
+        string $methodName
+    ): bool {
+        $magicClass = $this->findMagicCallClass(strtolower($class->name));
+        if (null === $magicClass) {
+            return false;
+        }
+        $frame->magicCallMethodName = $methodName;
+        $vis = $magicClass->methodVisibility['__call'] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = $this->callerClassLc($frame);
+        MethodVisibility::assertCallable(
+            $vis,
+            $callerClassLc,
+            strtolower($magicClass->name),
+            $magicClass->name,
+            '__call'
+        );
+        $frame->call = $magicClass->methods['__call'];
+        $frame->callArgs = [$receiver];
+        $frame->callArgEntries = [];
+
+        return true;
     }
 
     /**
