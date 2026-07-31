@@ -8624,6 +8624,65 @@ PHP;
     }
 
     /**
+     * Issue #25876 — parentNode->replaceChild($b->cloneNode(true), $a) must bind ConstFetch true
+     * to cloneNode, not the outer MethodCall's PropertyFetch receiver.
+     */
+    public function testDomNodeNestedCloneNodeBoolLiteralUsesConstFetchNotOuterReceiver(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$d = new DOMDocument();
+$d->loadXML('<r><a>1</a><b>2</b></r>');
+$a = $d->getElementsByTagName('a')->item(0);
+$b = $d->getElementsByTagName('b')->item(0);
+$a->parentNode->replaceChild($b->cloneNode(true), $a);
+echo $d->C14N(), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_nested_clonenode_bool_25876.php');
+
+        $cloneArgSendSlot = null;
+        $seenCloneNode = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'cloneNode' === $block->constants[$op->arg2]->toString()) {
+                $seenCloneNode = true;
+                continue;
+            }
+            if ($seenCloneNode && OpCode::TYPE_ARG_SEND === $op->type) {
+                $cloneArgSendSlot = $op->arg1;
+                break;
+            }
+        }
+        self::assertNotNull($cloneArgSendSlot, 'missing cloneNode ARG_SEND');
+
+        $deepIsConstFetchTrue = false;
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_CONST_FETCH === $op->type
+                && (string) $op->arg1 === (string) $cloneArgSendSlot
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'true' === strtolower($block->constants[$op->arg2]->toString())
+            ) {
+                $deepIsConstFetchTrue = true;
+                break;
+            }
+        }
+        self::assertTrue(
+            $deepIsConstFetchTrue,
+            'cloneNode deep must be ConstFetch true, got slot='.$cloneArgSendSlot
+        );
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("<r><b>2</b><b>2</b></r>\n", ob_get_clean());
+    }
+
+    /**
      * Issue #25841 — var_export($e->getAttributeNode(...)->isId()) must emit getAttributeNode
      * before isId (1-arg FuncCall must not defer the chain receiver as a multi-arg sibling).
      */

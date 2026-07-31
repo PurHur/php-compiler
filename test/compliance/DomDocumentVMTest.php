@@ -367,6 +367,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_import_node_methodcall_chained_deep.phpt',
             'dom_import_node_methodcall_chained_deep.phpt'
         );
+        yield 'dom_node_nested_clonenode_bool_literal.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_node_nested_clonenode_bool_literal.phpt',
+            'dom_node_nested_clonenode_bool_literal.phpt'
+        );
         yield 'dom_node_c14n_unattached_clone.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_node_c14n_unattached_clone.phpt',
             'dom_node_c14n_unattached_clone.phpt'
