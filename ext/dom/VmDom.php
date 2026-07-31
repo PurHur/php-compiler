@@ -8276,11 +8276,35 @@ final class VmDom
         return $entry;
     }
 
+    /**
+     * HTML5 foreign-content namespace for a start tag (php-src html5_parser / lexbor; #26033).
+     *
+     * In SVG or MathML foreign content, descendants stay in that namespace — including a nested
+     * {@code <svg>} under MathML ({@code predefined_namespaces.phpt}).
+     * In the HTML namespace (or no parent context), {@code svg}/{@code math} open those namespaces.
+     */
+    private static function htmlParseNamespaceForTag(string $localName, ?string $parentNamespace): ?string
+    {
+        if (VmDomLiving::SVG_NS === $parentNamespace || VmDomLiving::MATHML_NS === $parentNamespace) {
+            return $parentNamespace;
+        }
+        if ('svg' === $localName) {
+            return VmDomLiving::SVG_NS;
+        }
+        if ('math' === $localName) {
+            return VmDomLiving::MATHML_NS;
+        }
+
+        // null = use createElement (HTML_NS or HTML_NO_DEFAULT_NS null).
+        return null;
+    }
+
     private static function parseHtmlElementTree(
         Context $ctx,
         string $html,
         ObjectEntry $ownerDocument,
-        ?\PHPCompiler\Frame $frame = null
+        ?\PHPCompiler\Frame $frame = null,
+        ?string $parentNamespace = null
     ): ?ObjectEntry {
         $trimmed = trim($html);
         if ('' === $trimmed) {
@@ -8291,7 +8315,15 @@ final class VmDom
             return null;
         }
         if ($open['selfClose']) {
-            return self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], '', $ownerDocument, $frame);
+            return self::createHtmlElementFromTag(
+                $ctx,
+                $open['tag'],
+                $open['attrs'],
+                '',
+                $ownerDocument,
+                $frame,
+                $parentNamespace
+            );
         }
         // Avoid PCRE backreferences and \G — VmPregPure lacks them (#17954, compiled loadHTML/AOT).
         $end = self::findHtmlElementEnd($trimmed, 0);
@@ -8306,7 +8338,8 @@ final class VmDom
                 $open['attrs'],
                 substr($trimmed, $open['end']),
                 $ownerDocument,
-                $frame
+                $frame,
+                $parentNamespace
             );
         }
         $segment = substr($trimmed, 0, $end);
@@ -8321,7 +8354,8 @@ final class VmDom
                 $open['attrs'],
                 $inner,
                 $ownerDocument,
-                $frame
+                $frame,
+                $parentNamespace
             );
             self::syncSubtree($ctx, $entry);
 
@@ -8334,7 +8368,15 @@ final class VmDom
             $inner .= substr($trimmed, $end);
         }
 
-        $entry = self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], $inner, $ownerDocument, $frame);
+        $entry = self::createHtmlElementFromTag(
+            $ctx,
+            $open['tag'],
+            $open['attrs'],
+            $inner,
+            $ownerDocument,
+            $frame,
+            $parentNamespace
+        );
         self::syncSubtree($ctx, $entry);
 
         return $entry;
@@ -8347,10 +8389,17 @@ final class VmDom
         string $inner,
         ObjectEntry $ownerDocument,
         ?\PHPCompiler\Frame $frame = null,
+        ?string $parentNamespace = null,
     ): ObjectEntry {
         $localName = strtolower($tagName);
+        $foreignNs = self::htmlParseNamespaceForTag($localName, $parentNamespace);
         // Pass owner so living Dom\HTMLDocument nodeClassMap → Dom\HTMLElement (#20418).
-        $entry = self::createElement($ctx, $localName, $ownerDocument)->toObject();
+        // Foreign SVG/MathML use createElementNS → Dom\Element (php-src dom_get_element_ce; #26033).
+        if (null !== $foreignNs) {
+            $entry = self::createElementNS($ctx, $foreignNs, $localName, $ownerDocument)->toObject();
+        } else {
+            $entry = self::createElement($ctx, $localName, $ownerDocument)->toObject();
+        }
         $state = DomRegistry::state($entry);
         // createElement installs HTML nsDef (ensure_html_ns); applyParsedAttributes replaces
         // namespaceDeclarations with attribute-sourced xmlns only — keep the element nsDef (#26025).
@@ -8380,6 +8429,7 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null,
     ): void {
         $state = DomRegistry::state($parent);
+        $parentNamespace = self::isElement($parent) ? ($state->namespaceUri ?? null) : null;
         $pos = 0;
         $len = \strlen($inner);
         while ($pos < $len) {
@@ -8442,7 +8492,8 @@ final class VmDom
                         $recovered['attrs'],
                         '',
                         $ownerDocument,
-                        $frame
+                        $frame,
+                        $parentNamespace
                     );
                     $state->childIds[] = $child->id;
                     self::linkChildToParent($child, $parent);
@@ -8455,7 +8506,7 @@ final class VmDom
                 return;
             }
             $childHtml = substr($inner, $pos, $end - $pos);
-            $child = self::parseHtmlElementTree($ctx, $childHtml, $ownerDocument, $frame);
+            $child = self::parseHtmlElementTree($ctx, $childHtml, $ownerDocument, $frame, $parentNamespace);
             if (null === $child) {
                 return;
             }

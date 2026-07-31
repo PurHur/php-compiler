@@ -50,6 +50,12 @@ final class VmDomLiving
     /** HTML namespace URI (https://html.spec.whatwg.org/#html-namespace). */
     public const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
+    /** SVG namespace URI (https://html.spec.whatwg.org/#svg-namespace; #26033). */
+    public const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    /** MathML namespace URI (https://html.spec.whatwg.org/#mathml-namespace; #26033). */
+    public const MATHML_NS = 'http://www.w3.org/1998/Math/MathML';
+
     public const CLASS_DOCUMENT = 'dom\\document';
 
     public const CLASS_HTML_DOCUMENT = 'dom\\htmldocument';
