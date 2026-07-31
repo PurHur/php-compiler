@@ -60,6 +60,48 @@ final class VmUserStream
         return $chunk;
     }
 
+    /**
+     * Userspace stream_write / fwrite (#25972).
+     *
+     * @return int|false bytes written
+     */
+    public static function write(int $handle, string $data, ?int $length = null): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if (null !== $length && $length < 0) {
+            return 0;
+        }
+        if (null !== $length && $length < \strlen($data)) {
+            $data = \substr($data, 0, $length);
+        }
+        if ('' === $data) {
+            return 0;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_write')) {
+            return false;
+        }
+        $dataVar = new Variable();
+        $dataVar->string($data);
+        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'stream_write', $dataVar)->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $result->type) {
+            $written = $result->toInt();
+            if ($written < 0) {
+                return false;
+            }
+            $state->position += $written;
+
+            return $written;
+        }
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return $result->toBool() ? \strlen($data) : false;
+        }
+
+        return false;
+    }
+
     public static function feof(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;
@@ -316,7 +358,8 @@ final class VmUserStream
     }
 
     /**
-     * Userspace stream_tell / ftell (#25971).
+     * Userspace ftell — php-src uses stream->position (updated on read/write/seek), not a
+     * direct stream_tell call (#25971 / #25972).
      *
      * @return int|false
      */
@@ -327,7 +370,7 @@ final class VmUserStream
             return false;
         }
 
-        return self::tellState($state);
+        return $state->position;
     }
 
     public static function isValidHandle(int $handle): bool

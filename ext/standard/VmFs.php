@@ -1425,6 +1425,11 @@ final class VmFs
         if (null !== $length && $length < 0) {
             return 0;
         }
+        if (VmUserStream::isValidHandle($handle)) {
+            $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
+
+            return VmUserStream::write($handle, $data, $length);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
 
