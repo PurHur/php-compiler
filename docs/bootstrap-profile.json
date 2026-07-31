@@ -4738,6 +4738,7 @@
         "ext/zmq/Module.php",
         "ext/zmq/VmZmq.php",
         "ext/zmq/ZmqConstants.php",
+        "ext/zmq/ZmqExtensionPolicy.php",
         "ext/zmq/ZmqFunction.php",
         "ext/zmq/bootstrap_zmqexception.php",
         "ext/zmq/zmq_bind.php",
@@ -4865,6 +4866,7 @@
         "lib/Compiler/NonEnumBuiltinInterfaceCompileCheck.php",
         "lib/Compiler/OverrideValidator.php",
         "lib/Compiler/ParameterMetadata.php",
+        "lib/Compiler/PropertyVisibilityInheritCheck.php",
         "lib/Compiler/PseudoClassTypeHintCompileCheck.php",
         "lib/Compiler/ReadonlyClassCompileCheck.php",
         "lib/Compiler/SourceLocation.php",
@@ -6872,9 +6874,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6638,
+        "inventory_files": 6640,
         "excluded": 0,
-        "eligible": 6638,
+        "eligible": 6640,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
