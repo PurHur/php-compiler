@@ -509,23 +509,15 @@ final class VmIntlTimeZone
     public static function resolveTimezoneId(string $id): string
     {
         $id = trim($id);
-        if ('' === $id) {
-            return VmDate::defaultTimezoneGet();
-        }
-        // ICU sentinel — preserve literal ID (php-src TimeZone::getUnknown(); #20852).
-        if ('Etc/Unknown' === $id || 'unknown' === strtolower($id)) {
+        // ICU TimeZone::createTimeZone — empty / unknown → TimeZone::getUnknown() (#25356).
+        // php-src timezone_methods.cpp intltz_create_time_zone; Zend leaves U_ZERO_ERROR.
+        if ('' === $id || 'Etc/Unknown' === $id || 'unknown' === strtolower($id)) {
             return 'Etc/Unknown';
         }
         try {
             return VmDateTimeNative::validateTimezoneId($id);
         } catch (\Throwable) {
-            // php-src intltz_create_time_zone — unknown IDs become GMT with error set.
-            IntlError::set(
-                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-                "intltz_create_time_zone: No such time zone: '".$id."': U_ILLEGAL_ARGUMENT_ERROR"
-            );
-
-            return 'GMT';
+            return 'Etc/Unknown';
         }
     }
 
