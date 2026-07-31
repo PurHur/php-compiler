@@ -54,6 +54,13 @@ final class VmSplIterators
 
         $entry = new ClassEntry('OuterIterator');
         $entry->isInterface = true;
+        // Zend ce->interfaces is flattened: Iterator then Traversable (spl_iterators.c).
+        // Reverse-parent insert expands OuterIterator to OuterIterator,Traversable,Iterator
+        // (IteratorIterator / parent-walk order). class_implements(OuterIterator) lists
+        // parents in declaration order → Iterator,Traversable (#25798).
+        if (isset($ctx->classes['iterator'])) {
+            $entry->interfaces[] = 'iterator';
+        }
         if (isset($ctx->classes['traversable'])) {
             $entry->interfaces[] = 'traversable';
         }

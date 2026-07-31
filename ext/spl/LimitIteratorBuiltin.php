@@ -32,9 +32,12 @@ final class LimitIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('LimitIterator');
         $entry->parentLc = IteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator', 'SeekableIterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerializes flattened ce->interfaces (not OuterIterator-first parent walk).
+        // LimitIterator::seek exists but the class is not SeekableIterator (#25798).
+        // php-src ext/spl/spl_iterators.stub.php / ce->interfaces.
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }

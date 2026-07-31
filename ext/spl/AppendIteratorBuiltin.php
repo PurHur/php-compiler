@@ -36,9 +36,10 @@ final class AppendIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('AppendIterator');
         $entry->parentLc = IteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerialized flattened ce->interfaces (#25798).
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
