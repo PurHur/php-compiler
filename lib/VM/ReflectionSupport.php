@@ -805,7 +805,7 @@ final class ReflectionSupport
      *
      * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)
      * checks (attr->flags & target) after resolving the attribute class's #[Attribute] mask.
-     * Compile-time AttributeTargetValidator covers some paths; Reflection must still enforce.
+     * User Attribute::TARGET_* mismatches are deferred here (not compile-fatal) — #25729.
      * Caller must run {@see assertAttributeNewInstanceIsAttributeClass} first (#24930).
      */
     public static function assertAttributeNewInstanceTargetAllowed(
