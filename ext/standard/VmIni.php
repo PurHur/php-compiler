@@ -134,6 +134,7 @@ final class VmIni
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'session.save_path',
+        'session.serialize_handler',
         'session.use_strict_mode',
         'include_path',
         'short_open_tag',
@@ -187,6 +188,12 @@ final class VmIni
     /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
     private const CFG_SESSION_SAVE_PATH = '/var/lib/php/sessions';
 
+    /** php-src PS(serializer) default name — session.serialize_handler (#26089). */
+    private const CFG_SESSION_SERIALIZE_HANDLER = 'php';
+
+    /** @var list<string> */
+    private const SESSION_SERIALIZE_HANDLERS = ['php', 'php_serialize', 'php_binary'];
+
     public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
@@ -219,6 +226,8 @@ final class VmIni
                 return self::setSessionGcMaxLifetime($newValue);
             case 'session.save_path':
                 return self::setSessionSavePath($newValue);
+            case 'session.serialize_handler':
+                return self::setSessionSerializeHandler($newValue);
             case 'session.use_strict_mode':
                 return self::setSessionUseStrictMode($newValue);
             case 'include_path':
@@ -312,6 +321,8 @@ final class VmIni
                 return (string) self::$sessionGcMaxLifetime;
             case 'session.save_path':
                 return self::$sessionSavePath;
+            case 'session.serialize_handler':
+                return self::$sessionSerializeHandler;
             case 'session.use_strict_mode':
                 return self::formatBoolIniGet(VmSession::isUseStrictMode());
             case 'include_path':
@@ -380,6 +391,7 @@ final class VmIni
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
             'session.save_path' => self::CFG_SESSION_SAVE_PATH,
+            'session.serialize_handler' => self::CFG_SESSION_SERIALIZE_HANDLER,
             'session.use_strict_mode' => '0',
             'max_execution_time' => self::CFG_MAX_EXECUTION_TIME,
             'default_charset' => self::CFG_DEFAULT_CHARSET,
@@ -461,6 +473,8 @@ final class VmIni
     private static int $sessionGcMaxLifetime = 1440;
 
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+
+    private static string $sessionSerializeHandler = self::CFG_SESSION_SERIALIZE_HANDLER;
 
     private static string $userAgent = '';
 
@@ -619,6 +633,12 @@ final class VmIni
         return self::$sessionSavePath;
     }
 
+    /** php-src session.serialize_handler — PS(serializer)->name (#26089). */
+    public static function getSessionSerializeHandler(): string
+    {
+        return self::$sessionSerializeHandler;
+    }
+
     public static function setSessionSavePathValue(string $newValue): string
     {
         $old = self::$sessionSavePath;
@@ -752,6 +772,23 @@ final class VmIni
     private static function setSessionSavePath(string $newValue) {
         $old = self::$sessionSavePath;
         self::$sessionSavePath = $newValue;
+
+        return $old;
+    }
+
+    /**
+     * php-src OnUpdateSerializer — only registered serializer names (#26089).
+     *
+     * @return string|false
+     */
+    private static function setSessionSerializeHandler(string $newValue): string|false
+    {
+        $name = strtolower(trim($newValue));
+        if (!\in_array($name, self::SESSION_SERIALIZE_HANDLERS, true)) {
+            return false;
+        }
+        $old = self::$sessionSerializeHandler;
+        self::$sessionSerializeHandler = $name;
 
         return $old;
     }
@@ -891,6 +928,9 @@ final class VmIni
                 break;
             case 'session.save_path':
                 self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+                break;
+            case 'session.serialize_handler':
+                self::$sessionSerializeHandler = self::CFG_SESSION_SERIALIZE_HANDLER;
                 break;
             case 'session.use_strict_mode':
                 VmSession::setUseStrictMode(false);

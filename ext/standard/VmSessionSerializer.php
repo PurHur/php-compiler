@@ -9,12 +9,40 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * session_encode() / session_decode() php serialize handler (php-src ext/session/mod_php.c).
+ * session_encode() / session_decode() serializers (php-src ext/session/session.c).
  *
- * Wire format: {@code key|serialized_value} pairs concatenated (default session.serialize_handler).
+ * Handlers: {@code php} (default {@code key|serialized}), {@code php_serialize} (whole-array
+ * serialize), {@code php_binary} (length-prefixed — #26090).
  */
 final class VmSessionSerializer
 {
+    /**
+     * Encode $_SESSION with the active session.serialize_handler (#26089).
+     *
+     * @return string|false
+     */
+    public static function encode(Context $ctx, HashTable $session)
+    {
+        return match (VmIni::getSessionSerializeHandler()) {
+            'php_serialize' => self::encodePhpSerialize($ctx, $session),
+            // php_binary: #26090 — fall through to php until implemented
+            default => self::encodePhp($ctx, $session),
+        };
+    }
+
+    /**
+     * Decode payload with the active session.serialize_handler (#26089).
+     *
+     * {@code php} merges keys; {@code php_serialize} replaces $_SESSION.
+     */
+    public static function decode(Context $ctx, string $payload): bool
+    {
+        return match (VmIni::getSessionSerializeHandler()) {
+            'php_serialize' => self::decodePhpSerialize($ctx, $payload),
+            default => self::decodePhp($ctx, $payload),
+        };
+    }
+
     /**
      * @return string|false
      */
@@ -177,6 +205,65 @@ final class VmSessionSerializer
         $sessionVar->toArray()->mergeStringKeysFrom($incoming, true);
 
         return true;
+    }
+
+    /**
+     * php_serialize handler encode — whole-array serialize() (php-src session.c, #26089).
+     *
+     * @return string|false
+     */
+    public static function encodePhpSerialize(Context $ctx, HashTable $session)
+    {
+        $box = new Variable();
+        $box->array($session);
+
+        return VmSerialize::serializeValue($ctx, $box);
+    }
+
+    /**
+     * php_serialize handler decode — unserialize() replaces $_SESSION (php-src session.c, #26089).
+     */
+    public static function decodePhpSerialize(Context $ctx, string $payload): bool
+    {
+        if ('' === $payload) {
+            $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
+
+            return true;
+        }
+        $decoded = VmSerialize::unserializePayload($ctx, $payload);
+        if (false === $decoded) {
+            $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
+
+            return false;
+        }
+        $sessionVar = $ctx->ensureSuperglobal('_SESSION');
+        if ($decoded instanceof Variable) {
+            $decoded = $decoded->resolveIndirect();
+            if (Variable::TYPE_ARRAY === ($decoded->type & 0x7f)) {
+                $sessionVar->array($decoded->toArray());
+
+                return true;
+            }
+            if (Variable::TYPE_NULL === ($decoded->type & 0x7f)) {
+                $sessionVar->array(new HashTable());
+
+                return true;
+            }
+
+            return false;
+        }
+        if (\is_array($decoded)) {
+            $sessionVar->array(VmJson::import($decoded)->toArray());
+
+            return true;
+        }
+        if (null === $decoded) {
+            $sessionVar->array(new HashTable());
+
+            return true;
+        }
+
+        return false;
     }
 
     public static function decodeWireHashTable(string $payload): ?HashTable
