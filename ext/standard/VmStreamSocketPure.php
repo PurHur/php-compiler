@@ -43,10 +43,6 @@ final class VmStreamSocketPure
             return [false, 0, 'ssl:// transport is not supported in this compiler build', null];
         }
 
-        if ('unix' === $parsed['transport']) {
-            return [false, 0, 'unix:// transport is not supported in this compiler build', null];
-        }
-
         $contextTimeout = self::connectTimeoutFromContext($contextVar);
         if (null !== $contextTimeout) {
             $timeout = $contextTimeout;
@@ -97,10 +93,6 @@ final class VmStreamSocketPure
             return [false, 0, 'ssl:// transport is not supported in this compiler build', null];
         }
 
-        if ('unix' === $parsed['transport']) {
-            return [false, 0, 'unix:// transport is not supported in this compiler build', null];
-        }
-
         if (0 === $flags) {
             $flags = VmStreamSocketNative::STREAM_SERVER_BIND | VmStreamSocketNative::STREAM_SERVER_LISTEN;
         }
@@ -149,6 +141,23 @@ final class VmStreamSocketPure
         if (\preg_match('#^([a-z][a-z0-9+.-]*)://(.+)$#i', $remote, $schemeMatch)) {
             $transport = \strtolower($schemeMatch[1]);
             $rest = $schemeMatch[2];
+        }
+
+        // unix:// and udg:// paths may contain slashes (#25779); optional trailing :port
+        // comes from fsockopen()'s host+port merge (php-src php_fsockopen_format_host_port).
+        if ('unix' === $transport || 'udg' === $transport) {
+            if ('' === $rest) {
+                return null;
+            }
+            if (\preg_match('#^(.*):(\d+)$#', $rest, $unixPortMatch)) {
+                return [
+                    'transport' => $transport,
+                    'host' => $unixPortMatch[1],
+                    'port' => (int) $unixPortMatch[2],
+                ];
+            }
+
+            return ['transport' => $transport, 'host' => $rest, 'port' => 0];
         }
 
         if (\preg_match('#^\[([^\]]+)\](?::(\d+))?$#', $rest, $ipv6Match)) {

@@ -18,10 +18,28 @@ final class VmPersistentSocket
     /** @var array<int, string> fd stream handle => cache key */
     private static array $handleKeys = [];
 
+    /**
+     * Compose the stream xport URI for fsockopen/pfsockopen (#25779).
+     *
+     * php-src fsock.c — php_fsockopen_format_host_port: when port > 0, append ":port"
+     * to $hostname as-is (hostname may already include udp:// / tcp:// / unix://).
+     * Bare hosts without a scheme get an explicit tcp:// prefix for the VM stream layer.
+     */
     public static function remoteUri(string $hostname, int $port): string
     {
-        if ($port >= 0) {
+        $hasScheme = 1 === \preg_match('#^[a-z][a-z0-9+.-]*://#i', $hostname);
+
+        // php-src: if (port > 0) hostname = host ":" port  (empty prefix)
+        if ($port > 0) {
+            if ($hasScheme) {
+                return $hostname.':'.$port;
+            }
+
             return 'tcp://'.$hostname.':'.$port;
+        }
+
+        if ($hasScheme) {
+            return $hostname;
         }
 
         return 'tcp://'.$hostname;
