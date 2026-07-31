@@ -33,9 +33,10 @@ final class MemoryJitHelper
         return MemoryAccounting::markPeakQuery(MemoryAccounting::peakBytes());
     }
 
-    public static function resetPeakUsage(bool $realUsage): void
+    /** php-src zend_memory_reset_peak_usage — zero args (#26104). */
+    public static function resetPeakUsage(): void
     {
-        VmMemory::resetPeakUsage($realUsage);
+        VmMemory::resetPeakUsage();
     }
 
     public static function noteAlloc(int $delta): void

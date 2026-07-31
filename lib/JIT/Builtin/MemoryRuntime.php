@@ -75,13 +75,10 @@ final class MemoryRuntime
         );
     }
 
-    public static function resetPeakUsage(Context $context, Value $realUsage): void
+    public static function resetPeakUsage(Context $context): void
     {
         self::ensureLinked($context);
-        $context->builder->call(
-            $context->lookupFunction(self::RESET_PEAK_USAGE),
-            $realUsage
-        );
+        $context->builder->call($context->lookupFunction(self::RESET_PEAK_USAGE));
     }
 
     public static function noteAlloc(Context $context, Value $delta): void
@@ -116,7 +113,7 @@ final class MemoryRuntime
         self::ensureJitHelperCompiled($context);
         self::implementBoolToI64Bridge($context, self::GET_USAGE, self::GET_USAGE_HELPER);
         self::implementBoolToI64Bridge($context, self::GET_PEAK_USAGE, self::GET_PEAK_USAGE_HELPER);
-        self::implementBoolVoidBridge($context, self::RESET_PEAK_USAGE, self::RESET_PEAK_USAGE_HELPER);
+        self::implementZeroArgVoidBridge($context, self::RESET_PEAK_USAGE, self::RESET_PEAK_USAGE_HELPER);
         self::implementI64VoidBridge($context, self::NOTE_ALLOC, self::NOTE_ALLOC_HELPER);
         self::implementZeroArgI64Bridge($context, self::GC_MEM_CACHES, self::GC_MEM_CACHES_HELPER);
         self::registerLinkedRuntime($context);
@@ -156,7 +153,8 @@ final class MemoryRuntime
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementBoolVoidBridge(
+    /** Zero-arg void bridge for memory_reset_peak_usage (#26104). */
+    private static function implementZeroArgVoidBridge(
         Context $context,
         string $abiName,
         string $helperLogical
@@ -168,16 +166,15 @@ final class MemoryRuntime
             return;
         }
 
-        $i1 = $context->getTypeFromString('int1');
         $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i1);
+        $ft = $context->context->functionType($voidTy, false);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('memory_void_bridge_entry');
+        $entry = $fn->appendBasicBlock('memory_zero_void_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(self::helperFunction($context, $helperLogical), $fn->getParam(0));
+        $context->builder->call(self::helperFunction($context, $helperLogical));
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }

@@ -351,6 +351,9 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('error_clear_last'));
         self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_last_error_msg'));
         self::assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
+        // php-src ext/standard/basic_functions.stub.php (#26104)
+        self::assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('memory_reset_peak_usage'));
+        self::assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('memory_reset_peak_usage'));
         // php-src ext/libxml/libxml.stub.php (#25844)
         self::assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('libxml_get_errors'));
         self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_errors'));
