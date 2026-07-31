@@ -207,12 +207,9 @@ final class CycleCollector
 
         $ctx->visitGcRoots($visitVar);
 
-        foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
-            unset($marked['o'.$targetId]);
-        }
-        foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
-            unset($marked['o'.$targetId]);
-        }
+        // Weak edges are skipped during mark ({@see WeakRefSupport::shouldSkipGcMark}).
+        // Do not unmark WeakReference/WeakMap targets afterward — that erased strong-root
+        // marks and wiped surviving WeakMap sibling keys / live WeakReference targets (#25965).
 
         $collected = 0;
         /** @var array<int, ObjectEntry> $candidates */
@@ -519,12 +516,7 @@ final class CycleCollector
 
         $ctx->visitGcRoots($visitVar);
 
-        foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
-            unset($marked['o'.$targetId]);
-        }
-        foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
-            unset($marked['o'.$targetId]);
-        }
+        // Same as collect(): weak edges are omitted at mark time; do not strip strong marks (#25965).
 
         $roots = 0;
         foreach (ObjectRegistry::snapshot() as $object) {
