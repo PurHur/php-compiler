@@ -373,6 +373,93 @@ final class VmUserStream
         return $state->position;
     }
 
+    /**
+     * url_stat for file_exists()/filesize()/stat() on custom protocols (#25973).
+     *
+     * php-src main/streams/userspace.c — php_userstreamop_stat / url_stat
+     *
+     * @return array<int|string, int>|false
+     */
+    public static function urlStat(string $uri, int $flags = 0): array|false
+    {
+        if (!VmStreamWrapperRegistry::isCustomProtocol($uri)) {
+            return false;
+        }
+        $ctx = \PHPCompiler\Web\Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return false;
+        }
+        $protocol = VmStreamWrapperRegistry::parseProtocol($uri);
+        if (null === $protocol) {
+            return false;
+        }
+        $className = VmStreamWrapperRegistry::lookupClass($protocol);
+        if (null === $className) {
+            return false;
+        }
+        $wrapper = self::instantiateWrapper($ctx->runtime->vm, $ctx, $className);
+        if (null === $wrapper) {
+            return false;
+        }
+        if (!$ctx->runtime->vm->hasInstanceMethod($wrapper->class, 'url_stat')) {
+            return false;
+        }
+        $pathVar = new Variable();
+        $pathVar->string($uri);
+        $flagsVar = new Variable();
+        $flagsVar->int($flags);
+        $result = $ctx->runtime->vm->invokeInstanceMethod(
+            $wrapper,
+            'url_stat',
+            $pathVar,
+            $flagsVar
+        )->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $result->type) {
+            return false;
+        }
+
+        return self::statArrayFromHashTable($result->toArray());
+    }
+
+    /**
+     * @return array<int|string, int>|false
+     */
+    private static function statArrayFromHashTable(\PHPCompiler\VM\HashTable $ht): array|false
+    {
+        $out = [];
+        $keys = [
+            'dev', 'ino', 'mode', 'nlink', 'uid', 'gid', 'rdev', 'size',
+            'atime', 'mtime', 'ctime', 'blksize', 'blocks',
+        ];
+        foreach ($keys as $i => $key) {
+            $var = $ht->find($key) ?? $ht->findIndex($i);
+            if (null === $var) {
+                continue;
+            }
+            $var = $var->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $var->type) {
+                $out[$key] = $var->toInt();
+                $out[$i] = $var->toInt();
+            } elseif (Variable::TYPE_FLOAT === $var->type) {
+                $v = (int) $var->toFloat();
+                $out[$key] = $v;
+                $out[$i] = $v;
+            } elseif (Variable::TYPE_STRING === $var->type && \is_numeric($var->toString())) {
+                $v = (int) $var->toString();
+                $out[$key] = $v;
+                $out[$i] = $v;
+            }
+        }
+        // url_stat returning an array (even partial) means the path exists (php-src).
+        if ([] === $out) {
+            // Preserve existence with a zeroed size so filesize can still fail honestly if missing.
+            $out['size'] = 0;
+            $out[7] = 0;
+        }
+
+        return $out;
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$streams[$handle]);

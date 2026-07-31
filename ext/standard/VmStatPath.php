@@ -61,6 +61,6 @@ final class VmStatPath
             return false;
         }
 
-        return ($stat['mode'] & self::S_IFMT) === $expectedType;
+        return (($stat['mode'] ?? 0) & self::S_IFMT) === $expectedType;
     }
 }
