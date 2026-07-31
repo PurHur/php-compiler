@@ -549,7 +549,16 @@ final class ClosureSupport
         }
         $namedClassLc = $lcClass;
         $namedClass = $ctx->classes[$namedClassLc];
-        [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
+        try {
+            [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
+        } catch (\LogicException $e) {
+            // Missing method + __callStatic → fake Closure (zend_closures.c / #25757).
+            $magicState = self::tryMagicStaticCallable($ctx, $namedClassLc, $namedClass->name, $methodName);
+            if (null !== $magicState) {
+                return $magicState;
+            }
+            throw $e;
+        }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
@@ -713,6 +722,19 @@ final class ClosureSupport
             }
             $boundScopeClass = $ctx->classes[$resolveFromLc]->name;
         }
+        // Missing method + __call → fake Closure that magic-dispatches on invoke (#25757).
+        if (!$ctx->runtime->vm->hasInstanceMethod($ctx->classes[$resolveFromLc] ?? $class, $methodName)) {
+            $magicState = self::tryMagicInstanceCallable(
+                $ctx,
+                $receiver,
+                $methodName,
+                $resolveFromLc,
+                $boundScopeClass
+            );
+            if (null !== $magicState) {
+                return $magicState;
+            }
+        }
         [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc);
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
@@ -750,6 +772,99 @@ final class ClosureSupport
         }
 
         return $state;
+    }
+
+    /**
+     * Bind FCC / fromCallable to __call when the named instance method is missing (#25757).
+     *
+     * php-src: Zend/zend_closures.c + zend_std_get_method fallback.
+     */
+    private static function tryMagicInstanceCallable(
+        Context $ctx,
+        Variable $receiver,
+        string $methodName,
+        string $resolveFromLc,
+        string $boundScopeClass
+    ): ?ClosureState {
+        $magicClass = self::findMagicCallClass($ctx, $resolveFromLc);
+        if (null === $magicClass) {
+            return null;
+        }
+        $boundThis = new Variable();
+        $boundThis->copyFrom($receiver);
+        $state = ClosureState::fromMethodCallable(
+            $magicClass->methods['__call'],
+            $boundThis,
+            $methodName
+        );
+        $state->boundScopeClass = $boundScopeClass;
+
+        return $state;
+    }
+
+    /**
+     * Bind FCC / fromCallable to __callStatic when the named static method is missing (#25757).
+     */
+    private static function tryMagicStaticCallable(
+        Context $ctx,
+        string $lcClass,
+        string $scopeClassName,
+        string $methodName
+    ): ?ClosureState {
+        $magicClass = self::findMagicCallStaticClass($ctx, $lcClass);
+        if (null === $magicClass) {
+            return null;
+        }
+
+        return ClosureState::fromMagicStaticCallable(
+            $magicClass->methods['__callstatic'],
+            $methodName,
+            $scopeClassName
+        );
+    }
+
+    /** @see \PHPCompiler\VM::findMagicCallClass */
+    private static function findMagicCallClass(Context $ctx, string $lcClass): ?ClassEntry
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                break;
+            }
+            $class = $ctx->classes[$lcClass];
+            if (isset($class->methods['__call'])) {
+                return $class;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        return null;
+    }
+
+    /** @see \PHPCompiler\VM::findMagicCallStaticClass */
+    private static function findMagicCallStaticClass(Context $ctx, string $lcClass): ?ClassEntry
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                break;
+            }
+            $class = $ctx->classes[$lcClass];
+            if (isset($class->methods['__callstatic'])) {
+                return $class;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        return null;
     }
 
     /**

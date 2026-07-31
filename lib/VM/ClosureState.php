@@ -123,6 +123,30 @@ final class ClosureState
     }
 
     /**
+     * Fake static closure for missing method + __callStatic (FCC / fromCallable, #25757).
+     *
+     * {@see \PHPCompiler\VM::initClosureCall} sets magicCallMethodName from {@see $methodName}
+     * then invokes {@see $callStatic} (__callStatic).
+     */
+    public static function fromMagicStaticCallable(
+        Func $callStatic,
+        string $methodName,
+        string $scopeClass
+    ): self {
+        $stub = new Func\PHP('{closure}', new Block(null));
+        $state = new self($stub);
+        $state->wrappedFunc = $callStatic;
+        $state->methodName = $methodName;
+        $state->methodReceiver = null;
+        $state->boundScopeClass = $scopeClass;
+        if ($callStatic instanceof Func\PHP) {
+            $state->applyDefinitionSite(null, $callStatic->block);
+        }
+
+        return $state;
+    }
+
+    /**
      * Language {@code clone $closure} — duplicate static table (Zend zend_array_dup, #23489).
      *
      * Same shape as {@see cloneForBind()} for statics/captures; kept separate so bind and
