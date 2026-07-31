@@ -8456,6 +8456,8 @@ class JIT {
                 case OpCode::TYPE_ITER_RESET:
                     $arrayOp = $block->getOperand($op->arg1);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    // Zend FE_RESET / CV fetch: Undefined variable E_WARNING before type check (#26148).
+                    JIT\UndefinedVariableHelper::guardBeforeRuntimeRead($this->context, $arrayOp, $array);
                     if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
                         JIT\GeneratorHelper::compileIterReset($this->context, $array);
                         break;
