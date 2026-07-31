@@ -492,6 +492,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($tokenName, 'type', 'token_name'));
     }
 
+    /** @covers issue #24610 — php-src ext/sysvsem/sysvsem.stub.php */
+    public function testSemAcquireReleaseRemoveZendStubNamedParams(): void
+    {
+        $acquire = BuiltinParamNames::forFunction('sem_acquire');
+        self::assertSame(['semaphore', 'non_blocking='], $acquire);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($acquire, 'semaphore', 'sem_acquire'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($acquire, 'non_blocking', 'sem_acquire'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($acquire, 'id', 'sem_acquire'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($acquire, 'nowait', 'sem_acquire'));
+        self::assertSame(
+            ['semaphore', 'non_blocking='],
+            BuiltinParamNames::paramNamesForInternalFunction('sem_acquire')
+        );
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('sem_acquire'));
+
+        foreach (['sem_release', 'sem_remove'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['semaphore'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'semaphore', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'id', $fn), $fn);
+            self::assertSame(['semaphore'], BuiltinParamNames::paramNamesForInternalFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #24391 — php-src ext/shmop/shmop.stub.php */
     public function testShmopOpenReadWriteZendStubNamedParams(): void
     {

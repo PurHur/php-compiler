@@ -617,6 +617,12 @@ final class BuiltinParamNames
             case 'sem_get':
                 // php-src ext/sysvsem/sysvsem.stub.php (#19515)
                 return ['key', 'max_acquire', 'permissions', 'auto_release'];
+            // php-src ext/sysvsem/sysvsem.stub.php — InternalArgInfo still says id (#24610)
+            case 'sem_acquire':
+                return ['semaphore', 'non_blocking='];
+            case 'sem_release':
+            case 'sem_remove':
+                return ['semaphore'];
             // php-src ext/shmop/shmop.stub.php — InternalArgInfo still says flags/shmid/start/count (#24391)
             case 'shmop_open':
                 return ['key', 'mode', 'permissions', 'size'];

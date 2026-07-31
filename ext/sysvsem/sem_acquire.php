@@ -34,7 +34,7 @@ final class sem_acquire extends Internal
         SemArgs::requireAvailable('sem_acquire');
         $object = SemArgs::parseSemaphore($frame, 'sem_acquire');
         $host = SemArgs::requireHost($object, 'sem_acquire');
-        $nowait = SemArgs::parseOptionalBool($frame, 1, 'sem_acquire', 'nowait') ?? false;
+        $nowait = SemArgs::parseOptionalBool($frame, 1, 'sem_acquire', 'non_blocking') ?? false;
 
         $result = VmSem::acquire($host, $nowait);
         if (!$result) {

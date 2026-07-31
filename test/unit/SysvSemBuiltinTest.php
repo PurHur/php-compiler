@@ -27,5 +27,8 @@ final class SysvSemBuiltinTest extends BaseTest
 
         $path = __DIR__.'/../compliance/cases/sysvsem/sem_get_auto_release_bool.phpt';
         yield 'sem_get_auto_release_bool.phpt' => self::parsePHPT($path, 'sem_get_auto_release_bool.phpt');
+
+        $path = __DIR__.'/../compliance/cases/sysvsem/sem_acquire_reflection_names_24610.phpt';
+        yield 'sem_acquire_reflection_names_24610.phpt' => self::parsePHPT($path, 'sem_acquire_reflection_names_24610.phpt');
     }
 }
