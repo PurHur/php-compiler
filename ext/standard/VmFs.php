@@ -2013,6 +2013,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::tell($handle);
         }
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::tell($handle);
+        }
         if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
             return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::tell($handle);
         }
@@ -2230,6 +2233,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::seek($handle, $offset, $whence);
         }
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::seek($handle, $offset, $whence);
+        }
         if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
             return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::seek($handle, $offset, $whence);
         }
@@ -2251,6 +2257,9 @@ final class VmFs
     {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 0 === VmPhpMemoryStream::seek($handle, 0, \SEEK_SET);
+        }
+        if (VmUserStream::isValidHandle($handle)) {
+            return 0 === VmUserStream::seek($handle, 0, \SEEK_SET);
         }
         if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
             return 0 === \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::seek($handle, 0, \SEEK_SET);

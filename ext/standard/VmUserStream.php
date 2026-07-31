@@ -54,7 +54,10 @@ final class VmUserStream
             return false;
         }
 
-        return $result->toString();
+        $chunk = $result->toString();
+        $state->position += \strlen($chunk);
+
+        return $chunk;
     }
 
     public static function feof(int $handle): bool
@@ -155,6 +158,10 @@ final class VmUserStream
      * php-src userspace.c php_userstreamop_seek: after a successful stream_seek, stream_tell
      * must return the new offset; missing stream_tell → E_WARNING and seek failure.
      *
+     * SEEK_CUR / SEEK_END are normalized to SEEK_SET before invoking the wrapper (php-src stream
+     * layer converts SEEK_CUR; absolute SEEK_SET also avoids a VM $this/property glitch when
+     * whence=SEEK_END is passed as a method arg after prior seeks).
+     *
      * @return int 0 on success, -1 on failure (php-src fseek convention)
      */
     public static function seek(int $handle, int $offset, int $whence = \SEEK_SET): int
@@ -166,6 +173,57 @@ final class VmUserStream
         if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_seek')) {
             return -1;
         }
+
+        $absolute = self::absoluteSeekOffset($state, $offset, $whence);
+        if (null === $absolute) {
+            // SEEK_END without stream_stat size — invoke with SEEK_END directly.
+            return self::seekRaw($state, $offset, \SEEK_END);
+        }
+        if (false === $absolute) {
+            return -1;
+        }
+
+        return self::seekSet($state, $absolute);
+    }
+
+    /**
+     * @return int|false|null Absolute SEEK_SET offset; null = caller should seekRaw(SEEK_END);
+     *                       false = failure
+     */
+    private static function absoluteSeekOffset(UserStreamState $state, int $offset, int $whence): int|false|null
+    {
+        if (\SEEK_SET === $whence) {
+            return $offset;
+        }
+        if (\SEEK_CUR === $whence) {
+            $pos = self::tellState($state);
+            if (false === $pos) {
+                return false;
+            }
+
+            return $pos + $offset;
+        }
+        if (\SEEK_END === $whence) {
+            $size = self::statSize($state);
+            if (false === $size) {
+                return null;
+            }
+
+            return $size + $offset;
+        }
+
+        return false;
+    }
+
+    /** @return int 0 on success, -1 on failure */
+    private static function seekSet(UserStreamState $state, int $absolute): int
+    {
+        return self::seekRaw($state, $absolute, \SEEK_SET);
+    }
+
+    /** @return int 0 on success, -1 on failure */
+    private static function seekRaw(UserStreamState $state, int $offset, int $whence): int
+    {
         $offsetVar = new Variable();
         $offsetVar->int($offset);
         $whenceVar = new Variable();
@@ -208,12 +266,57 @@ final class VmUserStream
         if (Variable::TYPE_INTEGER !== $tellResult->type) {
             return -1;
         }
+        $state->position = $tellResult->toInt();
 
         return 0;
     }
 
+    /** @return int|false */
+    private static function tellState(UserStreamState $state): int|false
+    {
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_tell')) {
+            return $state->position;
+        }
+        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'stream_tell')->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $result->type) {
+            return false;
+        }
+        $state->position = $result->toInt();
+
+        return $state->position;
+    }
+
+    /** @return int|false size from stream_stat, or false */
+    private static function statSize(UserStreamState $state): int|false
+    {
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_stat')) {
+            return false;
+        }
+        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'stream_stat')->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $result->type) {
+            return false;
+        }
+        $ht = $result->toArray();
+        $sizeVar = $ht->find('size') ?? $ht->findIndex(7);
+        if (null === $sizeVar) {
+            return false;
+        }
+        $sizeVar = $sizeVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $sizeVar->type) {
+            return $sizeVar->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $sizeVar->type) {
+            return (int) $sizeVar->toFloat();
+        }
+        if (Variable::TYPE_STRING === $sizeVar->type && \is_numeric($sizeVar->toString())) {
+            return (int) $sizeVar->toString();
+        }
+
+        return false;
+    }
+
     /**
-     * Userspace stream_tell (#25971).
+     * Userspace stream_tell / ftell (#25971).
      *
      * @return int|false
      */
@@ -223,15 +326,8 @@ final class VmUserStream
         if (null === $state) {
             return false;
         }
-        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_tell')) {
-            return false;
-        }
-        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'stream_tell')->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $result->type) {
-            return false;
-        }
 
-        return $result->toInt();
+        return self::tellState($state);
     }
 
     public static function isValidHandle(int $handle): bool
@@ -316,6 +412,8 @@ final class VmUserStream
 /** @internal */
 final class UserStreamState
 {
+    public int $position = 0;
+
     public function __construct(
         public ObjectEntry $wrapper,
         public string $uri,
