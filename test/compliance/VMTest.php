@@ -756,6 +756,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\ds\DsExtensionPolicy::isDsComplianceCase($name)) {
                 continue;
             }
+            // Functional gnupg cases set PHP_COMPILER_ENABLE_GNUPG via --ENV--; phantoms when withheld (#25360).
+            if (!\PHPCompiler\ext\gnupg\GnupgExtensionPolicy::runsGnupgCompliance($name)
+                && \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::isGnupgComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

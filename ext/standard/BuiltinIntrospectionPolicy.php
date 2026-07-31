@@ -262,6 +262,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'lz4_')) {
             return \PHPCompiler\ext\lz4\Lz4ExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'gnupg_')) {
+            return \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
