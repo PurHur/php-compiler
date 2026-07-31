@@ -41,9 +41,10 @@ final class SplQueueBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplQueue');
         $entry->parentLc = SplDoublyLinkedListBuiltin::CLASS_LC;
-        foreach (['iterator', 'traversable', 'countable', 'arrayaccess', 'serializable'] as $iface) {
-            if (isset($ctx->classes[$iface])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerializes subclass ce->interfaces (Serializable first), not DDL parent order (#25797).
+        $entry->interfaces = [];
+        foreach (['serializable', 'arrayaccess', 'countable', 'traversable', 'iterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
@@ -90,9 +91,10 @@ final class SplStackBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplStack');
         $entry->parentLc = SplDoublyLinkedListBuiltin::CLASS_LC;
-        foreach (['iterator', 'traversable', 'countable', 'arrayaccess', 'serializable'] as $iface) {
-            if (isset($ctx->classes[$iface])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerializes subclass ce->interfaces (Serializable first), not DDL parent order (#25797).
+        $entry->interfaces = [];
+        foreach (['serializable', 'arrayaccess', 'countable', 'traversable', 'iterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
