@@ -370,6 +370,10 @@ final class BuiltinInternalDefaultValues
         'getimagesize' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/image.stub.php — ?array &$image_info = null (#23681)
+        'getimagesizefromstring' => [
+            1 => ['kind' => 'null'],
+        ],
         'session_set_cookie_params' => [
             1 => ['kind' => 'null'],
             2 => ['kind' => 'null'],
