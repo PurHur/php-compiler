@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc specialcolumns/procedures/procedurecolumns registered (#21294)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([

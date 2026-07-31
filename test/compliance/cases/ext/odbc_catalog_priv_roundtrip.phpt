@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc odbc_tableprivileges soft roundtrip when SQLite ODBC works (#21295)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 declare(strict_types=1);

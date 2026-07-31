@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc Phase 1 builtins registered; function_exists true (#6293)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([

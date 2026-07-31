@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc catalog builtins registered (#21279)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([

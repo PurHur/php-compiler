@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc prepare/fetch/tables/columns builtins registered (#21258)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([

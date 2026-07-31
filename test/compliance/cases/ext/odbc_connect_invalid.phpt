@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc odbc_connect invalid DSN → false + warning (#6293)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc field_scale/field_precision registered (#21306)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([

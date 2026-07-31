@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc autocommit/commit/rollback builtins registered (#21277)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([

@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc next_result/data_source/binmode/longreadlen registered (#21278)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 foreach ([
