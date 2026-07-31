@@ -146,13 +146,8 @@ class Compiler {
     /** While compiling an arrow function CFG for implicit outer captures (#10304). */
     private bool $compilingArrowAutoCapture = false;
 
-    /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
-    private array $abstractClasses = [];
-
     /** @var array<string, array<string, array<string, mixed>>> from PropertyHooks preprocessor (#6770). */
     private array $propertyHookRegistry = [];
-    /** @var array<string, true> lowercase abstract enum names for instantiate diagnostics (#3737). */
-    private array $abstractEnums = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
     /** spl_object_id(Coalesce expr) => scope slot for ?? result (stmt ?? before call args, #9479). */
@@ -532,8 +527,6 @@ class Compiler {
 
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
-        $this->abstractClasses = [];
-        $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
         $this->coalesceMergeBlocks = [];
         $this->nullsafeResultSlots = [];
@@ -633,8 +626,6 @@ class Compiler {
     public function compileEmitSmoke(Script $script): ?Block
     {
         $this->resetCompileAbortDetail();
-        $this->abstractClasses = [];
-        $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
         $this->coalesceMergeBlocks = [];
         $this->nullsafeResultSlots = [];
@@ -6357,14 +6348,6 @@ class Compiler {
         $return->classImplements = $enumIfaceLcs;
         $return->classImplementsDisplay = $enumIfaceDisplays;
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($enum->flags ?? 0);
-        if ($return->classIsAbstract) {
-            $name = $this->staticNameFromOperand($enum->name);
-            if (null !== $name) {
-                $lc = strtolower(ltrim($name, '\\'));
-                $this->abstractClasses[$lc] = true;
-                $this->abstractEnums[$lc] = true;
-            }
-        }
         if (null !== $enumName) {
             $enumLc = strtolower(ltrim($enumName, '\\'));
             $backedTypeName = null;
@@ -6671,9 +6654,6 @@ class Compiler {
         );
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
-        if ($return->classIsAbstract) {
-            $this->abstractClasses[strtolower(ltrim($className, '\\'))] = true;
-        }
         $classLc = strtolower(ltrim($className, '\\'));
         $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
         if (null !== $parentLc) {
@@ -12298,17 +12278,9 @@ class Compiler {
                     $calleeName
                 );
             case Op\Expr\New_::class:
+                // Abstract/enum `new` is a runtime Error when NEW executes (Zend zend_execute.c),
+                // not a unit-wide compile fatal — dead `if (false) { new Abstract; }` must load (#25787 / re-#3385).
                 $className = $this->literalScopeClassName($expr->class);
-
-                if (null !== $className) {
-                    $lc = strtolower(ltrim($className, '\\'));
-                    if (isset($this->abstractClasses[$lc])) {
-                        $msg = isset($this->abstractEnums[$lc])
-                            ? 'Cannot instantiate enum '.$className
-                            : 'Cannot instantiate abstract class '.$className;
-                        $this->throwCompileError($msg);
-                    }
-                }
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
                 $line = $expr->getLine();
                 $return = [
@@ -13174,16 +13146,8 @@ class Compiler {
      */
     private function compileNewExprForThrow(Op\Expr\New_ $expr, Block $block): array
     {
+        // Same as Op\Expr\New_:: class path — defer abstract/enum instantiate to runtime (#25787).
         $className = $this->literalScopeClassName($expr->class);
-        if (null !== $className) {
-            $lc = strtolower(ltrim($className, '\\'));
-            if (isset($this->abstractClasses[$lc])) {
-                $msg = isset($this->abstractEnums[$lc])
-                    ? 'Cannot instantiate enum '.$className
-                    : 'Cannot instantiate abstract class '.$className;
-                $this->throwCompileError($msg);
-            }
-        }
         $resultSlot = $block->forceFreshVarSlot($expr->result);
         $mergeEcho = $this->mergeEchoSlotForBranch($block);
         if (null !== $mergeEcho && $resultSlot === $mergeEcho) {
