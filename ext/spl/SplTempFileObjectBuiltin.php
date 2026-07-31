@@ -35,10 +35,12 @@ final class SplTempFileObjectBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplTempFileObject');
         $entry->parentLc = SplFileObjectBuiltin::CLASS_LC;
-        foreach (['SeekableIterator', 'Traversable', 'Iterator', 'RecursiveIterator', 'Stringable'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
-                $entry->interfaces[] = $iface;
+        // Zend rematerializes a different flattened table than SplFileObject (#25799).
+        // php-src ext/spl/spl_directory.c — SplTempFileObject class entry.
+        $entry->interfaces = [];
+        foreach (['seekableiterator', 'iterator', 'traversable', 'recursiveiterator', 'stringable'] as $ifaceLc) {
+            if (isset($ctx->classes[$ifaceLc])) {
+                $entry->interfaces[] = $ifaceLc;
             }
         }
 

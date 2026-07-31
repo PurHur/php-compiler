@@ -48,10 +48,12 @@ final class SplFileObjectBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplFileObject');
         $entry->parentLc = SplFileInfoBuiltin::CLASS_LC;
-        // Store lowercase interface keys so class_implements() resolves $ctx->classes (#6393).
+        // Zend rematerializes flattened ce->interfaces (php-src ext/spl/spl_directory.c).
+        // Traversable before Iterator after RecursiveIterator — not RecursiveIterator parent
+        // expansion order. Observable via class_implements() / Reflection (#25799).
+        $entry->interfaces = [];
         foreach (['stringable', 'recursiveiterator', 'traversable', 'iterator', 'seekableiterator'] as $ifaceLc) {
-            if (isset($ctx->classes[$ifaceLc])
-                && !\in_array($ifaceLc, $entry->interfaces, true)) {
+            if (isset($ctx->classes[$ifaceLc])) {
                 $entry->interfaces[] = $ifaceLc;
             }
         }
