@@ -1113,7 +1113,7 @@ final class BuiltinParamNames
             case 'explode':
                 return ['separator', 'string', 'limit'];
             // php-src ext/standard/string.stub.php — array|string $separator, ?array $array = null (#24811)
-            // InternalArgInfo still glue/pieces (implode) or inverted src/glue (join).
+            // Legacy InternalArgInfo glue/pieces are not runtime named params (#25589).
             case 'implode':
             case 'join':
                 return ['separator', 'array='];
@@ -1947,13 +1947,8 @@ final class BuiltinParamNames
         if (str_contains($lc, '::')) {
             return self::aliasesForClassMethod($lc);
         }
-        if ('implode' === $lc || 'join' === $lc) {
-            // php-src InternalArgInfo glue/pieces; public stub names separator/array (#9985).
-            return [
-                'glue' => 0,
-                'pieces' => 1,
-            ];
-        }
+        // implode/join: do NOT alias glue/pieces — Zend 8.2+ stubs use separator/array only;
+        // named glue/pieces is Unknown named parameter (#25589, reverts #9985 over-accept).
         if ('array_column' === $lc) {
             // php-src basic_functions.stub.php — public name `input` aliases internal `array` (#10042).
             return [
