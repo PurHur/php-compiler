@@ -170,6 +170,11 @@ class ClassEntry {
      * @var null|callable(ObjectEntry $src, ObjectEntry $dest): void
      */
     public $cloneObjectHandler = null;
+    /**
+     * When true on this class or an ancestor, clone throws "Trying to clone an uncloneable object"
+     * (php-src Exception/Error clone_obj = NULL; #25870).
+     */
+    public bool $denyClone = false;
 
     public function __construct(string $name) {
         $this->name = $name;

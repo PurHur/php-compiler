@@ -8575,7 +8575,7 @@ restart:
                         $this->context
                     );
                     if (null !== $uncloneableEnumClass) {
-                        $message = 'Trying to clone an uncloneable object of class '.$uncloneableEnumClass;
+                        $message = VM\CloneSupport::uncloneableObjectErrorMessage($uncloneableEnumClass);
                         $catchFrame = $this->dispatchVmError($message, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -8595,6 +8595,18 @@ restart:
                         break;
                     }
                     $srcObject = $src->toObject();
+                    $deniedCloneClass = VM\CloneSupport::uncloneableDeniedClass($srcObject, $this->context);
+                    if (null !== $deniedCloneClass) {
+                        $catchFrame = $this->dispatchVmError(
+                            VM\CloneSupport::uncloneableObjectErrorMessage($deniedCloneClass),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     $catchFrame = $this->enforceCloneVisibility($srcObject, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
