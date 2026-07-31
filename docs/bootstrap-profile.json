@@ -1917,6 +1917,8 @@
         "ext/snmp/snmpset.php",
         "ext/snmp/snmpwalk.php",
         "ext/soap/BuiltinClasses.php",
+        "ext/soap/JitIsSoapFault.php",
+        "ext/soap/JitUseSoapErrorHandler.php",
         "ext/soap/Module.php",
         "ext/soap/SoapClassMethod.php",
         "ext/soap/SoapConstants.php",
@@ -1925,6 +1927,7 @@
         "ext/soap/SoapHttpTransport.php",
         "ext/soap/SoapSdlPayload.php",
         "ext/soap/SoapUrlPayload.php",
+        "ext/soap/UseSoapErrorHandlerJitHelper.php",
         "ext/soap/VmSoapClient.php",
         "ext/soap/VmSoapEncoding.php",
         "ext/soap/VmSoapOpaque.php",
@@ -6885,9 +6888,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6651,
+        "inventory_files": 6654,
         "excluded": 0,
-        "eligible": 6651,
+        "eligible": 6654,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
