@@ -8623,6 +8623,94 @@ PHP;
         self::assertSame("<?xml version=\"1.0\"?>\n<root><a><b>x</b></a></root>\n", ob_get_clean());
     }
 
+    /**
+     * Issue #25841 — var_export($e->getAttributeNode(...)->isId()) must emit getAttributeNode
+     * before isId (1-arg FuncCall must not defer the chain receiver as a multi-arg sibling).
+     */
+    public function testVarExportChainedGetAttributeNodeIsIdEmitsReceiverMethodCall(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d = new DOMDocument();
+$e = $d->createElement('x');
+$d->appendChild($e);
+$e->setAttribute('class', 'c');
+var_export($e->getAttributeNode('class')->isId());
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_attr_isid_chain_var_export_25841.php');
+
+        $sawGetAttributeNode = false;
+        $sawIsId = false;
+        $getAttributeNodeBeforeIsId = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])) {
+                continue;
+            }
+            $method = $block->constants[$op->arg2]->toString();
+            if ('getAttributeNode' === $method) {
+                $sawGetAttributeNode = true;
+            }
+            if ('isId' === $method) {
+                $sawIsId = true;
+                $getAttributeNodeBeforeIsId = $sawGetAttributeNode;
+            }
+        }
+        self::assertTrue($sawGetAttributeNode, 'getAttributeNode METHODCALL_INIT missing');
+        self::assertTrue($sawIsId, 'isId METHODCALL_INIT missing');
+        self::assertTrue($getAttributeNodeBeforeIsId, 'getAttributeNode must precede isId');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("false\n", ob_get_clean());
+    }
+
+    /**
+     * Issue #25841 — echo var_export($e->getAttributeNode(...)->isId(), true) two-arg form.
+     */
+    public function testVarExportTrueChainedGetAttributeNodeIsIdEmitsReceiverMethodCall(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d = new DOMDocument();
+$e = $d->createElement('x');
+$d->appendChild($e);
+$e->setAttribute('class', 'c');
+echo var_export($e->getAttributeNode('class')->isId(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_attr_isid_chain_var_export_true_25841.php');
+
+        $sawGetAttributeNode = false;
+        $sawIsId = false;
+        $getAttributeNodeBeforeIsId = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])) {
+                continue;
+            }
+            $method = $block->constants[$op->arg2]->toString();
+            if ('getAttributeNode' === $method) {
+                $sawGetAttributeNode = true;
+            }
+            if ('isId' === $method) {
+                $sawIsId = true;
+                $getAttributeNodeBeforeIsId = $sawGetAttributeNode;
+            }
+        }
+        self::assertTrue($sawGetAttributeNode, 'getAttributeNode METHODCALL_INIT missing');
+        self::assertTrue($sawIsId, 'isId METHODCALL_INIT missing');
+        self::assertTrue($getAttributeNodeBeforeIsId, 'getAttributeNode must precede isId');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("false\n", ob_get_clean());
+    }
+
     /** Issue #24571 — appendChild(createElement) before importNode(documentElement, true) must not bind deep to the element. */
     public function testDomImportNodeAfterAppendChildCreateElementUsesPropertyFetchAndTrueSlots(): void
     {

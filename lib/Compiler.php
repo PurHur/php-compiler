@@ -28628,6 +28628,16 @@ class Compiler {
                                 $ops
                             )
                         )
+                        // var_export($e->getAttributeNode()->isId(), true) — leaf MethodCall before
+                        // ConstFetch true; nestedSep ordinal can miss the distinct result/arg temp (#25841).
+                        || (
+                            $op instanceof Op\Expr\MethodCall
+                            && $this->onlyScalarConstFetchPreludesBetween($producerIndex, $j, $ops)
+                            && property_exists($next, 'args')
+                            && \is_array($next->args)
+                            && \count($next->args) >= 2
+                            && $this->callArgIsDeadInlineTemporary($next->args[0] ?? null)
+                        )
                     )
                 ) {
                     return $j;
@@ -29549,11 +29559,15 @@ class Compiler {
                 // Require ≥2 consumer args: isSiblingMultiArgInlineCallConsumer matches any
                 // MethodCall, and treating 0/1-arg finals (getLineNo/getAttribute) as multi-arg
                 // consumers deferred getElementsByTagName with nothing to re-emit (#25842).
+                // Also allow ConstFetch between leaf and consumer for var_export(..., true) (#25841).
                 if (
-                    $j === $consumerIndex - 1
-                    && $this->isSiblingMultiArgInlineCallConsumer($consumer)
+                    $this->isSiblingMultiArgInlineCallConsumer($consumer)
                     && \is_array($consumer->args ?? null)
                     && \count($consumer->args) >= 2
+                    && (
+                        $j === $consumerIndex - 1
+                        || $this->onlyScalarConstFetchPreludesBetween($j, $consumerIndex, $cfgChildren)
+                    )
                 ) {
                     return true;
                 }
@@ -30416,6 +30430,19 @@ class Compiler {
             }
             if ($this->isSiblingInlineCallProducerExpr($mid)) {
                 if ($this->producerIsHoistedMultiArgSiblingChainStart($producerIndex, $consumerIndex, $cfgChildren)) {
+                    return false;
+                }
+                // $e->getAttributeNode()->isId() before var_export(..., true) — receiver MethodCall
+                // feeds the leaf; not a completed stmt ahead of the hoisted chain (#25841).
+                $producer = $cfgChildren[$producerIndex] ?? null;
+                if (
+                    $producer instanceof Op\Expr\MethodCall
+                    && $mid instanceof Op\Expr\MethodCall
+                    && null !== $producer->result
+                    && property_exists($mid, 'var')
+                    && null !== $mid->var
+                    && $this->operandsReferToSameVariable($producer->result, $mid->var)
+                ) {
                     return false;
                 }
 
