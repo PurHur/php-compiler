@@ -113,6 +113,7 @@ final class VmIntlCalendar
      *   locale: string,
      *   timestamp: int,
      *   millisecond: int,
+     *   udate: float,
      *   unsetFields: array<int, true>,
      *   repeatedWallTimeOption: int,
      *   skippedWallTimeOption: int,
@@ -123,6 +124,50 @@ final class VmIntlCalendar
      * }>
      */
     private static array $state = [];
+
+    /**
+     * Split ICU UDate (ms since epoch, may be fractional) into unix seconds +
+     * integer FIELD_MILLISECOND — php-src calendar_methods.cpp / ICU UDate.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private static function splitUDate(float $millis): array
+    {
+        $sec = (int) floor($millis / 1000.0);
+        $ms = (int) floor($millis - ($sec * 1000.0));
+        if ($ms >= 1000) {
+            $sec += intdiv($ms, 1000);
+            $ms %= 1000;
+        } elseif ($ms < 0) {
+            --$sec;
+            $ms += 1000;
+        }
+
+        return [$sec, $ms];
+    }
+
+    /**
+     * Store full float UDate and derive integer second / FIELD_MILLISECOND (#25788).
+     *
+     * @param array{timezone: string, locale: string, timestamp: int, millisecond: int, udate?: float, unsetFields: array<int, true>} $state
+     */
+    private static function applyUDate(array &$state, float $millis): void
+    {
+        $state['udate'] = $millis;
+        [$sec, $ms] = self::splitUDate($millis);
+        $state['timestamp'] = $sec;
+        $state['millisecond'] = $ms;
+    }
+
+    /**
+     * Rebuild UDate from integer fields (drops sub-millisecond fraction).
+     *
+     * @param array{timezone: string, locale: string, timestamp: int, millisecond: int, udate?: float, unsetFields: array<int, true>} $state
+     */
+    private static function resyncUDateFromFields(array &$state): void
+    {
+        $state['udate'] = ((float) $state['timestamp']) * 1000.0 + (float) $state['millisecond'];
+    }
 
     /** @return array<string, int> */
     public static function classConstants(): array
@@ -338,11 +383,13 @@ final class VmIntlCalendar
     ): void {
         $object->constructed = true;
         [$firstDow, $minDays] = self::localeWeekDefaults($locale);
+        $ts = VmDate::time();
         self::$state[$object->id] = [
             'timezone' => $timezoneId,
             'locale' => $locale,
-            'timestamp' => VmDate::time(),
+            'timestamp' => $ts,
             'millisecond' => 0,
+            'udate' => ((float) $ts) * 1000.0,
             'unsetFields' => [],
             'repeatedWallTimeOption' => self::WALLTIME_LAST,
             'skippedWallTimeOption' => self::WALLTIME_LAST,
@@ -428,6 +475,7 @@ final class VmIntlCalendar
         if (null === $field) {
             $state['timestamp'] = 0;
             $state['millisecond'] = 0;
+            self::resyncUDateFromFields($state);
             $state['unsetFields'] = [];
             for ($i = 0; $i < self::FIELD_FIELD_COUNT; ++$i) {
                 // php-src/ICU: after clear(), YEAR is unset; month/day/hour remain set at epoch defaults.
@@ -512,6 +560,7 @@ final class VmIntlCalendar
 
                 return false;
         }
+        self::resyncUDateFromFields($state);
         unset($state['unsetFields'][$field]);
         IntlError::clear();
 
@@ -590,6 +639,7 @@ final class VmIntlCalendar
 
                 return false;
         }
+        self::resyncUDateFromFields($state);
         unset($state['unsetFields'][$field]);
         IntlError::clear();
 
@@ -699,6 +749,7 @@ final class VmIntlCalendar
         $cal = self::createInstance($ctx, $tz, $locale ?? '');
         self::$state[$cal->id]['timestamp'] = $ts;
         self::$state[$cal->id]['millisecond'] = $ms;
+        self::resyncUDateFromFields(self::$state[$cal->id]);
         IntlError::clear();
 
         return $cal;
@@ -728,6 +779,7 @@ final class VmIntlCalendar
         );
         $state['timestamp'] = $parsed['timestamp'];
         $state['millisecond'] = max(0, min(999, $parts['millisecond']));
+        self::resyncUDateFromFields($state);
     }
 
     /**
@@ -763,6 +815,7 @@ final class VmIntlCalendar
             $state['timestamp'] = $sec;
             $state['millisecond'] = $ms;
         }
+        self::resyncUDateFromFields($state);
     }
 
     private static function addSecondsInZone(string $tz, int $timestamp, int $seconds): int
@@ -948,6 +1001,7 @@ final class VmIntlCalendar
         );
         $state['timestamp'] = $parsed['timestamp'];
         $state['millisecond'] = $parts['millisecond'];
+        self::resyncUDateFromFields($state);
         unset($state['unsetFields'][$field]);
         IntlError::clear();
 
@@ -995,6 +1049,7 @@ final class VmIntlCalendar
             $state['timezone']
         );
         $state['timestamp'] = $parsed['timestamp'];
+        self::resyncUDateFromFields($state);
         $state['unsetFields'] = [];
         IntlError::clear();
 
@@ -1019,7 +1074,7 @@ final class VmIntlCalendar
         }
         IntlError::clear();
 
-        return ((float) $state['timestamp']) * 1000.0 + (float) $state['millisecond'];
+        return (float) ($state['udate'] ?? (((float) $state['timestamp']) * 1000.0 + (float) $state['millisecond']));
     }
 
     public static function setTime(ObjectEntry $cal, float $millis): bool
@@ -1028,22 +1083,8 @@ final class VmIntlCalendar
         if (!isset($state)) {
             return false;
         }
-        if ($millis < 0) {
-            $sec = (int) ceil($millis / 1000.0);
-            $ms = (int) round($millis - ($sec * 1000.0));
-        } else {
-            $sec = (int) floor($millis / 1000.0);
-            $ms = (int) round($millis - ($sec * 1000.0));
-        }
-        if ($ms < 0) {
-            --$sec;
-            $ms += 1000;
-        } elseif ($ms >= 1000) {
-            $sec += intdiv($ms, 1000);
-            $ms %= 1000;
-        }
-        $state['timestamp'] = $sec;
-        $state['millisecond'] = $ms;
+        // Retain full float UDate (ICU); FIELD_MILLISECOND stays integer via floor split (#25788).
+        self::applyUDate($state, $millis);
         $state['unsetFields'] = [];
         IntlError::clear();
 
