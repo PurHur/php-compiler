@@ -27722,14 +27722,18 @@ class Compiler {
         int $deadInlineArgCount
     ): bool {
         if ($this->methodCallHasStatementLevelSideEffects($child)) {
-            return true;
+            // Iterator `$it->next(); var_export($it->current(), true)` — outside the dead-temp
+            // arg window (#13901). Value-producing `f($o->next(), $o->next())` stays (#25672).
+            return $deadInlineArgCount < 1
+                || ($consumerIndex - $childIndex) > $deadInlineArgCount;
         }
         $method = $this->staticNameFromOperand($child->name);
         if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
             return true;
         }
         if ($this->methodCallIsStmtLevelDiscardPrelude($child)) {
-            return true;
+            return $deadInlineArgCount < 1
+                || ($consumerIndex - $childIndex) > $deadInlineArgCount;
         }
         if ($this->methodCallInlineProducerSuppliesCallArgValue($child)) {
             return false;
@@ -27739,6 +27743,22 @@ class Compiler {
         }
 
         return ($consumerIndex - $childIndex) > $deadInlineArgCount;
+    }
+
+    /** Count php-cfg dead inline call-arg temporaries on a consumer (#9463, #25672). */
+    private function deadInlineTemporaryArgCount(?Op $consumer): int
+    {
+        if (null === $consumer || !property_exists($consumer, 'args') || !\is_array($consumer->args)) {
+            return 0;
+        }
+        $count = 0;
+        foreach ($consumer->args as $arg) {
+            if ($this->callArgIsDeadInlineTemporary($arg)) {
+                ++$count;
+            }
+        }
+
+        return $count;
     }
 
     /** php-cfg may leave void method results untyped; do not wire them as inline call-arg values (#10778). */
@@ -28196,9 +28216,8 @@ class Compiler {
         ) {
             return false;
         }
-        if ($op instanceof Op\Expr\MethodCall && $this->methodCallHasStatementLevelSideEffects($op)) {
-            return false;
-        }
+        // next()/send()/… may still be value-producing call-arg siblings (#25672); deferral is
+        // decided by isSiblingMultiArgFuncCallProducer's dead-temp distance window (#13901).
         // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
         if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
             return false;
@@ -28432,6 +28451,7 @@ class Compiler {
         int $consumerIndex,
         array $cfgChildren
     ): int {
+        $deadInlineArgCount = $this->deadInlineTemporaryArgCount($cfgChildren[$consumerIndex] ?? null);
         $count = 0;
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
@@ -28440,7 +28460,12 @@ class Compiler {
             }
             if (
                 $child instanceof Op\Expr\MethodCall
-                && $this->methodCallIsStmtLevelDiscardPrelude($child)
+                && $this->methodCallIsSkippedHoistedSiblingProducer(
+                    $child,
+                    $j,
+                    $consumerIndex,
+                    $deadInlineArgCount
+                )
             ) {
                 continue;
             }
@@ -28453,7 +28478,10 @@ class Compiler {
             if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
-            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
+            if (
+                !($child instanceof Op\Expr\MethodCall)
+                && $this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)
+            ) {
                 continue;
             }
             if (
@@ -28532,8 +28560,19 @@ class Compiler {
     private function siblingInlineFuncCallProducerOrdinal(
         int $producerIndex,
         int $firstSibling,
-        array $cfgChildren
+        array $cfgChildren,
+        ?int $consumerIndex = null
     ): int {
+        if (null === $consumerIndex) {
+            for ($k = $producerIndex + 1, $n = \count($cfgChildren); $k < $n; ++$k) {
+                if ($this->isSiblingMultiArgInlineCallConsumer($cfgChildren[$k] ?? null)) {
+                    $consumerIndex = $k;
+                    break;
+                }
+            }
+        }
+        $consumerIndex ??= $producerIndex + 1;
+        $deadInlineArgCount = $this->deadInlineTemporaryArgCount($cfgChildren[$consumerIndex] ?? null);
         $ordinal = -1;
         for ($j = $firstSibling; $j <= $producerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
@@ -28542,7 +28581,12 @@ class Compiler {
             }
             if (
                 $child instanceof Op\Expr\MethodCall
-                && $this->methodCallIsStmtLevelDiscardPrelude($child)
+                && $this->methodCallIsSkippedHoistedSiblingProducer(
+                    $child,
+                    $j,
+                    $consumerIndex,
+                    $deadInlineArgCount
+                )
             ) {
                 continue;
             }
@@ -28555,7 +28599,10 @@ class Compiler {
             if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
-            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
+            if (
+                !($child instanceof Op\Expr\MethodCall)
+                && $this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)
+            ) {
                 continue;
             }
             ++$ordinal;
@@ -28576,10 +28623,22 @@ class Compiler {
         int $consumerIndex,
         array $cfgChildren
     ): array {
+        $deadInlineArgCount = $this->deadInlineTemporaryArgCount($cfgChildren[$consumerIndex] ?? null);
         $producers = [];
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
             if (!$this->isSiblingInlineCallProducerExpr($child) || !$child instanceof Op\Expr) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\MethodCall
+                && $this->methodCallIsSkippedHoistedSiblingProducer(
+                    $child,
+                    $j,
+                    $consumerIndex,
+                    $deadInlineArgCount
+                )
+            ) {
                 continue;
             }
             if (
@@ -28609,7 +28668,10 @@ class Compiler {
             ) {
                 continue;
             }
-            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $next)) {
+            if (
+                !($child instanceof Op\Expr\MethodCall)
+                && $this->siblingInlineCallProducerSkipsHoistedArgChain($child, $next)
+            ) {
                 continue;
             }
             $producers[] = $child;
@@ -29208,7 +29270,14 @@ class Compiler {
             $producer instanceof Op\Expr\MethodCall
             && $this->methodCallHasStatementLevelSideEffects($producer)
         ) {
-            return false;
+            // Keep `f($o->next(), $o->next())` in the sibling chain; skip bare `$it->next()` (#25672 / #13901).
+            $deadInlineArgCount = $this->deadInlineTemporaryArgCount($consumer);
+            if (
+                $deadInlineArgCount < 1
+                || ($consumerIndex - $producerIndex) > $deadInlineArgCount
+            ) {
+                return false;
+            }
         }
         if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
             $producer,
