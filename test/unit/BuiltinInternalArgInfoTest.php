@@ -66,6 +66,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src array.stub.php — InternalArgInfo return empty; Zend int|float (#25441). */
+    public function testArraySumProductReturnTypeIsIntOrFloat(): void
+    {
+        foreach (['array_sum', 'array_product'] as $f) {
+            $this->assertSame('int|float', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     /** php-src basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472). */
     public function testHighlightFamilyReturnTypeIsStringOrBool(): void
     {
