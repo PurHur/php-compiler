@@ -89,7 +89,8 @@ final class VmStatCache
 
     /**
      * Drop only negative (stat-failed) cache entries for $path — php-src keeps
-     * successful stats across content writes until clearstatcache (#22841).
+     * successful stats across content writes / touch until clearstatcache
+     * (#22841, #25853).
      *
      * Used after create/touch/write when a prior miss must not stick, without
      * refreshing positive hits (filesize/filemtime stay stale like Zend).
