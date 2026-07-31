@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_sscanf / __compiler_sscanf_ex via SscanfJitHelper PHP (#12467).
+ * JIT/AOT link for __compiler_sscanf / __compiler_sscanf_ex via SscanfJitHelper PHP (#12467, #25691).
  *
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (VmSscanf → SscanfJitHelper)
+ * in one NestedJIT scope (peer StringSscanfArray #25653 / StringPack #22842).
  * php-src: ext/standard/sscanf.c — by-reference assignment branch
  */
 final class StringSscanfByRef
@@ -21,6 +22,16 @@ final class StringSscanfByRef
     private const HELPER_PATH = '/ext/standard/SscanfJitHelper.php';
 
     private const VM_SSCANF_PATH = '/ext/standard/VmSscanf.php';
+
+    /**
+     * Ordered NestedJIT sources — VmSscanf before SscanfJitHelper (#25691).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::VM_SSCANF_PATH,
+        self::HELPER_PATH,
+    ];
 
     private const PARSE_ASSIGN_HELPER = 'PHPCompiler\\ext\\standard\\SscanfJitHelper::parseAssignMeta';
 
@@ -128,53 +139,18 @@ final class StringSscanfByRef
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SscanfJitHelper compile (#12467)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25691');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            $jit = new JIT($context);
-            foreach ([$root.self::VM_SSCANF_PATH, $root.self::HELPER_PATH] as $includePath) {
-                $real = \realpath($includePath) ?: $includePath;
-                if ($context->hasJitIncludedFileCompiled($real)) {
-                    continue;
-                }
-                $block = $runtime->parseAndCompile(
-                    (string) \file_get_contents($includePath),
-                    \basename($includePath)
-                );
-                if (null === $block) {
-                    throw new \LogicException(\basename($includePath).' parseAndCompile failed (#12467)');
-                }
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($real);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#12467)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#25691'
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
