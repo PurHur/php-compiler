@@ -40,6 +40,26 @@ class ObjectEntry {
     /** Zend object property internal pointer (ext/standard/array.c; #11196). */
     private int $propertyInternalPointer = 0;
 
+    /**
+     * Zend zend_get_property_guard bits — prevent __get/__set/__isset/__unset re-entry (#25810).
+     *
+     * @see Zend/zend_object_handlers.c IN_GET / IN_SET / IN_ISSET / IN_UNSET
+     */
+    public const GUARD_IN_ISSET = 1;
+    public const GUARD_IN_GET = 2;
+    public const GUARD_IN_SET = 4;
+    public const GUARD_IN_UNSET = 8;
+
+    /** @var array<string, int> property name => guard bitmask */
+    private array $propertyGuards = [];
+
+    /**
+     * Declared slots explicitly unset() — distinct from never-initialized typed UNDEF (#25810).
+     *
+     * @var array<string, true>
+     */
+    private array $explicitlyUnsetProperties = [];
+
     public ?Func $constructor = null;
 
     /** True after `__construct` returns (or immediately when none is defined). */
@@ -332,15 +352,59 @@ class ObjectEntry {
                 continue;
             }
             // Declared property unset → UNDEF slot (typed Error vs untyped Warning on read, #4863/#22021).
+            // Mark explicitly unset so post-unset magic (__get/__isset/__set) matches Zend (#25810).
             $slot->reset();
             $slot->type = Variable::TYPE_UNDEFINED;
             $slot->objectPropertyOwner = $this;
             $slot->objectPropertyName = $name;
+            $this->explicitlyUnsetProperties[$name] = true;
 
             return;
         }
         // Dynamic property unset → remove slot (Zend zend_std_unset_property; #15750).
         unset($this->properties[$name]);
+        unset($this->explicitlyUnsetProperties[$name]);
+    }
+
+    /** True after unset() on a declared property until the slot is written again (#25810). */
+    public function isPropertyExplicitlyUnset(string $name): bool
+    {
+        return isset($this->explicitlyUnsetProperties[$name]);
+    }
+
+    public function clearPropertyExplicitlyUnset(string $name): void
+    {
+        unset($this->explicitlyUnsetProperties[$name]);
+    }
+
+    /**
+     * Begin a magic-method property guard. Returns false when already active (skip re-entry).
+     */
+    public function beginPropertyGuard(string $name, int $flag): bool
+    {
+        $cur = $this->propertyGuards[$name] ?? 0;
+        if (0 !== ($cur & $flag)) {
+            return false;
+        }
+        $this->propertyGuards[$name] = $cur | $flag;
+
+        return true;
+    }
+
+    public function endPropertyGuard(string $name, int $flag): void
+    {
+        if (!isset($this->propertyGuards[$name])) {
+            return;
+        }
+        $this->propertyGuards[$name] &= ~$flag;
+        if (0 === $this->propertyGuards[$name]) {
+            unset($this->propertyGuards[$name]);
+        }
+    }
+
+    public function isPropertyGuardActive(string $name, int $flag): bool
+    {
+        return 0 !== (($this->propertyGuards[$name] ?? 0) & $flag);
     }
 
     /** @return array<string, Variable> */
