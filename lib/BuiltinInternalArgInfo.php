@@ -114,6 +114,8 @@ final class BuiltinInternalArgInfo
             'ob_get_status', 'ob_list_handlers' => 'array',
             // ext/libxml/libxml.stub.php — InternalArgInfo return object (#25844)
             'libxml_get_errors' => 'array',
+            // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
+            'array_sum', 'array_product' => 'int|float',
             default => null,
         };
     }
