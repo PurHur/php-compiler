@@ -93,7 +93,8 @@ final class StreamBufferRuntimeShrinkTest extends TestCase
         $this->assertNotFalse($path);
         $fileHandle = VmFs::fopen($path, 'w+b');
         $this->assertGreaterThanOrEqual(0, $fileHandle);
-        $this->assertSame(1, StreamBufferJitHelper::setTimeoutArgv($fileHandle, 1, 0));
+        // php-src: READ_TIMEOUT unsupported on plainfile → 0 (#25924)
+        $this->assertSame(0, StreamBufferJitHelper::setTimeoutArgv($fileHandle, 1, 0));
         VmFs::fclose($fileHandle);
         @unlink($path);
     }

@@ -4,16 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamBufferRuntime;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_set_timeout() via __compiler_stream_set_timeout (issue #3754). */
+/** LLVM lowering for stream_set_timeout() via __compiler_stream_set_timeout (issue #3754, #25924). */
 final class JitStreamSetTimeout
 {
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $secondsLong, Value $usecLong): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamBufferRuntime::ensureLinked($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'stream_set_timeout_cont');
+        }
+
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_stream_set_timeout'),
             $handleLong,
