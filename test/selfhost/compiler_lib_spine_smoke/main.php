@@ -6767,4 +6767,7 @@ unset($__spineMimeEnc, $__spineMimeDec);
 require_once __DIR__.'/../../../lib/Compiler/PropertyVisibilityInheritCheck.php';
 require_once __DIR__.'/../../../ext/dom/DomCompareDocumentPositionJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeCompareDocumentPosition.php';
+require_once __DIR__.'/../../../ext/soap/JitIsSoapFault.php';
+require_once __DIR__.'/../../../ext/soap/JitUseSoapErrorHandler.php';
+require_once __DIR__.'/../../../ext/soap/UseSoapErrorHandlerJitHelper.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
