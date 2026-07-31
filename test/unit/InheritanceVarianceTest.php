@@ -779,4 +779,52 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** Zend: private impl of protected abstract rejected (#25662). */
+    public function testAbstractProtectedToPrivateFails(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A { abstract protected function f(): void; }
+class B extends A { private function f(): void {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Access level to B::f() must be protected (as in class A) or weaker');
+        $runtime->parseAndCompile($code, 'abs_vis_prot_priv.php');
+    }
+
+    /** Zend: public impl of protected abstract is OK (#25662). */
+    public function testAbstractProtectedToPublicAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A { abstract protected function f(): void; }
+class B extends A { public function f(): void {} }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abs_vis_prot_pub.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: protected→private on abstract also fails across eval (#25662). */
+    public function testAbstractProtectedToPrivateFailsAcrossEval(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+eval('abstract class A { abstract protected function f(): void; }');
+eval('class B extends A { private function f(): void {} }');
+echo "LOADED\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abs_vis_eval.php');
+        $this->assertNotNull($block);
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Access level to B::f() must be protected (as in class A) or weaker');
+        $runtime->run($block);
+    }
 }
