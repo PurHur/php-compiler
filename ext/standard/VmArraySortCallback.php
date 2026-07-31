@@ -49,7 +49,7 @@ final class VmArraySortCallback
     }
 
     /**
-     * Require a Zend-callable comparator for usort/uasort/uksort (#23550).
+     * Require a Zend-callable comparator for usort/uasort/uksort (#23550, #25712).
      * Closures, invokables, array callables, and user-defined function names are accepted.
      */
     public static function requireVmCallable(
@@ -66,24 +66,41 @@ final class VmArraySortCallback
             throw new \LogicException($function.'() requires VM context in this compiler build');
         }
         if (!VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
+            VmCallable::throwIfInaccessibleMethodCallback(
+                $frame->vmContext,
+                $callback,
+                $function,
+                $argNum,
+                $frame
+            );
             throw new \TypeError(self::invalidCallbackTypeError($function, $argNum));
         }
     }
 
     /**
-     * Deep-copy operands then invoke any VM callable (php-src php_usort_compare; #23550).
+     * Deep-copy operands then invoke any VM callable (php-src php_usort_compare; #23550, #25712).
+     * Passes the caller frame so private/protected comparators stay visible after validation.
      */
     public static function invokeCompare(
         Context $context,
         Variable $callback,
         Variable $a,
-        Variable $b
+        Variable $b,
+        ?Frame $scopeFrame = null,
+        string $function = 'usort'
     ): int {
         $copyA = new Variable();
         $copyA->duplicateFrom($a);
         $copyB = new Variable();
         $copyB->duplicateFrom($b);
-        $result = VmCallable::invoke($context, $callback, $copyA, $copyB);
+        $result = VmCallable::invokeAsWithScope(
+            $function,
+            $context,
+            $scopeFrame,
+            $callback,
+            $copyA,
+            $copyB
+        );
 
         return VmClosureCall::coerceUserSortCallbackResult($result);
     }
@@ -95,10 +112,18 @@ final class VmArraySortCallback
         Context $context,
         array &$values,
         Variable $callback,
-        bool $descending = false
+        bool $descending = false,
+        ?Frame $scopeFrame = null,
+        string $function = 'usort'
     ): void {
-        $cmp = static function (Variable $a, Variable $b) use ($context, $callback, $descending): int {
-            $result = self::invokeCompare($context, $callback, $a, $b);
+        $cmp = static function (Variable $a, Variable $b) use (
+            $context,
+            $callback,
+            $descending,
+            $scopeFrame,
+            $function
+        ): int {
+            $result = self::invokeCompare($context, $callback, $a, $b, $scopeFrame, $function);
 
             return $descending ? -$result : $result;
         };
@@ -112,10 +137,18 @@ final class VmArraySortCallback
         Context $context,
         array &$pairs,
         Variable $callback,
-        bool $descending = false
+        bool $descending = false,
+        ?Frame $scopeFrame = null,
+        string $function = 'uksort'
     ): void {
-        $cmp = static function (array $a, array $b) use ($context, $callback, $descending): int {
-            $result = self::invokeCompare($context, $callback, $a[0], $b[0]);
+        $cmp = static function (array $a, array $b) use (
+            $context,
+            $callback,
+            $descending,
+            $scopeFrame,
+            $function
+        ): int {
+            $result = self::invokeCompare($context, $callback, $a[0], $b[0], $scopeFrame, $function);
 
             return $descending ? -$result : $result;
         };
@@ -129,10 +162,18 @@ final class VmArraySortCallback
         Context $context,
         array &$pairs,
         Variable $callback,
-        bool $descending = false
+        bool $descending = false,
+        ?Frame $scopeFrame = null,
+        string $function = 'uasort'
     ): void {
-        $cmp = static function (array $a, array $b) use ($context, $callback, $descending): int {
-            $result = self::invokeCompare($context, $callback, $a[1], $b[1]);
+        $cmp = static function (array $a, array $b) use (
+            $context,
+            $callback,
+            $descending,
+            $scopeFrame,
+            $function
+        ): int {
+            $result = self::invokeCompare($context, $callback, $a[1], $b[1], $scopeFrame, $function);
 
             return $descending ? -$result : $result;
         };

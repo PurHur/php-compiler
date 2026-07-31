@@ -220,20 +220,94 @@ final class VmCallable
     }
 
     /**
-     * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709).
+     * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709, #25712).
      */
     public static function inaccessibleMethodCallbackTypeError(
         string $function,
         string $kind,
         string $className,
-        string $methodName
+        string $methodName,
+        int $argNum = 1
     ): string {
         return sprintf(
-            '%s(): Argument #1 ($callback) must be a valid callback, cannot access %s method %s::%s()',
+            '%s(): Argument #%d ($callback) must be a valid callback, cannot access %s method %s::%s()',
             $function,
+            $argNum,
             $kind,
             $className,
             $methodName
+        );
+    }
+
+    /**
+     * When a real method exists but is not visible from $scopeFrame, throw Zend's
+     * cannot-access TypeError (usort/uasort/uksort Argument #N; #25712).
+     * No-op when the callable is merely malformed or the method is missing.
+     */
+    public static function throwIfInaccessibleMethodCallback(
+        Context $ctx,
+        Variable $callback,
+        string $function,
+        int $argNum,
+        ?Frame $scopeFrame
+    ): void {
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $callback->type) {
+            return;
+        }
+        $table = $callback->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        $idx1 = new Variable(Variable::TYPE_INTEGER);
+        $idx1->int(1);
+        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            return;
+        }
+        $target = $table->findVariable($idx0, false)->resolveIndirect();
+        $methodVar = $table->findVariable($idx1, false)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $methodVar->type) {
+            return;
+        }
+        $methodName = $methodVar->toString();
+        if ('' === $methodName || !self::isValidMethodName($methodName)) {
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $target->type) {
+            self::assertInstanceMethodVisibleForInvoke(
+                $ctx,
+                $target->toObject()->class,
+                $methodName,
+                $function,
+                $scopeFrame,
+                $argNum
+            );
+
+            return;
+        }
+        if (Variable::TYPE_STRING !== $target->type) {
+            return;
+        }
+        $class = $target->toString();
+        if ('' === $class) {
+            return;
+        }
+        $resolved = self::resolveScopeKeywordClass($ctx, $class, $scopeFrame, false, $function);
+        if (null === $resolved || '' === $resolved) {
+            return;
+        }
+        $located = self::locateCallableMethodSoft($ctx, $resolved, $methodName);
+        if (null === $located) {
+            return;
+        }
+        [$declaring, $methodLc] = $located;
+        self::assertDeclaringMethodVisibleForInvoke(
+            $ctx,
+            $declaring,
+            $methodLc,
+            $methodName,
+            $function,
+            $scopeFrame,
+            $argNum
         );
     }
 
@@ -591,7 +665,8 @@ final class VmCallable
                 $object->class,
                 $methodName,
                 $function,
-                $scopeFrame
+                $scopeFrame,
+                1
             );
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, $methodName, ...$args);
@@ -627,7 +702,8 @@ final class VmCallable
         ClassEntry $objectClass,
         string $method,
         string $function,
-        ?Frame $scopeFrame
+        ?Frame $scopeFrame,
+        int $argNum = 1
     ): void {
         if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
             return;
@@ -643,12 +719,13 @@ final class VmCallable
             $methodLc,
             $method,
             $function,
-            $scopeFrame
+            $scopeFrame,
+            $argNum
         );
     }
 
     /**
-     * Shared visibility gate for instance + static array/`Class::method` callables (#25709).
+     * Shared visibility gate for instance + static array/`Class::method` callables (#25709, #25712).
      */
     private static function assertDeclaringMethodVisibleForInvoke(
         Context $ctx,
@@ -656,7 +733,8 @@ final class VmCallable
         string $methodLc,
         string $methodFallback,
         string $function,
-        ?Frame $scopeFrame
+        ?Frame $scopeFrame,
+        int $argNum = 1
     ): void {
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null !== $scopeFrame
@@ -676,7 +754,8 @@ final class VmCallable
             $function,
             $kind,
             $declaring->name,
-            $declaredName
+            $declaredName,
+            $argNum
         ));
     }
 
@@ -713,7 +792,8 @@ final class VmCallable
             $methodLc,
             $methodName,
             $function,
-            $scopeFrame
+            $scopeFrame,
+            1
         );
         $vm = $ctx->runtime->vm;
         if (!$isStatic) {
@@ -895,6 +975,45 @@ final class VmCallable
                 }
 
                 return [$class, $methodLc, $isStatic];
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $walk = $class->parentLc;
+        }
+
+        return null;
+    }
+
+    /**
+     * Like {@see locateCallableMethod} but returns null when the class/method is missing
+     * (no TypeError) — used for inaccessible-callback diagnostics (#25712).
+     *
+     * @return array{0: \PHPCompiler\VM\ClassEntry, 1: string}|null
+     */
+    private static function locateCallableMethodSoft(
+        Context $ctx,
+        string $className,
+        string $methodName
+    ): ?array {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
+        if (!isset($ctx->classes[$lcClass])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$lcClass])) {
+            return null;
+        }
+        $visited = [];
+        $walk = $lcClass;
+        while (!isset($visited[$walk])) {
+            $visited[$walk] = true;
+            if (!isset($ctx->classes[$walk])) {
+                break;
+            }
+            $class = $ctx->classes[$walk];
+            if (isset($class->methods[$methodLc])) {
+                return [$class, $methodLc];
             }
             if (null === $class->parentLc) {
                 break;

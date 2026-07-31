@@ -67,7 +67,9 @@ final class uasort_ extends Internal
                 $frame->vmContext,
                 $pairs,
                 $callback,
-                $descending
+                $descending,
+                $frame,
+                'uasort'
             );
         }
         $sorted = new HashTable();

@@ -74,7 +74,9 @@ final class usort_ extends Internal
                 $frame->vmContext,
                 $values,
                 $callback,
-                $descending
+                $descending,
+                $frame,
+                'usort'
             );
         }
         $array->separateArrayForWrite();

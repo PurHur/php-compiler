@@ -521,7 +521,14 @@ final class SplArrayStorage
             if (null === $frame->vmContext) {
                 throw new \LogicException($function.'() requires VM context in this compiler build');
             }
-            VmArraySortCallback::sortKeyedPairsByValue($frame->vmContext, $pairs, $callback);
+            VmArraySortCallback::sortKeyedPairsByValue(
+                $frame->vmContext,
+                $pairs,
+                $callback,
+                false,
+                $frame,
+                $function
+            );
         }
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
@@ -563,7 +570,14 @@ final class SplArrayStorage
             if (null === $frame->vmContext) {
                 throw new \LogicException($function.'() requires VM context in this compiler build');
             }
-            VmArraySortCallback::sortKeyedPairsByKey($frame->vmContext, $pairs, $callback);
+            VmArraySortCallback::sortKeyedPairsByKey(
+                $frame->vmContext,
+                $pairs,
+                $callback,
+                false,
+                $frame,
+                $function
+            );
         }
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
