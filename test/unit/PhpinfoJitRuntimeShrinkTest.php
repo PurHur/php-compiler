@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** phpinfo/phpcredits JIT routes through PhpinfoJitHelper PHP, not LLVM HTML tables (#9256). */
+/** phpinfo/phpcredits JIT routes through PhpinfoJitHelper via JitVmHelperLink, not hand-rolled NestedJIT (#9256, #25931). */
 final class PhpinfoJitRuntimeShrinkTest extends TestCase
 {
     public function testPhpinfoJitHelperDelegatesToVmInfo(): void
@@ -20,11 +20,19 @@ final class PhpinfoJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/StringPhpinfoRuntime.php');
         $this->assertStringContainsString('PhpinfoJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('PHP_COMPILER_SELFHOST_AOT', $source);
         $this->assertStringNotContainsString('emitPhpinfoHtmlHeader', $source);
         $this->assertStringNotContainsString('emitGeneralSection', $source);
         $this->assertStringNotContainsString('emitObEchoCstr', $source);
         $this->assertStringNotContainsString('StringPhpinfoRuntimeLlvm', $source);
-        $this->assertLessThan(200, \substr_count($source, "\n"), 'StringPhpinfoRuntime must be a thin bridge');
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1, 'StringPhpinfoRuntime must be a thin bridge');
         $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/JIT/Builtin/StringPhpinfoRuntimeLlvm.php');
     }
 
