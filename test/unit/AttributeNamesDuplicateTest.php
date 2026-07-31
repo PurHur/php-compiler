@@ -233,4 +233,30 @@ final class AttributeNamesDuplicateTest extends TestCase
 
         AttributeNames::assertSensitiveParameterParamTargetOnly(['\\SensitiveParameter'], 'property');
     }
+
+    public function testRejectsReturnTypeWillChangeOnFunction(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "ReturnTypeWillChange" cannot target function (allowed targets: method)'
+        );
+
+        AttributeNames::assertReturnTypeWillChangeMethodTargetOnly(['\\ReturnTypeWillChange'], 'function');
+    }
+
+    public function testRejectsReturnTypeWillChangeOnProperty(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "ReturnTypeWillChange" cannot target property (allowed targets: method)'
+        );
+
+        AttributeNames::assertReturnTypeWillChangeMethodTargetOnly(['ReturnTypeWillChange'], 'property');
+    }
+
+    public function testAllowsReturnTypeWillChangeOnMethod(): void
+    {
+        AttributeNames::assertReturnTypeWillChangeMethodTargetOnly(['\\ReturnTypeWillChange'], 'method');
+        $this->addToAssertionCount(1);
+    }
 }

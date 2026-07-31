@@ -304,6 +304,43 @@ final class AttributeNames
         );
     }
 
+    /** True when `#[\ReturnTypeWillChange]` is present (#25722). */
+    public static function hasReturnTypeWillChange(array $names): bool
+    {
+        foreach ($names as $name) {
+            $base = ltrim((string) $name, '\\');
+            if ('ReturnTypeWillChange' === $base || str_ends_with($base, '\\ReturnTypeWillChange')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend compile-time target guard (zend_attributes.c, issue #25722).
+     * `#[\ReturnTypeWillChange]` is TARGET_METHOD only — reject on functions/properties/etc.
+     *
+     * AttributeTargetValidator skips builtin internals (`returntypewillchange`), so this
+     * dedicated AttributeNames guard is required (same pattern as SensitiveParameter).
+     *
+     * @param list<string> $names
+     */
+    public static function assertReturnTypeWillChangeMethodTargetOnly(array $names, string $target): void
+    {
+        if (!self::hasReturnTypeWillChange($names)) {
+            return;
+        }
+
+        if ('method' === $target) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Attribute "'.self::messageName('ReturnTypeWillChange').'" cannot target '.$target.' (allowed targets: method)'
+        );
+    }
+
     /** PHP 8.4+ #[\NoDiscard] on functions/methods (issue #5078, Zend zend_attributes.c). */
     public static function hasNoDiscard(array $names): bool
     {
