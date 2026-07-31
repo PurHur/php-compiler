@@ -103,6 +103,19 @@ final class Variable {
     public ?string $functionStaticVarName = null;
 
     /**
+     * True when this INDIRECT alias was created by ASSIGN_REF to a typed property
+     * (`$r = &$obj->prop` / `&Class::$prop`). TypeError messages then use Zend's
+     * "reference held by property" wording (#25622, zend_execute.c).
+     */
+    public bool $typedPropertyByRef = false;
+
+    /**
+     * True when this INDIRECT is a PROPERTY_FETCH_WRITE / static write lvalue temp
+     * (direct `$obj->prop =` / `Class::$prop =`). Opposite of {@see $typedPropertyByRef}.
+     */
+    public bool $propertyAssignLvalue = false;
+
+    /**
      * Zend ZSTR_IS_INTERNED — compile-time string literals / interned table entries (#22716).
      * Used by debug_zval_dump(); cleared on fresh {@see string()} allocations.
      */
@@ -988,6 +1001,8 @@ final class Variable {
 
     public function indirect(Variable $value): void {
         $this->reset();
+        $this->typedPropertyByRef = false;
+        $this->propertyAssignLvalue = false;
         $this->type = self::TYPE_INDIRECT;
         $this->indirect = $value;
     }

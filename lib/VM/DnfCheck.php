@@ -189,12 +189,17 @@ final class DnfCheck
         string $expectedType,
         Variable $value
     ): \TypeError {
+        $expectedType = \PHPCompiler\DnfType::zendTypeErrorLabel($expectedType);
+        $propPhrase = TypeCheck::isAssignViaTypedPropertyReference()
+            ? 'reference held by property'
+            : 'property';
         $owner = $target->objectPropertyOwner;
         $propName = $target->objectPropertyName ?? 'property';
         if (null !== $owner) {
             return new \TypeError(sprintf(
-                'Cannot assign %s to property %s::$%s of type %s',
+                'Cannot assign %s to %s %s::$%s of type %s',
                 self::givenTypeLabel($value),
+                $propPhrase,
                 $owner->class->name,
                 $propName,
                 $expectedType
@@ -209,8 +214,9 @@ final class DnfCheck
             }
 
             return new \TypeError(sprintf(
-                'Cannot assign %s to property %s::$%s of type %s',
+                'Cannot assign %s to %s %s::$%s of type %s',
                 self::givenTypeLabel($value),
+                $propPhrase,
                 $classLabel,
                 $propName,
                 $expectedType
