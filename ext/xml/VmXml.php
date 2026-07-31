@@ -220,6 +220,9 @@ final class VmXml
         // Incomplete token / unclosed root while more data may arrive — Expat returns success
         // with error code 0 until isFinal (php-src ext/xml/xml.c XML_Parse).
         if (!$isFinal && self::isRecoverableIncompleteError($error)) {
+            // Expat still advances the parse cursor past complete tokens (#25817).
+            self::recordExpatParseCursor($parser, $accumulated, true);
+
             return 1;
         }
 
@@ -260,11 +263,10 @@ final class VmXml
 
     private static function recordSuccessfulParse(int $parser, string $data): void
     {
-        $byteIndex = \strlen($data);
         self::$parsers[$parser]['errorCode'] = 0;
-        self::$parsers[$parser]['line'] = 1 + substr_count($data, "\n");
-        self::$parsers[$parser]['byteIndex'] = $byteIndex;
-        self::$parsers[$parser]['column'] = $byteIndex + 1;
+        // Expat: byte index is end-of-buffer; column is 1-based within the current line
+        // (php-src ext/xml/xml.c XML_GetCurrentColumnNumber; #25817).
+        self::setParserCursor($parser, $data, \strlen($data));
     }
 
     /**
@@ -272,11 +274,118 @@ final class VmXml
      */
     private static function recordParserError(int $parser, array $error, string $data): void
     {
-        $byteIndex = $error['byteIndex'] ?? \strlen($data);
         self::$parsers[$parser]['errorCode'] = $error['code'];
+        // Premature-end / unclosed-token: Expat leaves the cursor after the last complete
+        // start-tag event (not always EOF), with a single-char `<X>` buffer quirk (#25817).
+        if (5 === $error['code'] || self::XML_ERR_UNCLOSED_NODE_TAG === $error['code']) {
+            self::recordExpatParseCursor($parser, $data, true);
+
+            return;
+        }
+        $byteIndex = $error['byteIndex'] ?? \strlen($data);
         self::$parsers[$parser]['line'] = $error['line'];
         self::$parsers[$parser]['column'] = $error['column'];
         self::$parsers[$parser]['byteIndex'] = $byteIndex;
+    }
+
+    /**
+     * Apply Expat post-parse line/column/byte diagnostics (php-src ext/xml/xml.c; #25817).
+     *
+     * @param bool $prematureEnd when the document still has open elements (err 5 / non-final)
+     */
+    private static function recordExpatParseCursor(int $parser, string $data, bool $prematureEnd): void
+    {
+        if ($prematureEnd) {
+            self::setParserCursor($parser, $data, self::expatCursorByteIndexForPrematureEnd($data));
+
+            return;
+        }
+        self::setParserCursor($parser, $data, \strlen($data));
+    }
+
+    /**
+     * Expat byte index after an unclosed-element parse (XML_ERROR_UNCLOSED_TOKEN / #25817).
+     *
+     * Normally the end of the last complete start-tag (`>`). Quirk: when the entire buffer is
+     * exactly one single-character bare start tag (`<r>`), Expat leaves byte index 0.
+     */
+    private static function expatCursorByteIndexForPrematureEnd(string $data): int
+    {
+        if (1 === preg_match('/^<[A-Za-z_]>$/', $data)) {
+            return 0;
+        }
+        $afterStart = self::findLastCompleteStartTagEnd($data);
+
+        return null !== $afterStart ? $afterStart : \strlen($data);
+    }
+
+    /** @return null|int byte offset immediately after the last complete start-tag `>` */
+    private static function findLastCompleteStartTagEnd(string $data): ?int
+    {
+        $len = \strlen($data);
+        $last = null;
+        $scan = 0;
+        while ($scan < $len) {
+            if ('<' !== $data[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $data, $close, 0, $scan)) {
+                $scan += \strlen($close[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/s', $data, $sc, 0, $scan)) {
+                $scan += \strlen($sc[0]);
+                $last = $scan;
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $data, $open, 0, $scan)) {
+                $scan += \strlen($open[0]);
+                $last = $scan;
+
+                continue;
+            }
+            $cdata = self::parseCdataSectionAt($data, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($data, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
+            $pi = self::parseProcessingInstructionAt($data, $scan);
+            if (null !== $pi) {
+                $scan = $pi['end'];
+
+                continue;
+            }
+            ++$scan;
+        }
+
+        return $last;
+    }
+
+    /** Set parser line/column/byteIndex from a 0-based end-relative byte index into $data. */
+    private static function setParserCursor(int $parser, string $data, int $byteIndex): void
+    {
+        if ($byteIndex < 0) {
+            $byteIndex = 0;
+        }
+        $len = \strlen($data);
+        if ($byteIndex > $len) {
+            $byteIndex = $len;
+        }
+        $prefix = substr($data, 0, $byteIndex);
+        self::$parsers[$parser]['byteIndex'] = $byteIndex;
+        self::$parsers[$parser]['line'] = 1 + substr_count($prefix, "\n");
+        self::$parsers[$parser]['column'] = self::columnOnLine($data, $byteIndex);
     }
 
     public static function isWellFormed(string $data): bool
@@ -1329,6 +1438,13 @@ final class VmXml
      */
     private static function expatAdjustLibxmlError(array $error): array
     {
+        // libxml XML_ERR_UNCLOSED_NODE_TAG → Expat XML_ERROR_UNCLOSED_TOKEN (5)
+        // "Invalid document end" (php-src ext/xml/xml.c; #25817).
+        if (self::XML_ERR_UNCLOSED_NODE_TAG === $error['code']) {
+            $error['code'] = 5;
+
+            return $error;
+        }
         if (self::XML_ERR_TAG_NAME_MISMATCH !== $error['code']) {
             return $error;
         }
