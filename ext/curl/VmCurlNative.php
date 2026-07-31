@@ -210,6 +210,46 @@ final class VmCurlNative
     }
 
     /**
+     * CURL_ERROR_SIZE (+1 for NUL) — php-src php_curl.err.str (#25814).
+     *
+     * @return \FFI\CData char[257] owned by PHP (must outlive CURLOPT_ERRORBUFFER attach)
+     */
+    public static function allocErrorBuffer(): \FFI\CData
+    {
+        $buf = self::requireCurl()->new('char[257]');
+        self::clearErrorBuffer($buf);
+
+        return $buf;
+    }
+
+    /**
+     * @param \FFI\CData $buf char[257]
+     */
+    public static function clearErrorBuffer(\FFI\CData $buf): void
+    {
+        for ($i = 0; $i < 257; ++$i) {
+            $buf[$i] = "\0";
+        }
+    }
+
+    /**
+     * @param \FFI\CData $ch  CURL*
+     * @param \FFI\CData $buf char[257]
+     */
+    public static function attachErrorBuffer(\FFI\CData $ch, \FFI\CData $buf): void
+    {
+        self::easySetoptPtr($ch, CurlConstants::CURLOPT_ERRORBUFFER, \FFI::addr($buf[0]));
+    }
+
+    /**
+     * @param \FFI\CData $buf char[257]
+     */
+    public static function errorBufferString(\FFI\CData $buf): string
+    {
+        return (string) \FFI::string($buf);
+    }
+
+    /**
      * @return \FFI\CData CURLM*
      */
     public static function multiInit(): \FFI\CData

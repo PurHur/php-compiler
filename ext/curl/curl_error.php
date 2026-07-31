@@ -11,7 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * curl_error() — last error string (php-src ext/curl/interface.c; #3325).
+ * curl_error() — last error string from CURLOPT_ERRORBUFFER
+ * (php-src ext/curl/interface.c; #3325, #25814).
  */
 final class curl_error extends Internal
 {

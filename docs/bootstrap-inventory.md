@@ -7514,12 +7514,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlEasy.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 57)
-- new Variable (line 69)
-- new ObjectEntry (line 70)
-- new Variable (line 509)
-- new ObjectEntry (line 510)
-- 34 class method(s)
+- new ClassEntry (line 58)
+- new Variable (line 72)
+- new ObjectEntry (line 73)
+- new Variable (line 524)
+- new ObjectEntry (line 525)
+- 35 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
@@ -7537,8 +7537,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 220)
-- 39 class method(s)
+- new Error (line 260)
+- 43 class method(s)
 
 ### `ext/curl/VmCurlShare.php`
 
@@ -7578,7 +7578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_error.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/curl/curl_escape.php`
