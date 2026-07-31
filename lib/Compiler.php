@@ -29546,9 +29546,14 @@ class Compiler {
                     return true;
                 }
                 // replaceChild(..., getElementsByTagName()->item(0)) — leaf item is adjacent (#25563).
+                // Require ≥2 consumer args: isSiblingMultiArgInlineCallConsumer matches any
+                // MethodCall, and treating 0/1-arg finals (getLineNo/getAttribute) as multi-arg
+                // consumers deferred getElementsByTagName with nothing to re-emit (#25842).
                 if (
                     $j === $consumerIndex - 1
                     && $this->isSiblingMultiArgInlineCallConsumer($consumer)
+                    && \is_array($consumer->args ?? null)
+                    && \count($consumer->args) >= 2
                 ) {
                     return true;
                 }
