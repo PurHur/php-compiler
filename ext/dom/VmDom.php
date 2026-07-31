@@ -7821,7 +7821,8 @@ final class VmDom
         }
         if ($pos < $len && '<' === $trimmed[$pos]) {
             $rest = substr($trimmed, $pos + 1);
-            if (str_starts_with(strtolower($rest), '!doctype') || str_starts_with(strtolower($rest), 'html')) {
+            $restLc = strtolower($rest);
+            if (str_starts_with($restLc, '!doctype') || str_starts_with($restLc, 'html')) {
                 $close = strpos($trimmed, '>');
                 if (false !== $close && str_starts_with(strtolower(ltrim(substr($trimmed, $pos + 1))), '!doctype')) {
                     return ltrim(substr($trimmed, $close + 1));
@@ -7829,9 +7830,33 @@ final class VmDom
 
                 return $trimmed;
             }
+            // Leading <body>/<head>: wrap in <html> only — avoid nested <body> (#25988).
+            // Preg-free (VmPregPure / AOT loadHTML; #17954).
+            if (self::htmlLoadSourceStartsWithBodyOrHead($restLc)) {
+                return '<html>'.$trimmed.'</html>';
+            }
         }
 
         return '<html><body>'.$trimmed.'</body></html>';
+    }
+
+    /** True when $restLc (after '<') is a body/head start tag name boundary. */
+    private static function htmlLoadSourceStartsWithBodyOrHead(string $restLc): bool
+    {
+        foreach (['body', 'head'] as $tag) {
+            $n = \strlen($tag);
+            if (!str_starts_with($restLc, $tag)) {
+                continue;
+            }
+            if (\strlen($restLc) === $n) {
+                return true;
+            }
+            $next = $restLc[$n];
+
+            return ctype_space($next) || '/' === $next || '>' === $next;
+        }
+
+        return false;
     }
 
     /**
@@ -8330,9 +8355,24 @@ final class VmDom
             }
             $end = self::findHtmlElementEnd($inner, $pos);
             if (null === $end) {
-                $tagName = self::detectHtmlUnclosedTagName($inner, $pos);
-                if (null !== $tagName) {
-                    self::reportDomLoadHtmlUnclosedTagWarnings($ctx, $tagName, $frame);
+                $recovered = self::recoverHtmlIncompleteStartTag($inner, $pos);
+                if (null !== $recovered) {
+                    self::reportDomLoadHtmlUnclosedTagWarnings($ctx, $recovered['tag'], $frame);
+                    // libxml creates the element anyway (<p><unclosed → <unclosed></unclosed>; #25988).
+                    $child = self::createHtmlElementFromTag(
+                        $ctx,
+                        $recovered['tag'],
+                        $recovered['attrs'],
+                        '',
+                        $ownerDocument,
+                        $frame
+                    );
+                    $state->childIds[] = $child->id;
+                    self::linkChildToParent($child, $parent);
+                    self::resolveElementNamespaceUri($child);
+                    $pos = $recovered['end'];
+
+                    continue;
                 }
 
                 return;
@@ -8383,11 +8423,9 @@ final class VmDom
 
                     continue;
                 }
-                // Ancestor/other close: imply optional end tags first (libxml; #20247).
+                // Ancestor/other close: auto-close intervening opens (libxml htmlReadMemory;
+                // optional tags #20247; non-optional e.g. div/span before </body> #25988).
                 while ([] !== $stack && end($stack) !== $name) {
-                    if (!self::htmlElementHasOptionalEndTag((string) end($stack))) {
-                        return null;
-                    }
                     array_pop($stack);
                     if ([] === $stack) {
                         // Closed the element we were scanning — leave this close tag for the parent.
@@ -8425,12 +8463,13 @@ final class VmDom
             ++$scan;
         }
 
-        // EOF: omit optional end tags (html/body/p/…) like libxml htmlReadMemory (#20247).
-        while ([] !== $stack && self::htmlElementHasOptionalEndTag((string) end($stack))) {
+        // EOF: auto-close remaining opens like libxml htmlReadMemory (#20247 optional;
+        // #25988 non-optional div/span/…). Well-formed start tags get no libxml warning.
+        while ([] !== $stack) {
             array_pop($stack);
         }
 
-        return [] === $stack ? $len : null;
+        return $len;
     }
 
     /**
@@ -8695,25 +8734,47 @@ final class VmDom
     /** Innermost unclosed/malformed tag for loadHTML libxml warnings (#16190). */
     private static function detectHtmlUnclosedTagName(string $content, int $pos): ?string
     {
+        $recovered = self::recoverHtmlIncompleteStartTag($content, $pos);
+
+        return null === $recovered ? null : $recovered['tag'];
+    }
+
+    /**
+     * Incomplete HTML start tag (missing '>') — libxml still materializes the element (#16190 / #25988).
+     *
+     * @return null|array{tag: string, attrs: string, end: int}
+     */
+    private static function recoverHtmlIncompleteStartTag(string $content, int $pos): ?array
+    {
         $tail = substr($content, $pos);
-        if ('' === $tail) {
+        if ('' === $tail || !isset($tail[0]) || '<' !== $tail[0]) {
             return null;
         }
-
-        if (preg_match('/<([A-Za-z_][\w:.-]*)(\s[^>]*)?(?=[^>]*(?:<|\z))/s', $tail, $broken)) {
-            return strtolower($broken[1]);
-        }
-
-        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $tail, $open)) {
+        // Preg-free scan for AOT/VmPregPure (#17954).
+        $len = \strlen($tail);
+        if ($len < 2 || !self::isHtmlTagNameStart($tail[1])) {
             return null;
         }
-
-        $tag = strtolower($open[1]);
-        if (!preg_match('/<\/'.preg_quote($tag, '/').'\s*>/is', $tail)) {
-            return $tag;
+        $i = 2;
+        while ($i < $len && self::isHtmlTagNameChar($tail[$i])) {
+            ++$i;
         }
+        $tag = strtolower(substr($tail, 1, $i - 1));
+        $attrStart = $i;
+        while ($i < $len && '>' !== $tail[$i] && '<' !== $tail[$i]) {
+            ++$i;
+        }
+        // Complete start tag with '>' is handled by findHtmlElementEnd — not incomplete.
+        if ($i < $len && '>' === $tail[$i]) {
+            return null;
+        }
+        $attrs = substr($tail, $attrStart, $i - $attrStart);
 
-        return null;
+        return [
+            'tag' => $tag,
+            'attrs' => $attrs,
+            'end' => $pos + $i,
+        ];
     }
 
     private static function serializeHtmlDoctypeFromDocumentState(DomNodeState $state): string
