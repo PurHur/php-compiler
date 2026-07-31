@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6650 |
-| Phase A inventory files (M2 ratio SSOT) | 6650 |
+| PHP files on vm.php path | 6651 |
+| Phase A inventory files (M2 ratio SSOT) | 6651 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21458 |
+| Source constructs flagged (warnings) | 21462 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -926,6 +926,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/BuiltinClasses.php` | 0 | 53 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IcuDateFormat.php` | 0 | 1 |
+| `ext/intl/IcuErrorConstants.php` | 0 | 1 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlConstants.php` | 0 | 1 |
@@ -3367,8 +3368,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmScope.php` | 0 | 6 |
 | `ext/standard/VmSerialize.php` | 0 | 60 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
-| `ext/standard/VmSession.php` | 0 | 17 |
-| `ext/standard/VmSessionSerializer.php` | 0 | 5 |
+| `ext/standard/VmSession.php` | 0 | 13 |
+| `ext/standard/VmSessionSerializer.php` | 0 | 14 |
 | `ext/standard/VmSetcookie.php` | 0 | 1 |
 | `ext/standard/VmSettype.php` | 0 | 7 |
 | `ext/standard/VmShellExecNative.php` | 0 | 1 |
@@ -3918,7 +3919,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/md5_file.php` | 0 | 1 |
 | `ext/standard/memory_get_peak_usage.php` | 0 | 3 |
 | `ext/standard/memory_get_usage.php` | 0 | 3 |
-| `ext/standard/memory_reset_peak_usage.php` | 0 | 3 |
+| `ext/standard/memory_reset_peak_usage.php` | 0 | 1 |
 | `ext/standard/metaphone.php` | 0 | 1 |
 | `ext/standard/method_exists_.php` | 0 | 3 |
 | `ext/standard/microtime.php` | 0 | 1 |
@@ -13254,6 +13255,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `ext/intl/IcuErrorConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/intl/IdnFunction.php`
 
@@ -25480,7 +25486,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ErrorSilenceJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/ExceptionHandlerJitHelper.php`
 
@@ -31774,14 +31780,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 1027)
-- new HashTable (line 1058)
-- new HashTable (line 1065)
-- new Variable (line 1076)
-- new Variable (line 1185)
-- new Variable (line 1193)
-- new Variable (line 1201)
-- 69 class method(s)
+- new HashTable (line 1067)
+- new HashTable (line 1098)
+- new HashTable (line 1105)
+- new Variable (line 1116)
+- new Variable (line 1225)
+- new Variable (line 1233)
+- new Variable (line 1241)
+- 71 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -32664,20 +32670,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 665)
 - new HashTable (line 687)
 - new HashTable (line 837)
-- new HashTable (line 845)
-- new HashTable (line 856)
-- new HashTable (line 863)
-- new HashTable (line 869)
 - 56 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 133)
-- new Variable (line 156)
-- new HashTable (line 172)
+- new HashTable (line 171)
 - new Variable (line 194)
-- 8 class method(s)
+- new HashTable (line 205)
+- new Variable (line 221)
+- new HashTable (line 233)
+- new HashTable (line 239)
+- new HashTable (line 252)
+- new HashTable (line 265)
+- new HashTable (line 302)
+- new Variable (line 325)
+- new HashTable (line 336)
+- new HashTable (line 347)
+- new Variable (line 369)
+- 14 class method(s)
 
 ### `ext/standard/VmSetcookie.php`
 
@@ -36009,9 +36020,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/memory_reset_peak_usage.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 40)
-- new ArgumentCountError (line 52)
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/metaphone.php`
 
@@ -41714,7 +41723,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 713)
+- new InternalArgInfo (line 718)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -41730,8 +41739,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1984)
-- new ArgumentCountError (line 1995)
+- new ArgumentCountError (line 1987)
+- new ArgumentCountError (line 1998)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -52866,10 +52875,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ErrorReporter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 129)
-- new ScriptExit (line 515)
-- new Variable (line 687)
-- 52 class method(s)
+- new Variable (line 148)
+- new ScriptExit (line 534)
+- new Variable (line 706)
+- 53 class method(s)
 
 ### `lib/VM/ExceptionHandlerStack.php`
 
