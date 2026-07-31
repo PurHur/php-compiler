@@ -27717,11 +27717,15 @@ class Compiler {
      * when they fall inside the trailing dead-temp arg window (DOMNodeList::item(), getElementById(),
      * … — #21171) and skipped when they are prior statement calls such as loadXML (#19719).
      */
+    /**
+     * @param list<Op> $cfgChildren
+     */
     private function methodCallIsSkippedHoistedSiblingProducer(
         Op\Expr\MethodCall $child,
         int $childIndex,
         int $consumerIndex,
-        int $deadInlineArgCount
+        int $deadInlineArgCount,
+        array $cfgChildren = []
     ): bool {
         if ($this->methodCallHasStatementLevelSideEffects($child)) {
             // Iterator `$it->next(); var_export($it->current(), true)` — outside the dead-temp
@@ -27740,11 +27744,40 @@ class Compiler {
         if ($this->methodCallInlineProducerSuppliesCallArgValue($child)) {
             return false;
         }
+        // getElementsByTagName()->item(0) before importNode(..., true) — keep the receiver
+        // producer even when trailing ConstFetch pushes raw distance past deadInlineArgCount
+        // (#25702, re-#20284/#25605).
+        if (
+            [] !== $cfgChildren
+            && null !== $child->result
+            && !empty($child->result->usages)
+        ) {
+            foreach ($child->result->usages as $usage) {
+                if (!($usage instanceof Op\Expr\MethodCall || $usage instanceof Op\Expr\StaticCall)) {
+                    continue;
+                }
+                $usageIndex = array_search($usage, $cfgChildren, true);
+                if (\is_int($usageIndex) && $usageIndex > $childIndex && $usageIndex < $consumerIndex) {
+                    return false;
+                }
+            }
+        }
         if ($deadInlineArgCount < 1) {
             return true;
         }
+        $distance = $consumerIndex - $childIndex;
+        // true/false/null ConstFetch between chained MethodCalls and the consumer occupy CFG
+        // slots without being call producers — do not let them push the leaf chain out of window.
+        if ([] !== $cfgChildren) {
+            for ($j = $childIndex + 1; $j < $consumerIndex; ++$j) {
+                $mid = $cfgChildren[$j] ?? null;
+                if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                    --$distance;
+                }
+            }
+        }
 
-        return ($consumerIndex - $childIndex) > $deadInlineArgCount;
+        return $distance > $deadInlineArgCount;
     }
 
     /** Count php-cfg dead inline call-arg temporaries on a consumer (#9463, #25672). */
@@ -28415,7 +28448,15 @@ class Compiler {
                 if ($this->isSiblingMultiArgFuncCallProducer($op, $next, $producerIndex, $j, $ops)) {
                     return $j;
                 }
-
+                // importNode(...->item(0), true) — only true/false/null ConstFetch between leaf MethodCall
+                // and consumer; detect structurally (isNestedCallArg can fail under firstSibling reentry) (#25702).
+                if (
+                    $op instanceof Op\Expr\MethodCall
+                    && $this->isSiblingMultiArgInlineCallConsumer($next)
+                    && $this->onlyScalarConstFetchPreludesBetween($producerIndex, $j, $ops)
+                ) {
+                    return $j;
+                }
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($next)) {
@@ -28466,7 +28507,8 @@ class Compiler {
                     $child,
                     $j,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $cfgChildren
                 )
             ) {
                 continue;
@@ -28587,7 +28629,8 @@ class Compiler {
                     $child,
                     $j,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $cfgChildren
                 )
             ) {
                 continue;
@@ -28638,7 +28681,8 @@ class Compiler {
                     $child,
                     $j,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $cfgChildren
                 )
             ) {
                 continue;
@@ -29279,6 +29323,44 @@ class Compiler {
                 || ($consumerIndex - $producerIndex) > $deadInlineArgCount
             ) {
                 return false;
+            }
+        }
+        // getElementsByTagName()->item(0) before importNode(..., true) — receiver MethodCall must
+        // emit before the leaf item() sibling even though it does not bind a consumer arg temp
+        // (#25702, re-#20284/#25605). Do not recurse into isSiblingMultiArgFuncCallProducer.
+        if (
+            $producer instanceof Op\Expr\MethodCall
+            && null !== $producer->result
+            && !empty($producer->result->usages)
+        ) {
+            for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                $later = $cfgChildren[$j] ?? null;
+                if (!($later instanceof Op\Expr\MethodCall)) {
+                    continue;
+                }
+                if (
+                    !property_exists($later, 'var')
+                    || null === $later->var
+                    || !$this->operandsReferToSameVariable($producer->result, $later->var)
+                ) {
+                    continue;
+                }
+                if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $later,
+                    $consumer,
+                    $j,
+                    $consumerIndex,
+                    $cfgChildren
+                )) {
+                    return true;
+                }
+                // replaceChild(..., getElementsByTagName()->item(0)) — leaf item is adjacent (#25563).
+                if (
+                    $j === $consumerIndex - 1
+                    && $this->isSiblingMultiArgInlineCallConsumer($consumer)
+                ) {
+                    return true;
+                }
             }
         }
         if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
@@ -30659,7 +30741,8 @@ class Compiler {
                     $child,
                     $i,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $cfgChildren
                 )) {
                     --$i;
                     continue;
@@ -30792,7 +30875,8 @@ class Compiler {
                     $skip,
                     $first,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $cfgChildren
                 )) {
                     ++$first;
                     continue;
@@ -31270,6 +31354,46 @@ class Compiler {
     }
 
     /**
+     * True when every CFG child between $fromExclusive and $toExclusive is true/false/null ConstFetch
+     * (or ClassConstFetch). Used for importNode(...->item(0), true) chain deferral (#25702).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function onlyScalarConstFetchPreludesBetween(
+        int $fromExclusive,
+        int $toExclusive,
+        array $cfgChildren
+    ): bool {
+        if ($fromExclusive + 1 >= $toExclusive) {
+            // Adjacent — not a ConstFetch-prelude pattern (require at least one scalar) (#25702).
+            return false;
+        }
+        $sawScalar = false;
+        for ($k = $fromExclusive + 1; $k < $toExclusive; ++$k) {
+            $mid = $cfgChildren[$k] ?? null;
+            if ($mid instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($mid->name);
+                if (
+                    null === $name
+                    || !\in_array(strtolower($name), ['true', 'false', 'null'], true)
+                ) {
+                    return false;
+                }
+                $sawScalar = true;
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ClassConstFetch) {
+                $sawScalar = true;
+                continue;
+            }
+
+            return false;
+        }
+
+        return $sawScalar;
+    }
+
+    /**
      * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall stmts before the consumer (#9463, #10981).
      * Compile each producer once with its own EXEC_RETURN slot before ARG_SEND wiring.
      */
@@ -31493,22 +31617,49 @@ class Compiler {
             ) {
                 continue;
             }
-            if (!$this->isSiblingMultiArgFuncCallProducer(
+            $isSib = $this->isSiblingMultiArgFuncCallProducer(
                 $producer,
                 $cfgCallOp,
                 $j,
                 $callIndex,
                 $cfgChildren
-            )
-                && !(
-                    $producer instanceof Op\Expr\MethodCall
-                    && $this->methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
-                        $producer,
-                        $cfgChildren,
-                        $j
-                    )
-                )
+            );
+            $isCreate = $producer instanceof Op\Expr\MethodCall
+                && $this->methodCallDeadTempFeedsLaterMultiArgMethodCallInOps(
+                    $producer,
+                    $cfgChildren,
+                    $j
+                );
+            // Leaf MethodCall before trailing true/false/null ConstFetch multi-arg consumer (#25702).
+            if (
+                !$isSib
+                && $producer instanceof Op\Expr\MethodCall
+                && $this->onlyScalarConstFetchPreludesBetween($j, $callIndex, $cfgChildren)
+                && $this->isSiblingMultiArgInlineCallConsumer($cfgCallOp)
             ) {
+                $isSib = true;
+            }
+            // Receiver MethodCall feeding a later MethodCall in this window (#25702).
+            if (
+                !$isSib
+                && !$isCreate
+                && $producer instanceof Op\Expr\MethodCall
+                && null !== $producer->result
+            ) {
+                for ($k = $j + 1; $k < $callIndex; ++$k) {
+                    $later = $cfgChildren[$k] ?? null;
+                    if (
+                        $later instanceof Op\Expr\MethodCall
+                        && property_exists($later, 'var')
+                        && null !== $later->var
+                        && $this->operandsReferToSameVariable($producer->result, $later->var)
+                    ) {
+                        $isSib = true;
+                        break;
+                    }
+                }
+            }
+            if (!$isSib && !$isCreate) {
                 continue;
             }
             $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
@@ -44919,7 +45070,8 @@ class Compiler {
                                             $mixedProducer,
                                             $mixedProducerIndex,
                                             $mixedConsumerIndex,
-                                            $mixedDeadTempCount
+                                            $mixedDeadTempCount,
+                                            $block->orig->children
                                         )
                                     ) {
                                         continue;
