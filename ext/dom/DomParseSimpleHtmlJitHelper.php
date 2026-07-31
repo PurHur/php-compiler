@@ -7,7 +7,8 @@ namespace PHPCompiler\ext\dom;
 /**
  * Preg-free simple HTML element scan for user-script AOT loadHTML (#17954).
  *
- * Handles single-element documents like {@code <p id="target">hello</p>}.
+ * Handles single-element documents like {@code <p id="target">hello</p>}
+ * and unclosed variants {@code <div id="x">} (libxml EOF auto-close; #25988).
  */
 final class DomParseSimpleHtmlJitHelper
 {
@@ -37,9 +38,11 @@ final class DomParseSimpleHtmlJitHelper
         $close = '</'.$tag.'>';
         $closePos = stripos($trimmed, $close, $gt + 1);
         if (false === $closePos) {
-            return null;
+            // Unclosed non-optional tags: libxml auto-closes at EOF (#25988).
+            $text = substr($trimmed, $gt + 1);
+        } else {
+            $text = substr($trimmed, $gt + 1, $closePos - $gt - 1);
         }
-        $text = substr($trimmed, $gt + 1, $closePos - $gt - 1);
         // Match VmDom::loadHTML / libxml htmlReadMemory entity expansion (#20260).
         $text = VmDom::decodeHtmlCharacterReferences($text);
         $id = VmDom::decodeHtmlCharacterReferences($id);
