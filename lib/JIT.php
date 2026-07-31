@@ -18353,6 +18353,11 @@ class JIT {
 
                 return;
             }
+            // Missing __construct on Class::__construct() / parent::__construct() is
+            // "Cannot call constructor" — never __callStatic (zend_object_handlers.c, #25909).
+            if ('__construct' === $methodLc) {
+                throw new \LogicException('Cannot call constructor');
+            }
             if (JIT\MagicMethodDispatch::tryInitMagicCallStatic(
                 $this->context,
                 $declaringClassLc,
