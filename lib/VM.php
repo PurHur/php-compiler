@@ -3177,6 +3177,39 @@ class VM {
         if (null === $meta) {
             return true;
         }
+
+        return $this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, $meta->getVisibility);
+    }
+
+    /**
+     * True when zend_std_write_property must invoke __set (undeclared slot or inaccessible declared prop).
+     * Shared by direct assign (#25686) and RMW ++/-- / assign-op (#25687).
+     */
+    protected function propertyWriteUsesMagicSet(ObjectEntry $object, string $name, Frame $frame): bool
+    {
+        if (!$this->hasInstanceMethod($object->class, '__set')) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($object, $name, $frame);
+        if (null === $meta) {
+            return true;
+        }
+
+        // Symmetric visibility: inaccessible declared props route through __set (zend_object_handlers.c).
+        // Asymmetric set visibility is handled separately via enforceAsymmetricPropertyWrite.
+        return $this->declaredPropertyInaccessibleFromCaller($object, $meta, $name, $frame, 0);
+    }
+
+    /**
+     * Declared private/protected prop not visible from the calling scope (zend_std_*_property).
+     */
+    private function declaredPropertyInaccessibleFromCaller(
+        ObjectEntry $object,
+        VM\ClassProperty $meta,
+        string $name,
+        Frame $frame,
+        int $getOrSetVisibility
+    ): bool {
         $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
             ?? $meta->declaringClassLc;
         try {
@@ -3188,7 +3221,7 @@ class VM {
                 $name,
                 strtolower($object->class->name),
                 fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-                $meta->getVisibility
+                $getOrSetVisibility
             );
 
             return false;
@@ -3268,9 +3301,17 @@ class VM {
 
     /**
      * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
+     * Inaccessible declared props with __set use the magic proxy (zend_std_write_property; #25686/#25687).
      */
     protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
     {
+        if ($this->propertyWriteUsesMagicSet($object, $name, $frame)) {
+            $proxy = new Variable();
+            $proxy->magicSetTarget = $object;
+            $proxy->magicSetName = $name;
+
+            return $proxy;
+        }
         $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null !== $meta && $object->hasPropertyForMeta($meta)) {
             return $object->getPropertyForMeta($meta);
@@ -9655,6 +9696,7 @@ restart:
     /**
      * Pre/post increment/decrement with Zend bool→int coercion (#4727, #3552).
      * Rejects ++/-- on readonly properties after construction (#3149).
+     * Inaccessible / overloaded props RMW via __get then __set (#25687, zend_object_handlers.c).
      */
     private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
     {
@@ -9680,6 +9722,17 @@ restart:
         $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
+        }
+        $magicCatch = $this->executeMagicOverloadedPropertyIncDec(
+            $frame,
+            $read,
+            $write,
+            $result,
+            $increment,
+            $prefix
+        );
+        if (false !== $magicCatch) {
+            return $magicCatch;
         }
         $this->warnUndefinedVariableForIncDecRead($frame, $op, $read, $write);
         $resolvedRead = $read->resolveIndirect();
@@ -9734,6 +9787,110 @@ restart:
         }
 
         $this->markScopeSlotInitialized($frame, (int) $op->arg3);
+
+        return null;
+    }
+
+    /**
+     * ++/-- on undeclared or inaccessible props: __get then __set (zend_std_*_property; #25687).
+     *
+     * @return null|Frame|false null on success, Frame on catch, false when not a magic RMW lvalue
+     */
+    private function executeMagicOverloadedPropertyIncDec(
+        Frame $frame,
+        Variable $read,
+        Variable $write,
+        Variable $result,
+        bool $increment,
+        bool $prefix
+    ): null|Frame|false {
+        $owner = $this->resolvePropertyWriteOwner($write);
+        $propName = $this->resolvePropertyWriteName($write);
+        if (null === $owner || null === $propName) {
+            return false;
+        }
+        $resolvedWrite = $write->resolveIndirect();
+        $isMagicSetProxy = null !== $resolvedWrite->magicSetTarget && null !== $resolvedWrite->magicSetName;
+        $readUsesMagic = $this->propertyReadUsesMagicGet($owner, $propName, $frame);
+        $writeUsesMagic = $this->propertyWriteUsesMagicSet($owner, $propName, $frame);
+        $meta = $this->classPropertyMeta($owner, $propName, $frame);
+        $declaredInaccessible = null !== $meta && (
+            $this->declaredPropertyInaccessibleFromCaller($owner, $meta, $propName, $frame, $meta->getVisibility)
+            || $this->declaredPropertyInaccessibleFromCaller($owner, $meta, $propName, $frame, 0)
+        );
+        if (!$isMagicSetProxy && !$declaredInaccessible && !$readUsesMagic && !$writeUsesMagic) {
+            return false;
+        }
+        // Accessible declared slot — keep normal in-place mutate even if __get/__set exist.
+        if (null !== $meta && !$declaredInaccessible && !$isMagicSetProxy) {
+            return false;
+        }
+
+        $working = new Variable();
+        if ($readUsesMagic) {
+            $working->copyFrom($this->invokeMagicGet($owner, $propName));
+        } elseif ($declaredInaccessible || $isMagicSetProxy) {
+            // Inaccessible / overloaded without __get: Error (do not read the private slot).
+            $catchFrame = $this->enforcePropertyVisibilityRead($owner, $propName, $frame);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            // Undeclared without __get: fall back to the fetched value (undefined → null/warn elsewhere).
+            $working->copyFrom($read->resolveIndirect());
+        } else {
+            $working->copyFrom($read->resolveIndirect());
+        }
+
+        try {
+            if ($prefix) {
+                if ($increment) {
+                    $working->applyIncrement();
+                } else {
+                    $working->applyDecrement();
+                }
+                if ($writeUsesMagic) {
+                    $this->invokeMagicSet($owner, $propName, $working);
+                } else {
+                    $catchFrame = $this->enforcePropertyVisibilityWrite($write, $frame);
+                    if (null !== $catchFrame) {
+                        return $catchFrame;
+                    }
+                    // Declared inaccessible without __set — visibility Error via owner metadata.
+                    $catchFrame = $this->enforcePropertyWriteVisibility($owner, $propName, $frame);
+                    if (null !== $catchFrame) {
+                        return $catchFrame;
+                    }
+                    $write->copyFrom($working);
+                }
+                $result->copyFrom($working);
+            } else {
+                $old = new Variable();
+                $old->copyFrom($working);
+                if ($increment) {
+                    $working->applyIncrement();
+                } else {
+                    $working->applyDecrement();
+                }
+                if ($writeUsesMagic) {
+                    $this->invokeMagicSet($owner, $propName, $working);
+                } else {
+                    $catchFrame = $this->enforcePropertyVisibilityWrite($write, $frame);
+                    if (null !== $catchFrame) {
+                        return $catchFrame;
+                    }
+                    $catchFrame = $this->enforcePropertyWriteVisibility($owner, $propName, $frame);
+                    if (null !== $catchFrame) {
+                        return $catchFrame;
+                    }
+                    $write->copyFrom($working);
+                }
+                $result->copyFrom($old);
+            }
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
 
         return null;
     }
