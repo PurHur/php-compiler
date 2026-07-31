@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\array_key_exists;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -56,14 +57,18 @@ final class filter_input extends Internal
         if (null === $ctx) {
             throw new \LogicException('filter_input() requires VM context in this compiler build');
         }
+        // php-src: unknown filter (null→0) warns + returns false before missing-var null (#18943, #25926).
+        if (!VmFilter::isSupportedFilter($filterId)) {
+            filter_var::triggerUnknownFilterWarning($frame, $filterId, 'filter_input');
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $value = VmFilter::requestInputValue($ctx, $typeInt, $keyStr);
         if (null === $value) {
             $frame->returnVar->null();
 
             return;
-        }
-        if (!VmFilter::isSupportedFilter($filterId)) {
-            filter_var::triggerUnknownFilterWarning($frame, $filterId);
         }
         filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options, $frame));
     }
@@ -88,6 +93,16 @@ final class filter_input extends Internal
         // Fourth $options arg accepted; full options parsing deferred (#4404).
         $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'var_name');
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
+
+        // php-src: null filter coerces to 0 → unknown filter → false before var lookup (#25926).
+        if (JITVariable::TYPE_NULL === $filterArg->type) {
+            JitBuiltinWarning::emit(
+                $context,
+                VmFilter::unknownFilterWarningMessage(0, 'filter_input')
+            );
+
+            return JitFilter::boxedFalse($context);
+        }
 
         $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
