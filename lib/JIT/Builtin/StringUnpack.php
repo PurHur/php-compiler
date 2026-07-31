@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543).
+ * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543, #25830).
  *
- * JIT/normal modules use compiled {@see UnpackJitHelper}; standalone uses the same
- * PHP bridge once UnpackEngine nested JIT is stable (#13063).
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
+ * (UnpackEngine → UnpackJitHelper) in one NestedJIT scope (peer StringVfscanf #25718).
  * php-src: ext/standard/pack.c — php_unpack()
  */
 final class StringUnpack
@@ -23,6 +22,16 @@ final class StringUnpack
     private const HELPER_PATH = '/ext/standard/UnpackJitHelper.php';
 
     private const ENGINE_PATH = '/ext/standard/UnpackEngine.php';
+
+    /**
+     * Ordered NestedJIT sources — engine before helper (#25830).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::ENGINE_PATH,
+        self::HELPER_PATH,
+    ];
 
     private const UNPACK_HELPER = 'PHPCompiler\\ext\\standard\\UnpackJitHelper::unpackArgv';
 
@@ -185,54 +194,18 @@ final class StringUnpack
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after UnpackJitHelper compile (#9543)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25830');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            $jit = new JIT($context);
-            foreach ([self::ENGINE_PATH, self::HELPER_PATH] as $relative) {
-                $path = $root.$relative;
-                $real = \realpath($path) ?: $path;
-                if ($context->hasJitIncludedFileCompiled($real)) {
-                    continue;
-                }
-                $block = $runtime->parseAndCompile(
-                    (string) \file_get_contents($path),
-                    \basename($path)
-                );
-                if (null === $block) {
-                    throw new \LogicException(\basename($path).' parseAndCompile failed (#9543)');
-                }
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($real);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9543)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#25830'
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
