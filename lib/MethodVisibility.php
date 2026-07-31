@@ -266,6 +266,12 @@ final class MethodVisibility
         bool $staticConstructorCall = false
     ): void {
         $kind = ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+        // zend_object_handlers.c visibility Errors: keep Parent@anonymous, strip NUL+file$N (#26031).
+        // Distinct from get_debug_type()'s class@anonymous label (#17443).
+        $className = self::formatAnonymousScopeForMessage($className);
+        if (null !== $fromScope) {
+            $fromScope = self::formatAnonymousScopeForMessage($fromScope);
+        }
         // zend_vm_def.h ZEND_INIT_STATIC_METHOD_CALL + CONSTRUCTOR (#25663).
         if ($staticConstructorCall && ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             throw new \LogicException("Cannot call private {$className}::__construct()");
@@ -280,5 +286,18 @@ final class MethodVisibility
             throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from global scope");
         }
         throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from scope {$fromScope}");
+    }
+
+    /**
+     * Visibility Error / ArgumentCountError display: Parent@anonymous without NUL provenance.
+     * php-src zend_object_handlers.c — get_class()/trace keep the internal name (#26031).
+     */
+    public static function formatAnonymousScopeForMessage(string $name): string
+    {
+        if (!str_contains($name, '@anonymous')) {
+            return $name;
+        }
+
+        return preg_replace('/(@anonymous)\0[^\0]+?(?=::|$)/', '$1', $name) ?? $name;
     }
 }
