@@ -11589,6 +11589,10 @@ restart:
                         $resolved->objectPropertyOwner,
                         $resolved->objectPropertyName
                     );
+                    VM\DatePeriodSupport::rejectReadOnlyPropertyWrite(
+                        $resolved->objectPropertyOwner,
+                        $resolved->objectPropertyName
+                    );
                 } catch (\Error $e) {
                     return $this->dispatchVmError($e->getMessage(), $frame);
                 }
@@ -11777,7 +11781,7 @@ restart:
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
-    /** php-src ext/dom/php_dom.c — DOMDocument::$documentElement / DOMAttr::$specified reject user writes (#15550, #20605). */
+    /** php-src ext/dom/php_dom.c + DatePeriod write handlers (#15550, #20605, #26154). */
     private function enforceDomDocumentReadOnlyPropertyWrite(
         ObjectEntry $object,
         string $name,
@@ -11786,6 +11790,7 @@ restart:
         try {
             ext\dom\DomDocumentPropertySupport::rejectReadOnlyPropertyWrite($object, $name);
             ext\dom\DomNodePropertySupport::rejectReadOnlyPropertyWrite($object, $name);
+            VM\DatePeriodSupport::rejectReadOnlyPropertyWrite($object, $name);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
