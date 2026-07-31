@@ -2091,8 +2091,11 @@ class Compiler {
         if ($op instanceof Op\Terminal\SetTickInterval || $op instanceof Op\Terminal\LeaveTickInterval) {
             return;
         }
-        // for ($i=0; $i<n; $i++) increment exprs are not Zend statement boundaries (#23486).
+        // for ($i=0; $i<n; $i++) init/increment exprs are not Zend statement boundaries (#23486, #25621).
         if ($op->hasAttribute('for_loop_increment') && $op->getAttribute('for_loop_increment')) {
+            return;
+        }
+        if ($op->hasAttribute('for_loop_init') && $op->getAttribute('for_loop_init')) {
             return;
         }
         if (
@@ -10885,6 +10888,11 @@ class Compiler {
                 return;
             }
             $rewriteNeNull = $this->rewrittenNeNullReturnJumpIf->contains($stmt);
+            // Capture before compiling arms: braced declare attaches LeaveTickInterval to the
+            // while/for exit block, which would clear activeTickInterval (#25621).
+            $emitLoopExitTick = $this->activeTickInterval > 0
+                && $stmt->hasAttribute('zend_loop_exit_tick')
+                && $stmt->getAttribute('zend_loop_exit_tick');
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
             if ($rewriteNeNull) {
                 $op->block1 = $this->compileCfgBranch($stmt->else, $block);
@@ -10905,6 +10913,20 @@ class Compiler {
             } else {
                 $op->block1 = $this->compileCfgBranch($stmt->if, $block);
                 $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+            }
+            // Zend zend_compile_stmt emits ZEND_TICKS after while/for/do-while on the
+            // fallthrough (loop exit) path — php-src Zend/zend_compile.c (#25621).
+            if ($emitLoopExitTick) {
+                $elseCompiled = $this->seen[$stmt->else] ?? null;
+                if ($elseCompiled instanceof Block) {
+                    $wrapped = $this->wrapBlockWithLoopExitTick($elseCompiled);
+                    if ($op->block1 === $elseCompiled) {
+                        $op->block1 = $wrapped;
+                    }
+                    if ($op->block2 === $elseCompiled) {
+                        $op->block2 = $wrapped;
+                    }
+                }
             }
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
@@ -40175,7 +40197,22 @@ class Compiler {
         return [new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE)];
     }
 
+    /**
+     * Zend places ZEND_TICKS on the fallthrough after while/for/do-while (#25621).
+     * Insert a synthetic block so the exit path ticks once before successor stmts.
+     */
+    private function wrapBlockWithLoopExitTick(Block $exit): Block
+    {
+        $wrapper = new Block(null);
+        $wrapper->syntheticCfgBranch = true;
+        $wrapper->strictTypes = $exit->strictTypes;
+        $wrapper->addOpCode(new OpCode(OpCode::TYPE_TICKS));
+        $jump = new OpCode(OpCode::TYPE_JUMP);
+        $jump->block1 = $exit;
+        $wrapper->addOpCode($jump);
 
+        return $wrapper;
+    }
 
     private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal, Block $block): bool
     {
