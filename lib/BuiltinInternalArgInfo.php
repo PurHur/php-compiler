@@ -79,6 +79,9 @@ final class BuiltinInternalArgInfo
             'stream_context_create' => '',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
             'restore_error_handler' => 'true',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits / empty (#25623)
+            'preg_last_error_msg' => 'string',
+            'error_clear_last' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
             'file_get_contents', 'fread', 'fgets' => 'string|false',
             'file_put_contents', 'fwrite' => 'int|false',
