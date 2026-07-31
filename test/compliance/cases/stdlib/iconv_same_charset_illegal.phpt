@@ -16,8 +16,15 @@ $noticed = false;
 $ignored = iconv('UTF-8', 'UTF-8//IGNORE', "a\x80b");
 echo (int) $noticed, "\n";
 echo bin2hex((string) $ignored), "\n";
+// Overlong / surrogate rejected like glibc iconv (feeds UConverter subst path, #25203)
+foreach (["a\xC0\x80b", "\xED\xA0\x80", "\xE0\x80\x80"] as $bad) {
+    echo var_export(@iconv('UTF-8', 'UTF-8', $bad), true), "\n";
+}
 --EXPECT--
 1
 false
 0
 6162
+false
+false
+false

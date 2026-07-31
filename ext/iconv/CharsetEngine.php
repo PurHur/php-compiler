@@ -413,7 +413,17 @@ final class CharsetEngine
 
                     return self::failCodepoints(self::ERROR_ILLEGAL);
                 }
-                $out[] = (($b & 0x1F) << 6) | ($b2 & 0x3F);
+                $cp = (($b & 0x1F) << 6) | ($b2 & 0x3F);
+                // Reject overlong 2-byte forms (C0/C1…) — glibc iconv / php-src iconv.c.
+                if ($cp < 0x80) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        ++$i;
+                        continue;
+                    }
+
+                    return self::failCodepoints(self::ERROR_ILLEGAL);
+                }
+                $out[] = $cp;
                 $i += 2;
                 continue;
             }
@@ -428,7 +438,17 @@ final class CharsetEngine
 
                     return self::failCodepoints(self::ERROR_ILLEGAL);
                 }
-                $out[] = (($b & 0x0F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
+                $cp = (($b & 0x0F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
+                // Overlong 3-byte or UTF-16 surrogate half.
+                if ($cp < 0x800 || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        ++$i;
+                        continue;
+                    }
+
+                    return self::failCodepoints(self::ERROR_ILLEGAL);
+                }
+                $out[] = $cp;
                 $i += 3;
                 continue;
             }
@@ -444,7 +464,17 @@ final class CharsetEngine
 
                     return self::failCodepoints(self::ERROR_ILLEGAL);
                 }
-                $out[] = (($b & 0x07) << 18) | (($b2 & 0x3F) << 12) | (($b3 & 0x3F) << 6) | ($b4 & 0x3F);
+                $cp = (($b & 0x07) << 18) | (($b2 & 0x3F) << 12) | (($b3 & 0x3F) << 6) | ($b4 & 0x3F);
+                // Overlong 4-byte only — glibc iconv may still accept cp > U+10FFFF.
+                if ($cp < 0x10000) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        ++$i;
+                        continue;
+                    }
+
+                    return self::failCodepoints(self::ERROR_ILLEGAL);
+                }
+                $out[] = $cp;
                 $i += 4;
                 continue;
             }
