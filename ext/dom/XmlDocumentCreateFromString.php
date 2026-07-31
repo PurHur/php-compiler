@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
@@ -26,11 +27,14 @@ final class XmlDocumentCreateFromString extends VmClassMethod
         $source = $this->stringArg($frame->calledArgs[0], 'Dom\\XMLDocument::createFromString()', 0, $frame, 'source');
         $options = 0;
         if (isset($frame->calledArgs[1])) {
-            $optionsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
-                throw new \TypeError('Dom\\XMLDocument::createFromString(): Argument #2 ($options) must be of type int');
-            }
-            $options = $optionsVar->toInt();
+            // Z_PARAM_LONG $options (#25768).
+            $options = VmMath::parseZParamLongBuiltinArgForFrame(
+                $frame,
+                1,
+                'Dom\\XMLDocument::createFromString',
+                2,
+                'options'
+            );
         }
         $overrideEncoding = null;
         if (isset($frame->calledArgs[2])) {

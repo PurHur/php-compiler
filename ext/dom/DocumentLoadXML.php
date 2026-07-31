@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Variable;
 
 /** DOMDocument::loadXML() — VM (#11895, #19796, php-src ext/dom/document.c). */
 final class DocumentLoadXML extends DomClassMethod
@@ -26,11 +25,8 @@ final class DocumentLoadXML extends DomClassMethod
         $xml = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'DOMDocument::loadXML', 0, 'source');
         $options = 0;
         if (isset($frame->calledArgs[2])) {
-            $optionsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
-                throw new \TypeError('DOMDocument::loadXML(): Argument #2 ($options) must be of type int');
-            }
-            $options = $optionsVar->toInt();
+            // Z_PARAM_LONG $options (#25768).
+            $options = $this->zParamLongArg($frame, 2, 'DOMDocument::loadXML', 2, 'options');
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::loadXML() requires VM context in this compiler build');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\VM\ObjectEntry;
@@ -29,11 +30,13 @@ final class VmDomJitDispatch
         );
         $options = 0;
         if (isset($extra[1])) {
-            $optionsVar = $extra[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
-                throw new \TypeError('DOMDocument::loadHTML(): Argument #2 ($options) must be of type int');
-            }
-            $options = $optionsVar->toInt();
+            // Z_PARAM_LONG $options — no Frame in JIT helper; soft-coerce like non-strict (#25768).
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::loadHTML',
+                2,
+                'options'
+            );
         }
         $ok = VmDom::loadHTML($ctx, $document, $html, $options);
         $var = new Variable();

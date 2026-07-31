@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -221,6 +222,8 @@ abstract class DomClassMethod extends VmClassMethod
         $options = 0;
         $hasNode = \array_key_exists(1, $frame->calledArgs);
         $hasOptions = \array_key_exists(2, $frame->calledArgs);
+        // Method label without trailing "()" — VmMath int TypeError adds "():".
+        $function = rtrim($label, '()');
 
         if ($hasNode) {
             $first = $frame->calledArgs[1]->resolveIndirect();
@@ -230,14 +233,54 @@ abstract class DomClassMethod extends VmClassMethod
             } else {
                 $node = $this->saveSerializationOptionalDomNodeArg($frame->calledArgs[1], $label, 0);
                 if ($hasOptions) {
-                    $options = $this->optionsIntArg($frame->calledArgs[2], $label, 1);
+                    $options = $this->zParamLongArg($frame, 2, $function, 2, 'options');
                 }
             }
         } elseif ($hasOptions) {
-            $options = $this->optionsIntArg($frame->calledArgs[2], $label, 1);
+            $options = $this->zParamLongArg($frame, 2, $function, 2, 'options');
         }
 
         return [$node, $options];
+    }
+
+    /**
+     * Optional int $options / $flags — Z_PARAM_LONG with caller strict_types (#25768).
+     *
+     * $function is the method name without trailing "()" (VmMath / TypeError appends it).
+     * $calledArgIndex indexes {@see Frame::$calledArgs} (includes $this for instance methods).
+     * $userArgIndex is the 1-based stub argument number in the TypeError message.
+     */
+    protected function zParamLongArg(
+        Frame $frame,
+        int $calledArgIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): int {
+        // Instance methods keep $this at calledArgs[0]; InternalStrictArg::requireInt would
+        // report Argument #($calledArgIndex+1). Use the stub ordinal for the message (#25768).
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $arg = $frame->calledArgs[$calledArgIndex]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $arg->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($%s) must be of type int, %s given',
+                    $function,
+                    $userArgIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($arg)
+                ));
+            }
+
+            return $arg->toInt();
+        }
+
+        return VmMath::parseZParamLongBuiltinArg(
+            $frame->calledArgs[$calledArgIndex],
+            $function,
+            $userArgIndex,
+            $paramName,
+            $frame
+        );
     }
 
     protected function saveSerializationOptionalDomNodeArg(Variable $var, string $label, int $index): ?ObjectEntry
@@ -267,18 +310,4 @@ abstract class DomClassMethod extends VmClassMethod
         return $object;
     }
 
-    protected function optionsIntArg(Variable $var, string $label, int $index): int
-    {
-        $var = $var->resolveIndirect();
-        if (!\in_array($var->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT], true)) {
-            throw new \TypeError(\sprintf(
-                '%s expects argument #%d to be of type int, %s given',
-                $label,
-                $index + 1,
-                VmDom::typeLabel($var)
-            ));
-        }
-
-        return $var->toInt();
-    }
 }
