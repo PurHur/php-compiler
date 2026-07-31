@@ -2043,7 +2043,9 @@ final class VmFs
     }
 
     public static function fgetc(int $handle) {
-        if (VmPhpMemoryStream::isValidHandle($handle)) {
+        if (VmUserStream::isValidHandle($handle)) {
+            $byte = VmUserStream::read($handle, 1);
+        } elseif (VmPhpMemoryStream::isValidHandle($handle)) {
             $byte = VmPhpMemoryStream::read($handle, 1);
         } elseif (VmPhpInputOutputStream::isValidHandle($handle)) {
             $byte = VmPhpInputOutputStream::read($handle, 1);
@@ -2064,7 +2066,9 @@ final class VmFs
     }
 
     public static function fgets(int $handle, ?int $length = null) {
-        if (VmPhpMemoryStream::isValidHandle($handle)) {
+        if (VmUserStream::isValidHandle($handle)) {
+            $line = VmUserStream::fgets($handle, $length);
+        } elseif (VmPhpMemoryStream::isValidHandle($handle)) {
             $line = VmPhpMemoryStream::fgets($handle, $length);
         } elseif (VmPhpFdStream::isValidHandle($handle)) {
             $line = VmPhpFdStream::fgets($handle, $length);

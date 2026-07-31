@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -37,6 +38,7 @@ final class JitFgets
      * (line string, or boolean false on failure/EOF) */
     public static function invoke(Context $context, Value $handleLong, Value $lengthLong): Value
     {
+        StreamReadRuntime::ensureLinked($context);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_fgets'),
             $handleLong,

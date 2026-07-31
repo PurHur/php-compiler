@@ -60,10 +60,12 @@ final class StreamReadJitHelper
 
     public static function fgetsArgv(int $handle, int $length): ?string
     {
-        if ($length <= 0) {
+        // JIT/AOT omit-length sentinel is -1 (see fgets.php); php-src default reads until newline.
+        $len = $length < 0 ? null : $length;
+        if (null !== $len && $len <= 0) {
             return null;
         }
-        $result = VmFs::fgets($handle, $length);
+        $result = VmFs::fgets($handle, $len);
         if (false === $result) {
             return null;
         }
