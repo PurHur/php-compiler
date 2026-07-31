@@ -259,6 +259,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_loadhtml_unclosed_warnings.phpt',
             'dom_loadhtml_unclosed_warnings.phpt'
         );
+        yield 'dom_loadhtml_unclosed_nonoptional.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_loadhtml_unclosed_nonoptional.phpt',
+            'dom_loadhtml_unclosed_nonoptional.phpt'
+        );
         yield 'dom_loadhtml_bare_utf8.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_loadhtml_bare_utf8.phpt',
             'dom_loadhtml_bare_utf8.phpt'
