@@ -20,6 +20,7 @@ final class EvalBuiltinTest extends BaseTest
     {
         foreach ([
             'eval_basic.phpt',
+            'eval_magic_consts.phpt',
             'eval_parse_error.phpt',
             'eval_parse_error_file.phpt',
             'eval_return_value.phpt',

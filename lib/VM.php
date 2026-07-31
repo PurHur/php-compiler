@@ -3598,7 +3598,9 @@ class VM {
         // Scope comes from getFrame($caller); parent must stay null so nested runFrames exits.
         $child->parent = null;
         $child->returnVar = $out;
-        $child->scriptPath = VmEval::EVAL_FILENAME;
+        // Zend __FILE__/__DIR__: enclosing script path + call site (#25809, zend_eval_string).
+        [$evalFile] = VM\ExceptionSupport::evalFatalSite($caller, 1);
+        $child->scriptPath = $evalFile;
         $this->context->scriptStack->push($child->scriptPath);
         try {
             $this->context->push($child);
