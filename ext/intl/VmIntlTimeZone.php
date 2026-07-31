@@ -529,6 +529,18 @@ final class VmIntlTimeZone
     public static function offsetMeta(string $id): array
     {
         $id = self::resolveTimezoneId($id);
+        // ICU TimeZone::getUnknown() — raw 0, DST savings 1h unused, GMT abbrs.
+        // Must not call exportTimezoneTransitions / pushProcessTimezone: host
+        // date_default_timezone_set('Etc/Unknown') emits E_NOTICE (#25789 / re-#25356).
+        if ('Etc/Unknown' === $id) {
+            return [
+                'rawMs' => 0,
+                'dstMs' => 3600000,
+                'useDst' => false,
+                'abbrStd' => 'GMT',
+                'abbrDst' => 'GMT',
+            ];
+        }
         // 2000-01-01 .. 2030-01-01 covers modern DST rules for Olson zones.
         $transitions = VmDateTimeNative::exportTimezoneTransitions($id, 946684800, 1893456000);
         $rawSec = null;
@@ -816,6 +828,13 @@ final class VmIntlTimeZone
         $id = self::idOf($object);
         $meta = self::offsetMeta($id);
         $rawOffset = $meta['rawMs'];
+        // ICU unknown zone: total offset always 0 — skip process-TZ push (#25789).
+        if ('Etc/Unknown' === self::resolveTimezoneId($id)) {
+            $dstOffset = 0;
+            IntlError::clear();
+
+            return true;
+        }
         $ts = (int) floor($timestamp / 1000.0);
         $totalSec = VmDateTimeNative::timezoneOffsetSeconds($id, $ts);
         $dstOffset = ($totalSec * 1000) - $rawOffset;
