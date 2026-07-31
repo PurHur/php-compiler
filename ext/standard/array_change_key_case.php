@@ -10,7 +10,6 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayChangeKeyCaseRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
