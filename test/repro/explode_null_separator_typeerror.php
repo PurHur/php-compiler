@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-// null separator must throw TypeError (php-src Z_PARAM_STR rejects null)
+// #25942 — non-strict explode(null) is DEP+ValueError on Zend 8.2 (not TypeError).
+// This file is strict_types: null separator must TypeError; empty still ValueError.
 try {
     explode(null, 'a');
     echo "BUG: no exception\n";
@@ -11,7 +12,6 @@ try {
     echo "BUG ValueError: ", $e->getMessage(), "\n";
 }
 
-// empty string separator must still throw ValueError
 try {
     explode('', 'a');
     echo "BUG: no exception\n";
