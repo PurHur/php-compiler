@@ -12558,6 +12558,13 @@ class Compiler {
         }
         $func = $expr->func;
         $wasArrowAutoCapture = $this->compilingArrowAutoCapture;
+        // Nested closure/arrow bodies must bind catch CVs through closureCaptures, not the
+        // outer catch-handler slot map. Rewriting reads to the handler slot made use($e) /
+        // fn() => $e appear to work only when that CV happened to be slot 0 (#25897).
+        $savedCatchVarSlots = $this->activeCatchVarSlotsByName;
+        $savedCatchVarRoots = $this->activeCatchVarRoots;
+        $this->activeCatchVarSlotsByName = [];
+        $this->activeCatchVarRoots = [];
         if ($expr instanceof Op\Expr\ArrowFunction) {
             $this->compilingArrowAutoCapture = true;
         }
@@ -12574,6 +12581,8 @@ class Compiler {
             $funcBlock->parents[] = $block;
         } finally {
             $this->compilingArrowAutoCapture = $wasArrowAutoCapture;
+            $this->activeCatchVarSlotsByName = $savedCatchVarSlots;
+            $this->activeCatchVarRoots = $savedCatchVarRoots;
         }
         $this->markGeneratorIfNeeded($expr, $funcBlock);
         $op = new OpCode(
