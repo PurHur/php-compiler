@@ -17,6 +17,12 @@ final class IntlError
     /** php-src / ICU U_ILLEGAL_ARGUMENT_ERROR */
     public const U_ILLEGAL_ARGUMENT_ERROR = 1;
 
+    /**
+     * php-src / ICU U_INVALID_ID — utrans_openU unknown transliterator id (#25355).
+     * Value is U_ERROR_WARNING_START + 1 (0x10001).
+     */
+    public const U_INVALID_ID = 65569;
+
     /** php-src / ICU U_MISSING_RESOURCE_ERROR */
     public const U_MISSING_RESOURCE_ERROR = 2;
 
@@ -154,6 +160,7 @@ final class IntlError
             10 => 'U_INVALID_CHAR_FOUND',
             15 => 'U_BUFFER_OVERFLOW_ERROR',
             16 => 'U_UNSUPPORTED_ERROR',
+            65569 => 'U_INVALID_ID',
             65801 => 'U_UNMATCHED_BRACES',
             -127 => 'U_USING_DEFAULT_WARNING',
             -128 => 'U_USING_FALLBACK_WARNING',
