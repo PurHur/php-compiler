@@ -35,10 +35,23 @@ final class RecursiveArrayIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('RecursiveArrayIterator');
         $entry->parentLc = ArrayIteratorBuiltin::CLASS_LC;
-        if (isset($ctx->classes['recursiveiterator'])
-            && !\in_array('recursiveiterator', $entry->interfaces, true)
-            && !\in_array('RecursiveIterator', $entry->interfaces, true)) {
-            $entry->interfaces[] = 'recursiveiterator';
+        // Zend rematerializes the full flattened ce->interfaces table on the subclass
+        // (not parent ArrayIterator order + RecursiveIterator). Observable via
+        // class_implements() / ReflectionClass::getInterfaceNames() (#25796).
+        // php-src ext/spl/spl_array.c — RecursiveArrayIterator class entry.
+        $entry->interfaces = [];
+        foreach ([
+            'countable',
+            'serializable',
+            'arrayaccess',
+            'iterator',
+            'traversable',
+            'seekableiterator',
+            'recursiveiterator',
+        ] as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $entry->interfaces[] = $iface;
+            }
         }
 
         // php-src REGISTER_SPL_CLASS_CONST_LONG CHILD_ARRAYS_ONLY (#22321).
