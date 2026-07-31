@@ -75,6 +75,8 @@ final class VmDomInstanceInvoke
             'importlegacynode' => VmDomJitDispatch::importLegacyNode($ctx, $self, $extra),
             'adoptnode' => VmDomJitDispatch::adoptNode($ctx, $self, $extra),
             'getattribute' => VmDomJitDispatch::getAttribute($self, $extra),
+            'getattributens' => VmDomJitDispatch::getAttributeNS($self, $extra),
+            'getattributenode' => VmDomJitDispatch::getAttributeNode($ctx, $self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),
             'removeattribute' => VmDomJitDispatch::removeAttribute($ctx, $self, $extra),
             'getattributenodens' => VmDomJitDispatch::getAttributeNodeNS($ctx, $self, $extra),

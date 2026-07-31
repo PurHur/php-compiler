@@ -37,7 +37,8 @@ final class DomImportNodeJitHelper
 
     public static function getAttributeArgv(ObjectEntry $element, string $name): string
     {
-        return VmDom::getAttribute($element, $name);
+        // Legacy DOMElement ABI is __string__*; Dom\* null missing-attrs use VmDomJitDispatch (#26062).
+        return VmDom::getAttribute($element, $name) ?? '';
     }
 
     /** DOMElement::getAttributeNodeNS() — user-script AOT (#19265). */

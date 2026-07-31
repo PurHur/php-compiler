@@ -24,6 +24,11 @@ final class ElementGetAttribute extends DomClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmDom::getAttribute($element, $name));
+        $value = VmDom::getAttribute($element, $name);
+        if (null === $value) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->string($value);
+        }
     }
 }

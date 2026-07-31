@@ -96,12 +96,12 @@ final class DomHtmlElementPropertySupport
         $var->objectPropertyOwner = $object;
         $var->objectPropertyName = $lc;
         if ('id' === $lc) {
-            $var->string(VmDom::getAttribute($object, 'id'));
+            $var->string(VmDom::getAttribute($object, 'id') ?? '');
 
             return $var;
         }
         if ('classname' === $lc) {
-            $var->string(VmDom::getAttribute($object, 'class'));
+            $var->string(VmDom::getAttribute($object, 'class') ?? '');
 
             return $var;
         }

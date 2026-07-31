@@ -1718,8 +1718,13 @@ final class VmDom
         }
         $state = DomRegistry::state($element);
         if (!\array_key_exists($name, $state->attributes)) {
-            $var = new Variable(Variable::TYPE_BOOLEAN);
-            $var->bool(false);
+            // Living Dom\* follow_spec → null; legacy DOMElement → false (php-src element.c; #26062).
+            $var = new Variable();
+            if (VmDomLiving::isLivingElement($element)) {
+                $var->null();
+            } else {
+                $var->bool(false);
+            }
 
             return $var;
         }
@@ -2046,7 +2051,11 @@ final class VmDom
         self::detachAttributeNode($attr);
     }
 
-    public static function getAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): string
+    /**
+     * DOMElement::getAttributeNS() — living Dom\* missing → null; legacy → ''
+     * (php-src element.c php_dom_follow_spec_intern; #26062).
+     */
+    public static function getAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): ?string
     {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
@@ -2067,7 +2076,7 @@ final class VmDom
             }
         }
 
-        return '';
+        return VmDomLiving::isLivingElement($element) ? null : '';
     }
 
     public static function hasAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): bool
@@ -3235,7 +3244,7 @@ final class VmDom
             if (null === $baseEl) {
                 continue;
             }
-            $href = self::getAttribute($baseEl, 'href');
+            $href = self::getAttribute($baseEl, 'href') ?? '';
             if ('' !== $href) {
                 return $href;
             }
@@ -3250,11 +3259,11 @@ final class VmDom
         if (!self::isElement($element)) {
             return null;
         }
-        $qName = self::getAttribute($element, 'xml:base');
+        $qName = self::getAttribute($element, 'xml:base') ?? '';
         if ('' !== $qName) {
             return $qName;
         }
-        $ns = self::getAttributeNS($element, DomConstants::XML_NS_URI, 'base');
+        $ns = self::getAttributeNS($element, DomConstants::XML_NS_URI, 'base') ?? '';
         if ('' !== $ns) {
             return $ns;
         }
@@ -3657,18 +3666,27 @@ final class VmDom
 
     /**
      * DOMElement::getAttribute() — qName lookup; xmlns* reads nsDef (php-src element.c; #19718).
+     * Living Dom\* missing → null; legacy DOMElement → '' (php_dom_follow_spec_intern; #26062).
      */
-    public static function getAttribute(ObjectEntry $element, string $name): string
+    public static function getAttribute(ObjectEntry $element, string $name): ?string
     {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
         }
         if (self::isXmlnsAttributeName($name)) {
-            return self::namespaceDeclarationValue($element, $name) ?? '';
+            $nsVal = self::namespaceDeclarationValue($element, $name);
+            if (null !== $nsVal) {
+                return $nsVal;
+            }
+
+            return VmDomLiving::isLivingElement($element) ? null : '';
         }
         $state = DomRegistry::state($element);
+        if (\array_key_exists($name, $state->attributes)) {
+            return $state->attributes[$name];
+        }
 
-        return $state->attributes[$name] ?? '';
+        return VmDomLiving::isLivingElement($element) ? null : '';
     }
 
     /**
@@ -9888,10 +9906,10 @@ final class VmDom
             if (null === $node || !self::isElement($node)) {
                 continue;
             }
-            if (self::getAttribute($node, 'id') === $key) {
+            if ((self::getAttribute($node, 'id') ?? '') === $key) {
                 return $node;
             }
-            if (self::elementIsInHtmlNamespace($node) && self::getAttribute($node, 'name') === $key) {
+            if (self::elementIsInHtmlNamespace($node) && (self::getAttribute($node, 'name') ?? '') === $key) {
                 return $node;
             }
         }
@@ -13220,8 +13238,8 @@ final class VmDom
         int $options,
         ?Frame $frame
     ): ?int {
-        $href = self::getAttribute($include, 'href');
-        $parse = self::getAttribute($include, 'parse');
+        $href = self::getAttribute($include, 'href') ?? '';
+        $parse = self::getAttribute($include, 'parse') ?? '';
         if ('' === $parse) {
             $parse = 'xml';
         }
