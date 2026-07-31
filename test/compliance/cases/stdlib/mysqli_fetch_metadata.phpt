@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli result fetch_all/object/field metadata registration (#22195)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 $funcs = [

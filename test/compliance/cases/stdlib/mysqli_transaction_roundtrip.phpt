@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli transaction begin/commit/rollback round-trip (#21825, ext/mysqli/mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --SKIPIF--
 <?php
 if (!getenv('MYSQLI_TEST_DSN')) {

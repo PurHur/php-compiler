@@ -1,5 +1,7 @@
 --TEST--
 stdlib mysqli_sql_exception class + mysqli_init() + new mysqli() (#21803, ext/mysqli/mysqli.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo class_exists('mysqli_sql_exception') ? 'ex=yes' : 'ex=no', "\n";

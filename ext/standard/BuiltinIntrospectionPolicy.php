@@ -277,6 +277,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'odbc_')) {
             return \PHPCompiler\ext\odbc\OdbcExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'mysqli_')) {
+            return \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -349,6 +352,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('odbc' === $ext) {
             return \PHPCompiler\ext\odbc\OdbcExtensionPolicy::advertisesExtension();
+        }
+        if ('mysqli' === $ext) {
+            return \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension();
         }
         if ('soap' === $ext) {
             return \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();

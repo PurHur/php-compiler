@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_stmt_init / mysqli_stmt_prepare two-step API (#22215, php-src mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

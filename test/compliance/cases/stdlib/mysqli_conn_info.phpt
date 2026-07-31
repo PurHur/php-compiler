@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli connection metadata / ssl_set registration (#22194)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 $funcs = [

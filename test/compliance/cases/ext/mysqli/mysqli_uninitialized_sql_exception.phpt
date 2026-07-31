@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli uninitialized link throws mysqli_sql_exception (#21815, ext/mysqli/mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);
