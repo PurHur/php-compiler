@@ -928,6 +928,7 @@
         "ext/intl/BuiltinClasses.php",
         "ext/intl/GraphemeStrSplitJitHelper.php",
         "ext/intl/IcuDateFormat.php",
+        "ext/intl/IcuErrorConstants.php",
         "ext/intl/IdnFunction.php",
         "ext/intl/IntlClassMethod.php",
         "ext/intl/IntlConstants.php",
@@ -3241,6 +3242,7 @@
         "ext/standard/VmFminMax.php",
         "ext/standard/VmFnmatch.php",
         "ext/standard/VmFnmatchPure.php",
+        "ext/standard/VmFopenMode.php",
         "ext/standard/VmForwardStaticCall.php",
         "ext/standard/VmFputcsv.php",
         "ext/standard/VmFs.php",
@@ -4818,6 +4820,7 @@
         "lib/Cfg/OpSubBlockAccess.php",
         "lib/ClassConstBraceDerefRejector.php",
         "lib/ClassConstDynamicFetchRejector.php",
+        "lib/ClassConstName.php",
         "lib/ClassConstVisibility.php",
         "lib/Cli/InvokeCwd.php",
         "lib/Cli/PhpcBuild.php",
@@ -5666,6 +5669,7 @@
         "lib/JIT/Call/ReflectionAttributeGetName.php",
         "lib/JIT/Call/ReflectionAttributeGetTarget.php",
         "lib/JIT/Call/ReflectionAttributeNewInstance.php",
+        "lib/JIT/Call/ReflectionClassConstantGetAttributes.php",
         "lib/JIT/Call/ReflectionClassConstruct.php",
         "lib/JIT/Call/ReflectionClassCreateLazyGhost.php",
         "lib/JIT/Call/ReflectionClassCreateLazyProxy.php",
@@ -6881,9 +6885,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6647,
+        "inventory_files": 6651,
         "excluded": 0,
-        "eligible": 6647,
+        "eligible": 6651,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
