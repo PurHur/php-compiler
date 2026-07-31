@@ -114,6 +114,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src array.stub.php — InternalArgInfo return bool; Zend true (#26172). */
+    public function testUsortKsortFamilyReturnTypeIsTrue(): void
+    {
+        foreach (['usort', 'uasort', 'uksort', 'ksort', 'krsort'] as $f) {
+            $this->assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($f), $f);
+            $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     /** php-src basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472). */
     public function testHighlightFamilyReturnTypeIsStringOrBool(): void
     {

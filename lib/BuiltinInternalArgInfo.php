@@ -128,6 +128,8 @@ final class BuiltinInternalArgInfo
             'libxml_get_errors' => 'array',
             // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
             'array_sum', 'array_product' => 'int|float',
+            // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
+            'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
             default => null,
         };
     }

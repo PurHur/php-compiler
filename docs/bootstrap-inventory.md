@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6651 |
-| Phase A inventory files (M2 ratio SSOT) | 6651 |
+| PHP files on vm.php path | 6654 |
+| Phase A inventory files (M2 ratio SSOT) | 6654 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21455 |
+| Source constructs flagged (warnings) | 21463 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1882,20 +1882,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/snmp/snmpset.php` | 0 | 1 |
 | `ext/snmp/snmpwalk.php` | 0 | 1 |
 | `ext/soap/BuiltinClasses.php` | 0 | 9 |
+| `ext/soap/JitIsSoapFault.php` | 0 | 1 |
+| `ext/soap/JitUseSoapErrorHandler.php` | 0 | 1 |
 | `ext/soap/Module.php` | 0 | 3 |
 | `ext/soap/SoapClassMethod.php` | 0 | 1 |
 | `ext/soap/SoapConstants.php` | 0 | 1 |
 | `ext/soap/SoapExtensionPolicy.php` | 0 | 1 |
 | `ext/soap/SoapFaultConstruct.php` | 0 | 1 |
-| `ext/soap/SoapHttpTransport.php` | 0 | 6 |
+| `ext/soap/SoapHttpTransport.php` | 0 | 11 |
 | `ext/soap/SoapSdlPayload.php` | 0 | 2 |
 | `ext/soap/SoapUrlPayload.php` | 0 | 2 |
+| `ext/soap/UseSoapErrorHandlerJitHelper.php` | 0 | 1 |
 | `ext/soap/VmSoapClient.php` | 0 | 78 |
 | `ext/soap/VmSoapEncoding.php` | 0 | 32 |
 | `ext/soap/VmSoapOpaque.php` | 0 | 6 |
 | `ext/soap/VmSoapServer.php` | 0 | 47 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
-| `ext/soap/is_soap_fault.php` | 0 | 2 |
+| `ext/soap/is_soap_fault.php` | 0 | 1 |
 | `ext/soap/use_soap_error_handler.php` | 0 | 3 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
@@ -4982,7 +4985,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ErrorHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/ErrorReporting.php` | 0 | 1 |
-| `lib/JIT/Builtin/EvalRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/EvalRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ExceptionHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
@@ -9945,58 +9948,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 7354)
 - new DOMException (line 7396)
 - new Error (line 7404)
-- new ObjectEntry (line 8260)
-- new DomNodeState (line 8262)
-- new DOMException (line 8916)
-- new Variable (line 8993)
-- new DOMException (line 9284)
-- new DOMException (line 9499)
-- new DOMException (line 9544)
-- new ObjectEntry (line 9648)
-- new DomNodeState (line 9652)
-- new Variable (line 9659)
-- new ObjectEntry (line 9677)
-- new DomNodeState (line 9681)
-- new Variable (line 9688)
-- new ObjectEntry (line 9706)
-- new DomNodeState (line 9710)
-- new Variable (line 9717)
-- new DOMException (line 9800)
-- new ObjectEntry (line 10125)
-- new DomNodeState (line 10129)
-- new Variable (line 10138)
-- new ObjectEntry (line 10188)
-- new DomNodeState (line 10191)
-- new Variable (line 10199)
-- new Variable (line 10437)
-- new DOMException (line 10574)
-- new DOMException (line 10583)
-- new DOMException (line 10618)
-- new Variable (line 10728)
-- new DOMException (line 11824)
-- new Variable (line 11960)
-- new Variable (line 11983)
-- new Variable (line 12012)
-- new Error (line 12030)
-- new Variable (line 12056)
-- new DOMException (line 12067)
-- new Variable (line 12069)
-- new DOMException (line 12243)
-- new DOMException (line 12270)
-- new DOMException (line 12306)
-- new DOMException (line 12536)
-- new DOMException (line 12544)
-- new Variable (line 12556)
-- new DOMException (line 12578)
-- new DOMException (line 12597)
-- new DOMException (line 12608)
-- new DOMException (line 12613)
+- new ObjectEntry (line 8262)
+- new DomNodeState (line 8264)
+- new DOMException (line 8926)
+- new Variable (line 9003)
+- new DOMException (line 9299)
+- new DOMException (line 9530)
+- new DOMException (line 9575)
+- new ObjectEntry (line 9679)
+- new DomNodeState (line 9683)
+- new Variable (line 9690)
+- new ObjectEntry (line 9708)
+- new DomNodeState (line 9712)
+- new Variable (line 9719)
+- new ObjectEntry (line 9737)
+- new DomNodeState (line 9741)
+- new Variable (line 9748)
+- new DOMException (line 9831)
+- new ObjectEntry (line 10156)
+- new DomNodeState (line 10160)
+- new Variable (line 10169)
+- new ObjectEntry (line 10219)
+- new DomNodeState (line 10222)
+- new Variable (line 10230)
+- new Variable (line 10468)
+- new DOMException (line 10605)
+- new DOMException (line 10614)
+- new DOMException (line 10649)
+- new Variable (line 10759)
+- new DOMException (line 11855)
+- new Variable (line 11991)
+- new Variable (line 12014)
+- new Variable (line 12043)
+- new Error (line 12061)
+- new Variable (line 12087)
+- new DOMException (line 12098)
+- new Variable (line 12100)
+- new DOMException (line 12274)
+- new DOMException (line 12301)
+- new DOMException (line 12337)
+- new DOMException (line 12567)
+- new DOMException (line 12575)
+- new Variable (line 12587)
+- new DOMException (line 12609)
+- new DOMException (line 12628)
 - new DOMException (line 12639)
-- new DOMException (line 12660)
-- new DOMException (line 12720)
-- new DOMException (line 12772)
-- new Error (line 14104)
-- new Error (line 14108)
+- new DOMException (line 12644)
+- new DOMException (line 12670)
+- new DOMException (line 12691)
+- new DOMException (line 12751)
+- new DOMException (line 12803)
+- new Error (line 14135)
+- new Error (line 14139)
 - 529 class method(s)
 - 4 closure(s)
 
@@ -22057,6 +22060,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SoapFaultConstruct (line 71)
 - 2 class method(s)
 
+### `ext/soap/JitIsSoapFault.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/soap/JitUseSoapErrorHandler.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/soap/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22087,12 +22100,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/SoapHttpTransport.php`
 
 **Warnings** (review for bootstrap subset):
-- new SoapFault (line 53)
-- new SoapFault (line 66)
-- new SoapFault (line 73)
-- new SoapFault (line 221)
-- new SoapFault (line 228)
-- 9 class method(s)
+- new SoapFault (line 49)
+- new SoapFault (line 62)
+- new SoapFault (line 69)
+- new SoapFault (line 217)
+- new SoapFault (line 224)
+- new SoapFault (line 268)
+- new SoapFault (line 275)
+- new SoapFault (line 283)
+- new SoapFault (line 292)
+- new SoapFault (line 312)
+- 11 class method(s)
 
 ### `ext/soap/SoapSdlPayload.php`
 
@@ -22105,6 +22123,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new self (line 48)
 - 2 class method(s)
+
+### `ext/soap/UseSoapErrorHandlerJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/soap/VmSoapClient.php`
 
@@ -22146,46 +22169,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SoapFault (line 612)
 - new SoapFault (line 808)
 - new SoapFault (line 821)
-- new SoapFault (line 898)
-- new SoapFault (line 1491)
-- new DOMDocument (line 1493)
-- new SoapFault (line 1495)
-- new DOMXPath (line 1497)
-- new DOMDocument (line 2270)
-- new SoapFault (line 2272)
-- new DOMXPath (line 2274)
-- new SoapFault (line 2297)
-- new SoapTypemapFromXml (line 2463)
-- new SoapMappedObject (line 2490)
-- new Variable (line 2568)
-- new Variable (line 2577)
-- new ObjectEntry (line 2598)
-- new Variable (line 2604)
-- new HashTable (line 2610)
-- new Variable (line 2620)
-- new stdClass (line 2634)
-- new ObjectEntry (line 2642)
-- new Variable (line 2649)
-- new Variable (line 2657)
-- new HashTable (line 2684)
-- new ObjectEntry (line 2702)
-- new ArgumentCountError (line 2989)
-- new Variable (line 3015)
-- new HashTable (line 3023)
-- new Variable (line 3029)
-- new Variable (line 3037)
-- new ArgumentCountError (line 3072)
-- new ArgumentCountError (line 3100)
-- new ArgumentCountError (line 3128)
-- new HashTable (line 3157)
-- new Variable (line 3160)
-- new HashTable (line 3182)
-- new Variable (line 3185)
-- new ArgumentCountError (line 3285)
-- new HashTable (line 3315)
-- new Variable (line 3317)
-- new ArgumentCountError (line 3336)
-- new ArgumentCountError (line 3366)
+- new SoapFault (line 899)
+- new SoapFault (line 1485)
+- new DOMDocument (line 1487)
+- new SoapFault (line 1489)
+- new DOMXPath (line 1491)
+- new DOMDocument (line 2264)
+- new SoapFault (line 2266)
+- new DOMXPath (line 2268)
+- new SoapFault (line 2291)
+- new SoapTypemapFromXml (line 2457)
+- new SoapMappedObject (line 2484)
+- new Variable (line 2562)
+- new Variable (line 2571)
+- new ObjectEntry (line 2592)
+- new Variable (line 2598)
+- new HashTable (line 2604)
+- new Variable (line 2614)
+- new stdClass (line 2628)
+- new ObjectEntry (line 2636)
+- new Variable (line 2643)
+- new Variable (line 2651)
+- new HashTable (line 2678)
+- new ObjectEntry (line 2696)
+- new ArgumentCountError (line 2983)
+- new Variable (line 3009)
+- new HashTable (line 3017)
+- new Variable (line 3023)
+- new Variable (line 3031)
+- new ArgumentCountError (line 3066)
+- new ArgumentCountError (line 3094)
+- new ArgumentCountError (line 3122)
+- new HashTable (line 3151)
+- new Variable (line 3154)
+- new HashTable (line 3176)
+- new Variable (line 3179)
+- new ArgumentCountError (line 3279)
+- new HashTable (line 3309)
+- new Variable (line 3311)
+- new ArgumentCountError (line 3330)
+- new ArgumentCountError (line 3360)
 - 84 class method(s)
 
 ### `ext/soap/VmSoapEncoding.php`
@@ -22293,7 +22316,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/is_soap_fault.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 36)
 - 3 class method(s)
 
 ### `ext/soap/use_soap_error_handler.php`
@@ -31273,9 +31295,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmEval.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 157)
-- new ParseError (line 224)
-- 16 class method(s)
+- new CompileError (line 179)
+- new ParseError (line 246)
+- 17 class method(s)
 
 ### `ext/standard/VmExceptionHandler.php`
 
@@ -41723,7 +41745,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 720)
+- new InternalArgInfo (line 732)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -41739,8 +41761,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2002)
-- new ArgumentCountError (line 2013)
+- new ArgumentCountError (line 2005)
+- new ArgumentCountError (line 2016)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -43745,9 +43767,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/EvalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 72)
-- new Variable (line 81)
-- 2 class method(s)
+- new Runtime (line 87)
+- new Variable (line 99)
+- new Variable (line 108)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php`
 
