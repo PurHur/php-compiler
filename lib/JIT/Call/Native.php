@@ -108,6 +108,7 @@ class Native implements Call {
      */
     public function callWithArgMap(Context $context, array $args): Value {
         ksort($args);
+        $this->rejectSkippedEffectivelyRequiredArgs($context, $args);
         // CallArgv: parameter-index order with defaults for skipped named optionals (#24948).
         // Keep $args sparse for RECV / LLVM binding; only the func_* snapshot is densified.
         $sentArgs = $this->densifyCallArgvArgs($args);
@@ -178,6 +179,8 @@ class Native implements Call {
      *
      * Skips an implicit $this / NEW receiver prefix. Fills holes up to max passed index with
      * {@see $defaultArgs} (indexed like LLVM params, including the receiver offset).
+     * Does not fill effectively-required holes (optional-before-required, #25728) — those are
+     * rejected in {@see rejectSkippedEffectivelyRequiredArgs()} before densify.
      *
      * @param array<int, Variable> $args
      *
@@ -188,13 +191,7 @@ class Native implements Call {
         if ([] === $args) {
             return [];
         }
-        $prefix = 0;
-        if (
-            [] !== $this->paramNames
-            && \count($this->argTypes) === \count($this->paramNames) + 1
-        ) {
-            $prefix = 1;
-        }
+        $prefix = $this->receiverPrefix();
         $userArgs = [];
         foreach ($args as $idx => $var) {
             $i = (int) $idx;
@@ -216,6 +213,9 @@ class Native implements Call {
                 $out[] = $userArgs[$i];
                 continue;
             }
+            if ($this->userParamIsEffectivelyRequired($i)) {
+                continue;
+            }
             $defaultIdx = $prefix + $i;
             if (isset($this->defaultArgs[$defaultIdx])) {
                 $out[] = $this->defaultArgs[$defaultIdx];
@@ -223,6 +223,91 @@ class Native implements Call {
         }
 
         return $out;
+    }
+
+    /**
+     * Named-arg skip of optional-before-required → ArgumentCountError (zend_execute.c, #25728).
+     *
+     * @param array<int, Variable> $args
+     */
+    private function rejectSkippedEffectivelyRequiredArgs(Context $context, array $args): void
+    {
+        if ([] === $this->paramNames || [] === $args) {
+            return;
+        }
+        $prefix = $this->receiverPrefix();
+        $maxUser = -1;
+        foreach ($args as $idx => $_) {
+            $i = (int) $idx;
+            if ($i < $prefix) {
+                continue;
+            }
+            $maxUser = max($maxUser, $i - $prefix);
+        }
+        if ($maxUser < 0) {
+            return;
+        }
+        $userCount = \count($this->paramNames);
+        for ($userIdx = 0; $userIdx < $userCount && $userIdx <= $maxUser; ++$userIdx) {
+            $llvmIdx = $prefix + $userIdx;
+            if (isset($args[$llvmIdx])) {
+                continue;
+            }
+            if (!$this->userParamIsEffectivelyRequired($userIdx)) {
+                continue;
+            }
+            // Later user arg present ⇒ named omission of an effectively-required param.
+            if ($maxUser > $userIdx) {
+                $name = $this->paramNames[$userIdx] ?? '';
+                \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                    $context,
+                    \sprintf(
+                        '%s(): Argument #%d ($%s) not passed',
+                        $this->name,
+                        $userIdx + 1,
+                        $name
+                    )
+                );
+            }
+        }
+    }
+
+    private function receiverPrefix(): int
+    {
+        if (
+            [] !== $this->paramNames
+            && \count($this->argTypes) === \count($this->paramNames) + 1
+        ) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /**
+     * User param must be passed: no compile-time default, or default before a later required (#25728).
+     */
+    private function userParamIsEffectivelyRequired(int $userIdx): bool
+    {
+        if (null !== $this->namedArgsVariadicIndex && $userIdx === $this->namedArgsVariadicIndex) {
+            return false;
+        }
+        $prefix = $this->receiverPrefix();
+        $hasDefault = isset($this->defaultArgs[$prefix + $userIdx]);
+        if (!$hasDefault) {
+            return true;
+        }
+        $userCount = \count($this->paramNames);
+        for ($j = $userIdx + 1; $j < $userCount; ++$j) {
+            if (null !== $this->namedArgsVariadicIndex && $j === $this->namedArgsVariadicIndex) {
+                return false;
+            }
+            if (!isset($this->defaultArgs[$prefix + $j])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function compileArg(Context $context, Variable $arg, int $argNum): Value {
