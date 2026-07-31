@@ -15,7 +15,10 @@ final class ZendDeclaredInterfaces
 {
     public static function register(Context $ctx): void
     {
-        self::registerInterface($ctx, 'SeekableIterator', ['iterator']);
+        // Zend ce->interfaces is flattened: Iterator then Traversable (php_spl / spl_iterators.c).
+        // Reverse-parent insert in class_implements / Reflection needs both edges so
+        // SeekableIterator expands to SeekableIterator,Traversable,Iterator (#25790).
+        self::registerInterface($ctx, 'SeekableIterator', ['iterator', 'traversable']);
         self::registerInterface($ctx, 'Reflector', []);
         // php-src ext/dom/php_dom.stub.php — DOMChildNode does not extend DOMParentNode (#22389).
         self::registerInterface($ctx, 'DOMParentNode', []);
