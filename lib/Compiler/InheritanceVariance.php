@@ -345,9 +345,12 @@ final class InheritanceVariance
                 return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
             }
         }
+        // Zend zend_compile.c auto-declares `: string` for untyped `__toString` so LSP against
+        // Stringable::__toString(): string (and typed parent overrides) succeeds (#25727).
+        $childReturn = self::effectiveToStringReturnType($methodLc, $child->returnType);
         if (!self::isReturnCompatibleStatic(
             $parent->returnType,
-            $child->returnType,
+            $childReturn,
             $parent->ownerLc,
             $child->ownerLc,
             $isClassSubtypeOf,
@@ -357,6 +360,24 @@ final class InheritanceVariance
         }
 
         return null;
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — untyped `__toString` is compiled as returning string.
+     * Declared non-string returns stay as-is (rejected by MagicMethodReturnTypeCheck / LSP).
+     */
+    private static function effectiveToStringReturnType(string $methodLc, ?TypeSig $declared): ?TypeSig
+    {
+        if ('__tostring' !== $methodLc) {
+            return $declared;
+        }
+        if (null !== $declared && !$declared->isMixed()) {
+            return $declared;
+        }
+        $string = new TypeSig();
+        $string->builtinScalar = 'string';
+
+        return $string;
     }
 
     private function compatibilityError(

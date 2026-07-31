@@ -10,7 +10,7 @@ use PHPCompiler\Compiler\TypeSig;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3323, #23504 */
+/** @covers issue #3323, #23504, #25727 */
 final class InheritanceVarianceTest extends TestCase
 {
     public function testInterfaceExtendsIncompatibleStaticReturnFailsAtCompileTime(): void
@@ -826,5 +826,42 @@ PHP;
         $this->expectException(\Error::class);
         $this->expectExceptionMessage('Access level to B::f() must be protected (as in class A) or weaker');
         $runtime->run($block);
+    }
+
+    /** Zend: untyped __toString is compatible with Stringable::__toString(): string (#25727). */
+    public function testUntypedToStringImplementsStringable(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class S implements Stringable {
+    public function __toString() {
+        return 'hi';
+    }
+}
+echo (string) (new S()), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'stringable_untyped_tostring.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
+
+    /** Declared non-string __toString still fatals (#25025 / #25727). */
+    public function testToStringIntReturnStillRejected(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class S implements Stringable {
+    public function __toString(): int {
+        return 1;
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('S::__toString(): Return type must be string when declared');
+        $runtime->parseAndCompile($code, 'stringable_int_tostring.php');
     }
 }
