@@ -18,6 +18,16 @@ final class VmUserStream
     /** @var array<int, UserStreamState> */
     private static array $streams = [];
 
+    /** @var array<int, UserDirState> directory handles from dir_opendir (#26002) */
+    private static array $dirs = [];
+
+    private static int $nextDirSlot = 1;
+
+    /** Distinct from {@see VmDirNative} HANDLE_BASE (0x10000000). */
+    private const DIR_HANDLE_BASE = 0x20000000;
+
+    private const MAX_DIR_HANDLES = 256;
+
     public static function open(VM $vm, Context $ctx, string $uri, string $mode): int|false
     {
         $protocol = VmStreamWrapperRegistry::parseProtocol($uri);
@@ -703,6 +713,166 @@ final class VmUserStream
     }
 
     /**
+     * opendir() on custom protocols — php-src userspace.c php_userstream_dir_opener (#26002).
+     *
+     * @return int|false|null null when $uri is not a registered custom protocol
+     */
+    public static function tryOpendir(string $uri): int|false|null
+    {
+        $wrapper = self::freshWrapperForUri($uri);
+        if (null === $wrapper) {
+            return null;
+        }
+        if (false === $wrapper) {
+            return false;
+        }
+        [$vm, $object] = $wrapper;
+        if (!$vm->hasInstanceMethod($object->class, 'dir_opendir')) {
+            return false;
+        }
+        $pathVar = new Variable();
+        $pathVar->string($uri);
+        $optionsVar = new Variable();
+        // php_stream_opendir typically passes options=0 into dir_opendir (Zend 8.2).
+        $optionsVar->int(0);
+        $result = $vm->invokeInstanceMethod(
+            $object,
+            'dir_opendir',
+            $pathVar,
+            $optionsVar
+        )->resolveIndirect();
+        if (!self::boolFromInvoke($result)) {
+            return false;
+        }
+        $handle = self::allocateDirHandle();
+        if (false === $handle) {
+            return false;
+        }
+        self::$dirs[$handle] = new UserDirState($object, $uri, $vm);
+
+        return $handle;
+    }
+
+    public static function isValidDirHandle(int $handle): bool
+    {
+        return isset(self::$dirs[$handle]);
+    }
+
+    /**
+     * readdir() on a userspace dir handle — userspace.c php_userstreamop_readdir (#26002).
+     *
+     * Bool true/false from dir_readdir both mean EOF (php-src skips IS_TRUE/IS_FALSE).
+     *
+     * @return string|false
+     */
+    public static function dirReaddir(int $handle): string|false
+    {
+        $state = self::$dirs[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'dir_readdir')) {
+            return false;
+        }
+        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'dir_readdir')->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return false;
+        }
+        if (Variable::TYPE_NULL === $result->type) {
+            return '';
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            return $result->toString();
+        }
+        if (Variable::TYPE_INTEGER === $result->type) {
+            return (string) $result->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $result->type) {
+            return (string) $result->toFloat();
+        }
+
+        // Objects/arrays: try_convert_to_string failure → EOF in php-src.
+        return false;
+    }
+
+    public static function dirClosedir(int $handle): void
+    {
+        $state = self::$dirs[$handle] ?? null;
+        if (null === $state) {
+            return;
+        }
+        if ($state->vm->hasInstanceMethod($state->wrapper->class, 'dir_closedir')) {
+            $state->vm->invokeInstanceMethod($state->wrapper, 'dir_closedir');
+        }
+        unset(self::$dirs[$handle]);
+    }
+
+    public static function dirRewinddir(int $handle): void
+    {
+        $state = self::$dirs[$handle] ?? null;
+        if (null === $state) {
+            return;
+        }
+        if ($state->vm->hasInstanceMethod($state->wrapper->class, 'dir_rewinddir')) {
+            $state->vm->invokeInstanceMethod($state->wrapper, 'dir_rewinddir');
+        }
+    }
+
+    /**
+     * scandir() on custom protocols — open/readdir/close then sort (php-src dir.c; #26002).
+     *
+     * @return list<string>|false|null null when not a registered custom protocol
+     */
+    public static function tryScandir(string $uri, int $sortingOrder): array|false|null
+    {
+        $handle = self::tryOpendir($uri);
+        if (null === $handle) {
+            return null;
+        }
+        if (false === $handle) {
+            return false;
+        }
+        $names = [];
+        while (true) {
+            $entry = self::dirReaddir($handle);
+            if (false === $entry) {
+                break;
+            }
+            $names[] = $entry;
+        }
+        self::dirClosedir($handle);
+        if (\SCANDIR_SORT_NONE === $sortingOrder) {
+            return $names;
+        }
+        \sort($names, \SORT_STRING);
+        if (\SCANDIR_SORT_DESCENDING === $sortingOrder) {
+            $names = \array_reverse($names, false);
+        }
+
+        return $names;
+    }
+
+    /** @return int|false */
+    private static function allocateDirHandle(): int|false
+    {
+        for ($attempt = 0; $attempt < self::MAX_DIR_HANDLES; ++$attempt) {
+            $slot = self::$nextDirSlot;
+            ++self::$nextDirSlot;
+            if (self::$nextDirSlot >= self::MAX_DIR_HANDLES) {
+                self::$nextDirSlot = 1;
+            }
+            $handle = self::DIR_HANDLE_BASE + $slot;
+            if (isset(self::$dirs[$handle])) {
+                continue;
+            }
+
+            return $handle;
+        }
+
+        return false;
+    }
+
+    /**
      * unlink() on custom protocols — php-src userspace.c user_wrapper_unlink (#25987).
      *
      * @return bool|null null when $uri is not a registered custom protocol
@@ -983,6 +1153,17 @@ final class UserStreamState
         public ObjectEntry $wrapper,
         public string $uri,
         public string $protocol,
+        public VM $vm,
+    ) {
+    }
+}
+
+/** @internal userspace directory handle (#26002) */
+final class UserDirState
+{
+    public function __construct(
+        public ObjectEntry $wrapper,
+        public string $uri,
         public VM $vm,
     ) {
     }
