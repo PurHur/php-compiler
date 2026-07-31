@@ -3624,7 +3624,9 @@ class VM {
         }
         $fiber->resumeArgument->null();
         $child = $fiber->callback->func->getFrame($this->context, null);
-        $this->bindClosureCallCaptures($child, $fiber->callback);
+        // Bound-closure / instance-method fibers need $this in scope (Zend/zend_fibers.c, #25777).
+        // applyClosureBinding also installs use()-captures (same as invokeClosure / generators).
+        $this->applyClosureBinding($child, $fiber->callback);
         $child->calledArgs = $startArgs;
         $child->fiberState = $fiber;
         $returnSlot = new Variable();

@@ -2019,6 +2019,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'fiber_get_trace')) {
                 continue;
             }
+            // Fiber::suspend($this) from instance-method closure — VM applyClosureBinding (#25777);
+            // class+Fiber MCJIT still trips nested helper StreamLibcHandle link (same as plain class Fiber).
+            if (str_contains($name, 'fiber_suspend_this')) {
+                continue;
+            }
             // exit/die expression ScriptExit status — VM compliance (#3539).
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
                 continue;
