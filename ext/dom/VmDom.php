@@ -1584,8 +1584,9 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
-        // php-src ext/dom/attr.c: Attr.name is the local name (libxml attr->name), not the QName.
-        $entry->getProperty(self::PROP_NAME)->string($localName);
+        // php-src attr.c: living Attr.name is QName (#26024); legacy DOMAttr.name is local (#19754).
+        $nameProp = VmDomLiving::isLivingAttr($entry) ? $qualifiedName : $localName;
+        $entry->getProperty(self::PROP_NAME)->string($nameProp);
         $entry->getProperty(self::PROP_VALUE)->string('');
         $entry->getProperty(self::PROP_OWNER_ELEMENT)->null();
         self::initNodePropertySlots($entry);
@@ -12676,9 +12677,10 @@ final class VmDom
         if ($attr->hasProperty(self::PROP_NODE_NAME)) {
             $attr->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
         }
-        // php-src Attr.name is the local name (libxml attr->name), not the QName.
+        // php-src attr.c: living Attr.name is QName (#26024); legacy DOMAttr.name is local (#19754).
         if ($attr->hasProperty(self::PROP_NAME)) {
-            $attr->getProperty(self::PROP_NAME)->string($localName);
+            $nameProp = VmDomLiving::isLivingAttr($attr) ? $qualifiedName : $localName;
+            $attr->getProperty(self::PROP_NAME)->string($nameProp);
         }
 
         if (null !== $owner) {
