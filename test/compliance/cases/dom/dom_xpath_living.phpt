@@ -1,11 +1,5 @@
 --TEST--
-Dom\XPath + Dom\NodeList on HTMLDocument/XMLDocument (#20757)
---SKIPIF--
-<?php
-if (!class_exists('Dom\\HTMLDocument')) {
-    die('skip Dom\\HTMLDocument requires PHP_COMPILER_PROFILE=8.4 (#20757)');
-}
-?>
+Dom\XPath + Dom\NodeList on HTMLDocument/XMLDocument (#20757, #26007)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -17,13 +11,16 @@ $doc = Dom\HTMLDocument::createFromString(
     '<html><body><p id="a">hi</p><p class="b">yo</p></body></html>'
 );
 $xp = new Dom\XPath($doc);
+// HTML elements are in the XHTML namespace — unprefixed //p matches 0 (#26007).
+$xp->registerNamespace('h', 'http://www.w3.org/1999/xhtml');
 echo get_class($xp), "\n";
-$list = $xp->query('//p');
+$list = $xp->query('//h:p');
 echo get_class($list), "\n";
 echo ($list instanceof Dom\NodeList) ? "isa\n" : "not\n";
 echo 'len=', $list->length, "\n";
 echo 'item=', $list->item(0)->tagName, "\n";
-echo 'count=', $xp->evaluate('count(//p)'), "\n";
+echo 'count=', $xp->evaluate('count(//h:p)'), "\n";
+echo 'bare=', $xp->query('//p')->length, "\n";
 
 $xml = Dom\XMLDocument::createFromString('<r xmlns:p="urn:x"><p:a>1</p:a></r>');
 $xp2 = new Dom\XPath($xml);
@@ -49,6 +46,7 @@ isa
 len=2
 item=P
 count=2
+bare=0
 ns=1
 legacy_type
 legacy_list=DOMNodeList

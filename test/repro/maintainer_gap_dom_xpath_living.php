@@ -21,7 +21,14 @@ if (!$xp instanceof Dom\XPath) {
     exit(1);
 }
 
-$list = $xp->query('//p');
+// XHTML default NS: unprefixed //p → 0; register prefix for matches (#26007).
+$xp->registerNamespace('h', 'http://www.w3.org/1999/xhtml');
+if (0 !== $xp->query('//p')->length) {
+    fwrite(STDERR, "fail: bare //p should be 0 on HTMLDocument\n");
+    exit(1);
+}
+
+$list = $xp->query('//h:p');
 if (!$list instanceof Dom\NodeList) {
     fwrite(STDERR, 'fail: query returned '.get_class($list).", expected Dom\\NodeList\n");
     exit(1);
@@ -36,7 +43,7 @@ if (!$first instanceof Dom\Element && !$first instanceof Dom\HTMLElement) {
     exit(1);
 }
 
-$n = $xp->evaluate('count(//p)');
+$n = $xp->evaluate('count(//h:p)');
 if (2.0 !== (float) $n) {
     fwrite(STDERR, 'fail: evaluate count='.var_export($n, true)."\n");
     exit(1);
