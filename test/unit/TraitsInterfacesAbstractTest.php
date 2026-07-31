@@ -32,9 +32,10 @@ PHP;
 abstract class A { public function f(): int { return 1; } }
 new A();
 PHP;
-        $this->expectException(\CompileError::class);
+        $block = $runtime->parseAndCompile($code, 'abstract_new.php');
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot instantiate abstract class A');
-        $runtime->parseAndCompile($code, 'abstract_new.php');
+        $runtime->run($block);
     }
 
     public function testTraitConflictFailsAtClassDeclaration(): void
