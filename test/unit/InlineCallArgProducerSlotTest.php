@@ -1043,6 +1043,46 @@ PHP;
         self::assertContains($sendSlots[1], $returnSlots);
     }
 
+    /** Issue #25672 — sibling next() MethodCall producers must not share ARG_SEND slots. */
+    public function testShowReceivesDistinctNextMethodCallProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function next(): int {
+        static $n = 0;
+        return ++$n;
+    }
+}
+$c = new C();
+function show($a, $b) { echo "$a,$b\n"; }
+show($c->next(), $c->next());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'next_method_call_args.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("1,2\n", $out);
+    }
+
     /** Issue #9351 — sibling MethodCall producers map to distinct var_dump arg slots. */
     public function testVarDumpReceivesDistinctMethodCallProducerSlots(): void
     {
