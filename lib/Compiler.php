@@ -13792,12 +13792,46 @@ class Compiler {
                 }
             ));
         }
+        // $a->parentNode->replaceChild($b->cloneNode(true), $a) — parentNode feeds the *outer*
+        // MethodCall receiver, not cloneNode's bool arg. Drop PropertyFetches consumed as
+        // later sibling MethodCall receivers (#25876).
+        if (\is_int($callIndex) && null !== $block->orig) {
+            $laterReceiverVars = [];
+            for ($later = $callIndex + 1, $nChildren = \count($block->orig->children); $later < $nChildren; ++$later) {
+                $laterOp = $block->orig->children[$later] ?? null;
+                if (
+                    $laterOp instanceof Op\Expr\MethodCall
+                    && null !== $laterOp->var
+                ) {
+                    $laterReceiverVars[] = $laterOp->var;
+                }
+            }
+            if ([] !== $laterReceiverVars) {
+                $fetches = \array_values(\array_filter(
+                    $fetches,
+                    function ($fetch) use ($laterReceiverVars): bool {
+                        if (null === $fetch->result) {
+                            return true;
+                        }
+                        foreach ($laterReceiverVars as $laterVar) {
+                            if ($this->operandsReferToSameVariable($laterVar, $fetch->result)) {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    }
+                ));
+            }
+        }
         if ([] === $fetches) {
             return null;
         }
         if (\count($fetches) > $propertyArgCount) {
             // Extra leaf is usually the MethodCall receiver (documentElement->C14NFile($tmp)).
-            if (0 !== $argIndex) {
+            // When every non-literal arg is a scalar ConstFetch (propertyArgCount===0), leftovers
+            // are outer receivers — not this call's args (#25876 nested cloneNode(true/false)).
+            if (0 !== $argIndex || 0 === $propertyArgCount) {
                 return null;
             }
 
