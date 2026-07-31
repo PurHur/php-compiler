@@ -15263,6 +15263,10 @@ restart:
 
     /**
      * Closure scope (ce) for self/parent/private — not late-static called_scope (#3673, #25793).
+     *
+     * Explicit bindTo($obj, null) leaves boundScopeClass null/empty; do not fall back to
+     * the definition-site func->class or calledClass ($this) — that re-widens visibility
+     * (#10097, #25838, zend_closures.c).
      */
     private function boundClosureScopeClassLc(Frame $frame): ?string
     {
@@ -15273,7 +15277,11 @@ restart:
             return null;
         }
         $state = $frame->closureCall ?? $frame->pendingClosureInvoke;
-        if (null !== $state && null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+        if (null !== $state) {
+            if (null === $state->boundScopeClass || '' === $state->boundScopeClass) {
+                return null;
+            }
+
             return strtolower($state->boundScopeClass);
         }
         if (null !== $frame->block->func->class && null !== $frame->block->func->class->value
@@ -15309,10 +15317,18 @@ restart:
     {
         $classLc = $this->boundClosureScopeClassLc($frame);
         if (null === $classLc) {
-            if (null !== $frame->block && null !== $frame->block->func && null !== $frame->block->func->class) {
-                $classLc = strtolower($frame->block->func->class->value);
-            } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
-                $classLc = strtolower($frame->calledClass);
+            // Closure frames: scope (ce) is the only visibility source. calledClass is
+            // late-static ($this class from #25793) and must not grant protected/private
+            // when bindTo left the scope unbound (#10097, #25838).
+            $isClosure = null !== $frame->block
+                && null !== $frame->block->func
+                && (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
+            if (!$isClosure) {
+                if (null !== $frame->block && null !== $frame->block->func && null !== $frame->block->func->class) {
+                    $classLc = strtolower($frame->block->func->class->value);
+                } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
+                    $classLc = strtolower($frame->calledClass);
+                }
             }
         }
         if (null === $classLc) {

@@ -1,5 +1,5 @@
 --TEST--
-Language: Closure::bindTo($obj, null) enforces property visibility (#10097, zend_closures.c)
+Language: Closure::bindTo($obj, null) enforces property visibility (#10097, #25838, zend_closures.c)
 --FILE--
 <?php
 declare(strict_types=1);
