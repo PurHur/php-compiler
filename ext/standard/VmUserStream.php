@@ -176,6 +176,40 @@ final class VmUserStream
         return boolval::isTruthy($result);
     }
 
+    /**
+     * Userspace stream_truncate / ftruncate (php-src userspace.c php_userstreamop_truncate; #25994).
+     *
+     * Missing stream_truncate → false. On success, clamp cached position like php-src.
+     */
+    public static function truncate(int $handle, int $size): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($size < 0) {
+            return false;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_truncate')) {
+            return false;
+        }
+        $sizeVar = new Variable();
+        $sizeVar->int($size);
+        $result = $state->vm->invokeInstanceMethod(
+            $state->wrapper,
+            'stream_truncate',
+            $sizeVar
+        )->resolveIndirect();
+        if (!boolval::isTruthy($result)) {
+            return false;
+        }
+        if ($state->position > $size) {
+            $state->position = $size;
+        }
+
+        return true;
+    }
+
     public static function close(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;
