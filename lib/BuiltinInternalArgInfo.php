@@ -105,6 +105,8 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
+            // ext/curl/curl.stub.php — InternalArgInfo return int; Zend bool (#26107)
+            'curl_multi_setopt' => 'bool',
             // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046)
             'filter_var' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
@@ -348,6 +350,14 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
+            // ext/curl/curl.stub.php — CurlHandle / CurlMultiHandle + mixed $value (#26107)
+            // InternalArgInfo still has untyped ch/mh/value and return int on curl_multi_setopt.
+            'curl_setopt_array' => 0 === $index ? 'CurlHandle' : null,
+            'curl_multi_setopt' => match ($index) {
+                0 => 'CurlMultiHandle',
+                2 => 'mixed',
+                default => null,
+            },
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
             'filter_var' => match ($index) {
                 0 => 'mixed',
