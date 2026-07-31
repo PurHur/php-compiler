@@ -919,13 +919,22 @@ final class VmReflection
                 }
                 $vis = $class->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
                 if (($vis & CfgFunc::FLAG_STATIC) !== 0) {
-                    return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
+                    if (self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc)) {
+                        return true;
+                    }
+
+                    // Inaccessible static still callable via __callStatic (#25710).
+                    return self::classHasStaticMagicCall($ctx, $lcClass);
                 }
                 $func = $class->methods[$methodLc];
                 if ($func instanceof Func\PHP) {
                     $decl = $func->block->func;
                     if (null !== $decl && (($decl->flags ?? 0) & CfgFunc::FLAG_STATIC) !== 0) {
-                        return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
+                        if (self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc)) {
+                            return true;
+                        }
+
+                        return self::classHasStaticMagicCall($ctx, $lcClass);
                     }
                 }
 

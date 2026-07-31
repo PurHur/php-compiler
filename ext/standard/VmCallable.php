@@ -316,7 +316,8 @@ final class VmCallable
             $function,
             $scopeFrame,
             $argNum,
-            $nullAllowed
+            $nullAllowed,
+            $resolved
         );
     }
 
@@ -515,13 +516,17 @@ final class VmCallable
             return self::hasInstanceMagicCall($ctx, $objectClass);
         }
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-
-        return VmReflection::isMethodCallableFromScope(
+        if (VmReflection::isMethodCallableFromScope(
             $ctx,
             $vis,
             strtolower($declaring->name),
             $callerClassLc
-        );
+        )) {
+            return true;
+        }
+
+        // Inaccessible declared method is still callable when __call exists (#25710).
+        return self::hasInstanceMagicCall($ctx, $objectClass);
     }
 
     private static function invokeStringCallable(
@@ -676,14 +681,17 @@ final class VmCallable
             ) {
                 return self::invokeMagicInstanceCall($ctx, $object, $methodName, ...$args);
             }
-            self::assertInstanceMethodVisibleForInvoke(
+            // Inaccessible declared method + __call → magic (zend_is_callable_ex / #25710).
+            if (self::instanceMethodNeedsMagicCall(
                 $ctx,
                 $object->class,
                 $methodName,
                 $function,
                 $scopeFrame,
                 1
-            );
+            )) {
+                return self::invokeMagicInstanceCall($ctx, $object, $methodName, ...$args);
+            }
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, $methodName, ...$args);
         }
@@ -707,11 +715,61 @@ final class VmCallable
     }
 
     /**
-     * call_user_func* — reject inaccessible instance methods before invoke (#25709).
+     * call_user_func* instance array callable (#25709 / #25710).
      *
      * Missing methods with `__call` are handled in {@see invokeArrayCallable} (#25747).
-     * When the method exists but the builtin caller frame cannot see it, Zend TypeErrors
-     * (zend_is_callable_ex) rather than invoking `__call` (see #25710 for that gap).
+     * Inaccessible declared methods: `__call` when present (#25710); otherwise TypeError (#25709).
+     *
+     * @return bool true when the callee must be invoked via `__call`
+     */
+    private static function instanceMethodNeedsMagicCall(
+        Context $ctx,
+        ClassEntry $objectClass,
+        string $method,
+        string $function,
+        ?Frame $scopeFrame,
+        int $argNum = 1,
+        bool $nullAllowed = false
+    ): bool {
+        if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
+            return false;
+        }
+        try {
+            [$declaring, $methodLc] = $ctx->runtime->vm->resolveInstanceMethod($objectClass, $method);
+        } catch (\LogicException) {
+            return false;
+        }
+        $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null !== $scopeFrame
+            ? VmReflection::callerClassLcFromFrame($scopeFrame)
+            : null;
+        if (VmReflection::isMethodCallableFromScope(
+            $ctx,
+            $vis,
+            strtolower($declaring->name),
+            $callerClassLc
+        )) {
+            return false;
+        }
+        if (self::hasInstanceMagicCall($ctx, $objectClass)) {
+            return true;
+        }
+        $kind = ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+        $declaredName = $declaring->methodNames[$methodLc] ?? $method;
+        throw new \TypeError(self::inaccessibleMethodCallbackTypeError(
+            $function,
+            $kind,
+            $declaring->name,
+            $declaredName,
+            $argNum,
+            $nullAllowed
+        ));
+    }
+
+    /**
+     * call_user_func* — reject inaccessible instance methods before invoke (#25709).
+     *
+     * Soft gate for usort/etc.: inaccessible + `__call` is allowed (zend_is_callable_ex / #25710).
      */
     private static function assertInstanceMethodVisibleForInvoke(
         Context $ctx,
@@ -722,18 +780,10 @@ final class VmCallable
         int $argNum = 1,
         bool $nullAllowed = false
     ): void {
-        if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
-            return;
-        }
-        try {
-            [$declaring, $methodLc] = $ctx->runtime->vm->resolveInstanceMethod($objectClass, $method);
-        } catch (\LogicException) {
-            return;
-        }
-        self::assertDeclaringMethodVisibleForInvoke(
+        // Throws TypeError when inaccessible without __call; returns true for magic path.
+        self::instanceMethodNeedsMagicCall(
             $ctx,
-            $declaring,
-            $methodLc,
+            $objectClass,
             $method,
             $function,
             $scopeFrame,
@@ -743,7 +793,50 @@ final class VmCallable
     }
 
     /**
-     * Shared visibility gate for instance + static array/`Class::method` callables (#25709, #25712).
+     * Shared visibility gate for static array/`Class::method` callables (#25709 / #25710 / #25712).
+     *
+     * @return bool true when the callee must be invoked via `__callStatic`
+     */
+    private static function declaringMethodNeedsStaticMagicCall(
+        Context $ctx,
+        ClassEntry $declaring,
+        string $methodLc,
+        string $methodFallback,
+        string $function,
+        ?Frame $scopeFrame,
+        string $resolvedClassName,
+        int $argNum = 1,
+        bool $nullAllowed = false
+    ): bool {
+        $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null !== $scopeFrame
+            ? VmReflection::callerClassLcFromFrame($scopeFrame)
+            : null;
+        if (VmReflection::isMethodCallableFromScope(
+            $ctx,
+            $vis,
+            strtolower($declaring->name),
+            $callerClassLc
+        )) {
+            return false;
+        }
+        if (self::hasStaticMagicCall($ctx, $resolvedClassName)) {
+            return true;
+        }
+        $kind = ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+        $declaredName = $declaring->methodNames[$methodLc] ?? $methodFallback;
+        throw new \TypeError(self::inaccessibleMethodCallbackTypeError(
+            $function,
+            $kind,
+            $declaring->name,
+            $declaredName,
+            $argNum,
+            $nullAllowed
+        ));
+    }
+
+    /**
+     * Soft visibility gate for instance + static array/`Class::method` callables (#25709, #25712).
      */
     private static function assertDeclaringMethodVisibleForInvoke(
         Context $ctx,
@@ -753,8 +846,24 @@ final class VmCallable
         string $function,
         ?Frame $scopeFrame,
         int $argNum = 1,
-        bool $nullAllowed = false
+        bool $nullAllowed = false,
+        ?string $resolvedClassNameForMagic = null
     ): void {
+        if (null !== $resolvedClassNameForMagic) {
+            self::declaringMethodNeedsStaticMagicCall(
+                $ctx,
+                $declaring,
+                $methodLc,
+                $methodFallback,
+                $function,
+                $scopeFrame,
+                $resolvedClassNameForMagic,
+                $argNum,
+                $nullAllowed
+            );
+
+            return;
+        }
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null !== $scopeFrame
             ? VmReflection::callerClassLcFromFrame($scopeFrame)
@@ -810,15 +919,6 @@ final class VmCallable
             ));
         }
         [$declaring, $methodLc, $isStatic] = $located;
-        self::assertDeclaringMethodVisibleForInvoke(
-            $ctx,
-            $declaring,
-            $methodLc,
-            $methodName,
-            $function,
-            $scopeFrame,
-            1
-        );
         $vm = $ctx->runtime->vm;
         if (!$isStatic) {
             $thisVar = null !== $scopeFrame
@@ -841,6 +941,17 @@ final class VmCallable
                     .'() cannot be called statically'
                 );
             }
+            // Class-string form: inaccessible instance method + object __call (#25710).
+            if (self::instanceMethodNeedsMagicCall(
+                $ctx,
+                $object->class,
+                $methodName,
+                $function,
+                $scopeFrame,
+                1
+            )) {
+                return self::invokeMagicInstanceCall($ctx, $object, $methodName, ...$args);
+            }
             $func = $declaring->methods[$methodLc];
             if (!$func instanceof \PHPCompiler\Func\PHP) {
                 return $vm->invokeInstanceMethod($object, $methodName, ...$args);
@@ -851,6 +962,16 @@ final class VmCallable
             return $vm->invokePhpFunctionIsolated($func, $boundThis, ...$args);
         }
 
+        $needsMagic = self::declaringMethodNeedsStaticMagicCall(
+            $ctx,
+            $declaring,
+            $methodLc,
+            $methodName,
+            $function,
+            $scopeFrame,
+            $resolved,
+            1
+        );
         $calledScope = $resolved;
         if ($isMagic && null !== $scopeFrame) {
             try {
@@ -858,6 +979,10 @@ final class VmCallable
             } catch (\Error) {
                 $calledScope = $resolved;
             }
+        }
+
+        if ($needsMagic) {
+            return self::invokeMagicStaticCall($ctx, $resolved, $methodName, ...$args);
         }
 
         return $vm->invokeDeclaredStaticWithCalledScope(
