@@ -599,6 +599,8 @@ final class BuiltinClasses
     private static function registerWeakReference(Context $ctx): void
     {
         $entry = new ClassEntry('WeakReference');
+        // zend_weakrefs.c — clone_obj unset; WeakReference is uncloneable (#25962).
+        $entry->denyClone = true;
         $nullProto = new Variable(Variable::TYPE_NULL);
         $entry->properties[] = new ClassProperty(
             WeakRefSupport::TARGET_PROPERTY,

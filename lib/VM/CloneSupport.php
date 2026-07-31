@@ -12,7 +12,8 @@ final class CloneSupport
     public const NON_OBJECT_ERROR_MESSAGE = '__clone method called on non-object';
 
     /**
-     * Class name when clone_obj is disabled on $object or an ancestor (Exception/Error, #25870).
+     * Class name when clone_obj is disabled on $object or an ancestor
+     * (Exception/Error #25870, WeakReference #25962).
      */
     public static function uncloneableDeniedClass(ObjectEntry $object, Context $context): ?string
     {

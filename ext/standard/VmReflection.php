@@ -3213,6 +3213,12 @@ final class VmReflection
         if ([] !== $entry->abstractMethods) {
             return false;
         }
+        // clone_obj = NULL on this class or an ancestor (Exception/Error, WeakReference; #25870, #25962).
+        foreach (self::classHierarchyChain($entry, $ctx) as $class) {
+            if ($class->denyClone) {
+                return false;
+            }
+        }
         $cloneLc = '__clone';
         foreach (self::classHierarchyChain($entry, $ctx) as $class) {
             if (isset($class->methods[$cloneLc])) {

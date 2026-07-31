@@ -10,6 +10,31 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #1366 */
 final class WeakReferenceWeakMapTest extends TestCase
 {
+    /** @covers issue #25962 — zend_weakrefs.c clone_obj unset */
+    public function testWeakReferenceCloneThrowsUncloneableError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new stdClass;
+$w = WeakReference::create($o);
+echo 'cloneable=', (new ReflectionClass(WeakReference::class))->isCloneable() ? '1' : '0', "\n";
+echo 'get=', var_export($w->get() === $o, true), "\n";
+try {
+    $c = clone $w;
+    echo 'cloned=', get_class($c), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_clone_25962.php'));
+        $this->assertSame(
+            "cloneable=0\nget=true\nError:Trying to clone an uncloneable object of class WeakReference\n",
+            ob_get_clean()
+        );
+    }
+
     public function testWeakReferenceGetNullAfterAssignNull(): void
     {
         $runtime = new Runtime();
