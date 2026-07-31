@@ -677,6 +677,13 @@ final class VmCallable
                 $scopeFrame,
                 1
             );
+            // Missing method → __call (zend_is_callable_ex FCC invoke; #25747 / re-#11534).
+            // invokeInstanceMethod does not walk magic handlers — only real methods.
+            if (!$ctx->runtime->vm->hasInstanceMethod($object->class, $methodName)
+                && self::hasInstanceMagicCall($ctx, $object->class)
+            ) {
+                return self::invokeMagicCall($ctx, $object, $methodName, ...$args);
+            }
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, $methodName, ...$args);
         }
@@ -702,7 +709,7 @@ final class VmCallable
     /**
      * call_user_func* — reject inaccessible instance methods before invoke (#25709).
      *
-     * Missing methods still fall through to {@see VM::invokeInstanceMethod} / `__call`.
+     * Missing methods are dispatched via {@see invokeMagicCall} when `__call` exists (#25747).
      * When the method exists but the builtin caller frame cannot see it, Zend TypeErrors
      * (zend_is_callable_ex) rather than invoking `__call`.
      */
@@ -793,6 +800,10 @@ final class VmCallable
         }
         $located = self::locateCallableMethod($ctx, $resolved, $methodName, $function);
         if (null === $located) {
+            // Missing static method → __callStatic (zend_std_get_static_method; #25747).
+            if (self::hasStaticMagicCall($ctx, $resolved)) {
+                return self::invokeMagicCallStatic($ctx, $resolved, $methodName, ...$args);
+            }
             throw new \TypeError(self::invalidStringCallbackTypeError(
                 $className.'::'.$methodName,
                 $function
@@ -1075,24 +1086,7 @@ final class VmCallable
      */
     private static function hasInstanceMagicCall(Context $ctx, \PHPCompiler\VM\ClassEntry $class): bool
     {
-        $lcClass = strtolower($class->name);
-        $visited = [];
-        while (!isset($visited[$lcClass])) {
-            $visited[$lcClass] = true;
-            if (!isset($ctx->classes[$lcClass])) {
-                return false;
-            }
-            $entry = $ctx->classes[$lcClass];
-            if (isset($entry->methods['__call'])) {
-                return true;
-            }
-            if (null === $entry->parentLc) {
-                return false;
-            }
-            $lcClass = $entry->parentLc;
-        }
-
-        return false;
+        return null !== self::findInstanceMagicCallClass($ctx, $class);
     }
 
     /**
@@ -1100,23 +1094,130 @@ final class VmCallable
      */
     private static function hasStaticMagicCall(Context $ctx, string $className): bool
     {
+        return null !== self::findStaticMagicCallClass($ctx, $className);
+    }
+
+    /**
+     * Walk hierarchy for the class that declares __call (zend_std_get_method).
+     */
+    private static function findInstanceMagicCallClass(
+        Context $ctx,
+        \PHPCompiler\VM\ClassEntry $class
+    ): ?\PHPCompiler\VM\ClassEntry {
+        $lcClass = strtolower($class->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                return null;
+            }
+            $entry = $ctx->classes[$lcClass];
+            if (isset($entry->methods['__call'])) {
+                return $entry;
+            }
+            if (null === $entry->parentLc) {
+                return null;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return null;
+    }
+
+    /**
+     * Walk hierarchy for the class that declares __callStatic.
+     */
+    private static function findStaticMagicCallClass(
+        Context $ctx,
+        string $className
+    ): ?\PHPCompiler\VM\ClassEntry {
         $lcClass = strtolower(ltrim($className, '\\'));
         $visited = [];
         while (!isset($visited[$lcClass])) {
             $visited[$lcClass] = true;
             if (!isset($ctx->classes[$lcClass])) {
-                return false;
+                return null;
             }
             $entry = $ctx->classes[$lcClass];
             if (isset($entry->methods['__callstatic'])) {
-                return true;
+                return $entry;
             }
             if (null === $entry->parentLc) {
-                return false;
+                return null;
             }
             $lcClass = $entry->parentLc;
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * Invoke __call($name, $arguments) for call_user_func* FCC (#25747).
+     *
+     * php-src: Zend/zend_API.c — zend_call_function after zend_is_callable_ex magic FCC
+     */
+    private static function invokeMagicCall(
+        Context $ctx,
+        \PHPCompiler\VM\ObjectEntry $object,
+        string $methodName,
+        Variable ...$args
+    ): Variable {
+        $nameVar = new Variable();
+        $nameVar->string($methodName);
+
+        return $ctx->runtime->vm->invokeInstanceMethod(
+            $object,
+            '__call',
+            $nameVar,
+            self::packMagicCallArguments(...$args)
+        );
+    }
+
+    /**
+     * Invoke __callStatic($name, $arguments) for call_user_func* FCC (#25747).
+     *
+     * php-src: Zend/zend_object_handlers.c — zend_std_get_static_method slow path
+     */
+    private static function invokeMagicCallStatic(
+        Context $ctx,
+        string $calledScopeClass,
+        string $methodName,
+        Variable ...$args
+    ): Variable {
+        $magicClass = self::findStaticMagicCallClass($ctx, $calledScopeClass);
+        if (null === $magicClass) {
+            throw new \TypeError(self::invalidStringCallbackTypeError(
+                $calledScopeClass.'::'.$methodName,
+                'call_user_func'
+            ));
+        }
+        $nameVar = new Variable();
+        $nameVar->string($methodName);
+
+        return $ctx->runtime->vm->invokeDeclaredStaticWithCalledScope(
+            $magicClass->name,
+            $calledScopeClass,
+            '__callStatic',
+            $nameVar,
+            self::packMagicCallArguments(...$args)
+        );
+    }
+
+    /**
+     * Pack call_user_func* positional args into __call / __callStatic $arguments.
+     */
+    private static function packMagicCallArguments(Variable ...$args): Variable
+    {
+        $argsVar = new Variable();
+        $argsVar->newArray();
+        $packed = $argsVar->toArray();
+        $i = 0;
+        foreach ($args as $arg) {
+            $copy = new Variable();
+            $copy->copyFrom($arg->resolveIndirect());
+            $packed->addIndex($i++, $copy);
+        }
+
+        return $argsVar;
     }
 }
