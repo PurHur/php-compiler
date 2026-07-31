@@ -7932,7 +7932,11 @@ restart:
                             'parentName' => $parentName,
                         ];
                     }
-                    $this->flushDeferredParentInheritance();
+                    try {
+                        $this->flushDeferredParentInheritance($frame);
+                    } catch (\CompileError $e) {
+                        $this->raiseClassDeclareCompileFatal($e, $frame);
+                    }
                     $this->flushDeferredTraitUses($frame);
                     $this->flushDeferredClassConstants();
                     break;
@@ -9712,7 +9716,9 @@ restart:
         }
         if ([] !== $this->context->deferredParentInheritance) {
             try {
-                $this->finalizeDeferredParentInheritance();
+                $this->finalizeDeferredParentInheritance($frame);
+            } catch (\CompileError $deferredCompileError) {
+                $this->raiseClassDeclareCompileFatal($deferredCompileError, $frame);
             } catch (\Error $deferredParentError) {
                 $catchFrame = $this->dispatchVmError($deferredParentError->getMessage(), $frame);
                 if (null !== $catchFrame) {
@@ -17615,7 +17621,7 @@ restart:
         $this->context->deferredTraitUses = $remaining;
     }
 
-    protected function flushDeferredParentInheritance(): void
+    protected function flushDeferredParentInheritance(?Frame $frame = null): void
     {
         if ([] === $this->context->deferredParentInheritance) {
             return;
@@ -17637,14 +17643,14 @@ restart:
             $this->assertAllowedBySealedParents($entry->name, $entry->parentLc, $entry->interfaces);
             $this->inheritFromParent($entry);
             $this->linkStaticPropertyHooks($entry);
-            VM\ClassValidator::finalizeClassDefinition($entry, $this->context);
+            VM\ClassValidator::finalizeClassDefinition($entry, $this->context, $frame);
         }
         $this->context->deferredParentInheritance = $remaining;
     }
 
-    protected function finalizeDeferredParentInheritance(): void
+    protected function finalizeDeferredParentInheritance(?Frame $frame = null): void
     {
-        $this->flushDeferredParentInheritance();
+        $this->flushDeferredParentInheritance($frame);
         if ([] === $this->context->deferredParentInheritance) {
             return;
         }

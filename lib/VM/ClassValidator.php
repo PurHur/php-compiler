@@ -137,7 +137,8 @@ final class ClassValidator
         [$ifaceLc, $method] = $missing[0];
         $ifaceName = $context->classes[$ifaceLc]->name ?? $ifaceLc;
 
-        throw new \LogicException(
+        // php-src: zend_verify_abstract_class — E_COMPILE_ERROR at DECLARE (#25912).
+        throw new \CompileError(
             "Class {$entry->name} contains {$count} abstract method"
             .(1 === $count ? '' : 's')
             ." and must therefore be declared abstract or implement the remaining methods ({$ifaceName}::{$method})"
@@ -153,7 +154,8 @@ final class ClassValidator
         $count = count($entry->abstractMethods);
         $first = array_key_first($entry->abstractMethods);
 
-        throw new \LogicException(
+        // php-src: zend_verify_abstract_class — E_COMPILE_ERROR at DECLARE (#25912).
+        throw new \CompileError(
             "Class {$entry->name} contains {$count} abstract method"
             .(1 === $count ? '' : 's')
             ." and must therefore be declared abstract or implement the remaining methods ({$entry->name}::{$first})"
@@ -173,7 +175,8 @@ final class ClassValidator
             $missing
         ));
 
-        throw new \LogicException(
+        // php-src: zend_verify_abstract_class — E_COMPILE_ERROR at DECLARE (#25912).
+        throw new \CompileError(
             "Class {$entry->name} contains {$count} abstract method"
             .(1 === $count ? '' : 's')
             ." and must therefore be declared abstract or implement the remaining methods ({$list})"

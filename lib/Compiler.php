@@ -2173,7 +2173,8 @@ class Compiler {
         // Interfaces before classes so same-file `class C implements I` / later `interface I`
         // resolves at DECLARE_CLASS like Zend early-binding (#25624).
         // Enums stay in source order so enum_exists() before declaration matches Zend (#5013).
-        // Serializable / forbidden-implements stay in source order for DECLARE side effects (#18781, #25109).
+        // Serializable / forbidden-implements / trait-use stay in source order for DECLARE
+        // side effects (#18781, #25109, #25912).
         foreach ($ops as $child) {
             if ($child instanceof Op\Stmt\Interface_) {
                 $block->addOpCode($this->compileInterface($child, $block));
@@ -6950,6 +6951,7 @@ class Compiler {
      * - Forbidden implements (DateTimeInterface / reserved): fatals at DECLARE (#18781)
      * - Serializable: E_DEPRECATED + class_exists timing match Zend (#22000, #25109)
      * - Any implements: DECLARE must run after prior spl_autoload_register (#25624)
+     * - Trait use: abstract residuals / trait bind fatals at DECLARE after prior stmts (#25912)
      */
     protected function requiresSourceOrderClassRegistration(Op\Stmt\ClassLike $class): bool
     {
@@ -6961,9 +6963,29 @@ class Compiler {
             return true;
         }
 
+        // Keep trait-using classes in source order so preceding opcodes (echo, etc.) run
+        // before zend_verify_abstract_class / trait bind fatals (#25912).
+        if ($class instanceof Op\Stmt\Class_ && $this->classDeclaresTraitUse($class)) {
+            return true;
+        }
+
         // Keep implements classes in source order so autoload callbacks registered above
         // the declaration are visible (Zend early-binds types, not user autoload timing).
         return $class instanceof Op\Stmt\Class_ && [] !== $class->implements;
+    }
+
+    /**
+     * True when the class body contains a `use Trait` statement (#25912).
+     */
+    protected function classDeclaresTraitUse(Op\Stmt\Class_ $class): bool
+    {
+        foreach ($class->stmts->children as $member) {
+            if ($member instanceof Op\Stmt\TraitUse) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function staticNameFromOperand(Operand $op): ?string
