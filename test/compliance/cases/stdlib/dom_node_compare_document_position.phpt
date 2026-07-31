@@ -12,7 +12,7 @@ echo $child->compareDocumentPosition($parent), "\n";
 echo $parent->compareDocumentPosition($sibling), "\n";
 echo (int) (($parent->compareDocumentPosition($sibling) & DOMNode::DOCUMENT_POSITION_DISCONNECTED) === 0), "\n";
 --EXPECT--
-10
 20
+10
 4
 1

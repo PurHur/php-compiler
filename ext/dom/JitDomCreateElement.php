@@ -232,6 +232,11 @@ final class JitDomCreateElement
             // #21687: contains()/getRootNode without DomRegistry.
             VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
             VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
+            // Sequential appendChild sibling walks (#25878 compareDocumentPosition).
+            VmDom::PROP_FIRST_CHILD => JITVariable::TYPE_VALUE,
+            VmDom::PROP_LAST_CHILD => JITVariable::TYPE_VALUE,
+            VmDom::PROP_NEXT_SIBLING => JITVariable::TYPE_VALUE,
+            VmDom::PROP_PREVIOUS_SIBLING => JITVariable::TYPE_VALUE,
             // initTextContentSlot / saveXML / getElementById helpers (#25475).
             VmDom::PROP_TEXT_CONTENT => JITVariable::TYPE_STRING,
             'nodeValue' => JITVariable::TYPE_STRING,
