@@ -454,6 +454,14 @@ final class SplMinHeapBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplMinHeap');
         $entry->parentLc = SplHeapBuiltin::CLASS_LC;
+        // Zend rematerializes Countable-first flattened ce->interfaces on the subclass
+        // (not SplHeap Iterator-first order). Observable via class_implements() (#25822).
+        $entry->interfaces = [];
+        foreach (['countable', 'traversable', 'iterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $entry->interfaces[] = $iface;
+            }
+        }
         $entry->isAbstract = false;
         unset($entry->abstractMethods['compare']);
         $entry->constructor = new SplMinHeapConstruct();
@@ -486,6 +494,13 @@ final class SplMaxHeapBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplMaxHeap');
         $entry->parentLc = SplHeapBuiltin::CLASS_LC;
+        // Zend rematerializes Countable-first flattened ce->interfaces on the subclass (#25822).
+        $entry->interfaces = [];
+        foreach (['countable', 'traversable', 'iterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $entry->interfaces[] = $iface;
+            }
+        }
         $entry->isAbstract = false;
         unset($entry->abstractMethods['compare']);
         $entry->constructor = new SplMaxHeapConstruct();
