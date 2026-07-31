@@ -2179,6 +2179,7 @@ class JITTest extends BaseTest {
             if ((str_contains($name, 'enum_') || str_contains($name, 'abstract_enum'))
                 && !str_contains($name, 'enum_case_name_value')
                 && !str_contains($name, 'enum_cases_static')
+                && !str_contains($name, 'enum_method_nullable_self_return')
                 && !str_contains($name, 'get_debug_type_enum')) {
                 continue;
             }

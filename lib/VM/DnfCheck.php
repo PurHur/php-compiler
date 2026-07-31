@@ -93,10 +93,13 @@ final class DnfCheck
      */
     private static function matchesIntersectionArm(Variable $value, array $interfaceLcs, Context $context): bool
     {
-        if (Variable::TYPE_OBJECT !== $value->type) {
-            return false;
+        $entry = EnumCaseSupport::entryForInstanceOfCheck($value);
+        if (null === $entry) {
+            if (Variable::TYPE_OBJECT !== $value->type) {
+                return false;
+            }
+            $entry = $value->toObject()->class;
         }
-        $entry = $value->toObject()->class;
         foreach ($interfaceLcs as $memberLc) {
             if (!InterfaceCheck::entrySatisfiesIntersectionMember($entry, $memberLc, $context)) {
                 return false;
@@ -172,7 +175,8 @@ final class DnfCheck
             return 'object';
         }
 
-        return strtolower(ltrim($value->toEnumCase()->enumClass->name, '\\'));
+        // Preserve declared case (zend_get_object_type / TypeError) — not strtolower (#25947).
+        return ltrim($value->toEnumCase()->enumClass->name, '\\');
     }
 
     private static function objectClassLabel(Variable $value): string
@@ -181,7 +185,7 @@ final class DnfCheck
             return 'object';
         }
 
-        return strtolower(ltrim($value->toObject()->class->name, '\\'));
+        return ltrim($value->toObject()->class->name, '\\');
     }
 
     private static function propertyTypeError(
