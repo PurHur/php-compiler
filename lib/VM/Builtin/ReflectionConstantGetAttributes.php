@@ -10,7 +10,7 @@ use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionConstant::getAttributes() — VM read path (#4136, #21255). */
+/** ReflectionConstant::getAttributes() — VM read path (#4136, #21255, #25963). */
 final class ReflectionConstantGetAttributes extends VmClassMethod
 {
     public function __construct()
@@ -47,8 +47,15 @@ final class ReflectionConstantGetAttributes extends VmClassMethod
             throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
         }
         if (null !== $frame->returnVar) {
+            // Class const attribute maps use ClassConstName::key (case-sensitive, #25910/#25963).
             $frame->returnVar->copyFrom(
-                AttributeRegistry::constantAttributes($frame, $entry, strtolower($constant), $filter, $flags)
+                AttributeRegistry::constantAttributes(
+                    $frame,
+                    $entry,
+                    \PHPCompiler\ClassConstName::key($constant),
+                    $filter,
+                    $flags
+                )
             );
         }
     }

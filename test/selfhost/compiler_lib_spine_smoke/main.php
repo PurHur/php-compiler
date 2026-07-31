@@ -5371,6 +5371,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewLazyGhost.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassNewLazyProxy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionConstantConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionConstantGetAttributes.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassConstantGetAttributes.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumGetCase.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumGetName.php';

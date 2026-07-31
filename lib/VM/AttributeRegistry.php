@@ -88,10 +88,13 @@ final class AttributeRegistry
         );
     }
 
+    /**
+     * @param string $constKey Class constant storage key — {@see \PHPCompiler\ClassConstName::key} (#25963)
+     */
     public static function constantAttributes(
         Frame $frame,
         ClassEntry $entry,
-        string $constLc,
+        string $constKey,
         ?string $filter,
         int $flags = 0
     ): Variable {
@@ -100,13 +103,13 @@ final class AttributeRegistry
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
         $target = AttributeSupport::TARGET_CLASS_CONSTANT;
-        $allEntries = $entry->constAttributeEntries[$constLc] ?? [];
+        $allEntries = $entry->constAttributeEntries[$constKey] ?? [];
         $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
             return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
         }
 
-        $all = $entry->constAttributeNames[$constLc] ?? [];
+        $all = $entry->constAttributeNames[$constKey] ?? [];
 
         return ReflectionSupport::attributesArray(
             $frame,

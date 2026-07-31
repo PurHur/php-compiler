@@ -120,9 +120,9 @@ class ClassEntry {
     public array $propertyAttributeNames = [];
     /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> property attributes (#4136). */
     public array $propertyAttributeEntries = [];
-    /** @var array<string, list<string>> class constant (lowercase) => attribute names (#4136). */
+    /** @var array<string, list<string>> class constant ({@see \PHPCompiler\ClassConstName::key}) => attribute names (#4136, #25963). */
     public array $constAttributeNames = [];
-    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> class constant attributes (#4136). */
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> class constant attributes (#4136, #25963). */
     public array $constAttributeEntries = [];
     /** @var array<string, list<\PHPCompiler\Compiler\ParameterMetadata>> method (lowercase) => params (#3340). */
     public array $methodParameterMetadata = [];
