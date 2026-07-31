@@ -69,7 +69,18 @@ final class ThrowableManifestTest extends TestCase
         $this->assertArrayHasKey('__tostring', $stringable->abstractMethods);
         $this->assertArrayHasKey('__tostring', $stringable->methodReturnDeclaredTypes);
 
+        // php-src Zend/zend_exceptions.stub.php — Exception/Error keep Zend method casing + returns (#25868).
+        $exception = $ctx->classes[ThrowableManifest::LC_EXCEPTION];
+        $this->assertSame('getMessage', $exception->methodNames['getmessage'] ?? null);
+        $this->assertArrayHasKey('getmessage', $exception->methodReturnDeclaredTypes);
+        $error = $ctx->classes[ThrowableManifest::LC_ERROR];
+        $this->assertSame('getMessage', $error->methodNames['getmessage'] ?? null);
+        $this->assertArrayHasKey('getmessage', $error->methodReturnDeclaredTypes);
+
         foreach (ThrowableManifest::registrationOrder() as $className) {
+            if (!ThrowableManifest::isAdvertised($className)) {
+                continue;
+            }
             $lc = ThrowableManifest::lcKey($className);
             $this->assertArrayHasKey($lc, $ctx->classes, $className);
             $entry = $ctx->classes[$lc];
