@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6650 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21453 |
+| Source constructs flagged (warnings) | 21455 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3398,7 +3398,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamNotification.php` | 0 | 3 |
 | `ext/standard/VmStreamOpenFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamPath.php` | 0 | 1 |
-| `ext/standard/VmStreamSelect.php` | 0 | 8 |
+| `ext/standard/VmStreamSelect.php` | 0 | 9 |
 | `ext/standard/VmStreamSelectGuard.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectPoll.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectPure.php` | 0 | 1 |
@@ -3440,7 +3440,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmUrlRewriterFlush.php` | 0 | 1 |
 | `ext/standard/VmUrlRewriterOb.php` | 0 | 1 |
 | `ext/standard/VmUserCall.php` | 0 | 7 |
-| `ext/standard/VmUserStream.php` | 0 | 29 |
+| `ext/standard/VmUserStream.php` | 0 | 30 |
 | `ext/standard/VmVarDump.php` | 0 | 1 |
 | `ext/standard/VmVarExport.php` | 0 | 1 |
 | `ext/standard/VmVarExportFloat.php` | 0 | 1 |
@@ -16753,7 +16753,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/Utf8CaseMap.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 12 class method(s)
 
 ### `ext/mbstring/VmMbConvertVariables.php`
 
@@ -16775,18 +16775,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 298)
 - new HashTable (line 964)
 - new Variable (line 967)
-- new ArgumentCountError (line 2135)
-- new ArgumentCountError (line 2143)
-- new Error (line 3454)
+- new ArgumentCountError (line 2139)
+- new ArgumentCountError (line 2147)
 - new Error (line 3458)
-- new Variable (line 3574)
-- new HashTable (line 3633)
-- new Variable (line 3635)
-- new HashTable (line 3652)
-- new Variable (line 3654)
-- new ArgumentCountError (line 3669)
-- new MailBuiltin (line 3883)
-- new Variable (line 3888)
+- new Error (line 3462)
+- new Variable (line 3578)
+- new HashTable (line 3637)
+- new Variable (line 3639)
+- new HashTable (line 3656)
+- new Variable (line 3658)
+- new ArgumentCountError (line 3673)
+- new MailBuiltin (line 3887)
+- new Variable (line 3892)
 - 175 class method(s)
 - 1 closure(s)
 
@@ -31376,14 +31376,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 346)
 - new Variable (line 421)
 - new Variable (line 462)
-- new HashTable (line 1890)
-- new Variable (line 1892)
-- new HashTable (line 2784)
-- new Variable (line 2787)
-- new Variable (line 2793)
-- new Variable (line 2799)
-- new Variable (line 2805)
-- new Variable (line 2812)
+- new HashTable (line 1898)
+- new Variable (line 1900)
+- new HashTable (line 2792)
+- new Variable (line 2795)
+- new Variable (line 2801)
+- new Variable (line 2807)
+- new Variable (line 2813)
+- new Variable (line 2820)
 - 151 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -32905,14 +32905,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamSelect.php`
 
 **Warnings** (review for bootstrap subset):
-- new StreamSelectPair (line 71)
-- new StreamSelectPair (line 79)
-- new StreamSelectPair (line 85)
-- new StreamSelectPair (line 94)
-- new HashTable (line 103)
-- new Variable (line 109)
-- new Variable (line 114)
-- 6 class method(s)
+- new StreamSelectPair (line 111)
+- new StreamSelectPair (line 128)
+- new StreamSelectPair (line 134)
+- new StreamSelectPair (line 138)
+- new StreamSelectPair (line 148)
+- new HashTable (line 154)
+- new Variable (line 160)
+- new Variable (line 165)
+- 8 class method(s)
 
 ### `ext/standard/VmStreamSelectGuard.php`
 
@@ -33178,30 +33179,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 184)
 - new Variable (line 253)
 - new Variable (line 284)
-- new Variable (line 309)
-- new Variable (line 311)
-- new Variable (line 313)
-- new Variable (line 536)
-- new Variable (line 538)
-- new Variable (line 698)
-- new Variable (line 700)
-- new Variable (line 733)
-- new Variable (line 735)
-- new UserDirState (line 751)
-- new Variable (line 893)
-- new Variable (line 923)
-- new Variable (line 925)
-- new Variable (line 927)
-- new Variable (line 953)
-- new Variable (line 955)
-- new Variable (line 983)
-- new Variable (line 985)
-- new ObjectEntry (line 1107)
-- new Variable (line 1123)
-- new Variable (line 1125)
-- new Variable (line 1127)
-- new Variable (line 1129)
-- 45 class method(s)
+- new Variable (line 310)
+- new Variable (line 338)
+- new Variable (line 340)
+- new Variable (line 342)
+- new Variable (line 587)
+- new Variable (line 589)
+- new Variable (line 749)
+- new Variable (line 751)
+- new Variable (line 784)
+- new Variable (line 786)
+- new UserDirState (line 802)
+- new Variable (line 944)
+- new Variable (line 974)
+- new Variable (line 976)
+- new Variable (line 978)
+- new Variable (line 1004)
+- new Variable (line 1006)
+- new Variable (line 1034)
+- new Variable (line 1036)
+- new ObjectEntry (line 1158)
+- new Variable (line 1174)
+- new Variable (line 1176)
+- new Variable (line 1178)
+- new Variable (line 1180)
+- 47 class method(s)
 
 ### `ext/standard/VmVarDump.php`
 

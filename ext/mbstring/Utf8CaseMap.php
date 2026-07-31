@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * UTF-8 Unicode case mapping (php-src ext/mbstring/php_unicode.c + unicode_data.h; #7014, #24050).
+ * UTF-8 Unicode case mapping (php-src ext/mbstring/php_unicode.c + unicode_data.h; #7014, #24050, #25964).
  *
  * Full modes apply 1:N SpecialCasing / CaseFolding expansions; *_SIMPLE modes are 1:1 only
  * (multi-only mappings leave the codepoint unchanged — matches Zend MB_CASE_*_SIMPLE).
+ *
+ * Latin Extended-A (U+0100–U+017F) uses even/odd pairing ranges from UnicodeData; digraphs
+ * with distinct titlecase (Ǆ→ǅ, …) use TITLE_SPECIAL per SpecialCasing.txt.
  */
 final class Utf8CaseMap
 {
@@ -19,6 +22,31 @@ final class Utf8CaseMap
         0x131 => 0x49, // Latin small letter dotless i -> I
         0x17F => 0x53, // long s -> S
         0x3C2 => 0x3A3, // Greek final sigma -> Sigma
+        // Latin digraphs (upper form) — SpecialCasing / UnicodeData (#25964)
+        0x1C5 => 0x1C4, // ǅ -> Ǆ
+        0x1C6 => 0x1C4, // ǆ -> Ǆ
+        0x1C8 => 0x1C7, // ǈ -> Ǉ
+        0x1C9 => 0x1C7, // ǉ -> Ǉ
+        0x1CB => 0x1CA, // ǋ -> Ǌ
+        0x1CC => 0x1CA, // ǌ -> Ǌ
+        0x1F2 => 0x1F1, // ǲ -> Ǳ
+        0x1F3 => 0x1F1, // ǳ -> Ǳ
+    ];
+
+    /**
+     * Titlecase when it differs from uppercase (SpecialCasing digraphs).
+     *
+     * @var array<int, int>
+     */
+    private const TITLE_SPECIAL = [
+        0x1C4 => 0x1C5, // Ǆ -> ǅ
+        0x1C6 => 0x1C5, // ǆ -> ǅ
+        0x1C7 => 0x1C8, // Ǉ -> ǈ
+        0x1C9 => 0x1C8, // ǉ -> ǈ
+        0x1CA => 0x1CB, // Ǌ -> ǋ
+        0x1CC => 0x1CB, // ǌ -> ǋ
+        0x1F1 => 0x1F2, // Ǳ -> ǲ
+        0x1F3 => 0x1F2, // ǳ -> ǲ
     ];
 
     /** @var array<int, list<int>> Unicode full upper expansions (1:N codepoints). */
@@ -49,8 +77,16 @@ final class Utf8CaseMap
         0x178 => 0xFF,
         0x49 => 0x69, // I -> i (ASCII path handles most)
         0x3A3 => 0x3C3,
+        // Latin digraphs (lower form)
+        0x1C4 => 0x1C6, // Ǆ -> ǆ
+        0x1C5 => 0x1C6, // ǅ -> ǆ
+        0x1C7 => 0x1C9, // Ǉ -> ǉ
+        0x1C8 => 0x1C9, // ǈ -> ǉ
+        0x1CA => 0x1CC, // Ǌ -> ǌ
+        0x1CB => 0x1CC, // ǋ -> ǌ
+        0x1F1 => 0x1F3, // Ǳ -> ǳ
+        0x1F2 => 0x1F3, // ǲ -> ǳ
     ];
-
     /**
      * Full case-fold expansions (CaseFolding.txt status F) — php_unicode_tofold_full.
      *
@@ -88,6 +124,27 @@ final class Utf8CaseMap
     }
 
     /**
+     * Titlecase codepoints (SpecialCasing TITLE when distinct from UPPER; else upper).
+     *
+     * @return list<int>
+     */
+    public static function toTitleCodepoints(int $codepoint): array
+    {
+        if (isset(self::TITLE_SPECIAL[$codepoint])) {
+            return [self::TITLE_SPECIAL[$codepoint]];
+        }
+        // Already in title form (ǅ/ǈ/ǋ/ǲ) — leave unchanged.
+        if (
+            0x1C5 === $codepoint || 0x1C8 === $codepoint
+            || 0x1CB === $codepoint || 0x1F2 === $codepoint
+        ) {
+            return [$codepoint];
+        }
+
+        return self::toUpperCodepoints($codepoint);
+    }
+
+    /**
      * @return list<int>
      */
     public static function toLowerCodepoints(int $codepoint): array
@@ -98,7 +155,6 @@ final class Utf8CaseMap
 
         return [self::toLower($codepoint)];
     }
-
     /**
      * Full Unicode case fold (MB_CASE_FOLD) — php_unicode_tofold_full.
      *
@@ -162,6 +218,10 @@ final class Utf8CaseMap
         if (0xFF === $codepoint) {
             return 0x178;
         }
+        $latinA = self::latinExtendedAUpper($codepoint);
+        if (null !== $latinA) {
+            return $latinA;
+        }
         if ($codepoint >= 0x3B1 && $codepoint <= 0x3C1) {
             return $codepoint - 0x20;
         }
@@ -192,6 +252,10 @@ final class Utf8CaseMap
         if (0x178 === $codepoint) {
             return 0xFF;
         }
+        $latinA = self::latinExtendedALower($codepoint);
+        if (null !== $latinA) {
+            return $latinA;
+        }
         if ($codepoint >= 0x391 && $codepoint <= 0x3A1) {
             return $codepoint + 0x20;
         }
@@ -206,6 +270,47 @@ final class Utf8CaseMap
         }
 
         return self::LOWER_SPECIAL[$codepoint] ?? $codepoint;
+    }
+
+    /**
+     * Latin Extended-A even/odd pairing (UnicodeData; excludes İ/ı/ĸ/ŉ/Ÿ/ſ handled elsewhere).
+     */
+    private static function latinExtendedAUpper(int $codepoint): ?int
+    {
+        if (
+            ($codepoint >= 0x100 && $codepoint <= 0x12F)
+            || ($codepoint >= 0x132 && $codepoint <= 0x137)
+            || ($codepoint >= 0x14A && $codepoint <= 0x177)
+        ) {
+            return 0 === ($codepoint % 2) ? $codepoint : $codepoint - 1;
+        }
+        if (
+            ($codepoint >= 0x139 && $codepoint <= 0x148)
+            || ($codepoint >= 0x179 && $codepoint <= 0x17E)
+        ) {
+            return 1 === ($codepoint % 2) ? $codepoint : $codepoint - 1;
+        }
+
+        return null;
+    }
+
+    private static function latinExtendedALower(int $codepoint): ?int
+    {
+        if (
+            ($codepoint >= 0x100 && $codepoint <= 0x12F)
+            || ($codepoint >= 0x132 && $codepoint <= 0x137)
+            || ($codepoint >= 0x14A && $codepoint <= 0x177)
+        ) {
+            return 0 === ($codepoint % 2) ? $codepoint + 1 : $codepoint;
+        }
+        if (
+            ($codepoint >= 0x139 && $codepoint <= 0x148)
+            || ($codepoint >= 0x179 && $codepoint <= 0x17E)
+        ) {
+            return 1 === ($codepoint % 2) ? $codepoint + 1 : $codepoint;
+        }
+
+        return null;
     }
 
     public static function isTitleDelimiter(int $codepoint): bool
