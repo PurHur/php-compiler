@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\WeakRefRegistryJitHelper;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringCompare;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_weakref_* registry via WeakRefRegistryJitHelper PHP (#9191).
+ * JIT/AOT link for phpc_weakref_* registry via WeakRefRegistryJitHelper PHP (#9191, #26028).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer InetRuntime #26010).
  * Replaces lib/AOT/runtime/phpc_weakref.c; registry storage in WeakRefRegistryJitHelper PHP (#9191).
  * php-src: Zend/zend_weakrefs.c
  */
@@ -524,43 +524,18 @@ final class WeakRefRegistryRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after WeakRefRegistryJitHelper compile (#9191)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26028');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'WeakRefRegistryJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('WeakRefRegistryJitHelper.php parseAndCompile failed (#9191)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9191)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26028'
+        );
     }
 
     private static function ensureExternals(Context $context): void
