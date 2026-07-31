@@ -9085,6 +9085,9 @@ class Compiler {
     {
         if (Op\Expr\MagicScriptConst::KIND_LINE === $expr->kind) {
             $line = max(1, $expr->getLine());
+            if (\PHPCompiler\ext\standard\VmEval::isEvalScriptPath($block->scriptPath())) {
+                $line = \PHPCompiler\ext\standard\VmEval::unwrapEvalLine($line);
+            }
             $value = new Variable(Variable::TYPE_INTEGER);
             $value->int($line);
 
@@ -12130,11 +12133,15 @@ class Compiler {
 
                 return [$op];
             case Op\Expr\Eval_::class:
-                return [new OpCode(
+                $evalOp = new OpCode(
                     $this->getOpCodeTypeFromUnaryOp($expr),
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->expr, $block, true)
-                )];
+                );
+                // Call-site line for Zend eval __FILE__ / fatals: parent(line) : eval()'d code (#25809, #4410).
+                $this->assignSourceMetadata($evalOp, $expr);
+
+                return [$evalOp];
             case Op\Expr\Print_::class:
                 $line = $expr->getLine();
 
@@ -12356,9 +12363,14 @@ class Compiler {
             case Op\Expr\Array_::class:
                 return $this->compileArrayLiteral($expr, $block);
             case Op\Expr\MagicScriptConst::class:
-                $line = Op\Expr\MagicScriptConst::KIND_LINE === $expr->kind
-                    ? max(1, $expr->getLine())
-                    : null;
+                $line = null;
+                if (Op\Expr\MagicScriptConst::KIND_LINE === $expr->kind) {
+                    $line = max(1, $expr->getLine());
+                    // wrapEvalCode prepends "<?php\n" — Zend __LINE__ is 1-based in the eval string (#25809).
+                    if (\PHPCompiler\ext\standard\VmEval::isEvalScriptPath($block->scriptPath())) {
+                        $line = \PHPCompiler\ext\standard\VmEval::unwrapEvalLine($line);
+                    }
+                }
 
                 return [new OpCode(
                     OpCode::TYPE_SCRIPT_MAGIC,

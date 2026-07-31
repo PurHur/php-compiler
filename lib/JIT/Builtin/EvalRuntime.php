@@ -40,6 +40,12 @@ final class EvalRuntime
             if (!Block::literalEvalSourceNeedsVm($literal)) {
                 $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal);
                 if ($evalBlock instanceof Block) {
+                    $callerPath = $callerBlock->scriptPath();
+                    $callLine = null !== $op->sourceLocation
+                        ? (int) $op->sourceLocation->startLine
+                        : 0;
+                    $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
+                    $evalBlock->setScriptPath(VmEval::zendEvalFilename($callerPath, $callLine));
                     IncludeHelper::compileInlinedBlock(
                         $jit,
                         $func,

@@ -24,6 +24,7 @@ final class EvalJitTest extends BaseTest
         foreach ([
             'eval_jit.phpt',
             'eval_basic.phpt',
+            'eval_magic_consts.phpt',
             'eval_parse_error.phpt',
             'eval_return_value.phpt',
             'eval_dynamic_fn.phpt',

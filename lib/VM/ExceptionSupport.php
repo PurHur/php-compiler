@@ -329,18 +329,15 @@ final class ExceptionSupport
     }
 
     /**
-     * Zend eval() ParseError file shape: parent.php(line) : eval()'d code (#4410).
+     * Zend eval() ParseError / __FILE__ shape: parent.php(line) : eval()'d code (#4410, #25809).
      *
      * @return array{0: string, 1: int}
      */
     public static function evalFatalSite(Frame $frame, int $evalLine = 1): array
     {
         [$file, $callLine] = self::userFatalSite($frame);
-        if ($callLine > 0) {
-            $file = $file.'('.$callLine.') : '.\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME;
-        } else {
-            $file = $file.' : '.\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME;
-        }
+        $callLine = \PHPCompiler\ext\standard\VmEval::evalCallSiteLine($file, $callLine);
+        $file = \PHPCompiler\ext\standard\VmEval::zendEvalFilename($file, $callLine);
 
         return [$file, max(1, $evalLine)];
     }

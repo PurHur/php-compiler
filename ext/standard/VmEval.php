@@ -23,6 +23,57 @@ final class VmEval
     public const MULTIPLE_ACCESS_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
     /**
+     * Zend __FILE__ / exception file shape for eval'd code (#25809, #4410).
+     *
+     * php-src: zif_eval / zend_eval_string — "{parent}({call_line}) : eval()'d code".
+     */
+    public static function zendEvalFilename(string $parentFile, int $callLine): string
+    {
+        if ('' === $parentFile) {
+            $parentFile = 'Command line code';
+        }
+        if ($callLine > 0) {
+            return $parentFile.'('.$callLine.') : '.self::EVAL_FILENAME;
+        }
+
+        return $parentFile.' : '.self::EVAL_FILENAME;
+    }
+
+    public static function isEvalScriptPath(string $path): bool
+    {
+        return self::EVAL_FILENAME === $path
+            || str_ends_with($path, self::EVAL_FILENAME);
+    }
+
+    /**
+     * Call-site line for nesting into zendEvalFilename (#25809).
+     *
+     * Inside an outer eval unit, CFG lines are still wrapEvalCode-shifted; unwrap so nested
+     * `__FILE__` matches Zend (`…eval()'d code(1) : eval()'d code`).
+     */
+    public static function evalCallSiteLine(string $parentFile, int $callLine): int
+    {
+        if ($callLine <= 0) {
+            return 0;
+        }
+        if (self::isEvalScriptPath($parentFile)) {
+            return self::unwrapEvalLine($callLine);
+        }
+
+        return $callLine;
+    }
+
+    /**
+     * Map wrapped `<?php\n` + eval body source line back to Zend eval-string line (#25809).
+     *
+     * {@see wrapEvalCode()} prepends one line so parser lines are +1 vs the eval string.
+     */
+    public static function unwrapEvalLine(int $wrappedLine): int
+    {
+        return $wrappedLine > 1 ? $wrappedLine - 1 : max(1, $wrappedLine);
+    }
+
+    /**
      * eval() Internal builtin — caller scope is the parent frame of the handler.
      *
      */
