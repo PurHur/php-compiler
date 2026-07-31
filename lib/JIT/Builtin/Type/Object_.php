@@ -180,6 +180,8 @@ class Object_ extends Type {
     private ?int $splObjectStorageClassId = null;
 
     private ?int $weakReferenceClassId = null;
+    /** @var array<int, true> class ids with clone_obj disabled (Exception/Error, WeakReference; #25870, #25962) */
+    private array $denyCloneClassIds = [];
 
     private ?int $weakMapClassId = null;
 
@@ -2601,6 +2603,46 @@ class Object_ extends Type {
         return null;
     }
 
+    /** Mark clone_obj disabled for this class id (php-src handlers.clone_obj = NULL). */
+    public function markDenyClone(int $classId): void
+    {
+        $this->denyCloneClassIds[$classId] = true;
+    }
+
+    public function classOrAncestorDeniesClone(int $classId): bool
+    {
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if (isset($this->denyCloneClassIds[$currentId])) {
+                return true;
+            }
+            $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+            if (null === $parentLc || !isset($this->classes[$parentLc])) {
+                return false;
+            }
+            $currentId = $this->classes[$parentLc];
+        }
+
+        return false;
+    }
+
+    /**
+     * Registered class ids that must reject clone, with display names for the Error message (#25962).
+     *
+     * @return list<array{0: int, 1: string}>
+     */
+    public function uncloneableClassIdsForGuard(): array
+    {
+        $out = [];
+        foreach ($this->classIdToName as $id => $name) {
+            if ($this->classOrAncestorDeniesClone($id)) {
+                $out[] = [$id, $name];
+            }
+        }
+
+        return $out;
+    }
+
     /**
      * WeakMap backing __hashtable__ at property slot 0 (#3667).
      */
@@ -3360,6 +3402,8 @@ class Object_ extends Type {
         }
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;
+            // zend_weakrefs.c — clone_obj unset (#25962).
+            $this->markDenyClone($id);
             $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);
             $this->defineMethodVisibility(
                 $id,
@@ -3687,6 +3731,10 @@ class Object_ extends Type {
         }
         if (ThrowableManifest::LC_ERROR_EXCEPTION === $lcname) {
             $this->defineMethodVisibility($classId, 'getseverity', $pub);
+        }
+        // zend_exceptions.c — clone_obj = NULL on Exception/Error roots (#25870).
+        if (ThrowableManifest::LC_EXCEPTION === $lcname || ThrowableManifest::LC_ERROR === $lcname) {
+            $this->markDenyClone($classId);
         }
 
         // Keep display name (LogicException) not lowercase for get_class / fatals (#23641).

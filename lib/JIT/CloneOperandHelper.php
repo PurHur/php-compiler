@@ -11,6 +11,8 @@ use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
 use PHPCompiler\VM\CloneSupport;
+use PHPLLVM\Builder;
+use PHPLLVM\Value\Function_;
 
 /**
  * TYPE_CLONE lowering — runtime object check matches Zend/zend_clones.c (#19097).
@@ -61,6 +63,7 @@ final class CloneOperandHelper
         Operand $resultOp,
         Value $srcObj
     ): void {
+        self::emitDenyCloneGuard($jit, $context, $srcObj);
         $cloned = $context->type->object->cloneObject($srcObj);
         $context->type->object->invokeCloneMagicIfPresent($block, $cloned);
         $objVar = new Variable(
@@ -70,6 +73,59 @@ final class CloneOperandHelper
             $cloned
         );
         $jit->assignOperandForced($resultOp, $objVar);
+    }
+
+    /**
+     * Reject clone when handlers.clone_obj is NULL (Exception/Error, WeakReference; #25870, #25962).
+     */
+    private static function emitDenyCloneGuard(JIT $jit, Context $context, Value $srcObj): void
+    {
+        $denied = $context->type->object->uncloneableClassIdsForGuard();
+        if ([] === $denied) {
+            return;
+        }
+
+        $fn = $context->builder->getInsertBlock()?->getParent();
+        if (!$fn instanceof Function_) {
+            return;
+        }
+        $entry = $context->builder->getInsertBlock();
+        if (null === $entry || null !== $entry->getTerminator()) {
+            return;
+        }
+
+        $classId = $context->type->object->readRuntimeClassId($srcObj);
+        $continue = $fn->appendBasicBlock('clone_deny_ok');
+        $checkBlock = $entry;
+        foreach ($denied as $i => [$id, $className]) {
+            $context->builder->positionAtEnd($checkBlock);
+            $fail = $fn->appendBasicBlock('clone_deny_'.$id);
+            $next = $i + 1 < count($denied)
+                ? $fn->appendBasicBlock('clone_deny_try_'.($i + 1))
+                : $continue;
+            $expected = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+            $context->builder->branchIf($isId, $fail, $next);
+            $context->builder->positionAtEnd($fail);
+            self::emitUncloneableError($jit, $context, $className);
+            $checkBlock = $next;
+        }
+        $context->builder->positionAtEnd($continue);
+    }
+
+    private static function emitUncloneableError(JIT $jit, Context $context, string $className): void
+    {
+        $message = CloneSupport::uncloneableObjectErrorMessage($className);
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+
+            return;
+        }
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->clearInsertionPosition();
     }
 
     private static function emitNonObjectError(JIT $jit, Context $context): void

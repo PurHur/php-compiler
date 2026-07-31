@@ -172,7 +172,7 @@ class ClassEntry {
     public $cloneObjectHandler = null;
     /**
      * When true on this class or an ancestor, clone throws "Trying to clone an uncloneable object"
-     * (php-src Exception/Error clone_obj = NULL; #25870).
+     * (php-src Exception/Error / WeakReference clone_obj = NULL; #25870, #25962).
      */
     public bool $denyClone = false;
 
