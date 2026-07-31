@@ -18273,7 +18273,10 @@ class JIT {
             $declaringClassLc,
             $className,
             $nameOp->value,
-            $parentScopeAllows
+            $parentScopeAllows,
+            null,
+            null,
+            '__construct' === $methodLc
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         // Per-user-module VmClosureInvoke::invokeVariable needs NestedClosureInvoke (#24156).
