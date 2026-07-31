@@ -2485,10 +2485,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
 
         foreach (['count', 'sizeof'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
-            self::assertSame(['value', 'mode'], $names, $fn);
+            self::assertSame(['value', 'mode='], $names, $fn);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'value', $fn), $fn);
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', $fn), $fn);
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'var', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
         }
 
         foreach ([

@@ -1438,7 +1438,9 @@ final class BuiltinParamNames
                 return ['value'];
             case 'count':
             case 'sizeof':
-                return ['value', 'mode'];
+                // Zend stubs: Countable|array $value, int $mode = COUNT_NORMAL (0). Encode `=` so
+                // sizeof (absent from InternalArgInfo) gets optional mode + required=1 (#25966).
+                return ['value', 'mode='];
             case 'is_string':
             case 'is_array':
             case 'is_bool':

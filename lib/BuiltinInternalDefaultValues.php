@@ -513,6 +513,10 @@ final class BuiltinInternalDefaultValues
         'user_error' => [
             1 => ['kind' => 'int', 'value' => 1024],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — int $mode = 0; sizeof absent from InternalArgInfo (#25966)
+        'sizeof' => [
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/zlib/zlib.stub.php — level=-1; encoding=GZIP/DEFLATE/RAW (int infer → 0) (#25012)
         'gzencode' => [
             1 => ['kind' => 'int', 'value' => -1],
