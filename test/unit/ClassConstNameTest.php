@@ -22,4 +22,11 @@ final class ClassConstNameTest extends TestCase
         self::assertTrue(ClassConstName::matchesDeclared('X', null));
         self::assertTrue(ClassConstName::matchesDeclared('x', null));
     }
+
+    public function testStorageKeyIsExact(): void
+    {
+        self::assertSame('A', ClassConstName::key('A'));
+        self::assertSame('a', ClassConstName::key('a'));
+        self::assertNotSame(ClassConstName::key('A'), ClassConstName::key('a'));
+    }
 }

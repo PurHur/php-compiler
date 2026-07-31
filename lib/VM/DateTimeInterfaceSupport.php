@@ -65,8 +65,10 @@ final class DateTimeInterfaceSupport
         foreach (self::FORMAT_CONSTANTS as $name => $format) {
             $const = new Variable(Variable::TYPE_STRING);
             $const->string($format);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = strtoupper($name);
+            // Declared casing is uppercase (DateTimeInterface::ATOM); keys are case-sensitive (#25929).
+            $canonical = strtoupper($name);
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
     }
 

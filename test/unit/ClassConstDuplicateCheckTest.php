@@ -41,4 +41,24 @@ PHP,
         );
         $this->assertNotNull($block);
     }
+
+    /** @covers issue #25929 */
+    public function testCaseDifferingClassConstantsCompile(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public const A = 1;
+    public const a = 2;
+}
+echo C::A, ' ', C::a;
+PHP,
+            'class_const_case_differ.php'
+        );
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('1 2', ob_get_clean());
+    }
 }

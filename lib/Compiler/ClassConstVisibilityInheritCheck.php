@@ -88,7 +88,8 @@ final class ClassConstVisibilityInheritCheck
             if (null === $name) {
                 continue;
             }
-            $constants[strtolower($name)] = [
+            // Class constants are case-sensitive — child A does not override parent a (#25929).
+            $constants[$name] = [
                 'display' => $name,
                 'vis' => $this->visibilityRank($member),
                 'file' => $member->getFile(),

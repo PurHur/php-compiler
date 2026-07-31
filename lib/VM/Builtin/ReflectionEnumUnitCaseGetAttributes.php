@@ -30,7 +30,7 @@ final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
         [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionEnumUnitCase::getAttributes()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(
-                AttributeRegistry::enumCaseAttributes($frame, $entry, strtolower($caseName), $filter, $flags)
+                AttributeRegistry::enumCaseAttributes($frame, $entry, \PHPCompiler\ClassConstName::key($caseName), $filter, $flags)
             );
         }
     }

@@ -29,7 +29,7 @@ final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
             throw new \LogicException('ReflectionEnumUnitCase expects an enum class');
         }
         $caseName = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionEnumUnitCase::__construct() case', 2);
-        $caseLc = strtolower($caseName);
+        $caseLc = \PHPCompiler\ClassConstName::key($caseName);
         if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)

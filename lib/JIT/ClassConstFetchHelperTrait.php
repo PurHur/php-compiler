@@ -101,7 +101,7 @@ trait ClassConstFetchHelperTrait
         ?\PHPCompiler\JIT $jit = null
     ): Variable {
         $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
-        $key = strtolower($constName);
+        $key = \PHPCompiler\ClassConstName::key($constName);
         $context = $objectType->jitContext();
         $resultSlot = JitValueBox::alloc($context);
         $fn = BasicBlockHelper::parentFunction($context);

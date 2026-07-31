@@ -236,10 +236,12 @@ final class ClassConstExpr
         $className = $frame->scope[$op->arg2]->toString();
         $lcClass = self::resolveClassName($context, $entry, $className);
         $constNameRaw = $frame->scope[$op->arg3]->toString();
-        $constName = strtolower($constNameRaw);
+        // Case-sensitive class constant / enum case key (#25910, #25929).
+        $constName = \PHPCompiler\ClassConstName::key($constNameRaw);
+        $constIsClass = 'class' === strtolower($constNameRaw);
 
         if ($lcClass === strtolower($entry->name)) {
-            self::fetchFromDeclaringClass($context, $frame, $op, $entry, $constName);
+            self::fetchFromDeclaringClass($context, $frame, $op, $entry, $constName, $constIsClass);
 
             return;
         }
@@ -257,7 +259,7 @@ final class ClassConstExpr
             }
         }
         if (!isset($context->classes[$lcClass])) {
-            if ('class' === $constName
+            if ($constIsClass
                 && !\in_array(strtolower($className), ['self', 'static', 'parent'], true)) {
                 // X::class is a pure name literal — Zend resolves it without the
                 // class existing. Native 8.3+ names (DateException, …) reach here
@@ -275,7 +277,7 @@ final class ClassConstExpr
         }
 
         $classEntry = $context->classes[$lcClass];
-        if ('class' === $constName) {
+        if ($constIsClass) {
             $frame->scope[$op->arg1]->string($className);
 
             return;
@@ -299,9 +301,10 @@ final class ClassConstExpr
         Frame $frame,
         OpCode $op,
         ClassEntry $entry,
-        string $constName
+        string $constName,
+        bool $constIsClass = false
     ): void {
-        if ('class' === $constName) {
+        if ($constIsClass || 'class' === strtolower($constName)) {
             $frame->scope[$op->arg1]->string($entry->name);
 
             return;

@@ -27,7 +27,7 @@ final class ReflectionEnumUnitCaseIsDeprecated extends VmClassMethod
             throw new \LogicException('ReflectionEnumUnitCase refers to unknown enum in this compiler build');
         }
         if (null !== $frame->returnVar) {
-            $meta = $entry->constDeprecated[strtolower($caseName)] ?? null;
+            $meta = $entry->constDeprecated[\PHPCompiler\ClassConstName::key($caseName)] ?? null;
             $frame->returnVar->bool(
                 null !== $meta && $meta->isDeprecatedForReflection()
             );

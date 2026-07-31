@@ -7837,8 +7837,9 @@ class Compiler {
     {
         $constName = $this->staticNameFromOperand($child->name);
         if (null !== $constName && null !== $this->compilingClassLc) {
-            $lc = strtolower($constName);
-            if (isset($this->compileTimeClassConstEmitted[$this->compilingClassLc][$lc])) {
+            // Case-sensitive — const A and const a are distinct (#25929).
+            $constKey = ClassConstName::key($constName);
+            if (isset($this->compileTimeClassConstEmitted[$this->compilingClassLc][$constKey])) {
                 // Idempotent re-parse when a JIT helper was already inlined from require_once (#9753, #1492).
                 return;
             }
@@ -7851,7 +7852,7 @@ class Compiler {
         $typeSlot = null;
         if (property_exists($child, 'declaredType') && null !== $child->declaredType) {
             if (null !== $constName) {
-                $result->classConstDeclaredTypes[strtolower($constName)] = $child->declaredType;
+                $result->classConstDeclaredTypes[ClassConstName::key($constName)] = $child->declaredType;
             }
             if (!$this->cfgDeclaredTypeIsMixed($child->declaredType)) {
                 $this->rejectTypedClassConstantIfUnsupported($child->name);
@@ -7883,7 +7884,7 @@ class Compiler {
             if (null !== $this->compilingClassLc) {
                 $constName = $this->staticNameFromOperand($child->name);
                 if (null !== $constName) {
-                    $this->compileTimeEnumCaseConstNames[$this->compilingClassLc][strtolower($constName)] = true;
+                    $this->compileTimeEnumCaseConstNames[$this->compilingClassLc][ClassConstName::key($constName)] = true;
                 }
             }
         }
@@ -7897,7 +7898,7 @@ class Compiler {
         AttributeNames::assertDeprecatedTargetAllowed($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && null !== $constName) {
-            $this->compileTimeClassConstEmitted[$this->compilingClassLc][strtolower($constName)] = true;
+            $this->compileTimeClassConstEmitted[$this->compilingClassLc][ClassConstName::key($constName)] = true;
         }
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
             $constName = $this->staticNameFromOperand($child->name);
@@ -7915,13 +7916,14 @@ class Compiler {
                     $stored = new Variable();
                     $stored->copyFrom($backing);
                 }
-                $lcConst = strtolower($constName);
-                $this->compileTimeClassConsts[$this->compilingClassLc][$lcConst] = $stored;
-                $this->compileTimeClassConstNames[$this->compilingClassLc][$lcConst] = $constName;
-                $this->compileTimeClassConstVisibility[$this->compilingClassLc][$lcConst]
+                // Case-sensitive storage key (#25910 fetch / #25929 declare).
+                $constKey = ClassConstName::key($constName);
+                $this->compileTimeClassConsts[$this->compilingClassLc][$constKey] = $stored;
+                $this->compileTimeClassConstNames[$this->compilingClassLc][$constKey] = $constName;
+                $this->compileTimeClassConstVisibility[$this->compilingClassLc][$constKey]
                     = ClassConstVisibility::mask($constOp->classConstVisibilityFlags);
                 if (null !== $constOp->deprecatedMetadata) {
-                    $this->compileTimeClassConstDeprecated[$this->compilingClassLc][$lcConst]
+                    $this->compileTimeClassConstDeprecated[$this->compilingClassLc][$constKey]
                         = $constOp->deprecatedMetadata;
                 }
             }
@@ -9771,7 +9773,7 @@ class Compiler {
             if (null === $caseName) {
                 continue;
             }
-            $lcCase = strtolower($caseName);
+            $lcCase = ClassConstName::key($caseName);
             if (isset($this->runtimeEnumCaseConsts[$enumLc][$lcCase])) {
                 continue;
             }
@@ -9977,26 +9979,26 @@ class Compiler {
         if ($this->classCompileRegistry->isTrait($lcClass)) {
             return null;
         }
-        $lcConst = strtolower($constName);
-        if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
-            // Class constants are case-sensitive — do not fold wrong casing (#25910).
-            $declared = $this->compileTimeClassConstNames[$lcClass][$lcConst] ?? null;
+        $constKey = ClassConstName::key($constName);
+        if (isset($this->compileTimeClassConsts[$lcClass][$constKey])) {
+            // Class constants are case-sensitive — do not fold wrong casing (#25910, #25929).
+            $declared = $this->compileTimeClassConstNames[$lcClass][$constKey] ?? null;
             if (!ClassConstName::matchesDeclared($constName, $declared)) {
                 return null;
             }
-            if (!$this->compileTimeClassConstFetchAllowed($lcClass, $lcConst, $block)) {
+            if (!$this->compileTimeClassConstFetchAllowed($lcClass, $constKey, $block)) {
                 return null;
             }
             // Deprecated constants must fetch at runtime so E_USER_DEPRECATED fires (#6962).
-            if (isset($this->compileTimeClassConstDeprecated[$lcClass][$lcConst])) {
+            if (isset($this->compileTimeClassConstDeprecated[$lcClass][$constKey])) {
                 return null;
             }
-            $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
+            $stored = $this->compileTimeClassConsts[$lcClass][$constKey];
             // Enum case fetches defer to runtime unless folding defaults/const-expr (#8767, #7399).
-            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst) && !$materializeEnumCase) {
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $constKey) && !$materializeEnumCase) {
                 return null;
             }
-            if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $lcConst, $stored)) {
+            if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $constKey, $stored)) {
                 return $this->compileTimeEnumCaseVar(
                     $className,
                     $constName,
@@ -10020,7 +10022,7 @@ class Compiler {
 
                 return $value;
             }
-            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $constKey)) {
                 return $this->materializeCompileTimeEnumCaseConstant(
                     $className,
                     $constName,
@@ -10033,9 +10035,9 @@ class Compiler {
 
             return $value;
         }
-        if (isset($this->runtimeEnumCaseConsts[$lcClass][$lcConst])) {
-            $stored = $this->runtimeEnumCaseConsts[$lcClass][$lcConst];
-            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst) && !$materializeEnumCase) {
+        if (isset($this->runtimeEnumCaseConsts[$lcClass][$constKey])) {
+            $stored = $this->runtimeEnumCaseConsts[$lcClass][$constKey];
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $constKey) && !$materializeEnumCase) {
                 return null;
             }
             if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
@@ -10053,7 +10055,7 @@ class Compiler {
 
                 return $value;
             }
-            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
+            if ($this->isCompileTimeEnumCaseConstantMember($lcClass, $constKey)) {
                 return $this->materializeCompileTimeEnumCaseConstant(
                     $className,
                     $constName,
@@ -10129,7 +10131,7 @@ class Compiler {
             if (null !== $className && null !== $caseName) {
                 $lcClass = $this->resolveDefaultClassConstScope($className, $block);
                 if (null !== $lcClass
-                    && $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($caseName))
+                    && $this->isCompileTimeEnumCaseConstantMember($lcClass, ClassConstName::key($caseName))
                 ) {
                     return ltrim($className, '\\');
                 }
@@ -10155,7 +10157,7 @@ class Compiler {
                 continue;
             }
             $lcClass = $this->resolveDefaultClassConstScope($className, $block);
-            $lcConst = strtolower($caseName);
+            $lcConst = ClassConstName::key($caseName);
             if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, $lcConst)) {
                 continue;
             }
@@ -41084,7 +41086,7 @@ class Compiler {
         if (null !== $constName && null !== $className) {
             $lcClass = $this->resolveDefaultClassConstScope($className, $block);
             if (null !== $lcClass
-                && $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
+                && $this->isCompileTimeEnumCaseConstantMember($lcClass, ClassConstName::key($constName))) {
                 return $this->compileClassConstFetchRuntimeOpCodes($expr, $block, $expr->result);
             }
         }
@@ -41362,7 +41364,7 @@ class Compiler {
             return [];
         }
         $lcClass = $this->resolveDefaultClassConstScope($className, $block);
-        if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
+        if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, ClassConstName::key($constName))) {
             return [];
         }
         if (!$this->callArgNeedsRuntimeEnumConstFetch($arg, $fetch, $block, $cfgCallOp)) {
@@ -41481,7 +41483,7 @@ class Compiler {
             return false;
         }
         $lcClass = $this->resolveDefaultClassConstScope($className, $block);
-        if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
+        if (null === $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, ClassConstName::key($constName))) {
             return false;
         }
         $children = $block->orig->children;
@@ -41982,7 +41984,7 @@ class Compiler {
         if (null === $lcClass) {
             $lcClass = strtolower(ltrim($className, '\\'));
         }
-        $lcConst = strtolower($constName);
+        $lcConst = ClassConstName::key($constName);
         if (isset($this->compileTimeEnumCaseConstNames[$lcClass][$lcConst])) {
             return true;
         }
@@ -45188,11 +45190,11 @@ class Compiler {
             return null;
         }
         $lcClass = $this->resolveDefaultClassConstScope($className, $block) ?? strtolower(ltrim($className, '\\'));
-        if ('sorting' !== $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName))) {
+        if ('sorting' !== $lcClass || !$this->isCompileTimeEnumCaseConstantMember($lcClass, ClassConstName::key($constName))) {
             return null;
         }
         $sortValue = null;
-        $lcConst = strtolower($constName);
+        $lcConst = ClassConstName::key($constName);
         if ('ascending' === $lcConst) {
             $sortValue = SORT_ASC;
         } elseif ('descending' === $lcConst) {
@@ -53057,7 +53059,7 @@ class Compiler {
                         $constName = $this->staticNameFromOperand($fetch->name);
                         if (null !== $className && null !== $constName) {
                             $lcClass = $this->resolveDefaultClassConstScope($className, $block);
-                            $lcConst = strtolower($constName);
+                            $lcConst = ClassConstName::key($constName);
                             $stored = null !== $lcClass
                                 ? ($this->compileTimeClassConsts[$lcClass][$lcConst] ?? null)
                                 : null;
@@ -53172,7 +53174,7 @@ class Compiler {
             return false;
         }
 
-        return $this->isCompileTimeEnumCaseConstantMember($lcClass, strtolower($constName));
+        return $this->isCompileTimeEnumCaseConstantMember($lcClass, ClassConstName::key($constName));
     }
 
     /**
@@ -56999,10 +57001,10 @@ class Compiler {
             return false;
         }
 
-        return isset($this->compileTimeClassConsts[$lcClass][strtolower($constName)])
+        return isset($this->compileTimeClassConsts[$lcClass][ClassConstName::key($constName)])
             && ClassConstName::matchesDeclared(
                 $constName,
-                $this->compileTimeClassConstNames[$lcClass][strtolower($constName)] ?? null
+                $this->compileTimeClassConstNames[$lcClass][ClassConstName::key($constName)] ?? null
             );
     }
 

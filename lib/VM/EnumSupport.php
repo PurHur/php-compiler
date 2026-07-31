@@ -137,10 +137,10 @@ final class EnumSupport
         $backing = new Variable(Variable::TYPE_NULL);
         $backing->null();
         if (null !== $enum->backedType) {
-            $memberLc = strtolower($caseName);
-            if (isset($enum->constants[$memberLc])) {
+            $memberKey = \PHPCompiler\ClassConstName::key($caseName);
+            if (isset($enum->constants[$memberKey])) {
                 $backing->copyFrom(
-                    BackedEnum::caseBackingScalar($enum->backedType, $enum->constants[$memberLc])
+                    BackedEnum::caseBackingScalar($enum->backedType, $enum->constants[$memberKey])
                 );
             }
         }
@@ -178,18 +178,18 @@ final class EnumSupport
     }
 
     /**
-     * Enum `case` member name for a constants-table key, or null for user `const` (#5832, #5054).
+     * Enum `case` member name for a constants-table key, or null for user `const` (#5832, #5054, #25929).
      */
-    public static function enumCaseNameForConstantMember(ClassEntry $enum, string $memberLc): ?string
+    public static function enumCaseNameForConstantMember(ClassEntry $enum, string $memberKey): ?string
     {
         if (!$enum->isEnum) {
             return null;
         }
-        if (isset($enum->enumCaseCanonicalNames[$memberLc])) {
-            return $enum->enumCaseCanonicalNames[$memberLc];
+        if (isset($enum->enumCaseCanonicalNames[$memberKey])) {
+            return $enum->enumCaseCanonicalNames[$memberKey];
         }
         foreach ($enum->enumCases as $case) {
-            if (strtolower($case['name']) === $memberLc) {
+            if ($case['name'] === $memberKey) {
                 return $case['name'];
             }
         }

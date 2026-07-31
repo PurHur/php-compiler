@@ -29,7 +29,7 @@ final class ReflectionEnumHasCase extends VmClassMethod
             throw new \LogicException('ReflectionEnum refers to unknown enum in this compiler build');
         }
         $caseName = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnum::hasCase() case', 1);
-        $caseLc = strtolower($caseName);
+        $caseLc = \PHPCompiler\ClassConstName::key($caseName);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(isset($entry->enumCaseCanonicalNames[$caseLc]));
         }

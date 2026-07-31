@@ -150,13 +150,15 @@ final class ClassConstMaterializer
         ClassEntry $entry,
         OpCode $op
     ): void {
-        $name = strtolower($frame->scope[$op->arg1]->toString());
+        $canonical = $frame->scope[$op->arg1]->toString();
+        $name = \PHPCompiler\ClassConstName::key($canonical);
         if (isset($bodyBlock->constants[$op->arg2])) {
             $const = $bodyBlock->constants[$op->arg2];
             if (!$const->is(Variable::TYPE_NULL)) {
                 $value = new Variable();
                 $value->copyFrom($const);
                 $entry->constants[$name] = EnumCaseSupport::materializeConstantValue($context, $value);
+                $entry->constNames[$name] = $canonical;
 
                 return;
             }
@@ -166,6 +168,7 @@ final class ClassConstMaterializer
                 $context,
                 $frame->scope[$op->arg2]
             );
+            $entry->constNames[$name] = $canonical;
         }
     }
 

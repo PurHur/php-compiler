@@ -99,16 +99,16 @@ final class EnumBackedCaseCheck
             if (!$this->memberIsEnumCase($member, $enum)) {
                 continue;
             }
+            // Enum case names are case-sensitive (Zend/zend_compile.c / zend_enum.c, #25929).
             $caseName = $this->operandDisplayName($member->name, 'case');
-            $lc = strtolower($caseName);
-            if (isset($seen[$lc])) {
+            if (isset($seen[$caseName])) {
                 throw new CompileFatal(
                     $member->getFile(),
                     $member->getLine(),
                     sprintf('Cannot redefine class constant %s::%s', $enumDisplay, $caseName)
                 );
             }
-            $seen[$lc] = true;
+            $seen[$caseName] = true;
         }
     }
 

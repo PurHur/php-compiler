@@ -71,37 +71,93 @@ final class JitMcjitEmbed
 
     private static function padPropertylessUserClassesForMcjit(string $code, bool &$needsReadonlyPromotedBootstrap): string
     {
-        $replaced = preg_replace_callback(
+        // Match against comment-blanked text so docblock phrases like
+        // "class constant E::a" cannot span into a following class/enum (#25929).
+        $mask = self::blankPhpCommentsPreservingLength($code);
+        if (!preg_match_all(
             '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+)\b[^{]*)\{((?:[^{}]|\{[^{}]*\})*)\}/',
-            static function (array $match) use (&$needsReadonlyPromotedBootstrap): string {
-                if (preg_match('/\binterface\s+/i', $match[1])) {
-                    return $match[0];
-                }
-                $body = $match[2];
-                if (str_contains($body, '__phpcMcjitClassPad')) {
-                    return $match[0];
-                }
-                if (self::classBodyHasNonPromotedDeclaredProperty($body)) {
-                    return $match[0];
-                }
-                $isReadonlyClass = (bool) preg_match('/\breadonly\b/i', $match[1]);
-                if ($isReadonlyClass && self::classBodyHasPromotedConstructorProperty($body)) {
-                    $needsReadonlyPromotedBootstrap = true;
+            $mask,
+            $matches,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return $code;
+        }
 
-                    return $match[0];
-                }
-                $trimmed = trim($body);
-                $pad = $isReadonlyClass ? self::EMPTY_READONLY_CLASS_PAD : self::EMPTY_CLASS_PAD;
-                if ('' === $trimmed) {
-                    return $match[1].'{ '.$pad.' }';
-                }
+        $out = $code;
+        // Apply from the end so earlier offsets stay valid.
+        for ($i = \count($matches[0]) - 1; $i >= 0; --$i) {
+            $full = $matches[0][$i][0];
+            $offset = $matches[0][$i][1];
+            $header = $matches[1][$i][0];
+            $body = $matches[2][$i][0];
+            if (preg_match('/\binterface\s+/i', $header)) {
+                continue;
+            }
+            if (preg_match('/\benum\b/i', $full)) {
+                continue;
+            }
+            // Same slices from the real source (comments restored).
+            $realFull = substr($code, $offset, \strlen($full));
+            $headerLen = \strlen($header);
+            $realHeader = substr($code, $offset, $headerLen);
+            $realBody = substr($code, $offset + $headerLen + 1, \strlen($body));
+            if (str_contains($realBody, '__phpcMcjitClassPad')) {
+                continue;
+            }
+            if (self::classBodyHasNonPromotedDeclaredProperty($realBody)) {
+                continue;
+            }
+            $isReadonlyClass = (bool) preg_match('/\breadonly\b/i', $realHeader);
+            if ($isReadonlyClass && self::classBodyHasPromotedConstructorProperty($realBody)) {
+                $needsReadonlyPromotedBootstrap = true;
 
-                return $match[1].'{ '.$pad.' '.$trimmed.' }';
-            },
-            $code
-        );
+                continue;
+            }
+            $trimmed = trim($realBody);
+            $pad = $isReadonlyClass ? self::EMPTY_READONLY_CLASS_PAD : self::EMPTY_CLASS_PAD;
+            $replacement = '' === $trimmed
+                ? $realHeader.'{ '.$pad.' }'
+                : $realHeader.'{ '.$pad.' '.$trimmed.' }';
+            $out = substr($out, 0, $offset).$replacement.substr($out, $offset + \strlen($realFull));
+        }
 
-        return null !== $replaced ? $replaced : $code;
+        return $out;
+    }
+
+    /**
+     * Replace // and /* * / comments with spaces so regex class matching ignores them (#25929).
+     */
+    private static function blankPhpCommentsPreservingLength(string $code): string
+    {
+        $len = \strlen($code);
+        $out = $code;
+        $i = 0;
+        while ($i < $len) {
+            if ($i + 1 < $len && '/' === $out[$i] && '*' === $out[$i + 1]) {
+                $end = strpos($out, '*/', $i + 2);
+                if (false === $end) {
+                    break;
+                }
+                $end += 2;
+                $out = substr($out, 0, $i).str_repeat(' ', $end - $i).substr($out, $end);
+                $i = $end;
+
+                continue;
+            }
+            if ($i + 1 < $len && '/' === $out[$i] && '/' === $out[$i + 1]) {
+                $end = $i + 2;
+                while ($end < $len && "\n" !== $out[$end] && "\r" !== $out[$end]) {
+                    ++$end;
+                }
+                $out = substr($out, 0, $i).str_repeat(' ', $end - $i).substr($out, $end);
+                $i = $end;
+
+                continue;
+            }
+            ++$i;
+        }
+
+        return $out;
     }
 
     private static function classBodyHasNonPromotedDeclaredProperty(string $body): bool

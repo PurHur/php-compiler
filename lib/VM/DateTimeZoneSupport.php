@@ -49,8 +49,9 @@ final class DateTimeZoneSupport
         foreach (self::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = strtoupper($name);
+            $canonical = strtoupper($name);
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
     }
 }
