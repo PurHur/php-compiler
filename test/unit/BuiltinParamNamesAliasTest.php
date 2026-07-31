@@ -346,6 +346,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('int|float', BuiltinInternalArgInfo::stubParamTypeOverride('range', 2));
         self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('dirname', 1));
         self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('restore_error_handler'));
+        // php-src ext/standard/array.stub.php (#26172)
+        foreach (['usort', 'uasort', 'uksort', 'ksort', 'krsort'] as $fn) {
+            self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            self::assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
         // php-src ext/standard/basic_functions.stub.php (#25623)
         self::assertSame('string', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('preg_last_error_msg'));
         self::assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('error_clear_last'));
