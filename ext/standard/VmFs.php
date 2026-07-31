@@ -2277,11 +2277,13 @@ final class VmFs
     {
         return VmPhpMemoryStream::isValidHandle($handle)
             || VmPhpInputOutputStream::isValidHandle($handle)
-            || VmPhpFdStream::isValidHandle($handle);
+            || VmPhpFdStream::isValidHandle($handle)
+            || VmUserStream::isValidHandle($handle);
     }
 
     /**
-     * fgetcsv() on native VM streams via fgets + VmCsv::parseLine (#5243, StringFgetcsvJit).
+     * fgetcsv() on native VM / userspace streams via fgets + VmCsv::parseLine
+     * (#5243, #26004, StringFgetcsvJit).
      *
      * @return list<string|null>|false
      */
