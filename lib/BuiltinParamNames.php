@@ -1034,6 +1034,9 @@ final class BuiltinParamNames
             // php-src ext/standard/image.stub.php — InternalArgInfo still says imagefile/info (#23343)
             case 'getimagesize':
                 return ['filename', 'image_info='];
+            // php-src ext/standard/image.stub.php — InternalArgInfo still says data/info (#23681)
+            case 'getimagesizefromstring':
+                return ['string', 'image_info='];
             // php-src ext/standard/image.stub.php — InternalArgInfo still says imagetype (#24459)
             case 'image_type_to_extension':
                 return ['image_type', 'include_dot='];

@@ -3341,6 +3341,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('getimagesize'));
     }
 
+    /** @covers issue #23681 */
+    public function testGetimagesizefromstringNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('getimagesizefromstring');
+        self::assertSame(['string', 'image_info='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'getimagesizefromstring'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'image_info', 'getimagesizefromstring'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'data', 'getimagesizefromstring'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'info', 'getimagesizefromstring'));
+        self::assertSame(
+            ['string', 'image_info='],
+            BuiltinParamNames::paramNamesForInternalFunction('getimagesizefromstring')
+        );
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('getimagesizefromstring'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('getimagesizefromstring'));
+    }
+
     /** @covers issue #23655 */
     public function testGzStreamNamedParamsResolve(): void
     {
@@ -3531,6 +3548,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
                 ['touch', 2, 'atime'],
                 ['version_compare', 2, 'operator'],
                 ['getimagesize', 1, 'image_info'],
+                ['getimagesizefromstring', 1, 'image_info'],
                 ['session_set_cookie_params', 1, 'path'],
                 ['session_set_cookie_params', 3, 'secure'],
                 ['session_set_cookie_params', 4, 'httponly'],
