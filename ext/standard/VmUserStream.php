@@ -102,6 +102,53 @@ final class VmUserStream
     }
 
     /**
+     * stream_get_line() on userspace handles via stream_read
+     * (php-src streamsfuncs.c / streams.c php_stream_get_line; #26003).
+     *
+     * Ending is stripped when matched (unlike fgets, which keeps "\n").
+     *
+     * @return string|false
+     */
+    public static function streamGetLine(int $handle, int $maxLength, ?string $ending = null): string|false
+    {
+        if (!isset(self::$streams[$handle])) {
+            return false;
+        }
+        if ($maxLength < 0) {
+            return false;
+        }
+        if (0 === $maxLength) {
+            $maxLength = 8192;
+        }
+        if (null === $ending || '' === $ending) {
+            $data = self::read($handle, $maxLength);
+            if (false === $data || ('' === $data && self::feof($handle))) {
+                return false;
+            }
+
+            return $data;
+        }
+
+        $result = '';
+        $endingLen = \strlen($ending);
+        while (\strlen($result) < $maxLength) {
+            $byte = self::read($handle, 1);
+            if (false === $byte || '' === $byte) {
+                break;
+            }
+            $result .= $byte;
+            if ($endingLen > 0 && \substr($result, -$endingLen) === $ending) {
+                return \substr($result, 0, -$endingLen);
+            }
+        }
+        if ('' === $result && self::feof($handle)) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
      * Userspace stream_write / fwrite (#25972).
      *
      * @return int|false bytes written

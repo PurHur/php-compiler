@@ -2164,6 +2164,9 @@ final class VmFs
      * php-src ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_get_line).
      */
     public static function streamGetLine(int $handle, int $maxLength, ?string $ending = null) {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::streamGetLine($handle, $maxLength, $ending);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::streamGetLine($handle, $maxLength, $ending);
         }
