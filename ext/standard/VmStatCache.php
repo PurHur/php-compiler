@@ -25,6 +25,12 @@ final class VmStatCache
         if (\array_key_exists($path, self::$stat)) {
             return self::$stat[$path];
         }
+        if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
+            $raw = VmUserStream::urlStat($path, 0);
+            self::$stat[$path] = $raw;
+
+            return $raw;
+        }
         $raw = VmStatNative::stat($path);
         self::$stat[$path] = $raw;
 
@@ -38,6 +44,13 @@ final class VmStatCache
     {
         if (\array_key_exists($path, self::$lstat)) {
             return self::$lstat[$path];
+        }
+        if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
+            // STREAM_URL_STAT_LINK = 1 — php-src streams.h
+            $raw = VmUserStream::urlStat($path, 1);
+            self::$lstat[$path] = $raw;
+
+            return $raw;
         }
         $raw = VmStatNative::lstat($path);
         self::$lstat[$path] = $raw;
