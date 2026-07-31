@@ -25,6 +25,16 @@ final class StringOffsetJitHelper
     /** Zend _convert_to_string() array branch before string-offset assign (#22925). */
     public const ARRAY_TO_STRING_WARNING = 'Array to string conversion';
 
+    /**
+     * Object RHS without __toString — Zend Error text (#25794).
+     *
+     * @see ValueEchoSupport::objectToStringErrorMessage()
+     */
+    public static function objectToStringErrorMessage(string $className): string
+    {
+        return ValueEchoSupport::objectToStringErrorMessage($className);
+    }
+
     /** @see Variable::STRING_OFFSET_REF_ERROR (#21910) */
     public const REF_ERROR = 'Cannot create references to/from string offsets';
 
