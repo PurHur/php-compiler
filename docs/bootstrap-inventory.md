@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6650 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21455 |
+| Source constructs flagged (warnings) | 21456 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4772,7 +4772,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/AttributeClassRegistry.php` | 0 | 1 |
 | `lib/Compiler/AttributeConstantEvaluator.php` | 0 | 3 |
 | `lib/Compiler/AttributeEntry.php` | 0 | 1 |
-| `lib/Compiler/AttributeMetadata.php` | 0 | 2 |
+| `lib/Compiler/AttributeMetadata.php` | 0 | 3 |
 | `lib/Compiler/AttributeNames.php` | 0 | 15 |
 | `lib/Compiler/AttributeTargetValidator.php` | 0 | 2 |
 | `lib/Compiler/ClassCompileRegistry.php` | 0 | 1 |
@@ -42308,9 +42308,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/AttributeConstantEvaluator.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileTimeEnumCase (line 150)
-- new CompileTimeNew (line 219)
-- 8 class method(s)
+- new CompileTimeEnumCase (line 264)
+- new CompileTimeNew (line 333)
+- 13 class method(s)
 
 ### `lib/Compiler/AttributeEntry.php`
 
@@ -42320,8 +42320,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/AttributeMetadata.php`
 
 **Warnings** (review for bootstrap subset):
-- new AttributeEntry (line 44)
+- new AttributeEntry (line 51)
 - 2 class method(s)
+- 1 closure(s)
 
 ### `lib/Compiler/AttributeNames.php`
 

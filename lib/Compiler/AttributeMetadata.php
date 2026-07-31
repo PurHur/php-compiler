@@ -23,8 +23,15 @@ final class AttributeMetadata
         if (!\is_array($groups)) {
             return [];
         }
+        $file = $op->getFile();
+        if ('unknown' === $file) {
+            $file = '';
+        }
 
-        return self::fromAttrGroups($groups);
+        return AttributeConstantEvaluator::withScriptFile(
+            $file,
+            static fn (): array => self::fromAttrGroups($groups)
+        );
     }
 
     /**
