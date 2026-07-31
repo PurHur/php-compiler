@@ -219,37 +219,18 @@ final class VmArraySort
     }
 
     /**
-     * usort/uasort/uksort optional SortDirection (#17429, ext/standard/array.c php_usort).
+     * usort/uasort/uksort — php-src arity is exactly 2; no SortDirection parameter (#23385, #26142).
      *
-     * @return bool true when descending order is requested
+     * @return bool always false (descending would reverse comparator; Zend has no such arg)
      */
     public static function resolveUserSortDescending(Frame $frame, string $function): bool
     {
-        if (!isset($frame->calledArgs[2])) {
-            return false;
-        }
-        $directionArg = $frame->calledArgs[2]->resolveIndirect();
-        $order = self::trySortDirectionOrderInt($directionArg);
-        if (null !== $order) {
-            return StdlibConstants::SORT_DESC === $order;
-        }
-        if (EnumCaseSupport::isEnumCaseVariable($directionArg)) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
-                $function,
-                EnumCaseSupport::typeNameForVariable($directionArg)
-            ));
-        }
-        throw new \TypeError(sprintf(
-            '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
-            $function,
-            VmInternalCompare::vmSortFlagsTypeName($directionArg->type)
-        ));
+        return false;
     }
 
     public static function maxUserSortArgCount(): int
     {
-        return \PHPCompiler\CompilerVersion::supportsSortingEnum() ? 3 : 2;
+        return 2;
     }
 
     /**
@@ -278,12 +259,13 @@ final class VmArraySort
     public static function assertUserSortArgCount(Frame $frame, string $function): void
     {
         $argc = \count($frame->calledArgs);
-        $max = self::maxUserSortArgCount();
-        if ($argc < 2 || $argc > $max) {
-            if ($max > 2) {
-                throw new \LogicException($function.'() requires two to three arguments');
-            }
-            throw new \LogicException($function.'() requires exactly two arguments');
+        if (2 !== $argc) {
+            // php-src zend_wrong_parameter_count — ArgumentCountError (#26142)
+            throw new \ArgumentCountError(sprintf(
+                '%s() expects exactly 2 arguments, %d given',
+                $function,
+                $argc
+            ));
         }
     }
 

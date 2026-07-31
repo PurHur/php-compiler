@@ -76,22 +76,40 @@ PHP;
         $this->assertSame("1,2,3\n1,2,3\n", ob_get_clean());
     }
 
-    /** @covers issue #17429 */
-    public function testUserSortAcceptsSortDirectionNamed(): void
+    /** @covers issue #17429 #26142 — php-src never added SortDirection to usort* */
+    public function testUserSortRejectsPhantomSortDirection(): void
     {
         $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
+foreach (['usort', 'uksort', 'uasort'] as $fn) {
+    $r = new ReflectionFunction($fn);
+    echo $fn, '=n', $r->getNumberOfParameters(), "\n";
+}
 $a = [3, 1, 2];
-usort($a, 'strcmp', direction: SortDirection::Ascending);
-echo implode(',', $a), "\n";
-$b = ['b' => 2, 'a' => 1, 'c' => 3];
-uksort($b, 'strcmp', direction: SortDirection::Descending);
-echo implode(',', array_keys($b)), "\n";
+try {
+    usort($a, 'strcmp', SortDirection::Ascending);
+    echo "positional=ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+}
+try {
+    usort(array: $a, callback: 'strcmp', direction: SortDirection::Ascending);
+    echo "named=ok\n";
+} catch (Throwable $e) {
+    echo $e->getMessage(), "\n";
+}
 PHP;
         ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'usort_sort_direction.php'));
-        $this->assertSame("1,2,3\nc,b,a\n", ob_get_clean());
+        $runtime->run($runtime->parseAndCompile($code, 'usort_phantom_direction.php'));
+        $out = ob_get_clean();
+        $this->assertStringContainsString("usort=n2\n", $out);
+        $this->assertStringContainsString("uksort=n2\n", $out);
+        $this->assertStringContainsString("uasort=n2\n", $out);
+        $this->assertStringContainsString("ArgumentCountError\n", $out);
+        $this->assertStringContainsString('Unknown named parameter $direction', $out);
+        $this->assertStringNotContainsString('positional=ok', $out);
+        $this->assertStringNotContainsString('named=ok', $out);
     }
 }

@@ -1,29 +1,23 @@
 --TEST--
-stdlib usort/uasort/uksort accept SortDirection named param (#17429, ext/standard/array.c)
---SKIPIF--
-<?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
+stdlib usort/uasort/uksort reject SortDirection named param — Zend arity 2 (#26142, re-#17429)
 --FILE--
 <?php
 declare(strict_types=1);
 
 $a = [3, 1, 2];
-usort($a, 'strcmp', direction: SortDirection::Ascending);
-echo implode(',', $a), "\n";
-
-$b = [3, 1, 2];
-usort($b, 'strcmp', direction: SortDirection::Descending);
-echo implode(',', $b), "\n";
-
-$c = ['b' => 2, 'a' => 1, 'c' => 3];
-uasort($c, 'strcmp', direction: SortDirection::Ascending);
-echo implode(',', array_keys($c)), "\n";
-
-$d = ['b' => 2, 'a' => 1, 'c' => 3];
-uksort($d, 'strcmp', direction: SortDirection::Descending);
-echo implode(',', array_keys($d)), "\n";
+try {
+    usort(array: $a, callback: static fn ($x, $y) => $x <=> $y, direction: 1);
+    echo "named_ok\n";
+} catch (Throwable $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    usort($a, static fn ($x, $y) => $x <=> $y, 1);
+    echo "positional_ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
-1,2,3
-3,2,1
-a,b,c
-c,b,a
+Unknown named parameter $direction
+ArgumentCountError: usort() expects exactly 2 arguments, 3 given

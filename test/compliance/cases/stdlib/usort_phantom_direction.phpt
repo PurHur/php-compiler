@@ -1,5 +1,5 @@
 --TEST--
-stdlib usort/uasort/uksort reject phantom named direction on 8.2 profile (#23385; vs php-src)
+stdlib usort/uasort/uksort reject phantom direction on all profiles (#23385, #26142; vs php-src)
 --FILE--
 <?php
 foreach (['usort', 'uksort', 'uasort'] as $fn) {
@@ -14,9 +14,17 @@ try {
 } catch (Throwable $e) {
     echo $e->getMessage(), "\n";
 }
+$b = [3, 1];
+try {
+    usort($b, static fn ($x, $y) => $x <=> $y, 1);
+    echo "positional_accepted\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
 usort=array,callback n=2
 uksort=array,callback n=2
 uasort=array,callback n=2
 Unknown named parameter $direction
+ArgumentCountError: usort() expects exactly 2 arguments, 3 given
