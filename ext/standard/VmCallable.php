@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\Variable;
@@ -215,6 +216,24 @@ final class VmCallable
             '%s(): Argument #1 ($callback) must be a valid callback, function "%s" not found or invalid function name',
             $function,
             $name
+        );
+    }
+
+    /**
+     * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709).
+     */
+    public static function inaccessibleMethodCallbackTypeError(
+        string $function,
+        string $kind,
+        string $className,
+        string $methodName
+    ): string {
+        return sprintf(
+            '%s(): Argument #1 ($callback) must be a valid callback, cannot access %s method %s::%s()',
+            $function,
+            $kind,
+            $className,
+            $methodName
         );
     }
 
@@ -566,7 +585,16 @@ final class VmCallable
             throw new \TypeError(self::invalidCallbackTypeError($function));
         }
         if (Variable::TYPE_OBJECT === $target->type) {
-            return $ctx->runtime->vm->invokeInstanceMethod($target->toObject(), $methodName, ...$args);
+            $object = $target->toObject();
+            self::assertInstanceMethodVisibleForInvoke(
+                $ctx,
+                $object->class,
+                $methodName,
+                $function,
+                $scopeFrame
+            );
+
+            return $ctx->runtime->vm->invokeInstanceMethod($object, $methodName, ...$args);
         }
         if (Variable::TYPE_STRING === $target->type) {
             $class = $target->toString();
@@ -585,6 +613,71 @@ final class VmCallable
         }
 
         throw new \TypeError(self::invalidCallbackTypeError($function));
+    }
+
+    /**
+     * call_user_func* — reject inaccessible instance methods before invoke (#25709).
+     *
+     * Missing methods still fall through to {@see VM::invokeInstanceMethod} / `__call`.
+     * When the method exists but the builtin caller frame cannot see it, Zend TypeErrors
+     * (zend_is_callable_ex) rather than invoking `__call`.
+     */
+    private static function assertInstanceMethodVisibleForInvoke(
+        Context $ctx,
+        ClassEntry $objectClass,
+        string $method,
+        string $function,
+        ?Frame $scopeFrame
+    ): void {
+        if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
+            return;
+        }
+        try {
+            [$declaring, $methodLc] = $ctx->runtime->vm->resolveInstanceMethod($objectClass, $method);
+        } catch (\LogicException) {
+            return;
+        }
+        self::assertDeclaringMethodVisibleForInvoke(
+            $ctx,
+            $declaring,
+            $methodLc,
+            $method,
+            $function,
+            $scopeFrame
+        );
+    }
+
+    /**
+     * Shared visibility gate for instance + static array/`Class::method` callables (#25709).
+     */
+    private static function assertDeclaringMethodVisibleForInvoke(
+        Context $ctx,
+        ClassEntry $declaring,
+        string $methodLc,
+        string $methodFallback,
+        string $function,
+        ?Frame $scopeFrame
+    ): void {
+        $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null !== $scopeFrame
+            ? VmReflection::callerClassLcFromFrame($scopeFrame)
+            : null;
+        if (VmReflection::isMethodCallableFromScope(
+            $ctx,
+            $vis,
+            strtolower($declaring->name),
+            $callerClassLc
+        )) {
+            return;
+        }
+        $kind = ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+        $declaredName = $declaring->methodNames[$methodLc] ?? $methodFallback;
+        throw new \TypeError(self::inaccessibleMethodCallbackTypeError(
+            $function,
+            $kind,
+            $declaring->name,
+            $declaredName
+        ));
     }
 
     /**
@@ -614,6 +707,14 @@ final class VmCallable
             ));
         }
         [$declaring, $methodLc, $isStatic] = $located;
+        self::assertDeclaringMethodVisibleForInvoke(
+            $ctx,
+            $declaring,
+            $methodLc,
+            $methodName,
+            $function,
+            $scopeFrame
+        );
         $vm = $ctx->runtime->vm;
         if (!$isStatic) {
             $thisVar = null !== $scopeFrame
