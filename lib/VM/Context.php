@@ -398,16 +398,18 @@ class Context {
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
                     return null;
                 }
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_ARGON2I);
+                // User-visible algo id is the string name (php-src password.c / #11615);
+                // VmPassword keeps int 2/3 only as internal hash lowering ids (#25818).
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2I);
 
                 return $var;
             case 'password_argon2id':
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
                     return null;
                 }
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_ARGON2ID);
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2ID);
 
                 return $var;
             case 'crypt_std_des':
