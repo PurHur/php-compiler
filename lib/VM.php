@@ -14647,7 +14647,13 @@ restart:
     }
 
     /**
-     * Reject writes to get-only hooked properties (#4687, #18072, Zend zend_object_handlers.c).
+     * Reject writes to get-only hooked properties (#4687, #18072, #26006, Zend zend_object_handlers.c).
+     *
+     * php-src PHP-8.4 external get-only VIRTUAL write uses "Property … is read-only".
+     * "Must not write to virtual property" is only for raw backing-slot access inside a hook
+     * ({@see raiseVirtualPropertyHookRawAccessError} / zend_throw_no_prop_backing_value_access).
+     * php-src master tip uses "Cannot write to get-only virtual property …" for the external path —
+     * keep the PHP-8.4 string under PROFILE=8.4.
      */
     private function enforceVirtualPropertyHookWrite(Variable $lvalue, Frame $frame): ?Frame
     {

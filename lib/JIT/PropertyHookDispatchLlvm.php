@@ -372,7 +372,10 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
-     * Block stores to get-only virtual hooked properties (#4687).
+     * Block stores to get-only hooked properties (#4687, #26006).
+     *
+     * PHP-8.4: virtual → "Property … is read-only"; backed get-only → without set hook.
+     * "Must not write to virtual property" is the raw backing-slot path only — not here.
      *
      * @return bool true when the store was blocked (caller must skip propertyStore)
      */
