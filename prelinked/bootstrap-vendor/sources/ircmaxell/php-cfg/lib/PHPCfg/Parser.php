@@ -362,7 +362,11 @@ class Parser
             array_pop($this->ctx->gotoLoopSwitchStack);
         }
         $cond = $this->readVariable($this->parseExprNode($node->cond));
-        $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        // Zend emits ZEND_TICKS after the do-while statement (on loop exit) (#25621).
+        $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $zendLoopExitTick = true;
+        $jumpIf->setAttribute('zend_loop_exit_tick', $zendLoopExitTick);
+        $this->block->children[] = $jumpIf;
         $this->processAssertions($cond, $loopBody, $loopEnd);
         $loopBody->addParent($this->block);
         $loopEnd->addParent($this->block);
@@ -433,7 +437,13 @@ class Parser
 
     protected function parseStmt_For(Stmt\For_ $node)
     {
+        // Mark for-init exprs — Zend compile_expr_list does not emit statement ticks (#25621).
+        $initStart = \count($this->block->children);
         $this->parseExprList($node->init, self::MODE_READ);
+        for ($i = $initStart, $c = \count($this->block->children); $i < $c; ++$i) {
+            $forLoopInit = true;
+            $this->block->children[$i]->setAttribute('for_loop_init', $forLoopInit);
+        }
         $loopInit = $this->block->create();
         $loopBody = $this->block->create();
         $loopEnd = $this->block->create();
@@ -445,7 +455,11 @@ class Parser
         } else {
             $cond = new Literal(true);
         }
-        $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        // Zend emits ZEND_TICKS after the for statement (on loop exit) (#25621).
+        $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $zendLoopExitTick = true;
+        $jumpIf->setAttribute('zend_loop_exit_tick', $zendLoopExitTick);
+        $this->block->children[] = $jumpIf;
         $this->processAssertions($cond, $loopBody, $loopEnd);
         $loopBody->addParent($this->block);
         $loopEnd->addParent($this->block);
@@ -957,7 +971,11 @@ class Parser
         $this->block = $loopInit;
         $cond = $this->readVariable($this->parseExprNode($node->cond));
 
-        $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        // Zend emits ZEND_TICKS after the while statement (on loop exit) (#25621).
+        $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $zendLoopExitTick = true;
+        $jumpIf->setAttribute('zend_loop_exit_tick', $zendLoopExitTick);
+        $this->block->children[] = $jumpIf;
         $this->processAssertions($cond, $loopBody, $loopEnd);
         $loopBody->addParent($this->block);
         $loopEnd->addParent($this->block);

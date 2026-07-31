@@ -5074,6 +5074,167 @@ print("Applied php-cfg-for-loop-increment-ticks.patch (overlay)")
 PY
 }
 
+# Zend post-loop ZEND_TICKS on while/for/do-while exit + skip for-init ticks (#25621).
+apply_php_cfg_loop_exit_tick_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$parser" ]]; then
+    return 0
+  fi
+  if grep -q "zend_loop_exit_tick" "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-loop-exit-tick.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+
+# while
+old_w = """        $cond = $this->readVariable($this->parseExprNode($node->cond));
+
+        $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $this->processAssertions($cond, $loopBody, $loopEnd);
+        $loopBody->addParent($this->block);
+        $loopEnd->addParent($this->block);
+
+        $loopId = ++$this->ctx->gotoScopeId;
+        $this->ctx->gotoLoopSwitchStack[] = $loopId;
+        try {
+            $this->block = $this->parseNodes($node->stmts, $loopBody);
+        } finally {
+            array_pop($this->ctx->gotoLoopSwitchStack);
+        }
+        $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+        $loopInit->addParent($this->block);
+        $this->block = $loopEnd;
+    }
+
+    /**
+     * @param Node[] $expr"""
+new_w = """        $cond = $this->readVariable($this->parseExprNode($node->cond));
+
+        // Zend emits ZEND_TICKS after the while statement (on loop exit) (#25621).
+        $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $zendLoopExitTick = true;
+        $jumpIf->setAttribute('zend_loop_exit_tick', $zendLoopExitTick);
+        $this->block->children[] = $jumpIf;
+        $this->processAssertions($cond, $loopBody, $loopEnd);
+        $loopBody->addParent($this->block);
+        $loopEnd->addParent($this->block);
+
+        $loopId = ++$this->ctx->gotoScopeId;
+        $this->ctx->gotoLoopSwitchStack[] = $loopId;
+        try {
+            $this->block = $this->parseNodes($node->stmts, $loopBody);
+        } finally {
+            array_pop($this->ctx->gotoLoopSwitchStack);
+        }
+        $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+        $loopInit->addParent($this->block);
+        $this->block = $loopEnd;
+    }
+
+    /**
+     * @param Node[] $expr"""
+if old_w not in text:
+    sys.stderr.write("php-cfg-loop-exit-tick: parseStmt_While anchor not found\\n")
+    raise SystemExit(1)
+text = text.replace(old_w, new_w, 1)
+
+# do-while
+old_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond));
+        $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $this->processAssertions($cond, $loopBody, $loopEnd);
+        $loopBody->addParent($this->block);
+        $loopEnd->addParent($this->block);
+
+        $this->block = $loopEnd;
+    }
+
+    protected function parseStmt_Enum(Stmt\\Enum_ $node)"""
+new_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond));
+        // Zend emits ZEND_TICKS after the do-while statement (on loop exit) (#25621).
+        $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $zendLoopExitTick = true;
+        $jumpIf->setAttribute('zend_loop_exit_tick', $zendLoopExitTick);
+        $this->block->children[] = $jumpIf;
+        $this->processAssertions($cond, $loopBody, $loopEnd);
+        $loopBody->addParent($this->block);
+        $loopEnd->addParent($this->block);
+
+        $this->block = $loopEnd;
+    }
+
+    protected function parseStmt_Enum(Stmt\\Enum_ $node)"""
+old_d = old_d.replace("\\\\", "\\")
+new_d = new_d.replace("\\\\", "\\")
+if old_d not in text:
+    sys.stderr.write("php-cfg-loop-exit-tick: parseStmt_Do anchor not found\\n")
+    raise SystemExit(1)
+text = text.replace(old_d, new_d, 1)
+
+# for: init mark + exit tick (must run after for_loop_increment overlay)
+old_f = """    protected function parseStmt_For(Stmt\\For_ $node)
+    {
+        $this->parseExprList($node->init, self::MODE_READ);
+        $loopInit = $this->block->create();
+        $loopBody = $this->block->create();
+        $loopEnd = $this->block->create();
+        $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+        $loopInit->addParent($this->block);
+        $this->block = $loopInit;
+        if (! empty($node->cond)) {
+            $cond = $this->readVariable($this->parseExprNode($node->cond));
+        } else {
+            $cond = new Literal(true);
+        }
+        $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $this->processAssertions($cond, $loopBody, $loopEnd);"""
+new_f = """    protected function parseStmt_For(Stmt\\For_ $node)
+    {
+        // Mark for-init exprs — Zend compile_expr_list does not emit statement ticks (#25621).
+        $initStart = \\count($this->block->children);
+        $this->parseExprList($node->init, self::MODE_READ);
+        for ($i = $initStart, $c = \\count($this->block->children); $i < $c; ++$i) {
+            $forLoopInit = true;
+            $this->block->children[$i]->setAttribute('for_loop_init', $forLoopInit);
+        }
+        $loopInit = $this->block->create();
+        $loopBody = $this->block->create();
+        $loopEnd = $this->block->create();
+        $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+        $loopInit->addParent($this->block);
+        $this->block = $loopInit;
+        if (! empty($node->cond)) {
+            $cond = $this->readVariable($this->parseExprNode($node->cond));
+        } else {
+            $cond = new Literal(true);
+        }
+        // Zend emits ZEND_TICKS after the for statement (on loop exit) (#25621).
+        $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+        $zendLoopExitTick = true;
+        $jumpIf->setAttribute('zend_loop_exit_tick', $zendLoopExitTick);
+        $this->block->children[] = $jumpIf;
+        $this->processAssertions($cond, $loopBody, $loopEnd);"""
+# Prefer already-increment-patched for body (no bare parseExprList init)
+old_f2 = """    protected function parseStmt_For(Stmt\\For_ $node)
+    {
+        $this->parseExprList($node->init, self::MODE_READ);
+        $loopInit = $this->block->create();"""
+# After for_loop_increment overlay, init line is still bare parseExprList
+if old_f.replace("\\\\", "\\") in text:
+    text = text.replace(old_f.replace("\\\\", "\\"), new_f.replace("\\\\", "\\"), 1)
+else:
+    sys.stderr.write("php-cfg-loop-exit-tick: parseStmt_For anchor not found\\n")
+    raise SystemExit(1)
+
+parser_path.write_text(text)
+print("Applied php-cfg-loop-exit-tick.patch (overlay)")
+PY
+}
+
 apply_php_cfg_magic_constants_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/MagicStringResolver.php"
@@ -6205,6 +6366,7 @@ apply_patch() {
   if [[ "$(basename "$patch")" == "php-cfg-declare-ticks.patch" ]]; then
     apply_php_cfg_declare_ticks_overlay
     apply_php_cfg_for_loop_increment_ticks_overlay
+    apply_php_cfg_loop_exit_tick_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-enum.patch" ]]; then
