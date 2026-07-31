@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** similar_text JIT routes through SimilarTextJitHelper PHP, not hand-written LLVM (#9731). */
+/** similar_text JIT NestedJIT via JitVmHelperLink::ensureCompiled (#9731 / #25784). */
 final class SimilarTextJitRuntimeShrinkTest extends TestCase
 {
     public function testSimilarTextJitHelperDelegatesToVmString(): void
@@ -26,6 +26,21 @@ final class SimilarTextJitRuntimeShrinkTest extends TestCase
 
         $jitShim = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSimilarTextJit.php');
         $this->assertLessThan(20, \substr_count($jitShim, "\n"), 'StringSimilarTextJit must be a thin shim');
+    }
+
+    public function testStringSimilarTextRoutesThroughEnsureCompiled(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSimilarText.php');
+        $this->assertStringContainsString('SimilarTextJitHelper::compute', $source);
+        $this->assertStringContainsString('phpc_similar_text', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertLessThan(130, \substr_count($source, "\n") + 1);
     }
 
     public function testJitSimilarTextRoutesThroughStringSimilarText(): void
