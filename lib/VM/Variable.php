@@ -3239,7 +3239,11 @@ restart:
 
                 return $s[0];
             case self::TYPE_INTEGER:
-                return chr($value->integer & 0xff);
+                // Zend convert_to_string then first byte — not chr()/code-unit (#25778).
+                $s = (string) $value->integer;
+                $this->warnIfMultiByteStringOffsetAssign($s);
+
+                return $s[0];
             case self::TYPE_ARRAY:
                 // Zend zend_assign_to_string_offset → convert_to_string → Array warning (#22925).
                 self::emitArrayToStringWarning(null, $this->stringOffsetFrame, $this->stringOffsetContext);

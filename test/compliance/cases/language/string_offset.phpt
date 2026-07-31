@@ -11,4 +11,4 @@ echo $s, "\n";
 --EXPECT--
 abc
 azc
-Azc
+6zc

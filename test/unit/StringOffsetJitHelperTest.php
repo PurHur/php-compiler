@@ -44,10 +44,16 @@ final class StringOffsetJitHelperTest extends TestCase
         );
     }
 
-    public function testByteFromLongTruncates(): void
+    public function testByteFromLongUsesDecimalFirstByte(): void
     {
-        $this->assertSame(65, StringOffsetJitHelper::byteFromLong(65));
-        $this->assertSame(1, StringOffsetJitHelper::byteFromLong(257));
+        // Zend convert_to_string then first byte — not trunc-to-u8 (#25778).
+        $this->assertSame(\ord('6'), StringOffsetJitHelper::byteFromLong(65));
+        $this->assertSame(\ord('2'), StringOffsetJitHelper::byteFromLong(257));
+        $this->assertSame(\ord('0'), StringOffsetJitHelper::byteFromLong(0));
+        $this->assertSame(\ord('-'), StringOffsetJitHelper::byteFromLong(-1));
+        $this->assertTrue(StringOffsetJitHelper::longNeedsFirstByteWarning(65));
+        $this->assertFalse(StringOffsetJitHelper::longNeedsFirstByteWarning(5));
+        $this->assertTrue(StringOffsetJitHelper::longNeedsFirstByteWarning(-1));
     }
 
     public function testByteFromStringFirstChar(): void
