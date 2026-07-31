@@ -48,6 +48,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'fcc_new_instance.phpt',
         'strlen_script_global.phpt',
         'array_keys_nested_producer.phpt',
+        'array_keys_getarraycopy_nested.phpt',
         'named_args_skip_first_optional.phpt',
         'byref_param_int.phpt',
     ];

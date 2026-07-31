@@ -19822,7 +19822,12 @@ class Compiler {
         if (null !== $block->orig) {
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
             $immediate = $producers[0] ?? null;
-            if ($immediate instanceof Op\Expr\FuncCall || $immediate instanceof Op\Expr\NsFuncCall) {
+            if (
+                $immediate instanceof Op\Expr\FuncCall
+                || $immediate instanceof Op\Expr\NsFuncCall
+                || $immediate instanceof Op\Expr\MethodCall
+                || $immediate instanceof Op\Expr\StaticCall
+            ) {
                 $producerSlot = $block->slotForOperand($immediate->result);
                 if (null !== $producerSlot) {
                     return (string) $producerSlot;
@@ -19854,6 +19859,12 @@ class Compiler {
                                 )) {
                                     return $this->slotForRecentInitArrayCallArg($block);
                                 }
+                                break;
+                            }
+                            if (
+                                $prior instanceof Op\Expr\MethodCall
+                                || $prior instanceof Op\Expr\StaticCall
+                            ) {
                                 break;
                             }
                             if (!$prior instanceof Op\Expr\ConstFetch
@@ -53916,7 +53927,8 @@ class Compiler {
             // array_keys(f()[k] ?? []) — keep coalesce merge slot, not ?? RHS INIT_ARRAY (#16127, re-#16435).
             return;
         }
-        // array_keys(array_flip([...])) — adjacent FuncCall result feeds arg #0; do not steal nested INIT_ARRAY (#21981).
+        // array_keys(array_flip([...])) / array_keys($ao->getArrayCopy()) — adjacent call result
+        // feeds arg #0; do not steal nested INIT_ARRAY (#21981, #25812).
         if (null !== $block->orig) {
             $callIndex = array_search($cfgCallOp, $block->orig->children, true);
             if (\is_int($callIndex) && $callIndex > 0) {
@@ -53934,7 +53946,12 @@ class Compiler {
                     break;
                 }
                 $adjacent = $block->orig->children[$adjacentIndex] ?? null;
-                if ($adjacent instanceof Op\Expr\FuncCall || $adjacent instanceof Op\Expr\NsFuncCall) {
+                if (
+                    $adjacent instanceof Op\Expr\FuncCall
+                    || $adjacent instanceof Op\Expr\NsFuncCall
+                    || $adjacent instanceof Op\Expr\MethodCall
+                    || $adjacent instanceof Op\Expr\StaticCall
+                ) {
                     return;
                 }
             }
@@ -55326,7 +55343,12 @@ class Compiler {
             break;
         }
         $adjacent = $block->orig->children[$adjacentIndex] ?? null;
-        if (!($adjacent instanceof Op\Expr\FuncCall || $adjacent instanceof Op\Expr\NsFuncCall)) {
+        if (!(
+            $adjacent instanceof Op\Expr\FuncCall
+            || $adjacent instanceof Op\Expr\NsFuncCall
+            || $adjacent instanceof Op\Expr\MethodCall
+            || $adjacent instanceof Op\Expr\StaticCall
+        )) {
             return;
         }
         $execSlot = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
