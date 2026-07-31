@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\mailparse;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * mailparse extension module entry (PECL mailparse / mailparse.c; #6383, #22230).
+ * mailparse extension module entry (PECL mailparse / mailparse.c; #6383, #22230, #24908).
  *
+ * Advertise mailparse_* / extension_loaded('mailparse') only when
+ * {@see MailparseExtensionPolicy::advertisesExtension()}.
  * MIME create/parse + multipart structure/extract/parse_file + transfer helpers.
  * PHP-in-PHP RFC822/MIME parser — no runtime/*.c growth.
  */
