@@ -7449,6 +7449,30 @@ restart:
                         $frame,
                         $op->sourceLocation
                     );
+                    if ([] !== $op->classImplements) {
+                        $missingIface = VM\ImplementsHierarchyRuntimeCheck::missingInterfaceMessage(
+                            $op->classImplements,
+                            $op->classImplementsDisplay,
+                            $this->context
+                        );
+                        if (null !== $missingIface) {
+                            $catchFrame = $this->dispatchVmError($missingIface, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $notIface = VM\ImplementsHierarchyRuntimeCheck::notInterfaceMessage(
+                            $name,
+                            $op->classImplements,
+                            $op->classImplementsDisplay,
+                            $this->context
+                        );
+                        if (null !== $notIface) {
+                            $this->raiseClassDeclareCompileFatal(new \CompileError($notIface), $frame);
+                        }
+                    }
                     self::defineClass($classEntry, $op->block1, $frame);
                     $this->inheritFromInterfaces($classEntry);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
@@ -7506,6 +7530,30 @@ restart:
                         $frame,
                         $op->sourceLocation
                     );
+                    if ([] !== $op->classImplements) {
+                        $missingIface = VM\ImplementsHierarchyRuntimeCheck::missingInterfaceMessage(
+                            $op->classImplements,
+                            $op->classImplementsDisplay,
+                            $this->context
+                        );
+                        if (null !== $missingIface) {
+                            $catchFrame = $this->dispatchVmError($missingIface, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $notIface = VM\ImplementsHierarchyRuntimeCheck::notInterfaceMessage(
+                            $name,
+                            $op->classImplements,
+                            $op->classImplementsDisplay,
+                            $this->context
+                        );
+                        if (null !== $notIface) {
+                            $this->raiseClassDeclareCompileFatal(new \CompileError($notIface), $frame);
+                        }
+                    }
                     self::defineClass($classEntry, $op->block1, $frame);
                     try {
                         if (!$parentPending && null !== $classEntry->parentLc) {
