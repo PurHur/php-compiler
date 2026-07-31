@@ -259,6 +259,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'lzf_')) {
             return \PHPCompiler\ext\lzf\LzfExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'lz4_')) {
+            return \PHPCompiler\ext\lz4\Lz4ExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -352,6 +355,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('lzf' === $ext) {
             return \PHPCompiler\ext\lzf\LzfExtensionPolicy::advertisesExtension();
+        }
+        if ('lz4' === $ext) {
+            return \PHPCompiler\ext\lz4\Lz4ExtensionPolicy::advertisesExtension();
         }
 
         return true;

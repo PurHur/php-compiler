@@ -901,6 +901,11 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\lzf\LzfExtensionPolicy::isLzfComplianceCase($name)) {
                 continue;
             }
+            // Functional lz4 cases set PHP_COMPILER_ENABLE_LZ4 via --ENV--; phantoms when withheld (#25087).
+            if (!\PHPCompiler\ext\lz4\Lz4ExtensionPolicy::runsLz4Compliance($name)
+                && \PHPCompiler\ext\lz4\Lz4ExtensionPolicy::isLz4ComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

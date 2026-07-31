@@ -1,9 +1,11 @@
 --TEST--
 lz4_compress()/lz4_uncompress() round-trip (#22529, kjdev/php-ext-lz4)
+--ENV--
+PHP_COMPILER_ENABLE_LZ4=1
 --SKIPIF--
 <?php
-if (!function_exists('lz4_compress') || !function_exists('lz4_uncompress')) {
-    die('skip lz4');
+if (!\PHPCompiler\ext\lz4\Lz4ExtensionPolicy::advertisesExtension()) {
+    die('skip lz4 withheld (#25087)');
 }
 ?>
 --FILE--
