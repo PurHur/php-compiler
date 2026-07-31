@@ -6654,16 +6654,17 @@ restart:
                         && null !== $frame->block->func->class->value
                         && '' !== $frame->block->func->class->value
                     ) {
-                        // Preserve declaring scope on the closure function so self:: resolves like Zend.
+                        // Scope (ce) = declaring class; called_scope (LSB) = creation called class
+                        // (#25793, zend_closures.c / zend_object_handlers.c).
+                        $declaring = $frame->block->func->class->value;
                         if (null !== $op->block1->func) {
                             $op->block1->func->class = $frame->block->func->class;
                         }
-
-                        // Preserve late-static binding (static::) from the creation scope (called class).
+                        $state->boundScopeClass = $declaring;
                         $called = $this->inferCalledClass($frame);
-                        $state->boundScopeClass = null !== $called && '' !== $called
-                            ? $called
-                            : $frame->block->func->class->value;
+                        if (null !== $called && '' !== $called) {
+                            $state->boundCalledScopeClass = $called;
+                        }
                         $isStaticClosure = null !== $op->block1->func
                             && (($op->block1->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
                         if (!$isStaticClosure) {
@@ -15184,7 +15185,7 @@ restart:
     }
 
     /**
-     * Runtime class scope for self/parent/static inside a bound closure (#3673, #12963).
+     * Closure scope (ce) for self/parent/private — not late-static called_scope (#3673, #25793).
      */
     private function boundClosureScopeClassLc(Frame $frame): ?string
     {
@@ -15194,11 +15195,37 @@ restart:
         if ((($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) === 0) {
             return null;
         }
-        if (null === $frame->calledClass || '' === $frame->calledClass) {
-            return null;
+        $state = $frame->closureCall ?? $frame->pendingClosureInvoke;
+        if (null !== $state && null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+            return strtolower($state->boundScopeClass);
+        }
+        if (null !== $frame->block->func->class && null !== $frame->block->func->class->value
+            && '' !== $frame->block->func->class->value) {
+            return strtolower($frame->block->func->class->value);
         }
 
-        return strtolower($frame->calledClass);
+        return null;
+    }
+
+    /**
+     * Late-static called_scope for a closure: $this's class, else stored creation LSB, else scope.
+     */
+    private function closureCalledScopeClass(ClosureState $state): ?string
+    {
+        if (null !== $state->boundThis) {
+            $thisObj = $state->boundThis->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisObj->type) {
+                return $thisObj->toObject()->class->name;
+            }
+        }
+        if (null !== $state->boundCalledScopeClass && '' !== $state->boundCalledScopeClass) {
+            return $state->boundCalledScopeClass;
+        }
+        if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+            return $state->boundScopeClass;
+        }
+
+        return null;
     }
 
     private function callerClassLc(Frame $frame): ?string
@@ -16765,8 +16792,9 @@ restart:
                 $callee->scope[$thisIdx]->copyFrom($boundThis);
             }
         }
-        if (null !== $closureState->boundScopeClass && '' !== $closureState->boundScopeClass) {
-            $callee->calledClass = $closureState->boundScopeClass;
+        $calledScope = $this->closureCalledScopeClass($closureState);
+        if (null !== $calledScope && '' !== $calledScope) {
+            $callee->calledClass = $calledScope;
         }
     }
 

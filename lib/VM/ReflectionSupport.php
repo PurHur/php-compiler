@@ -4986,7 +4986,7 @@ final class ReflectionSupport
         return sprintf("Attribute [ %s ]\n", $nameVar->toString());
     }
 
-    /** php-src: closure_func->common.scope (definition site). */
+    /** php-src: closure_func->common.scope (definition / bind scope). */
     public static function closureDefinitionScopeClassName(ClosureState $state): ?string
     {
         if (null !== $state->methodName && '' !== $state->methodName) {
@@ -5020,6 +5020,10 @@ final class ReflectionSupport
 
             return null;
         }
+        // User closure: bindTo updates boundScopeClass (ce); prefer it over CFG func->class (#25793).
+        if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+            return $state->boundScopeClass;
+        }
         $cfgFunc = $state->func->block->func ?? null;
         if (null === $cfgFunc || null === $cfgFunc->class || null === $cfgFunc->class->value || '' === $cfgFunc->class->value) {
             return null;
@@ -5031,6 +5035,15 @@ final class ReflectionSupport
     /** php-src: get_closure called_scope, else definition scope. */
     public static function closureCalledScopeClassName(ClosureState $state): ?string
     {
+        if (null !== $state->boundThis) {
+            $thisObj = $state->boundThis->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisObj->type) {
+                return $thisObj->toObject()->class->name;
+            }
+        }
+        if (null !== $state->boundCalledScopeClass && '' !== $state->boundCalledScopeClass) {
+            return $state->boundCalledScopeClass;
+        }
         if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
             return $state->boundScopeClass;
         }
