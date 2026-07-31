@@ -38,14 +38,16 @@ final class EvalRuntime
             // (#25535). Skip tryCompileBlock+inline here so a missed deferral cannot MCJIT-inline
             // class decls (segfault); fall through to emitFalse only as last resort.
             if (!Block::literalEvalSourceNeedsVm($literal)) {
-                $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal);
+                $callerPath = $callerBlock->scriptPath();
+                $callLine = null !== $op->sourceLocation
+                    ? (int) $op->sourceLocation->startLine
+                    : 0;
+                $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
+                $evalFile = VmEval::zendEvalFilename($callerPath, $callLine);
+                // Compile with Zend reflection filename so SourceLocation matches (#26032).
+                $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile);
                 if ($evalBlock instanceof Block) {
-                    $callerPath = $callerBlock->scriptPath();
-                    $callLine = null !== $op->sourceLocation
-                        ? (int) $op->sourceLocation->startLine
-                        : 0;
-                    $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
-                    $evalBlock->setScriptPath(VmEval::zendEvalFilename($callerPath, $callLine));
+                    $evalBlock->setScriptPath($evalFile);
                     IncludeHelper::compileInlinedBlock(
                         $jit,
                         $func,

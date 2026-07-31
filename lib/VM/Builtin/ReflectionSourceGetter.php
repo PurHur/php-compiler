@@ -34,7 +34,7 @@ abstract class ReflectionSourceGetter extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->resolveEntry($frame);
-        $location = $this->resolveLocation($frame) ?? new SourceLocation();
+        $location = ($this->resolveLocation($frame) ?? new SourceLocation())->forReflection();
         if (null !== $frame->returnVar) {
             ($this->apply)($location, $entry, $frame);
         }

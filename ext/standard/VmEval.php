@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Frame;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -98,16 +100,20 @@ final class VmEval
     /**
      * Compile eval source for JIT inline lowering — SSOT for parse path (#10248, #4652).
      *
+     * Pass Zend-shaped `$filename` (`parent(line) : eval()'d code`) when known so Reflection
+     * provenance matches php-src (#26032). Defaults to bare EVAL_FILENAME.
+     *
      * Returns null on parse/compile failure (caller assigns false like Zend eval parse errors).
      */
-    public static function tryCompileBlock(Runtime $runtime, string $code): ?Block
+    public static function tryCompileBlock(Runtime $runtime, string $code, ?string $filename = null): ?Block
     {
         Runtime::clearLastParseFailure();
         $runtime->compiler->resetCompileAbortDetail();
         $wrapped = self::wrapEvalCode($code);
+        $filename ??= self::EVAL_FILENAME;
 
         try {
-            return $runtime->parseAndCompile($wrapped, self::EVAL_FILENAME);
+            return $runtime->parseAndCompile($wrapped, $filename);
         } catch (\CompileError) {
             return null;
         } catch (\Throwable) {
@@ -129,9 +135,11 @@ final class VmEval
         Runtime::clearLastParseFailure();
         $runtime->compiler->resetCompileAbortDetail();
         $wrapped = self::wrapEvalCode($code);
+        // Stamp Zend reflection/__FILE__ shape onto the compile unit (#26032, #25809).
+        [$evalFile] = ExceptionSupport::evalFatalSite($scopeFrame, 1);
 
         try {
-            $block = $runtime->parseAndCompile($wrapped, self::EVAL_FILENAME);
+            $block = $runtime->parseAndCompile($wrapped, $evalFile);
         } catch (CompileFatal $e) {
             // Reference-profile syntax rejectors throw CompileFatal; Zend eval surfaces ParseError (#22796).
             if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
