@@ -19,7 +19,8 @@ final class ArrayChangeKeyCaseRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php');
         $this->assertStringContainsString('ArrayChangeKeyCaseJitHelper', $runtime);
-        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringNotContainsString('nativeListToHashTable', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildChangeKeyCaseArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 

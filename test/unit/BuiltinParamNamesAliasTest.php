@@ -2319,6 +2319,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #25500 */
+    public function testArrayChangeKeyCaseZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_change_key_case');
+        self::assertSame(['array', 'case='], $names);
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('array_change_key_case'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_change_key_case'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'array_change_key_case'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'case', 'array_change_key_case'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'array_change_key_case'));
+    }
+
     /** @covers issue #23460 */
     public function testEscapeshellZendStubNamedParams(): void
     {

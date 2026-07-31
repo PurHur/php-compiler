@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_change_key_case() via ArrayChangeKeyCaseJitHelper PHP (#12371, #18024).
  *
- * Standalone AOT compiles {@see ArrayChangeKeyCaseJitHelper} via JitVmHelperLink bridge (#14530); native literal arrays materialize to hashtable then route through PHP (#18024).
+ * Standalone AOT compiles {@see ArrayChangeKeyCaseJitHelper} via JitVmHelperLink bridge (#14530);
+ * operands materialize via {@see ArrayBuiltinHelper::loadHashTable()} (preserves string keys; #25500).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::changeKeyCase()}
  * php-src: ext/standard/array.c — php_array_change_key_case()
  */
@@ -34,20 +35,12 @@ final class ArrayChangeKeyCaseRuntime
     {
         self::ensureLinked($context);
 
+        // Prefer loadHashTable over packed-list materialization so string keys survive (#25500).
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CHANGE),
-            self::argToHashtable($context, $array),
+            ArrayBuiltinHelper::loadHashTable($context, $array),
             $case
         );
-    }
-
-    private static function argToHashtable(Context $context, JITVariable $arg): Value
-    {
-        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
-            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
-        }
-
-        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     public static function ensureLinked(Context $context): void

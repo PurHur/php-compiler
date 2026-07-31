@@ -500,6 +500,9 @@ final class BuiltinParamNames
             case 'array_key_first':
             case 'array_key_last':
                 return ['array'];
+            // php-src ext/standard/array.stub.php — array $array, int $case = CASE_LOWER; InternalArgInfo still says input (#25500)
+            case 'array_change_key_case':
+                return ['array', 'case='];
             // php-src ext/standard/array.stub.php — start/end; step=1 (InternalArgInfo still says low/high) (#23242 / #25070)
             case 'range':
                 return ['start', 'end', 'step='];
