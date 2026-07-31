@@ -107,6 +107,11 @@ final class BuiltinInternalArgInfo
             'json_encode' => 'string|false',
             // ext/curl/curl.stub.php — InternalArgInfo return int; Zend bool (#26107)
             'curl_multi_setopt' => 'bool',
+            // ext/curl/curl.stub.php — InternalArgInfo resource / empty; Zend CurlHandle|false / void (#26186)
+            'curl_init' => 'CurlHandle|false',
+            'curl_close' => 'void',
+            // InternalArgInfo bool|string; Zend Reflection string|bool (#26186)
+            'curl_exec' => 'string|bool',
             // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046)
             'filter_var' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
@@ -352,8 +357,15 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
-            // ext/curl/curl.stub.php — CurlHandle / CurlMultiHandle + mixed $value (#26107)
-            // InternalArgInfo still has untyped ch/mh/value and return int on curl_multi_setopt.
+            // ext/curl/curl.stub.php — CurlHandle / CurlMultiHandle + mixed $value (#26107, #26186)
+            // InternalArgInfo still has resource url, untyped ch/mh/value, and return int on curl_multi_setopt.
+            'curl_init' => 0 === $index ? '?string' : null,
+            'curl_setopt' => match ($index) {
+                0 => 'CurlHandle',
+                2 => 'mixed',
+                default => null,
+            },
+            'curl_exec', 'curl_close' => 0 === $index ? 'CurlHandle' : null,
             'curl_setopt_array' => 0 === $index ? 'CurlHandle' : null,
             'curl_multi_setopt' => match ($index) {
                 0 => 'CurlMultiHandle',

@@ -1038,6 +1038,8 @@ final class BuiltinParamNames
                     'untrusted_certificates_filename=',
                 ];
             // php-src ext/curl/curl.stub.php — InternalArgInfo still says ch/mh/sh (#23594)
+            case 'curl_init':
+                return ['url='];
             case 'curl_close':
             case 'curl_copy_handle':
             case 'curl_errno':

@@ -149,6 +149,10 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 512],
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/curl/curl.stub.php — ?string $url = null (InternalArgInfo string OPT without default) (#26186)
+        'curl_init' => [
+            0 => ['kind' => 'null'],
+        ],
         'explode' => [
             2 => ['kind' => 'int', 'value' => \PHP_INT_MAX],
         ],
