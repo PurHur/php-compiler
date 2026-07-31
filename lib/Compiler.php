@@ -91,6 +91,7 @@ use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Compiler\ClassConstVisibilityInheritCheck;
+use PHPCompiler\Compiler\PropertyVisibilityInheritCheck;
 use PHPCompiler\Compiler\TypedClassConstInheritCheck;
 use PHPCompiler\Compiler\TypedPropertyInheritCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
@@ -601,6 +602,7 @@ class Compiler {
         TraitClassConstConflictCheck::validate($script);
         TypedClassConstInheritCheck::validate($script);
         ClassConstVisibilityInheritCheck::validate($script);
+        PropertyVisibilityInheritCheck::validate($script);
         InterfaceConstVisibilityCheck::validate($script);
         InterfaceConstAmbiguityCheck::validate($script);
         InterfaceMethodVisibilityCheck::validate($script);
