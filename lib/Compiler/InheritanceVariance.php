@@ -15,7 +15,8 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time parameter contravariance / return covariance (Zend zend_inheritance.c, issue #3323).
+ * Compile-time parameter contravariance / return covariance, staticness, and
+ * visibility (Zend zend_inheritance.c, issues #3323, #25634).
  */
 final class InheritanceVariance
 {
@@ -234,6 +235,36 @@ final class InheritanceVariance
     ): ?string {
         if ('__construct' === $methodLc && !$parent->isAbstract) {
             return null;
+        }
+
+        // Private parent methods are not overridden (zend_inheritance.c).
+        if (0 !== ($parent->visibilityFlags & Func::FLAG_PRIVATE)) {
+            return null;
+        }
+
+        // Staticness must match exactly (zend_inheritance.c).
+        if ($parent->isStatic !== $child->isStatic) {
+            if ($parent->isStatic) {
+                return sprintf(
+                    'Cannot make static method %s::%s() non static in class %s',
+                    $parentClass,
+                    $methodLc,
+                    $childClass
+                );
+            }
+
+            return sprintf(
+                'Cannot make non static method %s::%s() static in class %s',
+                $parentClass,
+                $methodLc,
+                $childClass
+            );
+        }
+
+        // Visibility must not weaken (zend_inheritance.c / ClassConstVisibilityInheritCheck).
+        $visErr = self::visibilityCompatibilityError($childClass, $methodLc, $child, $parentClass, $parent);
+        if (null !== $visErr) {
+            return $visErr;
         }
 
         if (count($child->params) < count($parent->params)) {
@@ -645,6 +676,52 @@ final class InheritanceVariance
         return false;
     }
 
+    /**
+     * Reject visibility weakening on override (public→protected/private, protected→private).
+     * Strengthen (protected→public) and same level are OK.
+     */
+    private static function visibilityCompatibilityError(
+        string $childClass,
+        string $methodLc,
+        MethodSig $child,
+        string $parentClass,
+        MethodSig $parent
+    ): ?string {
+        $parentRank = self::visibilityRank($parent->visibilityFlags);
+        $childRank = self::visibilityRank($child->visibilityFlags);
+        if ($childRank <= $parentRank) {
+            return null;
+        }
+        if (1 === $parentRank) {
+            return sprintf(
+                'Access level to %s::%s() must be public (as in class %s)',
+                $childClass,
+                $methodLc,
+                $parentClass
+            );
+        }
+
+        return sprintf(
+            'Access level to %s::%s() must be protected (as in class %s) or weaker',
+            $childClass,
+            $methodLc,
+            $parentClass
+        );
+    }
+
+    /** 1=public, 2=protected, 3=private (higher = more restricted). */
+    private static function visibilityRank(int $flags): int
+    {
+        if (0 !== ($flags & Func::FLAG_PRIVATE)) {
+            return 3;
+        }
+        if (0 !== ($flags & Func::FLAG_PROTECTED)) {
+            return 2;
+        }
+
+        return 1;
+    }
+
     private static function formatDeclarationError(
         string $childClass,
         string $methodLc,
@@ -728,6 +805,9 @@ final class MethodSig
     /** @see Func::FLAG_PUBLIC|FLAG_PROTECTED|FLAG_PRIVATE */
     public int $visibilityFlags;
 
+    /** Whether the method was declared static (FLAG_STATIC). */
+    public bool $isStatic;
+
     /**
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
@@ -743,7 +823,8 @@ final class MethodSig
         bool $isAbstract = false,
         int $visibilityFlags = Func::FLAG_PUBLIC,
         bool $isFinal = false,
-        array $paramByRef = []
+        array $paramByRef = [],
+        bool $isStatic = false
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -754,6 +835,7 @@ final class MethodSig
         $this->isFinal = $isFinal;
         $this->visibilityFlags = $visibilityFlags;
         $this->paramByRef = $paramByRef;
+        $this->isStatic = $isStatic;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -775,6 +857,7 @@ final class MethodSig
         }
 
         $isFinal = 0 !== ($func->flags & Func::FLAG_FINAL);
+        $isStatic = 0 !== ($func->flags & Func::FLAG_STATIC);
 
         return new self(
             $ownerLc,
@@ -785,7 +868,8 @@ final class MethodSig
             $isAbstract,
             $visibility,
             $isFinal,
-            $byRef
+            $byRef,
+            $isStatic
         );
     }
 
@@ -863,6 +947,14 @@ final class MethodSig
         }
         $isAbstract = isset($entry->abstractMethods[$methodLc]) && !isset($entry->methods[$methodLc]);
         $isFinal = 0 !== ($vis & Func::FLAG_FINAL);
+        $isStatic = 0 !== ($vis & Func::FLAG_STATIC);
+        // Fallback: CFG Func flags when ClassEntry visibility omitted FLAG_STATIC.
+        if (!$isStatic) {
+            $decl = $entry->methods[$methodLc] ?? $entry->abstractMethods[$methodLc] ?? null;
+            if ($decl instanceof \PHPCompiler\Func\PHP && null !== $decl->block && null !== $decl->block->func) {
+                $isStatic = 0 !== ($decl->block->func->flags & Func::FLAG_STATIC);
+            }
+        }
 
         return new self(
             $ownerLc,
@@ -873,7 +965,8 @@ final class MethodSig
             $isAbstract,
             $visibility,
             $isFinal,
-            $byRef
+            $byRef,
+            $isStatic
         );
     }
 
