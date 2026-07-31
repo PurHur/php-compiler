@@ -1,5 +1,7 @@
 --TEST--
 curl_multi_select() float/int timeout returns int (#21569, ext/curl/multi.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

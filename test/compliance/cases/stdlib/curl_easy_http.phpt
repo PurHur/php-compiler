@@ -1,5 +1,7 @@
 --TEST--
 curl_init/setopt/exec/getinfo HTTP client via libcurl (#3325, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

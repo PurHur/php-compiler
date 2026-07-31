@@ -7,23 +7,64 @@ namespace PHPCompiler;
 use PHPCompiler\ext\curl\CurlExtensionPolicy;
 use PHPCompiler\ext\curl\VmCurlCore;
 use PHPCompiler\ext\curl\VmCurlNative;
+use PHPCompiler\ext\standard\ModuleRegistry;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /** @group curl_extension_policy */
 final class CurlExtensionPolicyTest extends TestCase
 {
-    public function testCurlPhase2BuiltinsAdvertised(): void
+    /** @var string|false|null */
+    private $prevEnable = null;
+
+    protected function setUp(): void
     {
+        $this->prevEnable = getenv('PHP_COMPILER_ENABLE_CURL');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevEnable || null === $this->prevEnable) {
+            putenv('PHP_COMPILER_ENABLE_CURL');
+        } else {
+            putenv('PHP_COMPILER_ENABLE_CURL='.$this->prevEnable);
+        }
+    }
+
+    public function testWithheldOnReferenceWithoutHostCurl(): void
+    {
+        if (\extension_loaded('curl')) {
+            self::markTestSkipped('host ext/curl loaded');
+        }
+        putenv('PHP_COMPILER_ENABLE_CURL');
+
+        self::assertFalse(CurlExtensionPolicy::advertisesExtension());
+        self::assertFalse(CurlExtensionPolicy::advertisesBuiltins());
+        self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
+        self::assertFalse(CurlExtensionPolicy::advertisesFileClasses());
+        self::assertFalse(CurlExtensionPolicy::advertisesShareHandles());
+        self::assertFalse(CurlExtensionPolicy::advertisesEasyHandleStubs());
+        self::assertFalse(CurlExtensionPolicy::advertisesMultiHandles());
+        self::assertFalse(CurlExtensionPolicy::advertisesIntrospectionFunctions());
+
+        $runtime = new Runtime();
+        self::assertFalse(ModuleRegistry::extensionLoaded('curl'));
+        self::assertFalse(VmReflection::functionExists($runtime->vmContext, 'curl_init'));
+        self::assertFalse(VmReflection::functionExists($runtime->vmContext, 'curl_version'));
+        self::assertFalse(VmReflection::classExists($runtime->vmContext, 'CurlHandle'));
+        self::assertFalse(VmReflection::classExists($runtime->vmContext, 'CURLFile'));
+    }
+
+    public function testExplicitEnableAdvertises(): void
+    {
+        if (\extension_loaded('curl')) {
+            self::markTestSkipped('host ext/curl loaded');
+        }
+
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
+        self::assertTrue(CurlExtensionPolicy::advertisesExtension());
         self::assertTrue(CurlExtensionPolicy::advertisesBuiltins());
-        $native = VmCurlNative::available();
-        self::assertSame($native, CurlExtensionPolicy::advertisesExtension());
-        self::assertSame($native, CurlExtensionPolicy::advertisesHandleClasses());
-        self::assertSame($native, CurlExtensionPolicy::advertisesFileClasses());
-        self::assertSame($native, CurlExtensionPolicy::advertisesShareHandles());
-        self::assertSame($native, CurlExtensionPolicy::advertisesEasyHandleStubs());
-        self::assertSame($native, CurlExtensionPolicy::advertisesMultiHandles());
-        self::assertSame($native, CurlExtensionPolicy::advertisesIntrospectionFunctions());
+        self::assertTrue(CurlExtensionPolicy::advertisesEasyHandleStubs());
     }
 
     public function testCurlShareHandleClassTracksExtension(): void
@@ -31,6 +72,7 @@ final class CurlExtensionPolicyTest extends TestCase
         if (!VmCurlNative::available()) {
             $this->markTestSkipped('libcurl FFI unavailable');
         }
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
 
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -55,6 +97,7 @@ PHP;
         if (!VmCurlNative::available()) {
             $this->markTestSkipped('libcurl FFI unavailable');
         }
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
 
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -84,6 +127,7 @@ PHP;
         if (!VmCurlNative::available()) {
             $this->markTestSkipped('libcurl FFI unavailable');
         }
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
 
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
@@ -102,6 +146,7 @@ PHP;
         if (!VmCurlNative::available()) {
             $this->markTestSkipped('libcurl FFI unavailable');
         }
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
 
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
@@ -138,6 +183,7 @@ PHP;
 
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.5');
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
         try {
             $this->assertTrue(\PHPCompiler\CompilerVersion::advertisesCurlMultiGetHandles());
             $runtime = new Runtime();
@@ -160,6 +206,7 @@ PHP;
 
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.5');
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
         try {
             $this->assertTrue(\PHPCompiler\CompilerVersion::advertisesCurlShareInitPersistent());
             $this->assertTrue(CurlExtensionPolicy::advertisesSharePersistentHandles());
@@ -183,6 +230,7 @@ PHP;
         }
 
         $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
         putenv('PHP_COMPILER_PROFILE');
         try {
             self::assertFalse(\PHPCompiler\CompilerVersion::advertisesPhp84CurlOptionConstants());
@@ -202,6 +250,7 @@ PHP;
         }
 
         putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
         try {
             self::assertTrue(\PHPCompiler\CompilerVersion::advertisesPhp84CurlOptionConstants());
             self::assertTrue(CurlExtensionPolicy::advertisesPhp84OptionConstants());

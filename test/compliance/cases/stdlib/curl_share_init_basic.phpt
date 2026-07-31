@@ -1,5 +1,7 @@
 --TEST--
 curl_share_init()/curl_share_setopt()/curl_share_close() lifecycle (#6322, ext/curl/curl_share.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

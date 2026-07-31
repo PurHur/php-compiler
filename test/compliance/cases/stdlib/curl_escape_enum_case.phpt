@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_escape() — backed enum case operand TypeError (#6351, #20493, php-src-strict)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 enum E: string { case A = 'x'; }

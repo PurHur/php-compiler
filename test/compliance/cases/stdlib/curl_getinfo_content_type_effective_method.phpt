@@ -1,5 +1,7 @@
 --TEST--
 curl_getinfo() content_type / effective_method + CURLINFO_EFFECTIVE_METHOD (#21883, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 error_reporting(E_ALL);

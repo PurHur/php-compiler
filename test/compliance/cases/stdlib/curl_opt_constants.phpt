@@ -1,5 +1,7 @@
 --TEST--
 curl CURLOPT_* / CURLINFO_* constants for common HTTP clients (#21137)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

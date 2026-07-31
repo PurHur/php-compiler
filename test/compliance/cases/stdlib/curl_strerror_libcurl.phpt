@@ -1,5 +1,7 @@
 --TEST--
 curl_strerror() uses live libcurl curl_easy_strerror (#25813)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_escape()/curl_unescape() require CurlHandle (#20493, re-#13588, php-src-strict)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 $ch = curl_init();

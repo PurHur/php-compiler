@@ -7,11 +7,15 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #7266 */
+/** @covers issue #7266 / #23953 — CurlHandle classes withheld without ext/curl */
 final class CurlHandleEnumTest extends TestCase
 {
     public function testCurlHandleBuiltinClassesExist(): void
     {
+        if (\extension_loaded('curl') || getenv('PHP_COMPILER_ENABLE_CURL')) {
+            $this->markTestSkipped('curl advertised on this host');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -32,7 +36,7 @@ PHP;
         $this->assertSame(
             "false\nfalse\nfalse\nfalse\nfalse\nfalse",
             ob_get_clean(),
-            'php-src ext/curl/curl.stub.php registers handle classes only when ext/curl is loaded (#12117)'
+            'php-src ext/curl/curl.stub.php registers handle classes only when ext/curl is loaded (#12117, #23953)'
         );
     }
 

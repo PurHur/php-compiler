@@ -1,5 +1,7 @@
 --TEST--
 stdlib CurlMultiHandle/CurlShareHandle serialize() reject (issue #23074 sibling)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 try {

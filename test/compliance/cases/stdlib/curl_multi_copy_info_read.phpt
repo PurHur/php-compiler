@@ -1,5 +1,7 @@
 --TEST--
 curl_copy_handle / curl_multi_info_read / setopt / errno (#20495, ext/curl)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

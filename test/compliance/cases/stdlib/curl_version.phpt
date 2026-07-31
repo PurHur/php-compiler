@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_version() / curl_strerror() — phase 2 introspection (#16659)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

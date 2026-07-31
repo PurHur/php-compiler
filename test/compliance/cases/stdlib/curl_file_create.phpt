@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_file_create() + CURLFile getters/setters (#6790, ext/curl/curl_file.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_version Reflection arity 0 — no $version (#25585, ext/curl/curl.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 $r = new ReflectionFunction('curl_version');

@@ -1,5 +1,7 @@
 --TEST--
 curl_multi_poll is libcurl-only — must not appear in function_exists (php-src; #21826, #21834)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

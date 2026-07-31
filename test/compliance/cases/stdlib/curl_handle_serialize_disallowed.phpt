@@ -1,5 +1,7 @@
 --TEST--
 stdlib CurlHandle serialize()/unserialize() reject (issue #23074, ext/curl/curl.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 $ch = curl_init();

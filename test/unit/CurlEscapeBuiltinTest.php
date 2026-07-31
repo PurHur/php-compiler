@@ -10,6 +10,24 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #13588, #16756, #20493 */
 final class CurlEscapeBuiltinTest extends TestCase
 {
+    /** @var string|false|null */
+    private $prevEnable = null;
+
+    protected function setUp(): void
+    {
+        $this->prevEnable = getenv('PHP_COMPILER_ENABLE_CURL');
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevEnable || null === $this->prevEnable) {
+            putenv('PHP_COMPILER_ENABLE_CURL');
+        } else {
+            putenv('PHP_COMPILER_ENABLE_CURL='.$this->prevEnable);
+        }
+    }
+
     public function testCurlEscapeRequiresCurlHandleWhenExtensionLoaded(): void
     {
         if (!CurlExtensionPolicy::advertisesExtension()) {

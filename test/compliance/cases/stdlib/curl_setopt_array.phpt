@@ -1,5 +1,7 @@
 --TEST--
 curl_setopt_array() bulk CURLOPT setup (#6695, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

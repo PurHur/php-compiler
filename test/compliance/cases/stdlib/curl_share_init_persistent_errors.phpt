@@ -1,5 +1,7 @@
 --TEST--
 curl_share_init_persistent() ValueError guards (#20530, PHP 8.5, ext/curl/share.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
