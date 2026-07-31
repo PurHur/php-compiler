@@ -39,6 +39,16 @@ final class LiteralEvalVmLoweringTest extends TestCase
         self::assertTrue(Block::requiresVmLowering($block));
     }
 
+    /**
+     * @covers issue #26169 — decl literal eval must be probed before AOT emitFalse
+     */
+    public function testDeclLiteralEvalIsDetectedForAotProbe(): void
+    {
+        self::assertTrue(Block::literalEvalSourceNeedsVm('class T { final public int $x = 1; }'));
+        self::assertTrue(Block::literalEvalSourceNeedsVm('function f() {}'));
+        self::assertFalse(Block::literalEvalSourceNeedsVm('$x = 1;'));
+    }
+
     public function testNonLiteralEvalStillRequiresVmLowering(): void
     {
         $runtime = new Runtime();

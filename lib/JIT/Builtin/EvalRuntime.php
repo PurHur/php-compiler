@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCfg\Operand;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\IncludeHelper;
@@ -14,6 +15,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
+use PHPCompiler\Runtime;
 
 /**
  * JIT/AOT eval() lowering via VmEval SSOT (#4652, #10248).
@@ -34,36 +36,61 @@ final class EvalRuntime
         $literal = JitStringArg::compileTimeLiteral($codeVar);
 
         if (null !== $literal) {
-            // Type/function decls: bin/jit.php must VM-lower via Block::literalEvalSourceNeedsVm
-            // (#25535). Skip tryCompileBlock+inline here so a missed deferral cannot MCJIT-inline
-            // class decls (segfault); fall through to emitFalse only as last resort.
-            if (!Block::literalEvalSourceNeedsVm($literal)) {
-                $callerPath = $callerBlock->scriptPath();
-                $callLine = null !== $op->sourceLocation
-                    ? (int) $op->sourceLocation->startLine
-                    : 0;
-                $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
-                $evalFile = VmEval::zendEvalFilename($callerPath, $callLine);
-                // Compile with Zend reflection filename so SourceLocation matches (#26032).
-                $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile);
-                if ($evalBlock instanceof Block) {
-                    $evalBlock->setScriptPath($evalFile);
-                    IncludeHelper::compileInlinedBlock(
-                        $jit,
-                        $func,
-                        $callerBlock,
-                        $evalBlock,
-                        $resultOp,
-                        true,
-                        'c:eval'
-                    );
+            $callerPath = $callerBlock->scriptPath();
+            $callLine = null !== $op->sourceLocation
+                ? (int) $op->sourceLocation->startLine
+                : 0;
+            $callLine = VmEval::evalCallSiteLine($callerPath, $callLine);
+            $evalFile = VmEval::zendEvalFilename($callerPath, $callLine);
 
-                    return;
-                }
+            // Type/function decls: bin/jit.php VM-lowers via Block::literalEvalSourceNeedsVm
+            // (#25535). AOT still lowers TYPE_EVAL here — must not emitFalse without first
+            // surfacing CompileFatal (final plain property on reference profile → parsed_ok, #26169).
+            if (Block::literalEvalSourceNeedsVm($literal)) {
+                self::assertDeclLiteralEvalOrThrow($literal, $evalFile);
+                self::emitFalse($jit, $resultOp);
+
+                return;
+            }
+
+            // Expression-only literal: inline when compile succeeds (#26032 filename shape).
+            $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile);
+            if ($evalBlock instanceof Block) {
+                $evalBlock->setScriptPath($evalFile);
+                IncludeHelper::compileInlinedBlock(
+                    $jit,
+                    $func,
+                    $callerBlock,
+                    $evalBlock,
+                    $resultOp,
+                    true,
+                    'c:eval'
+                );
+
+                return;
             }
         }
 
         self::emitFalse($jit, $resultOp);
+    }
+
+    /**
+     * Probe class/function-declaring eval on an isolated Runtime so CompileFatal propagates
+     * during AOT/JIT emit without registering decls into the outer compile unit (#26169).
+     *
+     * {@see Runtime::parseAndCompile()} suppresses stderr for eval()'d filenames (VM prints via
+     * raiseEvalCompileFatal). AOT must emit the Zend-shaped line here before rethrowing.
+     */
+    private static function assertDeclLiteralEvalOrThrow(string $literal, string $evalFile): void
+    {
+        try {
+            VmEval::tryCompileBlockOrThrowCompileFatal(new Runtime(), $literal, $evalFile);
+        } catch (CompileFatal $e) {
+            if (\defined('STDERR') && \is_resource(STDERR)) {
+                fwrite(STDERR, $e->zendStderrLine());
+            }
+            throw $e;
+        }
     }
 
     public static function emitFalse(JIT $jit, Operand $resultOp): void

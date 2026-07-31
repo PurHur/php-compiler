@@ -99,6 +99,34 @@ PHP;
     }
 
     /**
+     * @covers issue #26169 — AOT TYPE_EVAL probe must rethrow CompileFatal (not swallow → parsed_ok)
+     */
+    public function testEvalProbeRethrowsCompileFatalOnReferenceProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $probe = new Runtime();
+        $literal = 'class T { final public int $x = 1; }';
+        $evalFile = \PHPCompiler\ext\standard\VmEval::zendEvalFilename('aot_eval_final.php', 2);
+
+        try {
+            \PHPCompiler\ext\standard\VmEval::tryCompileBlockOrThrowCompileFatal($probe, $literal, $evalFile);
+            $this->fail('Expected CompileFatal for final plain property in eval probe');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString(
+                'Cannot declare property T::$x final, the final modifier is allowed only for methods, classes, and class constants',
+                $e->getMessage()
+            );
+        }
+
+        // Legacy tryCompileBlock still swallows — AOT must use OrThrowCompileFatal (#26169).
+        $swallowed = \PHPCompiler\ext\standard\VmEval::tryCompileBlock(new Runtime(), $literal, $evalFile);
+        self::assertNull($swallowed);
+    }
+
+    /**
      * @covers issue #24316 — construct + write must never run on reference profile
      * (issue table: declare=ok / write=… is the failure mode when the gate is skipped).
      */
