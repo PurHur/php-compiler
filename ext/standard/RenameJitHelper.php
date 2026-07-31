@@ -19,6 +19,19 @@ final class RenameJitHelper
     /** @return int 1 on success, 0 on failure */
     public static function invokeArgv(string $from, string $to): int
     {
+        $userOk = VmUserStream::tryRename($from, $to);
+        if (null !== $userOk) {
+            if ($userOk) {
+                VmStatCache::invalidatePath($from);
+                VmStatCache::invalidatePath($to);
+            } else {
+                TriggerErrorJitHelper::warning(
+                    'rename('.$from.','.$to.'): No such file or directory'
+                );
+            }
+
+            return $userOk ? 1 : 0;
+        }
         if (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
             $ok = false;
         } else {

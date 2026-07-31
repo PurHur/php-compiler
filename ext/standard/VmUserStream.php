@@ -463,6 +463,160 @@ final class VmUserStream
     }
 
     /**
+     * unlink() on custom protocols — php-src userspace.c user_wrapper_unlink (#25987).
+     *
+     * @return bool|null null when $uri is not a registered custom protocol
+     */
+    public static function tryUnlink(string $uri): ?bool
+    {
+        $wrapper = self::freshWrapperForUri($uri);
+        if (null === $wrapper) {
+            return null;
+        }
+        if (false === $wrapper) {
+            return false;
+        }
+        [$vm, $object] = $wrapper;
+        if (!$vm->hasInstanceMethod($object->class, 'unlink')) {
+            return false;
+        }
+        $pathVar = new Variable();
+        $pathVar->string($uri);
+
+        return self::boolFromInvoke($vm->invokeInstanceMethod($object, 'unlink', $pathVar)->resolveIndirect());
+    }
+
+    /**
+     * mkdir() on custom protocols — php-src userspace.c user_wrapper_mkdir (#25987).
+     *
+     * Options match php_stream_mkdir: STREAM_REPORT_ERRORS | STREAM_MKDIR_RECURSIVE.
+     *
+     * @return bool|null null when $uri is not a registered custom protocol
+     */
+    public static function tryMkdir(string $uri, int $mode, bool $recursive): ?bool
+    {
+        $wrapper = self::freshWrapperForUri($uri);
+        if (null === $wrapper) {
+            return null;
+        }
+        if (false === $wrapper) {
+            return false;
+        }
+        [$vm, $object] = $wrapper;
+        if (!$vm->hasInstanceMethod($object->class, 'mkdir')) {
+            return false;
+        }
+        $options = StdlibConstants::STREAM_REPORT_ERRORS;
+        if ($recursive) {
+            $options |= self::STREAM_MKDIR_RECURSIVE;
+        }
+        $pathVar = new Variable();
+        $pathVar->string($uri);
+        $modeVar = new Variable();
+        $modeVar->int($mode);
+        $optionsVar = new Variable();
+        $optionsVar->int($options);
+
+        return self::boolFromInvoke(
+            $vm->invokeInstanceMethod($object, 'mkdir', $pathVar, $modeVar, $optionsVar)->resolveIndirect()
+        );
+    }
+
+    /**
+     * rmdir() on custom protocols — php-src userspace.c user_wrapper_rmdir (#25987).
+     *
+     * @return bool|null null when $uri is not a registered custom protocol
+     */
+    public static function tryRmdir(string $uri): ?bool
+    {
+        $wrapper = self::freshWrapperForUri($uri);
+        if (null === $wrapper) {
+            return null;
+        }
+        if (false === $wrapper) {
+            return false;
+        }
+        [$vm, $object] = $wrapper;
+        if (!$vm->hasInstanceMethod($object->class, 'rmdir')) {
+            return false;
+        }
+        $pathVar = new Variable();
+        $pathVar->string($uri);
+        $optionsVar = new Variable();
+        $optionsVar->int(StdlibConstants::STREAM_REPORT_ERRORS);
+
+        return self::boolFromInvoke(
+            $vm->invokeInstanceMethod($object, 'rmdir', $pathVar, $optionsVar)->resolveIndirect()
+        );
+    }
+
+    /**
+     * rename() on custom protocols — php-src userspace.c user_wrapper_rename (#25987).
+     *
+     * Dispatches via the wrapper registered for $from (php_stream_rename).
+     *
+     * @return bool|null null when $from is not a registered custom protocol
+     */
+    public static function tryRename(string $from, string $to): ?bool
+    {
+        $wrapper = self::freshWrapperForUri($from);
+        if (null === $wrapper) {
+            return null;
+        }
+        if (false === $wrapper) {
+            return false;
+        }
+        [$vm, $object] = $wrapper;
+        if (!$vm->hasInstanceMethod($object->class, 'rename')) {
+            return false;
+        }
+        $fromVar = new Variable();
+        $fromVar->string($from);
+        $toVar = new Variable();
+        $toVar->string($to);
+
+        return self::boolFromInvoke(
+            $vm->invokeInstanceMethod($object, 'rename', $fromVar, $toVar)->resolveIndirect()
+        );
+    }
+
+    /** STREAM_MKDIR_RECURSIVE (main/streams/php_streams.h) — not yet on StdlibConstants. */
+    private const STREAM_MKDIR_RECURSIVE = 1;
+
+    /**
+     * @return array{0: VM, 1: ObjectEntry}|false|null null = not custom; false = cannot instantiate
+     */
+    private static function freshWrapperForUri(string $uri): array|false|null
+    {
+        if (!VmStreamWrapperRegistry::isCustomProtocol($uri)) {
+            return null;
+        }
+        $ctx = \PHPCompiler\Web\Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return false;
+        }
+        $protocol = VmStreamWrapperRegistry::parseProtocol($uri);
+        if (null === $protocol) {
+            return false;
+        }
+        $className = VmStreamWrapperRegistry::lookupClass($protocol);
+        if (null === $className) {
+            return false;
+        }
+        $object = self::instantiateWrapper($ctx->runtime->vm, $ctx, $className);
+        if (null === $object) {
+            return false;
+        }
+
+        return [$ctx->runtime->vm, $object];
+    }
+
+    private static function boolFromInvoke(Variable $result): bool
+    {
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    /**
      * @return array<int|string, int>|false
      */
     private static function statArrayFromHashTable(\PHPCompiler\VM\HashTable $ht): array|false

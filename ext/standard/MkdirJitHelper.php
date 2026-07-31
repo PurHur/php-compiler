@@ -7,7 +7,8 @@ namespace PHPCompiler\ext\standard;
 /**
  * mkdir() for compiled JIT/AOT modules (#15586, php-in-PHP).
  *
- * SSOT: {@see VmFsDirNative::mkdir()} + {@see VmStatPath::isDir()} warning parity with {@see mkdir_::execute()}.
+ * SSOT: {@see VmFs::mkdir()} (user wrappers via {@see VmUserStream::tryMkdir}; #25987)
+ * + {@see VmStatPath::isDir()} warning parity with {@see mkdir_::execute()}.
  * php-src: ext/standard/filestat.c — PHP_FUNCTION(mkdir)
  */
 final class MkdirJitHelper
@@ -15,7 +16,7 @@ final class MkdirJitHelper
     public static function invokeArgv(string $path, int $mode, bool $recursive): bool
     {
         $alreadyDir = VmStatPath::isDir($path);
-        $ok = VmFsDirNative::mkdir($path, $mode, $recursive);
+        $ok = VmFs::mkdir($path, $mode, $recursive);
         if (!$ok) {
             if ($alreadyDir) {
                 TriggerErrorJitHelper::warning('mkdir(): File exists');
