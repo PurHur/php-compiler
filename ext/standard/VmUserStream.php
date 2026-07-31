@@ -61,6 +61,47 @@ final class VmUserStream
     }
 
     /**
+     * fgets() on userspace handles via stream_read (php-src file.c + userspace.c; #25985).
+     *
+     * @return string|false
+     */
+    public static function fgets(int $handle, ?int $length = null): string|false
+    {
+        if (!isset(self::$streams[$handle])) {
+            return false;
+        }
+        if (null === $length) {
+            $maxLen = 8192;
+        } else {
+            if ($length <= 0) {
+                return false;
+            }
+            // php-src php_stream_get_line / fgets: at most $length - 1 bytes before newline/EOF.
+            $maxLen = $length - 1;
+            if ($maxLen <= 0) {
+                return false;
+            }
+        }
+
+        $line = '';
+        while (\strlen($line) < $maxLen) {
+            $byte = self::read($handle, 1);
+            if (false === $byte || '' === $byte) {
+                break;
+            }
+            $line .= $byte;
+            if ("\n" === $byte) {
+                break;
+            }
+        }
+        if ('' === $line && self::feof($handle)) {
+            return false;
+        }
+
+        return $line;
+    }
+
+    /**
      * Userspace stream_write / fwrite (#25972).
      *
      * @return int|false bytes written
