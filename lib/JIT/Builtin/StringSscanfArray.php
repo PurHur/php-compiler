@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_sscanf_array via SscanfJitHelper PHP (#9134).
+ * JIT/AOT link for __compiler_sscanf_array via SscanfJitHelper PHP (#9134, #25653).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer IniIntrospection #25630 / PosixTimes #25600).
  * JIT embed and standalone AOT compile {@see SscanfJitHelper}; thin LLVM bridge forwards the ABI.
  * php-src: ext/standard/sscanf.c — PHP_FUNCTION(sscanf) array return branch
  */
@@ -102,44 +102,18 @@ final class StringSscanfArray
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SscanfJitHelper compile (#9134)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25653');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SscanfJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SscanfJitHelper.php parseAndCompile failed (#9134)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9134)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25653'
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
