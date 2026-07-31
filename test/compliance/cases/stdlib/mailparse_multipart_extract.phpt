@@ -1,5 +1,13 @@
 --TEST--
 ext/mailparse multipart structure/extract/parse_file (#22230)
+--ENV--
+PHP_COMPILER_ENABLE_MAILPARSE=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\mailparse\MailparseExtensionPolicy::advertisesExtension()) {
+    die('skip mailparse withheld (#24908)');
+}
+?>
 --FILE--
 <?php
 foreach ([

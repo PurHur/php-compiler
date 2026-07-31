@@ -761,6 +761,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::isGnupgComplianceCase($name)) {
                 continue;
             }
+            // Functional mailparse cases set PHP_COMPILER_ENABLE_MAILPARSE via --ENV--; phantoms when withheld (#24908).
+            if (!\PHPCompiler\ext\mailparse\MailparseExtensionPolicy::runsMailparseCompliance($name)
+                && \PHPCompiler\ext\mailparse\MailparseExtensionPolicy::isMailparseComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

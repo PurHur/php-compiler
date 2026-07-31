@@ -1,5 +1,13 @@
 --TEST--
 ext/mailparse Phase 1 — msg create/parse/get_part_data + rfc822 (#6383)
+--ENV--
+PHP_COMPILER_ENABLE_MAILPARSE=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\mailparse\MailparseExtensionPolicy::advertisesExtension()) {
+    die('skip mailparse withheld (#24908)');
+}
+?>
 --FILE--
 <?php
 foreach (['mailparse_msg_create', 'mailparse_msg_parse', 'mailparse_msg_get_part_data', 'mailparse_rfc822_parse_addresses', 'mailparse_msg_free'] as $fn) {
