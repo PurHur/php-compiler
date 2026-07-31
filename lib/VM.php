@@ -1610,6 +1610,10 @@ class VM {
 
     public function unsetObjectProperty(ObjectEntry $object, string $propName): void
     {
+        // php-src date_interval_get_property_ptr_ptr — living fields ignore unset (#26180).
+        if (VM\DateIntervalSupport::shouldNoopUnset($object, $propName)) {
+            return;
+        }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             $object->unsetProperty($propName);

@@ -22,6 +22,32 @@ final class DateIntervalSupport
     public const FROM_STRING_STORAGE = '__di_from_string';
     public const DATE_STRING_STORAGE = '__di_date_string';
 
+    /**
+     * Living fields backed by php_interval_obj / get_property_ptr_ptr → NULL (ext/date/php_date.c).
+     * zend_std_unset_property does not clear them — unset is a no-op (#26180).
+     *
+     * @var list<string>
+     */
+    public const LIVING_PROPERTIES = ['y', 'm', 'd', 'h', 'i', 's', 'f', 'days', 'invert'];
+
+    public static function isLivingProperty(string $name): bool
+    {
+        foreach (self::LIVING_PROPERTIES as $prop) {
+            if (0 === strcasecmp($prop, $name)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** True when unset($interval->$name) must preserve the prior value (Zend no-op). */
+    public static function shouldNoopUnset(ObjectEntry $object, string $name): bool
+    {
+        return self::CLASS_DATEINTERVAL === strtolower($object->class->name)
+            && self::isLivingProperty($name);
+    }
+
     public static function requireDateInterval(
         Variable $var,
         string $label,
