@@ -505,7 +505,7 @@ final class IniJitHelper
         }
 
         if ('error_reporting' === $key) {
-            return \sprintf('%d', ErrorReporter::DEFAULT_STARTUP_REPORTING);
+            return \sprintf('%d', ErrorReporter::defaultStartupReporting());
         }
         if ('display_errors' === $key) {
             return self::CFG_DISPLAY_ERRORS;

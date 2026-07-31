@@ -27,11 +27,30 @@ final class ErrorReporter
     public const E_DEPRECATED = 8192;
 
     /**
-     * Zend startup mask: E_ALL & ~E_DEPRECATED & ~E_STRICT (main/main.c; issue #4842).
+     * Zend ≤8.3 / default-profile startup mask: E_ALL & ~E_DEPRECATED & ~E_STRICT (#4842).
      *
      * E_STRICT is 2048 on PHP ≤8.3; bit cleared even when the constant is removed (PHP 8.4+).
+     * Prefer {@see defaultStartupReporting()} — PROFILE≥8.4 uses Zend 8.4's E_ALL (includes
+     * E_DEPRECATED) so file-level compile deprecations are not silent (#26083).
      */
     public const DEFAULT_STARTUP_REPORTING = \E_ALL & ~self::E_DEPRECATED & ~2048;
+
+    /**
+     * Profile-aware guest default for error_reporting / ErrorReporter (#4842, #26083).
+     *
+     * PHP 8.0+ php.ini default is E_ALL (includes E_DEPRECATED). On PROFILE≥8.4, E_ALL no longer
+     * contains E_STRICT (value 30719 on Zend 8.4). Unset / ≤8.3 profiles keep #4842's 22527 mask
+     * so default-profile compliance stays stable.
+     */
+    public static function defaultStartupReporting(): int
+    {
+        if (\PHPCompiler\CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
+            // Zend 8.4: E_ALL without E_STRICT bit (php-src main/main.c / E_STRICT removal).
+            return \E_ALL & ~2048;
+        }
+
+        return self::DEFAULT_STARTUP_REPORTING;
+    }
 
     /** Valid trigger_error() $error_level values (ext/standard/basic_functions.c). */
     public static function isUserErrorLevel(int $level): bool
@@ -56,10 +75,10 @@ final class ErrorReporter
     private array $handlerStack = [];
 
     public function __construct(
-        int $errorReporting = self::DEFAULT_STARTUP_REPORTING,
+        ?int $errorReporting = null,
         bool $displayErrors = false
     ) {
-        $this->errorReporting = $errorReporting;
+        $this->errorReporting = $errorReporting ?? self::defaultStartupReporting();
         $this->displayErrors = $displayErrors;
     }
 
