@@ -440,6 +440,37 @@ final class VmNumberFormatter
         return false === $result ? (string) $value : $result;
     }
 
+    /**
+     * MessageFormat `{n,spellout}` / `{n,ordinal}` / `{n,duration}` (#25227).
+     *
+     * php-src: msgformat_helpers → ICU RuleBasedNumberFormat / duration NumberFormat.
+     *
+     * @param mixed $num
+     */
+    public static function formatMessageRuleBasedArg(string $locale, $num, int $style): string
+    {
+        if (!self::isRuleBasedStyle($style) || self::PATTERN_RULEBASED === $style) {
+            return (string) $num;
+        }
+        if (!\is_int($num) && !\is_float($num) && !(\is_string($num) && is_numeric($num))) {
+            return (string) $num;
+        }
+        $resolvedLocale = '' !== $locale ? $locale : VmLocale::getDefault();
+        $state = [
+            'locale' => $resolvedLocale,
+            'style' => $style,
+            'pattern' => self::defaultPatternForStyle($style),
+            'attributes' => self::defaultAttributesForStyle($style),
+            'symbols' => self::defaultSymbolsForLocale($resolvedLocale),
+            'textAttributes' => self::defaultTextAttributes(),
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
+        ];
+        $result = self::formatFromState($state, (float) $num);
+
+        return false === $result ? (string) $num : $result;
+    }
+
     public static function isRuleBasedStyle(int $style): bool
     {
         return self::SPELLOUT === $style

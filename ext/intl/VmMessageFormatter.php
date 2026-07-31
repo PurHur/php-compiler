@@ -21,8 +21,9 @@ use PHPCfg\Func as CfgFunc;
  * php-src: ext/intl/msgformat/msgformat.c, msgformat_class.c, msgformat.stub.php
  *
  * Covers simple / named placeholders, `{n,number}` (locale grouping via
- * NumberFormatter — #21959), `{n,date}` / `{n,time}` (#25226), and plural/select
- * (#21099). Advertisement gates on loaded ext/intl (#19670).
+ * NumberFormatter — #21959), `{n,date}` / `{n,time}` (#25226), spellout/ordinal/
+ * duration/selectordinal (#25227), and plural/select (#21099). Advertisement gates
+ * on loaded ext/intl (#19670).
  */
 final class VmMessageFormatter
 {
@@ -703,8 +704,31 @@ final class VmMessageFormatter
                 $end + 1,
             ];
         }
+        if ('spellout' === $type) {
+            return [
+                VmNumberFormatter::formatMessageRuleBasedArg($locale, $val, VmNumberFormatter::SPELLOUT),
+                $end + 1,
+            ];
+        }
+        if ('ordinal' === $type) {
+            return [
+                VmNumberFormatter::formatMessageRuleBasedArg($locale, $val, VmNumberFormatter::ORDINAL),
+                $end + 1,
+            ];
+        }
+        if ('duration' === $type) {
+            return [
+                VmNumberFormatter::formatMessageRuleBasedArg($locale, $val, VmNumberFormatter::DURATION),
+                $end + 1,
+            ];
+        }
         if ('plural' === $type) {
             $sub = self::choosePluralSelect($style ?? '', $val, true, $locale);
+
+            return [self::formatMessagePattern($locale, $sub, $args), $end + 1];
+        }
+        if ('selectordinal' === $type) {
+            $sub = self::chooseSelectOrdinal($style ?? '', $val, $locale);
 
             return [self::formatMessagePattern($locale, $sub, $args), $end + 1];
         }
@@ -828,6 +852,51 @@ final class VmMessageFormatter
         return $cases[\count($cases) - 1][1];
     }
 
+    /**
+     * selectordinal: CLDR ordinal keywords (en: one/two/few/other) + `#` → number (#25227).
+     *
+     * @param mixed $val
+     */
+    private static function chooseSelectOrdinal(string $style, $val, string $locale): string
+    {
+        $cases = self::parsePluralSelectCases($style);
+        if ([] === $cases) {
+            return self::stringify($val);
+        }
+        $num = 0.0;
+        if (\is_int($val) || \is_float($val) || (\is_string($val) && is_numeric($val))) {
+            $num = (float) $val;
+        }
+        $chosen = null;
+        foreach ($cases as [$key, $msg]) {
+            if (str_starts_with($key, '=')) {
+                $rhs = substr($key, 1);
+                if (is_numeric($rhs) && (float) $rhs == $num) {
+                    $chosen = $msg;
+                    break;
+                }
+            }
+        }
+        if (null === $chosen) {
+            $keyword = self::ordinalKeyword($locale, $num);
+            foreach ([$keyword, 'other'] as $want) {
+                foreach ($cases as [$key, $msg]) {
+                    if ($key === $want) {
+                        $chosen = $msg;
+                        break 2;
+                    }
+                }
+            }
+        }
+        if (null === $chosen) {
+            $chosen = $cases[\count($cases) - 1][1];
+        }
+        // ICU selectordinal `#` is the integer argument (not locale-grouped).
+        $numberText = (string) (int) $num;
+
+        return str_replace('#', $numberText, $chosen);
+    }
+
     /** @return list<array{0: string, 1: string}> */
     private static function parsePluralSelectCases(string $style): array
     {
@@ -886,6 +955,30 @@ final class VmMessageFormatter
         unset($locale);
         if (1.0 === $n) {
             return 'one';
+        }
+
+        return 'other';
+    }
+
+    /**
+     * English-oriented CLDR ordinal keyword (en: one/two/few/other) (#25227).
+     *
+     * Matches ICU en selectordinal: 1→one, 2→two, 3→few, 11–13→other, 21→one, …
+     */
+    private static function ordinalKeyword(string $locale, float $n): string
+    {
+        unset($locale);
+        $i = (int) $n;
+        $mod100 = $i % 100;
+        $mod10 = $i % 10;
+        if (1 === $mod10 && 11 !== $mod100) {
+            return 'one';
+        }
+        if (2 === $mod10 && 12 !== $mod100) {
+            return 'two';
+        }
+        if (3 === $mod10 && 13 !== $mod100) {
+            return 'few';
         }
 
         return 'other';
