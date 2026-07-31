@@ -2452,6 +2452,32 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_detect_encoding'));
     }
 
+    /** @covers issue #23805 */
+    public function testMbStrPadLcfirstUcfirstZendStubNamedParams(): void
+    {
+        $pad = BuiltinParamNames::forFunction('mb_str_pad');
+        self::assertSame(['string', 'length', 'pad_string=', 'pad_type=', 'encoding='], $pad);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($pad, 'string', 'mb_str_pad'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pad, 'length', 'mb_str_pad'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($pad, 'pad_string', 'mb_str_pad'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($pad, 'pad_type', 'mb_str_pad'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($pad, 'encoding', 'mb_str_pad'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('mb_str_pad'));
+        self::assertSame(5, BuiltinParamNames::paramCountForInternalFunction('mb_str_pad'));
+
+        $lc = BuiltinParamNames::forFunction('mb_lcfirst');
+        self::assertSame(['string', 'encoding='], $lc);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($lc, 'string', 'mb_lcfirst'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($lc, 'encoding', 'mb_lcfirst'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_lcfirst'));
+
+        $uc = BuiltinParamNames::forFunction('mb_ucfirst');
+        self::assertSame(['string', 'encoding='], $uc);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($uc, 'string', 'mb_ucfirst'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($uc, 'encoding', 'mb_ucfirst'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_ucfirst'));
+    }
+
     /** @covers issue #23383 */
     public function testFilterInputZendStubNamedParams(): void
     {

@@ -1389,6 +1389,12 @@ final class BuiltinParamNames
             case 'mb_ltrim':
             case 'mb_rtrim':
                 return ['string', 'characters', 'encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — Reflection was empty (#23805)
+            case 'mb_str_pad':
+                return ['string', 'length', 'pad_string=', 'pad_type=', 'encoding='];
+            case 'mb_lcfirst':
+            case 'mb_ucfirst':
+                return ['string', 'encoding='];
             case 'htmlspecialchars':
             case 'htmlentities':
                 return ['string', 'flags', 'encoding', 'double_encode'];
