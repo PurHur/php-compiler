@@ -28,6 +28,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'thousands_sep', 'number_format'));
     }
 
+    /** @covers issue #25589 (reverts #9985 glue/pieces over-accept) */
     public function testImplodeNamedSeparatorAndArrayResolve(): void
     {
         $names = BuiltinParamNames::forFunction('implode');
@@ -35,12 +36,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['separator', 'array='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'separator', 'implode'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'implode'));
-        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'glue', 'implode'));
-        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'pieces', 'implode'));
+        // Zend stubs use separator/array; glue/pieces are Unknown named parameter (#25589)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'glue', 'implode'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'pieces', 'implode'));
+        self::assertSame([], BuiltinParamNames::aliasesForFunction('implode'));
         self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('implode', 0));
         self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('implode', 1));
         $join = BuiltinParamNames::forFunction('join');
         self::assertSame(['separator', 'array='], $join);
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($join, 'glue', 'join'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($join, 'pieces', 'join'));
+        self::assertSame([], BuiltinParamNames::aliasesForFunction('join'));
         self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('join', 0));
         self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('join', 1));
     }
