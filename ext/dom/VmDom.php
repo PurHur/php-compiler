@@ -12804,21 +12804,29 @@ final class VmDom
         ?string $extendedClassName
     ): void {
         self::ensureDocument($document);
+        // Living Dom\* docs accept Dom\Node lineage (php-src document.c modern=true; #26061).
+        $living = VmDomLiving::isLivingDocument($document);
+        $methodLabel = $living
+            ? 'Dom\\Document::registerNodeClass()'
+            : 'DOMDocument::registerNodeClass()';
+        $nodeBaseLc = $living ? VmDomLiving::CLASS_NODE : self::CLASS_NODE;
         $baseEntry = self::resolveClassByName($ctx, $baseClassName);
         if (null === $baseEntry) {
             throw new \TypeError(sprintf(
-                'DOMDocument::registerNodeClass(): Argument #1 ($baseClass) must be a valid class name, %s given',
+                '%s: Argument #1 ($baseClass) must be a valid class name, %s given',
+                $methodLabel,
                 $baseClassName
             ));
         }
-        if (!InterfaceCheck::entryIsInstanceOf($baseEntry, self::CLASS_NODE, $ctx)) {
+        if (!InterfaceCheck::entryIsInstanceOf($baseEntry, $nodeBaseLc, $ctx)) {
             throw new \TypeError(sprintf(
-                'DOMDocument::registerNodeClass(): Argument #1 ($baseClass) must be a valid class name, %s given',
+                '%s: Argument #1 ($baseClass) must be a valid class name, %s given',
+                $methodLabel,
                 $baseClassName
             ));
         }
         if ($baseEntry->isAbstract) {
-            throw new \ValueError('DOMDocument::registerNodeClass(): Argument #1 ($baseClass) must not be an abstract class');
+            throw new \ValueError($methodLabel.': Argument #1 ($baseClass) must not be an abstract class');
         }
         $baseLc = strtolower($baseEntry->name);
         if (null === $extendedClassName) {
@@ -12829,20 +12837,22 @@ final class VmDom
         $extendedEntry = self::resolveClassByName($ctx, $extendedClassName);
         if (null === $extendedEntry) {
             throw new \TypeError(sprintf(
-                'DOMDocument::registerNodeClass(): Argument #2 ($extendedClass) must be a class name derived from %s or null, %s given',
+                '%s: Argument #2 ($extendedClass) must be a class name derived from %s or null, %s given',
+                $methodLabel,
                 $baseEntry->name,
                 $extendedClassName
             ));
         }
         if (!InterfaceCheck::entryIsInstanceOf($extendedEntry, $baseLc, $ctx)) {
             throw new \TypeError(sprintf(
-                'DOMDocument::registerNodeClass(): Argument #2 ($extendedClass) must be a class name derived from %s or null, %s given',
+                '%s: Argument #2 ($extendedClass) must be a class name derived from %s or null, %s given',
+                $methodLabel,
                 $baseEntry->name,
                 $extendedClassName
             ));
         }
         if ($extendedEntry->isAbstract) {
-            throw new \ValueError('DOMDocument::registerNodeClass(): Argument #2 ($extendedClass) must not be an abstract class');
+            throw new \ValueError($methodLabel.': Argument #2 ($extendedClass) must not be an abstract class');
         }
         DomRegistry::state($document)->nodeClassMap[$baseLc] = strtolower($extendedEntry->name);
     }
@@ -12860,12 +12870,23 @@ final class VmDom
         if (null === $ownerDocument || !self::isDocument($ownerDocument)) {
             return $default;
         }
-        $extendedLc = DomRegistry::state($ownerDocument)->nodeClassMap[$baseLc] ?? null;
+        $map = DomRegistry::state($ownerDocument)->nodeClassMap;
+        $extendedLc = $map[$baseLc] ?? null;
         if (null === $extendedLc) {
             return $default;
         }
+        // Living docs seed legacy DOM* → Dom\* then user overrides Dom\* (#26061):
+        // e.g. domelement → dom\htmlelement → MyH.
+        $resolvedLc = $extendedLc;
+        for ($guard = 0; $guard < 8; ++$guard) {
+            $nextLc = $map[$resolvedLc] ?? null;
+            if (null === $nextLc || $nextLc === $resolvedLc) {
+                break;
+            }
+            $resolvedLc = $nextLc;
+        }
 
-        return $ctx->classes[$extendedLc] ?? $default;
+        return $ctx->classes[$resolvedLc] ?? $ctx->classes[$extendedLc] ?? $default;
     }
 
     /**
