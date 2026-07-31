@@ -14703,24 +14703,12 @@ restart:
             return;
         }
         if (!$object->constructed) {
-            $declaringClassLc = $this->readonlyPropertyDeclaringClassLc($object, $propName);
-            $callerClassLc = $this->callerClassLc($frame);
-            if (null !== $declaringClassLc && null !== $callerClassLc && $callerClassLc !== $declaringClassLc) {
-                throw new \Error(\sprintf(
-                    'Cannot initialize readonly property %s::$%s from %s',
-                    $declaringClass,
-                    $propName,
-                    $this->propertyWriteScopeLabel($frame)
-                ));
+            // NIWC / mid-ctor: first init only from declaring-class scope (zend_readonly.c, #25745).
+            // Prior check skipped null callerClassLc → global `$o->x = …` after NIWC wrongly succeeded.
+            if ($this->allowReadonlyPropertyFirstInit($object, $propName, $frame)) {
+                return;
             }
-            if ($object->hasProperty($propName)) {
-                $slot = $object->getProperty($propName);
-                if (!VM\TypedPropertyCheck::isUninitialized($slot)) {
-                    throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
-                }
-            }
-
-            return;
+            throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
         }
         if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
             return;
@@ -14807,30 +14795,16 @@ restart:
             return null;
         }
         if (!$owner->constructed) {
-            $declaringClassLc = $this->readonlyPropertyDeclaringClassLc($owner, $prop);
-            $callerClassLc = $this->callerClassLc($frame);
-            if (null !== $declaringClassLc && null !== $callerClassLc && $callerClassLc !== $declaringClassLc) {
-                return $this->dispatchVmError(
-                    sprintf(
-                        'Cannot initialize readonly property %s::$%s from %s',
-                        $declaringClass,
-                        $prop,
-                        $this->propertyWriteScopeLabel($frame)
-                    ),
-                    $frame
-                );
-            }
-            if ($owner->hasProperty($prop)) {
-                $slot = $owner->getProperty($prop);
-                if (!VM\TypedPropertyCheck::isUninitialized($slot)) {
-                    return $this->dispatchVmError(
-                        $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame),
-                        $frame
-                    );
-                }
+            // NIWC / mid-ctor: first init only from declaring-class scope (zend_readonly.c, #25745).
+            // Prior check skipped null callerClassLc → global `$o->x = …` after NIWC wrongly succeeded.
+            if ($this->allowReadonlyPropertyFirstInit($owner, $prop, $frame)) {
+                return null;
             }
 
-            return null;
+            return $this->dispatchVmError(
+                $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame),
+                $frame
+            );
         }
         if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
             return null;

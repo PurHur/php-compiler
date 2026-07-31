@@ -49,6 +49,47 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_after.php'));
     }
 
+    /**
+     * @covers issue #25745 — NIWC leaves constructed=false; global first-init must Error
+     */
+    public function testReadonlyPropertyRejectsGlobalInitAfterNiwc(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class R {
+    public readonly int $x;
+    public function __construct(int $x) { $this->x = $x; }
+    public function init(int $x): void { $this->x = $x; }
+}
+$o = (new ReflectionClass(R::class))->newInstanceWithoutConstructor();
+try {
+    $o->x = 1;
+    echo "SET_OK\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
+    echo $o->x, "\n";
+} catch (Throwable $e) {
+    echo 'read=', get_class($e), ':', $e->getMessage(), "\n";
+}
+$o2 = (new ReflectionClass(R::class))->newInstanceWithoutConstructor();
+$o2->init(2);
+echo 'method_ok:', $o2->x, "\n";
+echo 'ctor:', (new R(3))->x, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_niwc_global.php'));
+        $this->assertSame(
+            "Error:Cannot initialize readonly property R::\$x from global scope\n"
+            . "read=Error:Typed property R::\$x must not be accessed before initialization\n"
+            . "method_ok:2\n"
+            . "ctor:3\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #14838 */
     public function testReadonlyClassRejectsReassignInsideConstruct(): void
     {
