@@ -1,15 +1,17 @@
 --TEST--
-stdlib proc_close() — exit code after non-blocking drain + early pipe close (#14685, ext/standard/proc_open.c)
+stdlib proc_close() — exit code after non-blocking drain + early pipe close (#14685, #25925, ext/standard/proc_open.c)
 --FILE--
 <?php
 declare(strict_types=1);
+// Deterministic child: stay alive across drain/fclose so status is still running.
+// (`echo ok` races — Zend often still running with close=1; VM reaps too fast.)
 $desc = [
     1 => ['pipe', 'w'],
     2 => ['pipe', 'w'],
 ];
 $pipes = [];
-$proc = proc_open('echo ok', $desc, $pipes);
-if (!is_resource($proc)) {
+$proc = proc_open('sleep 0.3; exit 1', $desc, $pipes);
+if (!is_resource($proc) && !is_object($proc)) {
     echo "no-proc\n";
     exit(1);
 }
