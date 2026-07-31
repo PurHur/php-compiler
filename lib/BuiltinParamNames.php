@@ -834,8 +834,9 @@ final class BuiltinParamNames
             case 'stream_set_write_buffer':
                 return ['stream', 'size'];
             // php-src stream context stubs — InternalArgInfo still says wrappername/optionname (#23939)
+            // option_name=null / value=UNKNOWN optional; `=` encodes required=2 (#25845)
             case 'stream_context_set_option':
-                return ['context', 'wrapper_or_options', 'option_name', 'value'];
+                return ['context', 'wrapper_or_options', 'option_name=', 'value='];
             // php-src ext/standard/basic_functions.stub.php — PHP 8.4; absent from InternalArgInfo (#25453)
             case 'stream_context_set_options':
                 return ['context', 'options'];

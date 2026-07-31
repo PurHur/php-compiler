@@ -96,6 +96,8 @@ final class BuiltinInternalArgInfo
             'hash_equals' => 'bool',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
             'hash_pbkdf2' => 'string',
+            // ext/hash/hash.stub.php — return string; InternalArgInfo omits the function (#25845)
+            'hash_hkdf' => 'string',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
@@ -406,6 +408,14 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/basic_functions.stub.php — array $options (context untyped; #25453)
             'stream_context_set_options' => 1 === $index ? 'array' : null,
+            // ext/standard/basic_functions.stub.php — array|string + optional ?string/mixed (#25845)
+            // InternalArgInfo still has wrappername:string / optionname:string / value required.
+            'stream_context_set_option' => match ($index) {
+                1 => 'array|string',
+                2 => '?string',
+                3 => 'mixed',
+                default => null,
+            },
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
             'header_remove' => 0 === $index ? '?string' : null,
             // ext/standard/head.stub.php — &$filename / &$line untyped (InternalArgInfo string/int) (#25381)
