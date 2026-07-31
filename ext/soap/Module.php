@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * soap extension module entry (php-src ext/soap/soap.c; #20037 / #20124 / #3724).
  *
- * VM-only: SoapClient + SoapFault + is_soap_fault + use_soap_error_handler. No new runtime C.
+ * SoapClient + SoapFault + is_soap_fault (VM+JIT #26167) + use_soap_error_handler. No new runtime C.
  */
 class Module extends ModuleAbstract
 {

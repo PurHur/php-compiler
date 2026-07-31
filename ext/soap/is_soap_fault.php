@@ -33,7 +33,7 @@ final class is_soap_fault extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('is_soap_fault() is not implemented for JIT in this compiler build (issue #20124)');
+        return JitIsSoapFault::invoke($context, ...$args);
     }
 
     public static function isSoapFaultVariable(Variable $var): bool
