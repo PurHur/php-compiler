@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\WeakRefRegistryJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** WeakRefRegistry JIT routes through WeakRefRegistryJitHelper PHP not LLVM globals (#9191, #15968). */
+/** WeakRefRegistry JIT routes through WeakRefRegistryJitHelper via JitVmHelperLink (#9191, #26028). */
 final class WeakRefRegistryRuntimeShrinkTest extends TestCase
 {
     public function testWeakRefRegistryRuntimeUsesJitHelperNotLlvmGlobals(): void
@@ -17,6 +17,13 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('WeakRefRegistryJitHelper::registerRef', $source);
         $this->assertStringContainsString('WeakRefRegistryJitHelper::registerMap', $source);
         $this->assertStringContainsString('WeakRefRegistryJitHelper::clearObject', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('phpc_wr_ref_count', $source);
         $this->assertStringNotContainsString('ensureGlobals', $source);
         $this->assertStringNotContainsString('refEntryPtr', $source);
