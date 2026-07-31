@@ -271,6 +271,7 @@
         "ext/dom/DomC14NJitHelper.php",
         "ext/dom/DomClassConstants.php",
         "ext/dom/DomClassMethod.php",
+        "ext/dom/DomCompareDocumentPositionJitHelper.php",
         "ext/dom/DomConstants.php",
         "ext/dom/DomContainsJitHelper.php",
         "ext/dom/DomContainsNullJitHelper.php",
@@ -509,6 +510,7 @@
         "ext/dom/dom_import_simplexml.php",
         "ext/dom/ns_import_simplexml.php",
         "ext/ds/BuiltinClasses.php",
+        "ext/ds/DsExtensionPolicy.php",
         "ext/ds/Module.php",
         "ext/ds/VmDsStorage.php",
         "ext/enchant/BuiltinClasses.php",
@@ -1230,6 +1232,7 @@
         "ext/libxml/libxml_set_streams_context.php",
         "ext/libxml/libxml_use_internal_errors.php",
         "ext/lz4/JitLz4.php",
+        "ext/lz4/Lz4ExtensionPolicy.php",
         "ext/lz4/Lz4JitHelper.php",
         "ext/lz4/Module.php",
         "ext/lz4/VmLz4Native.php",
@@ -5597,6 +5600,7 @@
         "lib/JIT/Call/DomNodeAppend.php",
         "lib/JIT/Call/DomNodeAppendChild.php",
         "lib/JIT/Call/DomNodeC14N.php",
+        "lib/JIT/Call/DomNodeCompareDocumentPosition.php",
         "lib/JIT/Call/DomNodeContains.php",
         "lib/JIT/Call/DomNodeGetRootNode.php",
         "lib/JIT/Call/DomNodeInsertBefore.php",
@@ -6877,9 +6881,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6643,
+        "inventory_files": 6647,
         "excluded": 0,
-        "eligible": 6643,
+        "eligible": 6647,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
