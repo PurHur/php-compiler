@@ -854,9 +854,11 @@ final class RecursiveRegexIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('RecursiveRegexIterator');
         $entry->parentLc = RegexIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator', 'RecursiveIterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerializes Iterator-first flattened ce->interfaces on the subclass
+        // (RegexIterator parent stays OuterIterator-first; #25823).
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator', 'recursiveiterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
