@@ -240,6 +240,49 @@ PHP;
         $this->assertStringContainsString('iter=99', $out);
     }
 
+    /**
+     * Surviving WeakMap key must remain after sibling unset + gc_collect_cycles (#25965).
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_weakrefs.c
+     */
+    public function testWeakMapGcPreservesLiveSiblingKey(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$m = new WeakMap();
+$keep = new stdClass();
+$drop = new stdClass();
+$m[$keep] = 'keep';
+$m[$drop] = 'drop';
+unset($drop);
+echo 'pre_gc=', count($m), "\n";
+gc_collect_cycles();
+echo 'post_gc=', count($m), ' isset_keep=', isset($m[$keep]) ? '1' : '0', "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_gc_sibling_25965.php'));
+        $this->assertSame("pre_gc=1\npost_gc=1 isset_keep=1\n", ob_get_clean());
+    }
+
+    /**
+     * WeakReference::get() stays live while a strong local still holds the referent (#25965).
+     */
+    public function testWeakReferenceGetSurvivesGcWhileLocalHoldsReferent(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new stdClass();
+$wr = WeakReference::create($o);
+gc_collect_cycles();
+echo $wr->get() === null ? 'null' : 'obj';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_gc_live_local_25965.php'));
+        $this->assertSame('obj', ob_get_clean());
+    }
+
     public function testWeakReferenceParsesAndCompiles(): void
     {
         $runtime = new Runtime();
