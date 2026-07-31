@@ -98,7 +98,8 @@ final class preg_replace_callback_array extends Internal
             $subjectVar,
             $limit,
             $totalCount,
-            $flags
+            $flags,
+            $frame
         );
         if ($hasCount) {
             $frame->calledArgs[3]->resolveIndirect()->int($totalCount);

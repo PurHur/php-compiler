@@ -94,7 +94,8 @@ final class preg_replace_callback extends Internal
                 $subjectVar->toString(),
                 $limit,
                 $count,
-                $flags
+                $flags,
+                $frame
             );
             if ($hasCount) {
                 $frame->calledArgs[4]->resolveIndirect()->int($count);
@@ -121,7 +122,8 @@ final class preg_replace_callback extends Internal
                 $value->toString(),
                 $limit,
                 $elemCount,
-                $flags
+                $flags,
+                $frame
             );
             $totalCount += $elemCount;
             if (false === $result) {
