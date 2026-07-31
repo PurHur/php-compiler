@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc prepare+execute+fetch_array round-trip via SQLite ODBC (#21258)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --SKIPIF--
 <?php
 if (!extension_loaded('ffi')) die('skip no ffi');

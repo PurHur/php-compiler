@@ -754,6 +754,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\pdo\PdoExtensionPolicy::isPdoSqliteComplianceCase($name)) {
                 continue;
             }
+            // Functional odbc cases set PHP_COMPILER_ENABLE_ODBC via --ENV--; phantoms when withheld (#23969).
+            if (!\PHPCompiler\ext\odbc\OdbcExtensionPolicy::runsOdbcCompliance($name)
+                && \PHPCompiler\ext\odbc\OdbcExtensionPolicy::isOdbcComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

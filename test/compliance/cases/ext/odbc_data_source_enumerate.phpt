@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc odbc_data_source / binmode / longreadlen / next_result live (#21278)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 declare(strict_types=1);

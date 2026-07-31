@@ -1,5 +1,7 @@
 --TEST--
 ext/odbc odbc_connection_string_* curly-brace helpers (#21256)
+--ENV--
+PHP_COMPILER_ENABLE_ODBC=1
 --FILE--
 <?php
 $with_end_curly1 = 'foo}bar';
