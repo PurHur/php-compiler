@@ -553,6 +553,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #26117 */
+    public function testFtokZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('ftok');
+        self::assertSame(['filename', 'project_id'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'ftok'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'project_id', 'ftok'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects pathname/proj)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'pathname', 'ftok'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'proj', 'ftok'));
+        self::assertSame(
+            ['filename', 'project_id'],
+            BuiltinParamNames::paramNamesForInternalFunction('ftok')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('ftok'));
+    }
+
     /** @covers issue #24373 */
     public function testSocketBindConnectReadWriteSetOptionZendStubNamedParams(): void
     {

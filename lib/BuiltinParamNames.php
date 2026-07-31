@@ -633,6 +633,9 @@ final class BuiltinParamNames
             case 'shmop_close':
             case 'shmop_delete':
                 return ['shmop'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still pathname/proj (#26117)
+            case 'ftok':
+                return ['filename', 'project_id'];
             case 'msg_get_queue':
                 // php-src ext/sysvmsg/sysvmsg.stub.php (#3666)
                 return ['key', 'permissions'];
