@@ -83,7 +83,15 @@ final class AttributeTargetValidator
 
                 continue;
             }
+            // Builtin #[Attribute] is TARGET_CLASS only (zend_attributes.c / #25723).
+            // Do not skip — wrong sites must compile-fatal like Zend.
             if (self::isAttributeMetaClass($entry->name)) {
+                if (AttributeSupport::TARGET_CLASS !== $targetFlag) {
+                    throw new \CompileError(
+                        'Attribute "'.self::messageName($entry->name).'" cannot target '.$targetLabel
+                        .' (allowed targets: class)'
+                    );
+                }
                 continue;
             }
 

@@ -123,6 +123,39 @@ final class AttributeNames
         );
     }
 
+    /** True when `#[\Attribute]` (the meta-attribute) is present (#25723). */
+    public static function hasAttributeMetaClass(array $names): bool
+    {
+        foreach ($names as $name) {
+            $normalized = strtolower(ltrim((string) $name, '\\'));
+            if ('attribute' === $normalized || str_ends_with($normalized, '\\attribute')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend compile-time target guard (zend_attributes.c, issue #25723).
+     * `#[\Attribute]` itself is TARGET_CLASS only — reject on functions/methods/etc.
+     *
+     * Call only from non-class declaration sites (same pattern as
+     * {@see assertAllowDynamicPropertiesClassTargetOnly}).
+     *
+     * @param list<string> $names
+     */
+    public static function assertAttributeMetaClassTargetOnly(array $names, string $target): void
+    {
+        if (!self::hasAttributeMetaClass($names)) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Attribute "'.self::messageName('Attribute').'" cannot target '.$target.' (allowed targets: class)'
+        );
+    }
+
     /**
      * Zend compile-time guard (zend_compile.c, issue #7299).
      * `#[\AllowDynamicProperties]` and `readonly class` are mutually exclusive.
