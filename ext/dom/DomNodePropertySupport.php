@@ -264,9 +264,14 @@ final class DomNodePropertySupport
 
             return $var;
         }
-        // php-src ext/dom/attr.c dom_attr_name_read — local name, not QName (#19754).
+        // php-src ext/dom/attr.c dom_attr_name_read — living follow_spec → QName
+        // (dom_node_get_node_name_attribute_or_element; #26024); legacy → local (#19754).
         if (VmDom::isAttr($object) && strtolower(VmDom::PROP_NAME) === $lc) {
-            $var->string(VmDom::readLocalName($object));
+            if (VmDomLiving::isLivingAttr($object)) {
+                $var->string(VmDom::readNodeName($object));
+            } else {
+                $var->string(VmDom::readLocalName($object));
+            }
 
             return $var;
         }

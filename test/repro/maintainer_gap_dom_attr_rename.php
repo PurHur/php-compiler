@@ -21,6 +21,7 @@ echo 'ren1:has_a=', $el->hasAttribute('a') ? '1' : '0', ',has_b=', $el->hasAttri
 $attr->rename('urn:x', 'x:b');
 echo 'ren2:name=', $attr->name, ',nodeName=', $attr->nodeName, ',ns=', $attr->namespaceURI,
     ',prefix=', $attr->prefix, "\n";
+// living Dom\Attr::$name is QName (#26024) — name === nodeName after rename
 echo 'ren2:has_b=', $el->hasAttribute('b') ? '1' : '0',
     ',ns_val=', $el->getAttributeNS('urn:x', 'b'), "\n";
 

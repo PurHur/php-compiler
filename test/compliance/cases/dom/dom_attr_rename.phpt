@@ -1,11 +1,5 @@
 --TEST--
 Dom\Attr::rename() — QName/NS update + duplicate guard (#21083)
---SKIPIF--
-<?php
-if (!class_exists('Dom\\XMLDocument')) {
-    die('skip Dom\\XMLDocument requires PHP_COMPILER_PROFILE=8.4 (#21083)');
-}
-?>
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -45,7 +39,7 @@ exists=yes
 class=Dom\Attr
 ren1:name=b,nodeName=b,local=b
 ren1:has_a=0,has_b=1,val=1
-ren2:name=b,nodeName=x:b,ns=urn:x,prefix=x
+ren2:name=x:b,nodeName=x:b,ns=urn:x,prefix=x
 ren2:has_b=0,ns_val=1
 dup:exists,code=13
 orphan:name=w,nodeName=w,val=9
