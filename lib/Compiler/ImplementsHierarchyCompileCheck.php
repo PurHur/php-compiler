@@ -30,7 +30,7 @@ final class ImplementsHierarchyCompileCheck
     /** @var array<string, array{display: string, implements: list<string>, extends: ?string}> */
     private array $classes = [];
 
-    /** @var array<string, array{display: string, implements: list<string>}> */
+    /** @var array<string, array{display: string, implements: list<string>, backed: bool, file: string, line: int}> */
     private array $enums = [];
 
     /** @var array<string, array{display: string, extends: list<string>}> */
@@ -144,6 +144,9 @@ final class ImplementsHierarchyCompileCheck
         $this->enums[$lc] = [
             'display' => $display,
             'implements' => $implements,
+            'backed' => null !== $enum->backedType,
+            'file' => '' !== $enum->getFile() ? $enum->getFile() : 'unknown',
+            'line' => max(1, $enum->getLine()),
         ];
     }
 
@@ -201,6 +204,15 @@ final class ImplementsHierarchyCompileCheck
                 ));
             }
             foreach ($enum['implements'] as $targetLc) {
+                // Explicit UnitEnum/BackedEnum — already implicit on every enum (#25946, zend_enum.c).
+                $builtin = EnumSupport::explicitBuiltinInterfaceForbiddenMessage(
+                    $enum['display'],
+                    $targetLc,
+                    $enum['backed']
+                );
+                if (null !== $builtin) {
+                    throw new CompileFatal($enum['file'], $enum['line'], $builtin);
+                }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',

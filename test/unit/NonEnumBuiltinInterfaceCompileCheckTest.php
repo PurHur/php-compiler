@@ -32,15 +32,17 @@ class C implements BackedEnum {}
 PHP, 'non_enum_backedenum.php');
     }
 
-    public function testBackedEnumImplementsUnitEnumStillCompiles(): void
+    /** @covers issue #25946 — was incorrectly allowed under #15447 */
+    public function testBackedEnumImplementsUnitEnumFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum E cannot implement previously implemented interface UnitEnum');
+        $runtime->parseAndCompile(<<<'PHP'
 <?php
 enum E: int implements UnitEnum {
     case A = 1;
 }
 PHP, 'enum_unitenum.php');
-        $this->assertNotNull($block);
     }
 }
