@@ -287,6 +287,11 @@ final class VmScope
         if (null !== $value && self::callerNameExists($caller, $name)) {
             return $value;
         }
+        // php-src zif_compact uses the active symbol table only — function/closure frames
+        // must not inherit {main}/$GLOBALS or auto-globals (#25898).
+        if (null === $caller->block || !$caller->block->isMainScript()) {
+            return null;
+        }
         if (null !== $frame->vmContext) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string($name);

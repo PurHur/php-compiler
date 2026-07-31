@@ -187,6 +187,14 @@ final class ScopeBuiltinEmitHelper
 
             return;
         }
+        // php-src zif_compact: active symbol table only — no {main}/$GLOBALS leak into
+        // function/closure frames (#25898).
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        if (!$block instanceof \PHPCompiler\Block || !$block->isMainScript()) {
+            self::emitCompactUndefinedVariableWarning($context, $name);
+
+            return;
+        }
         if (Superglobals::isSuperglobalName($name)) {
             $source = SuperglobalInit::load($context, $name);
             $keyStr = $context->builder->load($context->constantStringFromString($name));

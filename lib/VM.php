@@ -4774,6 +4774,9 @@ restart:
                     }
                     $globalName = $frame->block->constants[$op->arg2]->toString();
                     $frame->scope[$op->arg1]->indirect($this->context->ensureGlobal($globalName));
+                    // Zend: `global $x` installs $x in the active symbol table (compact /
+                    // get_defined_vars see it). Same as TYPE_DECLARE_FUNCTION_STATIC (#25898).
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
                     if (!isset($frame->block->constants[$op->arg2])) {
