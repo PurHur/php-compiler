@@ -223,6 +223,9 @@ final class VmCallable
      * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709, #25712).
      *
      * array_map/array_filter use "a valid callback or null" (#25711); usort/call_user_func do not.
+     * array_u* variadic comparators omit the ($callback) param name (php-src array.c; #25736).
+     *
+     * @param string|null $paramName Null omits " ($name)" — Zend array_udiff/uintersect/diff_uassoc.
      */
     public static function inaccessibleMethodCallbackTypeError(
         string $function,
@@ -230,14 +233,17 @@ final class VmCallable
         string $className,
         string $methodName,
         int $argNum = 1,
-        bool $nullAllowed = false
+        bool $nullAllowed = false,
+        ?string $paramName = 'callback'
     ): string {
         $phrase = $nullAllowed ? 'a valid callback or null' : 'a valid callback';
+        $paramPart = null !== $paramName ? ' ($'.$paramName.')' : '';
 
         return sprintf(
-            '%s(): Argument #%d ($callback) must be %s, cannot access %s method %s::%s()',
+            '%s(): Argument #%d%s must be %s, cannot access %s method %s::%s()',
             $function,
             $argNum,
+            $paramPart,
             $phrase,
             $kind,
             $className,
@@ -249,6 +255,8 @@ final class VmCallable
      * When a real method exists but is not visible from $scopeFrame, throw Zend's
      * cannot-access TypeError (usort/uasort/uksort Argument #N; #25712).
      * No-op when the callable is merely malformed or the method is missing.
+     *
+     * @param string|null $paramName Null omits " ($name)" for array_u* (#25736).
      */
     public static function throwIfInaccessibleMethodCallback(
         Context $ctx,
@@ -256,7 +264,8 @@ final class VmCallable
         string $function,
         int $argNum,
         ?Frame $scopeFrame,
-        bool $nullAllowed = false
+        bool $nullAllowed = false,
+        ?string $paramName = 'callback'
     ): void {
         $callback = $callback->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $callback->type) {
@@ -287,7 +296,8 @@ final class VmCallable
                 $function,
                 $scopeFrame,
                 $argNum,
-                $nullAllowed
+                $nullAllowed,
+                $paramName
             );
 
             return;
@@ -316,7 +326,8 @@ final class VmCallable
             $function,
             $scopeFrame,
             $argNum,
-            $nullAllowed
+            $nullAllowed,
+            $paramName
         );
     }
 
@@ -713,7 +724,8 @@ final class VmCallable
         string $function,
         ?Frame $scopeFrame,
         int $argNum = 1,
-        bool $nullAllowed = false
+        bool $nullAllowed = false,
+        ?string $paramName = 'callback'
     ): void {
         if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
             return;
@@ -731,12 +743,15 @@ final class VmCallable
             $function,
             $scopeFrame,
             $argNum,
-            $nullAllowed
+            $nullAllowed,
+            $paramName
         );
     }
 
     /**
      * Shared visibility gate for instance + static array/`Class::method` callables (#25709, #25712).
+     *
+     * @param string|null $paramName Null omits " ($name)" for array_u* (#25736).
      */
     private static function assertDeclaringMethodVisibleForInvoke(
         Context $ctx,
@@ -746,7 +761,8 @@ final class VmCallable
         string $function,
         ?Frame $scopeFrame,
         int $argNum = 1,
-        bool $nullAllowed = false
+        bool $nullAllowed = false,
+        ?string $paramName = 'callback'
     ): void {
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null !== $scopeFrame
@@ -768,7 +784,8 @@ final class VmCallable
             $declaring->name,
             $declaredName,
             $argNum,
-            $nullAllowed
+            $nullAllowed,
+            $paramName
         ));
     }
 

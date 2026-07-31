@@ -309,6 +309,9 @@ final class VmArrayUserSetOps
     }
 
     /**
+     * Resolve comparator with caller-frame visibility (php-src array_udiff*; #25736).
+     * Variadic u* args omit ($callback) in Zend TypeErrors — pass null param name.
+     *
      * @return callable
      */
     private static function resolveCompareCallback(
@@ -329,17 +332,22 @@ final class VmArrayUserSetOps
         if (null === $frame->vmContext) {
             throw new \LogicException($fn.'() requires VM context in this compiler build');
         }
-        if (!VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
-            throw new \TypeError(VmArraySortCallback::invalidCallbackTypeError($fn, $argNum));
-        }
+        // Same gate as usort (#25712): accept in-scope private; reject out-of-scope with Zend wording.
+        VmArraySortCallback::requireVmCallable($frame, $callback, $fn, $argNum, null);
         $ctx = $frame->vmContext;
+        $scopeFrame = $frame;
 
-        return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeVariableForUserCompare(
-            $ctx,
-            $callback,
-            $a,
-            $b
-        );
+        // Keep array_u* bool-unstable compare (#11219), not usort's true→1/false→-1.
+        return static function (Variable $a, Variable $b) use ($ctx, $callback, $scopeFrame, $fn): int {
+            return VmClosureCall::invokeVariableForUserCompare(
+                $ctx,
+                $callback,
+                $a,
+                $b,
+                $scopeFrame,
+                $fn
+            );
+        };
     }
 
     /**
