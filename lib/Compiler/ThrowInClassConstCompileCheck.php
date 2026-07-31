@@ -24,7 +24,7 @@ use PHPCfg\Script;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905, #24947).
+ * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905, #24947, #25839).
  *
  * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
  * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
@@ -35,7 +35,9 @@ use PHPCompiler\CompilerVersion;
  * Silence ({@code ZEND_AST_SILENCE} → php-cfg {@see ErrorSuppressBlock}) is always outside the
  * allow-list (#24905). Scalar/(array) casts ({@code ZEND_AST_CAST}) are allowed on PHP 8.5+
  * ({@see CompilerVersion::supportsCastsInConstantExpressions}); (object)/(void)/(unset) stay
- * rejected. On ≤8.4 every cast remains invalid (#24905).
+ * rejected. On ≤8.4 every *user* cast remains invalid (#24905). php-cfg's synthetic
+ * {@see Cast\Bool_} on the long arm of {@code &&}/{@code ||} is not a ZEND_AST_CAST — allow it
+ * so class-const logical expressions match Zend (#25839 / re-#17229).
  */
 final class ThrowInClassConstCompileCheck
 {
@@ -85,8 +87,9 @@ final class ThrowInClassConstCompileCheck
 
     /**
      * @param list<Op> $ops
+     * @param bool     $allowShortCircuitBoolCast php-cfg inserts {@see Cast\Bool_} on &&/|| (#25839)
      */
-    private function walkOps(array $ops): void
+    private function walkOps(array $ops, bool $allowShortCircuitBoolCast = false): void
     {
         if ($this->looksLikeLoweredMatch($ops)) {
             throw new \CompileError(self::MESSAGE);
@@ -101,22 +104,95 @@ final class ThrowInClassConstCompileCheck
             ) {
                 throw new \CompileError(self::MESSAGE);
             }
-            if ($op instanceof Cast && !self::isAllowedConstExprCast($op)) {
-                throw new \CompileError(self::MESSAGE);
+            if ($op instanceof Cast) {
+                $shortCircuitTail = $allowShortCircuitBoolCast
+                    && self::isShortCircuitBoolCastTail($ops, $op);
+                if (!$shortCircuitTail && !self::isAllowedConstExprCast($op)) {
+                    throw new \CompileError(self::MESSAGE);
+                }
             }
             if ($op instanceof Jump && $op->target instanceof ErrorSuppressBlock) {
                 throw new \CompileError(self::MESSAGE);
             }
+            $armAllow = $allowShortCircuitBoolCast
+                || ($op instanceof JumpIf && self::isLogicalShortCircuitJumpIf($op));
             foreach ($op->getSubBlocks() as $name) {
                 $sub = is_string($name) && property_exists($op, $name) ? $op->{$name} : $name;
                 if ($sub instanceof ErrorSuppressBlock) {
                     throw new \CompileError(self::MESSAGE);
                 }
                 if ($sub instanceof Block && property_exists($sub, 'children') && is_array($sub->children)) {
-                    $this->walkOps($sub->children);
+                    $this->walkOps($sub->children, $armAllow);
                 }
             }
         }
+    }
+
+    /**
+     * php-cfg {@see Parser::parseShortCircuiting}: one arm assigns a bool literal, the other
+     * ends with a synthetic {@see Cast\Bool_} before Jump.
+     */
+    private static function isLogicalShortCircuitJumpIf(JumpIf $jumpIf): bool
+    {
+        $ifTail = self::branchTailExprBeforeJump($jumpIf->if);
+        $elseTail = self::branchTailExprBeforeJump($jumpIf->else);
+        if (
+            $ifTail instanceof Cast\Bool_
+            && $elseTail instanceof Assign
+            && $elseTail->expr instanceof Operand\Literal
+        ) {
+            return true;
+        }
+
+        return $elseTail instanceof Cast\Bool_
+            && $ifTail instanceof Assign
+            && $ifTail->expr instanceof Operand\Literal;
+    }
+
+    private static function branchTailExprBeforeJump(?Block $branch): ?Op
+    {
+        if (null === $branch || !is_array($branch->children) || [] === $branch->children) {
+            return null;
+        }
+        $children = $branch->children;
+        $jumpIdx = null;
+        foreach ($children as $i => $child) {
+            if ($child instanceof Jump) {
+                $jumpIdx = $i;
+                break;
+            }
+        }
+        if (null === $jumpIdx || 0 === $jumpIdx) {
+            return null;
+        }
+        $tail = $children[$jumpIdx - 1];
+
+        return $tail instanceof Op\Expr ? $tail : null;
+    }
+
+    /**
+     * Only the trailing synthetic bool coercion is exempt — a user {@code (bool)} on the RHS
+     * of {@code &&}/{@code ||} still appears earlier and stays rejected on ≤8.4.
+     *
+     * @param list<Op> $ops
+     */
+    private static function isShortCircuitBoolCastTail(array $ops, Cast $cast): bool
+    {
+        if (!$cast instanceof Cast\Bool_) {
+            return false;
+        }
+        $jumpIdx = null;
+        foreach ($ops as $i => $op) {
+            if ($op instanceof Jump) {
+                $jumpIdx = $i;
+                break;
+            }
+        }
+        if (null === $jumpIdx || 0 === $jumpIdx) {
+            return false;
+        }
+
+        return $ops[$jumpIdx - 1] === $cast;
     }
 
     /**
