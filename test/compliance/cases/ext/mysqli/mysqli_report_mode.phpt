@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_report() mode get/set (#21804, ext/mysqli/mysqli_report.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo function_exists('mysqli_report') ? 'yes' : 'no', "\n";

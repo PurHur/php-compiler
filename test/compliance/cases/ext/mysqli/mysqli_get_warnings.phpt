@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_get_warnings / mysqli_stmt_get_warnings + mysqli_warning::next (#22224)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

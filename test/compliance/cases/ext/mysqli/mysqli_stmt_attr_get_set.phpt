@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_stmt_attr_get/attr_set + MYSQLI_STMT_ATTR_* (#22175, php-src mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_poll / mysqli_reap_async_query registration (#22163)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo function_exists('mysqli_poll') ? 'yes' : 'no', "\n";

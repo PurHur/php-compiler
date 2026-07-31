@@ -759,6 +759,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\odbc\OdbcExtensionPolicy::isOdbcComplianceCase($name)) {
                 continue;
             }
+            // Functional mysqli cases set PHP_COMPILER_ENABLE_MYSQLI via --ENV--; phantoms when withheld (#23954).
+            if (!\PHPCompiler\ext\mysqli\MysqliExtensionPolicy::runsMysqliCompliance($name)
+                && \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::isMysqliComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

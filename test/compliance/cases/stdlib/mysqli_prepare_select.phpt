@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli prepared statement SELECT ? round-trip (#21788, ext/mysqli/mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --SKIPIF--
 <?php
 if (!getenv('MYSQLI_TEST_DSN')) {

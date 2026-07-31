@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli use_result / more_results / stmt multi-result API (#22184)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 $funcs = [

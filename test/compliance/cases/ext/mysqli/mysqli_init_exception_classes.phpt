@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_sql_exception + mysqli_init() + new mysqli() zero-arg bootstrap (#21803, ext/mysqli/mysqli.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

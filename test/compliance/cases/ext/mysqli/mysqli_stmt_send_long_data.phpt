@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_stmt_send_long_data + mysqli_stmt::send_long_data (#22182, php-src mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

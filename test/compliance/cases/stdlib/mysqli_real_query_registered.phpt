@@ -1,5 +1,7 @@
 --TEST--
 mysqli_real_query / mysqli::real_query registered (#22249, ext/mysqli/mysqli.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo 'fn=', function_exists('mysqli_real_query') ? 'Y' : 'N', "\n";

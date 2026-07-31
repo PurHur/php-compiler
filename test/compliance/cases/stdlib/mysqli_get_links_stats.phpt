@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_get_links_stats keys (#22183, ext/mysqli/mysqli_nonapi.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 if (!function_exists('mysqli_get_links_stats')) {

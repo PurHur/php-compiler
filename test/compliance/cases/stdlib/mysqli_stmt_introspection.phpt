@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli stmt introspection registration (#22193)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 $funcs = [

@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_ping/select_db/change_user/thread_id/kill/get_client_stats (#22174, php-src mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli real_connect, charset, multi_query (#21791, ext/mysqli/mysqli_api.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --SKIPIF--
 <?php
 if (!getenv('MYSQLI_TEST_DSN')) {

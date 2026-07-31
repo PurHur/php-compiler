@@ -1,5 +1,7 @@
 --TEST--
 mysqli_sql_exception::getSqlState() + protected $sqlstate (#22456, ext/mysqli/mysqli.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo 'getSqlState=', (int) method_exists('mysqli_sql_exception', 'getSqlState'), "\n";

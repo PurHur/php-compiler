@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_fetch_column / mysqli_result::fetch_column (#22214, ext/mysqli/mysqli_nonapi.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo function_exists('mysqli_fetch_column') ? 'yes' : 'no', "\n";

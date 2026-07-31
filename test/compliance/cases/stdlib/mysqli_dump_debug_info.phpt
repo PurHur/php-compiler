@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_dump_debug_info / mysqli_debug (#22223, php-src mysqli.c)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 declare(strict_types=1);

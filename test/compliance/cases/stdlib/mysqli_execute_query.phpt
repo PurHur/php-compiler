@@ -1,5 +1,7 @@
 --TEST--
 ext/mysqli mysqli_execute_query registration (#21895)
+--ENV--
+PHP_COMPILER_ENABLE_MYSQLI=1
 --FILE--
 <?php
 echo 'mysqli_execute_query:', function_exists('mysqli_execute_query') ? 'yes' : 'no', "\n";
