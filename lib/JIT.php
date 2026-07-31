@@ -9685,7 +9685,7 @@ class JIT {
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $binLeftOp = $this->binaryOpLeftOperand($block, $op);
                     $binDestOp = $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result');
-                    $binLeft = $this->context->getVariableFromOp($binLeftOp);
+                    $binLeft = $this->variableFromOpForRuntimeRead($binLeftOp);
                     if (
                         JIT\StringOffsetHelper::isWritableCharOffsetLvalue($binLeft, $this->context)
                         || (
@@ -9705,7 +9705,7 @@ class JIT {
                         $this->compileBinaryOp(
                             $op,
                             $binLeft,
-                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
+                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
                     break;
@@ -9721,8 +9721,8 @@ class JIT {
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->compileBinaryOp(
                             $op,
-                            $this->context->getVariableFromOp($this->binaryOpLeftOperand($block, $op)),
-                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
+                            $this->variableFromOpForRuntimeRead($this->binaryOpLeftOperand($block, $op)),
+                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
                     break;
@@ -13847,6 +13847,7 @@ class JIT {
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
         $this->syncCompileTimeBcmathNumber($globalVar, $value, false);
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
+        $this->markScopeVariableAssignedIfTracked($resultOp, $globalVar);
 
         return true;
     }
@@ -13900,6 +13901,20 @@ class JIT {
         }
 
         return null;
+    }
+
+    /** Scope operand for value reads that may emit undefined-variable E_WARNING (#10358, #10360, #26147). */
+    private function variableFromOpForRuntimeRead(Operand $op): JIT\Variable
+    {
+        $var = $this->context->getVariableFromOp($op);
+        JIT\UndefinedVariableHelper::guardBeforeRuntimeRead($this->context, $op, $var);
+
+        return $var;
+    }
+
+    private function markScopeVariableAssignedIfTracked(Operand $resultOp, JIT\Variable $result): void
+    {
+        JIT\UndefinedVariableHelper::markAssigned($this->context, $resultOp, $result);
     }
 
     /**
