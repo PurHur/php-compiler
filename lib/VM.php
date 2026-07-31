@@ -18678,6 +18678,16 @@ restart:
             $entry->methodVisibility[$name] = $vis;
             if (isset($parent->methodDeclaringClassLc[$name])) {
                 $entry->methodDeclaringClassLc[$name] = $parent->methodDeclaringClassLc[$name];
+            } else {
+                // Builtin parents often omit declaring-class marks; still record the parent
+                // so Reflection/LSP can find stub arginfo on the declarer (#25840).
+                $entry->methodDeclaringClassLc[$name] = strtolower(ltrim($parent->name, '\\'));
+            }
+            if (isset($parent->methodParameterMetadata[$name])) {
+                $entry->methodParameterMetadata[$name] = $parent->methodParameterMetadata[$name];
+            }
+            if (isset($parent->methodReturnDeclaredTypes[$name])) {
+                $entry->methodReturnDeclaredTypes[$name] = $parent->methodReturnDeclaredTypes[$name];
             }
             if (isset($parent->methodDeprecated[$name])) {
                 $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];

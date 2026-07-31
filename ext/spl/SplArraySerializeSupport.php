@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmSerialize;
 use PHPCompiler\Frame;
@@ -167,6 +168,14 @@ final class SplArraySerializeSupport
         $entry->methodVisibility['__serialize'] = $pub;
         $entry->methods['__unserialize'] = new SplArrayUnserialize($ownerLc, $displayName);
         $entry->methodVisibility['__unserialize'] = $pub;
+        // php-src spl_array.stub.php — __unserialize(array $data); needed when subclasses
+        // inherit methods without redeclaring (#25840 inherit copies metadata).
+        $entry->methodParameterMetadata['__serialize'] = [];
+        $entry->methodParameterMetadata['__unserialize'] = [
+            new ParameterMetadata('data', [], false, false, false, false, 'array', null),
+        ];
+        $entry->methodNames['__serialize'] = '__serialize';
+        $entry->methodNames['__unserialize'] = '__unserialize';
     }
 }
 
