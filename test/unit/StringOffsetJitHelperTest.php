@@ -36,6 +36,14 @@ final class StringOffsetJitHelperTest extends TestCase
         );
     }
 
+    public function testObjectToStringErrorMessage(): void
+    {
+        $this->assertSame(
+            'Object of class D could not be converted to string',
+            StringOffsetJitHelper::objectToStringErrorMessage('D')
+        );
+    }
+
     public function testByteFromLongTruncates(): void
     {
         $this->assertSame(65, StringOffsetJitHelper::byteFromLong(65));

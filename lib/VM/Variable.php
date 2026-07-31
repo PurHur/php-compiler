@@ -3247,6 +3247,18 @@ restart:
                 $this->warnIfMultiByteStringOffsetAssign($s);
 
                 return $s[0];
+            case self::TYPE_OBJECT:
+                // Zend convert_to_string → __toString first byte; Error without (#25794).
+                if (null === $this->stringOffsetContext) {
+                    throw new \LogicException('String offset object assign requires VM context');
+                }
+                $s = $this->stringOffsetContext->runtime->vm()->castObjectToString($value->toObject());
+                if ('' === $s) {
+                    throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
+                }
+                $this->warnIfMultiByteStringOffsetAssign($s);
+
+                return $s[0];
             default:
                 $s = $value->toString(null, $this->stringOffsetFrame);
                 if ('' === $s) {

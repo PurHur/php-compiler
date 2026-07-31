@@ -306,6 +306,8 @@ final class StringOffsetRuntime
                 case JitVariable::TYPE_HASHTABLE:
                     // Nested leaf: skip user-visible warnings (same as OOR path).
                     return $i8->constInt(\ord('A'), false);
+                case JitVariable::TYPE_OBJECT:
+                    return self::assignByteFromObject($context, $value, true);
                 default:
                     throw new \LogicException(
                         'String offset assignment supports int or string RHS in JIT (got type '.$value->type.')'
@@ -339,11 +341,62 @@ final class StringOffsetRuntime
                 self::emitAssignEwarning($context, StringOffsetJitHelper::FIRST_BYTE_WARNING);
 
                 return $i8->constInt(\ord('A'), false);
+            case JitVariable::TYPE_OBJECT:
+                // Zend convert_to_string → __toString first byte; Error without (#25794).
+                return self::assignByteFromObject($context, $value, false);
             default:
                 throw new \LogicException(
                     'String offset assignment supports int or string RHS in JIT (got type '.$value->type.')'
                 );
         }
+    }
+
+    /**
+     * Object RHS: coerce via __toString then first byte (Zend zend_assign_to_string_offset, #25794).
+     */
+    private static function assignByteFromObject(Context $context, JitVariable $value, bool $nestedLeaf): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $asString = \PHPCompiler\JIT\MagicMethodDispatch::coerceObjectToString($context, $value);
+        if (null === $asString) {
+            $classHint = $value->type?->userType ?? '';
+            $classHint = \ltrim((string) $classHint, '\\');
+            if ('' === $classHint || 'object' === \strtolower($classHint)) {
+                $classHint = 'stdClass';
+            }
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                StringOffsetJitHelper::objectToStringErrorMessage($classHint)
+            );
+
+            return $i8->constInt(0, false);
+        }
+        if (!$nestedLeaf) {
+            // Multi-byte __toString result → first-byte warning (same as string RHS).
+            $strVal = $context->helper->loadValue($asString);
+            $map = $context->structFieldMap['__string__'];
+            $len = $context->builder->load($context->builder->structGep($strVal, $map['length']));
+            $i64 = $context->getTypeFromString('int64');
+            $isMulti = $context->builder->icmp(
+                Builder::INT_SGT,
+                $len,
+                $i64->constInt(1, false)
+            );
+            $warnBlock = BasicBlockHelper::append($context, 'soff_obj_mb_warn');
+            $contBlock = BasicBlockHelper::append($context, 'soff_obj_mb_cont');
+            $context->builder->branchIf($isMulti, $warnBlock, $contBlock);
+            $context->builder->positionAtEnd($warnBlock);
+            self::emitAssignEwarning($context, StringOffsetJitHelper::FIRST_BYTE_WARNING);
+            $context->builder->branch($contBlock);
+            $context->builder->positionAtEnd($contBlock);
+        }
+        $str = $context->helper->loadValue($asString);
+        $map = $context->structFieldMap['__string__'];
+        $chars = $context->builder->structGep($str, $map['value']);
+
+        return $context->builder->load($chars);
     }
 
     /** E_WARNING during string-offset assign (Array→string / first-byte, #22925). */
