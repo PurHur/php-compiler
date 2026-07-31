@@ -1338,6 +1338,13 @@ final class VmReflection
         $current = $class;
         while (true) {
             if (isset($current->constants[$lc])) {
+                $declared = $current->constNames[$lc]
+                    ?? $current->enumCaseCanonicalNames[$lc]
+                    ?? null;
+                // Case-sensitive: wrong casing is not a hit (#25910).
+                if (null !== $declared && $declared !== $constant) {
+                    return null;
+                }
                 $declLc = $current->constDeclaringClassLc[$lc]
                     ?? strtolower(ltrim($current->name, '\\'));
                 $declaring = $ctx->classes[$declLc] ?? $current;

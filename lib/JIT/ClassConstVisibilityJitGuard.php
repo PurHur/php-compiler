@@ -29,6 +29,13 @@ final class ClassConstVisibilityJitGuard
             // Missing / private-on-parent: classConstFetch throws; JIT.php emits runtime Error (#19615).
             return;
         }
+        // Wrong casing is Undefined constant, not a visibility error (#25910).
+        if (!\PHPCompiler\ClassConstName::matchesDeclared(
+            $constName,
+            $objectType->classConstDeclaredNameOrNull($holdingId, strtolower($constName))
+        )) {
+            return;
+        }
         $vis = $objectType->constVisibility($holdingId, $constName);
         if (MethodVisibility::isPublic($vis)) {
             return;

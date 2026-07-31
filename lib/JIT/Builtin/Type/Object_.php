@@ -5173,6 +5173,13 @@ class Object_ extends Type {
             throw new \LogicException("Undefined constant {$display}::{$constName}");
         }
 
+        // Class constants are case-sensitive (Zend/zend_constants.c, #25910).
+        $declared = $this->classConstDeclaredNameOrNull($resolvedId, $key);
+        if (!\PHPCompiler\ClassConstName::matchesDeclared($constName, $declared)) {
+            $display = $classNameHint ?? $this->classNameForId($classId);
+            throw new \LogicException("Undefined constant {$display}::{$constName}");
+        }
+
         if ($this->isEnumClassId($resolvedId)) {
             return $this->jitEnumCaseFromBacking($resolvedId, $key);
         }
@@ -5340,6 +5347,14 @@ class Object_ extends Type {
         $key = strtolower($constKey);
 
         return $this->classConstDisplayNames[$classId][$key] ?? $constKey;
+    }
+
+    /** Declared casing when recorded, else null (no fallback to the lookup key) (#25910). */
+    public function classConstDeclaredNameOrNull(int $classId, string $constKey): ?string
+    {
+        $key = strtolower($constKey);
+
+        return $this->classConstDisplayNames[$classId][$key] ?? null;
     }
 
     public function defineStaticProperty(

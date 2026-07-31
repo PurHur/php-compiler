@@ -544,6 +544,12 @@ final class ReflectionSupport
             $display = $entry->constNames[$constLc] ?? $constName;
             throw new \Error("Undefined constant {$entry->name}::{$display}");
         }
+        $declared = $entry->constNames[$constLc]
+            ?? $entry->enumCaseCanonicalNames[$constLc]
+            ?? null;
+        if (null !== $declared && $declared !== $constName) {
+            throw new \Error("Undefined constant {$entry->name}::{$constName}");
+        }
         $result = new Variable();
         $result->copyFrom($stored);
 

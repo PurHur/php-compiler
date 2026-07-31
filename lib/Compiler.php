@@ -208,6 +208,9 @@ class Compiler {
     /** @var array<string, array<string, DeprecatedMetadata>> deprecated class constants by lc name (#6962) */
     private array $compileTimeClassConstDeprecated = [];
 
+    /** @var array<string, array<string, string>> compile-time class constant declared casing by lc name (#25910) */
+    private array $compileTimeClassConstNames = [];
+
     /** @var array<string, Variable> lowercase global constant name => compile-time value (#3803, #6542) */
     private array $compileTimeGlobalConsts = [];
 
@@ -6770,6 +6773,9 @@ class Compiler {
         if (!isset($this->compileTimeClassConstDeprecated[$classLc])) {
             $this->compileTimeClassConstDeprecated[$classLc] = [];
         }
+        if (!isset($this->compileTimeClassConstNames[$classLc])) {
+            $this->compileTimeClassConstNames[$classLc] = [];
+        }
         foreach ($this->compileTimeClassConsts[$traitLc] as $constLc => $value) {
             if (isset($this->compileTimeClassConsts[$classLc][$constLc])) {
                 continue;
@@ -6785,6 +6791,10 @@ class Compiler {
                 $this->compileTimeClassConstDeprecated[$classLc][$constLc]
                     = $this->compileTimeClassConstDeprecated[$traitLc][$constLc];
             }
+            if (isset($this->compileTimeClassConstNames[$traitLc][$constLc])) {
+                $this->compileTimeClassConstNames[$classLc][$constLc]
+                    = $this->compileTimeClassConstNames[$traitLc][$constLc];
+            }
         }
     }
 
@@ -6799,6 +6809,9 @@ class Compiler {
         if (!isset($this->compileTimeClassConstVisibility[$classLc])) {
             $this->compileTimeClassConstVisibility[$classLc] = [];
         }
+        if (!isset($this->compileTimeClassConstNames[$classLc])) {
+            $this->compileTimeClassConstNames[$classLc] = [];
+        }
         foreach ($this->compileTimeClassConsts[$ifaceLc] as $constLc => $value) {
             if (isset($this->compileTimeClassConsts[$classLc][$constLc])) {
                 continue;
@@ -6809,6 +6822,10 @@ class Compiler {
             if (isset($this->compileTimeClassConstVisibility[$ifaceLc][$constLc])) {
                 $this->compileTimeClassConstVisibility[$classLc][$constLc]
                     = $this->compileTimeClassConstVisibility[$ifaceLc][$constLc];
+            }
+            if (isset($this->compileTimeClassConstNames[$ifaceLc][$constLc])) {
+                $this->compileTimeClassConstNames[$classLc][$constLc]
+                    = $this->compileTimeClassConstNames[$ifaceLc][$constLc];
             }
         }
     }
@@ -6830,6 +6847,9 @@ class Compiler {
         if (!isset($this->compileTimeClassConstDeprecated[$classLc])) {
             $this->compileTimeClassConstDeprecated[$classLc] = [];
         }
+        if (!isset($this->compileTimeClassConstNames[$classLc])) {
+            $this->compileTimeClassConstNames[$classLc] = [];
+        }
         foreach ($this->compileTimeClassConsts[$parentLc] as $constLc => $value) {
             if (isset($this->compileTimeClassConsts[$classLc][$constLc])) {
                 continue;
@@ -6845,6 +6865,10 @@ class Compiler {
             if (isset($this->compileTimeClassConstDeprecated[$parentLc][$constLc])) {
                 $this->compileTimeClassConstDeprecated[$classLc][$constLc]
                     = $this->compileTimeClassConstDeprecated[$parentLc][$constLc];
+            }
+            if (isset($this->compileTimeClassConstNames[$parentLc][$constLc])) {
+                $this->compileTimeClassConstNames[$classLc][$constLc]
+                    = $this->compileTimeClassConstNames[$parentLc][$constLc];
             }
             if (isset($this->compileTimeEnumCaseConstNames[$parentLc][$constLc])) {
                 $this->compileTimeEnumCaseConstNames[$classLc][$constLc] = true;
@@ -7871,6 +7895,7 @@ class Compiler {
                 }
                 $lcConst = strtolower($constName);
                 $this->compileTimeClassConsts[$this->compilingClassLc][$lcConst] = $stored;
+                $this->compileTimeClassConstNames[$this->compilingClassLc][$lcConst] = $constName;
                 $this->compileTimeClassConstVisibility[$this->compilingClassLc][$lcConst]
                     = ClassConstVisibility::mask($constOp->classConstVisibilityFlags);
                 if (null !== $constOp->deprecatedMetadata) {
@@ -9932,6 +9957,11 @@ class Compiler {
         }
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            // Class constants are case-sensitive — do not fold wrong casing (#25910).
+            $declared = $this->compileTimeClassConstNames[$lcClass][$lcConst] ?? null;
+            if (!ClassConstName::matchesDeclared($constName, $declared)) {
+                return null;
+            }
             if (!$this->compileTimeClassConstFetchAllowed($lcClass, $lcConst, $block)) {
                 return null;
             }
@@ -56932,7 +56962,11 @@ class Compiler {
             return false;
         }
 
-        return isset($this->compileTimeClassConsts[$lcClass][strtolower($constName)]);
+        return isset($this->compileTimeClassConsts[$lcClass][strtolower($constName)])
+            && ClassConstName::matchesDeclared(
+                $constName,
+                $this->compileTimeClassConstNames[$lcClass][strtolower($constName)] ?? null
+            );
     }
 
     protected function operandIsCompileTimeConstFetch(?Operand $operand, ?Block $block = null): bool
