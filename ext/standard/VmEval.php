@@ -104,9 +104,29 @@ final class VmEval
      * provenance matches php-src (#26032). Defaults to bare EVAL_FILENAME.
      *
      * Returns null on parse/compile failure (caller assigns false like Zend eval parse errors).
+     * Swallows {@see CompileFatal} — use {@see tryCompileBlockOrThrowCompileFatal()} when AOT/JIT
+     * must surface reference-profile rejects instead of silently emitting false (#26169).
      */
     public static function tryCompileBlock(Runtime $runtime, string $code, ?string $filename = null): ?Block
     {
+        try {
+            return self::tryCompileBlockOrThrowCompileFatal($runtime, $code, $filename);
+        } catch (CompileFatal) {
+            return null;
+        }
+    }
+
+    /**
+     * Like {@see tryCompileBlock()}, but rethrows {@see CompileFatal}.
+     *
+     * AOT TYPE_EVAL lowering must not swallow final-plain-property (and similar) rejects into
+     * emitFalse + continue — that printed `parsed_ok` while Zend exits 255 (#26169, re-#25535).
+     */
+    public static function tryCompileBlockOrThrowCompileFatal(
+        Runtime $runtime,
+        string $code,
+        ?string $filename = null
+    ): ?Block {
         Runtime::clearLastParseFailure();
         $runtime->compiler->resetCompileAbortDetail();
         $wrapped = self::wrapEvalCode($code);
@@ -114,6 +134,8 @@ final class VmEval
 
         try {
             return $runtime->parseAndCompile($wrapped, $filename);
+        } catch (CompileFatal $e) {
+            throw $e;
         } catch (\CompileError) {
             return null;
         } catch (\Throwable) {
