@@ -286,6 +286,7 @@ final class VmPDOStatement
 
     /**
      * PDO_FETCH_CLASS — object_init_ex + property update + optional ctor (php-src do_fetch, #25641).
+     * PDO_FETCH_CLASSTYPE — first column is the class name (#25667).
      *
      * @param array<string|int, mixed> $assoc
      * @param list<Variable>|null      $ctorOverride temporary fetchAll/fetchObject ctor args
@@ -300,7 +301,25 @@ final class VmPDOStatement
         ?array $ctorOverride = null
     ): bool {
         $className = $classOverride ?? $st->fetchClassName;
-        if (null === $className || '' === $className) {
+        if (0 !== ($flags & PdoConstants::FETCH_CLASSTYPE)) {
+            // php-src: consume column 0 as class name; missing/non-string → stdClass.
+            $className = 'stdClass';
+            $firstKey = \array_key_first($assoc);
+            if (null !== $firstKey && \is_string($firstKey)) {
+                $fromCol = $assoc[$firstKey];
+                unset($assoc[$firstKey]);
+                if (\is_string($fromCol) && '' !== $fromCol) {
+                    $candidate = $fromCol;
+                    $lcCand = strtolower(ltrim($candidate, '\\'));
+                    if (!isset($ctx->classes[$lcCand])) {
+                        $ctx->autoloadClass($candidate);
+                    }
+                    if (isset($ctx->classes[$lcCand])) {
+                        $className = $candidate;
+                    }
+                }
+            }
+        } elseif (null === $className || '' === $className) {
             // php-src: No fetch class specified (ATTR_DEFAULT_FETCH_MODE / bare fetch).
             VmPDO::raiseImplError(
                 VmPDO::stateById($st->pdoId),
