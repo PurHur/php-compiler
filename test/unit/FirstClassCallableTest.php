@@ -243,14 +243,16 @@ echo $maker(42)->v, "\n";
 PHP, 'test.php');
     }
 
-    /** Issue #23714: PROFILE=8.4 allows new Class(...) constructor FCC (Zend/zend_compile.c). */
+    /** Issue #26188: PROFILE=8.4 still rejects new Class(...) FCC (php-src never accepts; re-#10130). */
     public function testVmNewExpressionFirstClassCallableProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $rt = new Runtime();
-            $block = $rt->parseAndCompile(<<<'PHP'
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Cannot create Closure for new expression');
+            $rt->parseAndCompile(<<<'PHP'
 <?php
 declare(strict_types=1);
 class Box {
@@ -259,9 +261,6 @@ class Box {
 $maker = new Box(...);
 echo $maker(42)->v;
 PHP, 'test.php');
-            ob_start();
-            $rt->run($block);
-            $this->assertSame('42', ob_get_clean());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

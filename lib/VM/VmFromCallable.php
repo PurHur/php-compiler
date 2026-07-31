@@ -67,16 +67,9 @@ final class VmFromCallable
 
     private static function fromStringCallable(Context $context, Block $block, string $name): JitVariable
     {
-        // PHP ≤8.3: Zend compile-fatal; 8.4+ VM lowers via ClosureSupport::fromNewClassCallable.
-        // JIT still lacks a constructor Call proxy (#23714) — reject with the Zend message only
-        // when the language profile withholds the feature.
+        // php-src compile-fatal for `new Class(...)` FCC on every version (#10130, #26188).
         if (str_starts_with($name, 'new ')) {
-            if (!\PHPCompiler\CompilerVersion::supportsNewFirstClassCallable()) {
-                throw new \LogicException('Cannot create Closure for new expression');
-            }
-            throw new \LogicException(
-                'new(...) first-class callable is not supported in JIT in this compiler build'
-            );
+            throw new \LogicException('Cannot create Closure for new expression');
         }
 
         if (str_contains($name, '::')) {
