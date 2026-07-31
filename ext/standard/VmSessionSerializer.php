@@ -16,8 +16,11 @@ use PHPCompiler\VM\Variable;
  */
 final class VmSessionSerializer
 {
+    /** php-src PS_BIN_MAX — keys longer than this are skipped on encode. */
+    private const BIN_MAX_KEY_LEN = 127;
+
     /**
-     * Encode $_SESSION with the active session.serialize_handler (#26089).
+     * Encode $_SESSION with the active session.serialize_handler (#26089 / #26090).
      *
      * @return string|false
      */
@@ -25,20 +28,21 @@ final class VmSessionSerializer
     {
         return match (VmIni::getSessionSerializeHandler()) {
             'php_serialize' => self::encodePhpSerialize($ctx, $session),
-            // php_binary: #26090 — fall through to php until implemented
+            'php_binary' => self::encodePhpBinary($ctx, $session),
             default => self::encodePhp($ctx, $session),
         };
     }
 
     /**
-     * Decode payload with the active session.serialize_handler (#26089).
+     * Decode payload with the active session.serialize_handler (#26089 / #26090).
      *
-     * {@code php} merges keys; {@code php_serialize} replaces $_SESSION.
+     * {@code php} / {@code php_binary} merge keys; {@code php_serialize} replaces $_SESSION.
      */
     public static function decode(Context $ctx, string $payload): bool
     {
         return match (VmIni::getSessionSerializeHandler()) {
             'php_serialize' => self::decodePhpSerialize($ctx, $payload),
+            'php_binary' => self::decodePhpBinary($ctx, $payload),
             default => self::decodePhp($ctx, $payload),
         };
     }
@@ -264,6 +268,78 @@ final class VmSessionSerializer
         }
 
         return false;
+    }
+
+    /**
+     * php_binary handler encode — length-prefixed keys (php-src session.c, #26090).
+     *
+     * @return string|false
+     */
+    public static function encodePhpBinary(Context $ctx, HashTable $session)
+    {
+        $out = '';
+        foreach ($session->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $keyVar = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== ($keyVar->type & 0x7f)) {
+                continue;
+            }
+            $key = $keyVar->toString();
+            $keyLen = \strlen($key);
+            if ($keyLen > self::BIN_MAX_KEY_LEN) {
+                continue;
+            }
+            $out .= \chr($keyLen).$key.VmSerialize::serializeValue($ctx, $valueVar);
+        }
+
+        return $out;
+    }
+
+    /**
+     * php_binary handler decode — merges keys like {@see decodePhp} (php-src session.c, #26090).
+     */
+    public static function decodePhpBinary(Context $ctx, string $payload): bool
+    {
+        $incoming = new HashTable();
+        $pos = 0;
+        $len = \strlen($payload);
+        while ($pos < $len) {
+            $namelen = \ord($payload[$pos]) & self::BIN_MAX_KEY_LEN;
+            if ($namelen > self::BIN_MAX_KEY_LEN || ($pos + 1 + $namelen) >= $len) {
+                return false;
+            }
+            ++$pos;
+            $key = \substr($payload, $pos, $namelen);
+            $pos += $namelen;
+            if ('' === $key) {
+                return false;
+            }
+            $span = self::serializedValueByteLength($payload, $pos);
+            if (null === $span) {
+                return false;
+            }
+            $fragment = \substr($payload, $pos, $span);
+            $decoded = VmSerialize::unserializePayload($ctx, $fragment);
+            if (false === $decoded && 'b:0;' !== $fragment) {
+                return false;
+            }
+            $slot = new Variable();
+            if ($decoded instanceof Variable) {
+                $slot->copyFrom($decoded);
+            } else {
+                $slot->copyFrom(VmJson::import($decoded));
+            }
+            $incoming->add($key, $slot);
+            $pos += $span;
+        }
+        $sessionVar = $ctx->ensureSuperglobal('_SESSION');
+        if (Variable::TYPE_ARRAY !== ($sessionVar->type & 0x7f)) {
+            $sessionVar->array(new HashTable());
+        } else {
+            $sessionVar->separateArrayForWrite();
+        }
+        $sessionVar->toArray()->mergeStringKeysFrom($incoming, true);
+
+        return true;
     }
 
     public static function decodeWireHashTable(string $payload): ?HashTable
