@@ -142,6 +142,11 @@ final class Variable {
      */
     public bool $ephemeralConcatTemp = false;
 
+    /**
+     * By-ref actual is a call/method return temp — notice already emitted; mutator may use it (#25815).
+     */
+    public bool $nonVariableByRefTempAllowed = false;
+
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 

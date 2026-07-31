@@ -252,6 +252,18 @@ final class ReferencableCheck
                 }
                 continue;
             }
+            // reset/end/next/prev: call/method return temps → E_NOTICE + operate on temporary
+            // (zend_execute.c ZEND_SEND_VAR_NO_REF). Inline literals/casts/ternary stay Error (#25815).
+            if (
+                0 === $paramIdx
+                && self::isArrayInternalPointerMutatorBuiltin($fn)
+                && !self::isReferenceable($calledArgs[$paramIdx], $caller)
+                && self::isFuncCallReturnTempArg($calledArgs[$paramIdx], $caller)
+                && self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+            ) {
+                self::emitNonVariableByRefNotice($caller);
+                continue;
+            }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
             self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
         }
@@ -297,7 +309,8 @@ final class ReferencableCheck
 
     /**
      * Read-only pointer builtins may use materialized array literals (current/key/pos).
-     * Mutators (next/prev/reset/end) require an lvalue (#10557, #10295, #16594).
+     * Mutators (next/prev/reset/end) reject literals with by-ref Error (#10557, #10295, #16594)
+     * but allow call/method return temps with E_NOTICE (#25815).
      * array_multisort() also accepts inline arrays (zend_compile.c ZEND_SEND_REF).
      * Also used when wiring hoisted pointer FuncCall siblings before var_export(..., true) (#13829, #16556).
      */
@@ -321,6 +334,79 @@ final class ReferencableCheck
     public static function isArrayInternalPointerMutatorBuiltin(string $fn): bool
     {
         return \in_array(strtolower($fn), ['next', 'prev', 'reset', 'end'], true);
+    }
+
+    /**
+     * Scope slot written by FUNCCALL_EXEC_RETURN (func/method/new result) — not an lvalue (#25815).
+     */
+    public static function scopeSlotIsFuncCallReturn(Block $block, int $slot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && (int) $op->arg1 === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Non-variable call/method/new return temp used as by-ref actual (#25815, ZEND_SEND_VAR_NO_REF).
+     */
+    public static function isFuncCallReturnTempArg(Variable $arg, Frame $caller): bool
+    {
+        if ($arg->isIndirect()) {
+            return false;
+        }
+        $slot = self::scopeSlotForVariable($caller, $arg);
+        if (null === $slot || null === $caller->block) {
+            return false;
+        }
+        if ($caller->block->isNamedVariableSlot($slot)) {
+            return false;
+        }
+
+        return self::scopeSlotIsFuncCallReturn($caller->block, $slot);
+    }
+
+    /**
+     * Compile-time: operand is a FuncCall/MethodCall/StaticCall/New_ result temporary (#25815).
+     */
+    public static function operandIsFuncCallReturn(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        $current = $operand;
+        while ($current instanceof Temporary && null !== $current->original) {
+            $current = $current->original;
+        }
+        foreach ($current->usages as $usage) {
+            if (
+                (
+                    $usage instanceof \PHPCfg\Op\Expr\FuncCall
+                    || $usage instanceof \PHPCfg\Op\Expr\NsFuncCall
+                    || $usage instanceof \PHPCfg\Op\Expr\MethodCall
+                    || $usage instanceof \PHPCfg\Op\Expr\StaticCall
+                    || $usage instanceof \PHPCfg\Op\Expr\New_
+                )
+                && $usage->result === $current
+            ) {
+                return true;
+            }
+        }
+        if (null !== $block) {
+            $slot = $block->slotForOperand($operand);
+            if (null !== $slot) {
+                if ($block->isNamedVariableSlot((int) $slot)) {
+                    return false;
+                }
+
+                return self::scopeSlotIsFuncCallReturn($block, (int) $slot);
+            }
+        }
+
+        return false;
     }
 
     /** reset/current/key/… — ext/standard/array.c internal pointer API (#4967, #11196). */
