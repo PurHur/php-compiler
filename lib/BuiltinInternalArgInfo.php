@@ -112,6 +112,8 @@ final class BuiltinInternalArgInfo
             'flush' => 'void',
             // InternalArgInfo false|array; Zend stubs are array only (#25780)
             'ob_get_status', 'ob_list_handlers' => 'array',
+            // ext/libxml/libxml.stub.php — InternalArgInfo return object (#25844)
+            'libxml_get_errors' => 'array',
             default => null,
         };
     }
@@ -443,6 +445,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/standard/dns.stub.php — &$hosts / &$weights untyped (InternalArgInfo array) (#25780)
             'getmxrr', 'dns_get_mx' => ($index >= 1 && $index <= 2) ? '' : null,
+            // ext/libxml/libxml.stub.php — ?bool $use_errors = null (InternalArgInfo bool) (#25844)
+            'libxml_use_internal_errors' => 0 === $index ? '?bool' : null,
             default => null,
         };
     }

@@ -150,6 +150,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
     }
 
+    /** php-src ext/libxml/libxml.stub.php — array return; ?bool $use_errors = null (#25844). */
+    public function testLibxmlErrorControlReflectionStubs(): void
+    {
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_errors'));
+        $this->assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('libxml_use_internal_errors', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('libxml_use_internal_errors', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('use_errors', $info['name']);
+        $this->assertSame('?bool', $info['type']);
+        $this->assertTrue($info['isOptional']);
+    }
+
     /** php-src ext/standard/string.stub.php — array|string|null $allowed_tags (#25594). */
     public function testStripTagsAllowedTagsReflectionUnion(): void
     {
