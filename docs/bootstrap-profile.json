@@ -1236,6 +1236,7 @@
         "ext/lz4/lz4_compress.php",
         "ext/lz4/lz4_uncompress.php",
         "ext/lzf/JitLzf.php",
+        "ext/lzf/LzfExtensionPolicy.php",
         "ext/lzf/LzfJitHelper.php",
         "ext/lzf/Module.php",
         "ext/lzf/VmLzf.php",
@@ -4753,6 +4754,7 @@
         "ext/zstd/Module.php",
         "ext/zstd/VmZstdCore.php",
         "ext/zstd/VmZstdNative.php",
+        "ext/zstd/ZstdExtensionPolicy.php",
         "ext/zstd/ZstdJitHelper.php",
         "ext/zstd/zstd_compress.php",
         "ext/zstd/zstd_decompress.php",
@@ -6012,6 +6014,7 @@
         "lib/VM/Builtin/EnumCasesConstruct.php",
         "lib/VM/Builtin/ErrorExceptionConstruct.php",
         "lib/VM/Builtin/ErrorExceptionGetSeverity.php",
+        "lib/VM/Builtin/ExceptionClone.php",
         "lib/VM/Builtin/ExceptionConstruct.php",
         "lib/VM/Builtin/ExceptionGetCode.php",
         "lib/VM/Builtin/ExceptionGetFile.php",
@@ -6874,9 +6877,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6640,
+        "inventory_files": 6643,
         "excluded": 0,
-        "eligible": 6640,
+        "eligible": 6643,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -1,5 +1,13 @@
 --TEST--
 stdlib lzf_compress/lzf_decompress JIT round-trip via LzfJitHelper (#6384, #8805, ext/lzf/lzf.c)
+--ENV--
+PHP_COMPILER_ENABLE_LZF=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\lzf\LzfExtensionPolicy::advertisesExtension()) {
+    die('skip lzf withheld (#25287)');
+}
+?>
 --JIT--
 --FILE--
 <?php
