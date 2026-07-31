@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Variable;
 
 /** DOMDocument::loadHTMLFile() — VM (#18734, php-src ext/dom/php_dom.c). */
 final class DocumentLoadHTMLFile extends DomClassMethod
@@ -24,11 +23,8 @@ final class DocumentLoadHTMLFile extends DomClassMethod
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::loadHTMLFile()', 0);
         $options = 0;
         if (isset($frame->calledArgs[2])) {
-            $optionsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
-                throw new \TypeError('DOMDocument::loadHTMLFile(): Argument #2 ($options) must be of type int');
-            }
-            $options = $optionsVar->toInt();
+            // Z_PARAM_LONG $options (#25768).
+            $options = $this->zParamLongArg($frame, 2, 'DOMDocument::loadHTMLFile', 2, 'options');
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::loadHTMLFile() requires VM context in this compiler build');

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Variable;
 
 /** DOMDocument::xinclude() — XInclude substitution count (php-src ext/dom/document.c; #14370). */
 final class DocumentXInclude extends DomClassMethod
@@ -23,14 +22,8 @@ final class DocumentXInclude extends DomClassMethod
         }
         $options = 0;
         if (isset($frame->calledArgs[1])) {
-            $optionsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
-                throw new \TypeError(sprintf(
-                    'DOMDocument::xinclude() expects argument #1 to be of type int, %s given',
-                    VmDom::typeLabel($optionsVar)
-                ));
-            }
-            $options = $optionsVar->toInt();
+            // Z_PARAM_LONG $options (#25768).
+            $options = $this->zParamLongArg($frame, 1, 'DOMDocument::xinclude', 1, 'options');
         }
         $count = VmDom::xinclude($frame->vmContext, $document, $options, $frame);
         if (null !== $frame->returnVar) {

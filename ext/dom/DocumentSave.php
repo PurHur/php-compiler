@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\Variable;
 
 /** DOMDocument::save() — VM (#18435, php-src ext/dom/php_dom.c). */
 final class DocumentSave extends DomClassMethod
@@ -24,11 +23,8 @@ final class DocumentSave extends DomClassMethod
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::save()', 0, $frame, 'filename');
         $options = 0;
         if (isset($frame->calledArgs[2])) {
-            $optionsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
-                throw new \TypeError('DOMDocument::save(): Argument #2 ($options) must be of type int');
-            }
-            $options = $optionsVar->toInt();
+            // Z_PARAM_LONG $options (#25768).
+            $options = $this->zParamLongArg($frame, 2, 'DOMDocument::save', 2, 'options');
         }
         $result = VmDom::save($receiver, $filename, $options, $frame);
         if (null === $frame->returnVar) {

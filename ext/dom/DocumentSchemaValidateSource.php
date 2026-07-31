@@ -26,14 +26,8 @@ final class DocumentSchemaValidateSource extends DomClassMethod
         $source = $this->stringArg($frame->calledArgs[1], 'DOMDocument::schemaValidateSource()', 0, $frame, 'source');
         $flags = 0;
         if (isset($frame->calledArgs[2])) {
-            $flagsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \TypeError(sprintf(
-                    'DOMDocument::schemaValidateSource() expects argument #2 to be of type int, %s given',
-                    VmDom::typeLabel($flagsVar)
-                ));
-            }
-            $flags = $flagsVar->toInt();
+            // Z_PARAM_LONG $flags (#25768).
+            $flags = $this->zParamLongArg($frame, 2, 'DOMDocument::schemaValidateSource', 2, 'flags');
         }
         $ok = VmDom::schemaValidateSource($frame->vmContext, $document, $source, $flags, $frame);
         if (null !== $frame->returnVar) {

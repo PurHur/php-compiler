@@ -27,14 +27,8 @@ final class DocumentSchemaValidate extends DomClassMethod
         $filename = $this->stringArg($frame->calledArgs[1], 'DOMDocument::schemaValidate()', 0, $frame, 'filename');
         $flags = 0;
         if (isset($frame->calledArgs[2])) {
-            $flagsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \TypeError(sprintf(
-                    'DOMDocument::schemaValidate() expects argument #2 to be of type int, %s given',
-                    VmDom::typeLabel($flagsVar)
-                ));
-            }
-            $flags = $flagsVar->toInt();
+            // Z_PARAM_LONG $flags (#25768).
+            $flags = $this->zParamLongArg($frame, 2, 'DOMDocument::schemaValidate', 2, 'flags');
         }
         $ok = VmDom::schemaValidate($frame->vmContext, $document, $filename, $flags, $frame);
         if (null !== $frame->returnVar) {
