@@ -26,9 +26,9 @@ final class ReflectionEnumBackedCaseGetBackingValue extends VmClassMethod
         if (null === $entry || !$entry->isEnum || null === $entry->backedType) {
             throw new \LogicException('ReflectionEnumBackedCase refers to unknown backed enum in this compiler build');
         }
-        $caseLc = \PHPCompiler\ClassConstName::key($caseName);
+        $caseKey = \PHPCompiler\ClassConstName::key($caseName);
         foreach ($entry->enumCases as $case) {
-            if (strtolower($case['name']) === $caseLc) {
+            if (\PHPCompiler\ClassConstName::key($case['name']) === $caseKey) {
                 if (null !== $frame->returnVar) {
                     $frame->returnVar->copyFrom($case['value']);
                 }

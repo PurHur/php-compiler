@@ -3999,8 +3999,9 @@ final class VmReflection
         if (null === $reucClass) {
             throw new \LogicException('ReflectionEnumUnitCase is not registered in this compiler build');
         }
-        $caseLc = strtolower($caseName);
-        if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
+        // Case-sensitive key (Zend enum cases / #25910 / #25929) — not strtolower (#25940).
+        $caseKey = \PHPCompiler\ClassConstName::key($caseName);
+        if (!isset($enumEntry->enumCaseCanonicalNames[$caseKey])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)
             );
@@ -4010,7 +4011,7 @@ final class VmReflection
         \PHPCompiler\VM\ReflectionSupport::initReflectionEnumCaseMetadata(
             $obj,
             $enumEntry->name,
-            $enumEntry->enumCaseCanonicalNames[$caseLc]
+            $enumEntry->enumCaseCanonicalNames[$caseKey]
         );
 
         return $obj;
@@ -4031,8 +4032,9 @@ final class VmReflection
         if (null === $enumEntry->backedType) {
             throw new \LogicException('ReflectionEnumBackedCase expects a backed enum class');
         }
-        $caseLc = strtolower($caseName);
-        if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
+        // Case-sensitive key (Zend enum cases / #25910 / #25929) — not strtolower (#25940).
+        $caseKey = \PHPCompiler\ClassConstName::key($caseName);
+        if (!isset($enumEntry->enumCaseCanonicalNames[$caseKey])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)
             );
@@ -4042,7 +4044,7 @@ final class VmReflection
         \PHPCompiler\VM\ReflectionSupport::initReflectionEnumCaseMetadata(
             $obj,
             $enumEntry->name,
-            $enumEntry->enumCaseCanonicalNames[$caseLc]
+            $enumEntry->enumCaseCanonicalNames[$caseKey]
         );
 
         return $obj;
