@@ -1977,20 +1977,20 @@ final class VmFs
     }
 
     /**
-     * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
+     * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754, #25924).
+     *
+     * php-src returns the result of php_stream_set_option(READ_TIMEOUT): false for
+     * memory/temp/plainfile (option unsupported), true only when the transport accepts it.
      */
     public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool
     {
         $fp = self::lookup($handle);
         if (null === $fp) {
+            // Native memory/temp/fd handles have no host FILE* — same as unsupported option.
             return false;
         }
-        if (@\stream_set_timeout($fp, $seconds, $microseconds)) {
-            return true;
-        }
 
-        // php-src: read timeout applies to socket transports; memory/file are no-op success (#3754).
-        return !VmStreamMeta::isSocketTransport(self::handleUri($handle));
+        return (bool) @\stream_set_timeout($fp, $seconds, $microseconds);
     }
 
     public static function ftruncate(int $handle, int $size): bool

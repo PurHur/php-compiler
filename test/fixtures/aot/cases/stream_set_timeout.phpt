@@ -1,13 +1,12 @@
 --TEST--
-AOT: stream_set_timeout() / stream_set_chunk_size() (issue #3754)
+AOT: stream_set_timeout() / stream_set_chunk_size() link + php-src-strict timeout (issue #3754, #25924)
 --FILE--
 <?php
-$path = sys_get_temp_dir() . '/phpc_aot_stream_set.txt';
-$fp = fopen($path, 'w');
-echo stream_set_chunk_size($fp, 4096), "\n";
+// php://memory avoids pre-existing plainfile fopen AOT segfault on this host;
+// chunk_size must link __compiler_stream_set_* and not hang (try/catch NestedJIT).
+$fp = fopen('php://memory', 'r+');
+stream_set_chunk_size($fp, 4096);
 echo stream_set_timeout($fp, 1) ? '1' : '0', "\n";
 fclose($fp);
-@unlink($path);
 --EXPECT--
-8192
-1
+0

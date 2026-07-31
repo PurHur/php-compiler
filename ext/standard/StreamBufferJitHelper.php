@@ -15,11 +15,11 @@ final class StreamBufferJitHelper
 {
     public static function setChunkSizeArgv(int $handle, int $chunkSize): int
     {
-        try {
-            $previous = VmFs::streamSetChunkSize($handle, $chunkSize);
-        } catch (\ValueError) {
+        // Avoid try/catch in NestedJIT AOT helpers — try edges hang under AOT (#25924).
+        if ($chunkSize <= 0) {
             return -1;
         }
+        $previous = VmFs::streamSetChunkSize($handle, $chunkSize);
         if (false === $previous) {
             return -1;
         }
