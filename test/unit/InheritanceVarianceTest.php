@@ -622,4 +622,94 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** Zend: cannot make static method non-static (#25634). */
+    public function testStaticToInstanceFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A1 { public static function f() {} }
+class B1 extends A1 { public function f() {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot make static method A1::f() non static in class B1');
+        $runtime->parseAndCompile($code, 'static_to_inst.php');
+    }
+
+    /** Zend: cannot make non-static method static (#25634). */
+    public function testInstanceToStaticFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A1 { public function f() {} }
+class B1 extends A1 { public static function f() {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot make non static method A1::f() static in class B1');
+        $runtime->parseAndCompile($code, 'inst_to_static.php');
+    }
+
+    /** Zend: cannot weaken public→protected (#25634). */
+    public function testVisibilityWeakenPublicToProtectedFails(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A2 { public function f() {} }
+class B2 extends A2 { protected function f() {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Access level to B2::f() must be public (as in class A2)');
+        $runtime->parseAndCompile($code, 'vis_weaken.php');
+    }
+
+    /** Zend: cannot weaken protected→private (#25634). */
+    public function testVisibilityWeakenProtectedToPrivateFails(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { protected function f() {} }
+class B extends A { private function f() {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Access level to B::f() must be protected (as in class A) or weaker');
+        $runtime->parseAndCompile($code, 'vis_prot_priv.php');
+    }
+
+    /** Zend: visibility strengthen protected→public is OK (#25634). */
+    public function testVisibilityStrengthenAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A2 { protected function f() {} }
+class B2 extends A2 { public function f() {} }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'vis_strengthen.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Private parent methods are not overridden — incompatible child is OK (#25634). */
+    public function testPrivateParentNotOverridden(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { private static function f(): int { return 1; } }
+class B extends A { public function f(): string { return "x"; } }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'priv_not_override.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
