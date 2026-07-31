@@ -58,11 +58,11 @@ final class ArrayMapCallbackPolicy
     /** Scalar types Zend rejects before callable dispatch (ext/standard/array.c; #12676). */
     public static function isPhpSrcInvalidCallbackType(int $type): bool
     {
+        // TYPE_ARRAY is not a scalar reject — object/method callables are valid (#25711 / #1154).
         return \in_array($type, [
             VMVariable::TYPE_INTEGER,
             VMVariable::TYPE_BOOLEAN,
             VMVariable::TYPE_FLOAT,
-            VMVariable::TYPE_ARRAY,
         ], true);
     }
 
@@ -94,7 +94,6 @@ final class ArrayMapCallbackPolicy
 
     public static function vmRejectionMessage(): string
     {
-        return 'array_map() callback must be null, a string builtin name, a closure, or an invokable object in this compiler build; '
-            .self::DEFERRED_KINDS.' are deferred';
+        return 'array_map() callback must be null, a string builtin name, a closure, an invokable object, or an array callable in this compiler build';
     }
 }

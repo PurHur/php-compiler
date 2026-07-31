@@ -14,13 +14,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Func\PHP;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayFilterRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
-use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -55,8 +53,8 @@ final class array_filter extends Internal
 
             return;
         }
-        [$closure, $internal, $userFn] = VmArrayFilterCallback::resolve($frame, $callbackArg);
-        if (null === $closure && null === $internal && null === $userFn) {
+        [$closure, $internal, $userFn, $general] = VmArrayFilterCallback::resolve($frame, $callbackArg);
+        if (null === $closure && null === $internal && null === $userFn && null === $general) {
             self::filterDefault($src, $out);
             $frame->returnVar->array($out);
 
@@ -66,7 +64,16 @@ final class array_filter extends Internal
             throw new \LogicException('array_filter() requires VM context in this compiler build');
         }
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
-            $keep = self::invokeCallback($frame->vmContext, $closure, $internal, $userFn, $mode, $key, $value);
+            $keep = self::invokeCallback(
+                $frame,
+                $closure,
+                $internal,
+                $userFn,
+                $general,
+                $mode,
+                $key,
+                $value
+            );
             if (boolval::isTruthy($keep)) {
                 array_map::appendKeyedCopy($out, $key, $value);
             }
@@ -108,14 +115,42 @@ final class array_filter extends Internal
     }
 
     private static function invokeCallback(
-        VmContext $context,
+        Frame $frame,
         ?ClosureState $closure,
         ?Internal $internal,
         ?PHP $userFn,
+        ?Variable $general,
         int $mode,
         Variable $key,
         Variable $value,
     ): Variable {
+        $context = $frame->vmContext;
+        if (null !== $general) {
+            return match ($mode) {
+                StdlibConstants::ARRAY_FILTER_USE_KEY => VmCallable::invokeAsWithScope(
+                    'array_filter',
+                    $context,
+                    $frame,
+                    $general,
+                    $key
+                ),
+                StdlibConstants::ARRAY_FILTER_USE_BOTH => VmCallable::invokeAsWithScope(
+                    'array_filter',
+                    $context,
+                    $frame,
+                    $general,
+                    $value,
+                    $key
+                ),
+                default => VmCallable::invokeAsWithScope(
+                    'array_filter',
+                    $context,
+                    $frame,
+                    $general,
+                    $value
+                ),
+            };
+        }
         if (null !== $closure) {
             return match ($mode) {
                 StdlibConstants::ARRAY_FILTER_USE_KEY => VmClosureCall::invokeOne($context, $closure, $key),

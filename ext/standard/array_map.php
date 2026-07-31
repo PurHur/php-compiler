@@ -27,10 +27,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_map() — null zip, string builtins, and closure callbacks (ext/standard/array.c; #4539).
+ * array_map() — null zip, string builtins, closure/invokable/array callables (ext/standard/array.c; #4539, #25711).
  *
  * JIT/AOT: null, compile-time string builtins, and closure/arrow callbacks with native int/double
- * returns are lowered (issue #142). [class, method] callables deferred (#1154); invokable objects VM-only (#16228).
+ * returns are lowered (issue #142). [class, method] callables remain JIT-deferred (#1154) but work on VM.
  */
 final class array_map extends Internal
 {
@@ -129,8 +129,15 @@ final class array_map extends Internal
             if (null === $frame->vmContext) {
                 throw new \LogicException('array_map() requires VM context in this compiler build');
             }
+            self::requireArrayCallable($frame, $callback);
             foreach ($src->iterateKeyed(true) as [$key, $value]) {
-                $mapped = VmCallable::invoke($frame->vmContext, $callback, $value);
+                $mapped = VmCallable::invokeAsWithScope(
+                    'array_map',
+                    $frame->vmContext,
+                    $frame,
+                    $callback,
+                    $value
+                );
                 self::appendKeyed($out, $key, $mapped);
             }
 
@@ -157,6 +164,13 @@ final class array_map extends Internal
         $out = new HashTable();
         $first = $arrays[0];
         $destIdx = 0;
+        $useVmCallable = self::isVmCallableCallback($callback);
+        if ($useVmCallable) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_map() requires VM context in this compiler build');
+            }
+            self::requireArrayCallable($frame, $callback);
+        }
         foreach ($first->iterateKeyed(true) as [$key, $_value]) {
             $rowArgs = [];
             foreach ($arrays as $ht) {
@@ -170,11 +184,14 @@ final class array_map extends Internal
 
                 continue;
             }
-            if (self::isVmCallableCallback($callback)) {
-                if (null === $frame->vmContext) {
-                    throw new \LogicException('array_map() requires VM context in this compiler build');
-                }
-                $mapped = VmCallable::invoke($frame->vmContext, $callback, ...$rowArgs);
+            if ($useVmCallable) {
+                $mapped = VmCallable::invokeAsWithScope(
+                    'array_map',
+                    $frame->vmContext,
+                    $frame,
+                    $callback,
+                    ...$rowArgs
+                );
                 $out->addIndex($destIdx++, $mapped);
 
                 continue;
@@ -190,7 +207,7 @@ final class array_map extends Internal
                 continue;
             }
             throw new \LogicException(
-                'array_map() with multiple arrays requires a null, closure, invokable object, or string builtin callback in this compiler build'
+                'array_map() with multiple arrays requires a null, closure, invokable object, array callable, or string builtin callback in this compiler build'
             );
         }
 
@@ -241,7 +258,35 @@ final class array_map extends Internal
     private static function isVmCallableCallback(Variable $callback): bool
     {
         return VmClosureCall::isClosure($callback)
-            || Variable::TYPE_OBJECT === $callback->type;
+            || Variable::TYPE_OBJECT === $callback->type
+            || Variable::TYPE_ARRAY === $callback->type;
+    }
+
+    /**
+     * Reject inaccessible / malformed object-array callables with Zend wording (#25711).
+     * Closures and invokable objects skip this gate (handled by invokeAsWithScope).
+     */
+    private static function requireArrayCallable(Frame $frame, Variable $callback): void
+    {
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $callback->type) {
+            return;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('array_map() requires VM context in this compiler build');
+        }
+        if (VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
+            return;
+        }
+        VmCallable::throwIfInaccessibleMethodCallback(
+            $frame->vmContext,
+            $callback,
+            'array_map',
+            1,
+            $frame,
+            true
+        );
+        throw new \TypeError(ArrayMapCallbackPolicy::invalidCallbackTypeError());
     }
 
     private static function typeLabel(Variable $var): string
