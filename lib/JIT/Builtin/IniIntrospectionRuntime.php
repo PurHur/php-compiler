@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for php_ini_loaded_file() / php_ini_scanned_files() via IniIntrospectionJitHelper PHP (#11562).
+ * JIT/AOT link for php_ini_loaded_file() / php_ini_scanned_files() via IniIntrospectionJitHelper PHP (#11562, #25630).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer PosixTimes #25600 / GetcwdJit #25541).
  * Replaces LLVM getenv lowering in {@see \PHPCompiler\ext\standard\JitIniIntrospection}.
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmIniIntrospection}
- * php-src: ext/standard/ini.c
+ * php-src: ext/standard/basic_functions.c — php_ini_loaded_file / php_ini_scanned_files
  */
 final class IniIntrospectionRuntime
 {
@@ -149,44 +149,18 @@ final class IniIntrospectionRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after IniIntrospectionJitHelper compile (#11562)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25630');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'IniIntrospectionJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('IniIntrospectionJitHelper.php parseAndCompile failed (#11562)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#11562)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25630'
+        );
     }
 
     private static function ensureValueWriters(Context $context): void
