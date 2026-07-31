@@ -2502,6 +2502,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_ucfirst'));
     }
 
+    /** @covers issue #23657 */
+    public function testMbStrtolowerStrtoupperZendStubNamedParams(): void
+    {
+        foreach (['mb_strtolower', 'mb_strtoupper'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'encoding='], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn));
+            // Legacy InternalArgInfo name must not resolve (Zend rejects $str)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
+        }
+    }
+
     /** @covers issue #23383 */
     public function testFilterInputZendStubNamedParams(): void
     {

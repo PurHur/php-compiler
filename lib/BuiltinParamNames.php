@@ -1401,6 +1401,10 @@ final class BuiltinParamNames
             case 'mb_lcfirst':
             case 'mb_ucfirst':
                 return ['string', 'encoding='];
+            // php-src ext/mbstring/mbstring.stub.php — InternalArgInfo still str (#23657)
+            case 'mb_strtolower':
+            case 'mb_strtoupper':
+                return ['string', 'encoding='];
             case 'htmlspecialchars':
             case 'htmlentities':
                 return ['string', 'flags', 'encoding', 'double_encode'];
