@@ -1424,10 +1424,13 @@ final class VmDom
             return self::falseBoolVariable();
         }
         // Dom\HTMLDocument::createElement — lowercase + HTML namespace (php-src document.c; #21030).
+        // Dom\HTML_NO_DEFAULT_NS during loadHTML omits the default XHTML ns (#26008).
         $namespaceUri = null;
         if (self::isLivingHtmlDocument($ownerDocument)) {
             $name = strtolower($name);
-            $namespaceUri = VmDomLiving::HTML_NS;
+            if (!DomRegistry::state($ownerDocument)->htmlNoDefaultNs) {
+                $namespaceUri = VmDomLiving::HTML_NS;
+            }
         }
         $class = self::resolveElementClassForNamespace($ctx, $ownerDocument, $namespaceUri);
 
@@ -7609,6 +7612,10 @@ final class VmDom
         // else legacy DOMDocument defaults to ISO-8859-1 (bare UTF-8 bytes → mojibake).
         $isLiving = VmDomLiving::isLivingDocument($document);
         $state = DomRegistry::state($document);
+        // Dom\HTML_NO_DEFAULT_NS — omit default XHTML ns while building the tree (#26008).
+        $prevHtmlNoDefaultNs = $state->htmlNoDefaultNs;
+        $state->htmlNoDefaultNs = $isLiving
+            && 0 !== ($options & DomLivingConstants::HTML_NO_DEFAULT_NS);
         $overrideEncoding = $isLiving ? $state->encoding : null;
         $hadBom = false;
         if (str_starts_with($cursor, "\xEF\xBB\xBF")) {
@@ -7632,7 +7639,11 @@ final class VmDom
         $cursor = self::decodeHtmlLoadBytes($cursor, $decodeEncoding);
 
         $source = self::normalizeHtmlLoadSource($cursor, $options);
-        $root = self::parseHtmlElementTree($ctx, $source, $document, $frame);
+        try {
+            $root = self::parseHtmlElementTree($ctx, $source, $document, $frame);
+        } finally {
+            $state->htmlNoDefaultNs = $prevHtmlNoDefaultNs;
+        }
         if (null === $root) {
             return false;
         }
@@ -12832,6 +12843,10 @@ final class VmDom
         ?string $namespaceUri
     ): ClassEntry {
         if (self::isLivingHtmlDocument($ownerDocument) && VmDomLiving::HTML_NS !== $namespaceUri) {
+            // HTML_NO_DEFAULT_NS parse: still HTMLElement (null ns), not Dom\Element (#26008).
+            if (null === $namespaceUri && DomRegistry::state($ownerDocument)->htmlNoDefaultNs) {
+                return self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
+            }
             $state = DomRegistry::state($ownerDocument);
             $extendedLc = $state->nodeClassMap[VmDomLiving::CLASS_ELEMENT] ?? null;
             if (null !== $extendedLc && isset($ctx->classes[$extendedLc])) {

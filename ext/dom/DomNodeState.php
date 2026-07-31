@@ -254,6 +254,12 @@ final class DomNodeState
     /** True after DOMDocument::loadHTML() (php-src ext/dom/document.c; #14356). */
     public bool $isHtmlDocument = false;
 
+    /**
+     * Temporary Dom\HTML_NO_DEFAULT_NS parse flag — omit default XHTML ns on createElement
+     * during HTMLDocument load (php-src html_document.c; #26008). Cleared after loadHTML.
+     */
+    public bool $htmlNoDefaultNs = false;
+
     /** True after DOMDocument::loadXML() — saveHTML expands empty elements (re-#18618, ext/dom/php_dom.c). */
     public bool $loadedViaXml = false;
 
