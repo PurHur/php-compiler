@@ -196,6 +196,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzdecode'));
     }
 
+    /** php-src base64.c / string.stub.php — InternalArgInfo omits |false (#25477). */
+    public function testBase64DecodeHex2binReflectionReturnUnions(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('base64_decode'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('hex2bin'));
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — string / void (#25623). */
     public function testPregLastErrorMsgAndErrorClearLastReflectionReturns(): void
     {
