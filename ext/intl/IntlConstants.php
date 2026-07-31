@@ -9,6 +9,7 @@ namespace PHPCompiler\ext\intl;
  *
  * GRAPHEME_EXTR_* ship with the intl module only — withhold when
  * {@see IntlExtensionPolicy::advertisesGraphemeCore()} is false (#24128).
+ * ICU U_* error codes register with the module (#23998).
  */
 final class IntlConstants
 {
@@ -16,9 +17,14 @@ final class IntlConstants
     public static function registeredConstants(): array
     {
         $constants = [];
+        // php-src ext/intl/php_intl.c — ICU UErrorCode globals with the module (#23998).
+        if (IntlExtensionPolicy::advertisesExtension()) {
+            $constants = IcuErrorConstants::registeredConstants();
+        }
         // php-src ext/intl/php_intl.c — grapheme extract modes with the module (#24128).
         if (IntlExtensionPolicy::advertisesGraphemeCore()) {
             $constants = [
+                ...$constants,
                 'GRAPHEME_EXTR_COUNT' => VmGrapheme::EXTR_COUNT,
                 'GRAPHEME_EXTR_MAXBYTES' => VmGrapheme::EXTR_MAXBYTES,
                 'GRAPHEME_EXTR_MAXCHARS' => VmGrapheme::EXTR_MAXCHARS,
