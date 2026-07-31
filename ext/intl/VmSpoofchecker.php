@@ -25,6 +25,9 @@ final class VmSpoofchecker
 {
     public const CLASS_LC = 'spoofchecker';
 
+    /** ICU U_INVALID_STATE_ERROR — areConfusable without confusable check bits (#25209). */
+    public const U_INVALID_STATE_ERROR = 27;
+
     /** @see unicode/uspoof.h USPOOF_* */
     public const SINGLE_SCRIPT_CONFUSABLE = 1;
     public const MIXED_SCRIPT_CONFUSABLE = 2;
@@ -38,6 +41,11 @@ final class VmSpoofchecker
     public const HIDDEN_OVERLAY = 256;
     public const ALL_CHECKS = 0xFFFF;
     public const AUX_INFO = 0x40000000;
+
+    /** Bits that make uspoof_areConfusableUTF8 valid (ICU uspoof.h; #25209). */
+    private const CONFUSABLE_CHECK_MASK = self::SINGLE_SCRIPT_CONFUSABLE
+        | self::MIXED_SCRIPT_CONFUSABLE
+        | self::WHOLE_SCRIPT_CONFUSABLE;
 
     /** @see URestrictionLevel */
     public const ASCII = 0x10000000;
@@ -57,7 +65,7 @@ final class VmSpoofchecker
     /** ICU ≥73 only (php-src stub gated on U_ICU_VERSION_MAJOR_NUM >= 73). */
     public const SIMPLE_CASE_INSENSITIVE = 6;
 
-    /** @var array<int, array{handle: object|null, allowed_pattern?: string, allowed_options?: int}> */
+    /** @var array<int, array{handle: object|null, checks?: int, allowed_pattern?: string, allowed_options?: int}> */
     private static array $state = [];
 
     private static ?\FFI $ffi = null;
@@ -168,7 +176,10 @@ final class VmSpoofchecker
     public static function construct(ObjectEntry $object): void
     {
         $handle = self::openSpoof();
-        self::$state[$object->id] = ['handle' => $handle];
+        self::$state[$object->id] = [
+            'handle' => $handle,
+            'checks' => self::ALL_CHECKS,
+        ];
         $object->constructed = true;
         self::maybeAdvertiseSimpleCaseInsensitive($object);
         if (null === $handle) {
@@ -252,7 +263,15 @@ final class VmSpoofchecker
                     );
                     $code = (int) $status->cdata;
                     if ($code > 0) {
-                        IntlError::set($code, 'Spoofchecker::areConfusable(): U_FAILURE');
+                        // php-src spoofchecker_main.c / intl_error — leave code for caller to warn (#25209).
+                        IntlError::set(
+                            $code,
+                            \sprintf(
+                                'Spoofchecker::areConfusable(): (%d) %s',
+                                $code,
+                                IntlError::errorName($code)
+                            )
+                        );
 
                         return [true, $ret];
                     }
@@ -263,6 +282,21 @@ final class VmSpoofchecker
                     // fall through
                 }
             }
+        }
+
+        $checks = (int) ($state['checks'] ?? self::ALL_CHECKS);
+        if (0 === ($checks & self::CONFUSABLE_CHECK_MASK)) {
+            IntlError::set(
+                self::U_INVALID_STATE_ERROR,
+                \sprintf(
+                    'Spoofchecker::areConfusable(): (%d) %s',
+                    self::U_INVALID_STATE_ERROR,
+                    IntlError::errorName(self::U_INVALID_STATE_ERROR)
+                )
+            );
+            $ret = self::fallbackConfusableBits($string1, $string2);
+
+            return [$ret !== 0, $ret];
         }
 
         $ret = self::fallbackConfusableBits($string1, $string2);
@@ -306,6 +340,7 @@ final class VmSpoofchecker
         if (null === $state) {
             throw new \Error('Spoofchecker::setChecks() called on uninitialized Spoofchecker');
         }
+        self::$state[$object->id]['checks'] = $checks;
         $handle = $state['handle'];
         if (null === $handle) {
             return;
@@ -934,6 +969,22 @@ final class SpoofcheckerAreConfusable extends VmClassMethod
         $s1 = VmSpoofchecker::coerceStringArg($frame->calledArgs[1], 'Spoofchecker::areConfusable', 0, 'string1');
         $s2 = VmSpoofchecker::coerceStringArg($frame->calledArgs[2], 'Spoofchecker::areConfusable', 1, 'string2');
         [$confusable, $bits] = VmSpoofchecker::areConfusable($object, $s1, $s2);
+        // php-src spoofchecker_main.c — U_FAILURE → E_WARNING "(code) U_*"; intl slot cleared (#25209).
+        $errCode = IntlError::getCode();
+        if ($errCode > 0) {
+            $frame->vmContext->errors->languageWarning(
+                \sprintf(
+                    'Spoofchecker::areConfusable(): (%d) %s',
+                    $errCode,
+                    IntlError::errorName($errCode)
+                ),
+                null,
+                0,
+                $frame->vmContext,
+                $frame
+            );
+            IntlError::clear();
+        }
         if ($argc >= 4) {
             // ZEND_SEND_REF writeback — php-src spoofchecker_main.c (#25055)
             $frame->calledArgs[3]->byRefTarget()->int($bits);
