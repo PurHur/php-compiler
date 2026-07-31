@@ -426,7 +426,13 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::isStaticallyCallableMethod($ctx, $resolved, $method, $callerClassLc);
+            return VmReflection::isStaticallyCallableMethod(
+                $ctx,
+                $resolved,
+                $method,
+                $callerClassLc,
+                $scopeFrame
+            );
         }
         $callableName = $name;
         if (!self::isValidFunctionName($name)) {
@@ -492,7 +498,13 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::isStaticallyCallableMethod($ctx, $resolved, $method, $callerClassLc);
+            return VmReflection::isStaticallyCallableMethod(
+                $ctx,
+                $resolved,
+                $method,
+                $callerClassLc,
+                $scopeFrame
+            );
         }
 
         return false;
