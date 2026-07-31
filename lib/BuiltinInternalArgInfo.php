@@ -523,6 +523,9 @@ final class BuiltinInternalArgInfo
             'datetimeimmutable::settime' => 3 === $index ? 'int' : null,
             // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
             'dateperiod::__construct' => '',
+            // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25056)
+            'resourcebundle::__construct' => ($index === 0 || $index === 1) ? '?string' : null,
+            'resourcebundle::create' => ($index === 0 || $index === 1) ? '?string' : null,
             default => null,
         };
     }
