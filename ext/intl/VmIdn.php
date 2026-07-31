@@ -31,6 +31,33 @@ final class VmIdn
 
     public const IDNA_CHECK_CONTEXTO = 64;
 
+    /** php-src IDNA_ERROR_* bitflags (uidna.h / idn.c; #24096) */
+    public const IDNA_ERROR_EMPTY_LABEL = 1;
+
+    public const IDNA_ERROR_LABEL_TOO_LONG = 2;
+
+    public const IDNA_ERROR_DOMAIN_NAME_TOO_LONG = 4;
+
+    public const IDNA_ERROR_LEADING_HYPHEN = 8;
+
+    public const IDNA_ERROR_TRAILING_HYPHEN = 16;
+
+    public const IDNA_ERROR_HYPHEN_3_4 = 32;
+
+    public const IDNA_ERROR_LEADING_COMBINING_MARK = 64;
+
+    public const IDNA_ERROR_DISALLOWED = 128;
+
+    public const IDNA_ERROR_PUNYCODE = 256;
+
+    public const IDNA_ERROR_LABEL_HAS_DOT = 512;
+
+    public const IDNA_ERROR_INVALID_ACE_LABEL = 1024;
+
+    public const IDNA_ERROR_BIDI = 2048;
+
+    public const IDNA_ERROR_CONTEXTJ = 4096;
+
     /** php-src INTL_IDNA_VARIANT_2003 (removed as usable variant in PHP 7.4+) */
     public const VARIANT_2003 = 0;
 
@@ -66,6 +93,19 @@ final class VmIdn
             'IDNA_NONTRANSITIONAL_TO_ASCII' => self::IDNA_NONTRANSITIONAL_TO_ASCII,
             'IDNA_NONTRANSITIONAL_TO_UNICODE' => self::IDNA_NONTRANSITIONAL_TO_UNICODE,
             'IDNA_CHECK_CONTEXTO' => self::IDNA_CHECK_CONTEXTO,
+            'IDNA_ERROR_EMPTY_LABEL' => self::IDNA_ERROR_EMPTY_LABEL,
+            'IDNA_ERROR_LABEL_TOO_LONG' => self::IDNA_ERROR_LABEL_TOO_LONG,
+            'IDNA_ERROR_DOMAIN_NAME_TOO_LONG' => self::IDNA_ERROR_DOMAIN_NAME_TOO_LONG,
+            'IDNA_ERROR_LEADING_HYPHEN' => self::IDNA_ERROR_LEADING_HYPHEN,
+            'IDNA_ERROR_TRAILING_HYPHEN' => self::IDNA_ERROR_TRAILING_HYPHEN,
+            'IDNA_ERROR_HYPHEN_3_4' => self::IDNA_ERROR_HYPHEN_3_4,
+            'IDNA_ERROR_LEADING_COMBINING_MARK' => self::IDNA_ERROR_LEADING_COMBINING_MARK,
+            'IDNA_ERROR_DISALLOWED' => self::IDNA_ERROR_DISALLOWED,
+            'IDNA_ERROR_PUNYCODE' => self::IDNA_ERROR_PUNYCODE,
+            'IDNA_ERROR_LABEL_HAS_DOT' => self::IDNA_ERROR_LABEL_HAS_DOT,
+            'IDNA_ERROR_INVALID_ACE_LABEL' => self::IDNA_ERROR_INVALID_ACE_LABEL,
+            'IDNA_ERROR_BIDI' => self::IDNA_ERROR_BIDI,
+            'IDNA_ERROR_CONTEXTJ' => self::IDNA_ERROR_CONTEXTJ,
             'INTL_IDNA_VARIANT_2003' => self::VARIANT_2003,
             'INTL_IDNA_VARIANT_UTS46' => self::VARIANT_UTS46,
         ];
