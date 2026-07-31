@@ -13284,6 +13284,23 @@ class JIT {
                         $name->value,
                         $op->classConstVisibilityFlags
                     );
+                    if ([] !== $op->attributeNames) {
+                        $classLc = '' !== $this->context->scope->className
+                            ? strtolower(ltrim($this->context->scope->className, '\\'))
+                            : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
+                        if ('' !== $classLc) {
+                            $attrNames = [];
+                            foreach ($op->attributeNames as $n) {
+                                $attrNames[] = ltrim($n, '\\');
+                            }
+                            AttributeRegistry::emitRegisterMethod(
+                                $this->context,
+                                $classLc,
+                                \PHPCompiler\ClassConstName::key((string) $name->value),
+                                $attrNames
+                            );
+                        }
+                    }
                     break;
                 }
                 if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
@@ -13313,10 +13330,12 @@ class JIT {
                             foreach ($op->attributeNames as $n) {
                                 $attrNames[] = ltrim($n, '\\');
                             }
+                            // Member key must match ReflectionClassConstant::$name casing (#25963).
+                            // Lookup uses strcasecmp, so ClassConstName::key (exact) is sufficient.
                             AttributeRegistry::emitRegisterMethod(
                                 $this->context,
                                 $classLc,
-                                strtolower($name->value),
+                                \PHPCompiler\ClassConstName::key((string) $name->value),
                                 $attrNames
                             );
                         }
