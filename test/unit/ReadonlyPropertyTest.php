@@ -94,6 +94,48 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_assign_ref.php'));
     }
 
+    /** @covers issue #25620 — by-ref fetch itself Errors (not only later write) */
+    public function testReadonlyPropertyRejectsByRefFetchAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public function __construct(public readonly int $x) {}
+}
+$a = new A(1);
+try {
+    $r = &$a->x;
+    echo "REF_OK\n";
+} catch (Error $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_byref_fetch.php'));
+        $this->assertSame("Error:Cannot modify readonly property A::\$x\n", ob_get_clean());
+    }
+
+    /** @covers issue #25620 — uninitialized readonly uses "indirectly modify" */
+    public function testUninitializedReadonlyPropertyRejectsByRefFetch(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class E { public readonly int $x; }
+$e = new E();
+try {
+    $r = &$e->x;
+    echo "OK\n";
+} catch (Error $err) {
+    echo $err->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_byref_uninit.php'));
+        $this->assertSame("Cannot indirectly modify readonly property E::\$x\n", ob_get_clean());
+    }
+
     public function testReadonlyClassPropertyRejectsAssignThroughReferenceAfterConstruct(): void
     {
         $runtime = new Runtime();

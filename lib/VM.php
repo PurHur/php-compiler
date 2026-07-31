@@ -4200,6 +4200,12 @@ restart:
                     }
                     $this->emitPropertyWriteDeprecation($lhs, $frame);
                     $rhsSlot = $frame->scope[$op->arg2];
+                    // `$r = &$obj->readonlyProp` — also guard here when fetch temp carries owner (#25620).
+                    $catchFrame = $this->enforceReadonlyPropertyFetchByRef($rhsSlot, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     // Reference acquisition follows set visibility (php.net asymmetric visibility, #7070).
                     $catchFrame = $this->enforcePropertyVisibilityWrite($rhsSlot, $frame);
                     if (null !== $catchFrame) {
@@ -7847,6 +7853,15 @@ restart:
                             $writeProxy = new Variable();
                             $writeProxy->objectPropertyOwner = $propertyObject;
                             $writeProxy->objectPropertyName = $name;
+                            // `$r = &$obj->readonlyProp` — zend_readonly.c get_property_ptr_ptr (#25620).
+                            // Must Error before binding; write-through checks alone leave REF_OK.
+                            if ($this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                                $catchFrame = $this->enforceReadonlyPropertyFetchByRef($writeProxy, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                            }
                             // `$r = &$obj->hooked` — PROPERTY_FETCH_WRITE feeds ASSIGN_REF; Zend rejects
                             // without `&get` at get_ptr time, not as write-only (#22475).
                             if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
@@ -8018,6 +8033,17 @@ restart:
                         break;
                     }
                     if ($forWrite) {
+                        // Missing / uninitialized declared prop still trips by-ref readonly (#25620).
+                        if ($this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                            $missingRefProxy = new Variable();
+                            $missingRefProxy->objectPropertyOwner = $propertyObject;
+                            $missingRefProxy->objectPropertyName = $name;
+                            $catchFrame = $this->enforceReadonlyPropertyFetchByRef($missingRefProxy, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         $catchFrame = $this->enforceReadonlyDynamicPropertyCreate($propertyObject, $name, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -14132,6 +14158,38 @@ restart:
     ): void {
         // No-op: php-src has no "Cannot modify final property" write path.
         unset($object, $propName);
+    }
+
+    /**
+     * Reject `&$obj->readonlyProp` at fetch-for-write / ASSIGN_REF time (#25620).
+     *
+     * php-src: Zend/zend_readonly.c / zend_object_handlers.c get_property_ptr_ptr —
+     * initialized props use "Cannot modify…"; uninitialized use "Cannot indirectly modify…".
+     */
+    private function enforceReadonlyPropertyFetchByRef(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null !== $owner && VM\ObjectReadonlySupport::isDynamicReadonly($owner)) {
+            return $this->dispatchVmError(
+                VM\ObjectReadonlySupport::modifyObjectMessage($owner),
+                $frame
+            );
+        }
+        if (null === $owner) {
+            return null;
+        }
+        $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
+        $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
+        if (null === $declaringClass) {
+            return null;
+        }
+        $uninitialized = !$owner->hasProperty($prop)
+            || VM\TypedPropertyCheck::isUninitialized($owner->getProperty($prop));
+        $message = $uninitialized
+            ? sprintf('Cannot indirectly modify readonly property %s::$%s', $declaringClass, $prop)
+            : sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop);
+
+        return $this->dispatchVmError($message, $frame);
     }
 
     /**
