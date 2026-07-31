@@ -3983,7 +3983,17 @@ restart:
             $this->executingFrame = $frame;
             $this->context->executionLimits->check($this->context, $frame);
             $op = $frame->block->opCodes[$frame->pos++];
-            $this->assertDeferredDefinitionsBeforeRuntime($op->type);
+            try {
+                $this->assertDeferredDefinitionsBeforeRuntime($op->type);
+            } catch (\Error $deferredParentError) {
+                // Missing extends parent — Zend Error (catchable); was LogicException soft message (#25627).
+                $catchFrame = $this->dispatchVmError($deferredParentError->getMessage(), $frame);
+                if (null !== $catchFrame) {
+                    $frame = $catchFrame;
+                    goto restart;
+                }
+                break;
+            }
             try {
                 switch ($op->type) {
                 case OpCode::TYPE_TYPE_ASSERT:
@@ -9338,7 +9348,17 @@ restart:
             $this->finalizeAllDeferredClassConstants();
         }
         if ([] !== $this->context->deferredParentInheritance) {
-            $this->finalizeDeferredParentInheritance();
+            try {
+                $this->finalizeDeferredParentInheritance();
+            } catch (\Error $deferredParentError) {
+                $catchFrame = $this->dispatchVmError($deferredParentError->getMessage(), $frame);
+                if (null !== $catchFrame) {
+                    $frame = $catchFrame;
+                    goto restart;
+                }
+
+                return self::FAIL;
+            }
         }
 
         return self::SUCCESS;
@@ -17015,10 +17035,13 @@ restart:
             return;
         }
         $deferred = $this->context->deferredParentInheritance[0];
-        $childName = $this->context->classes[$deferred['childLc']]->name ?? $deferred['childLc'];
-        throw new \LogicException(
-            "Class {$childName} extends unknown class {$deferred['parentName']}"
-        );
+        $parentName = $deferred['parentName'];
+        // Zend does not leave the child class defined when the parent is missing (#25627).
+        // Do not re-invoke autoload here: TYPE_DECLARE_CLASS already tried, and a nested
+        // autoload frame would re-enter finalize at SUCCESS and recurse (#25627).
+        unset($this->context->classes[$deferred['childLc']]);
+        $this->context->deferredParentInheritance = [];
+        throw new \Error($this->classNotFoundMessage($parentName));
     }
 
     protected function finalizeDeferredTraitUses(): void
