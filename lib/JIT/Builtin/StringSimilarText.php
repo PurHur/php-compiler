@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_similar_text via SimilarTextJitHelper PHP (#9731).
+ * JIT/AOT link for phpc_similar_text via SimilarTextJitHelper PHP (#9731, #25784).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Getrusage #25754 / PosixTimes #25600).
  * Replaces former ~420-line LLVM Oliver algorithm with thin char* bridges into {@see VmString} SSOT.
  * php-src: ext/standard/string.c — php_similar_text, PHP_FUNCTION(similar_text)
  */
@@ -41,8 +42,20 @@ final class StringSimilarText
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
@@ -89,40 +102,17 @@ final class StringSimilarText
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SimilarTextJitHelper compile (#9731)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25784');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SimilarTextJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('SimilarTextJitHelper.php parseAndCompile failed (#9731)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9731)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25784'
+        );
     }
 }
