@@ -66,7 +66,9 @@ final class uksort_ extends Internal
                 $frame->vmContext,
                 $pairs,
                 $callback,
-                $descending
+                $descending,
+                $frame,
+                'uksort'
             );
         }
         $sorted = new HashTable();
