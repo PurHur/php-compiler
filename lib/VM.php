@@ -16741,28 +16741,11 @@ restart:
                 $this->assertMethodCallableStatically($class, $methodLc);
             }
         } catch (\LogicException $e) {
-            $magicClass = $this->findMagicCallStaticClass($lcClass);
-            if (null === $magicClass) {
-                throw $e;
+            // Missing method → zend_std_get_static_method slow path → __callStatic (#3273).
+            if ($this->tryDispatchCallStatic($frame, $lcClass, $methodName)) {
+                return;
             }
-            $frame->magicCallMethodName = $methodName;
-            $vis = $magicClass->methodVisibility['__callstatic'] ?? \PHPCfg\Func::FLAG_PUBLIC;
-            $callerClassLc = null;
-            if (null !== $frame->block->func && null !== $frame->block->func->class) {
-                $callerClassLc = strtolower($frame->block->func->class->value);
-            }
-            MethodVisibility::assertCallable(
-                $vis,
-                $callerClassLc,
-                strtolower($magicClass->name),
-                $magicClass->name,
-                '__callStatic'
-            );
-            $frame->call = $magicClass->methods['__callstatic'];
-            $frame->callArgs = [];
-            $frame->callArgEntries = [];
-
-            return;
+            throw $e;
         }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = $this->callerClassLc($frame);
@@ -16778,23 +16761,62 @@ restart:
         }
         $declaredName = $class->methodNames[$methodLc] ?? $methodName;
         $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
-        // zend_vm_def.h: INIT_STATIC_METHOD_CALL + CONSTRUCTOR → "Cannot call private …::__construct()" (#25663).
-        $staticConstructorCall = '__construct' === $methodLc;
-        MethodVisibility::assertCallable(
-            $vis,
-            $callerClassLc,
-            strtolower($class->name),
-            $class->name,
-            $declaredName,
-            $parentScopeAllows,
-            fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-            $callerDisplay,
-            $staticConstructorCall
-        );
+        try {
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($class->name),
+                $class->name,
+                $declaredName,
+                $parentScopeAllows,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $callerDisplay
+            );
+        } catch (\LogicException $e) {
+            // Inaccessible private/protected static → same __callStatic fallback as missing
+            // methods (php-src get_static_method_fallback / #25670, re-#3273).
+            if ($this->tryDispatchCallStatic($frame, $lcClass, $methodName)) {
+                return;
+            }
+            throw $e;
+        }
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = $class->name.'::'.$declaredName;
+    }
+
+    /**
+     * Bind a static call to __callStatic when present (Zend get_static_method_fallback).
+     *
+     * Used for both missing methods (#3273) and inaccessible private/protected statics (#25670).
+     *
+     * @return bool true when the frame was bound to __callStatic
+     */
+    private function tryDispatchCallStatic(Frame $frame, string $lcClass, string $methodName): bool
+    {
+        $magicClass = $this->findMagicCallStaticClass($lcClass);
+        if (null === $magicClass) {
+            return false;
+        }
+        $frame->magicCallMethodName = $methodName;
+        $vis = $magicClass->methodVisibility['__callstatic'] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null;
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        MethodVisibility::assertCallable(
+            $vis,
+            $callerClassLc,
+            strtolower($magicClass->name),
+            $magicClass->name,
+            '__callStatic'
+        );
+        $frame->call = $magicClass->methods['__callstatic'];
+        $frame->callArgs = [];
+        $frame->callArgEntries = [];
+
+        return true;
     }
 
     /**
@@ -18095,12 +18117,6 @@ restart:
                 // this runtime path (see final class const #22329 / final property #22988).
                 $this->rejectChildOverrideOfFinalMethod($entry, $parent, $name);
                 // Cross-file / eval LSP: same-script InheritanceVariance never sees the parent (#25384).
-                $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
-                continue;
-            }
-            // Child redeclared a concrete parent method as abstract (zend_inheritance.c, #25660).
-            // Abstract decls live in abstractMethods, not methods — still enforce before inherit.
-            if (isset($entry->abstractMethods[$name])) {
                 $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
                 continue;
             }
