@@ -235,6 +235,41 @@ final class VmUserStream
         return boolval::isTruthy($result);
     }
 
+    /**
+     * Userspace stream_set_option (php-src userspace.c user_stream_set_option; #25996 / #25999).
+     *
+     * Missing stream_set_option → false. Truthy return → option accepted.
+     */
+    public static function setOption(int $handle, int $option, int $arg1, ?int $arg2 = null): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_set_option')) {
+            return false;
+        }
+        $optVar = new Variable();
+        $optVar->int($option);
+        $a1 = new Variable();
+        $a1->int($arg1);
+        $a2 = new Variable();
+        if (null === $arg2) {
+            $a2->null();
+        } else {
+            $a2->int($arg2);
+        }
+        $result = $state->vm->invokeInstanceMethod(
+            $state->wrapper,
+            'stream_set_option',
+            $optVar,
+            $a1,
+            $a2
+        )->resolveIndirect();
+
+        return boolval::isTruthy($result);
+    }
+
     public static function close(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;

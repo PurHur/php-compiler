@@ -2031,9 +2031,14 @@ final class VmFs
      *
      * php-src returns the result of php_stream_set_option(READ_TIMEOUT): false for
      * memory/temp/plainfile (option unsupported), true only when the transport accepts it.
+     * User wrappers: STREAM_OPTION_READ_TIMEOUT via stream_set_option (#25996).
      */
     public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            // php-src: PHP_STREAM_OPTION_READ_TIMEOUT = 4; arg1=sec, arg2=usec
+            return VmUserStream::setOption($handle, 4, $seconds, $microseconds);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             // Native memory/temp/fd handles have no host FILE* — same as unsupported option.
