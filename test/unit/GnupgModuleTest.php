@@ -5,22 +5,42 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\gnupg\GnupgExtensionPolicy;
+use PHPCompiler\ext\gnupg\VmGnupgNative;
 use PHPCompiler\ext\standard\ModuleRegistry;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * gnupg module registration (issue #6668).
+ * gnupg module registration (issue #6668, #25360).
  *
  * @group gnupg
  */
 final class GnupgModuleTest extends TestCase
 {
+    /** @var string|false|null */
+    private $prevEnable = null;
+
+    protected function setUp(): void
+    {
+        $this->prevEnable = getenv('PHP_COMPILER_ENABLE_GNUPG');
+        putenv('PHP_COMPILER_ENABLE_GNUPG=1');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevEnable || null === $this->prevEnable) {
+            putenv('PHP_COMPILER_ENABLE_GNUPG');
+        } else {
+            putenv('PHP_COMPILER_ENABLE_GNUPG='.$this->prevEnable);
+        }
+    }
+
     public function test_gnupg_init_registered_when_gpgme_available(): void
     {
-        if (!GnupgExtensionPolicy::advertisesExtension()) {
+        if (!VmGnupgNative::available()) {
             $this->markTestSkipped('libgpgme FFI unavailable');
         }
+        self::assertTrue(GnupgExtensionPolicy::advertisesExtension());
 
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
@@ -46,7 +66,7 @@ PHP;
 
     public function test_issue_repro_script(): void
     {
-        if (!GnupgExtensionPolicy::advertisesExtension()) {
+        if (!VmGnupgNative::available()) {
             $this->markTestSkipped('libgpgme FFI unavailable');
         }
         $path = dirname(__DIR__).'/repro/issue_6668_gnupg_init.php';
@@ -60,7 +80,7 @@ PHP;
 
     public function test_encrypt_decrypt_roundtrip_when_test_keys_present(): void
     {
-        if (!GnupgExtensionPolicy::advertisesExtension()) {
+        if (!VmGnupgNative::available()) {
             $this->markTestSkipped('libgpgme FFI unavailable');
         }
         $home = getenv('GNUPGHOME');

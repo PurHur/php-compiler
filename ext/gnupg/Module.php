@@ -8,9 +8,11 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * gnupg extension module entry (PECL gnupg; #6668).
+ * gnupg extension module entry (PECL gnupg; #6668, #25360).
  *
- * Requires libgpgme via FFI — see Docker/dev/ubuntu-22.04/Dockerfile.
+ * Advertise gnupg_* / class gnupg / extension_loaded('gnupg') only when
+ * {@see GnupgExtensionPolicy::advertisesExtension()}. Requires libgpgme via FFI
+ * for runtime ops — see Docker/dev/ubuntu-22.04/Dockerfile.
  */
 class Module extends ModuleAbstract
 {

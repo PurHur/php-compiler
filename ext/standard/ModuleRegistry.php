@@ -174,8 +174,10 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\lz4\Lz4ExtensionPolicy::advertisesExtension();
         $withholdDsSurface = 'ds' === $primary
             && !\PHPCompiler\ext\ds\DsExtensionPolicy::advertisesExtension();
+        $withholdGnupgSurface = 'gnupg' === $primary
+            && !\PHPCompiler\ext\gnupg\GnupgExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface && !$withholdGmpSurface && !$withholdApcuSurface && !$withholdUuidSurface && !$withholdPspellSurface && !$withholdEnchantSurface && !$withholdZmqSurface && !$withholdZstdSurface && !$withholdLzfSurface && !$withholdLz4Surface && !$withholdDsSurface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface && !$withholdGmpSurface && !$withholdApcuSurface && !$withholdUuidSurface && !$withholdPspellSurface && !$withholdEnchantSurface && !$withholdZmqSurface && !$withholdZstdSurface && !$withholdLzfSurface && !$withholdLz4Surface && !$withholdDsSurface && !$withholdGnupgSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         } elseif ($registerSqlite3ExtensionLoaded) {
             self::register($module->getExtensionName(), $moduleVersion);
@@ -203,7 +205,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface || $withholdGmpSurface || $withholdApcuSurface || $withholdUuidSurface || $withholdPspellSurface || $withholdEnchantSurface || $withholdZmqSurface || $withholdZstdSurface || $withholdLzfSurface || $withholdLz4Surface || $withholdDsSurface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface || $withholdGmpSurface || $withholdApcuSurface || $withholdUuidSurface || $withholdPspellSurface || $withholdEnchantSurface || $withholdZmqSurface || $withholdZstdSurface || $withholdLzfSurface || $withholdLz4Surface || $withholdDsSurface || $withholdGnupgSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;
