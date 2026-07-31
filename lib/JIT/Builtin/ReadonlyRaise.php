@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT pending Error buffer for readonly property writes (#1360, #9522).
+ * JIT pending Error buffer for readonly property writes (#1360, #9522, #26041).
  *
  * LLVM ABI bridges call compiled {@see \PHPCompiler\ext\standard\ReadonlyRaiseJitHelper} PHP; no phpc_jit_pending_* globals.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer WeakRefRegistry #26028 / InetRuntime #26010).
  */
 final class ReadonlyRaise
 {
@@ -363,44 +364,18 @@ final class ReadonlyRaise
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ReadonlyRaiseJitHelper compile (#9522)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26041');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ReadonlyRaiseJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ReadonlyRaiseJitHelper.php parseAndCompile failed (#9522)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9522)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26041'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
