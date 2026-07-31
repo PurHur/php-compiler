@@ -18334,6 +18334,15 @@ restart:
 
     protected function inheritFromInterfaces(ClassEntry $entry): void
     {
+        $entryLc = strtolower(ltrim($entry->name, '\\'));
+        // Interfaces already satisfied by a parent — zend_inheritance.c does not re-check
+        // inherited method bodies against them (only overrides declared on this class) (#25868).
+        $inheritedIfaceSet = [];
+        if (null !== $entry->parentLc && isset($this->context->classes[$entry->parentLc])) {
+            foreach ($this->context->classes[$entry->parentLc]->interfaces as $parentIfaceLc) {
+                $inheritedIfaceSet[$parentIfaceLc] = true;
+            }
+        }
         foreach ($entry->interfaces as $ifaceLc) {
             if (!isset($this->context->classes[$ifaceLc])) {
                 continue;
@@ -18342,7 +18351,14 @@ restart:
             $this->inheritInterfacePropertyRules($entry, $iface);
             $this->inheritInterfacePropertyHooks($entry, $iface);
             // Cross-file interface LSP (same-script covered by InheritanceVariance) (#25384).
+            $ifaceInheritedFromParent = isset($inheritedIfaceSet[$ifaceLc]);
             foreach ($entry->methods as $methodLc => $_) {
+                if ($ifaceInheritedFromParent) {
+                    $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? $entryLc;
+                    if ($declLc !== $entryLc) {
+                        continue;
+                    }
+                }
                 if (isset($iface->methods[$methodLc]) || isset($iface->abstractMethods[$methodLc])) {
                     $this->rejectIncompatibleChildMethodSignature($entry, $iface, $methodLc);
                 }

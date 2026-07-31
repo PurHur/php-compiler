@@ -1907,11 +1907,11 @@ final class BuiltinClasses
     }
 
     /**
-     * php-src Zend/zend_exceptions.stub.php — Throwable method return types (#25427).
+     * php-src Zend/zend_exceptions.stub.php — Throwable method return types (#25427, #25868).
      *
-     * getCode() has no declared return in the stub. Applied on the interface only —
-     * concrete Exception/Error keep untyped Reflection under JIT (methodReturnDeclaredTypes
-     * + getReturnType still LLVM-verify-fails for builtins).
+     * getCode() has no declared return in the stub. Applied on Throwable and on concrete
+     * Exception/Error hierarchy entries so Reflection and LSP match Zend (subclassing the
+     * roots used to fatal on untyped inherited getmessage vs Throwable::getmessage(): string).
      */
     private static function applyThrowableMethodReturnTypes(ClassEntry $entry): void
     {
@@ -1928,6 +1928,46 @@ final class BuiltinClasses
             if (null !== $type) {
                 $entry->methodReturnDeclaredTypes[$methodLc] = $type;
             }
+        }
+    }
+
+    /**
+     * php-src Zend/zend_exceptions.stub.php — Exception/Error method table (#25868).
+     *
+     * Keys stay lowercase; methodNames keep Zend casing (getMessage not getmessage).
+     * Declaring class is Exception or Error (roots), matching zend_exceptions.c.
+     *
+     * @return array<string, \PHPCompiler\Func\Internal>
+     */
+    private static function throwableInstanceMethods(): array
+    {
+        return [
+            'getMessage' => new ExceptionGetMessage(),
+            'getCode' => new ExceptionGetCode(),
+            'getFile' => new ExceptionGetFile(),
+            'getLine' => new ExceptionGetLine(),
+            'getPrevious' => new ExceptionGetPrevious(),
+            'getTrace' => new ExceptionGetTrace(),
+            'getTraceAsString' => new ExceptionGetTraceAsString(),
+            '__toString' => new ExceptionToString(),
+        ];
+    }
+
+    /**
+     * @param array<string, \PHPCompiler\Func\Internal> $methods
+     */
+    private static function registerThrowableInstanceMethods(
+        ClassEntry $entry,
+        array $methods,
+        int $visibility,
+        string $declaringLc
+    ): void {
+        foreach ($methods as $name => $method) {
+            $lc = strtolower($name);
+            $entry->methods[$lc] = $method;
+            $entry->methodVisibility[$lc] = $visibility;
+            $entry->methodNames[$lc] = $name;
+            $entry->methodDeclaringClassLc[$lc] = $declaringLc;
         }
     }
 
@@ -1999,26 +2039,24 @@ final class BuiltinClasses
         }
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        $entry->methodNames['__construct'] = '__construct';
+        $entry->methodDeclaringClassLc['__construct'] = $lcKey;
         $entry->methods['__wakeup'] = new ExceptionWakeup();
         $entry->methodVisibility['__wakeup'] = $pub;
-        foreach (
-            [
-                'getmessage' => new ExceptionGetMessage(),
-                'getcode' => new ExceptionGetCode(),
-                'getfile' => new ExceptionGetFile(),
-                'getline' => new ExceptionGetLine(),
-                'getprevious' => new ExceptionGetPrevious(),
-                'gettrace' => new ExceptionGetTrace(),
-                'gettraceasstring' => new ExceptionGetTraceAsString(),
-                '__tostring' => new ExceptionToString(),
-            ] as $methodName => $method
-        ) {
-            $entry->methods[$methodName] = $method;
-            $entry->methodVisibility[$methodName] = $pub;
-        }
+        $entry->methodNames['__wakeup'] = '__wakeup';
+        $entry->methodDeclaringClassLc['__wakeup'] = $privateDeclaringLc;
+        self::registerThrowableInstanceMethods(
+            $entry,
+            self::throwableInstanceMethods(),
+            $pub,
+            $privateDeclaringLc
+        );
+        self::applyThrowableMethodReturnTypes($entry);
         if (ThrowableManifest::LC_ERROR_EXCEPTION === $lcKey) {
             $entry->methods['getseverity'] = new ErrorExceptionGetSeverity();
             $entry->methodVisibility['getseverity'] = $pub;
+            $entry->methodNames['getseverity'] = 'getSeverity';
+            $entry->methodDeclaringClassLc['getseverity'] = $lcKey;
         }
         $ctx->classes[$lcKey] = $entry;
     }

@@ -244,6 +244,53 @@ try {
         );
     }
 
+    /**
+     * User subclasses of Exception/Error must not fatal on Throwable LSP (#25868).
+     * php-src Zend/zend_exceptions.stub.php + zend_inheritance.c.
+     */
+    public function testUserSubclassOfExceptionAndErrorMatchesZend(): void
+    {
+        $this->assertVmCliOutput(
+            '<?php
+echo "named_Exception=";
+try {
+    eval(\'class E_Ex extends Exception { public function x(): int { return 1; } }\');
+    echo (new E_Ex("m"))->x() . "|" . (new E_Ex("m"))->getMessage();
+} catch (Throwable $e) {
+    echo get_class($e) . ":" . $e->getMessage();
+}
+echo "\n";
+echo "named_Error=";
+try {
+    eval(\'class E_Err extends Error { public function x(): int { return 1; } }\');
+    echo (new E_Err("m"))->x() . "|" . (new E_Err("m"))->getMessage();
+} catch (Throwable $e) {
+    echo get_class($e) . ":" . $e->getMessage();
+}
+echo "\n";
+echo "named_RuntimeException=";
+try {
+    eval(\'class E_Re extends RuntimeException { public function x(): int { return 1; } }\');
+    echo (new E_Re("m"))->x() . "|" . (new E_Re("m"))->getMessage();
+} catch (Throwable $e) {
+    echo get_class($e) . ":" . $e->getMessage();
+}
+echo "\n";
+echo "anon_Exception=";
+try {
+    $o = new class("m") extends Exception {
+        public function x(): int { return 1; }
+    };
+    echo $o->x() . "|" . $o->getMessage();
+} catch (Throwable $e) {
+    echo get_class($e) . ":" . $e->getMessage();
+}
+echo "\n";
+',
+            "named_Exception=1|m\nnamed_Error=1|m\nnamed_RuntimeException=1|m\nanon_Exception=1|m\n"
+        );
+    }
+
     private function assertVmCliOutput(string $code, string $expected): void
     {
         [$stdout, $exit] = $this->runVmCli($code);
