@@ -383,13 +383,21 @@ final class VmIntlCalendar
     ): void {
         $object->constructed = true;
         [$firstDow, $minDays] = self::localeWeekDefaults($locale);
-        $ts = VmDate::time();
+        // ICU GregorianCalendar starts at "now" including sub-second UDate (#25190).
+        $nowMs = (int) \floor(((float) VmDate::microtime(true)) * 1000.0);
+        $ts = intdiv($nowMs, 1000);
+        $ms = $nowMs % 1000;
+        if ($ms < 0) {
+            // PHP % can be negative for negative dividends; normalize to [0,999].
+            $ms += 1000;
+            --$ts;
+        }
         self::$state[$object->id] = [
             'timezone' => $timezoneId,
             'locale' => $locale,
             'timestamp' => $ts,
-            'millisecond' => 0,
-            'udate' => ((float) $ts) * 1000.0,
+            'millisecond' => $ms,
+            'udate' => (float) $nowMs,
             'unsetFields' => [],
             'repeatedWallTimeOption' => self::WALLTIME_LAST,
             'skippedWallTimeOption' => self::WALLTIME_LAST,
