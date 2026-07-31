@@ -23,6 +23,8 @@ final class BuiltinInternalDefaultValues
     private const NO_DEFAULT_AVAILABLE = [
         'array_walk::2' => true,
         'array_walk_recursive::2' => true,
+        // php-src basic_functions.stub.php — mixed $value = UNKNOWN (#25845)
+        'stream_context_set_option::3' => true,
     ];
 
     /**

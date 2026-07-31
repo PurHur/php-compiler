@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
@@ -3064,11 +3065,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($buf, 'buffer', 'stream_set_write_buffer'));
 
         $opt = BuiltinParamNames::forFunction('stream_context_set_option');
-        self::assertSame(['context', 'wrapper_or_options', 'option_name', 'value'], $opt);
+        self::assertSame(['context', 'wrapper_or_options', 'option_name=', 'value='], $opt);
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($opt, 'wrapper_or_options', 'stream_context_set_option'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($opt, 'option_name', 'stream_context_set_option'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($opt, 'wrappername', 'stream_context_set_option'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($opt, 'optionname', 'stream_context_set_option'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('stream_context_set_option'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('stream_context_set_option'));
 
         $setOptions = BuiltinParamNames::forFunction('stream_context_set_options');
         self::assertSame(['context', 'options'], $setOptions);
@@ -3722,6 +3725,45 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
         self::assertNull(
             BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_options', 0)
+        );
+    }
+
+    /** @covers issue #25845 */
+    public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
+    {
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_hkdf'));
+
+        self::assertSame(
+            ['context', 'wrapper_or_options', 'option_name=', 'value='],
+            BuiltinParamNames::forFunction('stream_context_set_option')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('stream_context_set_option'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('stream_context_set_option'));
+        self::assertSame(
+            'array|string',
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_option', 1)
+        );
+        self::assertSame(
+            '?string',
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_option', 2)
+        );
+        self::assertSame(
+            'mixed',
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_option', 3)
+        );
+        self::assertSame([], BuiltinByRefParams::forFunction('stream_context_set_option'));
+
+        $info3 = BuiltinInternalArgInfo::paramInfoForFunction('stream_context_set_option', 3);
+        self::assertNotNull($info3);
+        self::assertSame('mixed', $info3['type']);
+        // UNKNOWN default: optional via name `=`, but not materializable for Reflection (#25845)
+        self::assertFalse(
+            BuiltinInternalDefaultValues::isAvailable(
+                'stream_context_set_option',
+                3,
+                ['name' => 'value', 'type' => 'mixed', 'isOptional' => true],
+                false
+            )
         );
     }
 

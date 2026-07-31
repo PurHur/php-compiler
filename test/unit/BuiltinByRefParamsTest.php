@@ -209,9 +209,11 @@ final class BuiltinByRefParamsTest extends TestCase
 
     public function testStreamContextMutatorsFirstArgByRef(): void
     {
-        foreach (['stream_context_set_options', 'stream_context_set_option', 'stream_context_set_params'] as $fn) {
+        foreach (['stream_context_set_options', 'stream_context_set_params'] as $fn) {
             $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
         }
+        // php-src basic_functions.stub.php — $context not by-ref (#25845)
+        $this->assertSame([], BuiltinByRefParams::forFunction('stream_context_set_option'));
     }
 
     public function testSodiumMemzeroFirstArgByRef(): void

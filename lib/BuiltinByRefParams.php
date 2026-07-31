@@ -134,9 +134,11 @@ final class BuiltinByRefParams
             case 'openssl_seal':
                 return [1, 2, 5];
             case 'stream_context_set_options':
-            case 'stream_context_set_option':
             case 'stream_context_set_params':
                 return [0];
+            // php-src basic_functions.stub.php — $context not by-ref (#25845; set_options/params still &)
+            case 'stream_context_set_option':
+                return [];
             case 'exec':
                 return [1, 2];
             case 'passthru':
