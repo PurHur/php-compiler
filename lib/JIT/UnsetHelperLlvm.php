@@ -11,6 +11,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\VM\VmUnset;
 use PHPLLVM\Builder;
@@ -30,6 +31,10 @@ final class UnsetHelperLlvm
         $dimOp = $block->getOperand($op->arg3);
         $container = $context->getVariableFromOp($containerOp);
         $dim = $context->getVariableFromOp($dimOp);
+        // php-src DateInterval living unset is a no-op — skip value-box diamond entirely (#26180).
+        if ($op->unsetOnProperty && self::shouldNoopDateIntervalUnsetFromOps($containerOp, $dimOp, $block, $context)) {
+            return;
+        }
         if (Variable::TYPE_OBJECT === $container->type) {
             if ($op->unsetOnProperty) {
                 self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
@@ -262,6 +267,11 @@ final class UnsetHelperLlvm
             $blockClassName,
             $context->scope->className
         );
+        // php-src DateInterval living fields — unset is a no-op (ext/date/php_date.c; #26180).
+        // Skip before loadPropertyReceiver/propertyFetch: NATIVE_LONG←null breaks AOT verify.
+        if (self::shouldNoopDateIntervalUnset($declaringClass, $dimOp)) {
+            return;
+        }
         $receiver = self::loadPropertyReceiver($context, $containerOp);
         $null = new Variable(
             $context,
@@ -376,5 +386,52 @@ final class UnsetHelperLlvm
             'Property unset receiver must be object or object-valued property, got '
             .Variable::getStringType($var->type)
         );
+    }
+
+    /**
+     * php-src DateInterval living fields ignore unset (get_property_ptr_ptr → NULL; #26180).
+     *
+     * Value-box unset loses userType so declaringClass is often "object" — treat living
+     * property names as no-ops there too (avoids NATIVE_LONG←null store / verify failure).
+     * Typed non-DateInterval classes still take the normal unset path.
+     */
+    private static function shouldNoopDateIntervalUnset(string $declaringClass, Operand $dimOp): bool
+    {
+        $lc = strtolower(ltrim($declaringClass, '\\'));
+        $knownDi = 'dateinterval' === $lc;
+        $unresolved = 'object' === $lc || '' === $lc;
+        if ($dimOp instanceof Literal) {
+            if (!DateIntervalSupport::isLivingProperty((string) $dimOp->value)) {
+                return false;
+            }
+
+            return $knownDi || $unresolved;
+        }
+
+        // Dynamic unset($i->$p) on typed DateInterval — skip FetchDynamic. Unresolved
+        // dynamic keeps the normal path (avoid no-opping all value-box dynamic unsets).
+        return $knownDi;
+    }
+
+    /** Resolve declaring class from operands for early DateInterval unset no-op (#26180). */
+    private static function shouldNoopDateIntervalUnsetFromOps(
+        Operand $containerOp,
+        Operand $dimOp,
+        Block $block,
+        Context $context
+    ): bool {
+        $operandUserType = null !== $containerOp->type && Type::TYPE_OBJECT === $containerOp->type->type
+            ? $containerOp->type->userType
+            : null;
+        $blockClassName = null !== $block->func && null !== $block->func->class
+            ? $block->func->class->value
+            : null;
+        $declaringClass = VmUnset::resolveDeclaringClass(
+            $operandUserType,
+            $blockClassName,
+            $context->scope->className
+        );
+
+        return self::shouldNoopDateIntervalUnset($declaringClass, $dimOp);
     }
 }
