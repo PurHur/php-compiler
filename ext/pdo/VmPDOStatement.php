@@ -169,6 +169,16 @@ final class VmPDOStatement
             return false;
         }
         $count = VmSqlite3Native::columnCount($st->stmt);
+        // php-src do_fetch PDO_FETCH_KEY_PAIR — exactly 2 columns (#25640).
+        if (PdoConstants::FETCH_KEY_PAIR === $mode && 2 !== $count) {
+            VmPDO::raiseImplError(
+                VmPDO::stateById($st->pdoId),
+                'HY000',
+                'PDO::FETCH_KEY_PAIR fetch mode requires the result set to contain exactly 2 columns.'
+            );
+
+            return false;
+        }
         $assoc = [];
         $num = [];
         for ($i = 0; $i < $count; ++$i) {
@@ -178,12 +188,13 @@ final class VmPDOStatement
             $num[$i] = $value;
         }
         // FETCH_OBJ uses assoc keys (php-src object_init + property update).
-        // FETCH_COLUMN uses numeric indices; scalar extracted in fetch/fetchAll (#25578).
+        // FETCH_COLUMN / FETCH_KEY_PAIR use numeric indices (#25578, #25640).
         $row = match ($mode) {
             PdoConstants::FETCH_ASSOC,
             PdoConstants::FETCH_OBJ => $assoc,
             PdoConstants::FETCH_NUM,
-            PdoConstants::FETCH_COLUMN => $num,
+            PdoConstants::FETCH_COLUMN,
+            PdoConstants::FETCH_KEY_PAIR => $num,
             PdoConstants::FETCH_BOUND => $assoc + $num,
             default => $assoc + $num,
         };
@@ -226,7 +237,29 @@ final class VmPDOStatement
 
             return;
         }
+        if (PdoConstants::FETCH_KEY_PAIR === $mode) {
+            // Single-row KEY_PAIR: one-element map {col0 => col1} (php-src do_fetch).
+            $ht = new HashTable();
+            self::addKeyPairEntry($ht, $row);
+            $returnVar->array($ht);
+
+            return;
+        }
         VmPDO::assignRow($returnVar, $row);
+    }
+
+    /**
+     * Insert one KEY_PAIR row into an accumulating map (php-src do_fetch PDO_FETCH_KEY_PAIR).
+     *
+     * @param array<int|string, mixed> $numRow numeric columns; expects indices 0 and 1
+     */
+    public static function addKeyPairEntry(HashTable $ht, array $numRow): void
+    {
+        $key = $numRow[0] ?? null;
+        $value = $numRow[1] ?? null;
+        $slot = new Variable();
+        VmPDO::assignScalar($slot, $value);
+        $ht->add(\is_int($key) ? (string) $key : (string) $key, $slot);
     }
 
     /**
@@ -697,11 +730,18 @@ final class PDOStatementFetchAll extends PdoClassMethod
         $ht = new HashTable();
         $i = 0;
         try {
-            while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
-                $slot = new Variable();
-                VmPDOStatement::assignFetchResult($ctx, $slot, $st, $mode, $row, $columnOverride);
-                $ht->add((string) $i, $slot);
-                ++$i;
+            // FETCH_KEY_PAIR accumulates into one map, not a list of rows (php-src #25640).
+            if (PdoConstants::FETCH_KEY_PAIR === $mode) {
+                while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
+                    VmPDOStatement::addKeyPairEntry($ht, $row);
+                }
+            } else {
+                while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
+                    $slot = new Variable();
+                    VmPDOStatement::assignFetchResult($ctx, $slot, $st, $mode, $row, $columnOverride);
+                    $ht->add((string) $i, $slot);
+                    ++$i;
+                }
             }
         } finally {
             $st->fetchColumn = $savedColumn;
