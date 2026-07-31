@@ -109,6 +109,15 @@ final class array_walk_recursive extends Internal
                 $userdata
             );
         }
+        if (VmArrayWalk::isGeneralVmCallable($callback)) {
+            return VmArrayWalk::walkArrayRecursiveVmCallable(
+                $frame,
+                $table,
+                $callback,
+                $userdata,
+                'array_walk_recursive'
+            );
+        }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }

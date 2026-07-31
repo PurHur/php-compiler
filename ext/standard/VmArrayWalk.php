@@ -248,6 +248,155 @@ final class VmArrayWalk
         return true;
     }
 
+    /**
+     * Object-array / invokable callbacks with caller-frame visibility (#25764).
+     * Passes live value slots so by-ref &$value mutates in place (php_array_walk).
+     */
+    public static function walkArrayFlatVmCallable(
+        Frame $frame,
+        HashTable $table,
+        Variable $callback,
+        ?Variable $userdata,
+        string $function = 'array_walk'
+    ): bool {
+        if (null === $frame->vmContext) {
+            throw new \LogicException($function.'() requires VM context in this compiler build');
+        }
+        self::requireVmCallable($frame, $callback, $function);
+        $context = $frame->vmContext;
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            if (null !== $userdata) {
+                $userdataCopy = new Variable();
+                $userdataCopy->copyFrom($userdata);
+                $result = VmCallable::invokeAsWithScope(
+                    $function,
+                    $context,
+                    $frame,
+                    $callback,
+                    $value,
+                    $keyCopy,
+                    $userdataCopy
+                );
+            } else {
+                $result = VmCallable::invokeAsWithScope(
+                    $function,
+                    $context,
+                    $frame,
+                    $callback,
+                    $value,
+                    $keyCopy
+                );
+            }
+            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Recursive object-array / invokable walk (#25764).
+     */
+    public static function walkArrayRecursiveVmCallable(
+        Frame $frame,
+        HashTable $table,
+        Variable $callback,
+        ?Variable $userdata,
+        string $function = 'array_walk_recursive'
+    ): bool {
+        if (null === $frame->vmContext) {
+            throw new \LogicException($function.'() requires VM context in this compiler build');
+        }
+        self::requireVmCallable($frame, $callback, $function);
+        $context = $frame->vmContext;
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
+            if (Variable::TYPE_ARRAY === $value->type) {
+                $value->separateArrayForWrite();
+                if (!self::walkArrayRecursiveVmCallable(
+                    $frame,
+                    $value->toArray(),
+                    $callback,
+                    $userdata,
+                    $function
+                )) {
+                    return false;
+                }
+                continue;
+            }
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            if (null !== $userdata) {
+                $userdataCopy = new Variable();
+                $userdataCopy->copyFrom($userdata);
+                $result = VmCallable::invokeAsWithScope(
+                    $function,
+                    $context,
+                    $frame,
+                    $callback,
+                    $value,
+                    $keyCopy,
+                    $userdataCopy
+                );
+            } else {
+                $result = VmCallable::invokeAsWithScope(
+                    $function,
+                    $context,
+                    $frame,
+                    $callback,
+                    $value,
+                    $keyCopy
+                );
+            }
+            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function requireVmCallable(Frame $frame, Variable $callback, string $function): void
+    {
+        $callback = $callback->resolveIndirect();
+        if (null === $frame->vmContext) {
+            throw new \LogicException($function.'() requires VM context in this compiler build');
+        }
+        if (Variable::TYPE_ARRAY !== $callback->type) {
+            if (Variable::TYPE_OBJECT === $callback->type
+                && VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)
+            ) {
+                return;
+            }
+            throw new \TypeError(
+                $function.'(): Argument #2 ($callback) must be a valid callback, no array or string given'
+            );
+        }
+        if (VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
+            return;
+        }
+        VmCallable::throwIfInaccessibleMethodCallback(
+            $frame->vmContext,
+            $callback,
+            $function,
+            2,
+            $frame
+        );
+        throw new \TypeError(
+            $function.'(): Argument #2 ($callback) must be a valid callback, no array or string given'
+        );
+    }
+
+    public static function isGeneralVmCallable(Variable $callback): bool
+    {
+        $callback = $callback->resolveIndirect();
+
+        return Variable::TYPE_ARRAY === $callback->type
+            || (Variable::TYPE_OBJECT === $callback->type && !VmClosureCall::isClosure($callback));
+    }
+
     public static function walkObjectFlatClosure(
         \PHPCompiler\VM\Context $context,
         ObjectEntry $object,
