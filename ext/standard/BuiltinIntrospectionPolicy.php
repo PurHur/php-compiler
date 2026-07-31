@@ -268,6 +268,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'mailparse_')) {
             return \PHPCompiler\ext\mailparse\MailparseExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'dba_')) {
+            return \PHPCompiler\ext\dba\DbaExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -334,6 +337,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('mailparse' === $ext) {
             return \PHPCompiler\ext\mailparse\MailparseExtensionPolicy::advertisesExtension();
+        }
+        if ('dba' === $ext) {
+            return \PHPCompiler\ext\dba\DbaExtensionPolicy::advertisesExtension();
         }
         if ('soap' === $ext) {
             return \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();

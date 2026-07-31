@@ -7789,7 +7789,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dba/DbaExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 7 class method(s)
 
 ### `ext/dba/DbaFunction.php`
 
@@ -7806,21 +7806,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dba/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new dba_open (line 40)
-- new dba_popen (line 41)
-- new dba_close (line 42)
-- new dba_insert (line 43)
-- new dba_replace (line 44)
-- new dba_fetch (line 45)
-- new dba_exists (line 46)
-- new dba_delete (line 47)
-- new dba_handlers (line 48)
-- new dba_firstkey (line 49)
-- new dba_nextkey (line 50)
-- new dba_list (line 51)
-- new dba_optimize (line 52)
-- new dba_sync (line 53)
-- new dba_key_split (line 54)
+- new dba_open (line 42)
+- new dba_popen (line 43)
+- new dba_close (line 44)
+- new dba_insert (line 45)
+- new dba_replace (line 46)
+- new dba_fetch (line 47)
+- new dba_exists (line 48)
+- new dba_delete (line 49)
+- new dba_handlers (line 50)
+- new dba_firstkey (line 51)
+- new dba_nextkey (line 52)
+- new dba_list (line 53)
+- new dba_optimize (line 54)
+- new dba_sync (line 55)
+- new dba_key_split (line 56)
 - 3 class method(s)
 
 ### `ext/dba/VmDbaConnection.php`

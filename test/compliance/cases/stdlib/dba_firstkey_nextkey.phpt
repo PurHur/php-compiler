@@ -1,5 +1,13 @@
 --TEST--
 stdlib dba_firstkey/nextkey/list after flatfile CRUD (#21167, ext/dba/dba.c)
+--ENV--
+PHP_COMPILER_ENABLE_DBA=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\dba\DbaExtensionPolicy::advertisesExtension()) {
+    die('skip dba withheld (#24134)');
+}
+?>
 --FILE--
 <?php
 $path = sys_get_temp_dir() . '/phpc_dba_21167_' . getmypid() . '.db';
