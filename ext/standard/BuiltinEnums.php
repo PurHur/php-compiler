@@ -581,7 +581,7 @@ final class BuiltinEnums
 
     private static function registerPureEnumCase(ClassEntry $enum, string $name): void
     {
-        $lc = strtolower($name);
+        $lc = \PHPCompiler\ClassConstName::key($name);
         $null = new Variable();
         $null->null();
         $case = EnumCaseSupport::createCase($enum, $name, $null);
@@ -595,7 +595,7 @@ final class BuiltinEnums
 
     private static function registerBackedEnumCase(ClassEntry $enum, string $name, int $value): void
     {
-        $lc = strtolower($name);
+        $lc = \PHPCompiler\ClassConstName::key($name);
         $backing = new Variable();
         $backing->int($value);
         $case = EnumCaseSupport::createCase($enum, $name, $backing);
@@ -609,7 +609,7 @@ final class BuiltinEnums
 
     private static function registerStringBackedEnumCase(ClassEntry $enum, string $name, string $value): void
     {
-        $lc = strtolower($name);
+        $lc = \PHPCompiler\ClassConstName::key($name);
         $backing = new Variable();
         $backing->string($value);
         $case = EnumCaseSupport::createCase($enum, $name, $backing);

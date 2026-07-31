@@ -434,7 +434,7 @@ final class VmUri
 
             return;
         }
-        $lc = strtolower($caseName);
+        $lc = \PHPCompiler\ClassConstName::key($caseName);
         if (!isset($enum->constants[$lc])) {
             $dest->null();
 

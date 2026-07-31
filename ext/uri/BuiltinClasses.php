@@ -305,7 +305,7 @@ final class BuiltinClasses
 
     private static function registerUnitEnumCase(ClassEntry $enum, string $name): void
     {
-        $lc = strtolower($name);
+        $lc = \PHPCompiler\ClassConstName::key($name);
         $dummy = new Variable();
         $case = EnumCaseSupport::createCase($enum, $name, $dummy);
         $enum->constants[$lc] = $case;

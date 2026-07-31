@@ -55,13 +55,14 @@ final class ReflectionEnumJitHelper
                 unset($enumName);
                 $object = $context->type->object;
                 $i32 = $context->getTypeFromString('int32');
-                $strcasecmpFn = $context->lookupFunction('strcasecmp');
+                // Case-sensitive match (Zend/zend_enum.c, #25929 / #25945) — not strcasecmp.
+                $strcmpFn = $context->lookupFunction('strcmp');
                 $exists = $i1->constInt(0, false);
                 foreach ($object->enumCaseOrderForClass($enumId) as $caseKey) {
                     $canonical = $object->enumCaseCanonicalName($enumId, $caseKey);
-                    $candidate = $context->builder->load($context->constantStringFromString(strtolower($canonical)));
+                    $candidate = $context->builder->load($context->constantStringFromString($canonical));
                     $candidateData = self::stringDataPtr($context, $candidate);
-                    $cmp = $context->builder->call($strcasecmpFn, $caseData, $candidateData);
+                    $cmp = $context->builder->call($strcmpFn, $caseData, $candidateData);
                     $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
                     $exists = $context->builder->or($exists, $match);
                 }
@@ -127,16 +128,17 @@ final class ReflectionEnumJitHelper
             function (Context $context, int $enumId, string $enumName) use ($caseData, $caseStr, $resultSlot, $merge, $tag): void {
                 $object = $context->type->object;
                 $i32 = $context->getTypeFromString('int32');
-                $strcasecmpFn = $context->lookupFunction('strcasecmp');
+                // Case-sensitive match (Zend/zend_enum.c, #25929 / #25945) — not strcasecmp.
+                $strcmpFn = $context->lookupFunction('strcmp');
                 $caseKeys = $object->enumCaseOrderForClass($enumId);
                 $lastCaseIdx = \count($caseKeys) - 1;
                 $noCaseBlock = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_nocase');
                 $checkCaseBlock = $context->builder->getInsertBlock();
                 foreach ($caseKeys as $caseIdx => $caseKey) {
                     $canonical = $object->enumCaseCanonicalName($enumId, $caseKey);
-                    $candidate = $context->builder->load($context->constantStringFromString(strtolower($canonical)));
+                    $candidate = $context->builder->load($context->constantStringFromString($canonical));
                     $candidateData = self::stringDataPtr($context, $candidate);
-                    $cmp = $context->builder->call($strcasecmpFn, $caseData, $candidateData);
+                    $cmp = $context->builder->call($strcmpFn, $caseData, $candidateData);
                     $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
                     $matchBlock = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_match_'.$caseIdx);
                     $nextCase = $caseIdx === $lastCaseIdx ? $noCaseBlock : BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_next_'.$caseIdx);
