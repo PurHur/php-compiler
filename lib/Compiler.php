@@ -43451,7 +43451,11 @@ class Compiler {
     }
 
     /**
-     * `var_export(require $f)` after `@mkdir` — Include_ in the post-silence block feeds arg #0 (#21938).
+     * `var_export(require $f)` / `var_export(include $f, true)` after `@mkdir` — Include_/Eval_
+     * in the post-silence block feeds arg #0, not the @ return (#21938, #25851).
+     *
+     * Two-arg form hoists `true`/`false` ConstFetch immediately before the call; skip those so
+     * Include_ is still seen (single-arg already matched `$callIndex - 1`).
      */
     private function errorSuppressEndBlockCallArgHasTrailingIncludeProducer(
         Block $block,
@@ -43468,12 +43472,23 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return false;
         }
-        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        $children = $block->orig->children;
+        $callIndex = array_search($cfgCallOp, $children, true);
         if (!\is_int($callIndex) || $callIndex < 1) {
             return false;
         }
-        $producer = $block->orig->children[$callIndex - 1] ?? null;
-        if (!$producer instanceof Op\Expr\Include_ && !$producer instanceof Op\Expr\Eval_) {
+        $producer = null;
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $children[$i] ?? null;
+            if ($this->isHoistedScalarConstFetchImmediatelyBeforeCall($prev)) {
+                continue;
+            }
+            if ($prev instanceof Op\Expr\Include_ || $prev instanceof Op\Expr\Eval_) {
+                $producer = $prev;
+            }
+            break;
+        }
+        if (null === $producer) {
             return false;
         }
         if (
