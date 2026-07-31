@@ -707,6 +707,22 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureCompareDocumentPositionBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_COMPARE_DOCUMENT_POSITION,
+            'dom_node_compare_document_position_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int64'),
+            'PHPCompiler\\ext\\dom\\DomCompareDocumentPositionJitHelper::compareDocumentPositionArgv',
+            '/ext/dom/DomCompareDocumentPositionJitHelper.php'
+        );
+    }
+
     public static function ensureContainsNullBridge(Context $context): void
     {
         self::ensureContextBridge(

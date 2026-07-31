@@ -104,6 +104,7 @@ final class DomInstanceMethodJit
         'domelement::setattributenode' => true,
         'domelement::toggleattribute' => true,
         'domnode::contains' => true,
+        'domnode::comparedocumentposition' => true,
         'domnode::getrootnode' => true,
         'domnode::isequalnode' => true,
         'domnode::issamenode' => true,
@@ -328,6 +329,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::comparedocumentposition' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeCompareDocumentPosition();
+
+                return;
+            }
             if ('domnode::getrootnode' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeGetRootNode();
 
@@ -506,6 +512,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocumentfragment::replacechildren');
             self::ensureProxy($context, 'domelement::toggleattribute');
             self::ensureProxy($context, 'domnode::contains');
+            self::ensureProxy($context, 'domnode::comparedocumentposition');
             self::ensureProxy($context, 'domnode::getrootnode');
             self::ensureProxy($context, 'domnode::isequalnode');
             self::ensureProxy($context, 'domnode::issamenode');

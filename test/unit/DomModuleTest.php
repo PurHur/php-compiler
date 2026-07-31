@@ -452,7 +452,8 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'dom_compare_document_position.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("10\n20\n4\n1\n", ob_get_clean());
+        // Zend 8.4: parent→child CONTAINED_BY|FOLLOWING (20); child→parent CONTAINS|PRECEDING (10) (#25878).
+        self::assertSame("20\n10\n4\n1\n", ob_get_clean());
     }
 
     public function test_dom_node_is_equal_node(): void

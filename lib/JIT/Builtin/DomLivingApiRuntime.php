@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -18,19 +19,22 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT link for DOM Living Standard methods (#19507, #21687).
+ * User-script AOT link for DOM Living Standard methods (#19507, #21687, #25878).
  *
  * Bool ABI is int1 (DomLoadXML pattern). Lower call args before ensureBridge.
  * toggleAttribute uses omit / force-true / force-false ABIs (null force collapses in nested TUs).
  *
- * Thin standalone AOT: contains/getRootNode/isEqualNode/isSameNode via LLVM parentNode/tagName
- * slots (NestedJIT DomRegistry rematerialization loses identity — php-src ext/dom/node.c).
+ * Thin standalone AOT: contains/getRootNode/isEqualNode/isSameNode/compareDocumentPosition via
+ * LLVM parentNode/nextSibling/tagName slots (NestedJIT DomRegistry rematerialization loses
+ * identity — php-src ext/dom/node.c).
  */
 final class DomLivingApiRuntime
 {
     public const ABI_CONTAINS = '__phpc_dom_living_contains';
 
     public const ABI_CONTAINS_NULL = '__phpc_dom_living_contains_null';
+
+    public const ABI_COMPARE_DOCUMENT_POSITION = '__phpc_dom_living_compare_document_position';
 
     public const ABI_GET_ROOT_NODE = '__phpc_dom_living_get_root_node';
 
@@ -155,6 +159,361 @@ final class DomLivingApiRuntime
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($i1->constInt(1, false), $hit);
         $phi->addIncoming($i1->constInt(0, false), $miss);
+
+        return $phi;
+    }
+
+    /**
+     * DOMNode::compareDocumentPosition — php-src ext/dom/node.c (#25878).
+     * Returns int64 bitmask (CONTAINED_BY|FOLLOWING when this contains other, etc.).
+     */
+    public static function invokeCompareDocumentPosition(
+        Context $context,
+        Variable $receiver,
+        Variable $other
+    ): Value {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            return self::compareDocumentPositionViaParentSlots($context, $receiver, $other);
+        }
+        $receiverLlvm = self::loadObject($context, $receiver);
+        $otherLlvm = self::loadObject($context, $other);
+        JitDomDocumentMethodKernel::ensureCompareDocumentPositionBridge($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_COMPARE_DOCUMENT_POSITION),
+            $receiverLlvm,
+            $otherLlvm
+        );
+    }
+
+    /**
+     * Thin AOT compareDocumentPosition via parentNode / nextSibling slots (#25878).
+     * Ancestor axis = php-src steps 7–8; siblings via nextSibling under a common parent.
+     */
+    private static function compareDocumentPositionViaParentSlots(
+        Context $context,
+        Variable $receiver,
+        Variable $other
+    ): Value {
+        static $seq = 0;
+        $id = (string) $seq++;
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_cdp_slots_'.$id);
+        $i64 = $context->getTypeFromString('int64');
+        $receiverLlvm = self::loadObject($context, $receiver);
+        $otherLlvm = self::loadObject($context, $other);
+
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $sameBb = $fn->appendBasicBlock('dom_cdp_same_'.$id);
+        $checkAnc = $fn->appendBasicBlock('dom_cdp_anc_'.$id);
+        $containedBy = $fn->appendBasicBlock('dom_cdp_contained_'.$id);
+        $contains = $fn->appendBasicBlock('dom_cdp_contains_'.$id);
+        $sib = $fn->appendBasicBlock('dom_cdp_sib_'.$id);
+        $following = $fn->appendBasicBlock('dom_cdp_following_'.$id);
+        $preceding = $fn->appendBasicBlock('dom_cdp_preceding_'.$id);
+        $disconnected = $fn->appendBasicBlock('dom_cdp_disc_'.$id);
+        $done = $fn->appendBasicBlock('dom_cdp_done_'.$id);
+        $cont = $fn->appendBasicBlock('dom_cdp_cont_'.$id);
+
+        $same = $context->builder->icmp(Builder::INT_EQ, $receiverLlvm, $otherLlvm);
+        $context->builder->branchIf($same, $sameBb, $checkAnc);
+
+        $context->builder->positionAtEnd($sameBb);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkAnc);
+        $thisContainsOther = self::emitContainsWalk($context, $receiverLlvm, $otherLlvm, 'cdp_tco_'.$id);
+        $afterTco = $fn->appendBasicBlock('dom_cdp_after_tco_'.$id);
+        $context->builder->branchIf($thisContainsOther, $containedBy, $afterTco);
+
+        $context->builder->positionAtEnd($afterTco);
+        $otherContainsThis = self::emitContainsWalk($context, $otherLlvm, $receiverLlvm, 'cdp_oct_'.$id);
+        $context->builder->branchIf($otherContainsThis, $contains, $sib);
+
+        $context->builder->positionAtEnd($containedBy);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($contains);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($sib);
+        $sibOrder = self::emitSiblingDocumentOrder(
+            $context,
+            $receiverLlvm,
+            $otherLlvm,
+            'cdp_sib_'.$id
+        );
+        $isFollow = $context->builder->icmp(
+            Builder::INT_EQ,
+            $sibOrder,
+            $i64->constInt(DomConstants::DOCUMENT_POSITION_FOLLOWING, false)
+        );
+        $afterFollow = $fn->appendBasicBlock('dom_cdp_af_'.$id);
+        $context->builder->branchIf($isFollow, $following, $afterFollow);
+        $context->builder->positionAtEnd($afterFollow);
+        $isPrecede = $context->builder->icmp(
+            Builder::INT_EQ,
+            $sibOrder,
+            $i64->constInt(DomConstants::DOCUMENT_POSITION_PRECEDING, false)
+        );
+        $context->builder->branchIf($isPrecede, $preceding, $disconnected);
+
+        $context->builder->positionAtEnd($following);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($preceding);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($disconnected);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($i64->constInt(0, false), $sameBb);
+        $phi->addIncoming(
+            $i64->constInt(
+                DomConstants::DOCUMENT_POSITION_CONTAINED_BY | DomConstants::DOCUMENT_POSITION_FOLLOWING,
+                false
+            ),
+            $containedBy
+        );
+        $phi->addIncoming(
+            $i64->constInt(
+                DomConstants::DOCUMENT_POSITION_CONTAINS | DomConstants::DOCUMENT_POSITION_PRECEDING,
+                false
+            ),
+            $contains
+        );
+        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_FOLLOWING, false), $following);
+        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_PRECEDING, false), $preceding);
+        $phi->addIncoming(
+            $i64->constInt(
+                DomConstants::DOCUMENT_POSITION_DISCONNECTED
+                | DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC
+                | DomConstants::DOCUMENT_POSITION_PRECEDING,
+                false
+            ),
+            $disconnected
+        );
+        $context->builder->branch($cont);
+        $context->builder->positionAtEnd($cont);
+
+        return $phi;
+    }
+
+    /** Walk $descendant→parent looking for $ancestor; returns i1. */
+    private static function emitContainsWalk(
+        Context $context,
+        Value $ancestor,
+        Value $descendant,
+        string $tag
+    ): Value {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $i1 = $context->getTypeFromString('int1');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $hit = $fn->appendBasicBlock('dom_cw_hit_'.$tag);
+        $miss = $fn->appendBasicBlock('dom_cw_miss_'.$tag);
+        $done = $fn->appendBasicBlock('dom_cw_done_'.$tag);
+        $start = $fn->appendBasicBlock('dom_cw_start_'.$tag);
+
+        $same = $context->builder->icmp(Builder::INT_EQ, $ancestor, $descendant);
+        $context->builder->branchIf($same, $hit, $start);
+
+        $context->builder->positionAtEnd($start);
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        $docClassId = $objectType->lookup('DOMDocument');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        }
+        $objMap = $context->structFieldMap['__object__'];
+        $i64 = $context->getTypeFromString('int64');
+
+        $current = $descendant;
+        for ($hop = 0; $hop < 8; ++$hop) {
+            $classIdVal = $context->builder->load(
+                $context->builder->structGep($current, $objMap['class_id'])
+            );
+            $isDoc = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classIdVal,
+                $i64->constInt($docClassId, false)
+            );
+            $afterDoc = $fn->appendBasicBlock('dom_cw_d_'.$tag.'_'.$hop);
+            $context->builder->branchIf($isDoc, $miss, $afterDoc);
+            $context->builder->positionAtEnd($afterDoc);
+
+            $parentObj = self::loadLinkedObject($context, $current, $elementClassId, VmDom::PROP_PARENT_NODE, 'lpo_'.$tag.'_'.$hop);
+            $parentObjNull = $context->builder->icmp(Builder::INT_EQ, $parentObj, $objPtr->constNull());
+            $afterObj = $fn->appendBasicBlock('dom_cw_o_'.$tag.'_'.$hop);
+            $context->builder->branchIf($parentObjNull, $miss, $afterObj);
+            $context->builder->positionAtEnd($afterObj);
+            $isHit = $context->builder->icmp(Builder::INT_EQ, $parentObj, $ancestor);
+            $contHop = $fn->appendBasicBlock('dom_cw_c_'.$tag.'_'.$hop);
+            $context->builder->branchIf($isHit, $hit, $contHop);
+            $context->builder->positionAtEnd($contHop);
+            $current = $parentObj;
+        }
+        $context->builder->branch($miss);
+
+        $context->builder->positionAtEnd($hit);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($miss);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($i1->constInt(1, false), $hit);
+        $phi->addIncoming($i1->constInt(0, false), $miss);
+
+        return $phi;
+    }
+
+    /**
+     * Document-order among non-ancestor nodes via nextSibling + parent climb.
+     * Returns i64 FOLLOWING (4), PRECEDING (2), or 0 if unresolved.
+     */
+    private static function emitSiblingDocumentOrder(
+        Context $context,
+        Value $nodeA,
+        Value $nodeB,
+        string $tag
+    ): Value {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $i64 = $context->getTypeFromString('int64');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([VmDom::PROP_PARENT_NODE, VmDom::PROP_NEXT_ELEMENT_SIBLING] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, Variable::TYPE_VALUE);
+            }
+        }
+
+        $followBb = $fn->appendBasicBlock('dom_sdo_follow_'.$tag);
+        $precedeBb = $fn->appendBasicBlock('dom_sdo_precede_'.$tag);
+        $unknownBb = $fn->appendBasicBlock('dom_sdo_unknown_'.$tag);
+        $done = $fn->appendBasicBlock('dom_sdo_done_'.$tag);
+
+        $curA = $nodeA;
+        $curB = $nodeB;
+        for ($level = 0; $level < 8; ++$level) {
+            $foundFollow = self::emitNextSiblingFind($context, $curA, $curB, 'sdo_f_'.$tag.'_'.$level);
+            $afterF = $fn->appendBasicBlock('dom_sdo_af_'.$tag.'_'.$level);
+            $context->builder->branchIf($foundFollow, $followBb, $afterF);
+            $context->builder->positionAtEnd($afterF);
+
+            $foundPrecede = self::emitNextSiblingFind($context, $curB, $curA, 'sdo_p_'.$tag.'_'.$level);
+            $afterP = $fn->appendBasicBlock('dom_sdo_ap_'.$tag.'_'.$level);
+            $context->builder->branchIf($foundPrecede, $precedeBb, $afterP);
+            $context->builder->positionAtEnd($afterP);
+
+            $parentA = self::loadLinkedObject($context, $curA, $elementClassId, VmDom::PROP_PARENT_NODE, 'sdo_pa_'.$tag.'_'.$level);
+            $parentB = self::loadLinkedObject($context, $curB, $elementClassId, VmDom::PROP_PARENT_NODE, 'sdo_pb_'.$tag.'_'.$level);
+            $aNull = $context->builder->icmp(Builder::INT_EQ, $parentA, $objPtr->constNull());
+            $bNull = $context->builder->icmp(Builder::INT_EQ, $parentB, $objPtr->constNull());
+            $eitherNull = $context->builder->or($aNull, $bNull);
+            $afterNull = $fn->appendBasicBlock('dom_sdo_an_'.$tag.'_'.$level);
+            $context->builder->branchIf($eitherNull, $unknownBb, $afterNull);
+            $context->builder->positionAtEnd($afterNull);
+            $curA = $parentA;
+            $curB = $parentB;
+        }
+        $context->builder->branch($unknownBb);
+
+        $context->builder->positionAtEnd($followBb);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($precedeBb);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($unknownBb);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_FOLLOWING, false), $followBb);
+        $phi->addIncoming($i64->constInt(DomConstants::DOCUMENT_POSITION_PRECEDING, false), $precedeBb);
+        $phi->addIncoming($i64->constInt(0, false), $unknownBb);
+
+        return $phi;
+    }
+
+    /** Walk nextSibling from $start looking for $target; returns i1. */
+    private static function emitNextSiblingFind(
+        Context $context,
+        Value $start,
+        Value $target,
+        string $tag
+    ): Value {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $i1 = $context->getTypeFromString('int1');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_NEXT_ELEMENT_SIBLING)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_NEXT_ELEMENT_SIBLING, Variable::TYPE_VALUE);
+        }
+
+        $hit = $fn->appendBasicBlock('dom_nsf_hit_'.$tag);
+        $miss = $fn->appendBasicBlock('dom_nsf_miss_'.$tag);
+        $done = $fn->appendBasicBlock('dom_nsf_done_'.$tag);
+
+        $current = $start;
+        for ($hop = 0; $hop < 16; ++$hop) {
+            $next = self::loadLinkedObject($context, $current, $elementClassId, VmDom::PROP_NEXT_ELEMENT_SIBLING, 'nsf_'.$tag.'_'.$hop);
+            $isNull = $context->builder->icmp(Builder::INT_EQ, $next, $objPtr->constNull());
+            $afterNull = $fn->appendBasicBlock('dom_nsf_n_'.$tag.'_'.$hop);
+            $context->builder->branchIf($isNull, $miss, $afterNull);
+            $context->builder->positionAtEnd($afterNull);
+            $isHit = $context->builder->icmp(Builder::INT_EQ, $next, $target);
+            $contHop = $fn->appendBasicBlock('dom_nsf_c_'.$tag.'_'.$hop);
+            $context->builder->branchIf($isHit, $hit, $contHop);
+            $context->builder->positionAtEnd($contHop);
+            $current = $next;
+        }
+        $context->builder->branch($miss);
+
+        $context->builder->positionAtEnd($hit);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($miss);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($i1->constInt(1, false), $hit);
+        $phi->addIncoming($i1->constInt(0, false), $miss);
+
+        return $phi;
+    }
+
+    /** Load a nullable object-valued DOMElement property slot as __object__*. */
+    private static function loadLinkedObject(
+        Context $context,
+        Value $obj,
+        int $elementClassId,
+        string $prop,
+        string $tag
+    ): Value {
+        $objectType = $context->type->object;
+        $propVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            'DOMElement',
+            $prop,
+            $elementClassId
+        );
+        $propRaw = JitValueBox::valuePtrFromVariable($context, $propVar);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $propRaw);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $nullBb = $fn->appendBasicBlock('dom_ll_null_'.$tag);
+        $objBb = $fn->appendBasicBlock('dom_ll_obj_'.$tag);
+        $done = $fn->appendBasicBlock('dom_ll_done_'.$tag);
+        $context->builder->branchIf($isNull, $nullBb, $objBb);
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($objBb);
+        $linked = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::normalizeValuePtr($context, $propRaw)
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($objPtr);
+        $phi->addIncoming($objPtr->constNull(), $nullBb);
+        $phi->addIncoming($linked, $objBb);
 
         return $phi;
     }

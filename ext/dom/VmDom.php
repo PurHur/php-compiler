@@ -11303,11 +11303,13 @@ final class VmDom
             return self::disconnectedDocumentPosition($node, $other);
         }
 
+        // php-src ext/dom/node.c: node1=other, node2=this — when this is ancestor of
+        // other → CONTAINED_BY|FOLLOWING; when other is ancestor of this → CONTAINS|PRECEDING (#25878).
         if (self::contains($node, $other)) {
-            return DomConstants::DOCUMENT_POSITION_CONTAINS | DomConstants::DOCUMENT_POSITION_PRECEDING;
+            return DomConstants::DOCUMENT_POSITION_CONTAINED_BY | DomConstants::DOCUMENT_POSITION_FOLLOWING;
         }
         if (self::contains($other, $node)) {
-            return DomConstants::DOCUMENT_POSITION_CONTAINED_BY | DomConstants::DOCUMENT_POSITION_FOLLOWING;
+            return DomConstants::DOCUMENT_POSITION_CONTAINS | DomConstants::DOCUMENT_POSITION_PRECEDING;
         }
 
         $orderNode = self::documentOrderIndex($root1, $node);
