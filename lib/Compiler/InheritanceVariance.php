@@ -17,7 +17,10 @@ use PHPCfg\Script;
 /**
  * Compile-time parameter contravariance / return covariance, staticness,
  * abstract-from-concrete, and visibility (Zend zend_inheritance.c, issues
- * #3323, #25634, #25660).
+ * #3323, #25634, #25660, #25662).
+ *
+ * Visibility applies to concrete overrides and abstract→concrete implementations:
+ * child must be the parent visibility or weaker (public > protected > private).
  */
 final class InheritanceVariance
 {
@@ -303,7 +306,7 @@ final class InheritanceVariance
             );
         }
 
-        // Visibility must not weaken (zend_inheritance.c / ClassConstVisibilityInheritCheck).
+        // Visibility must not weaken — including abstract→concrete (#25662) and concrete overrides (#25634).
         $visErr = self::visibilityCompatibilityError($childClass, $methodLc, $child, $parentClass, $parent);
         if (null !== $visErr) {
             return $visErr;
