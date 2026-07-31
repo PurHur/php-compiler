@@ -11771,6 +11771,11 @@ restart:
         $this->rewindHandlerToCatchChain($handler);
         $catchFrame = $this->enterMatchingCatchHandler($handler);
         if (null !== $catchFrame) {
+            // Catch frame holds the throwable; mirror onto the try handler so callee CV release
+            // (#22541) can preserve it (pendingException was already cleared).
+            if (null !== $catchFrame->activeCatchException) {
+                $handler->activeCatchException = $catchFrame->activeCatchException;
+            }
             $this->releaseCalleeObjectRefsBeforeExceptionHandler($throwFrame, $handler);
 
             return $catchFrame;
@@ -20606,6 +20611,7 @@ restart:
 
     private function releaseFrameObjectRefs(Frame $frame): void
     {
+        $preserveIds = $this->exceptionObjectIdsToPreserve();
         foreach ($frame->scope as $slotIndex => $slot) {
             if ($this->frameScopeSlotIsClosureByRefCapture($frame, (int) $slotIndex)) {
                 continue;
@@ -20616,10 +20622,70 @@ restart:
             if ($this->variableAliasesObjectPropertyCell($slot)) {
                 continue;
             }
+            // Bridged throwable delivered to catch must survive callee CV release (#22541).
+            if ($this->variableHoldsPreservedExceptionObject($slot, $preserveIds)) {
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($slot);
         }
         foreach ($frame->iterators as $iter) {
+            if ($this->variableHoldsPreservedExceptionObject($iter, $preserveIds)) {
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($iter);
+        }
+    }
+
+    /**
+     * Object ids of the exception currently being delivered to catch/finally.
+     *
+     * @return array<int, true>
+     */
+    private function exceptionObjectIdsToPreserve(): array
+    {
+        $ids = [];
+        $candidates = [];
+        if (null !== $this->context->pendingException) {
+            $candidates[] = $this->context->pendingException;
+        }
+        if (null !== $this->context->activeCatchHandlerFrame
+            && null !== $this->context->activeCatchHandlerFrame->activeCatchException
+        ) {
+            $candidates[] = $this->context->activeCatchHandlerFrame->activeCatchException;
+        }
+        foreach ($this->context->activeTryHandlerFrames as $handler) {
+            if (null !== $handler->activeCatchException) {
+                $candidates[] = $handler->activeCatchException;
+            }
+        }
+        foreach ($candidates as $var) {
+            $resolved = $var->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                continue;
+            }
+            try {
+                $ids[$resolved->toObject()->id] = true;
+            } catch (\LogicException) {
+            }
+        }
+
+        return $ids;
+    }
+
+    /** @param array<int, true> $preserveIds */
+    private function variableHoldsPreservedExceptionObject(Variable $var, array $preserveIds): bool
+    {
+        if ([] === $preserveIds) {
+            return false;
+        }
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return false;
+        }
+        try {
+            return isset($preserveIds[$resolved->toObject()->id]);
+        } catch (\LogicException) {
+            return false;
         }
     }
 
@@ -20694,6 +20760,9 @@ restart:
                 continue;
             }
             if ($this->variableAliasesObjectPropertyCell($slot)) {
+                continue;
+            }
+            if ($this->variableHoldsPreservedExceptionObject($slot, $this->exceptionObjectIdsToPreserve())) {
                 continue;
             }
             $id = spl_object_id($slot);
