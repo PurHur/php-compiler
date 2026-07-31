@@ -54,8 +54,6 @@ final class use_soap_error_handler extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'use_soap_error_handler() JIT lowering not implemented (#20267)'
-        );
+        return JitUseSoapErrorHandler::invoke($context, ...$args);
     }
 }
