@@ -594,8 +594,9 @@ final class VmFs
         );
         if (null !== $wrapperOk) {
             if ($wrapperOk) {
-                // php-src php_touch() → php_clear_stat_cache() on success (ext/standard/filestat.c, #25308).
-                VmStatCache::invalidatePath($path);
+                // php-src keeps positive stats until clearstatcache; only clear misses (#25853).
+                // (#25308 over-invalidated vs Zend: prior filemtime then touch must stay stale.)
+                VmStatCache::invalidateNegative($path);
             }
 
             return $wrapperOk;
@@ -603,7 +604,8 @@ final class VmFs
 
         $ok = VmFsTouchNative::touch($path, $mtime, $atime);
         if ($ok) {
-            VmStatCache::invalidatePath($path);
+            // Same as chmod/copy content writes (#22841): drop negative hits only.
+            VmStatCache::invalidateNegative($path);
         }
 
         return $ok;

@@ -1,15 +1,15 @@
 <?php
-// Issue #25308 — touch() must invalidate VmStatCache so filemtime() sees new mtime.
+// Issue #25853 — after a positive filemtime hit, touch() must leave cache stale until clearstatcache.
 $p = sys_get_temp_dir() . '/phpc-touch-statcache-' . getmypid();
 @unlink($p);
+file_put_contents($p, 'x');
+
+$m1 = filemtime($p);
+sleep(1);
 touch($p);
-
-touch($p, 100);
-$afterFirst = filemtime($p);
-
+$m2 = filemtime($p);
 clearstatcache(true, $p);
-touch($p, 200);
-$afterSecond = filemtime($p);
+$m3 = filemtime($p);
 
-echo 'after_first=', $afterFirst, ' after_second=', $afterSecond, "\n";
+echo ($m2 === $m1 ? 'stale' : 'fresh'), '|', $m1, '|', $m2, '|', $m3, "\n";
 @unlink($p);
