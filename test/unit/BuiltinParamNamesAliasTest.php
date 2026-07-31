@@ -770,7 +770,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(['array', 'callback'], $names, $fn);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', $fn));
-            // #23385 — withhold phantom direction unless Sorting/SortDirection profile gate is on.
+            // #23385 / #26142 — Zend usort arity is always array/callback (no $direction).
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'direction', $fn), $fn);
         }
         // #23225 — sort/rsort are Zend array/flags only (no phantom direction).
