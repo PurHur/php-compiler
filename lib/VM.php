@@ -16778,6 +16778,8 @@ restart:
         }
         $declaredName = $class->methodNames[$methodLc] ?? $methodName;
         $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
+        // zend_vm_def.h: INIT_STATIC_METHOD_CALL + CONSTRUCTOR → "Cannot call private …::__construct()" (#25663).
+        $staticConstructorCall = '__construct' === $methodLc;
         MethodVisibility::assertCallable(
             $vis,
             $callerClassLc,
@@ -16786,7 +16788,8 @@ restart:
             $declaredName,
             $parentScopeAllows,
             fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-            $callerDisplay
+            $callerDisplay,
+            $staticConstructorCall
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
@@ -18092,6 +18095,12 @@ restart:
                 // this runtime path (see final class const #22329 / final property #22988).
                 $this->rejectChildOverrideOfFinalMethod($entry, $parent, $name);
                 // Cross-file / eval LSP: same-script InheritanceVariance never sees the parent (#25384).
+                $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
+                continue;
+            }
+            // Child redeclared a concrete parent method as abstract (zend_inheritance.c, #25660).
+            // Abstract decls live in abstractMethods, not methods — still enforce before inherit.
+            if (isset($entry->abstractMethods[$name])) {
                 $this->rejectIncompatibleChildMethodSignature($entry, $parent, $name);
                 continue;
             }

@@ -623,6 +623,73 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    /** Zend: cannot redeclare a concrete parent method as abstract (#25660). */
+    public function testAbstractFromConcreteFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(): void {} }
+abstract class B extends A { abstract public function f(): void; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot make non abstract method A::f() abstract in class B');
+        $runtime->parseAndCompile($code, 'abstract_from_concrete.php');
+    }
+
+    /** Zend: abstractizing a concrete __construct still fatals (#25660). */
+    public function testAbstractFromConcreteConstructorFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function __construct() {} }
+abstract class B extends A { abstract public function __construct(); }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot make non abstract method A::__construct() abstract in class B');
+        $runtime->parseAndCompile($code, 'abstract_from_concrete_ctor.php');
+    }
+
+    /** Zend: abstract override of abstract parent remains OK (#25660). */
+    public function testAbstractFromAbstractAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A { abstract public function f(): void; }
+abstract class B extends A { abstract public function f(): void; }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abstract_from_abstract.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: eval inherit also rejects abstractizing a concrete parent (#25660). */
+    public function testAbstractFromConcreteFailsViaEval(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+eval('class A { public function f(): void {} }');
+eval('abstract class B extends A { abstract public function f(): void; }');
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abstract_from_concrete_eval.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot make non abstract method A::f() abstract in class B');
+        ob_start();
+        try {
+            $runtime->run($block);
+        } finally {
+            ob_end_clean();
+        }
+    }
+
     /** Zend: cannot make static method non-static (#25634). */
     public function testStaticToInstanceFailsAtCompileTime(): void
     {
