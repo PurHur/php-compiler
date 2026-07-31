@@ -1579,6 +1579,39 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Phi slot for a ||/&& merge reached by JUMP from this block (#25850).
+     *
+     * Used when a (bool) cast lives inside an inner short-circuit merge (e.g. &&) but feeds an
+     * outer || merge — {@see logicalShortCircuitPhiMergeSlot} would otherwise return the inner phi.
+     */
+    private function logicalShortCircuitJumpTargetPhiMergeSlot(Block $branch): ?int
+    {
+        if (null === $branch->orig) {
+            return null;
+        }
+        foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
+            if (!$this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                continue;
+            }
+            $recorded = $this->ternaryMergePhiRhsSlot($mergeCfg);
+            if (null !== $recorded) {
+                return $recorded;
+            }
+            foreach ($mergeCfg->parents as $parentCfg) {
+                if ($parentCfg === $branch->orig || !$this->seen->contains($parentCfg)) {
+                    continue;
+                }
+                $phi = $this->logicalShortCircuitTailPhiSlot($this->seen[$parentCfg]);
+                if (null !== $phi) {
+                    return $phi;
+                }
+            }
+        }
+
+        return null;
+    }
+
     /** && / || long-arm bool cast must store into the recorded phi merge slot (#10626). */
     private function logicalShortCircuitPhiMergeSlot(Block $branch): ?int
     {
@@ -1603,23 +1636,9 @@ class Compiler {
                 }
             }
         }
-        foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
-            if (!$this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
-                continue;
-            }
-            $recorded = $this->ternaryMergePhiRhsSlot($mergeCfg);
-            if (null !== $recorded) {
-                return $recorded;
-            }
-            foreach ($mergeCfg->parents as $parentCfg) {
-                if ($parentCfg === $branch->orig || !$this->seen->contains($parentCfg)) {
-                    continue;
-                }
-                $phi = $this->logicalShortCircuitTailPhiSlot($this->seen[$parentCfg]);
-                if (null !== $phi) {
-                    return $phi;
-                }
-            }
+        $jumpTargetPhi = $this->logicalShortCircuitJumpTargetPhiMergeSlot($branch);
+        if (null !== $jumpTargetPhi) {
+            return $jumpTargetPhi;
         }
 
         return null;
@@ -11804,8 +11823,13 @@ class Compiler {
                 $this->throwCompileError('The (unset) cast is no longer supported');
             }
             $line = $expr->getLine();
+            // Seed jump-target ||/&& phi before lowering the cast. Prefer that seeded slot over
+            // logicalShortCircuitPhiMergeSlot when the cast sits *inside* an inner && merge that
+            // jumps to an outer || merge — otherwise the cast assigns the inner phi and the outer
+            // phi keeps a leftover callee-name string (#25850, re-#10626).
+            $seededPhiSlot = null;
             if (null !== $block->orig) {
-                $this->seedLogicalShortCircuitPhiSlot($block->orig, $block, $expr->result);
+                $seededPhiSlot = $this->seedLogicalShortCircuitPhiSlot($block->orig, $block, $expr->result);
             }
             $castResultSlot = $this->compileOperand($expr->result, $block, false);
             $ops = [new OpCode(
@@ -11815,7 +11839,9 @@ class Compiler {
                 $line > 0 ? $line : null,
             )];
             if ($expr instanceof Op\Expr\Cast\Bool_) {
-                $phiSlot = $this->logicalShortCircuitPhiMergeSlot($block);
+                $phiSlot = $seededPhiSlot
+                    ?? $this->logicalShortCircuitJumpTargetPhiMergeSlot($block)
+                    ?? $this->logicalShortCircuitPhiMergeSlot($block);
                 if (null !== $phiSlot) {
                     if ($block->isNamedVariableSlot($phiSlot)) {
                         $phiSlot = $block->forceFreshVarSlot($expr->result, $phiSlot);
