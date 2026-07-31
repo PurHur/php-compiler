@@ -1,5 +1,7 @@
 --TEST--
 AOT: pdo_drivers() returns sqlite when pdo_sqlite available (#20239)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 echo (int) function_exists('pdo_drivers'), "\n";

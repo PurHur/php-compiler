@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDOException::$errorInfo after failed exec (#22455, ext/pdo/pdo.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDO sqlite::memory: connect/prepare/query (#3367, ext/pdo)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

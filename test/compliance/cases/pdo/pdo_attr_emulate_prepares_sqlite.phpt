@@ -1,5 +1,7 @@
 --TEST--
 PDO ATTR_EMULATE_PREPARES on sqlite is unsupported (IM001) (#20413)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --SKIPIF--
 <?php
 if (!class_exists('PDO')) die('skip no PDO');

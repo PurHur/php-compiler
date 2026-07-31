@@ -1,6 +1,7 @@
 --TEST--
 PDO::quote(null) — TypeError forward 8.4 profile (#21080, ext/pdo/pdo.stub.php)
 --ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

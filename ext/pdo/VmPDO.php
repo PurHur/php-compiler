@@ -525,6 +525,10 @@ final class VmPDO
 
     public static function initObject(ObjectEntry $entry, string $filename): void
     {
+        // php-src pdo_find_driver — withhold sqlite when pdo_sqlite not advertised (#24523).
+        if (!PdoExtensionPolicy::advertisesSqliteDriver()) {
+            throw new \PDOException('could not find driver');
+        }
         if (!VmSqlite3Native::available()) {
             throw new \PDOException('could not find driver');
         }

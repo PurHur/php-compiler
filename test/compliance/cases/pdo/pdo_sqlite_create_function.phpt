@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDO::sqliteCreateFunction scalar UDF (#19863, ext/pdo_sqlite)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

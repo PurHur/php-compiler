@@ -1,5 +1,7 @@
 --TEST--
 PDO/PDOStatement/PDORow serialize()/unserialize() reject (issue #23103, ext/pdo stubs)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

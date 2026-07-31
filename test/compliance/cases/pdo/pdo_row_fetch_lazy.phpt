@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDORow class + FETCH_LAZY (#22294, ext/pdo/pdo_stmt.c)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 echo 'class_exists=', class_exists('PDORow') ? '1' : '0', "\n";

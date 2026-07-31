@@ -1,5 +1,7 @@
 --TEST--
 stdlib pdo_drivers() === PDO::getAvailableDrivers JIT (#20239, ext/pdo/pdo.c)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 echo (int) function_exists('pdo_drivers'), "\n";

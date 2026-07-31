@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDOStatement bindColumn/nextRowset/debugDumpParams/attrs/getIterator (#22274)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 foreach (['bindColumn', 'nextRowset', 'debugDumpParams', 'getAttribute', 'setAttribute', 'getIterator', 'bindParam'] as $m) {

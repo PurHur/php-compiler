@@ -10,8 +10,10 @@ use PHPCompiler\Runtime;
 /**
  * pdo extension module entry (php-src ext/pdo/pdo.c; #3367).
  *
- * Also advertises logical {@code pdo_sqlite} when libsqlite3 FFI is available,
- * and {@code pdo_pgsql} when the PHP 8.4 Pdo\Pgsql surface ships (#20566).
+ * Also advertises logical {@code pdo_sqlite} when
+ * {@see PdoExtensionPolicy::advertisesSqliteDriver()} (host pdo_sqlite or
+ * PHP_COMPILER_ENABLE_PDO_SQLITE + libsqlite3; #24523), and {@code pdo_pgsql}
+ * when the PHP 8.4 Pdo\Pgsql surface ships (#20566).
  */
 class Module extends ModuleAbstract
 {
@@ -19,6 +21,10 @@ class Module extends ModuleAbstract
     {
         if (PdoExtensionPolicy::advertisesExceptionClass()) {
             require_once __DIR__.'/bootstrap_pdoexception.php';
+        }
+        // Host catch type for VmSqlite3Native errors — not userland class_exists (#24523).
+        if (PdoExtensionPolicy::advertisesSqliteDriver()) {
+            require_once \dirname(__DIR__).'/sqlite3/bootstrap_sqlite3exception.php';
         }
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);

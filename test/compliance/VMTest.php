@@ -749,6 +749,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\dba\DbaExtensionPolicy::isDbaComplianceCase($name)) {
                 continue;
             }
+            // Functional pdo_sqlite cases set PHP_COMPILER_ENABLE_PDO_SQLITE via --ENV--; phantoms when withheld (#24523).
+            if (!\PHPCompiler\ext\pdo\PdoExtensionPolicy::runsPdoSqliteCompliance($name)
+                && \PHPCompiler\ext\pdo\PdoExtensionPolicy::isPdoSqliteComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {

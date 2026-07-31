@@ -1,5 +1,7 @@
 --TEST--
 PDOStatement::fetch/fetchAll honor FETCH_CLASS|FETCH_CLASSTYPE (#25667, ext/pdo/pdo_stmt.c)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 class RowA
