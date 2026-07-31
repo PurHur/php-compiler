@@ -15,9 +15,13 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -148,22 +152,18 @@ final class intval extends Internal
         if (Variable::TYPE_STRING === $v->type) {
             $s = $v->toString();
             if ('' === $s || !is_numeric($s)) {
-                throw new \TypeError('intval(): Argument #2 ($base) must be of type int, string given');
+                throw new \TypeError(self::baseTypeErrorMessage('string'));
             }
 
             return (int) $s;
         }
-        throw new \TypeError('intval(): Argument #2 ($base) must be of type int, '.self::zendTypeName($v->type).' given');
+        // php-src ZPP IS_LONG — name concrete class for objects (#25724, zend_API.c).
+        throw new \TypeError(self::baseTypeErrorMessage(EnumCaseSupport::typeNameForVariable($v)));
     }
 
-    private static function zendTypeName(int $type): string
+    private static function baseTypeErrorMessage(string $given): string
     {
-        return match ($type) {
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            Variable::TYPE_RESOURCE => 'resource',
-            default => 'unknown type',
-        };
+        return 'intval(): Argument #2 ($base) must be of type int, '.$given.' given';
     }
 
     private function parseBaseJit(Context $context, JITVariable $arg): Value
@@ -184,10 +184,173 @@ final class intval extends Internal
                     $this->jitString($context, $arg, 'intval() argument #2')
                 );
             case JITVariable::TYPE_VALUE:
-                return $this->valueToInt($context, $arg, $i64->constInt(10, false));
+                return $this->parseBaseValueJit($context, $arg);
+            case JITVariable::TYPE_OBJECT:
+                // Prefer compile-time class label when constant (proper casing + smaller CFG) (#25724).
+                $objectGiven = JitOperandTypeLabel::givenLabel($context, $arg);
+                if ('object' === $objectGiven || 'mixed' === $objectGiven) {
+                    JitStringBuiltinArg::emitObjectTypeErrorReject(
+                        $context,
+                        $arg,
+                        'intval',
+                        1,
+                        'base',
+                        'int'
+                    );
+                    BasicBlockHelper::ensureOpenInsertBlock($context, 'intval_base_obj_te_cont');
+                } else {
+                    $this->emitBaseTypeErrorAndAbort($context, $objectGiven);
+                }
+
+                return $i64->constInt(0, false);
+            case JITVariable::TYPE_HASHTABLE:
+                $this->emitBaseTypeErrorAndAbort($context, 'array');
+
+                return $i64->constInt(0, false);
             default:
-                throw new \LogicException('intval() argument #2 ($base) must be an integer in this compiler build');
+                $this->emitBaseTypeErrorAndAbort(
+                    $context,
+                    JitOperandTypeLabel::givenLabel($context, $arg)
+                );
+
+                return $i64->constInt(0, false);
         }
+    }
+
+    /**
+     * Boxed base: coerce scalars like Zend Z_PARAM_LONG; TypeError on array/object (#25724).
+     */
+    private function parseBaseValueJit(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $nullBlock = BasicBlockHelper::append($context, 'intval_base_null');
+        $longBlock = BasicBlockHelper::append($context, 'intval_base_long');
+        $boolBlock = BasicBlockHelper::append($context, 'intval_base_bool');
+        $doubleBlock = BasicBlockHelper::append($context, 'intval_base_double');
+        $stringBlock = BasicBlockHelper::append($context, 'intval_base_string');
+        $objectBlock = BasicBlockHelper::append($context, 'intval_base_object');
+        $arrayBlock = BasicBlockHelper::append($context, 'intval_base_array');
+        $badBlock = BasicBlockHelper::append($context, 'intval_base_bad');
+        $doneBlock = BasicBlockHelper::append($context, 'intval_base_done');
+
+        $afterNull = BasicBlockHelper::append($context, 'intval_base_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NULL, false)),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $afterLong = BasicBlockHelper::append($context, 'intval_base_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)),
+            $longBlock,
+            $afterLong
+        );
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'intval_base_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)),
+            $boolBlock,
+            $afterBool
+        );
+        $context->builder->positionAtEnd($boolBlock);
+        $boolInt = JitZendScalarCast::readBoolByteFromValueBox($context, $valuePtr, $i64);
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'intval_base_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)),
+            $doubleBlock,
+            $afterDouble
+        );
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $doubleInt = $context->builder->fpToSi($doubleVal, $i64);
+        $doubleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $afterString = BasicBlockHelper::append($context, 'intval_base_after_string');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
+            $stringBlock,
+            $afterString
+        );
+        $context->builder->positionAtEnd($stringBlock);
+        $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $stringInt = $this->stringToInt($context, $stringVal);
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterObject = BasicBlockHelper::append($context, 'intval_base_after_object');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $objectBlock,
+            $afterObject
+        );
+        $context->builder->positionAtEnd($objectBlock);
+        // Runtime class-id TypeError so AOT names stdClass/DateTime (#25724).
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $objVar = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $objPtr);
+        JitStringBuiltinArg::emitObjectTypeErrorReject(
+            $context,
+            $objVar,
+            'intval',
+            1,
+            'base',
+            'int'
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'intval_base_box_obj_te_cont');
+
+        $context->builder->positionAtEnd($afterObject);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false)),
+            $arrayBlock,
+            $badBlock
+        );
+        $context->builder->positionAtEnd($arrayBlock);
+        $this->emitBaseTypeErrorAndAbort($context, 'array');
+
+        $context->builder->positionAtEnd($badBlock);
+        $this->emitBaseTypeErrorAndAbort(
+            $context,
+            JitOperandTypeLabel::givenLabel($context, $arg)
+        );
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'intval_base_phi');
+        $phi->addIncoming($i64->constInt(0, false), $nullBlock);
+        $phi->addIncoming($longVal, $longEnd);
+        $phi->addIncoming($boolInt, $boolEnd);
+        $phi->addIncoming($doubleInt, $doubleEnd);
+        $phi->addIncoming($stringInt, $stringEnd);
+
+        return $phi;
+    }
+
+    private function emitBaseTypeErrorAndAbort(Context $context, string $given): void
+    {
+        ExceptionBridge::emitTypeErrorAndAbort($context, self::baseTypeErrorMessage($given));
+        // Catchable throw terminates the block — keep insert open for callers (#22827 / #25724).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'intval_base_te_cont');
     }
 
     private function valueToInt(Context $context, JITVariable $arg, Value $baseVal): Value
