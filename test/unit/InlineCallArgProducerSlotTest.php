@@ -9003,6 +9003,51 @@ PHP;
     }
 
     /**
+     * Issue #25949 — getElementsByTagName()->item()->appendChild($n) before a multi-arg user FuncCall
+     * must emit item before appendChild (do not defer item as a sibling of dump23514).
+     */
+    public function testDomItemAppendChildBeforeUserFuncCallKeepsItemBeforeAppendChild(): void
+    {
+        $code = <<<'PHP'
+<?php
+function dump23514($label, $html, $div) { echo $label, "\n"; }
+$xml = new DOMDocument();
+$xml->loadXML('<div id="w">x</div>');
+$html = new DOMDocument();
+$html->loadHTML('<!DOCTYPE html><html><body></body></html>');
+$n = $html->importNode($xml->documentElement, true);
+$html->getElementsByTagName('body')->item(0)->appendChild($n);
+dump23514('xml2html', $html, $n);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_item_appendchild_before_func_25949.php');
+
+        $itemInitAt = null;
+        $appendInitAt = null;
+        foreach ($block->opCodes as $i => $op) {
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])
+            ) {
+                continue;
+            }
+            $name = $block->constants[$op->arg2]->toString();
+            if ('item' === $name && null === $itemInitAt) {
+                $itemInitAt = $i;
+            } elseif ('appendChild' === $name && null === $appendInitAt) {
+                $appendInitAt = $i;
+            }
+        }
+        self::assertNotNull($itemInitAt, 'item() METHODCALL_INIT missing');
+        self::assertNotNull($appendInitAt, 'appendChild METHODCALL_INIT missing');
+        self::assertLessThan($appendInitAt, $itemInitAt, 'item() must precede appendChild');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("xml2html\n", ob_get_clean());
+    }
+
+    /**
      * Issue #25605 — importNode(getElementsByTagName()->item(), true) must not drop preceding loadXML
      * (re-#20284; regression from #25563 dead-temp multi-arg feed matching loadXML).
      */
