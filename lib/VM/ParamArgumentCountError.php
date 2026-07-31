@@ -19,17 +19,13 @@ final class ParamArgumentCountError
     {
         $block = $frame->block;
         $paramCount = \count($block->paramNames);
-        $hasOptional = false;
-        for ($i = 0; $i < $paramCount; ++$i) {
-            if (self::parameterHasDefault($block, $i)) {
-                $hasOptional = true;
-                break;
-            }
-        }
+        $minRequired = self::countMinimumRequired($block);
+        // Trailing optionals / variadics only — optional-before-required counts as required (#25728).
+        $hasTrailingOptional = $minRequired < $paramCount;
         $passed = self::countPassedUserArgs($frame);
-        $expectedPhrase = $hasOptional
-            ? \sprintf('at least %d expected', self::countMinimumRequired($block))
-            : \sprintf('exactly %d expected', $paramCount);
+        $expectedPhrase = $hasTrailingOptional
+            ? \sprintf('at least %d expected', $minRequired)
+            : \sprintf('exactly %d expected', $minRequired);
         [$scriptPath, $callSiteLine] = self::callSite($frame);
         $function = self::formatUserFunctionName(self::resolveFunctionName($frame));
 
@@ -41,6 +37,40 @@ final class ParamArgumentCountError
             $callSiteLine,
             $expectedPhrase
         ));
+    }
+
+    /**
+     * Named-arg omission of an effectively-required parameter (zend_execute.c, #25728).
+     *
+     * Message shape: {@code f(): Argument #1 ($a) not passed}
+     */
+    public static function forNamedArgNotPassed(Frame $frame, int $paramIndex): \ArgumentCountError
+    {
+        $name = $frame->block->paramNames[$paramIndex] ?? '';
+        $function = self::formatUserFunctionName(self::resolveFunctionName($frame));
+
+        return new \ArgumentCountError(\sprintf(
+            '%s(): Argument #%d ($%s) not passed',
+            $function,
+            $paramIndex + 1,
+            $name
+        ));
+    }
+
+    /**
+     * True when a later call argument was supplied (named-arg hole before a filled slot).
+     *
+     * @param array<int, mixed> $calledArgs
+     */
+    public static function calledArgsHaveIndexAbove(array $calledArgs, int $recvIdx): bool
+    {
+        foreach ($calledArgs as $idx => $_) {
+            if ((int) $idx > $recvIdx) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function countPassedUserArgs(Frame $frame): int
@@ -127,16 +157,53 @@ final class ParamArgumentCountError
         return preg_replace('/(@anonymous)\0[^\0]+?(?=::|$)/', '$1', $name) ?? $name;
     }
 
-    private static function countMinimumRequired(Block $block): int
+    /**
+     * Count of parameters that must be passed (zend_execute / Reflection required count).
+     *
+     * Trailing defaults and a trailing variadic are optional; a default followed by a
+     * later required (non-default, non-variadic) parameter remains required (#25728).
+     */
+    public static function countMinimumRequired(Block $block): int
     {
         $paramCount = \count($block->paramNames);
-        for ($i = 0; $i < $paramCount; ++$i) {
+        $required = $paramCount;
+        for ($i = $paramCount - 1; $i >= 0; --$i) {
+            if ($block->variadicParamIndex === $i) {
+                $required = $i;
+                continue;
+            }
             if (self::parameterHasDefault($block, $i)) {
-                return $i;
+                $required = $i;
+                continue;
+            }
+            break;
+        }
+
+        return $required;
+    }
+
+    /**
+     * Parameter must be passed: no default, or default before a later required param (#25728).
+     */
+    public static function parameterIsEffectivelyRequired(Block $block, int $paramIndex): bool
+    {
+        if ($block->variadicParamIndex === $paramIndex) {
+            return false;
+        }
+        if (!self::parameterHasDefault($block, $paramIndex)) {
+            return true;
+        }
+        $paramCount = \count($block->paramNames);
+        for ($i = $paramIndex + 1; $i < $paramCount; ++$i) {
+            if ($block->variadicParamIndex === $i) {
+                return false;
+            }
+            if (!self::parameterHasDefault($block, $i)) {
+                return true;
             }
         }
 
-        return $paramCount;
+        return false;
     }
 
     public static function parameterHasDefault(Block $block, int $paramIndex): bool

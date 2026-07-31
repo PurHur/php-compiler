@@ -7427,6 +7427,31 @@ restart:
                         } else {
                             $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                         }
+                    } elseif (
+                        (
+                            (null !== $op->arg3 && isset($frame->block->constants[$op->arg3]))
+                            || isset($frame->block->paramRuntimeDefaultInitBlocks[(int) $op->arg2])
+                        )
+                        && VM\ParamArgumentCountError::parameterIsEffectivelyRequired(
+                            $frame->block,
+                            (int) $op->arg2
+                        )
+                    ) {
+                        // Optional-before-required: do not apply the syntactic default (#25728).
+                        // Named hole (later arg present) → "Argument #N ($name) not passed";
+                        // otherwise Zend too-few wording.
+                        $error = VM\ParamArgumentCountError::calledArgsHaveIndexAbove(
+                            $frame->calledArgs,
+                            $recvIdx
+                        )
+                            ? VM\ParamArgumentCountError::forNamedArgNotPassed($frame, (int) $op->arg2)
+                            : VM\ParamArgumentCountError::forTooFewAtReceive($frame, (int) $op->arg2);
+                        $catchFrame = $this->dispatchVmArgumentCountError($error, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $default = $frame->block->constants[$op->arg3];
                         if (VM\EnumCaseSupport::isEnumCaseVariable($default)) {
