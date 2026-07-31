@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6639 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21374 |
+| Source constructs flagged (warnings) | 21376 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1607,7 +1607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoSerializeDeny.php` | 0 | 3 |
 | `ext/pdo/VmPDO.php` | 0 | 88 |
 | `ext/pdo/VmPDORow.php` | 0 | 5 |
-| `ext/pdo/VmPDOStatement.php` | 0 | 48 |
+| `ext/pdo/VmPDOStatement.php` | 0 | 52 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
 | `ext/pgsql/Module.php` | 0 | 123 |
@@ -5023,7 +5023,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/IniGet.php` | 0 | 1 |
-| `lib/JIT/Builtin/IniIntrospectionRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/IniIntrospectionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniParseQuantityRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/IniRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniSet.php` | 0 | 1 |
@@ -7768,8 +7768,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_version.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new ArgumentCountError (line 45)
+- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 43)
 - 2 class method(s)
 
 ### `ext/dba/BuiltinClasses.php`
@@ -19464,26 +19464,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOStatementNext (line 73)
 - new ObjectEntry (line 109)
 - new PdoStatementState (line 110)
-- new HashTable (line 603)
-- new Variable (line 606)
-- new ArgumentCountError (line 628)
-- new ArgumentCountError (line 668)
-- new ObjectEntry (line 763)
-- new ArgumentCountError (line 944)
-- new HashTable (line 986)
-- new Variable (line 987)
-- new Variable (line 990)
-- new Variable (line 997)
-- new ArgumentCountError (line 1020)
-- new HashTable (line 1033)
-- new Variable (line 1035)
-- new HashTable (line 1037)
-- new ArgumentCountError (line 1059)
-- new ArgumentCountError (line 1094)
-- new ArgumentCountError (line 1128)
-- new PdoStatementInternalIterator (line 1199)
-- new Variable (line 1239)
-- 45 class method(s)
+- new ObjectEntry (line 242)
+- new ArgumentCountError (line 673)
+- new ArgumentCountError (line 688)
+- new HashTable (line 697)
+- new Variable (line 701)
+- new ArgumentCountError (line 726)
+- new ArgumentCountError (line 766)
+- new ArgumentCountError (line 1036)
+- new ArgumentCountError (line 1046)
+- new ArgumentCountError (line 1062)
+- new HashTable (line 1106)
+- new Variable (line 1107)
+- new Variable (line 1110)
+- new Variable (line 1117)
+- new ArgumentCountError (line 1140)
+- new HashTable (line 1153)
+- new Variable (line 1155)
+- new HashTable (line 1157)
+- new ArgumentCountError (line 1179)
+- new ArgumentCountError (line 1214)
+- new ArgumentCountError (line 1248)
+- new PdoStatementInternalIterator (line 1319)
+- new Variable (line 1359)
+- 47 class method(s)
 
 ### `ext/pdo/pdo_drivers.php`
 
@@ -31301,14 +31305,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 322)
 - new Variable (line 397)
 - new Variable (line 438)
-- new HashTable (line 1806)
-- new Variable (line 1808)
-- new HashTable (line 2666)
-- new Variable (line 2669)
-- new Variable (line 2675)
-- new Variable (line 2681)
+- new HashTable (line 1824)
+- new Variable (line 1826)
+- new HashTable (line 2684)
 - new Variable (line 2687)
-- new Variable (line 2694)
+- new Variable (line 2693)
+- new Variable (line 2699)
+- new Variable (line 2705)
+- new Variable (line 2712)
 - 151 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -41598,7 +41602,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 644)
+- new InternalArgInfo (line 658)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -41614,8 +41618,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1906)
-- new ArgumentCountError (line 1917)
+- new ArgumentCountError (line 1914)
+- new ArgumentCountError (line 1925)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -42150,16 +42154,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 52817)
 - new OpCode (line 52836)
 - new OpCode (line 52843)
-- new Operand\Literal (line 53706)
-- new OpCode (line 55284)
-- new Literal (line 55447)
-- new OpCode (line 55546)
-- new Variable (line 55553)
-- new Temporary (line 55555)
-- new OpCode (line 55558)
-- new CompileFatal (line 55906)
-- new CompileFatal (line 56161)
-- 1127 class method(s)
+- new Operand\Literal (line 53731)
+- new OpCode (line 55309)
+- new Literal (line 55472)
+- new OpCode (line 55571)
+- new Variable (line 55578)
+- new Temporary (line 55580)
+- new OpCode (line 55583)
+- new CompileFatal (line 55931)
+- new CompileFatal (line 56186)
+- 1128 class method(s)
 - 52 closure(s)
 
 ### `lib/Compiler/AbstractMethodBodyCheck.php`
@@ -43872,9 +43876,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IniIntrospectionRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 181)
 - 14 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/IniParseQuantityRuntime.php`
 

@@ -177,9 +177,13 @@ final class VmPDOStatement
             $assoc[$name] = $value;
             $num[$i] = $value;
         }
+        // FETCH_OBJ uses assoc keys (php-src object_init + property update).
+        // FETCH_COLUMN uses numeric indices; scalar extracted in fetch/fetchAll (#25578).
         $row = match ($mode) {
-            PdoConstants::FETCH_ASSOC => $assoc,
-            PdoConstants::FETCH_NUM => $num,
+            PdoConstants::FETCH_ASSOC,
+            PdoConstants::FETCH_OBJ => $assoc,
+            PdoConstants::FETCH_NUM,
+            PdoConstants::FETCH_COLUMN => $num,
             PdoConstants::FETCH_BOUND => $assoc + $num,
             default => $assoc + $num,
         };
@@ -190,6 +194,61 @@ final class VmPDOStatement
         }
 
         return $row;
+    }
+
+    /**
+     * Materialize one fetched row into $returnVar for the given fetch mode (php-src do_fetch).
+     *
+     * @param array<string|int, mixed> $row
+     */
+    public static function assignFetchResult(
+        Context $ctx,
+        Variable $returnVar,
+        PdoStatementState $st,
+        int $mode,
+        array $row,
+        ?int $columnOverride = null
+    ): void {
+        if (PdoConstants::FETCH_OBJ === $mode) {
+            self::assignStdClassFromAssoc($ctx, $returnVar, $row);
+
+            return;
+        }
+        if (PdoConstants::FETCH_COLUMN === $mode) {
+            $col = $columnOverride ?? $st->fetchColumn;
+            if ($col < 0) {
+                throw new \ValueError('Column index must be greater than or equal to 0');
+            }
+            if (!\array_key_exists($col, $row)) {
+                throw new \ValueError('Invalid column index');
+            }
+            VmPDO::assignScalar($returnVar, $row[$col]);
+
+            return;
+        }
+        VmPDO::assignRow($returnVar, $row);
+    }
+
+    /**
+     * Build stdClass from associative column map (php-src PDO_FETCH_OBJ / fetchObject).
+     *
+     * @param array<string|int, mixed> $assoc
+     */
+    public static function assignStdClassFromAssoc(Context $ctx, Variable $returnVar, array $assoc): void
+    {
+        if (!isset($ctx->classes['stdclass'])) {
+            throw new \LogicException('stdClass is not registered');
+        }
+        $object = new ObjectEntry($ctx->classes['stdclass']);
+        $object->constructed = true;
+        foreach ($assoc as $key => $value) {
+            if (!\is_string($key)) {
+                continue;
+            }
+            $slot = $object->allocateProperty($key);
+            VmPDO::assignScalar($slot, $value);
+        }
+        $returnVar->object($object);
     }
 
     /**
@@ -424,6 +483,11 @@ final class PdoStatementState
 
     public int $fetchMode = PdoConstants::FETCH_BOTH;
 
+    /**
+     * Column index for PDO::FETCH_COLUMN (php-src stmt->fetch.column; default 0).
+     */
+    public int $fetchColumn = 0;
+
     /** Rows affected by last DML execute (php-src stmt->row_count / sqlite3_changes). */
     public int $rowCount = 0;
 
@@ -559,11 +623,11 @@ final class PDOStatementFetch extends PdoClassMethod
 
             return;
         }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDOStatement::fetch() requires VM context');
+        }
         if (PdoConstants::FETCH_LAZY === $mode) {
-            $ctx = $frame->vmContext;
-            if (null === $ctx) {
-                throw new \LogicException('PDOStatement::fetch() requires VM context');
-            }
             // FETCH_LAZY uses assoc column names on PDORow (php-src pdo_get_lazy_object; #22294).
             $assoc = [];
             foreach ($row as $key => $value) {
@@ -575,7 +639,8 @@ final class PDOStatementFetch extends PdoClassMethod
 
             return;
         }
-        VmPDO::assignRow($frame->returnVar, $row);
+        // FETCH_OBJ / FETCH_COLUMN / array modes — php-src do_fetch (#25578).
+        VmPDOStatement::assignFetchResult($ctx, $frame->returnVar, $st, $mode, $row);
     }
 }
 
@@ -600,13 +665,46 @@ final class PDOStatementFetchAll extends PdoClassMethod
                 'PDOStatement::fetchAll(): Argument #1 ($mode) PDO::FETCH_LAZY cannot be used with PDOStatement::fetchAll()'
             );
         }
+        // Optional column index for FETCH_COLUMN (php-src zim_PDOStatement_fetchAll arg2).
+        $columnOverride = null;
+        $savedColumn = $st->fetchColumn;
+        if (PdoConstants::FETCH_COLUMN === $mode) {
+            if (\count($frame->calledArgs) > 3) {
+                throw new \ArgumentCountError(
+                    'PDOStatement::fetchAll() expects at most 2 arguments for the fetch mode provided, '
+                    .(\count($frame->calledArgs) - 1).' given'
+                );
+            }
+            if (\count($frame->calledArgs) >= 3) {
+                $columnOverride = $this->intArg($frame->calledArgs[2], 'PDOStatement::fetchAll', 1, 'args');
+                if ($columnOverride < 0) {
+                    throw new \ValueError(
+                        'PDOStatement::fetchAll(): Argument #2 ($args) must be greater than or equal to 0'
+                    );
+                }
+                $st->fetchColumn = $columnOverride;
+            }
+        } elseif (\count($frame->calledArgs) > 2) {
+            throw new \ArgumentCountError(
+                'PDOStatement::fetchAll() expects exactly 1 argument for the fetch mode provided, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDOStatement::fetchAll() requires VM context');
+        }
         $ht = new HashTable();
         $i = 0;
-        while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
-            $slot = new Variable();
-            VmPDO::assignRow($slot, $row);
-            $ht->add((string) $i, $slot);
-            ++$i;
+        try {
+            while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
+                $slot = new Variable();
+                VmPDOStatement::assignFetchResult($ctx, $slot, $st, $mode, $row, $columnOverride);
+                $ht->add((string) $i, $slot);
+                ++$i;
+            }
+        } finally {
+            $st->fetchColumn = $savedColumn;
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->array($ht);
@@ -757,16 +855,10 @@ final class PDOStatementFetchObject extends PdoClassMethod
             return;
         }
         $ctx = $frame->vmContext;
-        if (null === $ctx || !isset($ctx->classes['stdclass'])) {
-            throw new \LogicException('stdClass is not registered');
+        if (null === $ctx) {
+            throw new \LogicException('PDOStatement::fetchObject() requires VM context');
         }
-        $object = new ObjectEntry($ctx->classes['stdclass']);
-        $object->constructed = true;
-        foreach ($row as $key => $value) {
-            $slot = $object->allocateProperty((string) $key);
-            VmPDO::assignScalar($slot, $value);
-        }
-        $frame->returnVar->object($object);
+        VmPDOStatement::assignStdClassFromAssoc($ctx, $frame->returnVar, $row);
     }
 }
 
@@ -929,7 +1021,7 @@ final class PDOStatementNext extends PdoClassMethod
     }
 }
 
-/** PDOStatement::setFetchMode(int $mode): bool — php-src zim_PDOStatement_setFetchMode (#19853). */
+/** PDOStatement::setFetchMode(int $mode, mixed ...$args): bool — php-src zim_PDOStatement_setFetchMode (#19853). */
 final class PDOStatementSetFetchMode extends PdoClassMethod
 {
     public function __construct()
@@ -944,7 +1036,35 @@ final class PDOStatementSetFetchMode extends PdoClassMethod
             throw new \ArgumentCountError('PDOStatement::setFetchMode() expects at least 1 argument, 0 given');
         }
         $st = VmPDOStatement::state($receiver);
-        $st->fetchMode = $this->intArg($frame->calledArgs[1], 'PDOStatement::setFetchMode', 0, 'mode');
+        $mode = $this->intArg($frame->calledArgs[1], 'PDOStatement::setFetchMode', 0, 'mode');
+        $variadic = \count($frame->calledArgs) - 2;
+        // Low byte is the fetch type; high bits are PDO_FETCH_* flags (GROUP/UNIQUE/…).
+        $how = $mode & 0xff;
+        if (PdoConstants::FETCH_COLUMN === $how) {
+            // php-src: FETCH_COLUMN requires exactly the column index arg.
+            if (1 !== $variadic) {
+                throw new \ArgumentCountError(
+                    'PDOStatement::setFetchMode() expects exactly 2 arguments for the fetch mode provided, '
+                    .(\count($frame->calledArgs) - 1).' given'
+                );
+            }
+            $col = $this->intArg($frame->calledArgs[2], 'PDOStatement::setFetchMode', 1, 'args');
+            if ($col < 0) {
+                throw new \ValueError(
+                    'PDOStatement::setFetchMode(): Argument #2 ($args) must be greater than or equal to 0'
+                );
+            }
+            $st->fetchColumn = $col;
+        } elseif (0 !== $variadic
+            && PdoConstants::FETCH_CLASS !== $how
+            && PdoConstants::FETCH_INTO !== $how
+        ) {
+            throw new \ArgumentCountError(
+                'PDOStatement::setFetchMode() expects exactly 1 argument for the fetch mode provided, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $st->fetchMode = $mode;
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
