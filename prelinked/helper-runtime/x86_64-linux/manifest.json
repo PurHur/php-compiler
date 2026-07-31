@@ -1,9 +1,9 @@
 {
     "version": 1,
-    "generated_at": "2026-07-31T00:36:28+00:00",
+    "generated_at": "2026-07-31T01:36:13+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
-    "core_fingerprint": "c09f7a6ac368b1161c53",
+    "core_fingerprint": "a8f8cc69d652d0b80bf3",
     "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
     "unit_count": 330,
     "published_fresh": 330,
