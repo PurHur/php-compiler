@@ -373,6 +373,28 @@ final class VmUserStream
     private const STREAM_BUFSIZ = 8192;
 
     /**
+     * stream_set_chunk_size on userspace — php-src streamsfuncs.c php_stream_set_chunk_size (#26045).
+     *
+     * Does not call stream_set_option; updates stream chunk_size and returns previous (default 8192).
+     *
+     * @return int|false previous chunk size
+     */
+    public static function setChunkSize(int $handle, int $chunkSize): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($chunkSize <= 0) {
+            throw new \ValueError('stream_set_chunk_size(): Argument #2 ($size) must be greater than 0');
+        }
+        $previous = $state->chunkSize;
+        $state->chunkSize = $chunkSize;
+
+        return $previous;
+    }
+
+    /**
      * stream_set_write_buffer on userspace — php-src streamsfuncs.c + user_stream_set_option (#25999).
      *
      * @return int|false 0 on success (php-src RETURN_LONG(0)), false on failure
@@ -1177,6 +1199,9 @@ final class VmUserStream
 final class UserStreamState
 {
     public int $position = 0;
+
+    /** php-src PHP_STREAM_CHUNK_SIZE default (#26045). */
+    public int $chunkSize = 8192;
 
     public function __construct(
         public ObjectEntry $wrapper,

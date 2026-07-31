@@ -1708,6 +1708,9 @@ final class VmFs
         if ($chunkSize <= 0) {
             throw new \ValueError('stream_set_chunk_size(): Argument #2 ($size) must be greater than 0');
         }
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::setChunkSize($handle, $chunkSize);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::setChunkSize($handle, $chunkSize);
         }

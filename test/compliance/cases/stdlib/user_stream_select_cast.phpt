@@ -34,6 +34,15 @@ $e = null;
 $n = stream_select($r, $w, $e, 0);
 echo 'casts=', implode(',', SelectWrap::$casts), "\n";
 echo 'n=', var_export($n, true), '|count=', count($r), "\n";
+
+// Write-only null $read (#26047) — stream_array_to_fd_set on write set.
+SelectWrap::$casts = [];
+$rW = null;
+$wW = [$f];
+$eW = null;
+$nW = stream_select($rW, $wW, $eW, 0);
+echo 'wcasts=', implode(',', SelectWrap::$casts), "\n";
+echo 'wn=', var_export($nW, true), '|wcount=', count($wW), "\n";
 fclose($f);
 stream_wrapper_unregister('uwsel');
 
@@ -65,4 +74,6 @@ stream_wrapper_unregister('uwnocast');
 --EXPECT--
 casts=3,3
 n=1|count=1
+wcasts=3,3
+wn=1|wcount=1
 nocast=No stream arrays were passed
