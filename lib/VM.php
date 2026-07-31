@@ -9239,7 +9239,8 @@ restart:
                     }
                     $this->throwYieldFromInvalidContainer($container);
                 case OpCode::TYPE_ITER_RESET:
-                    $container = $frame->scope[$op->arg1]->resolveIndirect();
+                    // Zend FE_RESET / CV fetch: Undefined variable E_WARNING before type check (#26148).
+                    $container = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg1)->resolveIndirect();
                     unset($this->context->foreachInvalidSlots[$op->arg1]);
                     if ($this->variableIsGenerator($container)) {
                         unset($this->context->foreachObjectAdvance[$op->arg1]);
