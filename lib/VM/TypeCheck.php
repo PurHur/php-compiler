@@ -572,7 +572,14 @@ final class TypeCheck
             return;
         }
         if (null !== $target->literalBoolType) {
-            self::assertLiteralBool($dest, $target->literalBoolType, $kind, $propertyWrite, $constraint);
+            self::assertLiteralBool(
+                $dest,
+                $target->literalBoolType,
+                $kind,
+                $propertyWrite,
+                $constraint,
+                $returnCallableName
+            );
 
             return;
         }
@@ -762,13 +769,23 @@ final class TypeCheck
         string $literal,
         string $kind,
         bool $propertyWrite,
-        int $constraint
+        int $constraint,
+        ?string $returnCallableName = null
     ): void {
         if (self::matchesLiteralBool($dest, $literal)) {
             return;
         }
         $value = $dest->resolveIndirect();
-        throw self::typedSlotError($dest, $constraint, $value, $kind, $propertyWrite, $literal);
+        throw self::typedSlotError(
+            $dest,
+            $constraint,
+            $value,
+            $kind,
+            $propertyWrite,
+            $literal,
+            null,
+            $returnCallableName
+        );
     }
 
     private static function weakCoerceInPlace(
