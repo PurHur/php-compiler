@@ -862,6 +862,57 @@ final class VmIntlDateFormatter
         return $datePat.self::dateTimeConnector($loc, $dateType).$timePat;
     }
 
+    /**
+     * MessageFormatter `{n,date[,style]}` / `{n,time[,style]}` — php-src msgformat_helpers (#25226).
+     *
+     * Named styles map to UDAT_* (default medium). Other style strings are treated as ICU patterns.
+     * Uses the process default timezone (same as Zend MessageFormatter / IntlDateFormatter).
+     *
+     * @param mixed $val unix timestamp (int/float/numeric string)
+     */
+    public static function formatMessageDateTimeArg(string $locale, $val, string $kind, ?string $style): string
+    {
+        if (!\is_int($val) && !\is_float($val) && !(\is_string($val) && is_numeric($val))) {
+            return \is_string($val) ? $val : (string) $val;
+        }
+        $timestamp = (int) $val;
+        $styleKey = null === $style ? '' : strtolower(trim($style));
+        $named = [
+            '' => self::MEDIUM,
+            'short' => self::SHORT,
+            'medium' => self::MEDIUM,
+            'long' => self::LONG,
+            'full' => self::FULL,
+        ];
+        $timezone = VmDate::defaultTimezoneGet();
+        if ('' === $timezone) {
+            $timezone = 'UTC';
+        }
+        if (\array_key_exists($styleKey, $named)) {
+            $udat = $named[$styleKey];
+            if ('time' === $kind) {
+                $pattern = self::patternFromStyles($locale, self::NONE, $udat);
+            } else {
+                $pattern = self::patternFromStyles($locale, $udat, self::NONE);
+            }
+            if (null === $pattern || '' === $pattern) {
+                return (string) $val;
+            }
+
+            return self::formatIcuPattern($pattern, $timestamp, 0, $timezone);
+        }
+        // Non-keyword style: ICU pattern (e.g. `{0,date,yyyy}`) — not ::skeletons (#25226 scope).
+        if (str_starts_with($styleKey, '::')) {
+            return (string) $val;
+        }
+        $pattern = trim((string) $style);
+        if ('' === $pattern) {
+            return (string) $val;
+        }
+
+        return self::formatIcuPattern($pattern, $timestamp, 0, $timezone);
+    }
+
     private static function normalizeStyle(int $style): int
     {
         if ($style >= self::RELATIVE_FULL) {
