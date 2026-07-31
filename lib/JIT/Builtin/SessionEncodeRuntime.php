@@ -39,6 +39,8 @@ final class SessionEncodeRuntime
     {
         StringUnserialize::ensureLinked($context);
         SessionStorageGlobals::ensureGlobals($context);
+        // Merge bridge for session_decode apply (#26088).
+        \PHPCompiler\ext\standard\JitSessionStorageKernel::ensureLinked($context);
 
         $savedBlock = null;
         try {
@@ -249,8 +251,26 @@ final class SessionEncodeRuntime
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbOk);
+        // Merge into existing $_SESSION (php-src mod_php.c) — do not replace (#26088).
         if (isset(SuperglobalInit::$globals['_SESSION'])) {
-            $context->builder->store($decoded, SuperglobalInit::$globals['_SESSION']);
+            $existing = $context->builder->load(SuperglobalInit::$globals['_SESSION']);
+            $existingNull = $context->builder->icmp(Builder::INT_EQ, $existing, $htPtr->constNull());
+            $bbAlloc = $fn->appendBasicBlock('se_dec_alloc_sess');
+            $bbMerge = $fn->appendBasicBlock('se_dec_merge');
+            $context->builder->branchIf($existingNull, $bbAlloc, $bbMerge);
+
+            $context->builder->positionAtEnd($bbAlloc);
+            $fresh = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            $context->builder->store($fresh, SuperglobalInit::$globals['_SESSION']);
+            $context->builder->branch($bbMerge);
+
+            $context->builder->positionAtEnd($bbMerge);
+            $dest = $context->builder->load(SuperglobalInit::$globals['_SESSION']);
+            $context->builder->call(
+                $context->lookupFunction('phpc_session_merge_hashtable'),
+                $dest,
+                $decoded
+            );
         }
         SessionStart::emitWriteBool($context, $outPtr, true);
         $context->builder->branch($bbDone);
