@@ -16699,6 +16699,25 @@ restart:
 
             return;
         }
+        // Static magic fake closure: methodName + __callStatic, no receiver (#25757).
+        if (
+            null !== $state->methodName
+            && '' !== $state->methodName
+            && null !== $state->wrappedFunc
+            && null === $state->methodReceiver
+        ) {
+            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+                $frame->calledClass = $state->boundScopeClass;
+            }
+            $frame->magicCallMethodName = $state->methodName;
+            $frame->call = $state->wrappedFunc;
+            $frame->closureCall = null;
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+            $frame->builtinCalleeQualifiedMethod = null;
+
+            return;
+        }
         if (null !== $state->wrappedFunc) {
             if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
                 $frame->calledClass = $state->boundScopeClass;
