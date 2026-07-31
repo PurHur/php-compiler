@@ -25,6 +25,14 @@ final class VmStreamFstat
 
             return VmStatPure::normalize($raw);
         }
+        if (VmUserStream::isValidHandle($handle)) {
+            $raw = VmUserStream::stat($handle);
+            if (false === $raw) {
+                return false;
+            }
+
+            return VmStatPure::normalize($raw);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $size = VmPhpMemoryStream::bufferLength($handle);
             if (false === $size) {
