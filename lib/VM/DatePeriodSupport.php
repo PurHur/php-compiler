@@ -41,6 +41,21 @@ final class DatePeriodSupport
     ];
 
     /**
+     * php-src @readonly DatePeriod props — write handlers reject assigns; not ZEND_ACC_READONLY (#26154, re-#26146).
+     *
+     * @var list<string>
+     */
+    public const HANDLER_READONLY_PROPS = [
+        'start',
+        'current',
+        'end',
+        'interval',
+        'recurrences',
+        'include_start_date',
+        'include_end_date',
+    ];
+
+    /**
      * Register DatePeriod::EXCLUDE_START_DATE / INCLUDE_END_DATE on the class entry (#20071).
      *
      * php-src: ext/date/php_date.c — REGISTER_DATEPERIOD_CLASS_CONST_LONG
@@ -53,6 +68,24 @@ final class DatePeriodSupport
             $canonical = strtoupper($name);
             $entry->constants[$canonical] = $const;
             $entry->constNames[$canonical] = $canonical;
+        }
+    }
+
+    /**
+     * php-src date object write handlers — userland assign Error; unset remains allowed (#26154).
+     *
+     * Do not set {@see ClassProperty::$readonly}: Zend 8.2 ReflectionProperty::isReadOnly() is false.
+     */
+    public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
+    {
+        if (self::CLASS_DATEPERIOD !== strtolower($owner->class->name)) {
+            return;
+        }
+        $lc = strtolower($name);
+        foreach (self::HANDLER_READONLY_PROPS as $prop) {
+            if ($lc === strtolower($prop)) {
+                throw new \Error('Cannot modify readonly property DatePeriod::$'.$prop);
+            }
         }
     }
 

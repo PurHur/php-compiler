@@ -1837,15 +1837,15 @@ final class BuiltinClasses
         DatePeriodSupport::registerClassConstants($dp);
         // php-src php_date.c / date.stub.php — IteratorAggregate + getIterator → InternalIterator (#22263).
         $dp->interfaces = ['iteratoraggregate'];
-        // php-src ext/date/php_date.stub.php — public readonly props (#26146).
-        // Internal DatePeriodSupport / JIT iterator writes bypass userland Assign guards.
-        $dp->properties[] = new ClassProperty('start', null, $objProto, true);
-        $dp->properties[] = new ClassProperty('current', null, $nullProto, true);
-        $dp->properties[] = new ClassProperty('end', null, $nullProto, true);
-        $dp->properties[] = new ClassProperty('interval', null, $objProto, true);
-        $dp->properties[] = new ClassProperty('recurrences', null, $intProto, true);
-        $dp->properties[] = new ClassProperty('include_start_date', null, $boolProto, true);
-        $dp->properties[] = new ClassProperty('include_end_date', null, $boolProto, true);
+        // php-src @readonly via write handlers — not ClassProperty::$readonly (#26154, re-#26146).
+        // Internal DatePeriodSupport / JIT iterator stores bypass userland Assign guards.
+        $dp->properties[] = new ClassProperty('start', null, $objProto);
+        $dp->properties[] = new ClassProperty('current', null, $nullProto);
+        $dp->properties[] = new ClassProperty('end', null, $nullProto);
+        $dp->properties[] = new ClassProperty('interval', null, $objProto);
+        $dp->properties[] = new ClassProperty('recurrences', null, $intProto);
+        $dp->properties[] = new ClassProperty('include_start_date', null, $boolProto);
+        $dp->properties[] = new ClassProperty('include_end_date', null, $boolProto);
         foreach ($dp->properties as $prop) {
             $prop->visibility = $pub;
             $prop->declaringClassLc = DatePeriodSupport::CLASS_DATEPERIOD;

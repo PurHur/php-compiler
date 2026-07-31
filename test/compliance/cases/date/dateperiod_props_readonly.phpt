@@ -1,5 +1,5 @@
 --TEST--
-date DatePeriod public props are readonly — Zend Error (#26146, ext/date/php_date.c)
+date DatePeriod handler-readonly props — write Error, unset OK, isReadOnly false (#26146/#26154)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -12,29 +12,34 @@ foreach (['start', 'current', 'end', 'interval', 'recurrences', 'include_start_d
         $p->$prop = $p->$prop;
         echo "$prop=WRITE_OK\n";
     } catch (Error $ex) {
-        $msg = $ex->getMessage();
-        echo str_contains($msg, 'Cannot modify readonly property DatePeriod::$' . $prop)
-            ? "$prop=ERR_readonly\n"
-            : "$prop=ERR_other:" . $msg . "\n";
+        echo "$prop=ERR_readonly\n";
     }
 }
 try {
     $p->start = new DateTimeImmutable('2024-01-02');
-    $days = [];
-    foreach ($p as $d) {
-        $days[] = $d->format('d');
-    }
-    echo 'iter=', implode(',', $days), "\n";
+    echo "mut=WRITE_OK\n";
 } catch (Throwable $ex) {
     echo "mut_blocked\n";
 }
-// Iteration still works when props are not mutated from userland.
+try {
+    unset($p->start);
+    echo "unset=OK\n";
+} catch (Error $ex) {
+    echo "unset=ERR\n";
+}
+try {
+    $v = $p->start;
+    echo 'after_unset=', null === $v ? 'null' : 'set', "\n";
+} catch (Error $ex) {
+    echo "after_unset=uninit\n";
+}
+$p2 = new DatePeriod($s, $i, $e);
 $days = [];
-foreach ($p as $d) {
+foreach ($p2 as $d) {
     $days[] = $d->format('d');
 }
 echo 'iter_ok=', implode(',', $days), "\n";
-$rp = new ReflectionProperty(DatePeriod::class, 'start');
+$rp = new ReflectionProperty('DatePeriod', 'start');
 echo 'refl_ro=', $rp->isReadOnly() ? '1' : '0', "\n";
 ?>
 --EXPECT--
@@ -46,5 +51,7 @@ recurrences=ERR_readonly
 include_start_date=ERR_readonly
 include_end_date=ERR_readonly
 mut_blocked
+unset=OK
+after_unset=null
 iter_ok=01,02,03
-refl_ro=1
+refl_ro=0

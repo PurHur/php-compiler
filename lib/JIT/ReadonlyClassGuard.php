@@ -49,7 +49,11 @@ final class ReadonlyClassGuard
         // set-visibility guard — not here. Plain `final` is inheritance-only in php-src (#23683).
         $guardClassIds = array_values(array_unique(array_merge(
             $objectType->readonlyClassIds(),
-            $objectType->readonlyPropertyClassIdsForProperty($propName)
+            $objectType->readonlyPropertyClassIdsForProperty($propName),
+            // Handler write-reject (DatePeriod @readonly): assign only — unset stays allowed (#26154).
+            'modify' === $violation
+                ? $objectType->writeRejectPropertyClassIdsForProperty($propName)
+                : []
         )));
         if ([] === $guardClassIds) {
             return;

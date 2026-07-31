@@ -203,6 +203,13 @@ class Object_ extends Type {
     /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
     private array $readonlyPropertyNames = [];
 
+    /**
+     * Handler-style write reject (assign only) — not ZEND_ACC_READONLY (#26154 DatePeriod).
+     *
+     * @var array<int, array<string, true>> class id => property lc => true
+     */
+    private array $writeRejectPropertyNames = [];
+
     /** @var array<int, array<string, true>> class id => property lc => true (#22451, #22450) */
     private array $finalPropertyNames = [];
 
@@ -1234,6 +1241,19 @@ class Object_ extends Type {
         return isset($this->readonlyPropertyNames[$classId][strtolower($name)]);
     }
 
+    /**
+     * Reject userland Assign only (unset + Reflection isReadOnly stay Zend-like) (#26154).
+     */
+    public function markPropertyWriteReject(int $classId, string $name): void
+    {
+        $this->writeRejectPropertyNames[$classId][strtolower($name)] = true;
+    }
+
+    public function isPropertyWriteReject(int $classId, string $name): bool
+    {
+        return isset($this->writeRejectPropertyNames[$classId][strtolower($name)]);
+    }
+
     public function markPropertyFinal(int $classId, string $name): void
     {
         $this->finalPropertyNames[$classId][strtolower($name)] = true;
@@ -1303,10 +1323,27 @@ class Object_ extends Type {
         return $ids;
     }
 
+    /**
+     * @return list<int> class ids with handler write-reject for $name (assign only; #26154)
+     */
+    public function writeRejectPropertyClassIdsForProperty(string $name): array
+    {
+        $lc = strtolower($name);
+        $ids = [];
+        foreach ($this->writeRejectPropertyNames as $classId => $props) {
+            if (isset($props[$lc])) {
+                $ids[] = $classId;
+            }
+        }
+
+        return $ids;
+    }
+
     public function hasReadonlyPropertyGuards(): bool
     {
         return [] !== $this->readonlyClassIds
             || [] !== $this->readonlyPropertyNames
+            || [] !== $this->writeRejectPropertyNames
             || [] !== $this->finalPropertyNames;
     }
 
@@ -3344,18 +3381,18 @@ class Object_ extends Type {
                 'exclude_start_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_EXCLUDE_START_DATE,
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
-            // php-src date.stub.php — public readonly; userland Assign rejects (#26146).
+            // php-src @readonly write handlers — assign reject only; unset + isReadOnly Zend 8.2 (#26154).
             foreach (['start', 'current', 'end', 'interval'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
-                $this->markPropertyReadonly($id, $prop);
+                $this->markPropertyWriteReject($id, $prop);
             }
             foreach (['recurrences'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
-                $this->markPropertyReadonly($id, $prop);
+                $this->markPropertyWriteReject($id, $prop);
             }
             foreach (['include_start_date', 'include_end_date'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_BOOL);
-                $this->markPropertyReadonly($id, $prop);
+                $this->markPropertyWriteReject($id, $prop);
             }
             foreach (['__dp_iter_key'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
