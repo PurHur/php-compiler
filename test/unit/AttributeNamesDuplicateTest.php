@@ -57,6 +57,16 @@ final class AttributeNamesDuplicateTest extends TestCase
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly(['AllowDynamicProperties'], 'method');
     }
 
+    public function testRejectsAllowDynamicPropertiesOnFunction(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "AllowDynamicProperties" cannot target function (allowed targets: class)'
+        );
+
+        AttributeNames::assertAllowDynamicPropertiesClassTargetOnly(['AllowDynamicProperties'], 'function');
+    }
+
     public function testRejectsAllowDynamicPropertiesOnReadonlyClass(): void
     {
         $this->expectException(\CompileError::class);
