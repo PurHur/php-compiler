@@ -83,7 +83,7 @@ final class DomAdjacentPositionEnum
 
     private static function registerStringBackedCase(ClassEntry $enum, string $name, string $value): void
     {
-        $lc = strtolower($name);
+        $lc = \PHPCompiler\ClassConstName::key($name);
         $backing = new Variable();
         $backing->string($value);
         $case = EnumCaseSupport::createCase($enum, $name, $backing);

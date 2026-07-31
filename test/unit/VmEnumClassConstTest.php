@@ -32,11 +32,11 @@ PHP;
         $this->assertSame("array (\n  0 => 2,\n  1 => 1,\n)\n", $output);
         $entry = $runtime->vmContext->classes['e'];
         $this->assertTrue($entry->isEnum);
-        $this->assertArrayHasKey('foo', $entry->constants);
-        $this->assertSame(2, $entry->constants['foo']->toInt());
-        $this->assertArrayHasKey('a', $entry->constants);
-        $this->assertArrayHasKey('a', $entry->enumCaseCanonicalNames);
-        $this->assertArrayNotHasKey('foo', $entry->enumCaseCanonicalNames);
+        $this->assertArrayHasKey('FOO', $entry->constants);
+        $this->assertSame(2, $entry->constants['FOO']->toInt());
+        $this->assertArrayHasKey('A', $entry->constants);
+        $this->assertArrayHasKey('A', $entry->enumCaseCanonicalNames);
+        $this->assertArrayNotHasKey('FOO', $entry->enumCaseCanonicalNames);
     }
 
     public function testBackedEnumTypedClassConst(): void
@@ -63,8 +63,8 @@ PHP;
 
         $this->assertSame("2\n", $output);
         $entry = $runtime->vmContext->classes['e'];
-        $this->assertArrayHasKey('foo', $entry->constants);
-        $this->assertSame(2, $entry->constants['foo']->toInt());
+        $this->assertArrayHasKey('FOO', $entry->constants);
+        $this->assertSame(2, $entry->constants['FOO']->toInt());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -119,8 +119,8 @@ PHP;
 
             $this->assertSame("\\Color::Red\nRed\n", $output);
             $entry = $runtime->vmContext->classes['palette'];
-            $this->assertArrayHasKey('primary', $entry->constants);
-            $stored = $entry->constants['primary']->resolveIndirect();
+            $this->assertArrayHasKey('PRIMARY', $entry->constants);
+            $stored = $entry->constants['PRIMARY']->resolveIndirect();
             $this->assertTrue(
                 Variable::TYPE_ENUM_CASE === $stored->type
                 || (Variable::TYPE_OBJECT === $stored->type && $stored->toObject()->isEnumCase)
@@ -153,8 +153,8 @@ PHP;
 
         $this->assertSame("\\E::A\n", $output);
         $entry = $runtime->vmContext->classes['c'];
-        $this->assertArrayHasKey('item', $entry->constants);
-        $stored = $entry->constants['item']->resolveIndirect();
+        $this->assertArrayHasKey('ITEM', $entry->constants);
+        $stored = $entry->constants['ITEM']->resolveIndirect();
         $this->assertTrue(
             Variable::TYPE_ENUM_CASE === $stored->type
             || (Variable::TYPE_OBJECT === $stored->type && $stored->toObject()->isEnumCase)

@@ -60,7 +60,7 @@ final class BuiltinEnums
 
     private static function registerBackedEnumCase(ClassEntry $enum, string $name, int $value): void
     {
-        $lc = strtolower($name);
+        $lc = \PHPCompiler\ClassConstName::key($name);
         $backing = new Variable();
         $backing->int($value);
         $case = EnumCaseSupport::createCase($enum, $name, $backing);

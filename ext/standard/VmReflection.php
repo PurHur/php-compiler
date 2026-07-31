@@ -1334,7 +1334,8 @@ final class VmReflection
      */
     public static function findClassConstantDecl(ClassEntry $class, string $constant, Context $ctx): ?array
     {
-        $lc = strtolower($constant);
+        // Exact casing key (#25910 / #25929); wrong case is a miss (#25945 isEnumCase / getReflectionConstants).
+        $lc = \PHPCompiler\ClassConstName::key($constant);
         $current = $class;
         while (true) {
             if (isset($current->constants[$lc])) {
