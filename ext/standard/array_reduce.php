@@ -25,9 +25,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_reduce() with string user-function and closure callbacks (subset of PHP).
+ * array_reduce() — string, closure, invokable, and object-array callables (ext/standard/array.c; #25763).
  *
- * JIT/AOT: compile-time string user-function names in this compile unit (#1213).
+ * JIT/AOT: compile-time string user-function names in this compile unit (#1213); array callables VM-only.
  */
 final class array_reduce extends Internal
 {
@@ -37,17 +37,38 @@ final class array_reduce extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
         }
+        $callback = $frame->calledArgs[1]->resolveIndirect();
         $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reduce', 1, 'array');
         if (null === $frame->vmContext) {
             throw new \LogicException('array_reduce() requires VM context in this compiler build');
         }
-        $callback = $frame->calledArgs[1];
         $hasInitial = 3 === $argc;
         $initial = $hasInitial ? $frame->calledArgs[2]->resolveIndirect() : null;
-        [$closure, $callbackFn] = VmReduceCallback::resolve($frame, $callback);
         if (null === $frame->returnVar) {
             return;
         }
+        // Closures / invokables / object-array callables — scoped like array_map (#25763).
+        if (VmClosureCall::isClosure($callback)
+            || Variable::TYPE_OBJECT === $callback->type
+            || Variable::TYPE_ARRAY === $callback->type
+        ) {
+            if (!VmClosureCall::isClosure($callback)) {
+                if (!VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
+                    VmCallable::throwIfInaccessibleMethodCallback(
+                        $frame->vmContext,
+                        $callback,
+                        'array_reduce',
+                        2,
+                        $frame
+                    );
+                    throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
+                }
+            }
+            self::reduceWithVmCallable($frame, $array, $hasInitial, $initial, $callback);
+
+            return;
+        }
+        [$closure, $callbackFn] = VmReduceCallback::resolve($frame, $callback);
         if ($callbackFn instanceof Internal && null === $closure) {
             $nullInitial = new Variable();
             $nullInitial->null();
@@ -59,6 +80,53 @@ final class array_reduce extends Internal
             return;
         }
         self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $callbackFn, $frame->vmContext);
+    }
+
+    private static function reduceWithVmCallable(
+        Frame $frame,
+        HashTable $array,
+        bool $hasInitial,
+        ?Variable $initial,
+        Variable $callback
+    ): void {
+        $ctx = $frame->vmContext;
+        $carry = null;
+        if ($hasInitial) {
+            $carry = new Variable();
+            $carry->copyFrom($initial);
+        }
+        $empty = true;
+        foreach ($array->iterateKeyed(true) as [, $value]) {
+            $empty = false;
+            $item = new Variable();
+            $item->copyFrom($value);
+            if ($hasInitial) {
+                $carryArg = $carry;
+            } elseif (null === $carry) {
+                $carryArg = new Variable();
+                $carryArg->null();
+            } else {
+                $carryArg = $carry;
+            }
+            $carry = VmCallable::invokeAsWithScope(
+                'array_reduce',
+                $ctx,
+                $frame,
+                $callback,
+                $carryArg,
+                $item
+            );
+        }
+        if ($empty) {
+            if ($hasInitial) {
+                $frame->returnVar->copyFrom($initial);
+            } else {
+                $frame->returnVar->null();
+            }
+
+            return;
+        }
+        $frame->returnVar->copyFrom($carry);
     }
 
     /**
