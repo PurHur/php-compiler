@@ -221,18 +221,24 @@ final class VmCallable
 
     /**
      * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709, #25712).
+     *
+     * array_map/array_filter use "a valid callback or null" (#25711); usort/call_user_func do not.
      */
     public static function inaccessibleMethodCallbackTypeError(
         string $function,
         string $kind,
         string $className,
         string $methodName,
-        int $argNum = 1
+        int $argNum = 1,
+        bool $nullAllowed = false
     ): string {
+        $phrase = $nullAllowed ? 'a valid callback or null' : 'a valid callback';
+
         return sprintf(
-            '%s(): Argument #%d ($callback) must be a valid callback, cannot access %s method %s::%s()',
+            '%s(): Argument #%d ($callback) must be %s, cannot access %s method %s::%s()',
             $function,
             $argNum,
+            $phrase,
             $kind,
             $className,
             $methodName
@@ -249,7 +255,8 @@ final class VmCallable
         Variable $callback,
         string $function,
         int $argNum,
-        ?Frame $scopeFrame
+        ?Frame $scopeFrame,
+        bool $nullAllowed = false
     ): void {
         $callback = $callback->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $callback->type) {
@@ -279,7 +286,8 @@ final class VmCallable
                 $methodName,
                 $function,
                 $scopeFrame,
-                $argNum
+                $argNum,
+                $nullAllowed
             );
 
             return;
@@ -307,7 +315,8 @@ final class VmCallable
             $methodName,
             $function,
             $scopeFrame,
-            $argNum
+            $argNum,
+            $nullAllowed
         );
     }
 
@@ -703,7 +712,8 @@ final class VmCallable
         string $method,
         string $function,
         ?Frame $scopeFrame,
-        int $argNum = 1
+        int $argNum = 1,
+        bool $nullAllowed = false
     ): void {
         if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
             return;
@@ -720,7 +730,8 @@ final class VmCallable
             $method,
             $function,
             $scopeFrame,
-            $argNum
+            $argNum,
+            $nullAllowed
         );
     }
 
@@ -734,7 +745,8 @@ final class VmCallable
         string $methodFallback,
         string $function,
         ?Frame $scopeFrame,
-        int $argNum = 1
+        int $argNum = 1,
+        bool $nullAllowed = false
     ): void {
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null !== $scopeFrame
@@ -755,7 +767,8 @@ final class VmCallable
             $kind,
             $declaring->name,
             $declaredName,
-            $argNum
+            $argNum,
+            $nullAllowed
         ));
     }
 
