@@ -13,20 +13,16 @@ use PHPCompiler\VM\Variable;
  * php-src php_http.c — stream_socket HTTP POST with Z_CLIENT_HTTPSOCKET keep-alive (#24913).
  *
  * PHP-in-PHP: host stream_socket_client + VmFs handle; no new runtime C.
- * Proxy+HTTPS CONNECT falls back to caller (file_get_contents) — httpsocket stays null.
+ * HTTPS through HTTP proxy uses CONNECT + stream_socket_enable_crypto (#26166).
  */
 final class SoapHttpTransport
 {
     /**
      * True when this transport can own the connection (attach httpsocket).
-     * Proxy through HTTPS needs CONNECT; keep legacy file_get_contents for that path.
      */
     public static function canHandle(string $location, bool $useProxy): bool
     {
         if (!\preg_match('#^https?://#i', $location)) {
-            return false;
-        }
-        if ($useProxy && \preg_match('#^https://#i', $location)) {
             return false;
         }
 
@@ -228,9 +224,117 @@ final class SoapHttpTransport
             throw new \SoapFault('HTTP', 'Could not connect to host');
         }
 
+        // php-src http_connect: proxy + SSL → CONNECT then crypto_enable (#26166).
+        if ($useProxy && $useSsl) {
+            self::proxyHttpsConnect($handle, $object, $state, $payload);
+        }
+
         self::attachSocket($object, $state, $handle, $useProxy);
 
         return $handle;
+    }
+
+    /**
+     * php-src php_http.c http_connect — CONNECT host:port + enable SSL (#26166).
+     *
+     * @throws \SoapFault
+     */
+    private static function proxyHttpsConnect(
+        int $handle,
+        ObjectEntry $object,
+        SoapClientState $state,
+        SoapUrlPayload $payload
+    ): void {
+        $host = (string) $payload->host;
+        $port = (int) $payload->port;
+        $connect = 'CONNECT '.$host.':'.$port." HTTP/1.1\r\n".
+            'Host: '.$host;
+        // php-src appends :port on Host when port != 80 (including 443).
+        if (80 !== $port) {
+            $connect .= ':'.$port;
+        }
+        $connect .= "\r\n";
+        if (null !== $state->proxyLogin) {
+            $user = $state->proxyLogin;
+            $pass = null !== $state->proxyPassword ? $state->proxyPassword : '';
+            $connect .= 'Proxy-Authorization: Basic '.\base64_encode($user.':'.$pass)."\r\n";
+        }
+        $connect .= "\r\n";
+
+        $written = VmFs::fwrite($handle, $connect);
+        if (false === $written || (int) $written !== \strlen($connect)) {
+            self::closeSocket($object, $state);
+
+            throw new \SoapFault('HTTP', 'Failed Sending HTTP SOAP request');
+        }
+
+        $statusLine = VmFs::fgets($handle);
+        if (false === $statusLine || '' === $statusLine) {
+            self::closeSocket($object, $state);
+
+            throw new \SoapFault('HTTP', 'Error Fetching http headers');
+        }
+        // Drain header block (php-src get_http_headers).
+        while (true) {
+            $line = VmFs::fgets($handle);
+            if (false === $line) {
+                self::closeSocket($object, $state);
+
+                throw new \SoapFault('HTTP', 'Error Fetching http headers');
+            }
+            if ('' === \rtrim($line, "\r\n")) {
+                break;
+            }
+        }
+        if (!\preg_match('#^HTTP/\d+\.\d+\s+200\b#i', \trim($statusLine))) {
+            self::closeSocket($object, $state);
+
+            throw new \SoapFault('HTTP', 'Could not connect to host');
+        }
+
+        $fp = VmFs::hostStreamResource($handle);
+        if (\is_resource($fp) && null !== $payload->host) {
+            // php-src: peer_name defaults to destination host, not the proxy.
+            $existing = @\stream_context_get_options($fp);
+            $hasPeer = \is_array($existing)
+                && isset($existing['ssl'])
+                && \is_array($existing['ssl'])
+                && \array_key_exists('peer_name', $existing['ssl']);
+            if (!$hasPeer) {
+                @\stream_context_set_option($fp, 'ssl', 'peer_name', $payload->host);
+            }
+        }
+
+        $crypto = self::sslMethodToCryptoMethod($state->sslMethod);
+        if (null === $crypto || !VmFs::streamSocketEnableCrypto($handle, true, $crypto)) {
+            self::closeSocket($object, $state);
+
+            throw new \SoapFault('HTTP', 'Could not connect to host');
+        }
+    }
+
+    /** php-src ssl_method → STREAM_CRYPTO_METHOD_*_CLIENT (#20366 / #26166). */
+    private static function sslMethodToCryptoMethod(?int $sslMethod): ?int
+    {
+        if (null === $sslMethod) {
+            return \defined('STREAM_CRYPTO_METHOD_SSLv23_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv23_CLIENT')
+                : (\defined('STREAM_CRYPTO_METHOD_TLS_CLIENT')
+                    ? (int) \constant('STREAM_CRYPTO_METHOD_TLS_CLIENT') : null);
+        }
+
+        return match ($sslMethod) {
+            SoapConstants::SOAP_SSL_METHOD_TLS => \defined('STREAM_CRYPTO_METHOD_TLS_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_TLS_CLIENT') : null,
+            SoapConstants::SOAP_SSL_METHOD_SSLv2 => \defined('STREAM_CRYPTO_METHOD_SSLv2_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv2_CLIENT') : null,
+            SoapConstants::SOAP_SSL_METHOD_SSLv3 => \defined('STREAM_CRYPTO_METHOD_SSLv3_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv3_CLIENT') : null,
+            SoapConstants::SOAP_SSL_METHOD_SSLv23 => \defined('STREAM_CRYPTO_METHOD_SSLv23_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv23_CLIENT') : null,
+            default => \defined('STREAM_CRYPTO_METHOD_TLS_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_TLS_CLIENT') : null,
+        };
     }
 
     /**
