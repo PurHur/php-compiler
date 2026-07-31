@@ -3208,6 +3208,35 @@ class VM {
     }
 
     /**
+     * `$r = &$obj->inaccessible` — Zend get_property_ptr_ptr fails; read_property(BP_VAR_W)
+     * invokes __get (zend_object_handlers.c, #25688).
+     *
+     * By-ref `__get` binds the returned lvalue; by-value `__get` yields a notice and a
+     * temporary (Indirect modification of overloaded property … has no effect).
+     */
+    protected function deliverInaccessiblePropertyFetchByRef(
+        Variable $result,
+        ObjectEntry $object,
+        string $name,
+        Frame $frame
+    ): void {
+        if ($this->instanceMethodReturnsByRef($object, '__get')) {
+            $result->indirect($this->invokeMagicGet($object, $name));
+
+            return;
+        }
+        $this->deliverMagicGetRead($result, $object, $name);
+        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $this->context->errors->indirectModificationOfOverloadedProperty(
+            $object->class->name,
+            $name,
+            $this->context,
+            $frame,
+            $scriptFile
+        );
+    }
+
+    /**
      * Reject []= / dim-write on a non-object value produced by __get (#4673, #20005).
      *
      * php-src zend_object_handlers.c: arrays returned by value from __get cannot be
@@ -7934,6 +7963,20 @@ restart:
                             $this->emitInstancePropertyAccessDeprecation($propertyObject, $name, $frame);
                         }
                         if ($forWrite) {
+                            // `$r = &$obj->inaccessible` — get_property_ptr_ptr fails; BP_VAR_W
+                            // read_property invokes __get (zend_object_handlers.c, #25688).
+                            if (
+                                $this->propertyFetchDestUsedAsAssignRefSource($frame, $op)
+                                && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame)
+                            ) {
+                                $this->deliverInaccessiblePropertyFetchByRef(
+                                    $result,
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                );
+                                break;
+                            }
                             $writeProxy = new Variable();
                             $writeProxy->objectPropertyOwner = $propertyObject;
                             $writeProxy->objectPropertyName = $name;

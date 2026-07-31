@@ -355,6 +355,28 @@ final class ErrorReporter
         );
     }
 
+    /**
+     * Zend E_NOTICE when `&$obj->prop` routes through by-value `__get` (zend_object_handlers.c, #25688).
+     */
+    public function indirectModificationOfOverloadedProperty(
+        string $className,
+        string $propertyName,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitNotice(
+            sprintf(
+                'Indirect modification of overloaded property %s::$%s has no effect',
+                $className,
+                $propertyName
+            ),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
     private function emitNotice(
         string $message,
         ?Context $context = null,
