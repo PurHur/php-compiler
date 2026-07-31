@@ -6092,11 +6092,11 @@ restart:
                             $frame = $traitConstFrame;
                             goto restart;
                         }
-                        $constLc = strtolower($memberNameRaw);
-                        if (isset($classEntry->constants[$constLc])
+                        $constKey = ClassConstName::key($memberNameRaw);
+                        if (isset($classEntry->constants[$constKey])
                             && ClassConstName::matchesDeclared(
                                 $memberNameRaw,
-                                $this->declaredClassConstName($classEntry, $constLc)
+                                $this->declaredClassConstName($classEntry, $constKey)
                             )
                         ) {
                             $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
@@ -6201,11 +6201,11 @@ restart:
                         $frame = $traitConstFrame;
                         goto restart;
                     }
-                    $constLc = strtolower($memberNameRaw);
-                    if (isset($classEntry->constants[$constLc])
+                    $constKey = ClassConstName::key($memberNameRaw);
+                    if (isset($classEntry->constants[$constKey])
                         && ClassConstName::matchesDeclared(
                             $memberNameRaw,
-                            $this->declaredClassConstName($classEntry, $constLc)
+                            $this->declaredClassConstName($classEntry, $constKey)
                         )
                     ) {
                         $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
@@ -15136,14 +15136,14 @@ restart:
 
     private function enforceClassConstVisibility(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
     {
-        $constLc = strtolower($constName);
-        $vis = $classEntry->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $constKey = ClassConstName::key($constName);
+        $vis = $classEntry->constVisibility[$constKey] ?? \PHPCfg\Func::FLAG_PUBLIC;
         if (MethodVisibility::isPublic($vis)) {
             return null;
         }
         // Trait methods keep access to private/protected consts imported from that trait onto the
         // composing class when self:: binds to the composing class (#9187, #19629, zend_traits.c).
-        $sourceTrait = $classEntry->traitConstSources[$constLc] ?? null;
+        $sourceTrait = $classEntry->traitConstSources[$constKey] ?? null;
         if (null !== $sourceTrait && '' !== $sourceTrait) {
             $traitLc = strtolower(ltrim($sourceTrait, '\\'));
             $traitEntry = $this->context->classes[$traitLc] ?? null;
@@ -19520,7 +19520,8 @@ restart:
         OpCode $op
     ): void {
         $canonical = $frame->scope[$op->arg1]->toString();
-        $name = strtolower($canonical);
+        // Case-sensitive key (Zend/zend_compile.c, #25910 fetch / #25929 declare).
+        $name = ClassConstName::key($canonical);
         if ($entry->isEnum && $op->isEnumCaseDeclare) {
             $backingSource = VM\ClassConstExpr::resolveValue($frame, $block, $op->arg2);
             $caseBacking = new Variable(Variable::TYPE_NULL);
@@ -19596,7 +19597,7 @@ restart:
         $inNewFragment = false;
         foreach ($classBodyOps as $index => $op) {
             if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
-                $name = strtolower($frame->scope[$op->arg1]->toString());
+                $name = ClassConstName::key($frame->scope[$op->arg1]->toString());
                 $segments[$name] = [
                     'initIndices' => $pendingInitIndices,
                     'declareIndex' => $index,
@@ -21194,36 +21195,38 @@ restart:
 
             return true;
         }
-        if (isset($classEntry->constants[$memberLc])) {
+        // Case-sensitive constant / enum-case key (#25910, #25929).
+        $memberKey = ClassConstName::key($memberNameRaw);
+        if (isset($classEntry->constants[$memberKey])) {
             if (!ClassConstName::matchesDeclared(
                 $memberNameRaw,
-                $this->declaredClassConstName($classEntry, $memberLc)
+                $this->declaredClassConstName($classEntry, $memberKey)
             )) {
                 return false;
             }
-            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
+            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberKey, $frame);
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }
-            if (EnumCaseSupport::fetchCaseByMemberName($classEntry, $memberLc, $dest, $this->context)) {
+            if (EnumCaseSupport::fetchCaseByMemberName($classEntry, $memberKey, $dest, $this->context)) {
                 return true;
             }
             $dest->copyFrom(
-                EnumCaseSupport::materializeConstantValue($this->context, $classEntry->constants[$memberLc])
+                EnumCaseSupport::materializeConstantValue($this->context, $classEntry->constants[$memberKey])
             );
 
             return true;
         }
-        $holding = $this->resolveInheritedClassConstantHolding($classEntry, $memberLc);
+        $holding = $this->resolveInheritedClassConstantHolding($classEntry, $memberKey);
         if (null !== $holding) {
             if (!ClassConstName::matchesDeclared(
                 $memberNameRaw,
-                $this->declaredClassConstName($holding, $memberLc)
+                $this->declaredClassConstName($holding, $memberKey)
             )) {
                 return false;
             }
-            $inheritedConst = $holding->constants[$memberLc];
-            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
+            $inheritedConst = $holding->constants[$memberKey];
+            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberKey, $frame);
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }
@@ -21240,44 +21243,44 @@ restart:
         return false;
     }
 
-    /** Declared casing for a class constant / enum case (#25910, #5385). */
-    private function declaredClassConstName(ClassEntry $entry, string $memberLc): ?string
+    /** Declared casing for a class constant / enum case (#25910, #5385, #25929). */
+    private function declaredClassConstName(ClassEntry $entry, string $memberKey): ?string
     {
-        return $entry->constNames[$memberLc]
-            ?? $entry->enumCaseCanonicalNames[$memberLc]
+        return $entry->constNames[$memberKey]
+            ?? $entry->enumCaseCanonicalNames[$memberKey]
             ?? null;
     }
 
     /**
-     * Class entry that holds an inherited (parent/interface) constant value (#25910).
+     * Class entry that holds an inherited (parent/interface) constant value (#25910, #25929).
      */
-    private function resolveInheritedClassConstantHolding(ClassEntry $entry, string $memberLc): ?ClassEntry
+    private function resolveInheritedClassConstantHolding(ClassEntry $entry, string $memberKey): ?ClassEntry
     {
         foreach ($entry->interfaces as $ifaceLc) {
             if (!isset($this->context->classes[$ifaceLc])) {
                 continue;
             }
             $iface = $this->context->classes[$ifaceLc];
-            if (isset($iface->constants[$memberLc])) {
+            if (isset($iface->constants[$memberKey])) {
                 return $iface;
             }
-            $fromParentIface = $this->resolveInheritedClassConstantHolding($iface, $memberLc);
+            $fromParentIface = $this->resolveInheritedClassConstantHolding($iface, $memberKey);
             if (null !== $fromParentIface) {
                 return $fromParentIface;
             }
         }
         if (null !== $entry->parentLc && isset($this->context->classes[$entry->parentLc])) {
             $parent = $this->context->classes[$entry->parentLc];
-            if (isset($parent->constants[$memberLc])) {
-                $vis = $parent->constVisibility[$memberLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (isset($parent->constants[$memberKey])) {
+                $vis = $parent->constVisibility[$memberKey] ?? \PHPCfg\Func::FLAG_PUBLIC;
                 if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
-                    return $this->resolveInheritedClassConstantHolding($parent, $memberLc);
+                    return $this->resolveInheritedClassConstantHolding($parent, $memberKey);
                 }
 
                 return $parent;
             }
 
-            return $this->resolveInheritedClassConstantHolding($parent, $memberLc);
+            return $this->resolveInheritedClassConstantHolding($parent, $memberKey);
         }
 
         return null;

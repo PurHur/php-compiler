@@ -1762,7 +1762,7 @@ class Object_ extends Type {
     /** @return int|float|bool|string|null */
     public function enumCaseBackingScalarForCase(int $classId, string $caseKey): int|float|bool|string|null
     {
-        $key = strtolower($caseKey);
+        $key = \PHPCompiler\ClassConstName::key($caseKey);
         if (!isset($this->classConstants[$classId][$key])) {
             throw new \LogicException('Unknown enum case backing: '.$caseKey);
         }
@@ -1820,7 +1820,7 @@ class Object_ extends Type {
         if (!$this->isEnumClassId($classId)) {
             throw new \LogicException('defineEnumCaseConst requires an enum class id');
         }
-        $key = strtolower($caseName);
+        $key = \PHPCompiler\ClassConstName::key($caseName);
         $this->enumCaseOrder[$classId][] = $key;
         $this->enumCaseCanonicalNames[$classId][$key] = $caseName;
         $this->classConstants[$classId][$key] = [
@@ -3082,31 +3082,34 @@ class Object_ extends Type {
     private function seedExternalClassConstants(int $id, array $constants): void
     {
         foreach ($constants as $name => $value) {
-            if (isset($this->classConstants[$id][$name])) {
+            // Seed tables use lowercase map keys; PHP declared names are UPPER_SNAKE (#25929).
+            $key = strtoupper((string) $name);
+            if (isset($this->classConstants[$id][$key])) {
                 continue;
             }
+            $this->classConstDisplayNames[$id][$key] = $key;
             if (\is_string($value)) {
-                $this->classConstants[$id][$name] = [
+                $this->classConstants[$id][$key] = [
                     'type' => Variable::TYPE_STRING,
                     'value' => $value,
                 ];
             } elseif (\is_float($value)) {
-                $this->classConstants[$id][$name] = [
+                $this->classConstants[$id][$key] = [
                     'type' => Variable::TYPE_NATIVE_DOUBLE,
                     'value' => $value,
                 ];
             } elseif (\is_bool($value)) {
-                $this->classConstants[$id][$name] = [
+                $this->classConstants[$id][$key] = [
                     'type' => Variable::TYPE_NATIVE_BOOL,
                     'value' => $value,
                 ];
             } elseif (null === $value) {
-                $this->classConstants[$id][$name] = [
+                $this->classConstants[$id][$key] = [
                     'type' => Variable::TYPE_NULL,
                     'value' => null,
                 ];
             } else {
-                $this->classConstants[$id][$name] = [
+                $this->classConstants[$id][$key] = [
                     'type' => Variable::TYPE_NATIVE_LONG,
                     'value' => (int) $value,
                 ];
@@ -4488,7 +4491,7 @@ class Object_ extends Type {
                     throw new \LogicException('Enum case property default requires enum class');
                 }
                 $enumClassId = $this->lookup(strtolower($enumClass->name));
-                $caseKey = strtolower(EnumCaseSupport::enumCaseNameForVariable($value));
+                $caseKey = \PHPCompiler\ClassConstName::key(EnumCaseSupport::enumCaseNameForVariable($value));
                 $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
                 $this->propertyDefaults[$classId][$propset[3]] = [
                     'propertyType' => $propset[2],
@@ -4511,17 +4514,17 @@ class Object_ extends Type {
 
     public function defineClassConstVisibility(int $classId, string $name, int $visibilityFlags): void
     {
-        $this->constVisibility[$classId][strtolower($name)] = ClassConstVisibility::mask($visibilityFlags);
+        $this->constVisibility[$classId][\PHPCompiler\ClassConstName::key($name)] = ClassConstVisibility::mask($visibilityFlags);
     }
 
     public function constVisibility(int $classId, string $name): int
     {
-        return $this->constVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        return $this->constVisibility[$classId][\PHPCompiler\ClassConstName::key($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
     {
-        $key = strtolower($name);
+        $key = \PHPCompiler\ClassConstName::key($name);
         $this->classConstDisplayNames[$classId][$key] = $name;
         unset($this->classConstMapGlobals[$classId]);
         if (VMVariable::TYPE_ARRAY === $value->type) {
@@ -4554,7 +4557,7 @@ class Object_ extends Type {
             $object = $value->toObject();
             if (EnumCaseSupport::isEnumCase($object)) {
                 $enumClassLc = strtolower($object->class->name);
-                $caseKey = strtolower((string) ($object->enumCaseName ?? ''));
+                $caseKey = \PHPCompiler\ClassConstName::key((string) ($object->enumCaseName ?? ''));
                 $this->defineClassConstEnumCaseRef($classId, $key, $this->lookup($enumClassLc), $caseKey);
 
                 return;
@@ -4634,9 +4637,9 @@ class Object_ extends Type {
         int $enumClassId,
         string $caseKey
     ): void {
-        $constKey = strtolower($constName);
+        $constKey = \PHPCompiler\ClassConstName::key($constName);
         $this->classConstDisplayNames[$holdingClassId][$constKey] = $constName;
-        $caseKey = strtolower($caseKey);
+        $caseKey = \PHPCompiler\ClassConstName::key($caseKey);
         if (!$this->isEnumClassId($enumClassId)) {
             throw new \LogicException('Class constant enum case reference requires an enum class id');
         }
@@ -4659,7 +4662,7 @@ class Object_ extends Type {
      */
     public function ensureEnumCaseSingletonGlobal(int $enumClassId, string $caseKey): string
     {
-        $caseKey = strtolower($caseKey);
+        $caseKey = \PHPCompiler\ClassConstName::key($caseKey);
         if (!$this->isEnumClassId($enumClassId)) {
             throw new \LogicException('Enum case singleton requires an enum class id');
         }
@@ -4707,7 +4710,7 @@ class Object_ extends Type {
             if (null === $enumClass) {
                 throw new \LogicException('Class constant array enum case requires enum class');
             }
-            $caseKey = strtolower(\PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($resolved));
+            $caseKey = \PHPCompiler\ClassConstName::key(\PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($resolved));
             $enumClassId = $this->lookup(strtolower($enumClass->name));
             $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
             $obj = $context->builder->load($this->classConstObjectGlobals[$globalName]);
@@ -4753,7 +4756,7 @@ class Object_ extends Type {
             if (null === $enumClass) {
                 throw new \LogicException('Class constant array enum case requires enum class');
             }
-            $caseKey = strtolower(\PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($resolved));
+            $caseKey = \PHPCompiler\ClassConstName::key(\PHPCompiler\VM\EnumCaseSupport::enumCaseNameForVariable($resolved));
             $enumClassId = $this->lookup(strtolower($enumClass->name));
             $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
             $obj = $context->builder->load($this->classConstObjectGlobals[$globalName]);
@@ -5159,7 +5162,7 @@ class Object_ extends Type {
     public function classConstFetch(int $classId, string $constName, ?Block $block = null, ?string $classNameHint = null): Variable
     {
         $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName, $block);
-        $key = strtolower($constName);
+        $key = \PHPCompiler\ClassConstName::key($constName);
         $resolvedId = $this->resolveClassConstHoldingId($classId, $key);
         if (null === $resolvedId) {
             // The registry name is lowercased; PSR-4 autoload in the native
@@ -5191,16 +5194,16 @@ class Object_ extends Type {
      * Find the class id that holds a fetchable class constant, skipping private
      * parent constants (Zend zend_constants.c / #19615).
      */
-    public function resolveClassConstHoldingId(int $classId, string $constKeyLc): ?int
+    public function resolveClassConstHoldingId(int $classId, string $constKey): ?int
     {
-        $constKeyLc = strtolower($constKeyLc);
+        $constKey = \PHPCompiler\ClassConstName::key($constKey);
         $currentId = $classId;
         for ($depth = 0; $depth < 64; ++$depth) {
-            if (isset($this->classConstants[$currentId][$constKeyLc])) {
+            if (isset($this->classConstants[$currentId][$constKey])) {
                 if ($currentId === $classId) {
                     return $currentId;
                 }
-                $vis = $this->constVisibility($currentId, $constKeyLc);
+                $vis = $this->constVisibility($currentId, $constKey);
                 // Private constants are not inherited — keep walking (#19615).
                 if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
                     return $currentId;
@@ -5320,7 +5323,7 @@ class Object_ extends Type {
     /** Lowercase trait FQCN that imported a composing-class constant, if any (#9187, #19629). */
     public function traitConstSourceLc(int $classId, string $constName): ?string
     {
-        $key = strtolower($constName);
+        $key = \PHPCompiler\ClassConstName::key($constName);
         $src = $this->traitConstSources[$classId][$key] ?? null;
         if (null === $src || '' === $src) {
             return null;
@@ -5344,15 +5347,15 @@ class Object_ extends Type {
 
     public function classConstDisplayName(int $classId, string $constKey): string
     {
-        $key = strtolower($constKey);
+        $key = \PHPCompiler\ClassConstName::key($constKey);
 
         return $this->classConstDisplayNames[$classId][$key] ?? $constKey;
     }
 
-    /** Declared casing when recorded, else null (no fallback to the lookup key) (#25910). */
+    /** Declared casing when recorded, else null (no fallback to the lookup key) (#25910, #25929). */
     public function classConstDeclaredNameOrNull(int $classId, string $constKey): ?string
     {
-        $key = strtolower($constKey);
+        $key = \PHPCompiler\ClassConstName::key($constKey);
 
         return $this->classConstDisplayNames[$classId][$key] ?? null;
     }

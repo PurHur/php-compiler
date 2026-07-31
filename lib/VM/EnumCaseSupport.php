@@ -478,11 +478,11 @@ final class EnumCaseSupport
         if (null === $match) {
             return false;
         }
-        $caseLc = strtolower($match->caseName);
-        if (!isset($enum->constants[$caseLc])) {
+        $caseKey = \PHPCompiler\ClassConstName::key($match->caseName);
+        if (!isset($enum->constants[$caseKey])) {
             return false;
         }
-        $stored = $enum->constants[$caseLc]->resolveIndirect();
+        $stored = $enum->constants[$caseKey]->resolveIndirect();
         if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
             return false;
         }
@@ -916,11 +916,11 @@ final class EnumCaseSupport
             if (null === $match) {
                 continue;
             }
-            $caseLc = strtolower($match->caseName);
-            if (!isset($entry->constants[$caseLc])) {
+            $caseKey = \PHPCompiler\ClassConstName::key($match->caseName);
+            if (!isset($entry->constants[$caseKey])) {
                 continue;
             }
-            $stored = $entry->constants[$caseLc]->resolveIndirect();
+            $stored = $entry->constants[$caseKey]->resolveIndirect();
             if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
                 continue;
             }

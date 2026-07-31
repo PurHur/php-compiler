@@ -178,6 +178,30 @@ PHP,
         );
     }
 
+    /** @covers issue #25929 */
+    public function testUnitEnumCaseDifferingNamesCompile(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case A;
+    case a;
+}
+foreach (E::cases() as $c) {
+    echo $c->name, ' ';
+}
+echo "\n";
+echo E::A === E::a ? "same\n" : "diff\n";
+PHP,
+            'enum_case_differ.php'
+        );
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("A a \ndiff\n", ob_get_clean());
+    }
+
     public function testDuplicateBackingErrorMessage(): void
     {
         $message = \PHPCompiler\Compiler\EnumBackedCaseCheck::duplicateBackingErrorMessage('E', [

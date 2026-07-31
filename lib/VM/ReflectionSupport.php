@@ -521,7 +521,7 @@ final class ReflectionSupport
         $result = new Variable();
         if (!EnumCaseSupport::tryMaterializeEnumCaseConstantFetch(
             $enum,
-            strtolower($spec->caseName),
+            \PHPCompiler\ClassConstName::key($spec->caseName),
             $result
         )) {
             throw new \Error(self::enumCaseNotFoundMessage($enum->name, $spec->caseName));
@@ -538,14 +538,14 @@ final class ReflectionSupport
         ClassEntry $entry,
         string $constName,
     ): Variable {
-        $constLc = strtolower($constName);
-        $stored = self::lookupClassConstantVariable($ctx, $entry, $constLc);
+        $constKey = \PHPCompiler\ClassConstName::key($constName);
+        $stored = self::lookupClassConstantVariable($ctx, $entry, $constKey);
         if (null === $stored) {
-            $display = $entry->constNames[$constLc] ?? $constName;
+            $display = $entry->constNames[$constKey] ?? $constName;
             throw new \Error("Undefined constant {$entry->name}::{$display}");
         }
-        $declared = $entry->constNames[$constLc]
-            ?? $entry->enumCaseCanonicalNames[$constLc]
+        $declared = $entry->constNames[$constKey]
+            ?? $entry->enumCaseCanonicalNames[$constKey]
             ?? null;
         if (null !== $declared && $declared !== $constName) {
             throw new \Error("Undefined constant {$entry->name}::{$constName}");

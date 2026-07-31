@@ -95,6 +95,49 @@ PHP;
         $this->assertStringContainsString('enum U', $out);
     }
 
+    /** @covers issue #25929 — docblock "class constant" must not pad a following enum */
+    public function testDoesNotPadEnumWhenDocblockMentionsClassConstant(): void
+    {
+        $in = <<<'PHP'
+<?php
+/**
+ * Fatal Cannot redefine class constant E::a
+ */
+enum E
+{
+    case A;
+    case a;
+}
+echo E::A->name;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringContainsString('enum E', $out);
+        $this->assertStringContainsString('case A;', $out);
+        $this->assertStringContainsString('case a;', $out);
+    }
+
+    /** @covers issue #25929 — const-only class still gets MCJIT pad when docblock says "class constant" */
+    public function testPadsConstOnlyClassDespiteClassConstantDocblock(): void
+    {
+        $in = <<<'PHP'
+<?php
+/**
+ * Cannot redefine class constant C::a
+ */
+class C
+{
+    public const A = 1;
+    public const a = 2;
+}
+echo C::A;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringContainsString('public const A = 1', $out);
+        $this->assertStringContainsString('public const a = 2', $out);
+    }
+
     public function testPadsConstructorPromotedOnlyUserClassForMcjit(): void
     {
         $in = <<<'PHP'

@@ -538,7 +538,7 @@ final class ClassCompileRegistry
             $flags = property_exists($child, 'flags')
                 ? (int) $child->flags
                 : ClassNode::MODIFIER_PUBLIC;
-            $constants[strtolower($name)] = [
+            $constants[$name] = [
                 'private' => 0 !== ($flags & ClassNode::MODIFIER_PRIVATE),
                 'ownerLc' => $ownerLc,
             ];

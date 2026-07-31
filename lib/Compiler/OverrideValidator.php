@@ -218,7 +218,7 @@ final class OverrideValidator
         if (null === $constName) {
             return;
         }
-        $constLc = strtolower($constName);
+        $constLc = $constName; // case-sensitive (#25929); registry keys match declared casing
         $childClassLc = strtolower(ltrim($childClassName, '\\'));
         $hasTraitParent = false;
         if (null !== $classStmts) {

@@ -24,7 +24,7 @@ final class ClassConstVisibilityJitGuard
         int $classId,
         string $constName
     ): void {
-        $holdingId = $objectType->resolveClassConstHoldingId($classId, strtolower($constName));
+        $holdingId = $objectType->resolveClassConstHoldingId($classId, $constName);
         if (null === $holdingId) {
             // Missing / private-on-parent: classConstFetch throws; JIT.php emits runtime Error (#19615).
             return;
@@ -32,7 +32,7 @@ final class ClassConstVisibilityJitGuard
         // Wrong casing is Undefined constant, not a visibility error (#25910).
         if (!\PHPCompiler\ClassConstName::matchesDeclared(
             $constName,
-            $objectType->classConstDeclaredNameOrNull($holdingId, strtolower($constName))
+            $objectType->classConstDeclaredNameOrNull($holdingId, $constName)
         )) {
             return;
         }

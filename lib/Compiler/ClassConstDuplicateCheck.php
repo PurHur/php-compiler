@@ -40,16 +40,16 @@ final class ClassConstDuplicateCheck
             if ($type instanceof Op\Stmt\Enum_ && $this->memberIsEnumCase($member, $type)) {
                 continue;
             }
+            // Class constants are case-sensitive (Zend/zend_compile.c, #25929).
             $constName = $this->operandDisplayName($member->name, 'const');
-            $lc = strtolower($constName);
-            if (isset($seen[$lc])) {
+            if (isset($seen[$constName])) {
                 throw new CompileFatal(
                     $member->getFile(),
                     $member->getLine(),
                     sprintf('Cannot redefine class constant %s::%s', $typeDisplay, $constName)
                 );
             }
-            $seen[$lc] = true;
+            $seen[$constName] = true;
         }
     }
 

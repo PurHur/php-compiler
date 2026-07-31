@@ -135,7 +135,7 @@ final class BackedEnum
      */
     public static function canonicalCaseVariable(ClassEntry $enum, string $caseName): ?Variable
     {
-        $lc = strtolower($caseName);
+        $lc = \PHPCompiler\ClassConstName::key($caseName);
         if (!isset($enum->constants[$lc])) {
             return null;
         }

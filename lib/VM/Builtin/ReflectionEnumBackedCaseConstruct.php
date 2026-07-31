@@ -31,7 +31,7 @@ final class ReflectionEnumBackedCaseConstruct extends VmClassMethod
             throw new \LogicException('ReflectionEnumBackedCase expects a backed enum class');
         }
         $caseName = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionEnumBackedCase::__construct() case', 2);
-        $caseLc = strtolower($caseName);
+        $caseLc = \PHPCompiler\ClassConstName::key($caseName);
         if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::enumCaseNotFoundMessage($enumEntry->name, $caseName)
