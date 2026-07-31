@@ -150,6 +150,16 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
     }
 
+    /** php-src ext/standard/string.stub.php — array|string|null $allowed_tags (#25594). */
+    public function testStripTagsAllowedTagsReflectionUnion(): void
+    {
+        $this->assertSame('array|string|null', BuiltinInternalArgInfo::stubParamTypeOverride('strip_tags', 1));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('strip_tags', 1);
+        $this->assertNotNull($info);
+        $this->assertSame('array|string|null', $info['type']);
+        $this->assertTrue($info['isOptional']);
+    }
+
     /** php-src Zend/zend_builtin_functions.stub.php — array|false + untyped object_or_class (#25498). */
     public function testClassImplementsFamilyReflectionStubs(): void
     {
