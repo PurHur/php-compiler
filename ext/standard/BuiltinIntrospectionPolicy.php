@@ -253,6 +253,12 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'zmq_')) {
             return \PHPCompiler\ext\zmq\ZmqExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'zstd_')) {
+            return \PHPCompiler\ext\zstd\ZstdExtensionPolicy::advertisesExtension();
+        }
+        if (str_starts_with($lc, 'lzf_')) {
+            return \PHPCompiler\ext\lzf\LzfExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -340,6 +346,12 @@ final class BuiltinIntrospectionPolicy
         }
         if ('zmq' === $ext) {
             return \PHPCompiler\ext\zmq\ZmqExtensionPolicy::advertisesExtension();
+        }
+        if ('zstd' === $ext) {
+            return \PHPCompiler\ext\zstd\ZstdExtensionPolicy::advertisesExtension();
+        }
+        if ('lzf' === $ext) {
+            return \PHPCompiler\ext\lzf\LzfExtensionPolicy::advertisesExtension();
         }
 
         return true;

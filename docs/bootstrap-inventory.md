@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6641 |
-| Phase A inventory files (M2 ratio SSOT) | 6641 |
+| PHP files on vm.php path | 6643 |
+| Phase A inventory files (M2 ratio SSOT) | 6643 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21426 |
+| Source constructs flagged (warnings) | 21428 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1232,6 +1232,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/lz4/lz4_compress.php` | 0 | 2 |
 | `ext/lz4/lz4_uncompress.php` | 0 | 2 |
 | `ext/lzf/JitLzf.php` | 0 | 1 |
+| `ext/lzf/LzfExtensionPolicy.php` | 0 | 1 |
 | `ext/lzf/LzfJitHelper.php` | 0 | 1 |
 | `ext/lzf/Module.php` | 0 | 3 |
 | `ext/lzf/VmLzf.php` | 0 | 1 |
@@ -4692,6 +4693,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zstd/Module.php` | 0 | 4 |
 | `ext/zstd/VmZstdCore.php` | 0 | 1 |
 | `ext/zstd/VmZstdNative.php` | 0 | 1 |
+| `ext/zstd/ZstdExtensionPolicy.php` | 0 | 1 |
 | `ext/zstd/ZstdJitHelper.php` | 0 | 1 |
 | `ext/zstd/zstd_compress.php` | 0 | 1 |
 | `ext/zstd/zstd_decompress.php` | 0 | 1 |
@@ -16361,6 +16363,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/lzf/LzfExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/lzf/LzfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16369,8 +16376,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/lzf/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new lzf_compress (line 17)
-- new lzf_decompress (line 18)
+- new lzf_compress (line 24)
+- new lzf_decompress (line 25)
 - 1 class method(s)
 
 ### `ext/lzf/VmLzf.php`
@@ -41306,9 +41313,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zstd/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new zstd_compress (line 17)
-- new zstd_decompress (line 18)
-- new zstd_uncompress (line 19)
+- new zstd_compress (line 24)
+- new zstd_decompress (line 25)
+- new zstd_uncompress (line 26)
 - 1 class method(s)
 
 ### `ext/zstd/VmZstdCore.php`
@@ -41320,6 +41327,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/zstd/ZstdExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/zstd/ZstdJitHelper.php`
 

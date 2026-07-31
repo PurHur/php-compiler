@@ -7,12 +7,19 @@ namespace PHPCompiler\ext\zstd;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * zstd extension module (php-src ext/zstd/zstd.c; issues #6382, #6387).
+ * zstd extension module (PECL php-ext-zstd; issues #6382, #6387, #25287).
+ *
+ * Advertise zstd_* / extension_loaded('zstd') only when
+ * {@see ZstdExtensionPolicy::advertisesExtension()}.
  */
 class Module extends ModuleAbstract
 {
     public function getFunctions(): array
     {
+        if (!ZstdExtensionPolicy::advertisesBuiltins()) {
+            return [];
+        }
+
         return [
             new zstd_compress(),
             new zstd_decompress(),

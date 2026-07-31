@@ -891,6 +891,16 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\zmq\ZmqExtensionPolicy::isZmqComplianceCase($name)) {
                 continue;
             }
+            // Functional zstd cases set PHP_COMPILER_ENABLE_ZSTD via --ENV--; phantoms when withheld (#25287).
+            if (!\PHPCompiler\ext\zstd\ZstdExtensionPolicy::runsZstdCompliance($name)
+                && \PHPCompiler\ext\zstd\ZstdExtensionPolicy::isZstdComplianceCase($name)) {
+                continue;
+            }
+            // Functional lzf cases set PHP_COMPILER_ENABLE_LZF via --ENV--; phantoms when withheld (#25287).
+            if (!\PHPCompiler\ext\lzf\LzfExtensionPolicy::runsLzfCompliance($name)
+                && \PHPCompiler\ext\lzf\LzfExtensionPolicy::isLzfComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {
