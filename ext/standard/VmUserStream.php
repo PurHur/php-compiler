@@ -512,6 +512,30 @@ final class VmUserStream
     }
 
     /**
+     * Userspace stream_stat / fstat (php-src userspace.c php_userstreamop_stat; #25998).
+     *
+     * Missing or non-array stream_stat → false.
+     *
+     * @return array<int|string, int>|false
+     */
+    public static function stat(int $handle): array|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_stat')) {
+            return false;
+        }
+        $result = $state->vm->invokeInstanceMethod($state->wrapper, 'stream_stat')->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $result->type) {
+            return false;
+        }
+
+        return self::statArrayFromHashTable($result->toArray());
+    }
+
+    /**
      * Userspace ftell — php-src uses stream->position (updated on read/write/seek), not a
      * direct stream_tell call (#25971 / #25972).
      *
