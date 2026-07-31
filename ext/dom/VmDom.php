@@ -7495,7 +7495,9 @@ final class VmDom
                 throw new \TypeError('DOMDocument::saveXML(): Argument #1 ($node) must be of type DOMNode');
             }
 
-            return self::serializeNode($node, 0, $formatOutput, $noEmptyTag);
+            // Node-scoped dump: redeclare namespaces on the dump root (libxml xmlNodeDump;
+            // parent may hold HTML nsDef that is outside the serialized subtree) (#26025).
+            return self::serializeNode($node, 0, $formatOutput, $noEmptyTag, true);
         }
 
         $lines = [self::serializeXmlDeclaration($state)];
@@ -8350,9 +8352,17 @@ final class VmDom
         // Pass owner so living Dom\HTMLDocument nodeClassMap → Dom\HTMLElement (#20418).
         $entry = self::createElement($ctx, $localName, $ownerDocument)->toObject();
         $state = DomRegistry::state($entry);
+        // createElement installs HTML nsDef (ensure_html_ns); applyParsedAttributes replaces
+        // namespaceDeclarations with attribute-sourced xmlns only — keep the element nsDef (#26025).
+        $createElementNsDefs = $state->namespaceDeclarations;
         $state->attributes = self::decodeHtmlAttributeMap(self::parseAttributes($attrPart));
         self::applyQualifiedElementNames($state, $localName);
         self::applyParsedAttributes($state, $state->attributes);
+        foreach ($createElementNsDefs as $prefix => $uri) {
+            if (!\array_key_exists($prefix, $state->namespaceDeclarations)) {
+                $state->namespaceDeclarations[$prefix] = $uri;
+            }
+        }
         // HTML parse assigns XML_ATTRIBUTE_ID to id (libxml htmlReadMemory; #23514).
         if (isset($state->attributes['id'])) {
             $state->attributeIsId['id'] = true;
@@ -9234,8 +9244,13 @@ final class VmDom
         return null;
     }
 
-    private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
-    {
+    private static function serializeNode(
+        ObjectEntry $entry,
+        int $depth = 0,
+        bool $format = false,
+        bool $noEmptyTag = false,
+        bool $redeclarableNsRoot = false
+    ): string {
         if (self::isDocumentType($entry)) {
             $dt = DomRegistry::state($entry);
 
@@ -9251,7 +9266,7 @@ final class VmDom
             return self::serializeDocumentFragmentChildrenXml($entry, $format, $noEmptyTag);
         }
         if (self::isElement($entry)) {
-            return self::serializeElement($entry, $depth, $format, $noEmptyTag);
+            return self::serializeElement($entry, $depth, $format, $noEmptyTag, $redeclarableNsRoot);
         }
         if (self::isTextNode($entry)) {
             $text = self::escapeText(DomRegistry::state($entry)->textContent ?? '');
@@ -9297,8 +9312,8 @@ final class VmDom
         foreach (DomRegistry::state($fragment)->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                // Fragment children are dumped at depth 0 (no wrapper indent).
-                $parts[] = self::serializeNode($child, 0, false, $noEmptyTag);
+                // Fragment children are dumped at depth 0 (no wrapper indent); each is an ns root.
+                $parts[] = self::serializeNode($child, 0, false, $noEmptyTag, true);
             }
         }
         if ([] === $parts) {
@@ -9330,11 +9345,16 @@ final class VmDom
         return false;
     }
 
-    private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
-    {
+    private static function serializeElement(
+        ObjectEntry $entry,
+        int $depth = 0,
+        bool $format = false,
+        bool $noEmptyTag = false,
+        bool $redeclarableNsRoot = false
+    ): string {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
-        $attrPart = self::serializeElementAttributes($entry);
+        $attrPart = self::serializeElementAttributes($entry, $redeclarableNsRoot);
         if ([] === $state->childIds) {
             $tag = $noEmptyTag
                 ? '<'.$name.$attrPart.'></'.$name.'>'
@@ -9374,16 +9394,27 @@ final class VmDom
      *
      * @return non-empty-string|''
      */
-    private static function serializeElementAttributes(ObjectEntry $entry): string
+    private static function serializeElementAttributes(ObjectEntry $entry, bool $redeclarableNsRoot = false): string
     {
         $state = DomRegistry::state($entry);
         $parts = [];
-        foreach ($state->namespaceDeclarations as $prefix => $uri) {
+        $decls = $state->namespaceDeclarations;
+        // Ensure the element's own namespaceURI is a dump candidate when nsDef was wiped
+        // (HTML parse applyParsedAttributes) or only namespaceUri is set (#26025).
+        $ownNs = $state->namespaceUri;
+        if (null !== $ownNs && '' !== $ownNs) {
+            $ownPrefix = $state->prefix ?? '';
+            if (!\array_key_exists($ownPrefix, $decls)) {
+                $decls[$ownPrefix] = $ownNs;
+            }
+        }
+        foreach ($decls as $prefix => $uri) {
             $attrName = '' === $prefix ? 'xmlns' : 'xmlns:'.$prefix;
             if (\array_key_exists($attrName, $state->attributes)) {
                 continue;
             }
-            if (self::parentNamespaceUri($entry, $prefix) === $uri) {
+            // Dump roots redeclare even when a non-serialized ancestor already holds the ns (#26025).
+            if (!$redeclarableNsRoot && self::parentNamespaceUri($entry, $prefix) === $uri) {
                 continue;
             }
             $parts[] = self::escapeName($attrName).'="'.self::escapeAttr($uri).'"';
