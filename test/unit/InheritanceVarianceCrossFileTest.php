@@ -79,4 +79,21 @@ PHP;
         $this->expectExceptionMessage('Declaration of B::f(): string must be compatible with A::f(): int');
         $runtime->run($block);
     }
+
+    /** @covers issue #25633 — by-ref mismatch on eval inherit */
+    public function testEvalRejectsByRefParamOverride(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A4 { function f(&$x) {} }
+eval('class B4 extends A4 { function f($x) {} }');
+echo "byref_accepted\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'issue_25633_eval_byref.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B4::f($x) must be compatible with A4::f(&$x)');
+        $runtime->run($block);
+    }
 }

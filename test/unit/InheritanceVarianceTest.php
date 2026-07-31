@@ -507,4 +507,51 @@ PHP;
         $this->expectExceptionMessage('Type of B::$x must not be defined (as in class A)');
         $runtime->parseAndCompile($code, 'prop_add_type.php');
     }
+
+    /** Zend: by-ref ↔ by-value override must fatal (#25633, zend_inheritance.c). */
+    public function testByRefParamDroppedFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(&$x) {} }
+class B extends A { public function f($x) {} }
+echo "accepted\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f($x) must be compatible with A::f(&$x)');
+        $runtime->parseAndCompile($code, 'byref_drop.php');
+    }
+
+    /** Zend: adding by-ref on override must fatal (#25633). */
+    public function testByRefParamAddedFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f($x) {} }
+class B extends A { public function f(&$x) {} }
+echo "accepted\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(&$x) must be compatible with A::f($x)');
+        $runtime->parseAndCompile($code, 'byref_add.php');
+    }
+
+    /** Matching by-ref on both sides is accepted (#25633). */
+    public function testMatchingByRefOverrideAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(&$x) {} }
+class B extends A { public function f(&$x) {} }
+echo "accepted\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'byref_match.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("accepted\n", ob_get_clean());
+    }
 }

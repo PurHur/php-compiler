@@ -252,6 +252,12 @@ final class InheritanceVariance
         }
         $paramCount = min(count($child->params), count($parent->params));
         for ($i = 0; $i < $paramCount; ++$i) {
+            // zend_inheritance.c: by-ref flag must match exactly on overrides (#25633).
+            $childByRef = (bool) ($child->paramByRef[$i] ?? false);
+            $parentByRef = (bool) ($parent->paramByRef[$i] ?? false);
+            if ($childByRef !== $parentByRef) {
+                return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+            }
             if (!self::isParameterCompatibleStatic(
                 $parent->params[$i],
                 $child->params[$i],
@@ -673,6 +679,9 @@ final class MethodSig
     /** @var list<bool> */
     public array $paramHasDefault;
 
+    /** @var list<bool> per-param by-ref flags (zend_inheritance.c, #25633) */
+    public array $paramByRef;
+
     public ?TypeSig $returnType;
 
     public string $ownerLc;
@@ -688,6 +697,7 @@ final class MethodSig
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
      * @param list<bool>       $paramHasDefault
+     * @param list<bool>       $paramByRef
      */
     public function __construct(
         string $ownerLc,
@@ -697,7 +707,8 @@ final class MethodSig
         ?TypeSig $returnType,
         bool $isAbstract = false,
         int $visibilityFlags = Func::FLAG_PUBLIC,
-        bool $isFinal = false
+        bool $isFinal = false,
+        array $paramByRef = []
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -707,6 +718,7 @@ final class MethodSig
         $this->isAbstract = $isAbstract;
         $this->isFinal = $isFinal;
         $this->visibilityFlags = $visibilityFlags;
+        $this->paramByRef = $paramByRef;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -714,10 +726,12 @@ final class MethodSig
         $params = [];
         $names = [];
         $hasDefault = [];
+        $byRef = [];
         foreach ($func->params as $param) {
             $params[] = TypeSig::fromCfgType($param->declaredType);
             $names[] = self::paramNameFromOperand($param->name);
             $hasDefault[] = null !== $param->defaultVar;
+            $byRef[] = (bool) $param->byRef;
         }
         $isAbstract = 0 !== ($func->flags & Func::FLAG_ABSTRACT);
         $visibility = $func->flags & (Func::FLAG_PUBLIC | Func::FLAG_PROTECTED | Func::FLAG_PRIVATE);
@@ -735,7 +749,8 @@ final class MethodSig
             TypeSig::fromCfgType($func->returnType),
             $isAbstract,
             $visibility,
-            $isFinal
+            $isFinal,
+            $byRef
         );
     }
 
@@ -759,6 +774,7 @@ final class MethodSig
         $params = [];
         $names = [];
         $hasDefault = [];
+        $byRef = [];
         $returnType = null;
 
         $func = $entry->methods[$methodLc] ?? null;
@@ -784,6 +800,9 @@ final class MethodSig
                 $hasDefault[] = isset($paramMetas[$i])
                     ? $paramMetas[$i]->isOptional
                     : false;
+                $byRef[] = isset($paramMetas[$i])
+                    ? $paramMetas[$i]->byRef
+                    : false;
             }
             $returnType = TypeSig::fromCfgType($block->returnDeclaredType);
             if (null === $returnType && isset($entry->methodReturnDeclaredTypes[$methodLc])) {
@@ -795,6 +814,7 @@ final class MethodSig
                 $params[] = TypeSig::fromDumpTypeString($meta->typeString);
                 $names[] = $meta->name;
                 $hasDefault[] = $meta->isOptional;
+                $byRef[] = $meta->byRef;
             }
             if (isset($entry->methodReturnDeclaredTypes[$methodLc])) {
                 $returnType = TypeSig::fromCfgType($entry->methodReturnDeclaredTypes[$methodLc]);
@@ -817,7 +837,8 @@ final class MethodSig
             $returnType,
             $isAbstract,
             $visibility,
-            $isFinal
+            $isFinal,
+            $byRef
         );
     }
 
@@ -848,7 +869,8 @@ final class MethodSig
         $parts = [];
         foreach ($this->params as $i => $type) {
             $prefix = $type instanceof TypeSig ? $type->format().' ' : '';
-            $parts[] = $prefix.'$'.($this->paramNames[$i] ?? 'param');
+            $amp = !empty($this->paramByRef[$i]) ? '&' : '';
+            $parts[] = $prefix.$amp.'$'.($this->paramNames[$i] ?? 'param');
         }
 
         return implode(', ', $parts);
