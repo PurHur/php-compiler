@@ -11,7 +11,7 @@ use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** session_gc JIT routes through SessionGcJitHelper PHP not LLVM file scan (#9411). */
+/** session_gc JIT routes through SessionGcJitHelper via JitVmHelperLink, not hand-rolled NestedJIT (#9411, #25916). */
 final class SessionGcRuntimeShrinkTest extends TestCase
 {
     private ?string $savedSessionDir = null;
@@ -34,12 +34,20 @@ final class SessionGcRuntimeShrinkTest extends TestCase
         parent::tearDown();
     }
 
-    public function testSessionGcRuntimeUsesJitHelperNotLlvmFileScan(): void
+    public function testSessionGcRuntimeUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $gcRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionGcRuntime.php');
         $this->assertStringContainsString('SessionGcJitHelper', $gcRuntime);
         $this->assertStringContainsString('gcExpiredFilesAsInt', $gcRuntime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $gcRuntime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $gcRuntime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $gcRuntime);
+        $this->assertStringNotContainsString('parseAndCompile', $gcRuntime);
+        $this->assertStringNotContainsString('new JIT(', $gcRuntime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $gcRuntime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $gcRuntime);
         $this->assertStringNotContainsString('emitGcApply', $gcRuntime);
+        $this->assertLessThan(230, \substr_count($gcRuntime, "\n") + 1);
 
         $storageRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStorageRuntime.php');
         $this->assertStringNotContainsString('ss_gc_loop_head', $storageRuntime);
