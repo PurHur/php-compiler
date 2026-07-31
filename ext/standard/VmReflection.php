@@ -15,6 +15,7 @@ use PHPCompiler\MethodVisibility;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
+use PHPCompiler\VM\ClosureSupport;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
@@ -862,7 +863,9 @@ final class VmReflection
      *
      * Static methods: normal visibility from the caller frame.
      * Instance methods: false from global / unrelated scopes (#12545); true when the
-     * caller class is the named class or a subclass *and* the method is visible (#23996).
+     * caller class is the named class or a subclass *and* the method is visible (#23996)
+     * *and* the caller has an active `$this` — still false from a static method even
+     * inside that class (#25873).
      *
      * php-src: Zend/zend_execute_API.c — zend_is_callable_ex / zend_is_callable_at_frame
      */
@@ -870,7 +873,8 @@ final class VmReflection
         Context $ctx,
         string $className,
         string $method,
-        ?string $callerClassLc = null
+        ?string $callerClassLc = null,
+        ?Frame $scopeFrame = null
     ): bool
     {
         $lcClass = strtolower(ltrim($className, '\\'));
@@ -938,14 +942,15 @@ final class VmReflection
                     }
                 }
 
-                // Instance method via class-string: only when caller is in the named
-                // class hierarchy and can see the method (Zend/zend_execute_API.c).
+                // Instance method via class-string: only when caller has $this, is in the
+                // named class hierarchy, and can see the method (Zend/zend_execute_API.c).
                 return self::isInstanceMethodCallableViaClassString(
                     $ctx,
                     $vis,
                     $walk,
                     $lcClass,
-                    $callerClassLc
+                    $callerClassLc,
+                    $scopeFrame
                 );
             }
             if (null === $class->parentLc) {
@@ -958,19 +963,25 @@ final class VmReflection
     }
 
     /**
-     * Class-string / "Class::method" form for a non-static method (#23996 / #12545).
+     * Class-string / "Class::method" form for a non-static method (#23996 / #12545 / #25873).
      *
-     * Zend requires the caller frame's class to be the named class or a subclass of it;
-     * visibility alone is not enough (unrelated scopes stay false even for public).
+     * Zend requires an active `$this` (instance method or bound closure) plus the caller
+     * frame's class to be the named class or a subclass; visibility alone is not enough
+     * (static methods and unrelated scopes stay false even for public).
      */
     private static function isInstanceMethodCallableViaClassString(
         Context $ctx,
         int $visibilityFlags,
         string $declaringClassLc,
         string $namedClassLc,
-        ?string $callerClassLc
+        ?string $callerClassLc,
+        ?Frame $scopeFrame = null
     ): bool {
         if (null === $callerClassLc) {
+            return false;
+        }
+        // No $this → class-string cannot name an instance method (#25873).
+        if (null === $scopeFrame || null === ClosureSupport::callerThis($scopeFrame)) {
             return false;
         }
         if (!self::isSameOrSubclassOf($ctx, $callerClassLc, $namedClassLc)) {
