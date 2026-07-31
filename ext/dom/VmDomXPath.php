@@ -1784,22 +1784,11 @@ final class VmDomXPath
         if ('*' === $localName) {
             return true;
         }
-        // Unprefixed name test — null namespace URI only (XPath 1.0; #21125).
-        if ('' === $ns) {
-            return true;
-        }
-        // Dom\HTMLDocument: elements live in the XHTML namespace, but php-src/libxml
-        // still matches unprefixed name tests against them (#20757 / #21125).
-        if (VmDomLiving::HTML_NS === $ns) {
-            $document = VmDom::ownerDocumentEntry($element);
-            if (null !== $document && DomRegistry::has($document)
-                && DomRegistry::state($document)->isHtmlDocument
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        // Unprefixed name test — null namespace URI only (XPath 1.0; #21125 / #26007).
+        // Dom\HTMLDocument elements default to the XHTML namespace, so //div does not
+        // match unless the caller registers that NS (or parses with HTML_NO_DEFAULT_NS).
+        // getElementsByTagName remains HTML-aware separately — this is not that API.
+        return '' === $ns;
     }
 
     /**
