@@ -16176,6 +16176,10 @@ class Compiler {
             ) {
                 continue;
             }
+            // `yield $arr[$i]` from `function &gen()` needs the live element (#25877).
+            if ($this->arrayDimFetchUsedAsByRefYieldValue($fetch, $usage, $block)) {
+                continue;
+            }
             // `[&$s[$i]]` — by-ref array element must FETCH_DIM_W so string offsets raise (#21910).
             if (
                 $usage instanceof Op\Expr\Array_
@@ -16227,6 +16231,10 @@ class Compiler {
                 $next instanceof Op\Expr\AssignRef
                 && ($next->var === $fetch->result || $next->expr === $fetch->result)
             ) {
+                return true;
+            }
+            // php-cfg: ArrayDimFetch then Yield from function &gen() (#25877).
+            if ($this->arrayDimFetchUsedAsByRefYieldValue($fetch, $next, $block)) {
                 return true;
             }
             // php-cfg: ArrayDimFetch then Expr_Array with byRef element (#21910).
@@ -16392,6 +16400,33 @@ class Compiler {
         }
 
         return $this->callArgRequiresByRef($calleeName, $argIndex, null, $block);
+    }
+
+    /**
+     * yield $arr[$i] from function &gen() — FETCH_DIM_W so foreach as &$v writeback hits the element (#25877).
+     */
+    private function arrayDimFetchUsedAsByRefYieldValue(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $usage,
+        Block $block
+    ): bool {
+        if (!$usage instanceof Op\Expr\Yield_) {
+            return false;
+        }
+        if ($usage->value !== $fetch->result) {
+            return false;
+        }
+
+        return $this->cfgFunctionYieldsByReference($block);
+    }
+
+    /** True when the enclosing CFG func is declared `function &name()` (FLAG_RETURNS_REF). */
+    private function cfgFunctionYieldsByReference(Block $block): bool
+    {
+        $decl = $block->func ?? null;
+
+        return null !== $decl
+            && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
     }
 
     /**
