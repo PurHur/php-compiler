@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDOStatement bindParam/errorInfo/setFetchMode/getColumnMeta (#19853, ext/pdo/pdo_stmt.c)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

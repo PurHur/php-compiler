@@ -1,5 +1,7 @@
 --TEST--
 PDOStatement::fetch/fetchAll honor FETCH_CLASS / FETCH_INTO / FETCH_FUNC (#25641, ext/pdo/pdo_stmt.c)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 class Row

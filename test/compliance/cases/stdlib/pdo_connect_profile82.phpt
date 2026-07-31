@@ -1,6 +1,7 @@
 --TEST--
 Stdlib: PDO — no connect() on PROFILE=8.2 (#22600, ext/pdo/pdo_dbh.stub.php)
 --ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 PHP_COMPILER_PROFILE=8.2
 --SKIPIF--
 <?php

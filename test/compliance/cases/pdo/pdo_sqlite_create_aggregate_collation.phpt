@@ -1,5 +1,7 @@
 --TEST--
 PDO::sqliteCreateAggregate + sqliteCreateCollation (#22332, ext/pdo_sqlite)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

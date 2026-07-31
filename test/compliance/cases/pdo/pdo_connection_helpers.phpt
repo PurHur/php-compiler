@@ -1,5 +1,7 @@
 --TEST--
 stdlib PDO lastInsertId/quote/txn/errorInfo (#19861, ext/pdo/pdo.c)
+--ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 --FILE--
 <?php
 $pdo = new PDO('sqlite::memory:');

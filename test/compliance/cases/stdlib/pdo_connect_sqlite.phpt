@@ -1,6 +1,7 @@
 --TEST--
 PDO::connect() + Pdo\Sqlite factory (#20529, #22600)
 --ENV--
+PHP_COMPILER_ENABLE_PDO_SQLITE=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
