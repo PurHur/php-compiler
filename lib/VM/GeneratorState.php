@@ -134,10 +134,16 @@ final class GeneratorState
         public readonly Func\PHP $func,
         array $calledArgs,
     ) {
-        // Snapshot call args so generator lifetime is not tied to caller scope slots
-        // (temps like `(new G())->gen()` otherwise lose $this — #22067).
+        // Snapshot by-value args so generator lifetime is not tied to caller temps
+        // (e.g. `(new G())->gen()` must keep `$this` — #22067). By-ref params must
+        // keep the caller's storage cell so yield/foreach writeback reaches it (#25877).
         $snap = [];
+        $byRefArgIndexes = self::byRefCalledArgIndexes($func);
         foreach ($calledArgs as $i => $arg) {
+            if (isset($byRefArgIndexes[$i])) {
+                $snap[$i] = $arg;
+                continue;
+            }
             $copy = new Variable();
             $copy->duplicateFrom($arg->resolveIndirect());
             $snap[$i] = $copy;
@@ -163,6 +169,35 @@ final class GeneratorState
 
         return null !== $decl
             && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    /**
+     * calledArgs indexes that bind by reference (Zend ZEND_SEND_REF / Block::$paramByRef).
+     *
+     * @return array<int, true>
+     */
+    private static function byRefCalledArgIndexes(Func\PHP $func): array
+    {
+        $block = $func->block;
+        if ([] === $block->paramByRef) {
+            return [];
+        }
+        $thisArgOffset = 0;
+        $decl = $block->func ?? null;
+        if (
+            null !== $decl
+            && null !== $decl->class
+            && !(($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+            && !(($decl->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)
+        ) {
+            $thisArgOffset = 1;
+        }
+        $indexes = [];
+        foreach ($block->paramByRef as $paramIdx => $_) {
+            $indexes[$paramIdx + $thisArgOffset] = true;
+        }
+
+        return $indexes;
     }
 
     /** Publish yielded value; keep snapshot for idempotent current() (#18183). */
