@@ -120,8 +120,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         foreach (['highlight_string', 'highlight_file', 'show_source'] as $f) {
             $this->assertSame('string|bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
         }
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('substr', 2));
         $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('substr_count', 3));
         $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('preg_quote', 1));
+        $this->assertSame(
+            ['string', 'offset', 'length='],
+            \PHPCompiler\BuiltinParamNames::forFunction('substr')
+        );
     }
 
     /** php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo resource/char (#25471). */

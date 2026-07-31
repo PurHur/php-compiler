@@ -118,7 +118,8 @@ final class substr extends Internal
             if (null !== $offsetLit) {
                 $folded = null;
                 if (3 === $argc) {
-                    if (JITVariable::TYPE_VALUE === $args[2]->type && ($args[2]->isNullConstant ?? false)) {
+                    // php-src basic_functions.stub.php — ?int $length = null means "to end" (#25749)
+                    if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
                         $folded = VmString::substr($strLit, $offsetLit, null, $warnOnClip);
                     } else {
                         $lengthLit = self::compileTimeSignedLong($context, $args[2]);
@@ -163,26 +164,38 @@ final class substr extends Internal
 
         $sliceLen = null;
         if (3 === $argc) {
-            if (JITVariable::TYPE_VALUE === $args[2]->type && $args[2]->isNullConstant) {
-                $sliceLen = $context->builder->sub($len, $start);
-                $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
-            } else {
-                $lengthArg = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'substr', 3, 'length');
-                $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
-                $remaining = $context->builder->sub($len, $start);
-                $adjustedLen = $context->builder->select(
-                    $negLen,
-                    $context->builder->add($remaining, $lengthArg),
-                    $lengthArg
-                );
-                $sliceLen = JitStringIndex::min(
-                    $context,
-                    JitStringIndex::max($context, $adjustedLen, $zero),
-                    $remaining
-                );
-                if ($warnOnClip) {
-                    self::maybeEmitJitTruncationWarning($context, $adjustedLen, $remaining);
-                }
+            // ?int $length = null → "to end" (same Z_PARAM_LONG_OR_NULL shape as array_splice; #25749)
+            [$hasLength, $lengthArg] = JitIntdiv::lowerSpliceLengthArg(
+                $context,
+                $args[2],
+                'substr',
+                3,
+                'length'
+            );
+            $toEnd = $context->builder->sub($len, $start);
+            $toEnd = JitStringIndex::max($context, $toEnd, $zero);
+            $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
+            $remaining = $context->builder->sub($len, $start);
+            $adjustedLen = $context->builder->select(
+                $negLen,
+                $context->builder->add($remaining, $lengthArg),
+                $lengthArg
+            );
+            $bounded = JitStringIndex::min(
+                $context,
+                JitStringIndex::max($context, $adjustedLen, $zero),
+                $remaining
+            );
+            $sliceLen = $context->builder->select($hasLength, $bounded, $toEnd);
+            if ($warnOnClip) {
+                // Truncation warn only for an explicit (non-null) length.
+                $warnChk = BasicBlockHelper::append($context, 'substr_len_warn_chk');
+                $warnSkip = BasicBlockHelper::append($context, 'substr_len_warn_skip');
+                $context->builder->branchIf($hasLength, $warnChk, $warnSkip);
+                $context->builder->positionAtEnd($warnChk);
+                self::maybeEmitJitTruncationWarning($context, $adjustedLen, $remaining);
+                $context->builder->branch($warnSkip);
+                $context->builder->positionAtEnd($warnSkip);
             }
         } else {
             $sliceLen = $context->builder->sub($len, $start);

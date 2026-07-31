@@ -125,7 +125,7 @@ final class BuiltinInternalDefaultValues
         'finfo_buffer' => [
             3 => ['kind' => 'null'],
         ],
-        // php-src stubs — InternalArgInfo types omit nullability / non-zero sentinels (#23181)
+        // php-src ext/standard/basic_functions.stub.php — ?int $length = null (#23181, #25749)
         'substr' => [
             2 => ['kind' => 'null'],
         ],
