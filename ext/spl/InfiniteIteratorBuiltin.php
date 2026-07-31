@@ -32,9 +32,10 @@ final class InfiniteIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('InfiniteIterator');
         $entry->parentLc = IteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerialized flattened ce->interfaces (#25798).
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
@@ -82,9 +83,10 @@ final class NoRewindIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('NoRewindIterator');
         $entry->parentLc = IteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerialized flattened ce->interfaces (#25798).
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }

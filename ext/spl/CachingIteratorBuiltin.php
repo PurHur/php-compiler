@@ -51,9 +51,10 @@ final class CachingIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('CachingIterator');
         $entry->parentLc = IteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator', 'ArrayAccess', 'Countable', 'Stringable'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerialized flattened ce->interfaces (#25798).
+        $entry->interfaces = [];
+        foreach (['stringable', 'iterator', 'traversable', 'outeriterator', 'arrayaccess', 'countable'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
