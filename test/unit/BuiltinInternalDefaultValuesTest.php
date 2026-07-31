@@ -571,4 +571,14 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         }
     }
 
+    /** php-src ext/curl/curl.stub.php — ?string $url = null (#26186). */
+    public function testCurlInitUrlDefaultIsNull(): void
+    {
+        $info = ['name' => 'url', 'type' => '?string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('curl_init', 0, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'curl_init', 0, $info));
+        self::assertSame(Variable::TYPE_NULL, $dest->type);
+    }
+
 }

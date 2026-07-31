@@ -168,6 +168,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('json_encode', 0));
     }
 
+    /** php-src ext/curl/curl.stub.php — CurlHandle stubs; InternalArgInfo still resource/ch (#26186). */
+    public function testCurlEasyReflectionStubTypes(): void
+    {
+        $this->assertSame('CurlHandle|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_init'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_close'));
+        $this->assertSame('string|bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_exec'));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('curl_init', 0));
+        $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride('curl_setopt', 0));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('curl_setopt', 2));
+        $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride('curl_exec', 0));
+        $this->assertSame('CurlHandle', BuiltinInternalArgInfo::stubParamTypeOverride('curl_close', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('curl_init', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('url', $info['name']);
+        $this->assertSame('?string', $info['type']);
+        $this->assertTrue($info['isOptional']);
+    }
+
     /** php-src string.stub.php — cost params stub-only; InternalArgInfo has string1/string2 only (#25538). */
     public function testLevenshteinCostParamTypesAreInt(): void
     {
