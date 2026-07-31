@@ -41595,24 +41595,9 @@ class Compiler {
             );
         }
 
-        // PHP 8.4+: `new Class(...)` → constructor Closure; ≤8.3 compile-fatal (#23714, #10130).
+        // php-src never accepts `new Class(...)` FCC (Zend/zend_compile.c; #10130, #26188).
         if (Op\Expr\FirstClassCallable::KIND_NEW === $expr->kind) {
-            if (!CompilerVersion::supportsNewFirstClassCallable()) {
-                $this->throwCompileError('Cannot create Closure for new expression');
-            }
-            $classOperand = $expr->class ?? $expr->name;
-            if (!$classOperand instanceof Operand\Literal) {
-                $this->throwCompileLogic('First-class new callable requires a literal class name');
-            }
-
-            $fromNew = new OpCode(
-                OpCode::TYPE_FROM_CALLABLE,
-                $result,
-                $this->compileStringLiteralSlot('new '.$classOperand->value, $block)
-            );
-            $this->assignSourceMetadata($fromNew, $expr);
-
-            return [$fromNew];
+            $this->throwCompileError('Cannot create Closure for new expression');
         }
 
         if (1 === $expr->kind) {

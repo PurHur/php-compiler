@@ -1,5 +1,5 @@
 --TEST--
-Language: new Class(...) first-class callable under PROFILE=8.4 (#23714, Zend/zend_compile.c)
+Language: new Class(...) first-class callable rejected under PROFILE=8.4 (#26188, re-#10130, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -15,5 +15,7 @@ class C
 
 $f = new C(...);
 echo $f(7)->x, "\n";
---EXPECT--
-7
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: Cannot create Closure for new expression
