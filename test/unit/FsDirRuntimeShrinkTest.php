@@ -9,7 +9,11 @@ use PHPCompiler\ext\standard\VmFsDirNative;
 use PHPCompiler\ext\standard\VmFsTouchNative;
 use PHPUnit\Framework\TestCase;
 
-/** touch/mkdir/tempnam JIT routes through FsDirJitHelper PHP not StringFsDirJit libc LLVM (#8999). */
+/**
+ * touch/mkdir/tempnam JIT routes through FsDirJitHelper PHP not StringFsDirJit libc LLVM (#8999 / #25976).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #25570).
+ */
 final class FsDirRuntimeShrinkTest extends TestCase
 {
     public function testStringFsDirJitDelegatesTouchMkdirTempnamToRuntime(): void
@@ -38,13 +42,21 @@ final class FsDirRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('mkstemp')", $source);
     }
 
-    public function testFsDirRuntimeUsesJitHelperNotLlvmLibc(): void
+    public function testFsDirRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FsDirRuntime.php');
         $this->assertStringContainsString('FsDirJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString("lookupFunction('mkdir')", $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $lineCount = \substr_count($source, "\n") + 1;
+        $this->assertLessThan(290, $lineCount);
+        $this->assertGreaterThan(10, 320 - $lineCount);
     }
 
     public function testFsDirJitHelperTouchMatchesVmFs(): void
