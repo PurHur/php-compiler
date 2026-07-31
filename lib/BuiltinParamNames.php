@@ -29,6 +29,9 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo omits microsecond; Immutable second required (#25400)
             'datetime::settime',
             'datetimeimmutable::settime' => ['hour', 'minute', 'second=', 'microsecond='],
+            // php-src ext/date/php_date.stub.php — PHP 8.4+; missing from InternalArgInfo (#26098)
+            'datetime::setmicrosecond',
+            'datetimeimmutable::setmicrosecond' => ['microsecond'],
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
