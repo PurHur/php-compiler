@@ -51,9 +51,14 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         if (PgsqlExtensionPolicy::advertisesBuiltins()) {
+            // PGSQL_LIBPQ_VERSION* are strings; ExecStatus/seek/fetch modes are ints (#24129).
             foreach (PgsqlConstants::registeredConstants() as $name => $value) {
                 $var = new \PHPCompiler\VM\Variable();
-                $var->int($value);
+                if (\is_string($value)) {
+                    $var->string($value);
+                } else {
+                    $var->int((int) $value);
+                }
                 $runtime->vmContext->defineConstant($name, $var);
             }
         }

@@ -15,6 +15,39 @@ final class PgsqlConstants
 
     public const PGSQL_BOTH = 3;
 
+    /** libpq PGRES_EMPTY_QUERY (php-src pgsql.stub.php; #24129) */
+    public const PGSQL_EMPTY_QUERY = 0;
+
+    /** libpq PGRES_COMMAND_OK */
+    public const PGSQL_COMMAND_OK = 1;
+
+    /** libpq PGRES_TUPLES_OK */
+    public const PGSQL_TUPLES_OK = 2;
+
+    /** libpq PGRES_COPY_OUT */
+    public const PGSQL_COPY_OUT = 3;
+
+    /** libpq PGRES_COPY_IN */
+    public const PGSQL_COPY_IN = 4;
+
+    /** libpq PGRES_BAD_RESPONSE */
+    public const PGSQL_BAD_RESPONSE = 5;
+
+    /** libpq PGRES_NONFATAL_ERROR */
+    public const PGSQL_NONFATAL_ERROR = 6;
+
+    /** libpq PGRES_FATAL_ERROR */
+    public const PGSQL_FATAL_ERROR = 7;
+
+    /** php-src PGSQL_SEEK_SET — large-object seek origin (#24129) */
+    public const PGSQL_SEEK_SET = 0;
+
+    /** php-src PGSQL_SEEK_CUR */
+    public const PGSQL_SEEK_CUR = 1;
+
+    /** php-src PGSQL_SEEK_END */
+    public const PGSQL_SEEK_END = 2;
+
     public const PGSQL_CONV_IGNORE_DEFAULT = 1 << 1;
 
     public const PGSQL_CONV_FORCE_NULL = 1 << 2;
@@ -182,7 +215,7 @@ final class PgsqlConstants
     public const PGSQL_NOTICE_CLEAR = 3;
 
     /**
-     * @return array<string, int>
+     * @return array<string, int|string>
      */
     public static function registeredConstants(): array
     {
@@ -190,6 +223,18 @@ final class PgsqlConstants
             'PGSQL_ASSOC' => self::PGSQL_ASSOC,
             'PGSQL_NUM' => self::PGSQL_NUM,
             'PGSQL_BOTH' => self::PGSQL_BOTH,
+            'PGSQL_EMPTY_QUERY' => self::PGSQL_EMPTY_QUERY,
+            'PGSQL_COMMAND_OK' => self::PGSQL_COMMAND_OK,
+            'PGSQL_TUPLES_OK' => self::PGSQL_TUPLES_OK,
+            'PGSQL_COPY_OUT' => self::PGSQL_COPY_OUT,
+            'PGSQL_COPY_IN' => self::PGSQL_COPY_IN,
+            'PGSQL_BAD_RESPONSE' => self::PGSQL_BAD_RESPONSE,
+            'PGSQL_NONFATAL_ERROR' => self::PGSQL_NONFATAL_ERROR,
+            'PGSQL_FATAL_ERROR' => self::PGSQL_FATAL_ERROR,
+            'PGSQL_SEEK_SET' => self::PGSQL_SEEK_SET,
+            'PGSQL_SEEK_CUR' => self::PGSQL_SEEK_CUR,
+            'PGSQL_SEEK_END' => self::PGSQL_SEEK_END,
+            ...self::libpqVersionConstants(),
             'PGSQL_CONV_IGNORE_DEFAULT' => self::PGSQL_CONV_IGNORE_DEFAULT,
             'PGSQL_CONV_FORCE_NULL' => self::PGSQL_CONV_FORCE_NULL,
             'PGSQL_CONV_IGNORE_NOT_NULL' => self::PGSQL_CONV_IGNORE_NOT_NULL,
@@ -265,5 +310,33 @@ final class PgsqlConstants
             'PGSQL_SHOW_CONTEXT_ERRORS' => self::PGSQL_SHOW_CONTEXT_ERRORS,
             'PGSQL_SHOW_CONTEXT_ALWAYS' => self::PGSQL_SHOW_CONTEXT_ALWAYS,
         ];
+    }
+
+    /**
+     * PGSQL_LIBPQ_VERSION / _STR — php-src php_pgsql_minit via php_libpq_version (#24129).
+     *
+     * @return array<string, string>
+     */
+    private static function libpqVersionConstants(): array
+    {
+        $version = self::resolveLibpqVersionString();
+
+        return [
+            'PGSQL_LIBPQ_VERSION' => $version,
+            'PGSQL_LIBPQ_VERSION_STR' => $version,
+        ];
+    }
+
+    /** Prefer live libpq FFI; fall back to host Zend when FFI unavailable. */
+    private static function resolveLibpqVersionString(): string
+    {
+        if (VmPgsqlNative::available()) {
+            return VmPgsqlNative::libpqVersionString();
+        }
+        if (\defined('PGSQL_LIBPQ_VERSION')) {
+            return (string) \constant('PGSQL_LIBPQ_VERSION');
+        }
+
+        return '0.0';
     }
 }
