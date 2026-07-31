@@ -8,15 +8,41 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\BinaryOp;
 use PhpParser\Node\Scalar;
+use PHPCompiler\ext\standard\DateConstants;
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmPhpCoreConstants;
 use PHPCompiler\VM\AttributeSupport;
+use PHPCompiler\VM\Context as VmContext;
+use PHPCompiler\VM\Variable;
 
 /**
- * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725).
+ * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725, #26030).
  *
  * php-src: zend_compile_attribute / zend_ast_evaluate constant expression rules (subset).
  */
 final class AttributeConstantEvaluator
 {
+    /** Compilation-unit path for folding `__DIR__` / `__FILE__` in attribute args (#26030). */
+    private static string $scriptFile = '';
+
+    /**
+     * @template T
+     *
+     * @param callable(): T $fn
+     *
+     * @return T
+     */
+    public static function withScriptFile(string $scriptFile, callable $fn): mixed
+    {
+        $prev = self::$scriptFile;
+        self::$scriptFile = $scriptFile;
+        try {
+            return $fn();
+        } finally {
+            self::$scriptFile = $prev;
+        }
+    }
+
     /**
      * @return array{name: ?string, value: mixed}
      */
@@ -39,17 +65,19 @@ final class AttributeConstantEvaluator
         if ($expr instanceof Scalar\DNumber) {
             return (float) $expr->value;
         }
+        if ($expr instanceof Scalar\MagicConst\Dir) {
+            return self::evalMagicDir();
+        }
+        if ($expr instanceof Scalar\MagicConst\File) {
+            return self::evalMagicFile();
+        }
+        if ($expr instanceof Scalar\MagicConst\Line) {
+            $line = $expr->getStartLine();
+
+            return $line > 0 ? $line : 1;
+        }
         if ($expr instanceof Expr\ConstFetch) {
-            $name = strtolower($expr->name->toString());
-            if ('null' === $name) {
-                return null;
-            }
-            if ('true' === $name) {
-                return true;
-            }
-            if ('false' === $name) {
-                return false;
-            }
+            return self::evalConstFetch($expr);
         }
         if ($expr instanceof Expr\UnaryMinus) {
             $v = self::evalExpr($expr->expr);
@@ -112,6 +140,92 @@ final class AttributeConstantEvaluator
         throw new \LogicException(
             'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
         );
+    }
+
+    /**
+     * Built-in / stdlib ConstFetch — mirrors Compiler::tryFoldGlobalConstFetch (#26030).
+     */
+    private static function evalConstFetch(Expr\ConstFetch $expr): mixed
+    {
+        $name = $expr->name->toString();
+        $lc = strtolower($name);
+        if ('null' === $lc) {
+            return null;
+        }
+        if ('true' === $lc) {
+            return true;
+        }
+        if ('false' === $lc) {
+            return false;
+        }
+
+        $core = VmPhpCoreConstants::fetch($name);
+        if (null !== $core) {
+            return self::variableToPhpScalar($core);
+        }
+        $errorInt = VmContext::errorReportingConstant($name);
+        if (null !== $errorInt) {
+            return $errorInt;
+        }
+        if ('inf' === $lc) {
+            return INF;
+        }
+        if ('nan' === $lc) {
+            return NAN;
+        }
+        $stdlibInt = StdlibConstants::coreIntByName($lc);
+        if (null !== $stdlibInt) {
+            return $stdlibInt;
+        }
+        $dateStr = DateConstants::CORE_STRING_BY_NAME[$lc] ?? null;
+        if (null !== $dateStr) {
+            return $dateStr;
+        }
+        $stdlibStr = StdlibConstants::CORE_STRING_BY_NAME[$lc] ?? null;
+        if (null !== $stdlibStr) {
+            return $stdlibStr;
+        }
+
+        throw new \LogicException(
+            'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+        );
+    }
+
+    private static function variableToPhpScalar(Variable $var): mixed
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => null,
+            Variable::TYPE_INTEGER => $var->toInt(),
+            Variable::TYPE_FLOAT => $var->toFloat(),
+            Variable::TYPE_BOOLEAN => $var->toBool(),
+            Variable::TYPE_STRING => $var->toString(),
+            default => throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            ),
+        };
+    }
+
+    private static function evalMagicFile(): string
+    {
+        $file = self::$scriptFile;
+        if ('' === $file) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+        if (is_file($file)) {
+            $real = realpath($file);
+            if (false !== $real) {
+                return $real;
+            }
+        }
+
+        return $file;
+    }
+
+    private static function evalMagicDir(): string
+    {
+        return dirname(self::evalMagicFile());
     }
 
     private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int|CompileTimeEnumCase
