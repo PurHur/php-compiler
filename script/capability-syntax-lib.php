@@ -1371,6 +1371,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/json_validate.php',
         ],
         [
+            'names' => ['socket_atmark'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsSocketAtmark'],
+            'since' => '8.3.0',
+            'module' => 'sockets',
+            'relPath' => 'ext/sockets/socket_atmark.php',
+        ],
+        [
             'names' => ['mb_str_pad'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbStrPad'],
             'since' => '8.3.0',

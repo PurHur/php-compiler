@@ -1,7 +1,13 @@
 --TEST--
-socket_atmark() — registered on VM (issue #6544)
+socket_atmark() — registered on VM under PHP 8.3+ profile (issue #6544, #25874)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
-<?php if (!function_exists('socket_atmark')) die('skip socket_atmark'); ?>
+<?php
+if (!\PHPCompiler\CompilerVersion::supportsSocketAtmark()) {
+    die('skip socket_atmark requires PHP 8.3+ profile');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);
@@ -28,4 +34,4 @@ echo "\n";
 ?>
 --EXPECT--
 1
-deps_skip
+true

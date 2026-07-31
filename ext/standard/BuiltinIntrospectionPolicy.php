@@ -26,6 +26,9 @@ final class BuiltinIntrospectionPolicy
         if ('json_validate' === $lc) {
             return CompilerVersion::advertisesJsonValidate();
         }
+        if ('socket_atmark' === $lc) {
+            return CompilerVersion::advertisesSocketAtmark();
+        }
         if ('crc32c' === $lc) {
             return CompilerVersion::advertisesCrc32c();
         }

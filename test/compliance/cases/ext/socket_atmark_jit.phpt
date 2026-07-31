@@ -1,7 +1,13 @@
 --TEST--
-socket_atmark() — JIT no fatal stub (issue #9215)
+socket_atmark() — JIT no fatal stub under PHP 8.3+ profile (issue #9215, #25874)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
-<?php if (!function_exists('socket_atmark')) die('skip socket_atmark'); ?>
+<?php
+if (!\PHPCompiler\CompilerVersion::supportsSocketAtmark()) {
+    die('skip socket_atmark requires PHP 8.3+ profile');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);
