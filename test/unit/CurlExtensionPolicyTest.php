@@ -68,9 +68,13 @@ PHP;
 
     public function testCurlVersionCore(): void
     {
-        self::assertSame('No error', VmCurlCore::easyStrerror(0));
         self::assertSame('No error', VmCurlCore::multiStrerror(0));
-        self::assertNull(VmCurlCore::easyStrerror(9999));
+        if (VmCurlNative::available()) {
+            // Live libcurl wording (#25813) — not the deleted VmCurlCore::EASY_ERRORS table.
+            self::assertSame('No error', VmCurlNative::easyStrerror(0));
+            self::assertSame('Unknown error', VmCurlNative::easyStrerror(9999));
+            self::assertStringContainsString('bad/illegal format', VmCurlNative::easyStrerror(3));
+        }
         $info = VmCurlCore::versionInfo();
         self::assertSame(VmCurlCore::LIBCURL_VERSION, $info['version']);
     }
