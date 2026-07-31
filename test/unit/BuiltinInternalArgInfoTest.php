@@ -62,6 +62,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** Zend/zend_builtin_functions.stub.php — exit/die string|int $status = 0 : never (#26056). */
+    public function testExitDieReflectionStubTypes(): void
+    {
+        foreach (['exit', 'die'] as $f) {
+            $this->assertSame('never', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('string|int', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($info, $f);
+            $this->assertSame('status', $info['name'], $f);
+            $this->assertSame('string|int', $info['type'], $f);
+            $this->assertTrue(
+                BuiltinInternalDefaultValues::isAvailable($f, 0, [
+                    'name' => 'status',
+                    'type' => 'string|int',
+                    'isOptional' => true,
+                ], false),
+                $f
+            );
+        }
+    }
+
     /** php-src string.stub.php — InternalArgInfo omits |false (#25442). */
     public function testStrposFamilyReturnTypeIncludesFalse(): void
     {

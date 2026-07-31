@@ -519,6 +519,13 @@ final class BuiltinInternalDefaultValues
         'sizeof' => [
             1 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src Zend/zend_builtin_functions.stub.php — string|int $status = 0 (union does not infer) (#26056)
+        'exit' => [
+            0 => ['kind' => 'int', 'value' => 0],
+        ],
+        'die' => [
+            0 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/zlib/zlib.stub.php — level=-1; encoding=GZIP/DEFLATE/RAW (int infer → 0) (#25012)
         'gzencode' => [
             1 => ['kind' => 'int', 'value' => -1],
