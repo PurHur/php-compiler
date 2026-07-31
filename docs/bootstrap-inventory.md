@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6640 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21408 |
+| Source constructs flagged (warnings) | 21413 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3125,7 +3125,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmAssert.php` | 0 | 2 |
 | `ext/standard/VmAssertState.php` | 0 | 1 |
 | `ext/standard/VmBrowser.php` | 0 | 1 |
-| `ext/standard/VmCallable.php` | 0 | 14 |
+| `ext/standard/VmCallable.php` | 0 | 18 |
 | `ext/standard/VmCallableInvoke.php` | 0 | 4 |
 | `ext/standard/VmChdirNative.php` | 0 | 1 |
 | `ext/standard/VmChdirPure.php` | 0 | 1 |
@@ -3860,7 +3860,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/int_min.php` | 0 | 1 |
 | `ext/standard/intdiv.php` | 0 | 3 |
 | `ext/standard/interface_exists_.php` | 0 | 1 |
-| `ext/standard/intval.php` | 0 | 1 |
+| `ext/standard/intval.php` | 0 | 2 |
 | `ext/standard/ip2long.php` | 0 | 1 |
 | `ext/standard/iptcembed.php` | 0 | 2 |
 | `ext/standard/iptcparse.php` | 0 | 6 |
@@ -30821,10 +30821,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 641)
 - new Variable (line 658)
 - new Variable (line 660)
-- new Error (line 817)
-- new Error (line 827)
-- new Variable (line 837)
-- 32 class method(s)
+- new Error (line 828)
+- new Error (line 838)
+- new Variable (line 848)
+- new Variable (line 1146)
+- new Variable (line 1166)
+- new Variable (line 1183)
+- new Variable (line 1188)
+- 35 class method(s)
 
 ### `ext/standard/VmCallableInvoke.php`
 
@@ -35616,7 +35620,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/intval.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- new JITVariable (line 312)
+- 10 class method(s)
 
 ### `ext/standard/ip2long.php`
 
@@ -41637,8 +41642,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1917)
-- new ArgumentCountError (line 1928)
+- new ArgumentCountError (line 1966)
+- new ArgumentCountError (line 1977)
 - 19 class method(s)
 - 1 closure(s)
 

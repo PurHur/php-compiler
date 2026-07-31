@@ -223,9 +223,6 @@ final class VmCallable
      * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709, #25712).
      *
      * array_map/array_filter use "a valid callback or null" (#25711); usort/call_user_func do not.
-     * array_u* variadic comparators omit the ($callback) param name (php-src array.c; #25736).
-     *
-     * @param string|null $paramName Null omits " ($name)" — Zend array_udiff/uintersect/diff_uassoc.
      */
     public static function inaccessibleMethodCallbackTypeError(
         string $function,
@@ -233,17 +230,14 @@ final class VmCallable
         string $className,
         string $methodName,
         int $argNum = 1,
-        bool $nullAllowed = false,
-        ?string $paramName = 'callback'
+        bool $nullAllowed = false
     ): string {
         $phrase = $nullAllowed ? 'a valid callback or null' : 'a valid callback';
-        $paramPart = null !== $paramName ? ' ($'.$paramName.')' : '';
 
         return sprintf(
-            '%s(): Argument #%d%s must be %s, cannot access %s method %s::%s()',
+            '%s(): Argument #%d ($callback) must be %s, cannot access %s method %s::%s()',
             $function,
             $argNum,
-            $paramPart,
             $phrase,
             $kind,
             $className,
@@ -255,8 +249,6 @@ final class VmCallable
      * When a real method exists but is not visible from $scopeFrame, throw Zend's
      * cannot-access TypeError (usort/uasort/uksort Argument #N; #25712).
      * No-op when the callable is merely malformed or the method is missing.
-     *
-     * @param string|null $paramName Null omits " ($name)" for array_u* (#25736).
      */
     public static function throwIfInaccessibleMethodCallback(
         Context $ctx,
@@ -264,8 +256,7 @@ final class VmCallable
         string $function,
         int $argNum,
         ?Frame $scopeFrame,
-        bool $nullAllowed = false,
-        ?string $paramName = 'callback'
+        bool $nullAllowed = false
     ): void {
         $callback = $callback->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $callback->type) {
@@ -296,8 +287,7 @@ final class VmCallable
                 $function,
                 $scopeFrame,
                 $argNum,
-                $nullAllowed,
-                $paramName
+                $nullAllowed
             );
 
             return;
@@ -326,8 +316,7 @@ final class VmCallable
             $function,
             $scopeFrame,
             $argNum,
-            $nullAllowed,
-            $paramName
+            $nullAllowed
         );
     }
 
@@ -680,6 +669,13 @@ final class VmCallable
         }
         if (Variable::TYPE_OBJECT === $target->type) {
             $object = $target->toObject();
+            // Missing method + __call: invokeInstanceMethod does not magic-dispatch (#25747).
+            if (
+                !$ctx->runtime->vm->hasInstanceMethod($object->class, $methodName)
+                && self::hasInstanceMagicCall($ctx, $object->class)
+            ) {
+                return self::invokeMagicInstanceCall($ctx, $object, $methodName, ...$args);
+            }
             self::assertInstanceMethodVisibleForInvoke(
                 $ctx,
                 $object->class,
@@ -688,13 +684,6 @@ final class VmCallable
                 $scopeFrame,
                 1
             );
-            // Missing method → __call (zend_is_callable_ex FCC invoke; #25747 / re-#11534).
-            // invokeInstanceMethod does not walk magic handlers — only real methods.
-            if (!$ctx->runtime->vm->hasInstanceMethod($object->class, $methodName)
-                && self::hasInstanceMagicCall($ctx, $object->class)
-            ) {
-                return self::invokeMagicCall($ctx, $object, $methodName, ...$args);
-            }
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, $methodName, ...$args);
         }
@@ -720,9 +709,9 @@ final class VmCallable
     /**
      * call_user_func* — reject inaccessible instance methods before invoke (#25709).
      *
-     * Missing methods are dispatched via {@see invokeMagicCall} when `__call` exists (#25747).
+     * Missing methods with `__call` are handled in {@see invokeArrayCallable} (#25747).
      * When the method exists but the builtin caller frame cannot see it, Zend TypeErrors
-     * (zend_is_callable_ex) rather than invoking `__call`.
+     * (zend_is_callable_ex) rather than invoking `__call` (see #25710 for that gap).
      */
     private static function assertInstanceMethodVisibleForInvoke(
         Context $ctx,
@@ -731,8 +720,7 @@ final class VmCallable
         string $function,
         ?Frame $scopeFrame,
         int $argNum = 1,
-        bool $nullAllowed = false,
-        ?string $paramName = 'callback'
+        bool $nullAllowed = false
     ): void {
         if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
             return;
@@ -750,15 +738,12 @@ final class VmCallable
             $function,
             $scopeFrame,
             $argNum,
-            $nullAllowed,
-            $paramName
+            $nullAllowed
         );
     }
 
     /**
      * Shared visibility gate for instance + static array/`Class::method` callables (#25709, #25712).
-     *
-     * @param string|null $paramName Null omits " ($name)" for array_u* (#25736).
      */
     private static function assertDeclaringMethodVisibleForInvoke(
         Context $ctx,
@@ -768,8 +753,7 @@ final class VmCallable
         string $function,
         ?Frame $scopeFrame,
         int $argNum = 1,
-        bool $nullAllowed = false,
-        ?string $paramName = 'callback'
+        bool $nullAllowed = false
     ): void {
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null !== $scopeFrame
@@ -791,8 +775,7 @@ final class VmCallable
             $declaring->name,
             $declaredName,
             $argNum,
-            $nullAllowed,
-            $paramName
+            $nullAllowed
         ));
     }
 
@@ -817,9 +800,9 @@ final class VmCallable
         }
         $located = self::locateCallableMethod($ctx, $resolved, $methodName, $function);
         if (null === $located) {
-            // Missing static method → __callStatic (zend_std_get_static_method; #25747).
+            // Missing method + __callStatic — zend_is_callable_ex / call_user_func* (#25747).
             if (self::hasStaticMagicCall($ctx, $resolved)) {
-                return self::invokeMagicCallStatic($ctx, $resolved, $methodName, ...$args);
+                return self::invokeMagicStaticCall($ctx, $resolved, $methodName, ...$args);
             }
             throw new \TypeError(self::invalidStringCallbackTypeError(
                 $className.'::'.$methodName,
@@ -1103,7 +1086,24 @@ final class VmCallable
      */
     private static function hasInstanceMagicCall(Context $ctx, \PHPCompiler\VM\ClassEntry $class): bool
     {
-        return null !== self::findInstanceMagicCallClass($ctx, $class);
+        $lcClass = strtolower($class->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                return false;
+            }
+            $entry = $ctx->classes[$lcClass];
+            if (isset($entry->methods['__call'])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return false;
     }
 
     /**
@@ -1111,75 +1111,39 @@ final class VmCallable
      */
     private static function hasStaticMagicCall(Context $ctx, string $className): bool
     {
-        return null !== self::findStaticMagicCallClass($ctx, $className);
-    }
-
-    /**
-     * Walk hierarchy for the class that declares __call (zend_std_get_method).
-     */
-    private static function findInstanceMagicCallClass(
-        Context $ctx,
-        \PHPCompiler\VM\ClassEntry $class
-    ): ?\PHPCompiler\VM\ClassEntry {
-        $lcClass = strtolower($class->name);
-        $visited = [];
-        while (!isset($visited[$lcClass])) {
-            $visited[$lcClass] = true;
-            if (!isset($ctx->classes[$lcClass])) {
-                return null;
-            }
-            $entry = $ctx->classes[$lcClass];
-            if (isset($entry->methods['__call'])) {
-                return $entry;
-            }
-            if (null === $entry->parentLc) {
-                return null;
-            }
-            $lcClass = $entry->parentLc;
-        }
-
-        return null;
-    }
-
-    /**
-     * Walk hierarchy for the class that declares __callStatic.
-     */
-    private static function findStaticMagicCallClass(
-        Context $ctx,
-        string $className
-    ): ?\PHPCompiler\VM\ClassEntry {
         $lcClass = strtolower(ltrim($className, '\\'));
         $visited = [];
         while (!isset($visited[$lcClass])) {
             $visited[$lcClass] = true;
             if (!isset($ctx->classes[$lcClass])) {
-                return null;
+                return false;
             }
             $entry = $ctx->classes[$lcClass];
             if (isset($entry->methods['__callstatic'])) {
-                return $entry;
+                return true;
             }
             if (null === $entry->parentLc) {
-                return null;
+                return false;
             }
             $lcClass = $entry->parentLc;
         }
 
-        return null;
+        return false;
     }
 
     /**
-     * Invoke __call($name, $arguments) for call_user_func* FCC (#25747).
+     * call_user_func* → `__call($name, $arguments)` (zend_std_get_method / #25747).
      *
-     * php-src: Zend/zend_API.c — zend_call_function after zend_is_callable_ex magic FCC
+     * {@see \PHPCompiler\VM::invokeInstanceMethod} does not magic-dispatch; build the
+     * Zend ($name, $args) pair and invoke `__call` directly.
      */
-    private static function invokeMagicCall(
+    private static function invokeMagicInstanceCall(
         Context $ctx,
         \PHPCompiler\VM\ObjectEntry $object,
         string $methodName,
         Variable ...$args
     ): Variable {
-        $nameVar = new Variable();
+        $nameVar = new Variable(Variable::TYPE_STRING);
         $nameVar->string($methodName);
 
         return $ctx->runtime->vm->invokeInstanceMethod(
@@ -1191,29 +1155,20 @@ final class VmCallable
     }
 
     /**
-     * Invoke __callStatic($name, $arguments) for call_user_func* FCC (#25747).
-     *
-     * php-src: Zend/zend_object_handlers.c — zend_std_get_static_method slow path
+     * call_user_func* → `__callStatic($name, $arguments)` (#25747).
      */
-    private static function invokeMagicCallStatic(
+    private static function invokeMagicStaticCall(
         Context $ctx,
-        string $calledScopeClass,
+        string $className,
         string $methodName,
         Variable ...$args
     ): Variable {
-        $magicClass = self::findStaticMagicCallClass($ctx, $calledScopeClass);
-        if (null === $magicClass) {
-            throw new \TypeError(self::invalidStringCallbackTypeError(
-                $calledScopeClass.'::'.$methodName,
-                'call_user_func'
-            ));
-        }
-        $nameVar = new Variable();
+        $nameVar = new Variable(Variable::TYPE_STRING);
         $nameVar->string($methodName);
 
         return $ctx->runtime->vm->invokeDeclaredStaticWithCalledScope(
-            $magicClass->name,
-            $calledScopeClass,
+            $className,
+            $className,
             '__callStatic',
             $nameVar,
             self::packMagicCallArguments(...$args)
@@ -1221,7 +1176,7 @@ final class VmCallable
     }
 
     /**
-     * Pack call_user_func* positional args into __call / __callStatic $arguments.
+     * Pack positional call_user_func* args into `__call` / `__callStatic`'s `$arguments` array.
      */
     private static function packMagicCallArguments(Variable ...$args): Variable
     {
