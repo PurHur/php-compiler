@@ -2312,13 +2312,13 @@ final class VmReflection
      *
      * Block::$func is a php-cfg {@see CfgFunc} (not {@see Func\PHP}); zero-arg calls leave
      * calledArgs empty, so detect user frames via {@see Block::isMainScript()} (#19617).
+     * Always take the innermost such frame — do not walk past a zero-arg callee to an
+     * outer caller with non-empty argv (#25896 / Zend execute_data).
      *
      * @return list<Variable>
      */
     public static function userCallArgs(Frame $frame): array
     {
-        $entryCandidate = null;
-        $userFrame = null;
         for ($f = $frame->parent; null !== $f; $f = $f->parent) {
             if (null === $f->block || null === $f->block->func || $f->hasHandler()) {
                 continue;
@@ -2327,23 +2327,12 @@ final class VmReflection
             if ($f->block->isMainScript()) {
                 continue;
             }
-            if ([] !== $f->calledArgs) {
-                $userFrame = $f;
-                break;
-            }
-            // Innermost zero-arg user function / method / closure frame.
-            if (null === $entryCandidate) {
-                $entryCandidate = $f;
-            }
-        }
-        if (null === $userFrame) {
-            $userFrame = $entryCandidate;
-        }
-        if (null === $userFrame) {
-            throw new \LogicException('Must be called from a function context');
+
+            // Innermost enclosing user function / method / closure (incl. zero-arg).
+            return self::liveUserCallArgs($f);
         }
 
-        return self::liveUserCallArgs($userFrame);
+        throw new \LogicException('Must be called from a function context');
     }
 
     /**
