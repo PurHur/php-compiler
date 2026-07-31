@@ -260,8 +260,14 @@ class OpCode {
     /** @var ?Block */
     public $block3 = null;
 
-    /** @var list<string> */
+    /** @var list<string> lowercase interface names for implements/extends (#25624). */
     public array $classImplements = [];
+    /**
+     * Display names parallel to {@see $classImplements} (source casing for Error messages, #25624).
+     *
+     * @var list<string>
+     */
+    public array $classImplementsDisplay = [];
     /** Sealed type: permitted child class names (lowercase FQCN); empty = none (#3322). */
     public bool $isSealed = false;
     /** @var list<string> */

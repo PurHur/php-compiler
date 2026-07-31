@@ -12,6 +12,10 @@ use PHPCompiler\Frame;
  *
  * php-src: zend_check_implement_interface — DateTimeInterface and internal classes
  * fatal when the class declaration executes, not at parseAndCompile().
+ *
+ * php-src: Zend/zend_execute_API.c — missing implements target → Error Interface "%s" not found
+ * after spl_autoload (#25624). Same-file forward refs rely on Compiler hoisting interfaces
+ * before classes so DECLARE_INTERFACE runs first.
  */
 final class ImplementsHierarchyRuntimeCheck
 {
@@ -31,6 +35,64 @@ final class ImplementsHierarchyRuntimeCheck
                 self::throwFatal($message, $frame, $sourceLocation);
             }
         }
+    }
+
+    /**
+     * Autoload then require each implements target to exist as an interface (#25624).
+     *
+     * @param list<string> $interfaceLcs lowercase interface names
+     * @param list<string> $interfaceDisplays source-cased names (parallel to $interfaceLcs)
+     *
+     * @return string|null Error message when unresolved; null when all ok
+     */
+    public static function missingInterfaceMessage(
+        array $interfaceLcs,
+        array $interfaceDisplays,
+        Context $context,
+    ): ?string {
+        foreach ($interfaceLcs as $i => $ifaceLc) {
+            $display = $interfaceDisplays[$i] ?? $ifaceLc;
+            if (!isset($context->classes[$ifaceLc])) {
+                $context->autoloadClass($display);
+            }
+            if (!isset($context->classes[$ifaceLc])) {
+                return sprintf('Interface "%s" not found', $display);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<string> $interfaceLcs
+     * @param list<string> $interfaceDisplays
+     *
+     * @return string|null Zend "C cannot implement Y - it is not an interface" or null
+     */
+    public static function notInterfaceMessage(
+        string $subjectDisplay,
+        array $interfaceLcs,
+        array $interfaceDisplays,
+        Context $context,
+    ): ?string {
+        foreach ($interfaceLcs as $i => $ifaceLc) {
+            if (!isset($context->classes[$ifaceLc])) {
+                continue;
+            }
+            $entry = $context->classes[$ifaceLc];
+            if ($entry->isInterface) {
+                continue;
+            }
+            $display = $interfaceDisplays[$i] ?? $ifaceLc;
+
+            return sprintf(
+                '%s cannot implement %s - it is not an interface',
+                $subjectDisplay,
+                '' !== $entry->name ? $entry->name : $display
+            );
+        }
+
+        return null;
     }
 
     /**

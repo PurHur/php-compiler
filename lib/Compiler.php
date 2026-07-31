@@ -2150,23 +2150,28 @@ class Compiler {
 
         // Hoist class-like definitions before functions so JIT/AOT see member
         // constants when compiling FUNCDEF bodies (issue #2215, MiniWebApp Router::CONST).
+        // Interfaces before classes so same-file `class C implements I` / later `interface I`
+        // resolves at DECLARE_CLASS like Zend early-binding (#25624).
         // Enums stay in source order so enum_exists() before declaration matches Zend (#5013).
         // Serializable / forbidden-implements stay in source order for DECLARE side effects (#18781, #25109).
         foreach ($ops as $child) {
-            switch (get_class($child)) {
-                case Op\Stmt\Class_::class:
-                    if ($this->requiresSourceOrderClassRegistration($child)) {
-                        break;
-                    }
-                    $block->addOpCode($this->compileClassLike($child, $block));
-                    break;
-                case Op\Stmt\Interface_::class:
-                    $block->addOpCode($this->compileInterface($child, $block));
-                    break;
-                case Op\Stmt\Trait_::class:
-                    $block->addOpCode($this->compileTrait($child, $block));
-                    break;
+            if ($child instanceof Op\Stmt\Interface_) {
+                $block->addOpCode($this->compileInterface($child, $block));
             }
+        }
+        foreach ($ops as $child) {
+            if ($child instanceof Op\Stmt\Trait_) {
+                $block->addOpCode($this->compileTrait($child, $block));
+            }
+        }
+        foreach ($ops as $child) {
+            if (!$child instanceof Op\Stmt\Class_) {
+                continue;
+            }
+            if ($this->requiresSourceOrderClassRegistration($child)) {
+                continue;
+            }
+            $block->addOpCode($this->compileClassLike($child, $block));
         }
         foreach ($ops as $child) {
             switch (get_class($child)) {
@@ -6338,7 +6343,9 @@ class Compiler {
             AttributeNames::assertAllowDynamicPropertiesNotOnEnum($return->attributeNames, $enumName);
             $this->registerAttributeClassFromEntries($enumName, $return->attributeEntries);
         }
-        $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
+        [$enumIfaceLcs, $enumIfaceDisplays] = $this->interfaceLcAndDisplayFromOperands($enum->implements);
+        $return->classImplements = $enumIfaceLcs;
+        $return->classImplementsDisplay = $enumIfaceDisplays;
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($enum->flags ?? 0);
         if ($return->classIsAbstract) {
             $name = $this->staticNameFromOperand($enum->name);
@@ -6615,7 +6622,7 @@ class Compiler {
             }
             $parentLc = strtolower(ltrim($parentName, '\\'));
         }
-        $interfaceLcs = $this->interfaceNamesFromOperands($class->implements);
+        [$interfaceLcs, $interfaceDisplays] = $this->interfaceLcAndDisplayFromOperands($class->implements);
         $parentSlot = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
@@ -6632,6 +6639,7 @@ class Compiler {
             $readonlySlot
         );
         $return->classImplements = $interfaceLcs;
+        $return->classImplementsDisplay = $interfaceDisplays;
         if (VM\StringableSupport::requiresImplementation($return->classImplements)) {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
@@ -6849,16 +6857,29 @@ class Compiler {
      */
     protected function interfaceNamesFromOperands(array $operands): array
     {
-        $names = [];
+        return $this->interfaceLcAndDisplayFromOperands($operands)[0];
+    }
+
+    /**
+     * @param Operand[] $operands
+     *
+     * @return array{0: list<string>, 1: list<string>} lowercase names, source display names
+     */
+    protected function interfaceLcAndDisplayFromOperands(array $operands): array
+    {
+        $lcs = [];
+        $displays = [];
         foreach ($operands as $operand) {
             $name = $this->staticNameFromOperand($operand);
             if (null === $name) {
                 $this->throwCompileError('Interface name must be a compile-time class reference');
             }
-            $names[] = strtolower(ltrim($name, '\\'));
+            $display = ltrim($name, '\\');
+            $displays[] = $display;
+            $lcs[] = strtolower($display);
         }
 
-        return $names;
+        return [$lcs, $displays];
     }
 
     /**
@@ -6882,6 +6903,7 @@ class Compiler {
      *
      * - Forbidden implements (DateTimeInterface / reserved): fatals at DECLARE (#18781)
      * - Serializable: E_DEPRECATED + class_exists timing match Zend (#22000, #25109)
+     * - Any implements: DECLARE must run after prior spl_autoload_register (#25624)
      */
     protected function requiresSourceOrderClassRegistration(Op\Stmt\ClassLike $class): bool
     {
@@ -6889,7 +6911,13 @@ class Compiler {
             return true;
         }
 
-        return \in_array('serializable', $this->interfaceNamesFromOperands($class->implements), true);
+        if (\in_array('serializable', $this->interfaceNamesFromOperands($class->implements), true)) {
+            return true;
+        }
+
+        // Keep implements classes in source order so autoload callbacks registered above
+        // the declaration are visible (Zend early-binds types, not user autoload timing).
+        return $class instanceof Op\Stmt\Class_ && [] !== $class->implements;
     }
 
     protected function staticNameFromOperand(Operand $op): ?string
