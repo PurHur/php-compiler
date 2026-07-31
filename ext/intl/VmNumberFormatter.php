@@ -334,7 +334,12 @@ final class VmNumberFormatter
         if (null !== $pattern && '' !== $pattern) {
             self::applyPatternDigitAttributes($object->id, $pattern);
         }
-        IntlError::clear();
+        // php-src INTL_METHOD_CHECK_STATUS — preserve ICU warnings e.g. U_USING_DEFAULT_WARNING (#23547).
+        if ($openStatus < 0) {
+            IntlError::set($openStatus, IntlError::errorName($openStatus));
+        } else {
+            IntlError::clear();
+        }
 
         return true;
     }
@@ -381,7 +386,8 @@ final class VmNumberFormatter
                 return (int) $status->cdata;
             }
 
-            return IntlError::U_ZERO_ERROR;
+            // Preserve ICU warnings (negative) — U_USING_DEFAULT_WARNING for en_US (#23547).
+            return (int) $status->cdata;
         } catch (\Throwable) {
             if ($style < 0 || $style > 16) {
                 return IntlError::U_UNSUPPORTED_ERROR;
