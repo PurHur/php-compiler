@@ -1,6 +1,7 @@
 --TEST--
 stdlib curl_version() feature_list + CURL_VERSION_* on PROFILE=8.4 (#21337, #25357)
 --ENV--
+PHP_COMPILER_ENABLE_CURL=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

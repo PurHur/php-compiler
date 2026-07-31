@@ -41,6 +41,10 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        // CURLOPT_*/CURLE_* only when ext/curl is advertised (Zend without curl has none; #23953).
+        if (!CurlExtensionPolicy::advertisesExtension()) {
+            return;
+        }
         foreach (CurlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);

@@ -1,5 +1,7 @@
 --TEST--
 curl_multi_init/add/exec/getcontent basic multi (#3721, ext/curl/multi.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

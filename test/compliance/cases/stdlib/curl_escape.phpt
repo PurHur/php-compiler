@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_escape() / curl_unescape() — RFC 3986 round-trip with CurlHandle (#6351, #20493)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 echo function_exists('curl_escape') ? "escape_exists\n" : "escape_missing\n";

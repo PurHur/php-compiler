@@ -1,5 +1,7 @@
 --TEST--
 CurlHandle has no pause/reset instance methods — procedural only (#22595, ext/curl/curl.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

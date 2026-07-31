@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_setopt(null option) — ValueError invalid cURL option — JIT (#21878, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --JIT--
 --FILE--
 <?php

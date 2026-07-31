@@ -1,5 +1,7 @@
 --TEST--
 curl_multi_get_handles lists attached easy handles (#20520, PHP 8.5, ext/curl/multi.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

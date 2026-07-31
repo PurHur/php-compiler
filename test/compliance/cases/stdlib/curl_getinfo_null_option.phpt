@@ -1,5 +1,7 @@
 --TEST--
 curl_getinfo($ch, null) returns all-info array without DEP (#21882, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 error_reporting(E_ALL);

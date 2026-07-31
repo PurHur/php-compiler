@@ -1,5 +1,7 @@
 --TEST--
 curl_reset() / curl_pause() easy-handle lifecycle (#20494, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

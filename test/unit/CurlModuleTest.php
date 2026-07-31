@@ -14,6 +14,24 @@ use PHPUnit\Framework\TestCase;
  */
 final class CurlModuleTest extends TestCase
 {
+    /** @var string|false|null */
+    private $prevEnable = null;
+
+    protected function setUp(): void
+    {
+        $this->prevEnable = getenv('PHP_COMPILER_ENABLE_CURL');
+        putenv('PHP_COMPILER_ENABLE_CURL=1');
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->prevEnable || null === $this->prevEnable) {
+            putenv('PHP_COMPILER_ENABLE_CURL');
+        } else {
+            putenv('PHP_COMPILER_ENABLE_CURL='.$this->prevEnable);
+        }
+    }
+
     public function test_curl_module_libcurl_easy_functions_constants_and_classes(): void
     {
         if (!\PHPCompiler\ext\curl\VmCurlNative::available()) {

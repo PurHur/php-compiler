@@ -649,52 +649,30 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
-            // curl_escape/unescape require CurlHandle + easy stubs (#20493)
-            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesEasyHandleStubs()
-                && str_contains($name, 'curl_escape')
-                && !str_contains($name, 'curl_escape_phantom')) {
-                continue;
-            }
-            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesExtension()
-                && str_contains($name, 'curl_escape_phantom')) {
+            // Functional curl cases set PHP_COMPILER_ENABLE_CURL via --ENV--; phantoms when withheld (#23953).
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlCompliance($name)
+                && \PHPCompiler\ext\curl\CurlExtensionPolicy::isCurlComplianceCase($name)) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlFileCompliance($name)
                 && (str_contains($name, 'curl_file_create')
-                    || str_contains($name, 'curl_string_file'))
-                && !str_contains($name, 'curl_file_phantom')) {
-                continue;
-            }
-            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesFileClasses()
-                && str_contains($name, 'curl_file_phantom')) {
+                    || str_contains($name, 'curl_string_file')
+                    || str_contains($name, 'curl_file_phantom'))) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlShareCompliance($name)
-                && str_contains($name, 'curl_share')
-                && !str_contains($name, 'curl_share_phantom')) {
-                continue;
-            }
-            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesShareHandles()
-                && str_contains($name, 'curl_share_phantom')) {
+                && str_contains($name, 'curl_share')) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlEasyCompliance($name)
-                && (str_contains($name, 'curl_setopt_array') || str_contains($name, 'curl_opt_constants'))
-                && !str_contains($name, 'curl_easy_phantom')) {
-                continue;
-            }
-            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesEasyHandleStubs()
-                && str_contains($name, 'curl_easy_phantom')) {
+                && (str_contains($name, 'curl_setopt_array')
+                    || str_contains($name, 'curl_opt_constants')
+                    || str_contains($name, 'curl_easy_phantom'))) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlMultiCompliance($name)
                 && str_contains($name, 'curl_multi')
-                && !str_contains($name, 'curl_multi_strerror')
-                && !str_contains($name, 'curl_multi_phantom')) {
-                continue;
-            }
-            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesMultiHandles()
-                && str_contains($name, 'curl_multi_phantom')) {
+                && !str_contains($name, 'curl_multi_strerror')) {
                 continue;
             }
             // Reference profile withholds ldap; functional cases set PROFILE via --ENV-- (#23857).

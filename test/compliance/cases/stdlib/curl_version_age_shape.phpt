@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_version() Zend shape - age/protocols/ares (#24463)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

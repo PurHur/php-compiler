@@ -1,5 +1,7 @@
 --TEST--
 curl CURL_HTTP_VERSION_* + 8.2 CURLOPT surface (#21336, #22837, ext/curl/curl.stub.php)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

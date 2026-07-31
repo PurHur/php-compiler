@@ -1,5 +1,7 @@
 --TEST--
 stdlib CURLFile serialize()/unserialize() reject (issue #23064, ext/curl/curl_file.stub.php @not-serializable)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 $f = new CURLFile('/tmp/x');

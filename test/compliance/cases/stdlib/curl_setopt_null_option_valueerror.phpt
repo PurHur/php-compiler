@@ -1,5 +1,7 @@
 --TEST--
 stdlib curl_setopt(null option) — ValueError invalid cURL option (#21878, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 $ch = curl_init();

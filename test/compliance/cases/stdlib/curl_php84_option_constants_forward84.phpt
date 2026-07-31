@@ -1,6 +1,7 @@
 --TEST--
 curl PHP 8.4 CURLOPT/CURLINFO constants on PROFILE=8.4 (#22837, ext/curl/curl.stub.php)
 --ENV--
+PHP_COMPILER_ENABLE_CURL=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

@@ -1,5 +1,7 @@
 --TEST--
 curl_share_errno()/curl_share_strerror() — share error surface (#20531, ext/curl/share.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);

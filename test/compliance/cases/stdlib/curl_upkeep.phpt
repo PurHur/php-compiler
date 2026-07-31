@@ -1,5 +1,7 @@
 --TEST--
 curl_upkeep() easy-handle connection upkeep (#20977, ext/curl/interface.c)
+--ENV--
+PHP_COMPILER_ENABLE_CURL=1
 --FILE--
 <?php
 declare(strict_types=1);
