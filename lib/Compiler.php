@@ -29714,6 +29714,8 @@ class Compiler {
                 // MethodCall, and treating 0/1-arg finals (getLineNo/getAttribute) as multi-arg
                 // consumers deferred getElementsByTagName with nothing to re-emit (#25842).
                 // Also allow ConstFetch between leaf and consumer for var_export(..., true) (#25841).
+                // The MethodCall that *uses* $producer ($later) must itself feed $consumer — not a
+                // discarded statement like item()->appendChild(); dump23514(...) (#25949, re-#23514).
                 if (
                     $this->isSiblingMultiArgInlineCallConsumer($consumer)
                     && \is_array($consumer->args ?? null)
@@ -29722,8 +29724,14 @@ class Compiler {
                         $j === $consumerIndex - 1
                         || $this->onlyScalarConstFetchPreludesBetween($j, $consumerIndex, $cfgChildren)
                     )
+                    && null !== $later->result
+                    && !empty($later->result->usages)
                 ) {
-                    return true;
+                    foreach ($later->result->usages as $laterUsage) {
+                        if ($laterUsage === $consumer) {
+                            return true;
+                        }
+                    }
                 }
             }
         }
@@ -32016,7 +32024,9 @@ class Compiler {
             ) {
                 $isSib = true;
             }
-            // Receiver MethodCall feeding a later MethodCall in this window (#25702).
+            // Receiver MethodCall feeding a later MethodCall whose result feeds this consumer
+            // (importNode(...->item(0), true) — #25702). Do not hoist getElements→item→appendChild()
+            // statement chains ahead of a following multi-arg FuncCall (#25949, re-#23514/#25842).
             if (
                 !$isSib
                 && !$isCreate
@@ -32026,13 +32036,20 @@ class Compiler {
                 for ($k = $j + 1; $k < $callIndex; ++$k) {
                     $later = $cfgChildren[$k] ?? null;
                     if (
-                        $later instanceof Op\Expr\MethodCall
-                        && property_exists($later, 'var')
-                        && null !== $later->var
-                        && $this->operandsReferToSameVariable($producer->result, $later->var)
+                        !($later instanceof Op\Expr\MethodCall)
+                        || !property_exists($later, 'var')
+                        || null === $later->var
+                        || !$this->operandsReferToSameVariable($producer->result, $later->var)
+                        || null === $later->result
+                        || empty($later->result->usages)
                     ) {
-                        $isSib = true;
-                        break;
+                        continue;
+                    }
+                    foreach ($later->result->usages as $laterUsage) {
+                        if ($laterUsage === $cfgCallOp) {
+                            $isSib = true;
+                            break 2;
+                        }
                     }
                 }
             }
