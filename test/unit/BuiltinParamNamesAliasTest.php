@@ -1579,11 +1579,35 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fva, 'definition', 'filter_var_array'));
 
         $headers = BuiltinParamNames::forFunction('get_headers');
-        self::assertSame(['url', 'associative', 'context'], $headers);
+        self::assertSame(['url', 'associative=', 'context='], $headers);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($headers, 'url', 'get_headers'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($headers, 'associative', 'get_headers'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($headers, 'context', 'get_headers'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($headers, 'format', 'get_headers'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('get_headers'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('get_headers'));
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_headers'));
+        self::assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('get_headers', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('get_headers', 2));
+        self::assertSame('int|bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('http_response_code'));
+        self::assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_socket_pair'));
+        self::assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('flush'));
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('ob_get_status'));
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('ob_list_handlers'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('getmxrr', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('getmxrr', 2));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'headers_sent',
+            0,
+            ['name' => 'filename', 'type' => '', 'isOptional' => true],
+            false
+        ));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'get_headers',
+            2,
+            ['name' => 'context', 'type' => '', 'isOptional' => true],
+            false
+        ));
     }
 
     /** @covers issue #25046 */

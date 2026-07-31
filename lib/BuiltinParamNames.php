@@ -843,9 +843,10 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says context (#24584)
             case 'stream_context_get_options':
                 return ['stream_or_context'];
-            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says format; omits context (#23598)
+            // php-src ext/standard/basic_functions.stub.php — associative=false, context=null (#23598, #25780)
+            // InternalArgInfo still says format=; omits context optionality.
             case 'get_headers':
-                return ['url', 'associative', 'context'];
+                return ['url', 'associative=', 'context='];
             case 'flock':
                 // php-src ext/standard/file.stub.php — ?bool &$would_block = null (#23352)
                 return ['stream', 'operation', '&would_block='];

@@ -563,6 +563,16 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — bool $associative = false; $context = null (#25780)
+        'get_headers' => [
+            1 => ['kind' => 'bool', 'value' => false],
+            2 => ['kind' => 'null'],
+        ],
+        // php-src ext/standard/head.stub.php — &$filename = null, &$line = null (untyped; no infer) (#25780)
+        'headers_sent' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

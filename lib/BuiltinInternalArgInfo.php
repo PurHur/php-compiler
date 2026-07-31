@@ -105,6 +105,13 @@ final class BuiltinInternalArgInfo
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
             'ceil', 'floor' => 'float',
+            // ext/standard/basic_functions.stub.php / head.c — InternalArgInfo omits |false / void (#25780)
+            'get_headers' => 'array|false',
+            'http_response_code' => 'int|bool',
+            'stream_socket_pair' => 'array|false',
+            'flush' => 'void',
+            // InternalArgInfo false|array; Zend stubs are array only (#25780)
+            'ob_get_status', 'ob_list_handlers' => 'array',
             default => null,
         };
     }
@@ -427,6 +434,15 @@ final class BuiltinInternalArgInfo
             'dirname' => 1 === $index ? 'int' : null,
             // ext/standard/math.stub.php — int|float $num (InternalArgInfo float) (#25595)
             'ceil', 'floor' => 0 === $index ? 'int|float' : null,
+            // ext/standard/basic_functions.stub.php — bool $associative = false; $context = null untyped (#25780)
+            // InternalArgInfo still says format:int and omits context.
+            'get_headers' => match ($index) {
+                1 => 'bool',
+                2 => '',
+                default => null,
+            },
+            // ext/standard/dns.stub.php — &$hosts / &$weights untyped (InternalArgInfo array) (#25780)
+            'getmxrr', 'dns_get_mx' => ($index >= 1 && $index <= 2) ? '' : null,
             default => null,
         };
     }
