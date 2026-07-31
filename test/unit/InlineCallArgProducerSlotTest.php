@@ -8770,6 +8770,51 @@ PHP;
         self::assertSame("false\n", ob_get_clean());
     }
 
+    /**
+     * Issue #25928 — loadXML + documentElement (UNKNOWN-typed getAttributeNode) before
+     * var_export(..., true) must still emit getAttributeNode before isId (re-#25841 residual).
+     */
+    public function testLoadXmlVarExportChainedGetAttributeNodeIsIdEmitsReceiverMethodCall(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d = new DOMDocument();
+$d->loadXML('<r><e myid="x" class="c">1</e></r>');
+$e = $d->documentElement->firstChild;
+$e->setIdAttribute('myid', true);
+echo var_export($e->getAttributeNode('myid')->isId(), true), "\n";
+echo var_export($e->getAttributeNode('class')->isId(), true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_attr_isid_chain_loadxml_25928.php');
+
+        $sawGetAttributeNode = false;
+        $sawIsId = false;
+        $getAttributeNodeBeforeIsId = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])) {
+                continue;
+            }
+            $method = $block->constants[$op->arg2]->toString();
+            if ('getAttributeNode' === $method) {
+                $sawGetAttributeNode = true;
+            }
+            if ('isId' === $method) {
+                $sawIsId = true;
+                $getAttributeNodeBeforeIsId = $sawGetAttributeNode;
+            }
+        }
+        self::assertTrue($sawGetAttributeNode, 'getAttributeNode METHODCALL_INIT missing');
+        self::assertTrue($sawIsId, 'isId METHODCALL_INIT missing');
+        self::assertTrue($getAttributeNodeBeforeIsId, 'getAttributeNode must precede isId');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("true\nfalse\n", ob_get_clean());
+    }
+
     /** Issue #24571 — appendChild(createElement) before importNode(documentElement, true) must not bind deep to the element. */
     public function testDomImportNodeAfterAppendChildCreateElementUsesPropertyFetchAndTrueSlots(): void
     {
