@@ -280,6 +280,46 @@ PHP, 'class_const_ternary_identical_ok.php');
         $this->assertNotNull($block);
     }
 
+    /** php-cfg synthetic Cast\Bool_ on &&/|| must not be treated as user cast (#25839). */
+    public function testLogicalAndOrInClassConstStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class AndConst {
+    public const X = true && false;
+}
+class OrConst {
+    public const X = false || true;
+}
+class TernaryConst {
+    public const X = 1 < 2 ? 3 : 4;
+}
+PHP, 'class_const_logical_ok.php');
+        $this->assertNotNull($block);
+    }
+
+    /** User (bool) cast in class const stays invalid on ≤8.4 even beside && (#25839 / #24905). */
+    public function testUserBoolCastInLogicalClassConstStillErrorsOn84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public const X = true && (bool) 1;
+}
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testLegalClassConstStillCompiles(): void
     {
         $runtime = new Runtime();
