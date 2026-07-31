@@ -16753,7 +16753,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/Utf8CaseMap.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 12 class method(s)
 
 ### `ext/mbstring/VmMbConvertVariables.php`
 
@@ -16775,18 +16775,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 298)
 - new HashTable (line 964)
 - new Variable (line 967)
-- new ArgumentCountError (line 2135)
-- new ArgumentCountError (line 2143)
-- new Error (line 3454)
+- new ArgumentCountError (line 2139)
+- new ArgumentCountError (line 2147)
 - new Error (line 3458)
-- new Variable (line 3574)
-- new HashTable (line 3633)
-- new Variable (line 3635)
-- new HashTable (line 3652)
-- new Variable (line 3654)
-- new ArgumentCountError (line 3669)
-- new MailBuiltin (line 3883)
-- new Variable (line 3888)
+- new Error (line 3462)
+- new Variable (line 3578)
+- new HashTable (line 3637)
+- new Variable (line 3639)
+- new HashTable (line 3656)
+- new Variable (line 3658)
+- new ArgumentCountError (line 3673)
+- new MailBuiltin (line 3887)
+- new Variable (line 3892)
 - 175 class method(s)
 - 1 closure(s)
 

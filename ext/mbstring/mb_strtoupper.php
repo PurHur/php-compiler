@@ -48,6 +48,31 @@ final class mb_strtoupper extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('mb_strtoupper() requires one or two arguments');
+        }
+        if (
+            JITVariable::TYPE_STRING === $args[0]->type
+            && null !== ($args[0]->compileTimeString ?? null)
+        ) {
+            $encoding = 'UTF-8';
+            if ($argc >= 2) {
+                if (
+                    JITVariable::TYPE_STRING !== $args[1]->type
+                    || null === ($args[1]->compileTimeString ?? null)
+                ) {
+                    throw new \LogicException(
+                        'mb_strtoupper() JIT requires a compile-time encoding literal in this compiler build'
+                    );
+                }
+                $encoding = $args[1]->compileTimeString;
+            }
+            $result = VmMbstring::strtoupper($args[0]->compileTimeString, $encoding);
+
+            return $context->builder->load($context->constantStringFromString($result));
+        }
+
         throw new \LogicException('mb_strtoupper() is not lowered for JIT/AOT in this compiler build');
     }
 }

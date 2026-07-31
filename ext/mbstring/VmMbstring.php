@@ -1101,7 +1101,11 @@ final class VmMbstring
         $upperNext = true;
         foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
             if ($upperNext) {
-                $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toUpperSimple($cp));
+                // Digraph TITLE forms are 1:1 (Ǆ→ǅ); otherwise simple upper.
+                $titleCps = Utf8CaseMap::toTitleCodepoints($cp);
+                $out .= self::encodeUtf8Codepoint(
+                    1 === \count($titleCps) ? $titleCps[0] : Utf8CaseMap::toUpperSimple($cp)
+                );
                 $upperNext = false;
             } else {
                 $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLowerSimple($cp));
@@ -1120,11 +1124,11 @@ final class VmMbstring
         $upperNext = true;
         foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
             if ($upperNext) {
-                $upperCps = Utf8CaseMap::toUpperCodepoints($cp);
-                $out .= self::encodeUtf8Codepoint($upperCps[0]);
-                for ($ui = 1, $un = \count($upperCps); $ui < $un; ++$ui) {
-                    // SpecialCasing title is first upper + remaining lower (ß→Ss, ﬃ→Ffi).
-                    $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLower($upperCps[$ui]));
+                // SpecialCasing TITLE when distinct from UPPER (Ǆ→ǅ); else upper + lower tail (ß→Ss).
+                $titleCps = Utf8CaseMap::toTitleCodepoints($cp);
+                $out .= self::encodeUtf8Codepoint($titleCps[0]);
+                for ($ui = 1, $un = \count($titleCps); $ui < $un; ++$ui) {
+                    $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLower($titleCps[$ui]));
                 }
                 $upperNext = false;
             } else {
