@@ -21,8 +21,8 @@ use PHPCfg\Func as CfgFunc;
  * php-src: ext/intl/msgformat/msgformat.c, msgformat_class.c, msgformat.stub.php
  *
  * Covers simple / named placeholders, `{n,number}` (locale grouping via
- * NumberFormatter — #21959), and plural/select (#21099). Advertisement gates on
- * loaded ext/intl (#19670).
+ * NumberFormatter — #21959), `{n,date}` / `{n,time}` (#25226), and plural/select
+ * (#21099). Advertisement gates on loaded ext/intl (#19670).
  */
 final class VmMessageFormatter
 {
@@ -691,6 +691,17 @@ final class VmMessageFormatter
         }
         if ('number' === $type) {
             return [self::formatNumberSimple($locale, $val, null !== $style ? trim($style) : null), $end + 1];
+        }
+        if ('date' === $type || 'time' === $type) {
+            return [
+                VmIntlDateFormatter::formatMessageDateTimeArg(
+                    $locale,
+                    $val,
+                    $type,
+                    null !== $style ? trim($style) : null
+                ),
+                $end + 1,
+            ];
         }
         if ('plural' === $type) {
             $sub = self::choosePluralSelect($style ?? '', $val, true, $locale);
