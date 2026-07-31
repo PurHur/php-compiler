@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6650 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21450 |
+| Source constructs flagged (warnings) | 21448 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5029,7 +5029,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ImageTypeToMimeType.php` | 0 | 1 |
 | `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/InetRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniGet.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniIntrospectionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniParseQuantityRuntime.php` | 0 | 2 |
@@ -41696,7 +41696,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 688)
+- new InternalArgInfo (line 697)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -41712,8 +41712,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1969)
-- new ArgumentCountError (line 1980)
+- new ArgumentCountError (line 1971)
+- new ArgumentCountError (line 1982)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -43976,9 +43976,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/InetRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 305)
 - 12 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/IniGet.php`
 

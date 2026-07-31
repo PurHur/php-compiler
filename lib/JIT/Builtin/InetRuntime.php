@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_ip2long/long2ip/inet_* via InetJitHelper PHP (#8969).
+ * JIT/AOT link for __compiler_ip2long/long2ip/inet_* via InetJitHelper PHP (#8969, #26010).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Ctype #22626 / Frexp #22575).
  * Embed and standalone AOT compile the same PHP bridge; no libc inet LLVM (#13193).
  * SSOT: {@see \PHPCompiler\ext\standard\VmInet}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(ip2long), long2ip, inet_ntop, inet_pton
@@ -267,60 +267,18 @@ final class InetRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after InetJitHelper compile (#8969)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26010');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'InetJitHelper.php');
-                if (null === $block) {
-                    throw new \LogicException('InetJitHelper.php parseAndCompile failed (#8969)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($realPath);
-            });
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#8969)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26010'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

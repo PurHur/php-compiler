@@ -9,19 +9,29 @@ use PHPCompiler\ext\standard\VmInet;
 use PHPCompiler\ext\standard\VmInetPure;
 use PHPUnit\Framework\TestCase;
 
-/** InetRuntime must route through InetJitHelper PHP, not libc LLVM (#8969). */
+/**
+ * InetRuntime routes through InetJitHelper PHP; NestedJIT via JitVmHelperLink (#8969, #26010).
+ */
 final class InetRuntimeShrinkTest extends TestCase
 {
     public function testInetRuntimeUsesJitHelperNotLibcLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InetRuntime.php');
         $this->assertStringContainsString('InetJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('PHP_COMPILER_SELFHOST_AOT', $source);
         $this->assertStringNotContainsString('InetLibcBridge', $source);
         $this->assertStringNotContainsString("lookupFunction('inet_pton')", $source);
         $this->assertStringNotContainsString("lookupFunction('inet_ntoa')", $source);
         $this->assertStringNotContainsString("lookupFunction('sscanf')", $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(300, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/InetLibcBridge.php');
     }
 
