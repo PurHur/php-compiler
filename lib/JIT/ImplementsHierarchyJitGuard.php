@@ -22,9 +22,18 @@ final class ImplementsHierarchyJitGuard
         array $interfaceLcs,
         ?string $scriptPath,
         ?SourceLocation $sourceLocation,
+        ?string $parentLc = null,
+        bool $isEnum = false,
     ): void {
+        $vmContext = $context->runtime->vmContext ?? null;
         foreach ($interfaceLcs as $targetLc) {
-            $message = ImplementsHierarchyRuntimeCheck::forbiddenMessage($subjectDisplay, $targetLc);
+            $message = ImplementsHierarchyRuntimeCheck::forbiddenMessage(
+                $subjectDisplay,
+                $targetLc,
+                $parentLc,
+                $isEnum,
+                $vmContext
+            );
             if (null === $message) {
                 continue;
             }

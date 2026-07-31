@@ -6903,10 +6903,20 @@ class Compiler {
         if (null === $className) {
             return false;
         }
+        $parentLc = null;
+        if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
+            $parentName = $this->staticNameFromOperand($class->extends);
+            if (null !== $parentName) {
+                $parentLc = strtolower(ltrim($parentName, '\\'));
+            }
+        }
+        $isEnum = $class instanceof Op\Stmt\Enum_;
 
         return ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
             ltrim($className, '\\'),
-            $this->interfaceNamesFromOperands($class->implements)
+            $this->interfaceNamesFromOperands($class->implements),
+            $parentLc,
+            $isEnum
         );
     }
 

@@ -11053,7 +11053,9 @@ class JIT {
                             $nameOp->value,
                             $op->classImplements,
                             $block->scriptPath(),
-                            $op->sourceLocation
+                            $op->sourceLocation,
+                            null,
+                            true
                         );
                     }
                     $this->context->pushScope();
@@ -11088,13 +11090,22 @@ class JIT {
                 case OpCode::TYPE_DECLARE_CLASS:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    $declareParentLc = null;
+                    if (null !== $op->arg2) {
+                        $earlyParent = $block->getOperand($op->arg2);
+                        if ($earlyParent instanceof Operand\Literal && is_string($earlyParent->value)) {
+                            $declareParentLc = strtolower(ltrim($earlyParent->value, '\\'));
+                        }
+                    }
                     if ([] !== $op->classImplements) {
                         JIT\ImplementsHierarchyJitGuard::emitBeforeDeclare(
                             $this->context,
                             $nameOp->value,
                             $op->classImplements,
                             $block->scriptPath(),
-                            $op->sourceLocation
+                            $op->sourceLocation,
+                            $declareParentLc,
+                            false
                         );
                     }
                     $this->context->pushScope();

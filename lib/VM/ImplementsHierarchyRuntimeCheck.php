@@ -28,9 +28,17 @@ final class ImplementsHierarchyRuntimeCheck
         Context $context,
         Frame $frame,
         ?SourceLocation $sourceLocation = null,
+        ?string $parentLc = null,
+        bool $isEnum = false,
     ): void {
         foreach ($interfaceLcs as $targetLc) {
-            $message = self::forbiddenMessage($subjectDisplay, $targetLc);
+            $message = self::forbiddenMessage(
+                $subjectDisplay,
+                $targetLc,
+                $parentLc,
+                $isEnum,
+                $context
+            );
             if (null !== $message) {
                 self::throwFatal($message, $frame, $sourceLocation);
             }
@@ -98,10 +106,15 @@ final class ImplementsHierarchyRuntimeCheck
     /**
      * @param list<string> $interfaceLcs lowercase interface names
      */
-    public static function requiresSourceOrderRegistration(string $subjectDisplay, array $interfaceLcs): bool
-    {
+    public static function requiresSourceOrderRegistration(
+        string $subjectDisplay,
+        array $interfaceLcs,
+        ?string $parentLc = null,
+        bool $isEnum = false,
+        ?Context $context = null,
+    ): bool {
         foreach ($interfaceLcs as $targetLc) {
-            if (null !== self::forbiddenMessage($subjectDisplay, $targetLc)) {
+            if (null !== self::forbiddenMessage($subjectDisplay, $targetLc, $parentLc, $isEnum, $context)) {
                 return true;
             }
         }
@@ -109,10 +122,23 @@ final class ImplementsHierarchyRuntimeCheck
         return false;
     }
 
-    public static function forbiddenMessage(string $subjectDisplay, string $targetLc): ?string
-    {
+    public static function forbiddenMessage(
+        string $subjectDisplay,
+        string $targetLc,
+        ?string $parentLc = null,
+        bool $isEnum = false,
+        ?Context $context = null,
+    ): ?string {
         if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
             return DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE;
+        }
+        if (ExceptionSupport::isThrowableInterfaceLc($targetLc)) {
+            return ExceptionSupport::userImplementsThrowableForbiddenMessage(
+                $subjectDisplay,
+                $isEnum,
+                $parentLc,
+                $context
+            );
         }
 
         return ReservedBuiltinClass::compileTimeImplementsForbiddenMessage($subjectDisplay, $targetLc);
