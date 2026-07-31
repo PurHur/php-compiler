@@ -52,6 +52,11 @@ final class ScopeBuiltinHelper
         if (null !== $local) {
             return $local;
         }
+        // Match VmScope::resolveCompactVariable — auto-globals only on {main} (#25898).
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        if (!$block instanceof CompilerBlock || !$block->isMainScript()) {
+            return null;
+        }
         if (!Superglobals::isSuperglobalName($name)) {
             return null;
         }
