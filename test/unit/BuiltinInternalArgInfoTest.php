@@ -143,6 +143,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzdecode'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — string / void (#25623). */
+    public function testPregLastErrorMsgAndErrorClearLastReflectionReturns(): void
+    {
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_last_error_msg'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
+    }
+
     /** php-src Zend/zend_builtin_functions.stub.php — array|false + untyped object_or_class (#25498). */
     public function testClassImplementsFamilyReflectionStubs(): void
     {
