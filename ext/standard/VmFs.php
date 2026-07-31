@@ -2036,6 +2036,9 @@ final class VmFs
 
     public static function ftruncate(int $handle, int $size): bool
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::truncate($handle, $size);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::truncate($handle, $size);
         }
