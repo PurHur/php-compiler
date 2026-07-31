@@ -32,6 +32,31 @@ final class EnumSupport
         return sprintf('Non-enum class %s cannot implement interface %s', $classDisplay, $iface);
     }
 
+    /**
+     * Explicit `implements UnitEnum` / `BackedEnum` on enums — Zend treats them as already present (#25946).
+     *
+     * php-src: Zend/zend_enum.c — zend_enum_register_symbol / implement interface guards
+     */
+    public static function explicitBuiltinInterfaceForbiddenMessage(
+        string $enumDisplay,
+        string $ifaceLc,
+        bool $isBacked
+    ): ?string {
+        $iface = self::BUILTIN_ENUM_INTERFACES[strtolower(ltrim($ifaceLc, '\\'))] ?? null;
+        if (null === $iface) {
+            return null;
+        }
+        if ('BackedEnum' === $iface && !$isBacked) {
+            return sprintf('Non-backed enum %s cannot implement interface BackedEnum', $enumDisplay);
+        }
+
+        return sprintf(
+            'Enum %s cannot implement previously implemented interface %s',
+            $enumDisplay,
+            $iface
+        );
+    }
+
     public static function ensureBuiltinCasesMethod(ClassEntry $entry): void
     {
         if (!$entry->isEnum) {

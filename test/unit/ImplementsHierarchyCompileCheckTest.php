@@ -471,4 +471,60 @@ PHP;
         $runtime->run($block);
         $this->assertSame("1\n", ob_get_clean());
     }
+
+    /** @covers issue #25946 */
+    public function testBackedEnumImplementsBackedEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum S: string implements BackedEnum { case A = "a"; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum S cannot implement previously implemented interface BackedEnum');
+        $runtime->parseAndCompile($code, 'enum_implements_backedenum.php');
+    }
+
+    /** @covers issue #25946 */
+    public function testUnitEnumImplementsUnitEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum U implements UnitEnum { case A; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum U cannot implement previously implemented interface UnitEnum');
+        $runtime->parseAndCompile($code, 'enum_implements_unitenum.php');
+    }
+
+    /** @covers issue #25946 */
+    public function testUnitEnumImplementsBackedEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum U implements BackedEnum { case A; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Non-backed enum U cannot implement interface BackedEnum');
+        $runtime->parseAndCompile($code, 'unit_implements_backedenum.php');
+    }
+
+    /** @covers issue #25946 */
+    public function testEnumImplementsOtherInterfaceStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {}
+enum E implements I { case A; }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_implements_other.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
