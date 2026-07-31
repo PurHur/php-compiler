@@ -224,6 +224,35 @@ class VM {
     }
 
     /**
+     * Isolated-stack invoke that keeps outer try/catch visible (#25911).
+     *
+     * Used for property magic (__get/__set/__isset/__unset): Zend delivers throws from
+     * zend_std_read_property / write / has / unset to the caller's try/catch
+     * (Zend/zend_object_handlers.c). Clearing handlers (as {@see invokePhpFunctionIsolated}
+     * does for serialize hooks) made those throws look uncaught.
+     *
+     * {@see Context::$deferBuiltinCallbackCatchToOuterRunFrames} forces a
+     * {@see VM\BuiltinCallbackCatchRedirect} so the catch resumes on the outer runFrames
+     * loop — not inside this nested stack.
+     */
+    public function invokePhpFunctionIsolatedCatchable(Func\PHP $func, Variable ...$args): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        $prevDefer = $this->context->deferBuiltinCallbackCatchToOuterRunFrames;
+        $this->context->deferBuiltinCallbackCatchToOuterRunFrames = true;
+        $this->context->isolatedPhpFunctionInvoke = true;
+        try {
+            return $this->invokePhpFunctionOnStack($func, ...$args);
+        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+            throw $redirect;
+        } finally {
+            $this->context->isolatedPhpFunctionInvoke = false;
+            $this->context->deferBuiltinCallbackCatchToOuterRunFrames = $prevDefer;
+            $this->context->swapRunStack($savedStack);
+        }
+    }
+
+    /**
      * Invoke a user function with positional/named call arg entries (call_user_func forwarding, #10637).
      *
      * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
@@ -699,11 +728,17 @@ class VM {
         }
 
         // Isolated stack: nested user method must not resume the caller frame mid-builtin (#11452).
+        // Property magic keeps outer try/catch visible so user throws remain catchable (#25911).
+        $catchablePropertyMagic = \in_array($methodLc, ['__get', '__set', '__isset', '__unset'], true);
         if ($omitThis) {
-            return $this->invokePhpFunctionIsolated($func, ...$extraArgs);
+            return $catchablePropertyMagic
+                ? $this->invokePhpFunctionIsolatedCatchable($func, ...$extraArgs)
+                : $this->invokePhpFunctionIsolated($func, ...$extraArgs);
         }
 
-        return $this->invokePhpFunctionIsolated($func, $thisVar, ...$extraArgs);
+        return $catchablePropertyMagic
+            ? $this->invokePhpFunctionIsolatedCatchable($func, $thisVar, ...$extraArgs)
+            : $this->invokePhpFunctionIsolated($func, $thisVar, ...$extraArgs);
     }
 
     /**
