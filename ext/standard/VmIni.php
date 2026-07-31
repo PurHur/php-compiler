@@ -1246,6 +1246,6 @@ final class VmIni
 
     private static function defaultErrorReportingString(): string
     {
-        return (string) ErrorReporter::DEFAULT_STARTUP_REPORTING;
+        return (string) ErrorReporter::defaultStartupReporting();
     }
 }

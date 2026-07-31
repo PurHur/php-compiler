@@ -14,7 +14,7 @@ use PHPCompiler\VM\ErrorReporter;
  */
 final class ErrorSilenceJitHelper
 {
-    private static int $errorReporting = ErrorReporter::DEFAULT_STARTUP_REPORTING;
+    private static ?int $errorReporting = null;
 
     private static int $silenceDepth = 0;
 
@@ -22,10 +22,15 @@ final class ErrorSilenceJitHelper
 
     private static bool $displayErrors = false;
 
+    private static function currentErrorReporting(): int
+    {
+        return self::$errorReporting ??= ErrorReporter::defaultStartupReporting();
+    }
+
     public static function beginSilence(): void
     {
         if (0 === self::$silenceDepth) {
-            self::$savedErrorReporting = self::$errorReporting;
+            self::$savedErrorReporting = self::currentErrorReporting();
             self::$errorReporting = 0;
         }
         ++self::$silenceDepth;
@@ -44,7 +49,7 @@ final class ErrorSilenceJitHelper
 
     public static function isErrorLevelEnabled(int $level): bool
     {
-        return 0 !== (self::$errorReporting & $level);
+        return 0 !== (self::currentErrorReporting() & $level);
     }
 
     public static function getDisplayErrors(): bool
@@ -65,7 +70,7 @@ final class ErrorSilenceJitHelper
 
     public static function getErrorReporting(): int
     {
-        return self::$errorReporting;
+        return self::currentErrorReporting();
     }
 
     public static function setErrorReporting(int $level): void
@@ -76,7 +81,7 @@ final class ErrorSilenceJitHelper
     /** @return int previous mask when $hasNew; current mask when not */
     public static function errorReportingExchange(bool $hasNew, int $newLevel): int
     {
-        $old = self::$errorReporting;
+        $old = self::currentErrorReporting();
         if ($hasNew) {
             self::$errorReporting = $newLevel;
         }
@@ -86,11 +91,11 @@ final class ErrorSilenceJitHelper
 
     public static function iniGetErrorReporting(): string
     {
-        return (string) self::$errorReporting;
+        return (string) self::currentErrorReporting();
     }
 
     public static function iniRestoreErrorReporting(): void
     {
-        self::$errorReporting = ErrorReporter::DEFAULT_STARTUP_REPORTING;
+        self::$errorReporting = ErrorReporter::defaultStartupReporting();
     }
 }

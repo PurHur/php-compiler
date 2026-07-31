@@ -14,8 +14,8 @@ $c = function (int $z = null): int { return 1; };
 $a = fn (int $w = null): int => 1;
 echo "ok\n";
 --EXPECTF--
-PHP Deprecated:  Implicitly marking parameter $y as nullable is deprecated, the explicit nullable type must be used instead in %s on line %d
 PHP Deprecated:  Implicitly marking parameter $x as nullable is deprecated, the explicit nullable type must be used instead in %s on line %d
+PHP Deprecated:  Implicitly marking parameter $y as nullable is deprecated, the explicit nullable type must be used instead in %s on line %d
 PHP Deprecated:  Implicitly marking parameter $z as nullable is deprecated, the explicit nullable type must be used instead in %s on line %d
 PHP Deprecated:  Implicitly marking parameter $w as nullable is deprecated, the explicit nullable type must be used instead in %s on line %d
 ok
