@@ -7,18 +7,26 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\JIT;
 use PHPLLVM\Value;
 
 /**
  * apache_note() — Apache request note table (#6276).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (#26120).
  * php-src: ext/standard/head.c — PHP_FUNCTION(apache_note)
  */
 final class apache_note extends Internal
 {
+    private const HELPER_PATH = '/ext/standard/ApacheNoteJitHelper.php';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        ApacheNoteJitHelper::class.'::noteUnavailable',
+        ApacheNoteJitHelper::class.'::versionUnavailable',
+    ];
+
     public function __construct()
     {
         parent::__construct('apache_note');
@@ -69,31 +77,20 @@ final class apache_note extends Internal
 
     public static function emitUnavailableJit(Context $context, string $helper): Value
     {
-        self::ensureHelperCompiled($context, $helper);
+        self::ensureHelperCompiled($context);
 
         return $context->builder->call(
-            $context->functions[\strtolower($helper)],
+            JitVmHelperLink::lookupCompiled($context, $helper, '#26120'),
         );
     }
 
-    private static function ensureHelperCompiled(Context $context, string $logical): void
+    private static function ensureHelperCompiled(Context $context): void
     {
-        $lc = \strtolower($logical);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__).'/ApacheNoteJitHelper.php';
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ApacheNoteJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ApacheNoteJitHelper.php parseAndCompile failed (#6276)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException($logical.' was not compiled for JIT (#6276)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26120'
+        );
     }
 }
