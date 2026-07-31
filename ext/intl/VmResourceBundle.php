@@ -143,7 +143,8 @@ final class VmResourceBundle
 
         if (null === $handle || $status > 0) {
             $code = $status > 0 ? $status : IntlError::U_MISSING_RESOURCE_ERROR;
-            $msg = 'Cannot load libICU resource bundle: '.IntlError::errorName($code);
+            // php-src resourcebundle_class.c — resourcebundle_ctor: … (#22902)
+            $msg = 'resourcebundle_ctor: Cannot load libICU resource bundle: '.IntlError::errorName($code);
             IntlError::set($code, $msg);
 
             return false;
