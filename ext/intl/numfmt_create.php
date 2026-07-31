@@ -36,7 +36,13 @@ final class numfmt_create extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->object(VmNumberFormatter::create($frame->vmContext, $locale, $style, $pattern));
+        $object = VmNumberFormatter::create($frame->vmContext, $locale, $style, $pattern);
+        if (null === $object) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object($object);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

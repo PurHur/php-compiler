@@ -35,7 +35,10 @@ final class IntlError
     /** php-src / ICU U_UNMATCHED_BRACES — MessageFormat create/parse (#22577). */
     public const U_UNMATCHED_BRACES = 65801;
 
-    /** php-src U_USING_FALLBACK_WARNING — not a failure for intl_is_failure() */
+    /** php-src / ICU U_UNSUPPORTED_ERROR — numfmt_create bad style (#25204). */
+    public const U_UNSUPPORTED_ERROR = 16;
+
+    /** php-src / ICU U_USING_FALLBACK_WARNING — not a failure for intl_is_failure() */
     public const U_USING_FALLBACK_WARNING = -128;
 
     /** php-src / ICU U_USING_DEFAULT_WARNING */
