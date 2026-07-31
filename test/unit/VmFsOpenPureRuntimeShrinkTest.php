@@ -34,8 +34,37 @@ final class VmFsOpenPureRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsOpenPure.php');
         $this->assertStringContainsString('fopen', $source);
+        $this->assertStringContainsString('VmFopenMode::isValid', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString('int open(const char', $source);
+    }
+
+    public function testEmptyAndJunkModesFailWithoutAllocatingHandle(): void
+    {
+        if (!VmFsOpenPure::available()) {
+            $this->markTestSkipped('host fopen unavailable');
+        }
+        $path = tempnam(sys_get_temp_dir(), 'phpc_fopen_mode_');
+        $this->assertNotFalse($path);
+        file_put_contents($path, 'x');
+        try {
+            $this->assertFalse(VmFsOpenPure::open($path, ''));
+            $this->assertSame(
+                "`' is not a valid mode for fopen",
+                \PHPCompiler\ext\standard\VmFopenMode::lastOpenFailureDetail()
+            );
+            $this->assertFalse(VmFsOpenPure::open($path, 'q'));
+            $this->assertSame(
+                "`q' is not a valid mode for fopen",
+                \PHPCompiler\ext\standard\VmFopenMode::lastOpenFailureDetail()
+            );
+            $ok = VmFsOpenPure::open($path, 'r');
+            $this->assertNotFalse($ok);
+            $this->assertNull(\PHPCompiler\ext\standard\VmFopenMode::lastOpenFailureDetail());
+            VmFs::fclose((int) $ok);
+        } finally {
+            @unlink($path);
+        }
     }
 
     public function testVmFsWritePureDoesNotUseLibcFfi(): void

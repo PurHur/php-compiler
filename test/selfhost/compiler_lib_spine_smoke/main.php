@@ -2837,6 +2837,7 @@ require_once __DIR__.'/../../../ext/standard/StreamCapsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamContextJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamErrorBuiltin.php';
 require_once __DIR__.'/../../../ext/standard/StreamFilterJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/VmFopenMode.php';
 require_once __DIR__.'/../../../ext/standard/StreamIoJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamLibcHandleJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamLibcThinAbi.php';
