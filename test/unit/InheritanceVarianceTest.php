@@ -554,4 +554,72 @@ PHP;
         $runtime->run($block);
         $this->assertSame("accepted\n", ob_get_clean());
     }
+
+    /** Zend: child cannot narrow a union param (int|string → int) (#25632). */
+    public function testUnionParamNarrowFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(int|string $x): void {} }
+class B extends A { public function f(int $x): void {} }
+echo "accepted\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessageMatches(
+            '/Declaration of B::f\(int \$x\): void must be compatible with A::f\((int\|string|string\|int) \$x\): void/'
+        );
+        $runtime->parseAndCompile($code, 'union_param_narrow.php');
+    }
+
+    /** Zend: implements cannot narrow a union param (#25632). */
+    public function testUnionParamNarrowOnImplementsFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public function f(int|string $x): void; }
+class C implements I { public function f(int $x): void {} }
+echo "ok\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessageMatches(
+            '/Declaration of C::f\(int \$x\): void must be compatible with I::f\((int\|string|string\|int) \$x\): void/'
+        );
+        $runtime->parseAndCompile($code, 'union_param_implements.php');
+    }
+
+    /** Zend: abstract override cannot narrow a union param (#25632). */
+    public function testUnionParamNarrowOnAbstractFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A { abstract public function f(int|string $x): void; }
+class B extends A { public function f(int $x): void {} }
+echo "ok\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessageMatches(
+            '/Declaration of B::f\(int \$x\): void must be compatible with A::f\((int\|string|string\|int) \$x\): void/'
+        );
+        $runtime->parseAndCompile($code, 'union_param_abstract.php');
+    }
+
+    /** Zend: widening union on override (int → int|string) is allowed (#25632). */
+    public function testUnionParamWidenAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(int $x): void {} }
+class B extends A { public function f(int|string $x): void {} }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'union_param_widen.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
