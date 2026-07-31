@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for directory handle ABI via DirHandleJitHelper PHP (#11811).
+ * JIT/AOT embed link for directory handle ABI via DirHandleJitHelper PHP (#11811, #25955).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringPhpinfo #25931 / StreamSocketPair #22468).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\DirHandleJitHelper}; thin LLVM
  * bridges forward the ABI (#11811, #12870).
  * SSOT: {@see \PHPCompiler\ext\standard\DirHandleJitHelper}
@@ -208,44 +209,18 @@ final class StringDirRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after DirHandleJitHelper compile (#11811)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25955');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'DirHandleJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('DirHandleJitHelper.php parseAndCompile failed (#11811)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT dir handles (#11811)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25955'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

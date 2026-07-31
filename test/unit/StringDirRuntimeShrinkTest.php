@@ -7,7 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\DirHandleJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** StringDirJit routes through DirHandleJitHelper PHP not LLVM monolith (#11811, #12870). */
+/**
+ * StringDirJit routes through DirHandleJitHelper via JitVmHelperLink, not hand-rolled NestedJIT
+ * (#11811, #12870, #25955).
+ */
 final class StringDirRuntimeShrinkTest extends TestCase
 {
     public function testStringDirJitIsThinDispatcher(): void
@@ -22,10 +25,17 @@ final class StringDirRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringDirStandaloneLlvm.php');
     }
 
-    public function testStringDirRuntimeUsesJitHelper(): void
+    public function testStringDirRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDirRuntime.php');
         $this->assertStringContainsString('DirHandleJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('StringDirStandaloneLlvm', $source);
         $this->assertStringNotContainsString('scandir', $source);
     }
