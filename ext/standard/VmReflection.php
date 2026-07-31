@@ -1585,7 +1585,20 @@ final class VmReflection
     {
         $ordered = [];
         $seen = [];
+        // Rematerialized tables already match Zend ce->interfaces — do not re-expand
+        // parents (RecursiveIterator vs SeekableIterator disagree on Traversable/Iterator
+        // placement; #25799).
+        $rematerialized = self::interfacesListIsRematerialized($entry->interfaces);
         foreach ($entry->interfaces as $ifaceLc) {
+            $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
+            if ($rematerialized) {
+                if (isset($seen[$ifaceLc])) {
+                    continue;
+                }
+                $seen[$ifaceLc] = true;
+                $ordered[] = $ifaceLc;
+                continue;
+            }
             self::appendReflectionInterfaceName($ifaceLc, $ctx, $ordered, $seen);
         }
 
@@ -1724,6 +1737,11 @@ final class VmReflection
                 break;
             }
             $visited[$lc] = true;
+            // php-src stores a flattened ce->interfaces table. When our ClassEntry already
+            // lists both Iterator and Traversable as siblings, treat the list as that table
+            // and do not re-expand parents (RecursiveIterator vs SeekableIterator parent
+            // edges disagree on Traversable/Iterator order; #25799).
+            $rematerialized = self::interfacesListIsRematerialized($current->interfaces);
             foreach ($current->interfaces as $ifaceLc) {
                 $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
                 if (null !== $builtin) {
@@ -1732,6 +1750,13 @@ final class VmReflection
                 }
                 $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
                 if (!isset($ctx->classes[$ifaceLc])) {
+                    continue;
+                }
+                if ($rematerialized) {
+                    $name = $ctx->classes[$ifaceLc]->name;
+                    if (!isset($result[$name])) {
+                        $result[$name] = $name;
+                    }
                     continue;
                 }
                 self::addInterfaceAndParents($ctx->classes[$ifaceLc], $ctx, $result);
@@ -1748,6 +1773,31 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * True when ClassEntry.interfaces already holds Zend's flattened ce->interfaces table
+     * (both Iterator and Traversable appear as direct siblings).
+     *
+     * @param list<string> $interfaces
+     */
+    private static function interfacesListIsRematerialized(array $interfaces): bool
+    {
+        $hasIterator = false;
+        $hasTraversable = false;
+        foreach ($interfaces as $iface) {
+            $lc = strtolower(ltrim((string) $iface, '\\'));
+            if ('iterator' === $lc) {
+                $hasIterator = true;
+            } elseif ('traversable' === $lc) {
+                $hasTraversable = true;
+            }
+            if ($hasIterator && $hasTraversable) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
