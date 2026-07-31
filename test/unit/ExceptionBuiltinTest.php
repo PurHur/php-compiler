@@ -159,6 +159,37 @@ try {
         );
     }
 
+    /** Issue #25870: Exception/Error private __clone — Reflection + uncloneable (zend_exceptions.stub.php). */
+    public function testExceptionAndErrorPrivateCloneReflection(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$r = new ReflectionClass(Exception::class);
+echo "has=" . ($r->hasMethod("__clone") ? "1" : "0") . "\n";
+if ($r->hasMethod("__clone")) {
+    $m = $r->getMethod("__clone");
+    echo "private=" . ($m->isPrivate() ? "1" : "0") . "\n";
+    echo "return=" . (string) $m->getReturnType() . "\n";
+} else {
+    echo "missing\n";
+}
+$r2 = new ReflectionClass(Error::class);
+echo "error_has=" . ($r2->hasMethod("__clone") ? "1" : "0") . "\n";
+if ($r2->hasMethod("__clone")) {
+    echo "error_private=" . ($r2->getMethod("__clone")->isPrivate() ? "1" : "0") . "\n";
+}
+echo "cloneable=" . ((new ReflectionClass(Exception::class))->isCloneable() ? "1" : "0") . "\n";
+try {
+    clone new Exception("x");
+    echo "cloned\n";
+} catch (Throwable $t) {
+    echo get_class($t) . "\n";
+}
+',
+            "has=1\nprivate=1\nreturn=void\nerror_has=1\nerror_private=1\ncloneable=0\nError\n"
+        );
+    }
+
     /** Guards bin/vm.php stdin path (compliance PHPTs); Runtime-only tests miss merge resume (#195). */
     public function testThrowExceptionCaughtViaVmCli(): void
     {

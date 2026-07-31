@@ -55,6 +55,7 @@ use PHPCompiler\VM\Builtin\DateTimeZoneGetTransitions;
 use PHPCompiler\VM\Builtin\DateTimeZoneListAbbreviations;
 use PHPCompiler\VM\Builtin\DateTimeZoneListIdentifiers;
 use PHPCompiler\VM\Builtin\DateTimeZoneSetState;
+use PHPCompiler\VM\Builtin\ExceptionClone;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionGetSeverity;
@@ -2045,6 +2046,19 @@ final class BuiltinClasses
         $entry->methodVisibility['__wakeup'] = $pub;
         $entry->methodNames['__wakeup'] = '__wakeup';
         $entry->methodDeclaringClassLc['__wakeup'] = $privateDeclaringLc;
+        // php-src zend_exceptions.stub.php — private __clone on Exception/Error roots only (#25870).
+        if (ThrowableManifest::LC_EXCEPTION === $lcKey || ThrowableManifest::LC_ERROR === $lcKey) {
+            $entry->methods['__clone'] = new ExceptionClone();
+            $entry->methodVisibility['__clone'] = $priv;
+            $entry->methodNames['__clone'] = '__clone';
+            $entry->methodDeclaringClassLc['__clone'] = $lcKey;
+            $voidType = ReflectionTypeSupport::cfgTypeFromLabel('void');
+            if (null !== $voidType) {
+                $entry->methodReturnDeclaredTypes['__clone'] = $voidType;
+            }
+            // zend_exceptions.c — clone_obj = NULL; subclasses inherit via parent walk.
+            $entry->denyClone = true;
+        }
         self::registerThrowableInstanceMethods(
             $entry,
             self::throwableInstanceMethods(),
