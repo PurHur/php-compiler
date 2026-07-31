@@ -283,24 +283,38 @@ final class VmNumberFormatter
         return null !== $object && self::CLASS_LC === strtolower($object->class->name);
     }
 
-    public static function create(Context $ctx, string $locale, int $style, ?string $pattern): ObjectEntry
+    public static function create(Context $ctx, string $locale, int $style, ?string $pattern): ?ObjectEntry
     {
         if (!isset($ctx->classes[self::CLASS_LC])) {
             throw new \Error('Class "NumberFormatter" not found');
         }
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
-        self::initObject($object, $locale, $style, $pattern);
+        if (!self::initObject($object, $locale, $style, $pattern)) {
+            return null;
+        }
 
         return $object;
     }
 
     /**
-     * NumberFormatter::__construct / create shared init (#20754).
+     * NumberFormatter::__construct / create shared init (#20754, #25204).
+     *
+     * @return bool false when ICU rejects the style (create → null; construct → IntlException)
      */
-    public static function initObject(ObjectEntry $object, string $locale, int $style, ?string $pattern): void
+    public static function initObject(ObjectEntry $object, string $locale, int $style, ?string $pattern): bool
     {
-        $object->constructed = true;
         $resolvedLocale = '' !== $locale ? $locale : VmLocale::getDefault();
+        $openStatus = self::probeStyleOpen($resolvedLocale, $style, $pattern);
+        if ($openStatus > 0) {
+            // php-src formatter_main.c numfmt_create — U_UNSUPPORTED_ERROR etc.
+            IntlError::set(
+                $openStatus,
+                'numfmt_create: number formatter creation failed: '.IntlError::errorName($openStatus)
+            );
+
+            return false;
+        }
+        $object->constructed = true;
         // php-src/ICU: create without an explicit pattern still exposes a non-empty
         // default via unum_toPattern (#21113) — e.g. DECIMAL → #,##0.###.
         self::$state[$object->id] = [
@@ -321,6 +335,60 @@ final class VmNumberFormatter
             self::applyPatternDigitAttributes($object->id, $pattern);
         }
         IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * Probe unum_open for style validity — returns ICU UErrorCode (>0 = failure).
+     * When ICU FFI is unavailable, reject styles outside the known php-src range (#25204).
+     */
+    private static function probeStyleOpen(string $locale, int $style, ?string $pattern): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            // Offline / no libicui18n: mirror ICU UNumberFormatStyle span (0..16).
+            if ($style < 0 || $style > 16) {
+                return IntlError::U_UNSUPPORTED_ERROR;
+            }
+
+            return IntlError::U_ZERO_ERROR;
+        }
+        $suffix = self::$symSuffix;
+        $open = 'unum_open'.$suffix;
+        $close = 'unum_close'.$suffix;
+        try {
+            $status = \FFI::new('int32_t');
+            $status->cdata = 0;
+            $patPtr = null;
+            $patLen = -1;
+            if (null !== $pattern && '' !== $pattern
+                && (self::PATTERN_RULEBASED === $style || self::PATTERN_DECIMAL === $style)) {
+                $u = self::utf8ToUChar($pattern);
+                if (null !== $u) {
+                    $patPtr = $u[0];
+                    $patLen = $u[1];
+                }
+            }
+            $fmt = $ffi->$open($style, $patPtr, $patLen, $locale, null, \FFI::addr($status));
+            if (null !== $fmt) {
+                try {
+                    $ffi->$close($fmt);
+                } catch (\Throwable) {
+                }
+            }
+            if ($status->cdata > 0) {
+                return (int) $status->cdata;
+            }
+
+            return IntlError::U_ZERO_ERROR;
+        } catch (\Throwable) {
+            if ($style < 0 || $style > 16) {
+                return IntlError::U_UNSUPPORTED_ERROR;
+            }
+
+            return IntlError::U_ZERO_ERROR;
+        }
     }
 
     /**
@@ -2133,7 +2201,10 @@ final class NumberFormatterConstruct extends VmClassMethod
         if ($argc >= 4) {
             $pattern = VmIntlDateFormatter::coerceOptionalPattern($frame->calledArgs[3], 'NumberFormatter::__construct', 3);
         }
-        VmNumberFormatter::initObject($receiver->toObject(), $locale, $style, $pattern);
+        if (!VmNumberFormatter::initObject($receiver->toObject(), $locale, $style, $pattern)) {
+            // php-src formatter_main.c — EH_THROW → IntlException("Constructor failed") (#25204)
+            throw new \IntlException('Constructor failed');
+        }
     }
 }
 
@@ -2163,7 +2234,13 @@ final class NumberFormatterCreate extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->object(VmNumberFormatter::create($frame->vmContext, $locale, $style, $pattern));
+        $object = VmNumberFormatter::create($frame->vmContext, $locale, $style, $pattern);
+        if (null === $object) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object($object);
     }
 }
 
