@@ -25,6 +25,20 @@ final class UnpackJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitUnpack', $bridge);
     }
 
+    public function testStringUnpackRoutesThroughEnsureCompiledBundle(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUnpack.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('UnpackEngine.php', $source);
+        $this->assertStringContainsString('UnpackJitHelper::unpackArgv', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+    }
+
     public function testUnpackJitHelperMatchesUnpackEngine(): void
     {
         $packed = \pack('i', -1);
