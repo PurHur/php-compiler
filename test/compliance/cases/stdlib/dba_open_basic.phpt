@@ -1,5 +1,13 @@
 --TEST--
 stdlib dba_open flatfile CRUD round-trip (#4422, ext/dba/dba.c)
+--ENV--
+PHP_COMPILER_ENABLE_DBA=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\dba\DbaExtensionPolicy::advertisesExtension()) {
+    die('skip dba withheld (#24134)');
+}
+?>
 --FILE--
 <?php
 echo 'open=', function_exists('dba_open') ? '1' : '0', "\n";

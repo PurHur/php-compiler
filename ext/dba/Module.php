@@ -8,9 +8,11 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * dba extension module entry (php-src ext/dba/dba.c; #4422).
+ * dba extension module entry (php-src ext/dba/dba.c; #4422, #24134).
  *
- * Phase 1: Dba\Connection + flatfile open/CRUD/handlers (PHP-in-PHP; no libdb).
+ * Advertise dba_* / Dba\Connection / extension_loaded('dba') only when
+ * {@see DbaExtensionPolicy::advertisesExtension()}.
+ * Flatfile/inifile open/CRUD/handlers (PHP-in-PHP; no libdb).
  */
 class Module extends ModuleAbstract
 {

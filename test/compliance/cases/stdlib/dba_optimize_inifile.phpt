@@ -1,5 +1,13 @@
 --TEST--
 stdlib dba_optimize/sync/key_split + inifile handler (#21168, ext/dba)
+--ENV--
+PHP_COMPILER_ENABLE_DBA=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\dba\DbaExtensionPolicy::advertisesExtension()) {
+    die('skip dba withheld (#24134)');
+}
+?>
 --FILE--
 <?php
 $handlers = dba_handlers();

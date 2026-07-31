@@ -921,6 +921,11 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\mailparse\MailparseExtensionPolicy::isMailparseComplianceCase($name)) {
                 continue;
             }
+            // Functional dba cases set PHP_COMPILER_ENABLE_DBA via --ENV--; phantoms when withheld (#24134).
+            if (!\PHPCompiler\ext\dba\DbaExtensionPolicy::runsDbaCompliance($name)
+                && \PHPCompiler\ext\dba\DbaExtensionPolicy::isDbaComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {
