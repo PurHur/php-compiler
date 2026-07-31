@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM preg_replace_callback() — host PCRE for matching, VM callable callbacks (#1177, #4442).
+ * VM preg_replace_callback() — host PCRE for matching, VM callable callbacks (#1177, #4442, #25735).
  */
 final class VmPregReplaceCallback
 {
@@ -22,16 +23,14 @@ final class VmPregReplaceCallback
         string $subject,
         int $limit = -1,
         ?int &$count = null,
-        int $flags = 0
+        int $flags = 0,
+        ?Frame $scopeFrame = null,
+        string $function = 'preg_replace_callback'
     ) {
         if (strlen($pattern) > VmPreg::MAX_PATTERN_BYTES) {
             return false;
         }
-        if (!VmCallableInvoke::isInvokable($callback)) {
-            throw new \TypeError(
-                'preg_replace_callback(): Argument #2 ($callback) must be a valid callback, no array or string given'
-            );
-        }
+        VmCallableInvoke::requireCallable($vmContext, $callback, $function, 2, $scopeFrame);
 
         $flags = VmPreg::normalizeReplaceCallbackFlags($flags);
         $matchFlags = \PREG_OFFSET_CAPTURE;
@@ -69,7 +68,13 @@ final class VmPregReplaceCallback
             $result .= \substr($subject, $offset, $matchStart - $offset);
 
             $vmMatches = VmPreg::callbackMatchesFromOffsetCapture($matches, $flags);
-            $replacement = VmCallableInvoke::invokeOne($vmContext, $callback, $vmMatches);
+            $replacement = VmCallableInvoke::invokeOne(
+                $vmContext,
+                $callback,
+                $vmMatches,
+                $function,
+                $scopeFrame
+            );
             $replacement = $replacement->resolveIndirect();
             $result .= $vmContext->runtime->vm->coerceVariableToString($replacement);
 
