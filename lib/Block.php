@@ -204,6 +204,13 @@ class Block {
     public array $literalIncludePaths = [];
 
     /**
+     * Include_/Eval_ CFG exprs already lowered in this block — avoid double TYPE_INCLUDE (#25852).
+     *
+     * @var array<int, true> spl_object_id(Op\Expr) => true
+     */
+    public array $emittedIncludeOrEvalExprIds = [];
+
+    /**
      * phpc_deploy_path() + suffix includes (arg3 index, issue #623).
      *
      * @var array<int, array{rel: string, fallback: string, suffix: string, compile: ?string}>

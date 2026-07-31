@@ -12381,6 +12381,12 @@ class Compiler {
                         : $expr->kind,
                 )];
             case Op\Expr\Include_::class:
+                // Re-lowering the same Include_ (CFG walk + call-arg compileExpr) re-runs once-skip
+                // and overwrites the first-load int(1) with bool(true) (#25852).
+                if (isset($block->emittedIncludeOrEvalExprIds[spl_object_id($expr)])) {
+                    return [];
+                }
+
                 return [$this->compileIncludeOp($expr, $block)];
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
@@ -12856,6 +12862,7 @@ class Compiler {
                 $pathIndex,
             );
             $op->includeKind = $includeKind;
+            $block->emittedIncludeOrEvalExprIds[spl_object_id($expr)] = true;
 
             return $op;
         }
@@ -12877,6 +12884,7 @@ class Compiler {
                     $pathIndex,
                 );
                 $op->includeKind = $includeKind;
+                $block->emittedIncludeOrEvalExprIds[spl_object_id($expr)] = true;
 
                 return $op;
             }
@@ -12888,6 +12896,7 @@ class Compiler {
             $resultSlot,
         );
         $op->includeKind = $includeKind;
+        $block->emittedIncludeOrEvalExprIds[spl_object_id($expr)] = true;
 
         return $op;
     }
@@ -18395,6 +18404,35 @@ class Compiler {
                     }
                 }
             }
+            // var_export(require_once $f) / var_export(include $f, true) — adjacent Include_/Eval_ (#25852).
+            $includeProducer = null;
+            if ($prev instanceof Op\Expr\Include_ || $prev instanceof Op\Expr\Eval_) {
+                $includeProducer = $prev;
+            } elseif (
+                0 === $argIndex
+                && $this->isHoistedScalarConstFetchImmediatelyBeforeCall($prev)
+                && $callIndex >= 2
+            ) {
+                $beforeConst = $block->orig->children[$callIndex - 2] ?? null;
+                if ($beforeConst instanceof Op\Expr\Include_ || $beforeConst instanceof Op\Expr\Eval_) {
+                    $includeProducer = $beforeConst;
+                }
+            }
+            if (
+                null !== $includeProducer
+                && null !== ($callOp->args[$argIndex] ?? null)
+                && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex])
+            ) {
+                if (null === $block->slotForOperand($includeProducer->result)) {
+                    foreach ($this->compileExpr($includeProducer, $block) as $op) {
+                        $block->addOpCode($op);
+                    }
+                }
+                $slot = $block->slotForOperand($includeProducer->result);
+                if (null !== $slot) {
+                    return (string) $slot;
+                }
+            }
         }
         $coalesceArg = $this->findCoalesceStmtForCallArg($arg, $block);
         if (null !== $coalesceArg) {
@@ -18538,6 +18576,12 @@ class Compiler {
             $producerSlot = $block->slotForOperand($producer->result);
         }
         if (null === $producerSlot && $producer instanceof Op\Expr\Eval_) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
+        if (null === $producerSlot && $producer instanceof Op\Expr\Include_) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
             }
@@ -20805,6 +20849,49 @@ class Compiler {
                 }
             }
         }
+        // var_export(require_once $f, true) / print_r(include $f, true) — Include_/Eval_ + trailing
+        // true/false/null ConstFetch as sibling dead temps (#25852, #21938). Without ordinal wiring,
+        // ARG_SEND steals earlier getmypid()/file_put_contents() temps from the same CFG block.
+        if (
+            null !== $callArg
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $includeProducer = null;
+            $scalarConst = null;
+            foreach ($producers as $producer) {
+                if (
+                    ($producer instanceof Op\Expr\Include_ || $producer instanceof Op\Expr\Eval_)
+                    && null === $includeProducer
+                ) {
+                    $includeProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $name = $this->staticNameFromOperand($producer->name);
+                    if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                        $scalarConst = $producer;
+                    }
+                }
+            }
+            if (null !== $includeProducer && null !== $scalarConst) {
+                $deadTempIndexes = [];
+                foreach ($callArgs as $i => $candidate) {
+                    if (
+                        $candidate instanceof Operand
+                        && $this->callArgIsDeadInlineTemporary($candidate)
+                        && !$this->isEmbeddedCallLiteralArg($candidate)
+                    ) {
+                        $deadTempIndexes[] = (int) $i;
+                    }
+                }
+                if (2 === \count($deadTempIndexes)) {
+                    if ($argIndex === $deadTempIndexes[0]) {
+                        return $includeProducer;
+                    }
+                    if ($argIndex === $deadTempIndexes[1]) {
+                        return $scalarConst;
+                    }
+                }
+            }
+        }
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
@@ -22047,12 +22134,15 @@ class Compiler {
                 }
             }
             // var_export(C::__set_state([]), true) — arg #0 is sibling call result, nested Array_ is callee arg (#11896).
+            // var_export(require_once $f, true) — Include_/Eval_ is arg #0 (#25852).
             if ('var_export' === $inlineFuncName && 2 === $producerCount && 2 === $argCount && 0 === $argIndex) {
                 foreach ($producers as $producer) {
                     if ($producer instanceof Op\Expr\StaticCall
                         || $producer instanceof Op\Expr\MethodCall
                         || $producer instanceof Op\Expr\FuncCall
-                        || $producer instanceof Op\Expr\NsFuncCall) {
+                        || $producer instanceof Op\Expr\NsFuncCall
+                        || $producer instanceof Op\Expr\Include_
+                        || $producer instanceof Op\Expr\Eval_) {
                         return $producer;
                     }
                 }
@@ -24478,6 +24568,8 @@ class Compiler {
             || $expr instanceof Op\Expr\Cast
             || $expr instanceof Op\Expr\UnaryMinus
             || $expr instanceof Op\Expr\UnaryPlus
+            || $expr instanceof Op\Expr\Include_
+            || $expr instanceof Op\Expr\Eval_
             || $this->isComparisonInlineCallArgProducer($expr)
             || $this->isArithmeticInlineCallArgProducer($expr);
     }
@@ -25617,7 +25709,8 @@ class Compiler {
         $scalarConst = null;
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall
-                || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
+                || $producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall
+                || $producer instanceof Op\Expr\Include_ || $producer instanceof Op\Expr\Eval_) {
                 $call = $producer;
             } elseif ($producer instanceof Op\Expr\ConstFetch) {
                 $name = $this->staticNameFromOperand($producer->name);
@@ -27246,6 +27339,25 @@ class Compiler {
                 }
                 // explode(PATH_SEPARATOR, …) after `if (':' !== PATH_SEPARATOR || …)` — compare bool must not bind arg #0 (#15833).
                 continue;
+            }
+            // var_export(require_once $f[, true]) — adjacent Include_/Eval_ feeds dead-temp arg (#25852, #21938).
+            // Statement-level require_once earlier must not keep walking into getmypid()/file_put_contents().
+            if ($child instanceof Op\Expr\Include_ || $child instanceof Op\Expr\Eval_) {
+                if ($this->inlineCallArgProducerFeedsConsumer($child, $callOp)) {
+                    array_unshift($producers, $child);
+                    break;
+                }
+                $adjacentInclude = $i === $callIndex - 1
+                    || (
+                        $i === $callIndex - 2
+                        && $this->isHoistedScalarConstFetchImmediatelyBeforeCall(
+                            $cfgChildren[$callIndex - 1] ?? null
+                        )
+                    );
+                if ($adjacentInclude) {
+                    array_unshift($producers, $child);
+                }
+                break;
             }
             array_unshift($producers, $child);
         }
@@ -33826,6 +33938,14 @@ class Compiler {
                 $candidate = $child;
                 break;
             }
+            // var_export(require_once $f[, true]) — Include_/Eval_ feeds arg #0 (#25852, #21938).
+            if (
+                ($child instanceof Op\Expr\Include_ || $child instanceof Op\Expr\Eval_)
+                && $this->callArgIsDeadInlineTemporary($callArg)
+            ) {
+                $candidate = $child;
+                break;
+            }
             // var_export($text->data) — PropertyFetch prelude must not fall through to stale MethodCall (#17540).
             if (
                 $i === $callIndex - 1
@@ -33852,6 +33972,8 @@ class Compiler {
                     || $candidate instanceof Op\Expr\FuncCall
                     || $candidate instanceof Op\Expr\NsFuncCall
                     || $candidate instanceof Op\Expr\MethodCall
+                    || $candidate instanceof Op\Expr\Include_
+                    || $candidate instanceof Op\Expr\Eval_
                     || $this->isImmediateVarExportExpressionPrelude($candidate)
                 )
             );
@@ -37345,6 +37467,16 @@ class Compiler {
             return false;
         }
         $priorProducer = $block->orig->children[$callIndex - 2] ?? null;
+        // var_export(require_once $f, true) — Include_/Eval_ + hoisted true (#25852).
+        if (
+            ($priorProducer instanceof Op\Expr\Include_ || $priorProducer instanceof Op\Expr\Eval_)
+            && $this->isHoistedScalarConstFetchImmediatelyBeforeCall(
+                $block->orig->children[$callIndex - 1] ?? null
+            )
+            && 2 === \count($callOp->args ?? [])
+        ) {
+            return true;
+        }
         if (
             !($priorProducer instanceof Op\Expr\FuncCall || $priorProducer instanceof Op\Expr\NsFuncCall)
             || !$this->nestedFuncCallProducerSeparatedBySkippablePreludesOnly(
@@ -55038,6 +55170,10 @@ class Compiler {
                 }
                 // var_export(isset($obj->p), true) / empty(...) — bool from TYPE_ISSET/EMPTY, not stale EXEC_RETURN (#17555).
                 if ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) {
+                    return;
+                }
+                // var_export(require_once $f, true) — Include_/Eval_ result, not prior getmypid EXEC_RETURN (#25852).
+                if ($producer instanceof Op\Expr\Include_ || $producer instanceof Op\Expr\Eval_) {
                     return;
                 }
                 // var_export($text->data) / var_export(JSON_HEX_TAG | JSON_HEX_AMP) — expression prelude feeds arg #0, not stale FuncCall EXEC_RETURN (#17540, #17562).

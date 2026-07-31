@@ -11,7 +11,7 @@ namespace PHPCompiler\VM;
  */
 final class VmInclude
 {
-    /** Zend: skipped include_once on already-included file returns true (int 1). */
+    /** Zend: skipped include_once on already-included file returns true; self-host stubs use int 1. */
     public const SKIPPED_SELFHOST_INCLUDE_RETURN = 1;
 
     /**
