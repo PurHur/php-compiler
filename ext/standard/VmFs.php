@@ -2295,6 +2295,14 @@ final class VmFs
 
             return VmStreamFilterChain::applyReadFilters($handle, $data);
         }
+        if (VmUserStream::isValidHandle($handle)) {
+            $data = VmUserStream::streamGetContents($handle, $maxlength, $offset);
+            if (false === $data) {
+                return false;
+            }
+
+            return VmStreamFilterChain::applyReadFilters($handle, $data);
+        }
         if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
             $data = \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::streamGetContents($handle, $maxlength, $offset);
             if (false === $data) {
