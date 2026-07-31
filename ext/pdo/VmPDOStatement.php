@@ -466,6 +466,191 @@ final class VmPDOStatement
         $ht->add(\is_int($key) ? (string) $key : (string) $key, $slot);
     }
 
+    /** True when fetchAll must key rows by the first column (php-src PDO_FETCH_GROUP / UNIQUE). */
+    public static function isGroupingFetch(int $mode): bool
+    {
+        $flags = self::fetchFlags($mode);
+
+        return 0 !== ($flags & PdoConstants::FETCH_GROUP)
+            || ($flags & PdoConstants::FETCH_UNIQUE) === PdoConstants::FETCH_UNIQUE;
+    }
+
+    /** True when FETCH_UNIQUE (includes GROUP bits) — last row per key wins. */
+    public static function isUniqueFetch(int $mode): bool
+    {
+        return (self::fetchFlags($mode) & PdoConstants::FETCH_UNIQUE) === PdoConstants::FETCH_UNIQUE;
+    }
+
+    /** convert_to_string() for PDO group keys (php-src do_fetch). */
+    public static function groupKeyString(mixed $value): string
+    {
+        if (null === $value) {
+            return '';
+        }
+        if (\is_bool($value)) {
+            return $value ? '1' : '';
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * Fetch one row for fetchAll GROUP/UNIQUE: first column is the map key, rest form the value
+     * (php-src do_fetch with group_key; #25642).
+     *
+     * @return array{key: string, row: array<string|int, mixed>, column_scalar: bool}|false
+     */
+    public static function fetchGroupedRow(PdoStatementState $st, int $mode): array|false
+    {
+        if (null === $st->stmt) {
+            return false;
+        }
+        if (!$st->executed) {
+            return false;
+        }
+        $rc = VmSqlite3Native::step($st->stmt);
+        if (VmSqlite3Native::STEP_ROW !== $rc) {
+            $st->exhausted = true;
+            $st->current = null;
+
+            return false;
+        }
+        $count = VmSqlite3Native::columnCount($st->stmt);
+        $how = self::fetchHow($mode);
+        $flags = self::fetchFlags($mode);
+        $assoc = [];
+        $num = [];
+        $names = [];
+        for ($i = 0; $i < $count; ++$i) {
+            $name = VmSqlite3Native::columnName($st->stmt, $i);
+            $value = VmSqlite3Native::columnValueAt($st->stmt, $i);
+            $names[$i] = $name;
+            $assoc[$name] = $value;
+            $num[$i] = $value;
+        }
+        $groupKey = self::groupKeyString($num[0] ?? null);
+        ++$st->key;
+
+        // FETCH_COLUMN + GROUP/UNIQUE — value is a scalar, not a row (php-src do_fetch COLUMN branch).
+        if (PdoConstants::FETCH_COLUMN === $how) {
+            $col = $st->fetchColumn;
+            if (0 !== ($flags & (PdoConstants::FETCH_GROUP | PdoConstants::FETCH_UNIQUE)) && -1 === $col) {
+                $colno = 1;
+            } else {
+                $colno = $col;
+            }
+            if ($colno < 0) {
+                throw new \ValueError('Column index must be greater than or equal to 0');
+            }
+            if ($colno >= $count) {
+                throw new \ValueError('Invalid column index');
+            }
+            // php-src: flags == PDO_FETCH_GROUP (exact) quirks for default vs explicit column.
+            if (PdoConstants::FETCH_GROUP === $flags && -1 === $st->fetchColumn) {
+                $value = $num[1] ?? null;
+            } elseif (PdoConstants::FETCH_GROUP === $flags && $colno) {
+                $value = $num[0] ?? null;
+            } else {
+                $value = $num[$colno] ?? null;
+            }
+            $st->current = [$value];
+
+            return ['key' => $groupKey, 'row' => [$value], 'column_scalar' => true];
+        }
+
+        // Remaining columns after the group key (column_index_to_fetch starts at 1).
+        $row = match ($how) {
+            PdoConstants::FETCH_ASSOC,
+            PdoConstants::FETCH_OBJ,
+            PdoConstants::FETCH_CLASS,
+            PdoConstants::FETCH_INTO => self::assocWithoutFirstColumn($assoc, $names),
+            PdoConstants::FETCH_NUM,
+            PdoConstants::FETCH_FUNC => self::numWithoutFirstColumnRenumbered($num),
+            // USE_DEFAULT (0) and BOTH keep original numeric indices (php-src zend_hash_index_add).
+            default => self::bothWithoutFirstColumn($assoc, $num, $names),
+        };
+        $st->current = $row;
+
+        return ['key' => $groupKey, 'row' => $row, 'column_scalar' => false];
+    }
+
+    /**
+     * @param array<string, mixed> $assoc
+     * @param array<int, string>   $names
+     *
+     * @return array<string, mixed>
+     */
+    private static function assocWithoutFirstColumn(array $assoc, array $names): array
+    {
+        if ([] === $names) {
+            return [];
+        }
+        $out = $assoc;
+        unset($out[$names[0]]);
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, mixed> $num
+     *
+     * @return array<int, mixed>
+     */
+    private static function numWithoutFirstColumnRenumbered(array $num): array
+    {
+        $out = [];
+        $n = \count($num);
+        for ($i = 1; $i < $n; ++$i) {
+            $out[] = $num[$i];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $assoc
+     * @param array<int, mixed>    $num
+     * @param array<int, string>   $names
+     *
+     * @return array<string|int, mixed>
+     */
+    private static function bothWithoutFirstColumn(array $assoc, array $num, array $names): array
+    {
+        $out = [];
+        $n = \count($num);
+        for ($i = 1; $i < $n; ++$i) {
+            $out[$names[$i]] = $num[$i];
+            $out[$i] = $num[$i];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Insert one grouped fetchAll value under $groupKey (php-src fetchAll GROUP/UNIQUE path).
+     */
+    public static function accumulateGroupedFetch(HashTable $ht, string $groupKey, Variable $slot, bool $unique): void
+    {
+        if ($unique) {
+            // zend_symtable_update — last row wins.
+            $ht->update($groupKey, $slot);
+
+            return;
+        }
+        $existing = $ht->find($groupKey);
+        if (null === $existing || Variable::TYPE_ARRAY !== $existing->type) {
+            $wrap = new Variable();
+            $list = $wrap->newArray();
+            $list->append($slot);
+            $ht->update($groupKey, $wrap);
+
+            return;
+        }
+        // Parent storage addRef'd the list — separate before append (Zend COW).
+        $existing->separateArrayForWrite();
+        $existing->toArray()->append($slot);
+    }
+
     /**
      * Build stdClass from associative column map (php-src PDO_FETCH_OBJ / fetchObject).
      *
@@ -999,13 +1184,57 @@ final class PDOStatementFetchAll extends PdoClassMethod
         if (null === $ctx) {
             throw new \LogicException('PDOStatement::fetchAll() requires VM context');
         }
+        // php-src: GROUP/UNIQUE without column arg → fetch.column = -1 (COLUMN uses col 1 as value).
+        if (PdoConstants::FETCH_COLUMN === $how
+            && VmPDOStatement::isGroupingFetch($mode)
+            && null === $columnOverride
+        ) {
+            $st->fetchColumn = -1;
+        }
         $ht = new HashTable();
         $i = 0;
+        $unique = VmPDOStatement::isUniqueFetch($mode);
+        $grouping = VmPDOStatement::isGroupingFetch($mode);
         try {
             // FETCH_KEY_PAIR accumulates into one map, not a list of rows (php-src #25640).
             if (PdoConstants::FETCH_KEY_PAIR === $how) {
                 while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
                     VmPDOStatement::addKeyPairEntry($ht, $row);
+                }
+            } elseif ($grouping) {
+                // FETCH_GROUP / FETCH_UNIQUE — key by first column (php-src #25642).
+                while (false !== ($grouped = VmPDOStatement::fetchGroupedRow($st, $mode))) {
+                    $slot = new Variable();
+                    if ($grouped['column_scalar']) {
+                        VmPDO::assignScalar($slot, $grouped['row'][0] ?? null);
+                    } elseif (PdoConstants::FETCH_CLASS === $how) {
+                        if (!VmPDOStatement::assignFetchClass(
+                            $ctx,
+                            $slot,
+                            $st,
+                            $grouped['row'],
+                            VmPDOStatement::fetchFlags($mode),
+                            $classOverride,
+                            $ctorOverride
+                        )) {
+                            break;
+                        }
+                    } elseif (PdoConstants::FETCH_FUNC === $how) {
+                        if (!VmPDOStatement::assignFetchFunc($ctx, $slot, $st, $grouped['row'], $funcOverride)) {
+                            break;
+                        }
+                    } elseif (!VmPDOStatement::assignFetchResult(
+                        $ctx,
+                        $slot,
+                        $st,
+                        // Strip GROUP/UNIQUE flags so assignFetchResult does not see them as how.
+                        VmPDOStatement::fetchHow($mode),
+                        $grouped['row'],
+                        $columnOverride
+                    )) {
+                        break;
+                    }
+                    VmPDOStatement::accumulateGroupedFetch($ht, $grouped['key'], $slot, $unique);
                 }
             } else {
                 while (false !== ($row = VmPDOStatement::fetchRow($st, $mode))) {
