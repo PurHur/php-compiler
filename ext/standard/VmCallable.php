@@ -29,7 +29,7 @@ final class VmCallable
         $var = $var->resolveIndirect();
         $name = null;
         $callerClassLc = null !== $scopeFrame ? VmReflection::callerClassLcFromFrame($scopeFrame) : null;
-        $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name, $callerClassLc);
+        $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name, $callerClassLc, $scopeFrame);
         if (null !== $callableNameOut && null !== $name) {
             self::writeCallableName($callableNameOut, $name);
         }
@@ -47,15 +47,28 @@ final class VmCallable
      */
     public static function invokeAs(string $function, Context $ctx, Variable $callback, Variable ...$args): Variable
     {
+        return self::invokeAsWithScope($function, $ctx, null, $callback, ...$args);
+    }
+
+    /**
+     * call_user_func* entry — passes the builtin frame so parent/self/static resolve (#25625).
+     */
+    public static function invokeAsWithScope(
+        string $function,
+        Context $ctx,
+        ?Frame $scopeFrame,
+        Variable $callback,
+        Variable ...$args
+    ): Variable {
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             return VmClosureCall::invoke($ctx, VmClosureCall::resolve($callback), ...$args);
         }
         if (Variable::TYPE_STRING === $callback->type) {
-            return self::invokeStringCallable($ctx, $callback->toString(), $function, ...$args);
+            return self::invokeStringCallable($ctx, $callback->toString(), $function, $scopeFrame, ...$args);
         }
         if (Variable::TYPE_ARRAY === $callback->type) {
-            return self::invokeArrayCallable($ctx, $callback, $function, ...$args);
+            return self::invokeArrayCallable($ctx, $callback, $function, $scopeFrame, ...$args);
         }
         if (Variable::TYPE_OBJECT === $callback->type) {
             $object = $callback->toObject();
@@ -76,7 +89,8 @@ final class VmCallable
         Context $ctx,
         Variable $callback,
         array $entries,
-        string $function = 'call_user_func'
+        string $function = 'call_user_func',
+        ?Frame $scopeFrame = null
     ): Variable {
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
@@ -91,12 +105,18 @@ final class VmCallable
             return VmClosureCall::invoke($ctx, $state, ...$resolved);
         }
         if (Variable::TYPE_STRING === $callback->type) {
-            return self::invokeStringCallableWithEntries($ctx, $callback->toString(), $entries, $function);
+            return self::invokeStringCallableWithEntries(
+                $ctx,
+                $callback->toString(),
+                $entries,
+                $function,
+                $scopeFrame
+            );
         }
         if (Variable::TYPE_ARRAY === $callback->type) {
             $resolved = self::resolveEntriesToPositional($entries);
 
-            return self::invokeArrayCallable($ctx, $callback, $function, ...$resolved);
+            return self::invokeArrayCallable($ctx, $callback, $function, $scopeFrame, ...$resolved);
         }
         if (Variable::TYPE_OBJECT === $callback->type) {
             $object = $callback->toObject();
@@ -206,7 +226,8 @@ final class VmCallable
         Variable $var,
         bool $syntaxOnly,
         ?string &$callableName,
-        ?string $callerClassLc = null
+        ?string $callerClassLc = null,
+        ?Frame $scopeFrame = null
     ): bool {
         if (VmClosureCall::isClosure($var)) {
             $callableName = '{closure}';
@@ -214,10 +235,24 @@ final class VmCallable
             return true;
         }
         if (Variable::TYPE_STRING === $var->type) {
-            return self::probeStringCallable($ctx, $var->toString(), $syntaxOnly, $callableName, $callerClassLc);
+            return self::probeStringCallable(
+                $ctx,
+                $var->toString(),
+                $syntaxOnly,
+                $callableName,
+                $callerClassLc,
+                $scopeFrame
+            );
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            return self::probeArrayCallable($ctx, $var, $syntaxOnly, $callableName, $callerClassLc);
+            return self::probeArrayCallable(
+                $ctx,
+                $var,
+                $syntaxOnly,
+                $callableName,
+                $callerClassLc,
+                $scopeFrame
+            );
         }
         if (Variable::TYPE_OBJECT === $var->type) {
             $object = $var->toObject();
@@ -265,7 +300,8 @@ final class VmCallable
         string $name,
         bool $syntaxOnly,
         ?string &$callableName,
-        ?string $callerClassLc = null
+        ?string $callerClassLc = null,
+        ?Frame $scopeFrame = null
     ): bool {
         if ('' === $name) {
             $callableName = '';
@@ -278,12 +314,16 @@ final class VmCallable
             if ('' === $class || '' === $method || !self::isValidMethodName($method)) {
                 return false;
             }
-            $callableName = $class.'::'.$method;
+            $resolved = self::resolveScopeKeywordClass($ctx, $class, $scopeFrame, false, 'is_callable');
+            if (null === $resolved) {
+                return false;
+            }
+            $callableName = $resolved.'::'.$method;
             if ($syntaxOnly) {
                 return true;
             }
 
-            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method, $callerClassLc);
+            return VmReflection::isStaticallyCallableMethod($ctx, $resolved, $method, $callerClassLc);
         }
         $callableName = $name;
         if (!self::isValidFunctionName($name)) {
@@ -304,7 +344,8 @@ final class VmCallable
         Variable $callback,
         bool $syntaxOnly,
         ?string &$callableName,
-        ?string $callerClassLc = null
+        ?string $callerClassLc = null,
+        ?Frame $scopeFrame = null
     ): bool {
         $table = $callback->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
@@ -339,12 +380,16 @@ final class VmCallable
             if ('' === $class) {
                 return false;
             }
-            $callableName = $class.'::'.$method;
+            $resolved = self::resolveScopeKeywordClass($ctx, $class, $scopeFrame, false, 'is_callable');
+            if (null === $resolved) {
+                return false;
+            }
+            $callableName = $resolved.'::'.$method;
             if ($syntaxOnly) {
                 return true;
             }
 
-            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method, $callerClassLc);
+            return VmReflection::isStaticallyCallableMethod($ctx, $resolved, $method, $callerClassLc);
         }
 
         return false;
@@ -381,6 +426,7 @@ final class VmCallable
         Context $ctx,
         string $name,
         string $function,
+        ?Frame $scopeFrame,
         Variable ...$args
     ): Variable {
         if (str_contains($name, '::')) {
@@ -389,7 +435,14 @@ final class VmCallable
                 throw new \TypeError(self::invalidCallbackTypeError($function));
             }
 
-            return $ctx->runtime->vm->invokeStaticWithCalledScope($class, $method, ...$args);
+            return self::invokeClassMethodCallable(
+                $ctx,
+                $class,
+                $method,
+                $function,
+                $scopeFrame,
+                ...$args
+            );
         }
         // exit/die are registered Internals but hidden on the 8.2 reference profile (#22796).
         if (!VmReflection::isVisibleToFunctionExists($name)) {
@@ -418,12 +471,13 @@ final class VmCallable
         Context $ctx,
         string $name,
         array $entries,
-        string $function
+        string $function,
+        ?Frame $scopeFrame
     ): Variable {
         if (str_contains($name, '::')) {
             $resolved = self::resolveEntriesToPositional($entries);
 
-            return self::invokeStringCallable($ctx, $name, $function, ...$resolved);
+            return self::invokeStringCallable($ctx, $name, $function, $scopeFrame, ...$resolved);
         }
         if (!VmReflection::isVisibleToFunctionExists($name)) {
             throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
@@ -495,6 +549,7 @@ final class VmCallable
         Context $ctx,
         Variable $callback,
         string $function,
+        ?Frame $scopeFrame,
         Variable ...$args
     ): Variable {
         $table = $callback->toArray();
@@ -519,10 +574,252 @@ final class VmCallable
                 throw new \TypeError(self::invalidCallbackTypeError($function));
             }
 
-            return $ctx->runtime->vm->invokeStaticWithCalledScope($class, $methodName, ...$args);
+            return self::invokeClassMethodCallable(
+                $ctx,
+                $class,
+                $methodName,
+                $function,
+                $scopeFrame,
+                ...$args
+            );
         }
 
         throw new \TypeError(self::invalidCallbackTypeError($function));
+    }
+
+    /**
+     * Resolve and invoke Class::method / parent::method string callables (zend_execute_API.c, #25625).
+     *
+     * parent/self/static are scope keywords for call_user_func* / is_callable only — not for $c().
+     */
+    private static function invokeClassMethodCallable(
+        Context $ctx,
+        string $className,
+        string $methodName,
+        string $function,
+        ?Frame $scopeFrame,
+        Variable ...$args
+    ): Variable {
+        $rawLc = strtolower(ltrim($className, '\\'));
+        $isMagic = \in_array($rawLc, ['parent', 'self', 'static'], true);
+        $resolved = self::resolveScopeKeywordClass($ctx, $className, $scopeFrame, true, $function);
+        if (null === $resolved || '' === $resolved) {
+            throw new \TypeError(self::invalidCallbackTypeError($function));
+        }
+        $located = self::locateCallableMethod($ctx, $resolved, $methodName, $function);
+        if (null === $located) {
+            throw new \TypeError(self::invalidStringCallbackTypeError(
+                $className.'::'.$methodName,
+                $function
+            ));
+        }
+        [$declaring, $methodLc, $isStatic] = $located;
+        $vm = $ctx->runtime->vm;
+        if (!$isStatic) {
+            $thisVar = null !== $scopeFrame
+                ? \PHPCompiler\VM\ClosureSupport::callerThis($scopeFrame)
+                : null;
+            if (null === $thisVar) {
+                throw new \Error(
+                    'Non-static method '.$declaring->name.'::'
+                    .($declaring->methodNames[$methodLc] ?? $methodName)
+                    .'() cannot be called statically'
+                );
+            }
+            $object = $thisVar->resolveIndirect()->toObject();
+            $namedLc = strtolower($resolved);
+            $objectLc = strtolower($object->class->name);
+            if (!self::objectInHierarchy($ctx, $objectLc, $namedLc)) {
+                throw new \Error(
+                    'Non-static method '.$declaring->name.'::'
+                    .($declaring->methodNames[$methodLc] ?? $methodName)
+                    .'() cannot be called statically'
+                );
+            }
+            $func = $declaring->methods[$methodLc];
+            if (!$func instanceof \PHPCompiler\Func\PHP) {
+                return $vm->invokeInstanceMethod($object, $methodName, ...$args);
+            }
+            $boundThis = new Variable();
+            $boundThis->object($object);
+
+            return $vm->invokePhpFunctionIsolated($func, $boundThis, ...$args);
+        }
+
+        $calledScope = $resolved;
+        if ($isMagic && null !== $scopeFrame) {
+            try {
+                $calledScope = VmReflection::getCalledClass($scopeFrame);
+            } catch (\Error) {
+                $calledScope = $resolved;
+            }
+        }
+
+        return $vm->invokeDeclaredStaticWithCalledScope(
+            $resolved,
+            $calledScope,
+            $methodName,
+            ...$args
+        );
+    }
+
+    /**
+     * php-src zend_is_callable_ex — resolve parent/self/static from the active class scope (#25625).
+     *
+     * @return string|null resolved class name; null when not resolvable (is_callable → false)
+     */
+    private static function resolveScopeKeywordClass(
+        Context $ctx,
+        string $className,
+        ?Frame $scopeFrame,
+        bool $throwOnFailure,
+        string $function
+    ): ?string {
+        $normalized = VmReflection::normalizeGlobalIntrospectionName($className);
+        $lc = strtolower($normalized);
+        if (!\in_array($lc, ['parent', 'self', 'static'], true)) {
+            return $normalized;
+        }
+        if (null === $scopeFrame) {
+            if ($throwOnFailure) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #1 ($callback) must be a valid callback, cannot access "%s" when no class scope is active',
+                    $function,
+                    $lc
+                ));
+            }
+
+            return null;
+        }
+        if ('static' === $lc) {
+            try {
+                return VmReflection::getCalledClass($scopeFrame);
+            } catch (\Error) {
+                if ($throwOnFailure) {
+                    throw new \TypeError(\sprintf(
+                        '%s(): Argument #1 ($callback) must be a valid callback, cannot access "%s" when no class scope is active',
+                        $function,
+                        $lc
+                    ));
+                }
+
+                return null;
+            }
+        }
+        if ('self' === $lc) {
+            try {
+                return VmReflection::zeroArgGetClassName($scopeFrame);
+            } catch (\Error) {
+                if ($throwOnFailure) {
+                    throw new \TypeError(\sprintf(
+                        '%s(): Argument #1 ($callback) must be a valid callback, cannot access "%s" when no class scope is active',
+                        $function,
+                        $lc
+                    ));
+                }
+
+                return null;
+            }
+        }
+        // parent
+        try {
+            $defining = VmReflection::zeroArgGetClassName($scopeFrame);
+        } catch (\Error) {
+            if ($throwOnFailure) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #1 ($callback) must be a valid callback, cannot access "%s" when no class scope is active',
+                    $function,
+                    $lc
+                ));
+            }
+
+            return null;
+        }
+        $lcDefining = strtolower($defining);
+        if (!isset($ctx->classes[$lcDefining])) {
+            $ctx->autoloadClass($defining);
+        }
+        if (!isset($ctx->classes[$lcDefining]) || null === $ctx->classes[$lcDefining]->parentLc) {
+            if ($throwOnFailure) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #1 ($callback) must be a valid callback, cannot access "parent" when current class scope has no parent',
+                    $function
+                ));
+            }
+
+            return null;
+        }
+        $parentLc = $ctx->classes[$lcDefining]->parentLc;
+
+        return $ctx->classes[$parentLc]->name;
+    }
+
+    /**
+     * @return array{0: \PHPCompiler\VM\ClassEntry, 1: string, 2: bool}|null
+     */
+    private static function locateCallableMethod(
+        Context $ctx,
+        string $className,
+        string $methodName,
+        string $function
+    ): ?array {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
+        if (!isset($ctx->classes[$lcClass])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$lcClass])) {
+            throw new \TypeError(self::invalidStringCallbackTypeError(
+                $className.'::'.$methodName,
+                $function
+            ));
+        }
+        $visited = [];
+        $walk = $lcClass;
+        while (!isset($visited[$walk])) {
+            $visited[$walk] = true;
+            if (!isset($ctx->classes[$walk])) {
+                break;
+            }
+            $class = $ctx->classes[$walk];
+            if (isset($class->methods[$methodLc])) {
+                $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $isStatic = ($vis & \PHPCfg\Func::FLAG_STATIC) !== 0;
+                $func = $class->methods[$methodLc];
+                if (!$isStatic && $func instanceof \PHPCompiler\Func\PHP) {
+                    $decl = $func->block->func;
+                    if (null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                        $isStatic = true;
+                    }
+                }
+
+                return [$class, $methodLc, $isStatic];
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $walk = $class->parentLc;
+        }
+
+        return null;
+    }
+
+    private static function objectInHierarchy(Context $ctx, string $objectLc, string $namedLc): bool
+    {
+        $current = $objectLc;
+        while (true) {
+            if ($current === $namedLc) {
+                return true;
+            }
+            if (!isset($ctx->classes[$current])) {
+                return false;
+            }
+            $parentLc = $ctx->classes[$current]->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
     }
 
     private static function writeCallableName(Variable $ref, string $name): void

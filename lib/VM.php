@@ -6635,7 +6635,9 @@ restart:
                     $name = $callee->toString();
                     if (str_contains($name, '::')) {
                         try {
-                            $this->initStaticCallable($frame, $name);
+                            // Dynamic "$c()" / array callables do not resolve parent/self/static
+                            // as scope keywords — Zend Errors with Class "parent" not found (#25625).
+                            $this->initStaticCallable($frame, $name, false, false, false);
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                             if (null !== $catchFrame) {
@@ -16682,10 +16684,13 @@ restart:
         Frame $frame,
         string $callableName,
         bool $parentKeywordScope = false,
-        bool $selfKeywordScope = false
+        bool $selfKeywordScope = false,
+        bool $resolveScopeKeywords = true
     ): void {
         [$className, $methodName] = explode('::', $callableName, 2);
-        $lcClass = $this->resolveClassScopeName($className, $frame);
+        $lcClass = $resolveScopeKeywords
+            ? $this->resolveClassScopeName($className, $frame)
+            : strtolower($className);
         if (!isset($this->context->classes[$lcClass])) {
             $this->context->autoloadClass($className);
         }
@@ -18358,7 +18363,14 @@ restart:
             if ('' === $class) {
                 throw new \LogicException('Invalid array callable');
             }
-            $this->initStaticCallable($frame, $class.'::'.$methodName);
+            try {
+                // Dynamic array callables do not resolve parent/self/static (#25625).
+                $this->initStaticCallable($frame, $class.'::'.$methodName, false, false, false);
+            } catch (\Error $e) {
+                return $this->dispatchVmError($e->getMessage(), $frame);
+            } catch (\LogicException $e) {
+                return $this->dispatchVmError($e->getMessage(), $frame);
+            }
 
             return null;
         }

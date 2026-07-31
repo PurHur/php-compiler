@@ -36,8 +36,8 @@ final class call_user_func extends Internal
         $callback = $frame->calledArgs[0];
         $entries = self::collectForwardedArgEntries($frame);
         $result = [] === $entries
-            ? VmCallable::invokeAs('call_user_func', $ctx, $callback)
-            : VmCallable::invokeWithArgEntries($ctx, $callback, $entries, 'call_user_func');
+            ? VmCallable::invokeAsWithScope('call_user_func', $ctx, $frame, $callback)
+            : VmCallable::invokeWithArgEntries($ctx, $callback, $entries, 'call_user_func', $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);
         }

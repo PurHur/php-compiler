@@ -44,7 +44,8 @@ final class call_user_func_array extends Internal
             $ctx,
             $frame->calledArgs[0],
             VmCallable::arrayVariableToArgEntries($params),
-            'call_user_func_array'
+            'call_user_func_array',
+            $frame
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);
