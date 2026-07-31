@@ -53,6 +53,21 @@ final class VmStreamMeta
             ];
         }
 
+        // php-src main/streams/userspace.c — stream_get_meta_data labels (#25993).
+        if (VmStreamWrapperRegistry::isCustomProtocol($uri)) {
+            return [
+                'timed_out' => false,
+                'blocked' => $blocked ?? true,
+                'eof' => $eof,
+                'wrapper_type' => 'user-space',
+                'stream_type' => 'user-space',
+                'mode' => $reportedMode,
+                'unread_bytes' => 0,
+                'seekable' => self::supportsSeekable($uri),
+                'uri' => $uri,
+            ];
+        }
+
         // php-src ext/standard/streams.c — array_add_next insertion order (#17428).
         return [
             'timed_out' => false,
@@ -90,10 +105,13 @@ final class VmStreamMeta
     }
 
     /**
-     * php-src ext/standard/streams.c — wrapper_type in stream_get_meta_data (#18580, #18581).
+     * php-src ext/standard/streams.c — wrapper_type in stream_get_meta_data (#18580, #18581, #25993).
      */
     public static function wrapperTypeForUri(string $uri): string
     {
+        if (VmStreamWrapperRegistry::isCustomProtocol($uri)) {
+            return 'user-space';
+        }
         if (\str_starts_with($uri, 'php://')) {
             return 'PHP';
         }
