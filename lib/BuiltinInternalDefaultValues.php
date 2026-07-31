@@ -36,6 +36,13 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'string', 'value' => 'ArrayIterator'],
         ],
+        // php-src resourcebundle.stub.php — bool $fallback = true (bool infer → false) (#25056)
+        'resourcebundle::__construct' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
+        'resourcebundle::create' => [
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
         'datetime::__construct' => [
             0 => ['kind' => 'string', 'value' => 'now'],
             1 => ['kind' => 'null'],

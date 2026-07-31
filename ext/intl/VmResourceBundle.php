@@ -71,6 +71,12 @@ final class VmResourceBundle
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        // php-src resourcebundle.stub.php — __construct shares open path with create (#25056).
+        $construct = new ResourceBundleConstruct();
+        $entry->constructor = $construct;
+        $entry->methods['__construct'] = $construct;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methodNames['__construct'] = '__construct';
         $entry->methods['create'] = new ResourceBundleCreate();
         $entry->methodVisibility['create'] = $pubStatic;
         $entry->methodNames['create'] = 'create';
@@ -101,13 +107,16 @@ final class VmResourceBundle
     }
 
     /**
-     * @return ObjectEntry|null
+     * ResourceBundle::__construct / create shared open (#25056, php-src resourcebundle_ctor).
+     *
+     * @return bool false when open fails (create → null; construct → IntlException)
      */
-    public static function create(Context $ctx, ?string $locale, ?string $bundleName, bool $fallback = true): ?ObjectEntry
-    {
-        if (!isset($ctx->classes[self::CLASS_LC])) {
-            throw new \Error('Class "ResourceBundle" not found');
-        }
+    public static function initObject(
+        ObjectEntry $object,
+        ?string $locale,
+        ?string $bundleName,
+        bool $fallback = true
+    ): bool {
         $locale = null !== $locale && '' !== $locale ? $locale : VmLocale::getDefault();
         $opened = self::openBundle($locale, $bundleName, $fallback);
         $handle = $opened['handle'];
@@ -115,7 +124,6 @@ final class VmResourceBundle
 
         // Synthetic Version-only fallback when ICU FFI unavailable (null handle, zero status).
         if (null === $handle && 0 === $status) {
-            $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
             $object->constructed = true;
             self::$state[$object->id] = [
                 'locale' => $locale,
@@ -130,7 +138,7 @@ final class VmResourceBundle
                 self::$state[$object->id]['errorMessage']
             );
 
-            return $object;
+            return true;
         }
 
         if (null === $handle || $status > 0) {
@@ -138,7 +146,7 @@ final class VmResourceBundle
             $msg = 'Cannot load libICU resource bundle: '.IntlError::errorName($code);
             IntlError::set($code, $msg);
 
-            return null;
+            return false;
         }
 
         // fallback=false + ICU used default/fallback locale → fail (php-src resourcebundle_ctor).
@@ -157,10 +165,9 @@ final class VmResourceBundle
             IntlError::set($status, $msg);
             self::uresClose($handle);
 
-            return null;
+            return false;
         }
 
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
         $errorMessage = IntlError::errorName($status);
         self::$state[$object->id] = [
@@ -173,6 +180,22 @@ final class VmResourceBundle
         ];
         // Propagate ICU warning/success to global intl error (php-src INTL_DATA_ERROR + intl_error_set_code NULL).
         IntlError::set($status, $errorMessage);
+
+        return true;
+    }
+
+    /**
+     * @return ObjectEntry|null
+     */
+    public static function create(Context $ctx, ?string $locale, ?string $bundleName, bool $fallback = true): ?ObjectEntry
+    {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            throw new \Error('Class "ResourceBundle" not found');
+        }
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        if (!self::initObject($object, $locale, $bundleName, $fallback)) {
+            return null;
+        }
 
         return $object;
     }
@@ -353,14 +376,18 @@ final class VmResourceBundle
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'locale');
     }
 
-    public static function coerceBundleArg(Variable $var, string $function, int $position): ?string
-    {
+    public static function coerceBundleArg(
+        Variable $var,
+        string $function,
+        int $position,
+        string $argName = 'bundlename'
+    ): ?string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
 
-        return VmString::coerceStringBuiltinArg($var, $function, $position, 'bundlename');
+        return VmString::coerceStringBuiltinArg($var, $function, $position, $argName);
     }
 
     /**
@@ -1019,6 +1046,42 @@ int32_t uenum_count{$suffix}(UEnumeration *en, UErrorCode *status);
 const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
 void uenum_close{$suffix}(UEnumeration *en);
 C;
+    }
+}
+
+/** ResourceBundle::__construct() — php-src resourcebundle_ctor (#25056). */
+final class ResourceBundleConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        // $this + locale + bundle [+ fallback] — stub: (?string, ?string, bool = true)
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'ResourceBundle::__construct() expects between 2 and 3 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmResourceBundle::isResourceBundleObject($receiver->toObject())) {
+            throw new \Error('ResourceBundle::__construct() called on incompatible object');
+        }
+        $locale = VmResourceBundle::coerceLocaleArg($frame->calledArgs[1], 'ResourceBundle::__construct', 1);
+        $bundle = VmResourceBundle::coerceBundleArg($frame->calledArgs[2], 'ResourceBundle::__construct', 2, 'bundle');
+        $fallback = true;
+        if ($argc >= 4) {
+            $fallback = LocaleLookup::coerceBool($frame->calledArgs[3], 'ResourceBundle::__construct', 3, 'fallback');
+        }
+        if (!VmResourceBundle::initObject($receiver->toObject(), $locale, $bundle, $fallback)) {
+            // php-src resourcebundle_class.c — EH_THROW → IntlException("Constructor failed")
+            throw new \IntlException('Constructor failed');
+        }
     }
 }
 

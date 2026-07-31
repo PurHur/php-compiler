@@ -80,7 +80,9 @@ final class BuiltinParamNames
             'spoofchecker::areconfusable' => ['string1', 'string2', '&errorCode='],
             'transliterator::create' => ['id', 'direction'],
             'transliterator::transliterate' => ['string', 'start', 'end'],
-            'resourcebundle::create' => ['locale', 'bundlename', 'fallback'],
+            'resourcebundle::create' => ['locale', 'bundle', 'fallback='],
+            // php-src resourcebundle.stub.php — __construct(?string $locale, ?string $bundle, bool $fallback = true) (#25056)
+            'resourcebundle::__construct' => ['locale', 'bundle', 'fallback='],
             'resourcebundle::get' => ['index'],
             'resourcebundle::count' => [],
             // php-src timezone.stub.php — ICU≥74 (#21553)
