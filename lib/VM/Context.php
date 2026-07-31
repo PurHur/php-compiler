@@ -148,6 +148,17 @@ class Context {
      */
     public bool $deferBuiltinCallbackCatchToOuterRunFrames = false;
 
+    /**
+     * When set, only activeTryHandlerFrames entries with index < this depth redirect to the outer
+     * runFrames via {@see BuiltinCallbackCatchRedirect} (#25816).
+     *
+     * Nested eval() pushes a child frame without swapping the run stack; try handlers entered
+     * inside the eval sit at index ≥ this depth and must run in the nested loop so trailing
+     * eval opcodes still execute. Handlers already active before eval (outer try) must not —
+     * otherwise catch/merge runs inside executeEvalBlock and TYPE_EVAL continues the try body.
+     */
+    public ?int $deferCatchBelowTryHandlerDepth = null;
+
     /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
     public ?Frame $cloneMagicExternalCatchFrame = null;
 

@@ -3655,6 +3655,9 @@ class VM {
 
     /**
      * Execute dynamically compiled eval() code in the caller variable scope (#3358).
+     *
+     * Outer try/catch handlers active before eval must not run inside this nested runFrames —
+     * that resumes the try body after catch (#25816; same shape as #24138 / #14104).
      */
     public function executeEvalBlock(Block $block, Frame $caller): Variable
     {
@@ -3668,13 +3671,18 @@ class VM {
         [$evalFile] = VM\ExceptionSupport::evalFatalSite($caller, 1);
         $child->scriptPath = $evalFile;
         $this->context->scriptStack->push($child->scriptPath);
+        $prevDeferDepth = $this->context->deferCatchBelowTryHandlerDepth;
+        $this->context->deferCatchBelowTryHandlerDepth = \count($this->context->activeTryHandlerFrames);
         try {
             $this->context->push($child);
             $result = $this->runFrames();
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('eval() execution failed in this compiler build');
             }
+        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+            throw $redirect;
         } finally {
+            $this->context->deferCatchBelowTryHandlerDepth = $prevDeferDepth;
             $this->context->scriptStack->pop();
         }
 
@@ -5757,6 +5765,10 @@ restart:
                             $frame,
                             $codeVar->toString()
                         );
+                    } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                        // Outer try matched from nested eval runFrames — resume catch here (#25816).
+                        $frame = $redirect->catchFrame;
+                        goto restart;
                     } catch (\ParseError $e) {
                         $catchFrame = $this->dispatchVmParseError($e, $frame);
                         if (null !== $catchFrame) {
@@ -9623,7 +9635,10 @@ restart:
                 $frame = $signal->catchFrame;
                 goto restart;
             } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
-                if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+                if (
+                    $this->context->deferBuiltinCallbackCatchToOuterRunFrames
+                    || null !== $this->context->deferCatchBelowTryHandlerDepth
+                ) {
                     throw $redirect;
                 }
                 $frame = $redirect->catchFrame;
@@ -12136,7 +12151,7 @@ restart:
                 if ($this->context->coercingObjectToString) {
                     $this->context->magicMethodThrowHandled = true;
                 }
-                if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+                if ($this->shouldDeferCatchToOuterRunFrames($i)) {
                     throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
                 }
                 $this->redirectCloneMagicExternalCatch($handler, $catchFrame);
@@ -12155,7 +12170,10 @@ restart:
                 if ($this->context->coercingObjectToString) {
                     $this->context->magicMethodThrowHandled = true;
                 }
-                if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+                $handlerIndex = \array_search($handler, $this->context->activeTryHandlerFrames, true);
+                if ($this->shouldDeferCatchToOuterRunFrames(
+                    false !== $handlerIndex ? (int) $handlerIndex : 0
+                )) {
                     throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
                 }
                 $this->redirectCloneMagicExternalCatch($handler, $catchFrame);
@@ -12165,6 +12183,23 @@ restart:
         }
 
         return null;
+    }
+
+    /**
+     * True when a matched try handler must resume on the outer runFrames (#14104, #25816).
+     *
+     * {@see Context::$deferBuiltinCallbackCatchToOuterRunFrames} defers every match (isolated
+     * callbacks). {@see Context::$deferCatchBelowTryHandlerDepth} defers only handlers that were
+     * already active before a nested eval() — inner eval try/catch stays on the nested loop.
+     */
+    private function shouldDeferCatchToOuterRunFrames(int $handlerIndex): bool
+    {
+        if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+            return true;
+        }
+        $depth = $this->context->deferCatchBelowTryHandlerDepth;
+
+        return null !== $depth && $handlerIndex < $depth;
     }
 
     /**
