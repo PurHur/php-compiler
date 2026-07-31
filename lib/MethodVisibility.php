@@ -26,6 +26,10 @@ final class MethodVisibility
 
     /**
      * @throws \LogicException when the call is not allowed
+     *
+     * @param bool $staticConstructorCall Zend INIT_STATIC_METHOD_CALL + CONSTRUCTOR
+     *        (`parent::__construct()` / `Class::__construct()`) uses
+     *        "Cannot call private Class::__construct()" (#25663, zend_vm_def.h).
      */
     public static function assertCallable(
         int $visibilityFlags,
@@ -35,7 +39,8 @@ final class MethodVisibility
         string $methodName,
         bool $parentScopeAllows = false,
         ?callable $isSameOrSubclassOf = null,
-        ?string $callerClassDisplay = null
+        ?string $callerClassDisplay = null,
+        bool $staticConstructorCall = false
     ): void {
         self::assertCallableInternal(
             $visibilityFlags,
@@ -46,7 +51,8 @@ final class MethodVisibility
             $parentScopeAllows,
             $isSameOrSubclassOf,
             $callerClassDisplay,
-            false
+            false,
+            $staticConstructorCall
         );
     }
 
@@ -73,7 +79,8 @@ final class MethodVisibility
             $parentScopeAllows,
             $isSameOrSubclassOf,
             $callerClassDisplay,
-            true
+            true,
+            false
         );
     }
 
@@ -100,7 +107,8 @@ final class MethodVisibility
             $parentScopeAllows,
             $isSameOrSubclassOf,
             $callerClassDisplay,
-            true
+            true,
+            false
         );
     }
 
@@ -113,7 +121,8 @@ final class MethodVisibility
         bool $parentScopeAllows,
         ?callable $isSameOrSubclassOf,
         ?string $callerClassDisplay,
-        bool $constructorMessage
+        bool $constructorMessage,
+        bool $staticConstructorCall = false
     ): void {
         if (self::isPublic($visibilityFlags)) {
             return;
@@ -127,7 +136,8 @@ final class MethodVisibility
                 $declaringClassDisplay,
                 $methodName,
                 $callerClassDisplay,
-                $constructorMessage
+                $constructorMessage,
+                $staticConstructorCall
             );
 
             return;
@@ -139,7 +149,8 @@ final class MethodVisibility
                     $declaringClassDisplay,
                     $methodName,
                     $callerClassDisplay ?? $callerClassLc,
-                    $constructorMessage
+                    $constructorMessage,
+                    $staticConstructorCall
                 );
             }
 
@@ -164,7 +175,8 @@ final class MethodVisibility
                 $declaringClassDisplay,
                 $methodName,
                 $callerClassDisplay ?? $callerClassLc,
-                $constructorMessage
+                $constructorMessage,
+                $staticConstructorCall
             );
         }
     }
@@ -189,6 +201,7 @@ final class MethodVisibility
                 $parentScopeAllows,
                 $isSameOrSubclassOf,
                 null,
+                false,
                 false
             );
 
@@ -249,9 +262,14 @@ final class MethodVisibility
         string $className,
         string $methodName,
         ?string $fromScope,
-        bool $constructorMessage = false
+        bool $constructorMessage = false,
+        bool $staticConstructorCall = false
     ): void {
         $kind = ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+        // zend_vm_def.h ZEND_INIT_STATIC_METHOD_CALL + CONSTRUCTOR (#25663).
+        if ($staticConstructorCall && ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
+            throw new \LogicException("Cannot call private {$className}::__construct()");
+        }
         if ($constructorMessage) {
             if (null === $fromScope) {
                 throw new \LogicException("Call to {$kind} {$className}::{$methodName}() from global scope");

@@ -16778,6 +16778,8 @@ restart:
         }
         $declaredName = $class->methodNames[$methodLc] ?? $methodName;
         $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
+        // zend_vm_def.h: INIT_STATIC_METHOD_CALL + CONSTRUCTOR → "Cannot call private …::__construct()" (#25663).
+        $staticConstructorCall = '__construct' === $methodLc;
         MethodVisibility::assertCallable(
             $vis,
             $callerClassLc,
@@ -16786,7 +16788,8 @@ restart:
             $declaredName,
             $parentScopeAllows,
             fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-            $callerDisplay
+            $callerDisplay,
+            $staticConstructorCall
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
