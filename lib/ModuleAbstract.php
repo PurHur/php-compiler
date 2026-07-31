@@ -29,10 +29,16 @@ abstract class ModuleAbstract implements Module {
         return strtolower(preg_replace('#.*\\\\([^\\\\]+)$#', '$1', $class));
     }
 
-    /** php-src zend_module_entry version — reported by phpversion($extension). */
+    /**
+     * php-src zend_module_entry version — reported by phpversion($extension).
+     *
+     * Bundled PHP extensions track the active reported PHP version (reference
+     * profile {@see CompilerVersion::REFERENCE_PHP_VERSION}), not the forward
+     * {@see CompilerVersion::VERSION} string (#25819, ext/standard/info.c).
+     */
     public function getExtensionVersion(): string
     {
-        return CompilerVersion::VERSION;
+        return CompilerVersion::reportedPhpVersion();
     }
 
     /**

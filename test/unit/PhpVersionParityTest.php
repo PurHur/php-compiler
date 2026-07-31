@@ -34,4 +34,20 @@ final class PhpVersionParityTest extends TestCase
             (string) file_get_contents(__DIR__.'/../../ext/standard/InfoJitHelper.php')
         );
     }
+
+    /** Bundled xml family tracks reported PHP version, not forward VERSION (#25819). */
+    public function testXmlFamilyPhpversionMatchesReported(): void
+    {
+        // ModuleRegistry populates when Runtime loads core modules.
+        new \PHPCompiler\Runtime();
+        $reported = CompilerVersion::reportedPhpVersion();
+        $this->assertNotSame(CompilerVersion::VERSION, $reported);
+        $this->assertSame($reported, VmInfo::phpversion('xml'));
+        $this->assertSame($reported, VmInfo::phpversion('libxml'));
+        $this->assertSame($reported, VmInfo::phpversion('simplexml'));
+        $this->assertSame($reported, VmInfo::phpversion('xmlreader'));
+        $this->assertSame($reported, VmInfo::phpversion('xmlwriter'));
+        $this->assertSame($reported, InfoJitHelper::phpversion('xml'));
+        $this->assertSame('20031129', VmInfo::phpversion('dom'));
+    }
 }
