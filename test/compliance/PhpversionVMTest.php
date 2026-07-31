@@ -25,6 +25,10 @@ final class PhpversionVMTest extends BaseTest
             __DIR__.'/cases/stdlib/phpversion_builtin_ext.phpt',
             'phpversion_builtin_ext.phpt'
         );
+        yield 'phpversion_xml.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/phpversion_xml.phpt',
+            'phpversion_xml.phpt'
+        );
     }
 
     public function setUp(): void
