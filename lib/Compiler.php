@@ -27592,7 +27592,7 @@ class Compiler {
             if (
                 $producer instanceof Op\Expr\MethodCall
                 && (
-                    $this->methodCallIsStmtLevelDiscardPrelude($producer)
+                    $this->methodCallIsStmtLevelDiscardPrelude($producer, $callOp)
                     || (
                         property_exists($producer, 'result')
                         && empty($producer->result->usages)
@@ -27715,20 +27715,24 @@ class Compiler {
      * when they fall inside the trailing dead-temp arg window (DOMNodeList::item(), getElementById(),
      * … — #21171) and skipped when they are prior statement calls such as loadXML (#19719).
      */
+    /**
+     * @param ?Op $consumer Multi-arg call that may list this MethodCall in Temporary->ops (#25672).
+     */
     private function methodCallIsSkippedHoistedSiblingProducer(
         Op\Expr\MethodCall $child,
         int $childIndex,
         int $consumerIndex,
-        int $deadInlineArgCount
+        int $deadInlineArgCount,
+        ?Op $consumer = null
     ): bool {
-        if ($this->methodCallHasStatementLevelSideEffects($child)) {
+        if ($this->methodCallIsIteratorPointerStmtSideEffect($child, $consumer)) {
             return true;
         }
         $method = $this->staticNameFromOperand($child->name);
         if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
             return true;
         }
-        if ($this->methodCallIsStmtLevelDiscardPrelude($child)) {
+        if ($this->methodCallIsStmtLevelDiscardPrelude($child, $consumer)) {
             return true;
         }
         if ($this->methodCallInlineProducerSuppliesCallArgValue($child)) {
@@ -28144,7 +28148,7 @@ class Compiler {
                 break;
             }
             $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
-                ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
+                ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren, $consumer)
                 : ($producerIndex - $firstSibling);
             if ($ordinal < 0 || ($leadingEmbedded + $ordinal) !== $targetArgIndex) {
                 return false;
@@ -28197,7 +28201,15 @@ class Compiler {
             return false;
         }
         if ($op instanceof Op\Expr\MethodCall && $this->methodCallHasStatementLevelSideEffects($op)) {
-            return false;
+            // Value-producing next()/send()/… that feed a later multi-arg consumer stay deferrable (#25672).
+            $sideEffectConsumer = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
+            $sideEffectConsumerOp = \is_int($sideEffectConsumer) ? ($ops[$sideEffectConsumer] ?? null) : null;
+            if (
+                null === $sideEffectConsumerOp
+                || $this->methodCallIsIteratorPointerStmtSideEffect($op, $sideEffectConsumerOp)
+            ) {
+                return false;
+            }
         }
         // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
         if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
@@ -28433,6 +28445,8 @@ class Compiler {
         array $cfgChildren
     ): int {
         $count = 0;
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        $consumerOp = $consumer instanceof Op ? $consumer : null;
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
             if (!$this->isSiblingInlineCallProducerExpr($child)) {
@@ -28440,7 +28454,7 @@ class Compiler {
             }
             if (
                 $child instanceof Op\Expr\MethodCall
-                && $this->methodCallIsStmtLevelDiscardPrelude($child)
+                && $this->methodCallIsStmtLevelDiscardPrelude($child, $consumerOp)
             ) {
                 continue;
             }
@@ -28453,7 +28467,11 @@ class Compiler {
             if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
-            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
+            if ($this->siblingInlineCallProducerSkipsHoistedArgChain(
+                $child,
+                $cfgChildren[$j + 1] ?? null,
+                $consumerOp
+            )) {
                 continue;
             }
             if (
@@ -28532,7 +28550,8 @@ class Compiler {
     private function siblingInlineFuncCallProducerOrdinal(
         int $producerIndex,
         int $firstSibling,
-        array $cfgChildren
+        array $cfgChildren,
+        ?Op $consumer = null
     ): int {
         $ordinal = -1;
         for ($j = $firstSibling; $j <= $producerIndex; ++$j) {
@@ -28542,7 +28561,7 @@ class Compiler {
             }
             if (
                 $child instanceof Op\Expr\MethodCall
-                && $this->methodCallIsStmtLevelDiscardPrelude($child)
+                && $this->methodCallIsStmtLevelDiscardPrelude($child, $consumer)
             ) {
                 continue;
             }
@@ -28555,7 +28574,11 @@ class Compiler {
             if ($this->siblingInlineFuncCallSkipsExecReturnOrdinal($child, $j, $cfgChildren)) {
                 continue;
             }
-            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $cfgChildren[$j + 1] ?? null)) {
+            if ($this->siblingInlineCallProducerSkipsHoistedArgChain(
+                $child,
+                $cfgChildren[$j + 1] ?? null,
+                $consumer
+            )) {
                 continue;
             }
             ++$ordinal;
@@ -28577,6 +28600,8 @@ class Compiler {
         array $cfgChildren
     ): array {
         $producers = [];
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        $consumerOp = $consumer instanceof Op ? $consumer : null;
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
             if (!$this->isSiblingInlineCallProducerExpr($child) || !$child instanceof Op\Expr) {
@@ -28609,7 +28634,7 @@ class Compiler {
             ) {
                 continue;
             }
-            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $next)) {
+            if ($this->siblingInlineCallProducerSkipsHoistedArgChain($child, $next, $consumerOp)) {
                 continue;
             }
             $producers[] = $child;
@@ -29206,7 +29231,7 @@ class Compiler {
         }
         if (
             $producer instanceof Op\Expr\MethodCall
-            && $this->methodCallHasStatementLevelSideEffects($producer)
+            && $this->methodCallIsIteratorPointerStmtSideEffect($producer, $consumer)
         ) {
             return false;
         }
@@ -29278,7 +29303,8 @@ class Compiler {
             $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
                 $producerIndex,
                 $firstSibling,
-                $cfgChildren
+                $cfgChildren,
+                $consumer
             );
             if ($producerOrdinal < 0 || $producerOrdinal >= $argCount) {
                 return false;
@@ -29565,7 +29591,7 @@ class Compiler {
             $ordinal = $outerOrdinal;
         } else {
             $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
-                ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
+                ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren, $consumer)
                 : ($producerIndex - $firstSibling);
         }
 
@@ -30588,7 +30614,8 @@ class Compiler {
                     $child,
                     $i,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $consumer instanceof Op ? $consumer : null
                 )) {
                     --$i;
                     continue;
@@ -30721,7 +30748,8 @@ class Compiler {
                     $skip,
                     $first,
                     $consumerIndex,
-                    $deadInlineArgCount
+                    $deadInlineArgCount,
+                    $consumer instanceof Op ? $consumer : null
                 )) {
                     ++$first;
                     continue;
@@ -32379,8 +32407,17 @@ class Compiler {
                 || $child instanceof Op\Expr\NullsafeMethodCall
                 || $child instanceof Op\Expr\StaticCall
             ) {
-                if ($child instanceof Op\Expr\MethodCall && $this->methodCallHasStatementLevelSideEffects($child)) {
-                    continue;
+                if ($child instanceof Op\Expr\MethodCall) {
+                    $consumerForSideEffect = null;
+                    if (\is_int($consumerIndex)) {
+                        $maybeConsumer = $cfgChildren[$consumerIndex] ?? null;
+                        if ($maybeConsumer instanceof Op) {
+                            $consumerForSideEffect = $maybeConsumer;
+                        }
+                    }
+                    if ($this->methodCallIsIteratorPointerStmtSideEffect($child, $consumerForSideEffect)) {
+                        continue;
+                    }
                 }
                 // Prior loadXML()-style MethodCalls compile as EXEC_NORETURN — do not inflate
                 // the EXEC_RETURN ordinal base used for sibling MethodCall arg producers (#21182).
@@ -37156,6 +37193,10 @@ class Compiler {
 
     /**
      * Generator/Iterator resume methods — stmt-level side effects, not hoisted fwrite/var_dump arg producers (#16609, re-#13989).
+     *
+     * Name alone is not enough: userland {@code next()} used as a call argument
+     * ({@code show($c->next(), $c->next())}) is a value producer (#25672). Use
+     * {@see methodCallIsIteratorPointerStmtSideEffect} when a consumer is known.
      */
     private function methodCallHasStatementLevelSideEffects(Op\Expr\MethodCall $call): bool
     {
@@ -37173,13 +37214,62 @@ class Compiler {
     }
 
     /**
-     * Iterator pointer stmts ($it->next()) before a hoisted sibling call-arg producer — not part of the chain (#13901, #17251).
+     * True when php-cfg parseArg listed this MethodCall in a consumer call-arg Temporary->ops (#25672).
+     *
+     * Distinguishes {@code show($c->next(), $c->next())} (producer in arg ops) from
+     * {@code $it->next(); var_export($it->current(), true)} (pointer stmt not in arg ops).
      */
-    private function siblingInlineCallProducerSkipsHoistedArgChain(Op $child, ?Op $nextChild = null): bool
+    private function methodCallListedInConsumerCallArgOps(Op\Expr\MethodCall $producer, Op $consumer): bool
     {
+        if (!property_exists($consumer, 'args') || !\is_array($consumer->args)) {
+            return false;
+        }
+        foreach ($consumer->args as $arg) {
+            if (!$arg instanceof Operand) {
+                continue;
+            }
+            if (
+                isset($arg->ops)
+                && \is_array($arg->ops)
+                && \in_array($producer, $arg->ops, true)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Iterator/generator pointer MethodCall that does not feed the consumer's call args (#25672).
+     */
+    private function methodCallIsIteratorPointerStmtSideEffect(
+        Op\Expr\MethodCall $call,
+        ?Op $consumer = null
+    ): bool {
+        if (!$this->methodCallHasStatementLevelSideEffects($call)) {
+            return false;
+        }
+        if (null !== $consumer && $this->methodCallListedInConsumerCallArgOps($call, $consumer)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Iterator pointer stmts ($it->next()) before a hoisted sibling call-arg producer — not part of the chain (#13901, #17251).
+     *
+     * @param ?Op $consumer Multi-arg consumer; when set, value-producing next()/send()/… stay in the chain (#25672).
+     */
+    private function siblingInlineCallProducerSkipsHoistedArgChain(
+        Op $child,
+        ?Op $nextChild = null,
+        ?Op $consumer = null
+    ): bool {
         if (
             $child instanceof Op\Expr\MethodCall
-            && $this->methodCallHasStatementLevelSideEffects($child)
+            && $this->methodCallIsIteratorPointerStmtSideEffect($child, $consumer)
             && (
                 $nextChild instanceof Op\Expr\FuncCall
                 || $nextChild instanceof Op\Expr\NsFuncCall
@@ -37207,10 +37297,13 @@ class Compiler {
      * Stmt-level iterator/generator pointer advance before a sibling MethodCall inline arg (#17251, #13901).
      *
      * php-cfg: `$it->next(); var_export($it->current(), true)` hoists both MethodCalls; only current feeds arg #0.
+     * Value-producing {@code next()} call args keep the producer in Temporary->ops (#25672).
+     *
+     * @param ?Op $consumer When set, MethodCalls listed in consumer arg ops are not discard preludes.
      */
-    private function methodCallIsStmtLevelDiscardPrelude(Op\Expr\MethodCall $call): bool
+    private function methodCallIsStmtLevelDiscardPrelude(Op\Expr\MethodCall $call, ?Op $consumer = null): bool
     {
-        if (!$this->methodCallHasStatementLevelSideEffects($call)) {
+        if (!$this->methodCallIsIteratorPointerStmtSideEffect($call, $consumer)) {
             return false;
         }
         if (!property_exists($call, 'result')) {
@@ -44848,7 +44941,8 @@ class Compiler {
                                             $mixedProducer,
                                             $mixedProducerIndex,
                                             $mixedConsumerIndex,
-                                            $mixedDeadTempCount
+                                            $mixedDeadTempCount,
+                                            $cfgCallOp
                                         )
                                     ) {
                                         continue;
@@ -54129,7 +54223,8 @@ class Compiler {
             $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
                 $producerIndex,
                 $firstSibling,
-                $block->orig->children
+                $block->orig->children,
+                $cfgCallOp
             );
             $execOrdinal = $execReturnCount - $chainProducerCount + $siblingOrdinal;
             $slot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinalWithPending(
