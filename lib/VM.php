@@ -7774,7 +7774,9 @@ restart:
                         $op->classImplements,
                         $this->context,
                         $frame,
-                        $op->sourceLocation
+                        $op->sourceLocation,
+                        null,
+                        true
                     );
                     if ([] !== $op->classImplements) {
                         $missingIface = VM\ImplementsHierarchyRuntimeCheck::missingInterfaceMessage(
@@ -7855,7 +7857,9 @@ restart:
                         $op->classImplements,
                         $this->context,
                         $frame,
-                        $op->sourceLocation
+                        $op->sourceLocation,
+                        $classEntry->parentLc,
+                        false
                     );
                     if ([] !== $op->classImplements) {
                         $missingIface = VM\ImplementsHierarchyRuntimeCheck::missingInterfaceMessage(

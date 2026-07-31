@@ -74,6 +74,73 @@ final class ExceptionSupport
     public const THROW_ONLY_OBJECTS_MESSAGE = 'Can only throw objects';
 
     /**
+     * Zend zend_implement_throwable — user class/enum cannot list Throwable unless root
+     * extends Exception or Error (#25869, Zend/zend_exceptions.c).
+     */
+    public static function isThrowableInterfaceLc(string $ifaceLc): bool
+    {
+        return self::CLASS_THROWABLE === strtolower(ltrim($ifaceLc, '\\'));
+    }
+
+    /**
+     * @return string|null Zend fatal body (no "Fatal error:" prefix), or null when allowed
+     */
+    public static function userImplementsThrowableForbiddenMessage(
+        string $subjectDisplay,
+        bool $isEnum,
+        ?string $parentLc = null,
+        ?Context $ctx = null,
+    ): ?string {
+        if ($isEnum) {
+            return sprintf('Enum %s cannot implement interface Throwable', $subjectDisplay);
+        }
+        if (self::parentRootIsExceptionOrError($parentLc, $ctx)) {
+            return null;
+        }
+
+        return sprintf(
+            'Class %s cannot implement interface Throwable, extend Exception or Error instead',
+            $subjectDisplay
+        );
+    }
+
+    /**
+     * Walk parentLc / ClassEntry chain; allow when root is Exception or Error (or subclass).
+     */
+    public static function parentRootIsExceptionOrError(?string $parentLc, ?Context $ctx): bool
+    {
+        if (null === $parentLc || '' === $parentLc) {
+            return false;
+        }
+        $lc = strtolower(ltrim($parentLc, '\\'));
+        $seen = [];
+        while ('' !== $lc) {
+            if (isset($seen[$lc])) {
+                return false;
+            }
+            $seen[$lc] = true;
+            if (
+                self::CLASS_EXCEPTION === $lc
+                || self::CLASS_ERROR === $lc
+                || ThrowableManifest::isDescendantOf($lc, self::CLASS_EXCEPTION)
+                || ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR)
+            ) {
+                return true;
+            }
+            if (null === $ctx || !isset($ctx->classes[$lc])) {
+                return false;
+            }
+            $next = $ctx->classes[$lc]->parentLc;
+            if (null === $next || '' === $next) {
+                return false;
+            }
+            $lc = strtolower(ltrim($next, '\\'));
+        }
+
+        return false;
+    }
+
+    /**
      * Zend zend_throw_non_object — message depends on operand kind (#5727, #9488).
      */
     public static function throwNormalizeErrorMessage(Variable $var): string

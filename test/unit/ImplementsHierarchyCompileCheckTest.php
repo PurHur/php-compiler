@@ -138,6 +138,154 @@ PHP;
         $runtime->parseAndCompile($code, 'nested.php');
     }
 
+    /** @covers issue #25869 */
+    public function testClassImplementsThrowableFailsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class X implements Throwable {
+  public function getMessage(): string { return ""; }
+  public function getCode() { return 0; }
+  public function getFile(): string { return ""; }
+  public function getLine(): int { return 0; }
+  public function getTrace(): array { return []; }
+  public function getTraceAsString(): string { return ""; }
+  public function getPrevious(): ?Throwable { return null; }
+  public function __toString(): string { return ""; }
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'implements_throwable.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Fatal error: Class X cannot implement interface Throwable, extend Exception or Error instead'
+        );
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #25869 */
+    public function testEmptyClassImplementsThrowableFailsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Y implements Throwable {}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'implements_throwable_empty.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Fatal error: Class Y cannot implement interface Throwable, extend Exception or Error instead'
+        );
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #25869 */
+    public function testEnumImplementsThrowableFailsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E implements Throwable { case A; }
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_implements_throwable.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Fatal error: Enum E cannot implement interface Throwable'
+        );
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #25869 */
+    public function testClassExtendsExceptionImplementsThrowableAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Z extends Exception implements Throwable {}
+echo class_exists("Z", false) ? "ok\n" : "missing\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'extends_exception_implements_throwable.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertSame("ok\n", $out);
+    }
+
+    /** @covers issue #25869 */
+    public function testClassImplementsThrowableCompilesThenFatalsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class X implements Throwable {
+  public function getMessage(): string { return ""; }
+  public function getCode() { return 0; }
+  public function getFile(): string { return ""; }
+  public function getLine(): int { return 0; }
+  public function getTrace(): array { return []; }
+  public function getTraceAsString(): string { return ""; }
+  public function getPrevious(): ?Throwable { return null; }
+  public function __toString(): string { return ""; }
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'implements_throwable.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Fatal error: Class X cannot implement interface Throwable, extend Exception or Error instead'
+        );
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #25869 */
+    public function testEmptyClassImplementsThrowableFatalsWithBanNotAbstractList(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Y implements Throwable {}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'implements_throwable_empty.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Fatal error: Class Y cannot implement interface Throwable, extend Exception or Error instead'
+        );
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #25869 */
+    public function testEnumImplementsThrowableFatalsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E implements Throwable { case A; }
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_implements_throwable.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Fatal error: Enum E cannot implement interface Throwable');
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #25869 */
+    public function testExtendsExceptionImplementsThrowableAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Z extends Exception implements Throwable {}
+echo class_exists('Z', false) ? "ok\n" : "missing\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'extends_exception_implements_throwable.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
     /** @covers issue #13325, #18781 */
     public function testClassImplementsDateTimeInterfaceCompilesThenFatalsAtRuntime(): void
     {
