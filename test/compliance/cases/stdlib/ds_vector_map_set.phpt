@@ -1,9 +1,11 @@
 --TEST--
 Ds\Vector / Ds\Map / Ds\Set MVP (#22549, php-ds/ext-ds)
+--ENV--
+PHP_COMPILER_ENABLE_DS=1
 --SKIPIF--
 <?php
-if (!extension_loaded('ds') || !class_exists('Ds\\Vector')) {
-    die('skip ds');
+if (!\PHPCompiler\ext\ds\DsExtensionPolicy::advertisesExtension()) {
+    die('skip ds withheld (#25086)');
 }
 ?>
 --FILE--

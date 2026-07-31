@@ -1139,6 +1139,7 @@ require_once __DIR__.'/../../../ext/lz4/VmLz4Native.php';
 require_once __DIR__.'/../../../ext/lz4/lz4_compress.php';
 require_once __DIR__.'/../../../ext/lz4/lz4_uncompress.php';
 require_once __DIR__.'/../../../ext/ds/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/ds/DsExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/ds/Module.php';
 require_once __DIR__.'/../../../ext/ds/VmDsStorage.php';
 require_once __DIR__.'/../../../ext/mbstring/EastAsianWidthTable.php';

@@ -359,6 +359,9 @@ final class BuiltinIntrospectionPolicy
         if ('lz4' === $ext) {
             return \PHPCompiler\ext\lz4\Lz4ExtensionPolicy::advertisesExtension();
         }
+        if ('ds' === $ext) {
+            return \PHPCompiler\ext\ds\DsExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }
