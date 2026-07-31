@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
@@ -97,15 +98,30 @@ final class VmClosureCall
 
     /**
      * Same unstable user-compare rules for any VmCallable (invokable/array/user-string; #23551).
+     * Optional $scopeFrame keeps in-scope private/protected comparators visible (#25736).
      */
     public static function invokeVariableForUserCompare(
         Context $context,
         Variable $callback,
         Variable $a,
-        Variable $b
+        Variable $b,
+        ?Frame $scopeFrame = null,
+        string $function = 'call_user_func'
     ): int {
         return self::invokeUserCompareWith(
-            static fn (Variable ...$args): Variable => VmCallable::invoke($context, $callback, ...$args),
+            static function (Variable ...$args) use ($context, $callback, $scopeFrame, $function): Variable {
+                if (null !== $scopeFrame) {
+                    return VmCallable::invokeAsWithScope(
+                        $function,
+                        $context,
+                        $scopeFrame,
+                        $callback,
+                        ...$args
+                    );
+                }
+
+                return VmCallable::invoke($context, $callback, ...$args);
+            },
             $a,
             $b
         );

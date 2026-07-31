@@ -49,14 +49,18 @@ final class VmArraySortCallback
     }
 
     /**
-     * Require a Zend-callable comparator for usort/uasort/uksort (#23550, #25712).
-     * Closures, invokables, array callables, and user-defined function names are accepted.
+     * Require a Zend-callable comparator for usort/uasort/uksort (#23550, #25712)
+     * and array_u* (#25736). Closures, invokables, array callables, and user-defined
+     * function names are accepted.
+     *
+     * @param string|null $paramName Null omits " ($name)" — Zend array_udiff family.
      */
     public static function requireVmCallable(
         Frame $frame,
         Variable $callback,
         string $function,
-        int $argNum = 2
+        int $argNum = 2,
+        ?string $paramName = 'callback'
     ): void {
         $callback = $callback->resolveIndirect();
         if (self::isStrcmpFamilyCallback($callback) || VmClosureCall::isClosure($callback)) {
@@ -71,9 +75,11 @@ final class VmArraySortCallback
                 $callback,
                 $function,
                 $argNum,
-                $frame
+                $frame,
+                false,
+                $paramName
             );
-            throw new \TypeError(self::invalidCallbackTypeError($function, $argNum));
+            throw new \TypeError(self::invalidCallbackTypeError($function, $argNum, $paramName));
         }
     }
 
@@ -180,21 +186,34 @@ final class VmArraySortCallback
         ZendSort::sort($pairs, $cmp);
     }
 
-    public static function invalidCallbackTypeError(string $function, int $argNum = 2): string
-    {
+    public static function invalidCallbackTypeError(
+        string $function,
+        int $argNum = 2,
+        ?string $paramName = 'callback'
+    ): string {
+        $paramPart = null !== $paramName ? ' ($'.$paramName.')' : '';
+
         return \sprintf(
-            '%s(): Argument #%d ($callback) must be a valid callback, no array or string given',
+            '%s(): Argument #%d%s must be a valid callback, no array or string given',
             $function,
-            $argNum
+            $argNum,
+            $paramPart
         );
     }
 
-    public static function invalidStringCallbackTypeError(string $function, int $argNum, string $name): string
-    {
+    public static function invalidStringCallbackTypeError(
+        string $function,
+        int $argNum,
+        string $name,
+        ?string $paramName = 'callback'
+    ): string {
+        $paramPart = null !== $paramName ? ' ($'.$paramName.')' : '';
+
         return \sprintf(
-            '%s(): Argument #%d ($callback) must be a valid callback, function "%s" not found or invalid function name',
+            '%s(): Argument #%d%s must be a valid callback, function "%s" not found or invalid function name',
             $function,
             $argNum,
+            $paramPart,
             $name
         );
     }
