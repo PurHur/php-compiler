@@ -33,6 +33,11 @@ final class IntlConstants
         if (IntlExtensionPolicy::advertisesIdn()) {
             $constants = [...$constants, ...VmIdn::registeredConstants()];
         }
+        // php-src Locale stub @cvalue ULOC_* — bare globals alongside Locale::ACTUAL/VALID (#24097).
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            $constants['ULOC_ACTUAL_LOCALE'] = VmIntlCalendar::ULOC_ACTUAL_LOCALE;
+            $constants['ULOC_VALID_LOCALE'] = VmIntlCalendar::ULOC_VALID_LOCALE;
+        }
 
         return $constants;
     }
