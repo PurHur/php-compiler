@@ -293,6 +293,35 @@ final class VmUserStream
     }
 
     /**
+     * Userspace stream_cast (php-src userspace.c php_userstreamop_cast; #26000).
+     *
+     * Missing stream_cast or non-stream return → null (cast FAILURE). On success returns the
+     * cast-target stream handle for further AS_FD_FOR_SELECT resolution.
+     */
+    public static function cast(int $handle, int $castAs): ?int
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return null;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_cast')) {
+            return null;
+        }
+        $castVar = new Variable();
+        $castVar->int($castAs);
+        $result = $state->vm->invokeInstanceMethod(
+            $state->wrapper,
+            'stream_cast',
+            $castVar
+        )->resolveIndirect();
+        if (!\PHPCompiler\VM\ResourceSupport::isStreamResource($result)) {
+            return null;
+        }
+
+        return \PHPCompiler\VM\ResourceSupport::resolveHandle($result);
+    }
+
+    /**
      * Userspace stream_set_option (php-src userspace.c user_stream_set_option; #25996 / #25999).
      *
      * Missing stream_set_option → false. Truthy return → option accepted.
