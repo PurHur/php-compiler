@@ -449,8 +449,15 @@ final class ClosureSupport
                 'Cannot call non-static '.$state->func->getName().'() statically'
             );
         }
+        // php-src ZEND_METHOD(Closure, call): zend_valid_closure_binding fails → Warning + null
+        // (same text as bindTo; #25984 / #22423). Do not throw Error.
         if ($state->isStaticClosure()) {
-            throw new \Error('Cannot bind static closure to object');
+            self::warnCannotBindInstanceToStaticClosure($ctx, $frame);
+
+            $null = new Variable();
+            $null->null();
+
+            return $null;
         }
         $scopeClass = $newThis->toObject()->class->name;
         if (self::isInternalScopeClass($ctx, $scopeClass)) {
