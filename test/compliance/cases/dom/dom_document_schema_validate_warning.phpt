@@ -1,5 +1,5 @@
 --TEST--
-DOMDocument::schemaValidate()/relaxNGValidate() warn and return false (#15691, ext/dom/document.c)
+DOMDocument::schemaValidate()/relaxNGValidate() warn with method prefix and return false (#15691, #25843, ext/dom/document.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -23,9 +23,9 @@ foreach ($warnings as $w) {
 schema-false
 relax-false
 6
-I/O warning : failed to load external entity "%s/nonexistent.xsd"
-Failed to locate the main schema resource at '%s/nonexistent.xsd'.
+DOMDocument::schemaValidate(): I/O warning : failed to load external entity "%s/nonexistent.xsd"
+DOMDocument::schemaValidate(): Failed to locate the main schema resource at '%s/nonexistent.xsd'.
 DOMDocument::schemaValidate(): Invalid Schema
-I/O warning : failed to load external entity "%s/nonexistent.rng"
-xmlRelaxNGParse: could not load %s/nonexistent.rng
+DOMDocument::relaxNGValidate(): I/O warning : failed to load external entity "%s/nonexistent.rng"
+DOMDocument::relaxNGValidate(): xmlRelaxNGParse: could not load %s/nonexistent.rng
 DOMDocument::relaxNGValidate(): Invalid RelaxNG

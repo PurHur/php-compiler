@@ -13400,13 +13400,15 @@ final class VmDom
             }
             if ('' !== $schemaPath) {
                 // php-src/libxml2: I/O diagnostics → libxml ring under use_internal_errors (#20776).
+                // PHP warnings carry DOMDocument::schemaValidate(): prefix (php-src #25843).
                 self::reportDomMissingValidationResource(
                     $ctx,
                     $frame,
                     $schemaPath,
                     1757,
                     sprintf("Failed to locate the main schema resource at '%s'.\n", $schemaPath),
-                    sprintf("Failed to locate the main schema resource at '%s'.", $schemaPath)
+                    sprintf("Failed to locate the main schema resource at '%s'.", $schemaPath),
+                    'DOMDocument::schemaValidate()'
                 );
             }
             self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
@@ -13449,13 +13451,15 @@ final class VmDom
             }
             if ('' !== $rngPath) {
                 // php-src/libxml2: I/O diagnostics → libxml ring under use_internal_errors (#20776).
+                // PHP warnings carry DOMDocument::relaxNGValidate(): prefix (php-src #25843).
                 self::reportDomMissingValidationResource(
                     $ctx,
                     $frame,
                     $rngPath,
                     1065,
                     sprintf("xmlRelaxNGParse: could not load %s\n", $rngPath),
-                    sprintf('xmlRelaxNGParse: could not load %s', $rngPath)
+                    sprintf('xmlRelaxNGParse: could not load %s', $rngPath),
+                    'DOMDocument::relaxNGValidate()'
                 );
             }
             self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
@@ -13567,10 +13571,11 @@ final class VmDom
     }
 
     /**
-     * Missing XSD/RNG path — two libxml I/O records + PHP Invalid* warning (#20776, re-#17453/#20181).
+     * Missing XSD/RNG path — two libxml I/O records + PHP Invalid* warning (#20776, re-#17453/#20181, #25843).
      *
      * Under libxml_use_internal_errors(true): codes 1549 + $secondCode land in libxml_get_errors();
-     * otherwise both messages are PHP warnings (I/O warning prefix on the first).
+     * otherwise both messages are PHP warnings with DOMDocument::{method}(): prefix (php-src
+     * php_libxml_error_handler / ext/dom/document.c).
      */
     private static function reportDomMissingValidationResource(
         Context $ctx,
@@ -13578,8 +13583,10 @@ final class VmDom
         string $path,
         int $secondCode,
         string $secondMessage,
-        string $secondWarningMessage
+        string $secondWarningMessage,
+        string $methodLabel
     ): void {
+        $prefix = $methodLabel.': ';
         $ioMessage = sprintf("failed to load external entity \"%s\"\n", $path);
         VmLibxml::handleError(
             $ctx,
@@ -13593,7 +13600,7 @@ final class VmDom
             ],
             $frame,
             null,
-            sprintf('I/O warning : failed to load external entity "%s"', $path)
+            sprintf('%sI/O warning : failed to load external entity "%s"', $prefix, $path)
         );
         VmLibxml::handleError(
             $ctx,
@@ -13607,7 +13614,7 @@ final class VmDom
             ],
             $frame,
             null,
-            $secondWarningMessage
+            $prefix.$secondWarningMessage
         );
     }
 
