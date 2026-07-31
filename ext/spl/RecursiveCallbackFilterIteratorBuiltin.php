@@ -36,14 +36,12 @@ final class RecursiveCallbackFilterIteratorBuiltin
         $pub = CfgFunc::FLAG_PUBLIC;
         $prot = CfgFunc::FLAG_PROTECTED;
         $entry = new ClassEntry('RecursiveCallbackFilterIterator');
-        if (isset($ctx->classes['iterator'])) {
-            $entry->interfaces[] = 'iterator';
-        }
-        if (isset($ctx->classes['recursiveiterator'])) {
-            $entry->interfaces[] = 'recursiveiterator';
-        }
-        if (isset($ctx->classes['outeriterator'])) {
-            $entry->interfaces[] = 'outeriterator';
+        // Zend rematerialized flattened ce->interfaces (#25823).
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator', 'recursiveiterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $entry->interfaces[] = $iface;
+            }
         }
 
         $entry->constructor = new RecursiveCallbackFilterIteratorConstruct();

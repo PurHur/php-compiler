@@ -38,9 +38,11 @@ final class RecursiveTreeIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('RecursiveTreeIterator');
         $entry->parentLc = RecursiveIteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
+        // Zend rematerializes Iterator-first flattened ce->interfaces on the subclass
+        // (RecursiveIteratorIterator parent stays OuterIterator-first; #25823).
+        $entry->interfaces = [];
+        foreach (['iterator', 'traversable', 'outeriterator'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
                 $entry->interfaces[] = $iface;
             }
         }
