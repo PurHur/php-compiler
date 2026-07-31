@@ -996,9 +996,10 @@ class VM {
     }
 
     /**
-     * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
+     * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586, #25668).
      * Hooked properties: real backing (same-name or separate) probes storage; virtual get-only invokes get (#11262, #11617).
      * Incomplete objects: E_WARNING + false (zend_object_handlers.c, #19632).
+     * Inaccessible declared props skip the slot and route through __isset (zend_object_handlers.c).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -1027,13 +1028,22 @@ class VM {
             return $domChildrenIsset;
         }
         // ReflectionAttribute / other C-only slots are not PHP-visible (#22513).
-        $meta = $this->classPropertyMeta($object, $propName);
+        $meta = $this->classPropertyMeta($object, $propName, $frame);
         if (null !== $meta && $meta->phpInvisible) {
             return false;
         }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
-            return VmIsset::storedPropertyIsSet($props[$propName]);
+            // Declared but not visible from caller scope — do not leak the private/protected slot (#25668).
+            if (
+                null !== $frame
+                && null !== $meta
+                && $this->declaredPropertyIssetUsesOverload($object, $meta, $propName, $frame)
+            ) {
+                // Fall through to __isset / false (zend_std_has_property).
+            } else {
+                return VmIsset::storedPropertyIsSet($props[$propName]);
+            }
         }
         // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys as properties (spl_array.c; #22576).
         // has_property(isset) shares spl_array_has_dimension null-check (#24398, peer #24251).
@@ -1575,6 +1585,7 @@ class VM {
 
     /**
      * unset($obj->hooked) — invoke unset hook, reset separate backing, or Error (#6471, #6502).
+     * Inaccessible declared props: __unset or Error before touching the slot (#25668).
      */
     private function dispatchHookedInstancePropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
@@ -1582,6 +1593,10 @@ class VM {
             $this->unsetHookedInstancePropertyRaw($object, $propName);
 
             return null;
+        }
+        $inaccessibleFrame = $this->dispatchInaccessibleDeclaredPropertyUnset($object, $propName, $frame);
+        if (false !== $inaccessibleFrame) {
+            return $inaccessibleFrame;
         }
         if ($this->invokeInstancePropertyUnsetHook($object, $propName, $frame)) {
             return null;
@@ -3210,6 +3225,9 @@ class VM {
         Frame $frame,
         int $getOrSetVisibility
     ): bool {
+        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame)) {
+            return true;
+        }
         $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
             ?? $meta->declaringClassLc;
         try {
@@ -3228,6 +3246,75 @@ class VM {
         } catch (\LogicException $e) {
             return true;
         }
+    }
+
+    /**
+     * isset/empty must not read an inaccessible declared slot (zend_std_has_property; #25668).
+     */
+    private function declaredPropertyIssetUsesOverload(
+        ObjectEntry $object,
+        VM\ClassProperty $meta,
+        string $name,
+        Frame $frame
+    ): bool {
+        return $this->declaredPropertyInaccessibleFromCaller(
+            $object,
+            $meta,
+            $name,
+            $frame,
+            $meta->getVisibility
+        );
+    }
+
+    /**
+     * Inaccessible declared unset — __unset, silent no-op (parent private from child), or Error (#25668).
+     *
+     * @return Frame|false|null Frame on catch, null when handled, false when caller should continue
+     */
+    private function dispatchInaccessibleDeclaredPropertyUnset(
+        ObjectEntry $object,
+        string $propName,
+        Frame $frame
+    ): Frame|false|null {
+        $meta = $this->classPropertyMeta($object, $propName, $frame);
+        if (null === $meta) {
+            return false;
+        }
+        $invisibleParent = $this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame);
+        $inaccessible = $invisibleParent
+            || $this->declaredPropertyInaccessibleFromCaller($object, $meta, $propName, $frame, 0);
+        if (!$inaccessible) {
+            return false;
+        }
+        if ($this->hasInstanceMethod($object->class, '__unset')) {
+            $key = new Variable();
+            $key->string($propName);
+            $this->invokeInstanceMethod($object, '__unset', $key);
+
+            return null;
+        }
+        if ($invisibleParent) {
+            // Parent private is not in child scope — unset is a no-op (zend_get_property_offset).
+            return null;
+        }
+        $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta->visibility,
+                $this->callerClassLc($frame),
+                $meta->declaringClassLc,
+                $declaringDisplay,
+                $propName,
+                strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                0
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
     }
 
     /**
