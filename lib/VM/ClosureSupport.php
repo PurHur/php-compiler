@@ -165,7 +165,7 @@ final class ClosureSupport
             if (null !== $state) {
                 return $callable->toObject();
             }
-            $invokeState = self::tryFromInvokableObject($ctx, $frame, $callable);
+            $invokeState = self::tryFromInvokableObject($ctx, $frame, $callable, $fromCallableApi);
             if (null !== $invokeState) {
                 return self::wrapState($ctx, $invokeState);
             }
@@ -573,7 +573,9 @@ final class ClosureSupport
                             $class->name,
                             $declaredName,
                             $isSameOrSubclass,
-                            $callerDisplay
+                            $callerDisplay,
+                            false,
+                            true
                         );
                         $boundThis = new Variable();
                         $boundThis->copyFrom($thisVar);
@@ -604,7 +606,9 @@ final class ClosureSupport
             $class->name,
             $declaredName,
             $isSameOrSubclass,
-            $callerDisplay
+            $callerDisplay,
+            false,
+            $fromCallableApi
         );
 
         // Named class is called-scope for LSB (zend_closures.c): Closure::fromCallable([B::class, 'foo'])
@@ -635,14 +639,23 @@ final class ClosureSupport
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
         if (Variable::TYPE_OBJECT === $receiver->type) {
-            return self::fromInstanceMethodCallable($ctx, $frame, $receiver, $methodName, $parentScope);
+            return self::fromInstanceMethodCallable(
+                $ctx,
+                $frame,
+                $receiver,
+                $methodName,
+                $parentScope,
+                $fromCallableApi
+            );
         }
         if (Variable::TYPE_ENUM_CASE === $receiver->type) {
             return self::fromInstanceMethodCallable(
                 $ctx,
                 $frame,
                 EnumCaseSupport::receiverForInstanceMethod($receiver),
-                $methodName
+                $methodName,
+                false,
+                $fromCallableApi
             );
         }
         if (Variable::TYPE_STRING === $receiver->type) {
@@ -663,7 +676,8 @@ final class ClosureSupport
     private static function tryFromInvokableObject(
         Context $ctx,
         Frame $frame,
-        Variable $callable
+        Variable $callable,
+        bool $fromCallableApi = false
     ): ?ClosureState {
         if (Variable::TYPE_OBJECT !== $callable->type) {
             return null;
@@ -676,7 +690,7 @@ final class ClosureSupport
             return null;
         }
 
-        return self::fromInstanceMethodCallable($ctx, $frame, $callable, '__invoke');
+        return self::fromInstanceMethodCallable($ctx, $frame, $callable, '__invoke', false, $fromCallableApi);
     }
 
     private static function fromInstanceMethodCallable(
@@ -684,7 +698,8 @@ final class ClosureSupport
         Frame $frame,
         Variable $receiver,
         string $methodName,
-        bool $parentScope = false
+        bool $parentScope = false,
+        bool $fromCallableApi = false
     ): ClosureState {
         $object = $receiver->toObject();
         $methodLc = strtolower($methodName);
@@ -720,7 +735,8 @@ final class ClosureSupport
             $declaringClass->methodNames[$methodLc] ?? $methodName,
             fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
             $callerDisplay,
-            $parentScopeAllows
+            $parentScopeAllows,
+            $fromCallableApi
         );
         $boundThis = new Variable();
         $boundThis->copyFrom($receiver);
@@ -957,9 +973,13 @@ final class ClosureSupport
     }
 
     /**
-     * Zend zend_closure_from_callable() visibility — TypeError, not call-site LogicException (#7416).
+     * Visibility for Closure::fromCallable() vs first-class callable `$obj->m(...)` (#7416, #25689).
      *
-     * @throws \TypeError when the callback is not accessible from the current scope
+     * php-src: zend_closures.c — fromCallable → TypeError "Failed to create closure…"
+     * php-src: zend_object_handlers.c / FCC — same Error wording as a direct inaccessible call.
+     *
+     * @throws \TypeError when $fromCallableApi and the callback is not accessible
+     * @throws \Error when FCC ($fromCallableApi false) and the method is not accessible
      */
     private static function assertMethodAccessibleForFromCallable(
         int $visibilityFlags,
@@ -969,7 +989,8 @@ final class ClosureSupport
         string $methodName,
         ?callable $isSameOrSubclassOf = null,
         ?string $callerClassDisplay = null,
-        bool $parentScopeAllows = false
+        bool $parentScopeAllows = false,
+        bool $fromCallableApi = false
     ): void {
         try {
             MethodVisibility::assertCallable(
@@ -978,16 +999,20 @@ final class ClosureSupport
                 $declaringClassLc,
                 $declaringClassDisplay,
                 $methodName,
-                false,
+                $parentScopeAllows,
                 $isSameOrSubclassOf,
                 $callerClassDisplay,
-                $parentScopeAllows
+                false
             );
-        } catch (\LogicException) {
-            $kind = ($visibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
-            throw new \TypeError(
-                "Failed to create closure from callable: cannot access {$kind} method {$declaringClassDisplay}::{$methodName}()"
-            );
+        } catch (\LogicException $e) {
+            if ($fromCallableApi) {
+                $kind = ($visibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+                throw new \TypeError(
+                    "Failed to create closure from callable: cannot access {$kind} method {$declaringClassDisplay}::{$methodName}()"
+                );
+            }
+            // FCC: surface the same Error text as a direct private/protected call (#25689).
+            throw new \Error($e->getMessage());
         }
     }
 

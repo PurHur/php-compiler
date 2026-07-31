@@ -252,14 +252,19 @@ final class VmFromCallable
         } elseif ($context->scope->className !== '') {
             $callerClassLc = $context->scope->className;
         }
-        MethodVisibility::assertCallable(
-            $visFlags,
-            $callerClassLc,
-            $declaringClassLc,
-            $className,
-            $methodName,
-            false
-        );
+        try {
+            MethodVisibility::assertCallable(
+                $visFlags,
+                $callerClassLc,
+                $declaringClassLc,
+                $className,
+                $methodName,
+                false
+            );
+        } catch (\LogicException $e) {
+            // FCC: same Error wording as a direct call (#25689, zend_object_handlers.c).
+            throw new \Error($e->getMessage());
+        }
         $proxyName = strtolower($className.'::'.$methodName);
         if (!$context->functionIsRegistered($proxyName)) {
             throw new \LogicException("Call to undefined static method {$className}::{$methodName}()");
