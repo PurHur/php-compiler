@@ -38,9 +38,28 @@ final class BuiltinInternalArgInfoTest extends TestCase
     {
         $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('strlen'));
         $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('count'));
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('sizeof'));
         $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('array_keys'));
         $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('is_string'));
         $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('not_a_real_builtin_xyz'));
+    }
+
+    /** Zend/zend_builtin_functions.stub.php — count/sizeof Countable|array + int mode (#25966). */
+    public function testCountSizeofReflectionStubTypes(): void
+    {
+        foreach (['count', 'sizeof'] as $f) {
+            $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('Countable|array', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride($f, 1), $f);
+            $value = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($value, $f);
+            $this->assertSame('Countable|array', $value['type'], $f);
+            $this->assertFalse($value['isOptional'], $f);
+            $mode = BuiltinInternalArgInfo::paramInfoForFunction($f, 1);
+            $this->assertNotNull($mode, $f);
+            $this->assertSame('int', $mode['type'], $f);
+            $this->assertTrue($mode['isOptional'], $f);
+        }
     }
 
     /** php-src string.stub.php — InternalArgInfo omits |false (#25442). */

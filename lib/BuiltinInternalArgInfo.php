@@ -103,6 +103,8 @@ final class BuiltinInternalArgInfo
             'filter_var' => 'mixed',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
+            // Zend/zend_builtin_functions.stub.php — sizeof alias absent from InternalArgInfo (#25966)
+            'sizeof' => 'int',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
             'ceil', 'floor' => 'float',
             // ext/standard/basic_functions.stub.php / head.c — InternalArgInfo omits |false / void (#25780)
@@ -292,6 +294,13 @@ final class BuiltinInternalArgInfo
             // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)
             'user_error' => match ($index) {
                 0 => 'string',
+                1 => 'int',
+                default => null,
+            },
+            // Zend/zend_builtin_functions.stub.php — count/sizeof Countable|array; sizeof absent (#25966)
+            // InternalArgInfo still has untyped $var for count; sizeof has no row at all.
+            'count', 'sizeof' => match ($index) {
+                0 => 'Countable|array',
                 1 => 'int',
                 default => null,
             },
