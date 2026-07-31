@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6639 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21388 |
+| Source constructs flagged (warnings) | 21399 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1607,7 +1607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoSerializeDeny.php` | 0 | 3 |
 | `ext/pdo/VmPDO.php` | 0 | 88 |
 | `ext/pdo/VmPDORow.php` | 0 | 5 |
-| `ext/pdo/VmPDOStatement.php` | 0 | 54 |
+| `ext/pdo/VmPDOStatement.php` | 0 | 67 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
 | `ext/pgsql/Module.php` | 0 | 123 |
@@ -5374,7 +5374,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketImportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodium.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSoundex.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringSscanfArray.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringSscanfArray.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSscanfByRef.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrContains.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrGetcsv.php` | 0 | 3 |
@@ -19436,60 +19436,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/VmPDOStatement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 38)
-- new PDOStatementExecute (line 49)
-- new PDOStatementFetch (line 50)
-- new PDOStatementFetchAll (line 51)
-- new PDOStatementFetchColumn (line 52)
-- new PDOStatementFetchObject (line 53)
-- new PDOStatementBindValue (line 54)
-- new PDOStatementBindParam (line 55)
-- new PDOStatementBindColumn (line 56)
-- new PDOStatementRowCount (line 57)
-- new PDOStatementColumnCount (line 58)
-- new PDOStatementCloseCursor (line 59)
-- new PDOStatementSetFetchMode (line 60)
-- new PDOStatementErrorCode (line 61)
-- new PDOStatementErrorInfo (line 62)
-- new PDOStatementGetColumnMeta (line 63)
-- new PDOStatementGetAttribute (line 64)
-- new PDOStatementSetAttribute (line 65)
-- new PDOStatementNextRowset (line 66)
-- new PDOStatementDebugDumpParams (line 67)
-- new PDOStatementGetIterator (line 68)
-- new PDOStatementRewind (line 69)
-- new PDOStatementValid (line 70)
-- new PDOStatementCurrent (line 71)
-- new PDOStatementKey (line 72)
-- new PDOStatementNext (line 73)
-- new ObjectEntry (line 109)
-- new PdoStatementState (line 110)
-- new HashTable (line 242)
-- new Variable (line 260)
-- new ObjectEntry (line 275)
-- new ArgumentCountError (line 706)
-- new ArgumentCountError (line 721)
-- new HashTable (line 730)
-- new Variable (line 740)
-- new ArgumentCountError (line 766)
-- new ArgumentCountError (line 806)
-- new ArgumentCountError (line 1076)
-- new ArgumentCountError (line 1086)
-- new ArgumentCountError (line 1102)
-- new HashTable (line 1146)
-- new Variable (line 1147)
-- new Variable (line 1150)
-- new Variable (line 1157)
-- new ArgumentCountError (line 1180)
-- new HashTable (line 1193)
-- new Variable (line 1195)
-- new HashTable (line 1197)
-- new ArgumentCountError (line 1219)
-- new ArgumentCountError (line 1254)
+- new ClassEntry (line 39)
+- new PDOStatementExecute (line 50)
+- new PDOStatementFetch (line 51)
+- new PDOStatementFetchAll (line 52)
+- new PDOStatementFetchColumn (line 53)
+- new PDOStatementFetchObject (line 54)
+- new PDOStatementBindValue (line 55)
+- new PDOStatementBindParam (line 56)
+- new PDOStatementBindColumn (line 57)
+- new PDOStatementRowCount (line 58)
+- new PDOStatementColumnCount (line 59)
+- new PDOStatementCloseCursor (line 60)
+- new PDOStatementSetFetchMode (line 61)
+- new PDOStatementErrorCode (line 62)
+- new PDOStatementErrorInfo (line 63)
+- new PDOStatementGetColumnMeta (line 64)
+- new PDOStatementGetAttribute (line 65)
+- new PDOStatementSetAttribute (line 66)
+- new PDOStatementNextRowset (line 67)
+- new PDOStatementDebugDumpParams (line 68)
+- new PDOStatementGetIterator (line 69)
+- new PDOStatementRewind (line 70)
+- new PDOStatementValid (line 71)
+- new PDOStatementCurrent (line 72)
+- new PDOStatementKey (line 73)
+- new PDOStatementNext (line 74)
+- new ObjectEntry (line 110)
+- new PdoStatementState (line 111)
+- new HashTable (line 263)
+- new Error (line 314)
+- new Error (line 318)
+- new ObjectEntry (line 320)
+- new Variable (line 391)
+- new Variable (line 447)
+- new Variable (line 464)
+- new Variable (line 642)
+- new ObjectEntry (line 664)
+- new ArgumentCountError (line 1130)
+- new ArgumentCountError (line 1146)
+- new ArgumentCountError (line 1170)
+- new ArgumentCountError (line 1178)
+- new HashTable (line 1194)
+- new Variable (line 1207)
+- new Variable (line 1241)
 - new ArgumentCountError (line 1288)
-- new PdoStatementInternalIterator (line 1359)
-- new Variable (line 1399)
-- 48 class method(s)
+- new ArgumentCountError (line 1328)
+- new ArgumentCountError (line 1611)
+- new ArgumentCountError (line 1626)
+- new ArgumentCountError (line 1642)
+- new ArgumentCountError (line 1649)
+- new ArgumentCountError (line 1655)
+- new ArgumentCountError (line 1691)
+- new ArgumentCountError (line 1705)
+- new HashTable (line 1749)
+- new Variable (line 1750)
+- new Variable (line 1753)
+- new Variable (line 1760)
+- new ArgumentCountError (line 1783)
+- new HashTable (line 1796)
+- new Variable (line 1798)
+- new HashTable (line 1800)
+- new ArgumentCountError (line 1822)
+- new ArgumentCountError (line 1857)
+- new ArgumentCountError (line 1891)
+- new PdoStatementInternalIterator (line 1962)
+- new Variable (line 2002)
+- 63 class method(s)
 
 ### `ext/pdo/pdo_drivers.php`
 
@@ -42393,13 +42406,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new self (line 57)
-- new self (line 730)
-- new self (line 812)
-- new self (line 897)
-- new Op\Type\Literal (line 1008)
-- new self (line 1055)
-- new self (line 1072)
-- new self (line 1078)
+- new self (line 779)
+- new self (line 867)
+- new self (line 954)
+- new Op\Type\Literal (line 1082)
+- new self (line 1129)
+- new self (line 1146)
+- new self (line 1152)
 - 46 class method(s)
 - 7 closure(s)
 
@@ -45723,9 +45736,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSscanfArray.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 134)
 - 7 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringSscanfByRef.php`
 
