@@ -457,6 +457,41 @@ final class InheritanceVariance
             return false;
         }
 
+        // Union assignability (zend_type / #25632): U|V <: T iff every member <: T;
+        // T <: U|V iff T <: any member.
+        if ($super->isUnion()) {
+            foreach ($super->unionMembers as $member) {
+                if (self::isSubtypeOfStatic(
+                    $sub,
+                    $member,
+                    $subOwnerLc,
+                    $superOwnerLc,
+                    $isClassSubtypeOf,
+                    $classImplementsInterface
+                )) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($sub->isUnion()) {
+            foreach ($sub->unionMembers as $member) {
+                if (!self::isSubtypeOfStatic(
+                    $member,
+                    $super,
+                    $subOwnerLc,
+                    $superOwnerLc,
+                    $isClassSubtypeOf,
+                    $classImplementsInterface
+                )) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         if ($super->isVoid() || $super->isNever() || $sub->isVoid() || $sub->isNever()) {
             return $sub->signatureKey($subOwnerLc) === $super->signatureKey($superOwnerLc);
         }
@@ -908,7 +943,7 @@ final class TypeSig
     /** @var list<TypeSig>|null Intersection members (A&B); mutually exclusive with scalar/class. */
     public ?array $intersectionMembers = null;
 
-    /** @var list<TypeSig>|null Union members (A|B); property types (#23505). */
+    /** @var list<TypeSig>|null Union members (A|B); params/returns (#25632) and properties (#23505). */
     public ?array $unionMembers = null;
 
     public static function fromCfgType(?Op\Type $type): ?self
@@ -935,6 +970,23 @@ final class TypeSig
             $inner->nullable = true;
 
             return $inner;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            // Keep unions for param/return LSP (#25632); mirrors fromCfgPropertyType (#23505).
+            $members = [];
+            foreach ($type->types as $memberType) {
+                $member = self::fromCfgType($memberType);
+                if (null === $member || $member->isMixed()) {
+                    return null;
+                }
+                $members[] = $member;
+            }
+            if ([] === $members) {
+                return null;
+            }
+            $sig->unionMembers = $members;
+
+            return $sig;
         }
         if ($type instanceof Op\Type\Intersection) {
             $members = [];
@@ -1248,6 +1300,15 @@ final class TypeSig
         }
         if ($this->never) {
             return 'never';
+        }
+        if ($this->isUnion()) {
+            $parts = [];
+            foreach ($this->unionMembers as $member) {
+                $parts[] = $member->signatureKey($ownerLc);
+            }
+            sort($parts);
+
+            return implode('|', $parts).($this->nullable ? '?' : '');
         }
         if ($this->isIntersection()) {
             $parts = [];
