@@ -1370,6 +1370,9 @@ final class BuiltinParamNames
                 return ['string', 'start', 'width', 'trim_marker', 'encoding'];
             case 'mb_convert_encoding':
                 return ['string', 'to_encoding', 'from_encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — InternalArgInfo still str/encoding_list (#23623)
+            case 'mb_detect_encoding':
+                return ['string', 'encodings=', 'strict='];
             // php-src ext/mbstring/mbstring.stub.php — Reflection had empty params (#23291)
             case 'mb_chr':
                 return ['codepoint', 'encoding'];

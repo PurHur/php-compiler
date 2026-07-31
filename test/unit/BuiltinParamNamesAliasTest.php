@@ -2417,6 +2417,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($split, 'encoding', 'mb_str_split'));
     }
 
+    /** @covers issue #23623 */
+    public function testMbDetectEncodingZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('mb_detect_encoding');
+        self::assertSame(['string', 'encodings=', 'strict='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'mb_detect_encoding'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'encodings', 'mb_detect_encoding'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'strict', 'mb_detect_encoding'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $encoding_list)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'mb_detect_encoding'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'encoding_list', 'mb_detect_encoding'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_detect_encoding'));
+    }
+
     /** @covers issue #23383 */
     public function testFilterInputZendStubNamedParams(): void
     {
