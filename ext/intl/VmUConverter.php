@@ -171,14 +171,19 @@ final class VmUConverter
         // from_subst applies to the source converter; for UTF-8→SBCS illegal input, ICU still
         // surfaces via the dest subst path after U+FFFD (php-src converter.cpp) — honor to_subst.
         unset($options);
-        $result = VmIconv::iconv($from, $to, $str);
-        if (false !== $result) {
-            return $result;
-        }
         $destOk = null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($to, false));
         $srcOk = null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($from, true));
         if (!$destOk || !$srcOk) {
             return false;
+        }
+        // ICU UTF-8 is stricter than glibc iconv (overlong/surrogate/out-of-range). Always walk
+        // UTF-8 sources through nativeSubstConvert so illegal bytes become U+FFFD (#25203).
+        if (self::isUtf8Family($from)) {
+            return self::nativeSubstConvert($str, $from, $to, $toSubst ?? '');
+        }
+        $result = VmIconv::iconv($from, $to, $str);
+        if (false !== $result) {
+            return $result;
         }
 
         return self::nativeSubstConvert($str, $from, $to, $toSubst ?? '');
@@ -271,6 +276,11 @@ final class VmUConverter
         if ($hasUserCb) {
             return self::convertWithCallbacks($ctx, $object, $str, $from, $to, $reverse);
         }
+        // Same ICU-vs-iconv strictness as transcode() (#25203): UTF-8 sources must not
+        // short-circuit on a glibc iconv "success" that kept overlong/surrogate/out-of-range.
+        if (self::isUtf8Family($from)) {
+            return self::convertWithNativeSubst($object, $str, $from, $to);
+        }
         $result = VmIconv::iconv($from, $to, $str);
         if (false === $result) {
             // Base UConverter short-circuits PHP callbacks (php-src php_converter_set_callbacks);
@@ -302,7 +312,7 @@ final class VmUConverter
     }
 
     /**
-     * Shared ICU-like substitution for convert() and static transcode() (#21978 / #25201).
+     * Shared ICU-like substitution for convert() and static transcode() (#21978 / #25201 / #25203).
      *
      * @param string $configuredSubstChars empty → charset defaults (ASCII 0x1A / Unicode U+FFFD);
      *                                     non-empty honors transcode() {@code to_subst} / setSubstChars()
@@ -617,7 +627,13 @@ final class VmUConverter
         return str_contains($n, 'UTF8') || 'CP1208' === $n || '' === $n;
     }
 
-    /** @return int|null codepoint; advances $next */
+    /**
+     * Decode one well-formed UTF-8 codepoint (ICU / php-src converter.cpp).
+     * Illegal lead, overlong, surrogate, or out-of-range advances $next by one byte so each
+     * bad byte becomes U+FFFD (#25203) — matching Zend UConverter::transcode.
+     *
+     * @return int|null codepoint; advances $next
+     */
     private static function utf8NextCodepoint(string $str, int $i, ?int &$next): ?int
     {
         $len = \strlen($str);
@@ -632,60 +648,44 @@ final class VmUConverter
 
             return $b0;
         }
-        if ($b0 < 0xC2 || $b0 > 0xF4) {
+        if (($b0 & 0xE0) === 0xC0) {
+            $need = 1;
+            $min = 0x80;
+        } elseif (($b0 & 0xF0) === 0xE0) {
+            $need = 2;
+            $min = 0x800;
+        } elseif (($b0 & 0xF8) === 0xF0) {
+            $need = 3;
+            $min = 0x10000;
+        } else {
             $next = $i + 1;
 
             return null;
         }
-        if ($b0 < 0xE0) {
-            if ($i + 1 >= $len) {
-                $next = $len;
-
-                return null;
-            }
-            $b1 = \ord($str[$i + 1]);
-            if (($b1 & 0xC0) !== 0x80) {
-                $next = $i + 1;
-
-                return null;
-            }
-            $next = $i + 2;
-
-            return (($b0 & 0x1F) << 6) | ($b1 & 0x3F);
-        }
-        if ($b0 < 0xF0) {
-            if ($i + 2 >= $len) {
-                $next = $len;
-
-                return null;
-            }
-            $b1 = \ord($str[$i + 1]);
-            $b2 = \ord($str[$i + 2]);
-            if (($b1 & 0xC0) !== 0x80 || ($b2 & 0xC0) !== 0x80) {
-                $next = $i + 1;
-
-                return null;
-            }
-            $next = $i + 3;
-
-            return (($b0 & 0x0F) << 12) | (($b1 & 0x3F) << 6) | ($b2 & 0x3F);
-        }
-        if ($i + 3 >= $len) {
-            $next = $len;
-
-            return null;
-        }
-        $b1 = \ord($str[$i + 1]);
-        $b2 = \ord($str[$i + 2]);
-        $b3 = \ord($str[$i + 3]);
-        if (($b1 & 0xC0) !== 0x80 || ($b2 & 0xC0) !== 0x80 || ($b3 & 0xC0) !== 0x80) {
+        if ($i + $need >= $len) {
             $next = $i + 1;
 
             return null;
         }
-        $next = $i + 4;
+        $cp = $b0 & (0xFF >> (2 + $need));
+        for ($j = 1; $j <= $need; ++$j) {
+            $bj = \ord($str[$i + $j]);
+            if (($bj & 0xC0) !== 0x80) {
+                $next = $i + 1;
 
-        return (($b0 & 0x07) << 18) | (($b1 & 0x3F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
+                return null;
+            }
+            $cp = ($cp << 6) | ($bj & 0x3F);
+        }
+        // Overlong, UTF-16 surrogates, or above U+10FFFF — consume one byte (ICU).
+        if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF) || $cp > 0x10FFFF) {
+            $next = $i + 1;
+
+            return null;
+        }
+        $next = $i + 1 + $need;
+
+        return $cp;
     }
 
     private static function utf8Chr(int $cp): ?string
