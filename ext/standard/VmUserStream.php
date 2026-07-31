@@ -270,6 +270,62 @@ final class VmUserStream
         return boolval::isTruthy($result);
     }
 
+    /** STREAM_OPTION_WRITE_BUFFER (php_streams.h) */
+    private const STREAM_OPTION_WRITE_BUFFER = 3;
+
+    /** STREAM_OPTION_READ_BUFFER */
+    private const STREAM_OPTION_READ_BUFFER = 2;
+
+    /** STREAM_OPTION_BLOCKING */
+    private const STREAM_OPTION_BLOCKING = 1;
+
+    /** STREAM_BUFFER_NONE / STREAM_BUFFER_FULL */
+    private const STREAM_BUFFER_NONE = 0;
+    private const STREAM_BUFFER_FULL = 2;
+
+    /** libc BUFSIZ used when php-src passes NULL ptrparam for buffer options */
+    private const STREAM_BUFSIZ = 8192;
+
+    /**
+     * stream_set_write_buffer on userspace — php-src streamsfuncs.c + user_stream_set_option (#25999).
+     *
+     * @return int|false 0 on success (php-src RETURN_LONG(0)), false on failure
+     */
+    public static function setWriteBuffer(int $handle, int $buffer): int|false
+    {
+        $mode = 0 === $buffer ? self::STREAM_BUFFER_NONE : self::STREAM_BUFFER_FULL;
+        $size = 0 === $buffer ? self::STREAM_BUFSIZ : $buffer;
+        if (!self::setOption($handle, self::STREAM_OPTION_WRITE_BUFFER, $mode, $size)) {
+            return false;
+        }
+
+        return 0;
+    }
+
+    /**
+     * stream_set_read_buffer on userspace (#25999).
+     *
+     * @return int|false 0 on success, false on failure
+     */
+    public static function setReadBuffer(int $handle, int $buffer): int|false
+    {
+        $mode = 0 === $buffer ? self::STREAM_BUFFER_NONE : self::STREAM_BUFFER_FULL;
+        $size = 0 === $buffer ? self::STREAM_BUFSIZ : $buffer;
+        if (!self::setOption($handle, self::STREAM_OPTION_READ_BUFFER, $mode, $size)) {
+            return false;
+        }
+
+        return 0;
+    }
+
+    /**
+     * stream_set_blocking on userspace — must invoke stream_set_option (#25999).
+     */
+    public static function setBlocking(int $handle, bool $mode): bool
+    {
+        return self::setOption($handle, self::STREAM_OPTION_BLOCKING, $mode ? 1 : 0, null);
+    }
+
     public static function close(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;

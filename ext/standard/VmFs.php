@@ -1735,6 +1735,9 @@ final class VmFs
      * @return int|false previous buffer size
      */
     public static function streamSetWriteBuffer(int $handle, int $buffer) {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::setWriteBuffer($handle, $buffer);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::setWriteBuffer($handle, $buffer);
         }
@@ -1756,6 +1759,9 @@ final class VmFs
      * @return int|false previous buffer size
      */
     public static function streamSetReadBuffer(int $handle, int $buffer) {
+        if (VmUserStream::isValidHandle($handle)) {
+            return VmUserStream::setReadBuffer($handle, $buffer);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::setReadBuffer($handle, $buffer);
         }
@@ -1834,9 +1840,17 @@ final class VmFs
      */
     public static function streamSetBlocking(int $handle, bool $mode): bool
     {
+        if (VmUserStream::isValidHandle($handle)) {
+            // php-src userspace: STREAM_OPTION_BLOCKING via stream_set_option (#25999)
+            if (!VmUserStream::setBlocking($handle, $mode)) {
+                return false;
+            }
+            self::setHandleBlocked($handle, $mode);
+
+            return true;
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)
-            || VmPhpInputOutputStream::isValidHandle($handle)
-            || VmUserStream::isValidHandle($handle)) {
+            || VmPhpInputOutputStream::isValidHandle($handle)) {
             self::setHandleBlocked($handle, $mode);
 
             return true;
