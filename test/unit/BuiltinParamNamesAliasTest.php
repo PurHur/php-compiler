@@ -1780,7 +1780,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($crypt, 'str', 'crypt'));
     }
 
-    /** @covers issue #23217 */
+    /** @covers issue #23217 / #25594 */
     public function testStripTagsZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('strip_tags');
@@ -1790,6 +1790,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $allowable_tags)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'strip_tags'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'allowable_tags', 'strip_tags'));
+        self::assertSame('array|string|null', BuiltinInternalArgInfo::stubParamTypeOverride('strip_tags', 1));
     }
 
     /** @covers issue #23226 */

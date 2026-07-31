@@ -339,6 +339,8 @@ final class BuiltinInternalArgInfo
                 1 => '?array',
                 default => null,
             },
+            // ext/standard/string.stub.php — array|string|null $allowed_tags = null (InternalArgInfo string) (#25594)
+            'strip_tags' => 1 === $index ? 'array|string|null' : null,
             // ext/standard/string.stub.php — ?int $length = null (InternalArgInfo int → 0) (#25472)
             'substr_count' => 3 === $index ? '?int' : null,
             // ext/standard/string.stub.php — ?string $delimiter = null (InternalArgInfo string, OPT no default) (#25472)
