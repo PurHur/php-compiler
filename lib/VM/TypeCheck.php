@@ -172,29 +172,73 @@ final class TypeCheck
         InterfaceCheck::assertObjectImplementsAll($dest, $interfaceLcs, $context, 'Argument', $expectedDisplay);
     }
 
+    /** Set while coercing a write through `$r = &$typedProp` (#25622). */
+    private static bool $assignViaTypedPropertyReference = false;
+
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
     {
-        $target = $dest->resolveIndirect();
-        if (null !== $target->dnfArms) {
-            return;
-        }
-        if (null !== $target->unionTypeConstraints) {
-            self::coerceUnionValue(
-                $target,
-                $target->unionTypeConstraints,
-                $strict,
-                null !== $target->functionStaticVarName ? 'Static variable' : 'Property',
-                $target->declaredTypeLabel
-            );
+        $prevViaRef = self::$assignViaTypedPropertyReference;
+        self::$assignViaTypedPropertyReference = self::destIsTypedPropertyByRefWrite($dest);
+        try {
+            $target = $dest->resolveIndirect();
+            if (null !== $target->dnfArms) {
+                return;
+            }
+            if (null !== $target->unionTypeConstraints) {
+                self::coerceUnionValue(
+                    $target,
+                    $target->unionTypeConstraints,
+                    $strict,
+                    null !== $target->functionStaticVarName ? 'Static variable' : 'Property',
+                    $target->declaredTypeLabel
+                );
 
-            return;
+                return;
+            }
+            $kind = null !== $target->functionStaticVarName ? 'Static variable' : 'Property';
+            self::coerceTypedSlot($dest, $strict, $kind, null, true);
+            $resolved = $dest->resolveIndirect();
+            if (null !== $resolved->genericArrayTypeSpec) {
+                self::assertGenericArrayShape($resolved, $resolved->genericArrayTypeSpec, $kind);
+            }
+        } finally {
+            self::$assignViaTypedPropertyReference = $prevViaRef;
         }
-        $kind = null !== $target->functionStaticVarName ? 'Static variable' : 'Property';
-        self::coerceTypedSlot($dest, $strict, $kind, null, true);
-        $resolved = $dest->resolveIndirect();
-        if (null !== $resolved->genericArrayTypeSpec) {
-            self::assertGenericArrayShape($resolved, $resolved->genericArrayTypeSpec, $kind);
+    }
+
+    /** Expose assign-via-ref for DnfCheck property TypeErrors (#25622). */
+    public static function withTypedPropertyByRefAssign(bool $viaReference, callable $fn): void
+    {
+        $prev = self::$assignViaTypedPropertyReference;
+        self::$assignViaTypedPropertyReference = $viaReference;
+        try {
+            $fn();
+        } finally {
+            self::$assignViaTypedPropertyReference = $prev;
         }
+    }
+
+    public static function isAssignViaTypedPropertyReference(): bool
+    {
+        return self::$assignViaTypedPropertyReference;
+    }
+
+    /**
+     * Zend: writes through `$r = &$typedProp` say "reference held by property";
+     * direct `$obj->prop =` / fetch-write temps do not (#25622).
+     */
+    public static function destIsTypedPropertyByRefWrite(Variable $dest): bool
+    {
+        if ($dest->typedPropertyByRef) {
+            return true;
+        }
+        if ($dest->propertyAssignLvalue || !$dest->isIndirect()) {
+            return false;
+        }
+        $target = $dest->resolveIndirect();
+
+        return (null !== $target->objectPropertyOwner && null !== $target->objectPropertyName)
+            || (null !== $target->staticPropertyClassLc && null !== $target->objectPropertyName);
     }
 
     public static function coerceFunctionStaticWrite(Variable $dest, bool $strict): void
@@ -1024,6 +1068,7 @@ final class TypeCheck
         string $expectedType,
         Variable $value
     ): \TypeError {
+        $expectedType = \PHPCompiler\DnfType::zendTypeErrorLabel($expectedType);
         if (null !== $target->functionStaticVarName && '' !== $target->functionStaticVarName) {
             return new \TypeError(sprintf(
                 'Cannot assign %s to static variable $%s of type %s',
@@ -1032,12 +1077,16 @@ final class TypeCheck
                 $expectedType
             ));
         }
+        $propPhrase = self::$assignViaTypedPropertyReference
+            ? 'reference held by property'
+            : 'property';
         $owner = $target->objectPropertyOwner;
         $propName = $target->objectPropertyName ?? 'property';
         if (null !== $owner) {
             return new \TypeError(sprintf(
-                'Cannot assign %s to property %s::$%s of type %s',
+                'Cannot assign %s to %s %s::$%s of type %s',
                 self::valueTypeLabel($value),
+                $propPhrase,
                 $owner->class->name,
                 $propName,
                 $expectedType
@@ -1052,8 +1101,9 @@ final class TypeCheck
             }
 
             return new \TypeError(sprintf(
-                'Cannot assign %s to property %s::$%s of type %s',
+                'Cannot assign %s to %s %s::$%s of type %s',
                 self::valueTypeLabel($value),
+                $propPhrase,
                 $classLabel,
                 $propName,
                 $expectedType

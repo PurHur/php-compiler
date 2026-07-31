@@ -196,6 +196,7 @@ final class VmSettype
             $meta->typeConstraint ?? Variable::TYPE_INTEGER,
             $meta->literalBoolType,
         );
+        $expected = \PHPCompiler\DnfType::zendTypeErrorLabel($expected);
         $resolved = $slot->resolveIndirect();
         $propName = $slot->objectPropertyName ?? $resolved->objectPropertyName ?? 'property';
         $classLc = $slot->staticPropertyClassLc ?? $resolved->staticPropertyClassLc;

@@ -4134,13 +4134,20 @@ restart:
                     try {
                         TypeCheck::coercePropertyWrite($arg2, $strict);
                         if (null !== $writeTarget->dnfArms) {
-                            DnfCheck::assertMatches(
-                                $arg3,
-                                $writeTarget->dnfArms,
-                                $this->context,
-                                'Property',
-                                $writeTarget,
-                                $strict
+                            $dnfCtx = $this->context;
+                            $viaRef = TypeCheck::destIsTypedPropertyByRefWrite($arg2);
+                            TypeCheck::withTypedPropertyByRefAssign(
+                                $viaRef,
+                                static function () use ($arg3, $writeTarget, $dnfCtx, $strict): void {
+                                    DnfCheck::assertMatches(
+                                        $arg3,
+                                        $writeTarget->dnfArms,
+                                        $dnfCtx,
+                                        'Property',
+                                        $writeTarget,
+                                        $strict
+                                    );
+                                }
                             );
                         }
                     } catch (\TypeError $e) {
@@ -4376,6 +4383,15 @@ restart:
                     // IS_REFERENCE-style cell so `$b =& $a[$k]; unset($a);` keeps the residual (#22027).
                     if (null !== $rhs->objectPropertyOwner) {
                         $writeTarget->indirect($rhs);
+                        $this->markTypedPropertyByRefAlias($writeTarget, $rhs);
+                        break;
+                    }
+                    if (
+                        null !== $rhs->staticPropertyClassLc
+                        && null !== $rhs->objectPropertyName
+                    ) {
+                        $writeTarget->indirect($rhs);
+                        $this->markTypedPropertyByRefAlias($writeTarget, $rhs);
                         break;
                     }
                     if (
@@ -4384,6 +4400,7 @@ restart:
                         && !$rhs->hashTableBucketCell
                     ) {
                         $writeTarget->indirect($rhs);
+                        $this->markTypedPropertyByRefAlias($writeTarget, $rhs);
                         break;
                     }
                     if (Variable::TYPE_INDIRECT !== $rhs->type) {
@@ -4392,6 +4409,7 @@ restart:
                         $rhs->indirect($ref);
                     }
                     $writeTarget->indirect($rhs->resolveIndirect());
+                    $this->markTypedPropertyByRefAlias($writeTarget, $rhs->resolveIndirect());
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $dest = $frame->scope[$op->arg1];
@@ -6043,6 +6061,9 @@ restart:
                         }
                         $dest = $frame->scope[$op->arg1];
                         $dest->indirect($storage);
+                        if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                            $dest->propertyAssignLvalue = true;
+                        }
                         $dest->staticPropertyClassLc = $lcClass;
                         $dest->objectPropertyName = $propNameRaw;
                         $storage->staticPropertyClassLc = $lcClass;
@@ -6079,6 +6100,9 @@ restart:
                         VM\TypedPropertyCheck::assertReadable($storage);
                     }
                     $dest->indirect($storage);
+                    if ($forWrite && !$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                        $dest->propertyAssignLvalue = true;
+                    }
                     $dest->staticPropertyClassLc = $lcClass;
                     $dest->objectPropertyName = $propNameRaw;
                     if (!$mutates) {
@@ -7923,6 +7947,9 @@ restart:
                                 goto restart;
                             }
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                            if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                                $result->propertyAssignLvalue = true;
+                            }
                             break;
                         }
                         $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($propertyObject, $name, $frame);
@@ -8050,6 +8077,9 @@ restart:
                             goto restart;
                         }
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                        if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                            $result->propertyAssignLvalue = true;
+                        }
                         break;
                     }
                     if ($magicGetForRead) {
@@ -12957,6 +12987,20 @@ restart:
     public function currentExecutingFrame(): ?Frame
     {
         return $this->executingFrame;
+    }
+
+    /**
+     * Mark an ASSIGN_REF alias so TypeErrors use "reference held by property" (#25622).
+     */
+    private function markTypedPropertyByRefAlias(Variable $alias, Variable $storage): void
+    {
+        $resolved = $storage->resolveIndirect();
+        if (
+            (null !== $resolved->objectPropertyOwner && null !== $resolved->objectPropertyName)
+            || (null !== $resolved->staticPropertyClassLc && null !== $resolved->objectPropertyName)
+        ) {
+            $alias->typedPropertyByRef = true;
+        }
     }
 
     /**

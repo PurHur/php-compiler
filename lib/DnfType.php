@@ -298,7 +298,49 @@ final class DnfType
         if ([] === $memberNames) {
             return '';
         }
+        $sorted = self::zendSortUnionMemberNames($memberNames);
+        // Simple T|null → ?T (zend_type pretty-print / property TypeError, #25622).
+        if (2 === \count($sorted)) {
+            $a = strtolower($sorted[0]);
+            $b = strtolower($sorted[1]);
+            if ('null' === $b && 'null' !== $a && !str_contains($sorted[0], '|') && !str_contains($sorted[0], '&')) {
+                return '?'.$sorted[0];
+            }
+            if ('null' === $a && 'null' !== $b && !str_contains($sorted[1], '|') && !str_contains($sorted[1], '&')) {
+                return '?'.$sorted[1];
+            }
+        }
 
-        return implode('|', self::zendSortUnionMemberNames($memberNames));
+        return implode('|', $sorted);
+    }
+
+    /**
+     * Property / typed-slot TypeError expected-type display (php-src zend_type pretty-print).
+     * Accepts labels already stored as `int|null` and renders `?int` (#25622).
+     */
+    public static function zendTypeErrorLabel(string $label): string
+    {
+        if ('' === $label || str_starts_with($label, '?')) {
+            return $label;
+        }
+        $parts = explode('|', $label);
+        if (2 !== \count($parts)) {
+            return $label;
+        }
+        $a = trim($parts[0]);
+        $b = trim($parts[1]);
+        if ('' === $a || '' === $b || str_contains($a, '&') || str_contains($b, '&')) {
+            return $label;
+        }
+        $aLc = strtolower($a);
+        $bLc = strtolower($b);
+        if ('null' === $bLc && 'null' !== $aLc) {
+            return '?'.$a;
+        }
+        if ('null' === $aLc && 'null' !== $bLc) {
+            return '?'.$b;
+        }
+
+        return $label;
     }
 }
