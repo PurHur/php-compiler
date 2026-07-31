@@ -28088,7 +28088,9 @@ class Compiler {
                     continue;
                 }
                 $usageIndex = array_search($usage, $cfgChildren, true);
-                if (\is_int($usageIndex) && $usageIndex > $childIndex && $usageIndex < $consumerIndex) {
+                // Include usageIndex === consumerIndex: auto-detected "consumer" may be the leaf
+                // MethodCall (isId) whose var is this receiver — not the outer FuncCall (#25928).
+                if (\is_int($usageIndex) && $usageIndex > $childIndex && $usageIndex <= $consumerIndex) {
                     return false;
                 }
             }
@@ -28950,10 +28952,20 @@ class Compiler {
     ): int {
         if (null === $consumerIndex) {
             for ($k = $producerIndex + 1, $n = \count($cfgChildren); $k < $n; ++$k) {
-                if ($this->isSiblingMultiArgInlineCallConsumer($cfgChildren[$k] ?? null)) {
-                    $consumerIndex = $k;
-                    break;
+                $cand = $cfgChildren[$k] ?? null;
+                if (!$this->isSiblingMultiArgInlineCallConsumer($cand)) {
+                    continue;
                 }
+                // Skip 0-arg MethodCall leaves (isId) so ordinals use the outer multi-arg FuncCall
+                // (var_export(..., true)) — otherwise UNKNOWN-typed receivers get ord=-1 (#25928).
+                if (
+                    ($cand instanceof Op\Expr\MethodCall || $cand instanceof Op\Expr\StaticCall)
+                    && $this->deadInlineTemporaryArgCount($cand) < 1
+                ) {
+                    continue;
+                }
+                $consumerIndex = $k;
+                break;
             }
         }
         $consumerIndex ??= $producerIndex + 1;
@@ -32028,7 +32040,8 @@ class Compiler {
             $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
                 $j,
                 $contiguousFirst,
-                $cfgChildren
+                $cfgChildren,
+                $callIndex
             );
             $execReturnCountNow = 0;
             foreach ($block->opCodes as $op) {
@@ -33033,7 +33046,8 @@ class Compiler {
             $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
                 $producerIndex,
                 $firstSibling,
-                $cfgChildren
+                $cfgChildren,
+                $consumerIndex
             );
             $legacyBase = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
                 $firstSibling,
@@ -33130,7 +33144,8 @@ class Compiler {
         $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
             $producerIndex,
             $firstSibling,
-            $cfgChildren
+            $cfgChildren,
+            $consumerIndex
         );
         $chainProducerCount = $this->countSiblingInlineFuncCallProducers(
             $firstSibling,
