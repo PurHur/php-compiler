@@ -5428,23 +5428,25 @@ restart:
                     $frame->scope[$op->arg1]->null();
                     break;
                 case OpCode::TYPE_IDENTICAL:
+                    // Match arms lower to IDENTICAL — warn on undefined CV reads (#26147, #10358).
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $arg1->bool($arg2->identicalTo($arg3));
                     break;
                 case OpCode::TYPE_NOT_IDENTICAL:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $arg1->bool(!$arg2->identicalTo($arg3));
                     $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg2, (int) $op->arg1, (int) $op->arg3);
                     $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg3, (int) $op->arg1, (int) $op->arg2);
                     break;
                 case OpCode::TYPE_EQUAL:
+                    // Switch cases lower to EQUAL — same undefined-CV warning path (#26147).
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     try {
                         $arg1->bool($arg2->equals($arg3, $this));
                     } catch (VM\MagicMethodInvocationAborted) {
@@ -5455,8 +5457,8 @@ restart:
                     break;
                 case OpCode::TYPE_NOT_EQUAL:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     try {
                         $arg1->bool(!$arg2->equals($arg3, $this));
                     } catch (VM\MagicMethodInvocationAborted) {
@@ -5467,8 +5469,8 @@ restart:
                     break;
                 case OpCode::TYPE_LOGICAL_XOR:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     $arg1->bool($arg2->toBool($this) !== $arg3->toBool($this));
                     break;
                 case OpCode::TYPE_SMALLER:
@@ -5476,8 +5478,8 @@ restart:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     try {
                         $arg1->compareOp($op->type, $arg2, $arg3, $this);
                     } catch (\TypeError $e) {
@@ -5491,8 +5493,8 @@ restart:
                     break;
                 case OpCode::TYPE_SPACESHIP:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $arg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
                     try {
                         $arg1->spaceshipOp($arg2, $arg3, $this);
                     } catch (\TypeError $e) {
