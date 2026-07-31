@@ -1856,21 +1856,21 @@ final class BuiltinClasses
         DateSerializeMethods::registerOnDateInterval($di, $pub);
         $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
 
-        $objProto = new Variable(Variable::TYPE_OBJECT);
-        $nullProto = new Variable(Variable::TYPE_NULL);
         $dp = new ClassEntry('DatePeriod');
         DatePeriodSupport::registerClassConstants($dp);
         // php-src php_date.c / date.stub.php — IteratorAggregate + getIterator → InternalIterator (#22263).
         $dp->interfaces = ['iteratoraggregate'];
         // php-src @readonly via write handlers — not ClassProperty::$readonly (#26154, re-#26146).
         // Internal DatePeriodSupport / JIT iterator stores bypass userland Assign guards.
-        $dp->properties[] = new ClassProperty('start', null, $objProto);
-        $dp->properties[] = new ClassProperty('current', null, $nullProto);
-        $dp->properties[] = new ClassProperty('end', null, $nullProto);
-        $dp->properties[] = new ClassProperty('interval', null, $objProto);
-        $dp->properties[] = new ClassProperty('recurrences', null, $intProto);
-        $dp->properties[] = new ClassProperty('include_start_date', null, $boolProto);
-        $dp->properties[] = new ClassProperty('include_end_date', null, $boolProto);
+        // Declared types match php_date.stub.php so unset→read is typed-uninit Error (#26170).
+        // Fresh Variable per property — shared prototypes/defaults corrupted sibling slots on Error.
+        $dp->properties[] = new ClassProperty('start', null, self::datePeriodNullableDtiProto());
+        $dp->properties[] = new ClassProperty('current', null, self::datePeriodNullableDtiNullProto());
+        $dp->properties[] = new ClassProperty('end', null, self::datePeriodNullableDtiNullProto());
+        $dp->properties[] = new ClassProperty('interval', null, self::datePeriodNullableIntervalProto());
+        $dp->properties[] = new ClassProperty('recurrences', null, self::datePeriodIntProto());
+        $dp->properties[] = new ClassProperty('include_start_date', null, self::datePeriodBoolProto());
+        $dp->properties[] = new ClassProperty('include_end_date', null, self::datePeriodBoolProto());
         foreach ($dp->properties as $prop) {
             $prop->visibility = $pub;
             $prop->declaringClassLc = DatePeriodSupport::CLASS_DATEPERIOD;
@@ -1903,6 +1903,57 @@ final class BuiltinClasses
         $dp->methodNames['__set_state'] = '__set_state';
         DateSerializeMethods::registerOnDatePeriod($dp, $pub);
         $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
+    }
+
+    /** php-src DatePeriod::$start — ?DateTimeInterface, starts uninitialized (#26170). */
+    private static function datePeriodNullableDtiProto(): Variable
+    {
+        $proto = new Variable(Variable::TYPE_UNDEFINED);
+        $proto->typeConstraint = Variable::TYPE_OBJECT;
+        $proto->classConstraint = 'DateTimeInterface';
+        $proto->declaredTypeLabel = '?DateTimeInterface';
+
+        return $proto;
+    }
+
+    /** php-src DatePeriod::$current/$end — ?DateTimeInterface, default null (#26170). */
+    private static function datePeriodNullableDtiNullProto(): Variable
+    {
+        $proto = new Variable(Variable::TYPE_NULL);
+        $proto->typeConstraint = Variable::TYPE_OBJECT;
+        $proto->classConstraint = 'DateTimeInterface';
+        $proto->declaredTypeLabel = '?DateTimeInterface';
+
+        return $proto;
+    }
+
+    /** php-src DatePeriod::$interval — ?DateInterval (#26170). */
+    private static function datePeriodNullableIntervalProto(): Variable
+    {
+        $proto = new Variable(Variable::TYPE_UNDEFINED);
+        $proto->typeConstraint = Variable::TYPE_OBJECT;
+        $proto->classConstraint = 'DateInterval';
+        $proto->declaredTypeLabel = '?DateInterval';
+
+        return $proto;
+    }
+
+    private static function datePeriodIntProto(): Variable
+    {
+        $proto = new Variable(Variable::TYPE_UNDEFINED);
+        $proto->typeConstraint = Variable::TYPE_INTEGER;
+        $proto->declaredTypeLabel = 'int';
+
+        return $proto;
+    }
+
+    private static function datePeriodBoolProto(): Variable
+    {
+        $proto = new Variable(Variable::TYPE_UNDEFINED);
+        $proto->typeConstraint = Variable::TYPE_BOOLEAN;
+        $proto->declaredTypeLabel = 'bool';
+
+        return $proto;
     }
 
     private static function registerExceptions(Context $ctx): void

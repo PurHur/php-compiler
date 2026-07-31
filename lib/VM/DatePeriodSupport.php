@@ -42,6 +42,7 @@ final class DatePeriodSupport
 
     /**
      * php-src @readonly DatePeriod props — write handlers reject assigns; not ZEND_ACC_READONLY (#26154, re-#26146).
+     * Declared types live on BuiltinClasses prototypes so unset→read is typed-uninit Error (#26170).
      *
      * @var list<string>
      */
@@ -837,7 +838,8 @@ final class DatePeriodSupport
     private static function requireIntProperty(ObjectEntry $obj, string $name): Variable
     {
         $var = $obj->getProperty($name)->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $var->type) {
+        // Typed prototypes start UNDEFINED until construct assigns (#26170).
+        if (Variable::TYPE_INTEGER !== $var->type && Variable::TYPE_UNDEFINED !== $var->type) {
             throw new \LogicException("DatePeriod property {$name} is missing in this compiler build");
         }
 
@@ -847,7 +849,7 @@ final class DatePeriodSupport
     private static function requireBoolProperty(ObjectEntry $obj, string $name): Variable
     {
         $var = $obj->getProperty($name)->resolveIndirect();
-        if (Variable::TYPE_BOOLEAN !== $var->type) {
+        if (Variable::TYPE_BOOLEAN !== $var->type && Variable::TYPE_UNDEFINED !== $var->type) {
             throw new \LogicException("DatePeriod property {$name} is missing in this compiler build");
         }
 
