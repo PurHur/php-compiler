@@ -351,9 +351,41 @@ final class VmDomJitDispatch
         $name = self::stringArg($extra[0] ?? self::missingArg('getAttribute', 0), 'getAttribute', 0);
         $value = VmDom::getAttribute($element, $name);
         $var = new Variable();
-        $var->string($value);
+        if (null === $value) {
+            $var->null();
+        } else {
+            $var->string($value);
+        }
 
         return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function getAttributeNS(ObjectEntry $element, array $extra): Variable
+    {
+        $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNS', 0), 'getAttributeNS', 0);
+        $localName = self::stringArg($extra[1] ?? self::missingArg('getAttributeNS', 1), 'getAttributeNS', 1);
+        $value = VmDom::getAttributeNS($element, $namespace, $localName);
+        $var = new Variable();
+        if (null === $value) {
+            $var->null();
+        } else {
+            $var->string($value);
+        }
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function getAttributeNode(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        $name = self::stringArg($extra[0] ?? self::missingArg('getAttributeNode', 0), 'getAttributeNode', 0);
+
+        return VmDom::getAttributeNode($ctx, $element, $name);
     }
 
     /**
