@@ -107,15 +107,15 @@ final class VmMemory
         return MemoryAccounting::peakBytes();
     }
 
-    /** php-src: zend_reset_peak_memory_usage — baseline peak at current usage. */
-    public static function resetPeakUsage(bool $realUsage = false): void
+    /**
+     * php-src: zend_memory_reset_peak_usage — baseline emalloc + real peaks (#26104).
+     *
+     * No $real_usage flag: Zend takes zero args and resets both peaks.
+     */
+    public static function resetPeakUsage(): void
     {
-        if ($realUsage) {
-            self::$peakReal = self::readRssBytes();
-
-            return;
-        }
         MemoryAccounting::resetPeakToCurrent();
+        self::$peakReal = self::readRssBytes();
     }
 
     /**
