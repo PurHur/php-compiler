@@ -183,14 +183,17 @@ final class VmPDOStatement
         }
         $assoc = [];
         $num = [];
+        $names = [];
         for ($i = 0; $i < $count; ++$i) {
             $name = VmSqlite3Native::columnName($st->stmt, $i);
             $value = VmSqlite3Native::columnValueAt($st->stmt, $i);
+            $names[$i] = $name;
             $assoc[$name] = $value;
             $num[$i] = $value;
         }
         // FETCH_OBJ / FETCH_CLASS / FETCH_INTO use assoc keys (php-src property update).
         // FETCH_COLUMN / FETCH_KEY_PAIR / FETCH_FUNC use numeric indices (#25578, #25640, #25641).
+        // FETCH_NAMED nests duplicate column names into lists (#25666).
         $row = match ($how) {
             PdoConstants::FETCH_ASSOC,
             PdoConstants::FETCH_OBJ,
@@ -200,6 +203,7 @@ final class VmPDOStatement
             PdoConstants::FETCH_COLUMN,
             PdoConstants::FETCH_KEY_PAIR,
             PdoConstants::FETCH_FUNC => $num,
+            PdoConstants::FETCH_NAMED => self::buildNamedRow($names, $num),
             PdoConstants::FETCH_BOUND => $assoc + $num,
             default => $assoc + $num,
         };
@@ -466,6 +470,34 @@ final class VmPDOStatement
         $ht->add(\is_int($key) ? (string) $key : (string) $key, $slot);
     }
 
+    /**
+     * Build a FETCH_NAMED row — duplicate column names nest into lists (php-src #25666).
+     *
+     * @param array<int, string> $names
+     * @param array<int, mixed>  $num
+     *
+     * @return array<string, mixed>
+     */
+    public static function buildNamedRow(array $names, array $num): array
+    {
+        $out = [];
+        foreach ($names as $i => $name) {
+            $value = $num[$i] ?? null;
+            if (!\array_key_exists($name, $out)) {
+                $out[$name] = $value;
+                continue;
+            }
+            $cur = $out[$name];
+            if (!\is_array($cur)) {
+                $out[$name] = [$cur, $value];
+            } else {
+                $out[$name][] = $value;
+            }
+        }
+
+        return $out;
+    }
+
     /** True when fetchAll must key rows by the first column (php-src PDO_FETCH_GROUP / UNIQUE). */
     public static function isGroupingFetch(int $mode): bool
     {
@@ -566,6 +598,7 @@ final class VmPDOStatement
             PdoConstants::FETCH_INTO => self::assocWithoutFirstColumn($assoc, $names),
             PdoConstants::FETCH_NUM,
             PdoConstants::FETCH_FUNC => self::numWithoutFirstColumnRenumbered($num),
+            PdoConstants::FETCH_NAMED => self::namedWithoutFirstColumn($names, $num),
             // USE_DEFAULT (0) and BOTH keep original numeric indices (php-src zend_hash_index_add).
             default => self::bothWithoutFirstColumn($assoc, $num, $names),
         };
@@ -605,6 +638,25 @@ final class VmPDOStatement
         }
 
         return $out;
+    }
+
+    /**
+     * @param array<int, string> $names
+     * @param array<int, mixed>  $num
+     *
+     * @return array<string, mixed>
+     */
+    private static function namedWithoutFirstColumn(array $names, array $num): array
+    {
+        $restNames = [];
+        $restNum = [];
+        $n = \count($num);
+        for ($i = 1; $i < $n; ++$i) {
+            $restNames[] = $names[$i];
+            $restNum[] = $num[$i];
+        }
+
+        return self::buildNamedRow($restNames, $restNum);
     }
 
     /**

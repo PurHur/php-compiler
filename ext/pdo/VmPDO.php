@@ -666,7 +666,12 @@ final class VmPDO
         $ht = new HashTable();
         foreach ($row as $key => $item) {
             $slot = new Variable();
-            self::assignScalar($slot, $item);
+            if (\is_array($item)) {
+                // Nested lists for PDO::FETCH_NAMED duplicate columns (#25666).
+                self::assignRow($slot, $item);
+            } else {
+                self::assignScalar($slot, $item);
+            }
             $ht->add(\is_int($key) ? (string) $key : $key, $slot);
         }
         $returnVar->array($ht);
