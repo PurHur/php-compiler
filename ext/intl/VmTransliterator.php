@@ -137,9 +137,10 @@ final class VmTransliterator
         $handle = self::openTransliterator($id, $direction);
         $fallback = null === $handle && self::supportsFallbackId($id);
         if (null === $handle && !$fallback) {
+            // php-src transliterator_methods.c — utrans_openU failure → U_INVALID_ID (#25355).
             IntlError::set(
-                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-                'transliterator_create: unable to open transliterator with ID "'.$id.'": U_INVALID_ID'
+                IntlError::U_INVALID_ID,
+                'transliterator_create: unable to open ICU transliterator with id "'.$id.'": U_INVALID_ID'
             );
 
             return null;
@@ -470,9 +471,10 @@ final class VmTransliterator
         $handle = self::openTransliterator($id, self::FORWARD);
         $fallback = null === $handle && self::supportsFallbackId($id);
         if (null === $handle && !$fallback) {
+            // php-src transliterator_methods.c — utrans_openU failure → U_INVALID_ID (#25355).
             IntlError::set(
-                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-                'transliterator_create: unable to open transliterator with ID "'.$id.'": U_INVALID_ID'
+                IntlError::U_INVALID_ID,
+                'transliterator_create: unable to open ICU transliterator with id "'.$id.'": U_INVALID_ID'
             );
 
             return false;
