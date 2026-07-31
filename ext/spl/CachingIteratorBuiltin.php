@@ -103,6 +103,8 @@ final class CachingIteratorBuiltin
         $entry->methodNames['offsetget'] = 'offsetGet';
         $entry->methodNames['offsetset'] = 'offsetSet';
         $entry->methodNames['offsetunset'] = 'offsetUnset';
+        // php-src spl_iterators.stub.php — untyped $key; @tentative-return-type (#25856).
+        SplArrayStorage::attachArrayAccessArginfoNamed($entry, 'key', null, 'value', 'mixed');
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;

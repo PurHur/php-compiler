@@ -63,6 +63,8 @@ final class SplFixedArrayBuiltin
         $entry->methodNames['offsetset'] = 'offsetSet';
         $entry->methodNames['offsetexists'] = 'offsetExists';
         $entry->methodNames['offsetunset'] = 'offsetUnset';
+        // php-src spl_fixedarray.stub.php — untyped $index; @tentative-return-type (#25856).
+        SplArrayStorage::attachArrayAccessArginfoNamed($entry, 'index', null, 'value', 'mixed');
         $entry->methods['fromarray'] = new SplFixedArrayFromArray();
         $entry->methodVisibility['fromarray'] = $pubStatic;
         $entry->methodNames['fromarray'] = 'fromArray';
@@ -383,7 +385,7 @@ final class SplFixedArrayDebugInfo extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::__debugInfo()'
@@ -404,7 +406,7 @@ final class SplFixedArrayConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::__construct()'
@@ -431,7 +433,7 @@ final class SplFixedArrayCount extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::count()'
@@ -459,7 +461,7 @@ final class SplFixedArrayOffsetGet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetGet()'
@@ -486,7 +488,7 @@ final class SplFixedArrayOffsetSet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetSet()'
@@ -510,7 +512,7 @@ final class SplFixedArrayOffsetExists extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetExists()'
@@ -539,7 +541,7 @@ final class SplFixedArrayOffsetUnset extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::offsetUnset()'
@@ -593,7 +595,7 @@ final class SplFixedArrayToArray extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::toArray()'
@@ -613,7 +615,7 @@ final class SplFixedArrayGetIterator extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::getIterator()'
@@ -635,7 +637,7 @@ final class SplFixedArrayGetSize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::getSize()'
@@ -663,7 +665,7 @@ final class SplFixedArraySetSize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::setSize()'
@@ -693,7 +695,7 @@ final class SplFixedArrayJsonSerialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::jsonSerialize()'
@@ -713,7 +715,7 @@ final class SplFixedArraySerialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::__serialize()'
@@ -740,7 +742,7 @@ final class SplFixedArrayUnserialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::__unserialize()'
