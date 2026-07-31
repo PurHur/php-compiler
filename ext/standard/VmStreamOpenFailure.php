@@ -44,10 +44,14 @@ final class VmStreamOpenFailure
     }
 
     /**
-     * php-src streams.c — http wrapper propagates connect strerror; plainfile defaults ENOENT.
+     * php-src streams.c — invalid mode / http connect strerror; plainfile defaults ENOENT.
      */
     private static function resolveOpenFailureDetail(string $path): string
     {
+        $invalidMode = VmFopenMode::consumeLastOpenFailureDetail();
+        if (null !== $invalidMode && '' !== $invalidMode) {
+            return $invalidMode;
+        }
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
             $httpDetail = VmHttpFetchPure::lastOpenFailureDetail();
             if (null !== $httpDetail && '' !== $httpDetail) {

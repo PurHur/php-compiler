@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmCsv;
 use PHPCompiler\ext\standard\VmCsvArg;
+use PHPCompiler\ext\standard\VmFopenMode;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFputcsv;
 use PHPCompiler\ext\standard\VmMath;
@@ -207,9 +208,13 @@ final class SplFileObjectConstruct extends VmClassMethod
         SplFileObjectStorage::setHandle($object, $handle, $mode);
     }
 
-    /** php-src streams.c — prefer host fopen reason (invalid mode vs missing path). */
+    /** php-src streams.c — prefer invalid-mode detail / host fopen reason (#6393, #25941). */
     private static function fopenFailureDetail(string $pathname, string $mode): string
     {
+        $invalid = VmFopenMode::consumeLastOpenFailureDetail();
+        if (null !== $invalid && '' !== $invalid) {
+            return $invalid;
+        }
         $last = \error_get_last();
         $detail = 'No such file or directory';
         if (\is_array($last) && isset($last['message']) && \is_string($last['message'])) {
