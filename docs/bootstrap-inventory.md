@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6644 |
-| Phase A inventory files (M2 ratio SSOT) | 6644 |
+| PHP files on vm.php path | 6645 |
+| Phase A inventory files (M2 ratio SSOT) | 6645 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21427 |
+| Source constructs flagged (warnings) | 21428 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -509,6 +509,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/dom/ns_import_simplexml.php` | 0 | 2 |
 | `ext/ds/BuiltinClasses.php` | 0 | 19 |
+| `ext/ds/DsExtensionPolicy.php` | 0 | 1 |
 | `ext/ds/Module.php` | 0 | 1 |
 | `ext/ds/VmDsStorage.php` | 0 | 15 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
@@ -10257,6 +10258,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 251)
 - new ArgumentCountError (line 273)
 - 13 class method(s)
+
+### `ext/ds/DsExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/ds/Module.php`
 

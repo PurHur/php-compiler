@@ -751,6 +751,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\lz4\Lz4ExtensionPolicy::isLz4ComplianceCase($name)) {
                 continue;
             }
+            // Functional ds cases set PHP_COMPILER_ENABLE_DS via --ENV--; phantoms when withheld (#25086).
+            if (!\PHPCompiler\ext\ds\DsExtensionPolicy::runsDsCompliance($name)
+                && \PHPCompiler\ext\ds\DsExtensionPolicy::isDsComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsBrotli()
                 && (str_contains($name, 'brotli') || str_contains($name, 'brotli_'))
                 && !str_contains($name, 'brotli_phantom')) {
