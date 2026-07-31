@@ -107,6 +107,8 @@ final class BuiltinInternalArgInfo
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
             // Zend/zend_builtin_functions.stub.php — sizeof alias absent from InternalArgInfo (#25966)
             'sizeof' => 'int',
+            // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)
+            'exit', 'die' => 'never',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
             'ceil', 'floor' => 'float',
             // ext/standard/basic_functions.stub.php / head.c — InternalArgInfo omits |false / void (#25780)
@@ -306,6 +308,8 @@ final class BuiltinInternalArgInfo
                 1 => 'int',
                 default => null,
             },
+            // Zend/zend_builtin_functions.stub.php — string|int $status = 0; InternalArgInfo int / die absent (#26056)
+            'exit', 'die' => 0 === $index ? 'string|int' : null,
             // ext/standard/array.stub.php — ?callable $callback; mode missing from InternalArgInfo (#24843)
             'array_filter' => match ($index) {
                 1 => '?callable',
