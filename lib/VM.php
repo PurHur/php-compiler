@@ -2228,17 +2228,25 @@ class VM {
             return WeakRefSupport::debugInfoEntries($object);
         }
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
-            $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
+            // php-src zend_std_get_debug_info: hook throw → zend_exception_error(E_WARNING)
+            // then zend_error_noreturn(E_ERROR, "__debuginfo() must return an array") (#25748).
+            // Caller try/catch must not absorb the hook exception.
+            try {
+                $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
+            } catch (ScriptExit $e) {
+                throw $e;
+            } catch (VM\BuiltinCallbackCatchRedirect $e) {
+                throw $e;
+            } catch (VM\MagicMethodInvocationAborted $e) {
+                throw $e;
+            } catch (\Throwable $hookException) {
+                $this->raiseDebugInfoMustReturnArrayFatal($frame, $hookException);
+            }
             if (Variable::TYPE_NULL === $result->type) {
                 return [];
             }
             if (Variable::TYPE_ARRAY !== $result->type) {
-                $given = Variable::TYPE_OBJECT === $result->type
-                    ? $result->toObject()->class->name
-                    : TypeCheck::typeNameForConstraint($result->type);
-                throw new \TypeError(
-                    "{$object->class->name}::__debugInfo(): Return value must be of type array, {$given} returned"
-                );
+                $this->raiseDebugInfoMustReturnArrayFatal($frame, null);
             }
             $props = [];
             foreach ($result->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -2278,6 +2286,47 @@ class VM {
         }
 
         return $object->class->getProperties($object->getRawProperties(), ClassEntry::PROP_PURPOSE_DEBUG);
+    }
+
+    /**
+     * php-src zend_std_get_debug_info failure: optional Warning for hook throw, then E_ERROR (#25748).
+     *
+     * @return never
+     */
+    private function raiseDebugInfoMustReturnArrayFatal(?Frame $frame, ?\Throwable $hookException): never
+    {
+        if (null !== $hookException) {
+            VM\ExceptionSupport::emitNativeUncaughtWarning(
+                $hookException,
+                null,
+                $this->context->errors->getDisplayErrors()
+            );
+        }
+        $message = '__debuginfo() must return an array';
+        if (null !== $frame) {
+            [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        } else {
+            $file = '';
+            $line = 0;
+            $stack = $this->context->runStackFrames();
+            if ([] !== $stack) {
+                [$file, $line] = VM\ExceptionSupport::userFatalSite($stack[0]);
+            }
+        }
+        $this->context->errors->recordLastError(
+            VM\ErrorReporter::E_ERROR,
+            $message,
+            $file,
+            $line
+        );
+        VM\ErrorReporter::writeCliErrorOutput(
+            VM\ErrorReporter::E_ERROR,
+            $message,
+            '' !== $file ? $file : null,
+            $line,
+            $this->context->errors->getDisplayErrors()
+        );
+        throw new ScriptExit(255);
     }
 
     /**

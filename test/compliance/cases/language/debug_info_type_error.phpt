@@ -1,5 +1,5 @@
 --TEST--
-Language: __debugInfo() — TypeError when return is not array (#4683, Zend/zend.c)
+Language: __debugInfo() non-array return → Fatal must return an array (#25748, re-#4683, Zend/zend.c)
 --FILE--
 <?php
 class C {
@@ -15,6 +15,7 @@ try {
     echo get_class($e), ':', $e->getMessage(), "\n";
 }
 echo "ok\n";
---EXPECT--
-TypeError:C::__debugInfo(): Return value must be of type array, string returned
-ok
+--EXPECTF--
+PHP Fatal error:  __debuginfo() must return an array in %s on line %d
+--EXPECT_EXIT--
+255

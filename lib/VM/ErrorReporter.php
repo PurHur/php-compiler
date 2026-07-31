@@ -16,6 +16,8 @@ final class ErrorReporter
     public const E_PARSE = 4;
     public const E_WARNING = 2;
     public const E_NOTICE = 8;
+    /** Zend E_ERROR (main/main.c; e.g. __debuginfo() must return an array, #25748). */
+    public const E_ERROR = 1;
     /** Zend E_COMPILE_ERROR (main/main.c; inheritance fatals during eval, #22922). */
     public const E_COMPILE_ERROR = 64;
     public const E_USER_ERROR = 256;
@@ -572,7 +574,7 @@ final class ErrorReporter
             self::E_WARNING, self::E_USER_WARNING => 'PHP Warning',
             self::E_NOTICE, self::E_USER_NOTICE => 'PHP Notice',
             self::E_DEPRECATED, self::E_USER_DEPRECATED => 'PHP Deprecated',
-            self::E_COMPILE_ERROR, self::E_USER_ERROR => 'PHP Fatal error',
+            self::E_ERROR, self::E_COMPILE_ERROR, self::E_USER_ERROR => 'PHP Fatal error',
             default => 'PHP Unknown error',
         };
     }
@@ -583,7 +585,7 @@ final class ErrorReporter
             self::E_WARNING, self::E_USER_WARNING => 'Warning',
             self::E_NOTICE, self::E_USER_NOTICE => 'Notice',
             self::E_DEPRECATED, self::E_USER_DEPRECATED => 'Deprecated',
-            self::E_COMPILE_ERROR, self::E_USER_ERROR => 'Fatal error',
+            self::E_ERROR, self::E_COMPILE_ERROR, self::E_USER_ERROR => 'Fatal error',
             default => 'Unknown error',
         };
     }
