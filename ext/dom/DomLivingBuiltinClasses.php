@@ -64,6 +64,8 @@ final class DomLivingBuiltinClasses
         if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
             return;
         }
+        // Always (re)register living constants — early return below skips class rebuild.
+        DomLivingConstants::register($ctx);
         if (isset($ctx->classes[VmDomLiving::CLASS_HTML_DOCUMENT])) {
             return;
         }

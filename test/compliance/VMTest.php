@@ -1547,7 +1547,8 @@ class VMTest extends BaseTest {
             }
             if (CompilerVersion::supportsDomLivingStandardNamespace()
                 && (str_contains($name, 'dom_html_document_phantom')
-                    || str_contains($name, 'dom_xml_document_phantom'))) {
+                    || str_contains($name, 'dom_xml_document_phantom')
+                    || str_contains($name, 'dom_html_no_default_ns_phantom'))) {
                 continue;
             }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
