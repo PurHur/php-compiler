@@ -5,19 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\VmFsTempnam;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_touch/__compiler_mkdir/__compiler_tempnam via FsDirJitHelper PHP (#8999).
+ * JIT/AOT link for __compiler_touch/__compiler_mkdir/__compiler_tempnam via FsDirJitHelper PHP (#8999, #25976).
  *
  * Replaces libc LLVM in {@see StringFsDirJit}. SSOT: {@see \PHPCompiler\ext\standard\VmFs}.
  * php-src: ext/standard/filestat.c, ext/standard/file.c
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer IconvRuntime #25570).
  */
 final class FsDirRuntime
 {
@@ -256,44 +257,18 @@ final class FsDirRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after FsDirJitHelper compile (#8999)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#25976');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FsDirJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('FsDirJitHelper.php parseAndCompile failed (#8999)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#8999)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#25976'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
