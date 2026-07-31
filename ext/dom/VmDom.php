@@ -7690,6 +7690,11 @@ final class VmDom
         }
         self::linkChildToParent($root, $document);
         self::propagateDocumentId($root, $document->id);
+        // Living HTML5 (lexbor): always insert an implied <head> under <html> unless
+        // LIBXML_HTML_NOIMPLIED — legacy libxml loadHTML leaves body-only trees (#26023).
+        if ($isLiving) {
+            self::ensureLivingHtmlImpliedHead($ctx, $document, $root, $options);
+        }
         if (!$deferDocumentSlotSync) {
             self::syncSubtree($ctx, $document);
         }
@@ -7817,6 +7822,38 @@ final class VmDom
         }
 
         return $written;
+    }
+
+    /**
+     * HTML5 "create an element for a token" + "before head" / "after head" — living Dom\\
+     * documents always expose a direct <head> child of <html> after parse (php-src lexbor;
+     * #26023). Legacy DOMDocument::loadHTML (libxml) does not invent <head>.
+     */
+    private static function ensureLivingHtmlImpliedHead(
+        Context $ctx,
+        ObjectEntry $document,
+        ObjectEntry $root,
+        int $options
+    ): void {
+        if (0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NOIMPLIED)) {
+            return;
+        }
+        if (!self::isElement($root)) {
+            return;
+        }
+        if ('html' !== strtolower(DomRegistry::state($root)->nodeName)) {
+            return;
+        }
+        if (null !== VmDomLiving::findDirectChildElementByLocalName($root, 'head')) {
+            return;
+        }
+        $headVar = self::createElement($ctx, 'head', $document);
+        if (Variable::TYPE_OBJECT !== $headVar->type) {
+            return;
+        }
+        $head = $headVar->toObject();
+        $body = VmDomLiving::findDirectChildElementByLocalName($root, 'body');
+        self::insertBefore($ctx, $root, $head, $body);
     }
 
     private static function normalizeHtmlLoadSource(string $html, int $options): string
