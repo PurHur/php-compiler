@@ -1762,16 +1762,29 @@ final class VmReflection
         };
     }
 
-    /** @param array<string, string> $result */
+    /**
+     * Insert interface then parents in Zend ce->interfaces expansion order (#25790).
+     *
+     * Matches {@see appendReflectionInterfaceName}: parents are inserted in reverse
+     * declaration order so SeekableIterator (Iterator, Traversable) expands to
+     * SeekableIterator, Traversable, Iterator — the same order as php-src.
+     *
+     * @param array<string, string> $result
+     */
     private static function addInterfaceAndParents(ClassEntry $iface, Context $ctx, array &$result): void
     {
         if (!$iface->isInterface) {
             return;
         }
         $name = $iface->name;
+        if (isset($result[$name])) {
+            return;
+        }
         $result[$name] = $name;
-        foreach ($iface->interfaces as $parentLc) {
-            $parentLc = strtolower(ltrim($parentLc, '\\'));
+
+        $parents = $iface->interfaces;
+        for ($i = count($parents) - 1; $i >= 0; --$i) {
+            $parentLc = strtolower(ltrim($parents[$i], '\\'));
             if (!isset($ctx->classes[$parentLc])) {
                 continue;
             }

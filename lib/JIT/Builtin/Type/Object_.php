@@ -1580,7 +1580,8 @@ class Object_ extends Type {
         $this->setInterfaceExtends('BackedEnum', ['UnitEnum']);
         $this->markInterfaceClass('Serializable');
         $this->markInterfaceClass('SeekableIterator');
-        $this->setInterfaceExtends('SeekableIterator', ['Iterator']);
+        // Flattened Zend ce->interfaces: Iterator, Traversable (#25790).
+        $this->setInterfaceExtends('SeekableIterator', ['Iterator', 'Traversable']);
         $this->markInterfaceClass('Reflector');
         // php-src php_dom.stub.php — classic ParentNode/ChildNode are independent (#22389).
         $this->markInterfaceClass('DOMParentNode');

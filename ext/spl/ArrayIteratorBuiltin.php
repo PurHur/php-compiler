@@ -28,20 +28,13 @@ final class ArrayIteratorBuiltin
 
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry = new ClassEntry('ArrayIterator');
-        if (isset($ctx->classes['iterator'])) {
-            $entry->interfaces[] = 'iterator';
-        }
-        if (isset($ctx->classes['countable'])) {
-            $entry->interfaces[] = 'countable';
-        }
-        if (isset($ctx->classes['arrayaccess'])) {
-            $entry->interfaces[] = 'arrayaccess';
-        }
-        if (isset($ctx->classes['seekableiterator'])) {
-            $entry->interfaces[] = 'seekableiterator';
-        }
-        if (isset($ctx->classes['serializable'])) {
-            $entry->interfaces[] = 'serializable';
+        // php-src ext/spl/spl_array.stub.php:
+        //   class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Countable
+        // Order is observable via class_implements() / ReflectionClass::getInterfaces() (#25790).
+        foreach (['seekableiterator', 'arrayaccess', 'serializable', 'countable'] as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $entry->interfaces[] = $iface;
+            }
         }
 
         // php-src REGISTER_SPL_CLASS_CONST_LONG — lc keys + constNames for defined()/getConstant (#22348).
