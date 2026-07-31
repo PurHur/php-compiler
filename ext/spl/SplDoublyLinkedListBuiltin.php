@@ -101,6 +101,8 @@ final class SplDoublyLinkedListBuiltin
         $entry->methodNames['offsetset'] = 'offsetSet';
         $entry->methodNames['offsetexists'] = 'offsetExists';
         $entry->methodNames['offsetunset'] = 'offsetUnset';
+        // php-src spl_dllist.stub.php — untyped $index; @tentative-return-type (#25856).
+        SplArrayStorage::attachArrayAccessArginfoNamed($entry, 'index', null, 'value', 'mixed');
         $entry->methodNames['setiteratormode'] = 'setIteratorMode';
         $entry->methodNames['getiteratormode'] = 'getIteratorMode';
         $entry->methodNames['isempty'] = 'isEmpty';
@@ -528,7 +530,7 @@ final class SplDoublyLinkedListConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplDoublyLinkedListBuiltin::CLASS_LC,
             'SplDoublyLinkedList::__construct()'

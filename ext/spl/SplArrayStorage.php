@@ -40,12 +40,28 @@ final class SplArrayStorage
      */
     public static function attachArrayAccessArginfo(ClassEntry $entry): void
     {
-        $key = new ParameterMetadata('key', [], false, false, false, false, 'mixed', null);
-        $value = new ParameterMetadata('value', [], false, false, false, false, 'mixed', null);
-        $entry->methodParameterMetadata['offsetexists'] = [$key];
-        $entry->methodParameterMetadata['offsetget'] = [$key];
-        $entry->methodParameterMetadata['offsetset'] = [$key, $value];
-        $entry->methodParameterMetadata['offsetunset'] = [$key];
+        self::attachArrayAccessArginfoNamed($entry, 'key', 'mixed', 'value', 'mixed');
+    }
+
+    /**
+     * Attach ArrayAccess stub arginfo with php-src stub param names/types (#25840, #25856).
+     *
+     * @param ?string $offsetType null = untyped (SplFixedArray $index, CachingIterator $key, …)
+     * @param ?string $valueType  null = untyped; typically 'mixed' for offsetSet value/info
+     */
+    public static function attachArrayAccessArginfoNamed(
+        ClassEntry $entry,
+        string $offsetName,
+        ?string $offsetType,
+        string $valueName = 'value',
+        ?string $valueType = 'mixed',
+    ): void {
+        $offset = new ParameterMetadata($offsetName, [], false, false, false, false, $offsetType, null);
+        $value = new ParameterMetadata($valueName, [], false, false, false, false, $valueType, null);
+        $entry->methodParameterMetadata['offsetexists'] = [$offset];
+        $entry->methodParameterMetadata['offsetget'] = [$offset];
+        $entry->methodParameterMetadata['offsetset'] = [$offset, $value];
+        $entry->methodParameterMetadata['offsetunset'] = [$offset];
         $entry->methodNames['offsetexists'] = 'offsetExists';
         $entry->methodNames['offsetget'] = 'offsetGet';
         $entry->methodNames['offsetset'] = 'offsetSet';

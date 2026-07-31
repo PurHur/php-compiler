@@ -77,6 +77,8 @@ final class SplObjectStorageBuiltin
         $entry->methodNames['offsetset'] = 'offsetSet';
         $entry->methodNames['offsetexists'] = 'offsetExists';
         $entry->methodNames['offsetunset'] = 'offsetUnset';
+        // php-src spl_observer.stub.php — untyped $object; offsetSet info:mixed (#25856).
+        SplArrayStorage::attachArrayAccessArginfoNamed($entry, 'object', null, 'info', 'mixed');
         $entry->methodNames['getinfo'] = 'getInfo';
         $entry->methodNames['setinfo'] = 'setInfo';
         $entry->methodNames['gethash'] = 'getHash';
@@ -506,7 +508,7 @@ final class SplObjectStorageDebugInfo extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::__debugInfo()'
@@ -545,7 +547,7 @@ final class SplObjectStorageAttach extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::attach()'
@@ -570,7 +572,7 @@ final class SplObjectStorageAddAll extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::addAll()'
@@ -595,7 +597,7 @@ final class SplObjectStorageRemoveAll extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::removeAll()'
@@ -620,7 +622,7 @@ final class SplObjectStorageRemoveAllExcept extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::removeAllExcept()'
@@ -683,7 +685,7 @@ final class SplObjectStorageContains extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::contains()'
@@ -712,7 +714,7 @@ final class SplObjectStorageCount extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::count()'
@@ -733,7 +735,7 @@ final class SplObjectStorageOffsetGet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::offsetGet()'
@@ -760,7 +762,7 @@ final class SplObjectStorageOffsetSet extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::offsetSet()'
@@ -784,7 +786,7 @@ final class SplObjectStorageOffsetExists extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::offsetExists()'
@@ -813,7 +815,7 @@ final class SplObjectStorageDetach extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::detach()'
@@ -837,7 +839,7 @@ final class SplObjectStorageRewind extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::rewind()'
@@ -855,7 +857,7 @@ final class SplObjectStorageNext extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::next()'
@@ -873,7 +875,7 @@ final class SplObjectStorageValid extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::valid()'
@@ -894,7 +896,7 @@ final class SplObjectStorageCurrent extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::current()'
@@ -915,7 +917,7 @@ final class SplObjectStorageKey extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::key()'
@@ -936,7 +938,7 @@ final class SplObjectStorageGetInfo extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::getInfo()'
@@ -960,7 +962,7 @@ final class SplObjectStorageSetInfo extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::setInfo()'
@@ -984,7 +986,7 @@ final class SplObjectStorageGetHash extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiver(
+        SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::getHash()'
@@ -1013,7 +1015,7 @@ final class SplObjectStorageOffsetUnset extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::offsetUnset()'
@@ -1038,7 +1040,7 @@ final class SplObjectStorageSerialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::__serialize()'
@@ -1060,7 +1062,7 @@ final class SplObjectStorageUnserialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::__unserialize()'

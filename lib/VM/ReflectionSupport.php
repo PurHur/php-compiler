@@ -2485,8 +2485,14 @@ final class ReflectionSupport
                 $params = $entry->methodParameterMetadata[$methodLc] ?? [];
                 $index = self::parameterIndexForReflection($reflection);
                 $meta = $params[$index] ?? null;
-                if (null !== $meta && null !== $meta->typeString && '' !== $meta->typeString) {
-                    return ReflectionTypeSupport::cfgTypeFromLabel($meta->typeString);
+                if (null !== $meta) {
+                    // Present metadata wins over InternalArgInfo — null/'' typeString means
+                    // untyped stub arginfo (SplFixedArray $index, SplObjectStorage $object; #25856).
+                    if (null !== $meta->typeString && '' !== $meta->typeString) {
+                        return ReflectionTypeSupport::cfgTypeFromLabel($meta->typeString);
+                    }
+
+                    return null;
                 }
             }
         }
