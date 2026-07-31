@@ -7,7 +7,9 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\CsvJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** str_getcsv/fgetcsv JIT routes through CsvJitHelper PHP, not StringStrGetcsvJit LLVM (#9444, #13358). */
+/**
+ * str_getcsv/fgetcsv JIT routes through CsvJitHelper PHP (#9444, #13358, #26135).
+ */
 final class CsvRuntimeShrinkTest extends TestCase
 {
     public function testStringStrGetcsvJitMonolithDeleted(): void
@@ -15,23 +17,37 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringStrGetcsvJit.php');
     }
 
-    public function testStringStrGetcsvUsesJitHelperForAllLoadTypes(): void
+    public function testStringStrGetcsvUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrGetcsv.php');
         $this->assertStringContainsString('CsvJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('StringStrGetcsvJit', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
     }
 
-    public function testStringFgetcsvJitUsesPhpHelperNotFgetsLlvm(): void
+    public function testStringFgetcsvJitUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFgetcsvJit.php');
         $this->assertStringContainsString('CsvJitHelper::fgetcsvArgv', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('implementFgetcsvBridge', $source);
         $this->assertStringNotContainsString('emitCompilerFgetcsvPhpParse', $source);
         $this->assertStringNotContainsString('lookupFunction(\'fgets\')', $source);
         $this->assertStringNotContainsString('lookupFunction(\'malloc\')', $source);
         $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
     }
 
     public function testCsvJitHelperFgetcsvArgvMatchesVmFs(): void

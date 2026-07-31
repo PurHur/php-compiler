@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_str_getcsv via CsvJitHelper PHP (#9444, #13358).
+ * JIT/AOT link for __compiler_str_getcsv via CsvJitHelper PHP (#9444, #13358, #26135).
  *
- * Embed and standalone AOT compile {@see CsvJitHelper}; thin LLVM bridges forward the ABI.
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
+ * (VmCsv → CsvJitHelper) in one NestedJIT scope (peer StringUnpack #25830 / apache_note #26120).
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_getcsv)
  */
 final class StringStrGetcsv
@@ -23,6 +23,16 @@ final class StringStrGetcsv
     private const HELPER_PATH = '/ext/standard/CsvJitHelper.php';
 
     private const VM_CSV_PATH = '/ext/standard/VmCsv.php';
+
+    /**
+     * Ordered NestedJIT sources — VmCsv before helper (#26135).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::VM_CSV_PATH,
+        self::HELPER_PATH,
+    ];
 
     private const STR_GETCSV_HELPER = 'PHPCompiler\\ext\\standard\\CsvJitHelper::strGetcsvArgv';
 
@@ -175,54 +185,18 @@ final class StringStrGetcsv
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after CsvJitHelper compile (#9444)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26135');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            $jit = new JIT($context);
-            foreach ([self::VM_CSV_PATH, self::HELPER_PATH] as $relative) {
-                $path = $root.$relative;
-                $real = \realpath($path) ?: $path;
-                if ($context->hasJitIncludedFileCompiled($real)) {
-                    continue;
-                }
-                $block = $runtime->parseAndCompile(
-                    (string) \file_get_contents($path),
-                    \basename($path)
-                );
-                if (null === $block) {
-                    throw new \LogicException(\basename($path).' parseAndCompile failed (#9444)');
-                }
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($real);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9444)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#26135'
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
