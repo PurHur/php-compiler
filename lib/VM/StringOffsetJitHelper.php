@@ -111,9 +111,26 @@ final class StringOffsetJitHelper
         return self::REF_ERROR;
     }
 
+    /**
+     * Zend zend_assign_to_string_offset: convert_to_string then first byte (#25778).
+     * Warning for strlen > 1 is emitted by {@see \PHPCompiler\JIT\Builtin\StringOffsetRuntime}
+     * (and by {@see Variable::byteFromAssignValue} on the VM path).
+     */
     public static function byteFromLong(int $value): int
     {
-        return $value & 0xFF;
+        $s = (string) $value;
+
+        return \ord($s[0]);
+    }
+
+    /**
+     * True when decimal string of $value has length > 1 (Zend first-byte E_WARNING).
+     *
+     * @see Variable::STRING_OFFSET_FIRST_BYTE_WARNING
+     */
+    public static function longNeedsFirstByteWarning(int $value): bool
+    {
+        return \strlen((string) $value) > 1;
     }
 
     public static function byteFromStringFirstChar(string $str): int

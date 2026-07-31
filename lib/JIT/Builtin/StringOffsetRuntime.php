@@ -293,6 +293,7 @@ final class StringOffsetRuntime
         if (NestedJitCompileScope::isActive()) {
             switch ($value->type) {
                 case JitVariable::TYPE_NATIVE_LONG:
+                    // Helper-compile leaf only (not user scripts). User/AOT uses byteFromLong (#25778).
                     return $context->builder->truncOrBitCast(
                         $context->helper->loadValue($value),
                         $i8
@@ -319,6 +320,7 @@ final class StringOffsetRuntime
         switch ($value->type) {
             case JitVariable::TYPE_NATIVE_LONG:
                 $long = $context->helper->loadValue($value);
+                self::emitFirstByteWarningIfLongMultiDigit($context, $long);
 
                 return $context->builder->truncOrBitCast(
                     $context->builder->call(
@@ -397,6 +399,27 @@ final class StringOffsetRuntime
         $chars = $context->builder->structGep($str, $map['value']);
 
         return $context->builder->load($chars);
+    }
+
+    /**
+     * Zend first-byte E_WARNING when decimal form of int RHS has length > 1 (#25778).
+     * Equivalent to {@see StringOffsetJitHelper::longNeedsFirstByteWarning} (not 0..9).
+     */
+    private static function emitFirstByteWarningIfLongMultiDigit(Context $context, Value $long): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $builder = $context->builder;
+        $fn = $builder->getInsertBlock()->getParent();
+        $warnBlock = $fn->appendBasicBlock('soff_long_first_byte_warn');
+        $contBlock = $fn->appendBasicBlock('soff_long_first_byte_cont');
+        $lt0 = $builder->icmp(Builder::INT_SLT, $long, $i64->constInt(0, false));
+        $gt9 = $builder->icmp(Builder::INT_SGT, $long, $i64->constInt(9, false));
+        $needs = $builder->or($lt0, $gt9);
+        $builder->branchIf($needs, $warnBlock, $contBlock);
+        $builder->positionAtEnd($warnBlock);
+        self::emitAssignEwarning($context, StringOffsetJitHelper::FIRST_BYTE_WARNING);
+        $builder->branch($contBlock);
+        $builder->positionAtEnd($contBlock);
     }
 
     /** E_WARNING during string-offset assign (Array→string / first-byte, #22925). */
