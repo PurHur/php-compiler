@@ -4563,6 +4563,72 @@ PHP;
         self::assertStringNotContainsString('TypeError', $out);
     }
 
+    /** Issue #25812 — array_keys($ao->getArrayCopy()) ARG_SEND uses MethodCall EXEC_RETURN, not INIT_ARRAY. */
+    public function testArrayKeysNestedGetArrayCopyProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = new ArrayObject(['b' => 2, 'a' => 1]);
+var_export(array_keys($a->getArrayCopy()));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_keys_nested_getarraycopy.php');
+
+        $copyReturnSlot = null;
+        $keysSendSlot = null;
+        $initArraySlot = null;
+        $methodOrdinal = 0;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $initArraySlot) {
+                $initArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                ++$methodOrdinal;
+            }
+            if (1 === $methodOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $copyReturnSlot) {
+                $copyReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $keysSendSlot) {
+                $keysSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($copyReturnSlot, 'getArrayCopy return slot');
+        self::assertNotNull($keysSendSlot, 'array_keys ARG_SEND slot');
+        self::assertNotNull($initArraySlot, 'INIT_ARRAY slot');
+        self::assertSame($copyReturnSlot, $keysSendSlot, 'array_keys must receive getArrayCopy EXEC_RETURN');
+        self::assertNotSame($initArraySlot, $keysSendSlot, 'array_keys must not steal constructor INIT_ARRAY');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 'b'", $out);
+        self::assertStringContainsString("1 => 'a'", $out);
+        self::assertStringNotContainsString('TypeError', $out);
+    }
+
+    /** Issue #25812 — ArrayObject/ArrayIterator nested getArrayCopy match Zend. */
+    public function testArrayKeysNestedGetArrayCopyIssueRepro(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/issue_25812_array_keys_getarraycopy.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'issue_25812_array_keys_getarraycopy.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 'b'", $out);
+        self::assertStringContainsString("1 => 'a'", $out);
+        self::assertStringContainsString("0 => 2", $out);
+        self::assertStringContainsString("\n2\n", $out);
+        self::assertStringNotContainsString('TypeError', $out);
+    }
+
     /** Issue #15558 — maintainer_gap repro: assignment form matches var_export probe (#13776). */
     public function testArrayCombineInlineArrayKeysMaintainerGapRepro(): void
     {
