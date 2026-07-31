@@ -573,6 +573,10 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'null'],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/libxml/libxml.stub.php — ?bool $use_errors = null (bool infer → false) (#25844)
+        'libxml_use_internal_errors' => [
+            0 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
