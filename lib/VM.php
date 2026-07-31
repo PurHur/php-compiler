@@ -3231,13 +3231,14 @@ class VM {
 
     /**
      * True when zend_std_read_property must invoke __get (undeclared slot or inaccessible declared prop).
+     * Scope-aware meta: in-frame private beats child shadow so __get does not recurse (#25795).
      */
     protected function propertyReadUsesMagicGet(ObjectEntry $object, string $name, Frame $frame): bool
     {
         if (!$this->hasInstanceMethod($object->class, '__get')) {
             return false;
         }
-        $meta = $this->classPropertyMeta($object, $name);
+        $meta = $this->classPropertyMeta($object, $name, $frame);
         if (null === $meta) {
             return true;
         }
