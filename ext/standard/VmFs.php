@@ -1585,6 +1585,15 @@ final class VmFs
     public static function flock(int $handle, int $operation, ?int &$wouldBlock = null): bool
     {
         $captureWouldBlock = \func_num_args() > 2;
+        if (VmUserStream::isValidHandle($handle)) {
+            $ok = VmUserStream::lock($handle, $operation);
+            if ($captureWouldBlock) {
+                // php-src userspace.c: TODO wouldblock — leave 0 when wrapper returns.
+                $wouldBlock = 0;
+            }
+
+            return $ok;
+        }
         if (VmPhpFdStream::isValidHandle($handle)) {
             $ok = VmPhpFdStream::flock($handle, $operation);
             if ($captureWouldBlock) {

@@ -210,6 +210,31 @@ final class VmUserStream
         return true;
     }
 
+    /**
+     * Userspace stream_lock / flock (php-src userspace.c user_stream_set_locking; #25995).
+     *
+     * Missing stream_lock → false. Operation is passed through as LOCK_* bits.
+     */
+    public static function lock(int $handle, int $operation): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if (!$state->vm->hasInstanceMethod($state->wrapper->class, 'stream_lock')) {
+            return false;
+        }
+        $opVar = new Variable();
+        $opVar->int($operation);
+        $result = $state->vm->invokeInstanceMethod(
+            $state->wrapper,
+            'stream_lock',
+            $opVar
+        )->resolveIndirect();
+
+        return boolval::isTruthy($result);
+    }
+
     public static function close(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;
