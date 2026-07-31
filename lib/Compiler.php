@@ -10693,6 +10693,7 @@ class Compiler {
         $return->parameterMetadata = $this->parameterMetadataFromParams($function->func->params);
         $this->assignAttributeMetadata($return, $function);
         $this->assignSourceMetadata($return, $function);
+        AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($return->attributeNames, 'function');
         AttributeNames::assertAttributeMetaClassTargetOnly($return->attributeNames, 'function');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'function');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'function');
@@ -12547,6 +12548,7 @@ class Compiler {
         $op->parameterMetadata = $this->parameterMetadataFromParams($func->params);
         $this->assignAttributeMetadata($op, $expr);
         $this->assignSourceMetadata($op, $expr);
+        AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($op->attributeNames, 'function');
         AttributeNames::assertAttributeMetaClassTargetOnly($op->attributeNames, 'function');
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         AttributeNames::assertSensitiveParameterParamTargetOnly($op->attributeNames, 'function');
