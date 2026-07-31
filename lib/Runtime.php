@@ -392,7 +392,7 @@ class Runtime {
         [$code, $staticLines] = $staticPreprocessor->preprocess($code, $filename);
         $this->staticClassAnnotator->setStaticLines($staticLines);
         [$code, $newRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
-        if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
+        if (\PHPCompiler\ext\standard\VmEval::isEvalScriptPath($filename)) {
             $this->vmContext->propertyHookRegistry = self::mergePropertyHookRegistry(
                 $this->vmContext->propertyHookRegistry,
                 $newRegistry
@@ -916,7 +916,7 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
-            if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
+            if (\PHPCompiler\ext\standard\VmEval::isEvalScriptPath($filename)) {
                 $detail = $this->compiler->getCompileAbortDetail();
                 $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
                 $this->recordLastParseFailure(sprintf('%s: %s', $filename, $primary));

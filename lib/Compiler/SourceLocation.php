@@ -22,6 +22,31 @@ final class SourceLocation
     ) {
     }
 
+    /**
+     * Reflection getters / __toString — unwrap wrapEvalCode line shift (#26032).
+     *
+     * Stored lines stay wrap-shifted so nested eval __FILE__ / evalCallSiteLine stay correct.
+     */
+    public function forReflection(): self
+    {
+        if ('' === $this->filename
+            || !\PHPCompiler\ext\standard\VmEval::isEvalScriptPath($this->filename)
+        ) {
+            return $this;
+        }
+        $start = $this->startLine > 0
+            ? \PHPCompiler\ext\standard\VmEval::unwrapEvalLine($this->startLine)
+            : 0;
+        $end = $this->endLine > 0
+            ? \PHPCompiler\ext\standard\VmEval::unwrapEvalLine($this->endLine)
+            : 0;
+        if ($start === $this->startLine && $end === $this->endLine) {
+            return $this;
+        }
+
+        return new self($this->docComment, $start, $end, $this->filename);
+    }
+
     public static function fromOp(Op $op): self
     {
         $doc = self::docCommentFromOp($op);

@@ -3998,6 +3998,9 @@ final class ReflectionSupport
         $out = "Method [ {$tag} {$mods}method {$amp}{$name} ] {\n";
 
         $loc = self::methodSourceLocation($declaring, $methodLc);
+        if (null !== $loc) {
+            $loc = $loc->forReflection();
+        }
         if (null !== $loc && '' !== $loc->filename && $loc->startLine > 0) {
             $end = $loc->endLine > 0 ? $loc->endLine : $loc->startLine;
             $out .= "  @@ {$loc->filename} {$loc->startLine} - {$end}\n";
@@ -4076,6 +4079,9 @@ final class ReflectionSupport
         $out = "Class [ {$tag} {$mods}{$kind} {$entry->name}{$implements} ] {\n";
 
         $loc = $entry->sourceLocation;
+        if (null !== $loc) {
+            $loc = $loc->forReflection();
+        }
         if (null !== $loc && !$isInternal && '' !== $loc->filename && $loc->startLine > 0) {
             $end = $loc->endLine > 0 ? $loc->endLine : $loc->startLine;
             $out .= "  @@ {$loc->filename} {$loc->startLine} - {$end}\n";
@@ -4222,6 +4228,9 @@ final class ReflectionSupport
 
         if (!$isInternal) {
             $loc = self::functionSourceLocation($ctx, $reflection);
+            if (null !== $loc) {
+                $loc = $loc->forReflection();
+            }
             if (null !== $loc && '' !== $loc->filename && $loc->startLine > 0) {
                 $end = $loc->endLine > 0 ? $loc->endLine : $loc->startLine;
                 $out .= "  @@ {$loc->filename} {$loc->startLine} - {$end}\n";
@@ -4456,6 +4465,7 @@ final class ReflectionSupport
 
             return;
         }
+        $location = $location->forReflection();
         $file = $location->filename;
         if ('' === $file || 'unknown' === $file) {
             $returnVar->bool(false);
@@ -4470,6 +4480,9 @@ final class ReflectionSupport
         if (null === $returnVar) {
             return;
         }
+        if (null !== $location) {
+            $location = $location->forReflection();
+        }
         if ($isInternal || null === $location || $location->startLine <= 0) {
             $returnVar->bool(false);
 
@@ -4482,6 +4495,9 @@ final class ReflectionSupport
     {
         if (null === $returnVar) {
             return;
+        }
+        if (null !== $location) {
+            $location = $location->forReflection();
         }
         if ($isInternal || null === $location || $location->endLine <= 0) {
             $returnVar->bool(false);
