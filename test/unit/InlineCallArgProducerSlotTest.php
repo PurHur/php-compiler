@@ -8763,6 +8763,54 @@ PHP;
     }
 
     /**
+     * Issue #25842 — echo getElementsByTagName()->item()->getLineNo() must emit getElementsByTagName
+     * (0/1-arg method finals are not multi-arg sibling consumers that defer the receiver chain).
+     */
+    public function testDomChainEchoItemGetLineNoEmitsGetElementsByTagName(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d = new DOMDocument();
+$d->loadXML("<r>\n<a id=\"x\"/>\n</r>");
+echo $d->getElementsByTagName('a')->item(0)->getLineNo(), "\n";
+echo $d->getElementsByTagName('a')->item(0)->getAttribute('id'), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_chain_echo_item_method_25842.php');
+
+        $getElementsInits = 0;
+        $itemInits = 0;
+        $getLineNoInits = 0;
+        $getAttributeInits = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])
+            ) {
+                continue;
+            }
+            $name = $block->constants[$op->arg2]->toString();
+            if ('getElementsByTagName' === $name) {
+                ++$getElementsInits;
+            } elseif ('item' === $name) {
+                ++$itemInits;
+            } elseif ('getLineNo' === $name) {
+                ++$getLineNoInits;
+            } elseif ('getAttribute' === $name) {
+                ++$getAttributeInits;
+            }
+        }
+        self::assertSame(2, $getElementsInits, 'both getElementsByTagName calls must METHODCALL_INIT');
+        self::assertSame(2, $itemInits, 'both item() calls must METHODCALL_INIT');
+        self::assertSame(1, $getLineNoInits);
+        self::assertSame(1, $getAttributeInits);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2\nx\n", ob_get_clean());
+    }
+
+    /**
      * Issue #25605 — importNode(getElementsByTagName()->item(), true) must not drop preceding loadXML
      * (re-#20284; regression from #25563 dead-temp multi-arg feed matching loadXML).
      */
