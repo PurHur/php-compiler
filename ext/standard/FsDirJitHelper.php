@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * touch()/mkdir()/tempnam() for compiled JIT/AOT modules (#8999, php-in-PHP).
  *
- * SSOT: {@see VmFsTouchNative}, {@see VmFsDirNative}, {@see VmFsTempnam}
+ * SSOT: {@see VmFs::touch()}, {@see VmFs::mkdir()}, {@see VmFsTempnam}
  * php-src: ext/standard/filestat.c, ext/standard/file.c
  */
 final class FsDirJitHelper
@@ -33,7 +33,7 @@ final class FsDirJitHelper
 
     public static function mkdir(string $path, int $mode, bool $recursive): bool
     {
-        return VmFsDirNative::mkdir($path, $mode, $recursive);
+        return VmFs::mkdir($path, $mode, $recursive);
     }
 
     /** @return string|null null when tempnam() fails */

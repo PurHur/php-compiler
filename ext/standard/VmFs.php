@@ -273,6 +273,14 @@ final class VmFs
 
     public static function unlink(string $path): bool
     {
+        $wrapperOk = VmUserStream::tryUnlink($path);
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
         $ok = VmFsUnlink::unlink($path);
         if ($ok) {
             VmStatCache::invalidatePath($path);
@@ -283,6 +291,14 @@ final class VmFs
 
     public static function mkdir(string $path, int $mode = 0777, bool $recursive = false): bool
     {
+        $wrapperOk = VmUserStream::tryMkdir($path, $mode, $recursive);
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
         $ok = VmFsDirNative::mkdir($path, $mode, $recursive);
         if ($ok) {
             VmStatCache::invalidatePath($path);
@@ -293,6 +309,14 @@ final class VmFs
 
     public static function rmdir(string $path): bool
     {
+        $wrapperOk = VmUserStream::tryRmdir($path);
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($path);
+            }
+
+            return $wrapperOk;
+        }
         $ok = VmFsDirNative::rmdir($path);
         if ($ok) {
             VmStatCache::invalidatePath($path);
@@ -461,6 +485,15 @@ final class VmFs
 
     public static function rename(string $from, string $to): bool
     {
+        $wrapperOk = VmUserStream::tryRename($from, $to);
+        if (null !== $wrapperOk) {
+            if ($wrapperOk) {
+                VmStatCache::invalidatePath($from);
+                VmStatCache::invalidatePath($to);
+            }
+
+            return $wrapperOk;
+        }
         $ok = VmFsPathNative::rename($from, $to);
         if ($ok) {
             VmStatCache::invalidatePath($from);
