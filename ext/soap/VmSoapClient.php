@@ -821,8 +821,7 @@ final class VmSoapClient
             throw new \SoapFault('Client', 'SoapClient location is not set');
         }
 
-        // php-src php_http.c — stream POST + Z_CLIENT_HTTPSOCKET keep-alive (#24913).
-        // Proxy+HTTPS CONNECT still uses file_get_contents (httpsocket stays null).
+        // php-src php_http.c — stream POST + Z_CLIENT_HTTPSOCKET keep-alive (#24913 / #26166).
         if (SoapHttpTransport::canHandle($location, $useProxy)) {
             [$body, $responseHeaders] = SoapHttpTransport::post(
                 $object,
@@ -833,7 +832,8 @@ final class VmSoapClient
                 $useProxy
             );
         } else {
-            // Legacy host HTTP wrapper (proxy+https CONNECT / missing stream_socket_client).
+            // Legacy host HTTP wrapper (missing stream_socket_client).
+            $useSsl = (bool) \preg_match('#^https://#i', $location);
             $headers = ($state->keepAlive ? "Connection: Keep-Alive\r\n" : "Connection: close\r\n").
                 "Content-Type: text/xml; charset=utf-8\r\n".
                 'SOAPAction: "'.$action."\"\r\n";
@@ -849,13 +849,14 @@ final class VmSoapClient
             if ('' !== $authHeader) {
                 $headers .= $authHeader."\r\n";
             }
-            if ($useProxy && '' !== $proxyAuthHeader) {
+            // php-src: Proxy-Authorization on POST only when use_proxy && !use_ssl (#20339 / #26166).
+            if ($useProxy && !$useSsl && '' !== $proxyAuthHeader) {
                 $headers .= $proxyAuthHeader."\r\n";
             }
             $contextHeaderExtra = self::streamContextHttpHeaderBlock(
                 $state->streamContextOptions,
                 '' !== $authHeader,
-                $useProxy && '' !== $proxyAuthHeader,
+                $useProxy && !$useSsl && '' !== $proxyAuthHeader,
                 '' !== $cookieHeader
             );
             if ('' !== $contextHeaderExtra) {
@@ -1264,21 +1265,13 @@ final class VmSoapClient
     }
 
     /**
-     * php-src use_proxy when proxy_host (string) + proxy_port (long) are set (#20339).
-     * Fixture file locations still count as "using proxy" for traced request headers.
+     * php-src use_proxy when proxy_host (string) + proxy_port (long) are set (#20339 / #26166).
+     * HTTPS still uses the proxy (CONNECT); Proxy-Authorization is omitted from the POST
+     * header block and sent on CONNECT instead (php_http.c).
      */
     private static function usesHttpProxy(SoapClientState $state, string $location): bool
     {
-        if (null === $state->proxyHost || null === $state->proxyPort) {
-            return false;
-        }
-        // php-src skips Proxy-Authorization on SSL-through-proxy CONNECT path for the
-        // POST headers block in some branches; http:// and fixture paths emit it.
-        if (\preg_match('#^https://#i', $location)) {
-            return false;
-        }
-
-        return true;
+        return null !== $state->proxyHost && null !== $state->proxyPort;
     }
 
     /**
@@ -1303,11 +1296,12 @@ final class VmSoapClient
     ): string {
         $path = '/';
         $host = 'localhost';
+        $useSsl = (bool) \preg_match('#^https://#i', $location);
         if (\preg_match('#^https?://([^/]+)(/.*)?$#i', $location, $m)) {
             $host = $m[1];
             $path = isset($m[2]) && '' !== $m[2] ? $m[2] : '/';
-            // php-src: POST absolute-URI when use_proxy && !use_ssl (#20339).
-            if ($useProxy) {
+            // php-src: POST absolute-URI when use_proxy && !use_ssl (#20339 / #26166).
+            if ($useProxy && !$useSsl) {
                 $path = $location;
             }
         } elseif ('' !== $location) {
@@ -1342,15 +1336,15 @@ final class VmSoapClient
         if ('' !== $authHeader) {
             $hdr .= $authHeader."\r\n";
         }
-        // php-src: Proxy-Authorization only when use_proxy && !use_ssl (#20339).
-        if ($useProxy && '' !== $proxyAuthHeader) {
+        // php-src: Proxy-Authorization only when use_proxy && !use_ssl (#20339 / #26166).
+        if ($useProxy && !$useSsl && '' !== $proxyAuthHeader) {
             $hdr .= $proxyAuthHeader."\r\n";
         }
         // php-src http_context_headers — merge stream_context http.header (#20365).
         $hdr .= self::streamContextHttpHeaderBlock(
             $streamContextOptions,
             '' !== $authHeader,
-            $useProxy && '' !== $proxyAuthHeader,
+            $useProxy && !$useSsl && '' !== $proxyAuthHeader,
             '' !== $cookieHeader
         );
 
