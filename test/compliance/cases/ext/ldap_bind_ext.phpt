@@ -1,6 +1,7 @@
 --TEST--
 stdlib ldap_bind_ext registration + Result|false (#22164, ext/ldap/ldap.c)
 --ENV--
+PHP_COMPILER_ENABLE_LDAP=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

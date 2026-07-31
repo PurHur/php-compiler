@@ -1,6 +1,7 @@
 --TEST--
 stdlib ldap_connect returns LDAP\Connection via libldap FFI (#3369, ext/ldap/ldap.c)
 --ENV--
+PHP_COMPILER_ENABLE_LDAP=1
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php

@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ldap;
 
 /**
- * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#6352, #18211, #3369, #23857).
+ * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#6352, #18211, #3369, #23857, #24536).
  *
  * OpenLDAP FFI stays in-tree ({@see VmLdapNative}) but introspection must match Zend
  * module registration on the reference harness (host without php-ldap), not FFI
- * availability alone — same shape as soap/sqlite3/gmp (#22859 / #22791 / #22860).
+ * availability or {@code PHP_COMPILER_PROFILE} alone — same host-module gate as
+ * dba/gnupg (#24134 / #25360). Forward profiles must not invent ldap when host Zend
+ * lacks it (#24536).
  *
- * Enable via host {@code extension_loaded('ldap')}, or an explicit
- * {@code PHP_COMPILER_PROFILE} override plus libldap FFI (functional compliance sets
- * PROFILE via {@code --ENV--}).
+ * Enable via host {@code extension_loaded('ldap')}, or explicit
+ * {@code PHP_COMPILER_ENABLE_LDAP=1} plus libldap FFI (functional compliance sets
+ * ENABLE via {@code --ENV--}; keep PROFILE for version-gated helpers).
  */
 final class LdapExtensionPolicy
 {
@@ -23,7 +25,7 @@ final class LdapExtensionPolicy
     }
 
     /**
-     * extension_loaded('ldap') / CREDITS_MODULES — match Zend without phantom ldap (#23857).
+     * extension_loaded('ldap') / CREDITS_MODULES — match Zend without phantom ldap (#23857 / #24536).
      */
     public static function advertisesExtension(): bool
     {
@@ -35,14 +37,7 @@ final class LdapExtensionPolicy
             return false;
         }
 
-        // Reference profile (unset PROFILE): withhold like Zend without php-ldap (#18211 / #23857).
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        // Explicit PROFILE (8.2 / 8.3 / 8.4) + FFI — functional / version-gate cases (#3369 / #22731).
-        return true;
+        return self::explicitEnableRequested();
     }
 
     public static function advertisesClasses(): bool
@@ -96,18 +91,23 @@ final class LdapExtensionPolicy
             || str_contains($testFileName, 'extension_loaded_ldap');
     }
 
-    /** Phantom-registration guards that assert ldap is withheld (#18211 / #23857). */
+    /** Phantom-registration guards that assert ldap is withheld (#18211 / #23857 / #24536). */
     public static function isLdapPhantomComplianceCase(string $testFileName): bool
     {
         return str_contains($testFileName, 'phantom_ldap')
+            || str_contains($testFileName, 'ldap_extension_loaded_phantom')
+            || str_contains($testFileName, 'ldap_escape_phantom')
+            || str_contains($testFileName, 'get_defined_constants_phantom_ldap')
+            || str_contains($testFileName, 'maintainer_gap_ldap')
             || (str_contains($testFileName, 'ldap_')
                 && str_contains($testFileName, 'phantom')
-                && !str_contains($testFileName, 'phantom_profile'));
+                && !str_contains($testFileName, 'phantom_profile')
+                && !str_contains($testFileName, 'exop_php83_phantom'));
     }
 
     /**
-     * Functional ldap cases set {@code PHP_COMPILER_PROFILE} via {@code --ENV--} and always run
-     * when selected; phantom guards run only when ldap is withheld (#23857 / #22791 shape).
+     * Functional ldap cases set {@code PHP_COMPILER_ENABLE_LDAP} via {@code --ENV--} and always run
+     * when selected; phantom guards run only when ldap is withheld (#23857 / #24536).
      */
     public static function runsLdapCompliance(string $testFileName): bool
     {
@@ -116,5 +116,18 @@ final class LdapExtensionPolicy
         }
 
         return true;
+    }
+
+    /** Explicit side-load / functional-test opt-in when host Zend lacks php-ldap (#24536). */
+    private static function explicitEnableRequested(): bool
+    {
+        $raw = getenv('PHP_COMPILER_ENABLE_LDAP');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        $v = strtolower(trim($raw));
+
+        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }
