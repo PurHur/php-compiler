@@ -1998,12 +1998,8 @@ final class BuiltinParamNames
         }
         // implode/join: do NOT alias glue/pieces — Zend 8.2+ stubs use separator/array only;
         // named glue/pieces is Unknown named parameter (#25589, reverts #9985 over-accept).
-        if ('array_column' === $lc) {
-            // php-src basic_functions.stub.php — public name `input` aliases internal `array` (#10042).
-            return [
-                'input' => 0,
-            ];
-        }
+        // array_column: do NOT alias input→array — Zend stubs use $array only;
+        // named input is Unknown named parameter (#25592, reverts #10042 over-accept).
         // fgetcsv/str_getcsv: do NOT alias delimiter→separator — Zend 8.2+ stubs already use
         // separator; named delimiter is Unknown named parameter (#25590, reverts #12018 over-accept).
 

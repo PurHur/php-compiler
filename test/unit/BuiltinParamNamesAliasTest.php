@@ -375,13 +375,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #10042 */
+    /** @covers issue #25592 (reverts #10042 input over-accept) */
     public function testArrayColumnNamedParamsResolve(): void
     {
         $names = BuiltinParamNames::forFunction('array_column');
         self::assertSame(['array', 'column_key', 'index_key'], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'array_column'));
-        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'array_column'));
+        // Zend stubs use array; input is Unknown named parameter (#25592)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'array_column'));
+        self::assertSame([], BuiltinParamNames::aliasesForFunction('array_column'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'column_key', 'array_column'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
     }
