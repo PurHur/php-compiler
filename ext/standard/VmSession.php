@@ -833,8 +833,9 @@ final class VmSession
     private static function loadSession(Context $ctx): void
     {
         $sessionVar = $ctx->ensureSuperglobal('_SESSION');
+        // php_session_track_init — destroy then decode merges into empty (#26088).
+        $sessionVar->array(new HashTable());
         if ('' === self::$id) {
-            $sessionVar->array(new HashTable());
             self::$loadedPayload = '';
 
             return;
@@ -842,7 +843,6 @@ final class VmSession
         if (SessionUserHandler::isActiveModule()) {
             $raw = SessionUserHandler::read($ctx, self::$id);
             if ('' === $raw || !VmSessionSerializer::decodePhp($ctx, $raw)) {
-                $sessionVar->array(new HashTable());
                 self::$loadedPayload = '';
 
                 return;
@@ -853,20 +853,17 @@ final class VmSession
         }
         $path = SessionFileStorage::storagePath(self::$id);
         if (!VmStatPath::isFile($path)) {
-            $sessionVar->array(new HashTable());
             self::$loadedPayload = '';
 
             return;
         }
         $raw = VmFsReadNative::read($path);
         if (false === $raw || '' === $raw) {
-            $sessionVar->array(new HashTable());
             self::$loadedPayload = '';
 
             return;
         }
         if (!VmSessionSerializer::decodePhp($ctx, $raw)) {
-            $sessionVar->array(new HashTable());
             self::$loadedPayload = '';
 
             return;

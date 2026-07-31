@@ -339,20 +339,12 @@ final class JitSessionLifecycleKernel
 
     private static function emitEnsureSessionTable(Context $context): void
     {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $sgSession = self::sgSessionPtr($context);
-        $current = $context->builder->load($sgSession);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $current, $htPtr->constNull());
-        $fn = BasicBlockHelper::parentFunction($context);
-        $bbAlloc = $fn->appendBasicBlock('slc_alloc_session_'.spl_object_id($context));
-        $bbAfter = $fn->appendBasicBlock('slc_after_alloc_'.spl_object_id($context));
-        $context->builder->branchIf($isNull, $bbAlloc, $bbAfter);
-
-        $context->builder->positionAtEnd($bbAlloc);
+        // php_session_track_init — always replace with empty HT before load (#26088).
         $fresh = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $context->builder->store($fresh, $sgSession);
-        $context->builder->branch($bbAfter);
-        $context->builder->positionAtEnd($bbAfter);
+        $context->builder->store($fresh, self::sgSessionPtr($context));
+        if (isset(SuperglobalInit::$globals['_SESSION'])) {
+            $context->builder->store($fresh, SuperglobalInit::$globals['_SESSION']);
+        }
     }
 
     private static function emitCopyIdStringToGlobals(Context $context, Value $idStr): void

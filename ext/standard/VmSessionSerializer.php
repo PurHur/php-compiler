@@ -128,9 +128,15 @@ final class VmSessionSerializer
         return VmJson::export($value);
     }
 
+    /**
+     * Decode php-handler wire into $_SESSION by merging keys (php-src mod_php.c).
+     *
+     * Does not call track_init — existing keys are preserved unless overwritten (#26088).
+     * Callers that hydrate from storage ({@see VmSession::loadSession}) must clear first.
+     */
     public static function decodePhp(Context $ctx, string $payload): bool
     {
-        $ht = new HashTable();
+        $incoming = new HashTable();
 
         $pos = 0;
         $len = \strlen($payload);
@@ -159,10 +165,16 @@ final class VmSessionSerializer
             } else {
                 $slot->copyFrom(VmJson::import($decoded));
             }
-            $ht->add($key, $slot);
+            $incoming->add($key, $slot);
             $pos += $span;
         }
-        $ctx->ensureSuperglobal('_SESSION')->array($ht);
+        $sessionVar = $ctx->ensureSuperglobal('_SESSION');
+        if (Variable::TYPE_ARRAY !== ($sessionVar->type & 0x7f)) {
+            $sessionVar->array(new HashTable());
+        } else {
+            $sessionVar->separateArrayForWrite();
+        }
+        $sessionVar->toArray()->mergeStringKeysFrom($incoming, true);
 
         return true;
     }
