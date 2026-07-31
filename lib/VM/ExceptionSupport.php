@@ -385,6 +385,40 @@ final class ExceptionSupport
     }
 
     /**
+     * zend_exception_error(ex, E_WARNING) — pending hook throw before a follow-on E_ERROR (#25748).
+     *
+     * php-src: Zend/zend.c zend_error path clears EG(exception) via zend_exception_error(E_WARNING)
+     * before `__debuginfo() must return an array` (zend_object_handlers.c).
+     */
+    public static function emitNativeUncaughtWarning(
+        \Throwable $native,
+        ?ObjectEntry $vmEntry = null,
+        bool $displayErrors = false,
+    ): void {
+        $class = $native::class;
+        $message = $native->getMessage();
+        $file = $native->getFile();
+        $line = $native->getLine();
+        // Match zend_exception_error + php_error_cb: Uncaught %Z\n  thrown + " in file on line N".
+        $body = "Uncaught {$class}: {$message}";
+        if ('' !== $file) {
+            $body .= " in {$file}";
+            if ($line > 0) {
+                $body .= ":{$line}";
+            }
+        }
+        $body .= "\nStack trace:\n".self::formatUncaughtStackTrace($vmEntry);
+        $body .= '  thrown';
+        ErrorReporter::writeCliErrorOutput(
+            ErrorReporter::E_WARNING,
+            $body,
+            '' !== $file ? $file : null,
+            $line,
+            $displayErrors
+        );
+    }
+
+    /**
      * Zend zend_exceptions.c — finally throw over pending try uncaught fatal (#5867, #7342).
      *
      * @return never
