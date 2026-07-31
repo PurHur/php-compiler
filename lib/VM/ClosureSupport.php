@@ -265,6 +265,8 @@ final class ClosureSupport
             $bound->boundThis = $stored;
         }
         $bound->boundScopeClass = $scopeClass;
+        // Re-derive called_scope from new $this (or scope) at invoke (#25793).
+        $bound->boundCalledScopeClass = null;
 
         return self::wrapState($ctx, $bound);
     }
@@ -464,6 +466,7 @@ final class ClosureSupport
         $boundThis->copyFrom($newThis);
         $invokeState->boundThis = $boundThis;
         $invokeState->boundScopeClass = $scopeClass;
+        $invokeState->boundCalledScopeClass = null;
         if ($isInstanceMethodClosure) {
             // initClosureCall dispatches via methodReceiver — point it at the temporary $this.
             $invokeState->methodReceiver = $boundThis;

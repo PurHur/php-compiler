@@ -35,8 +35,17 @@ final class ClosureState
     /** Rebound $this from bindTo / fromCallable instance method wrapper. */
     public ?Variable $boundThis = null;
 
-    /** Class scope name for private/protected access (bindTo / fromCallable). */
+    /**
+     * Closure scope (ce) for private/protected / self:: / getClosureScopeClass().
+     * Distinct from late-static called_scope ({@see $boundCalledScopeClass}).
+     */
     public ?string $boundScopeClass = null;
+
+    /**
+     * Late-static called_scope when $this is unbound (e.g. closure created in a static
+     * method). When {@see $boundThis} is set, called_scope is derived from that object.
+     */
+    public ?string $boundCalledScopeClass = null;
 
     /** Definition site for var_dump via get_debug_info handler (issue #7069, #22565). */
     public string $definitionFile = '';
@@ -181,6 +190,7 @@ final class ClosureState
             : null;
         $clone->boundThis = null !== $this->boundThis ? $this->copyVar($this->boundThis) : null;
         $clone->boundScopeClass = $this->boundScopeClass;
+        $clone->boundCalledScopeClass = $this->boundCalledScopeClass;
         // Value-copy statics at clone/bind time; tables then diverge (zend_array_dup).
         foreach ($this->staticVars as $name => $var) {
             $clone->staticVars[$name] = $this->copyVar($var);
