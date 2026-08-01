@@ -4583,6 +4583,7 @@ require_once __DIR__.'/../../../lib/CloneWithSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 require_once __DIR__.'/../../../lib/Compiler/AbstractMethodBodyCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/AbstractMethodVisibilityCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/AbstractPromotedPropertyCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/AsymmetricVisibilityCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/AttributeClassRegistry.php';
 require_once __DIR__.'/../../../lib/Compiler/AttributeConstantEvaluator.php';
