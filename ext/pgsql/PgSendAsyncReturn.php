@@ -7,13 +7,12 @@ namespace PHPCompiler\ext\pgsql;
 /**
  * Shared true / 0 / false return for pg_send_* (#20681).
  *
- * Own unit so Zend/AOT spine compile can resolve the trait before
- * {@see pg_async_builtins.php} classes that `use` it (in-file trait
- * discovery fails under full-spine emit).
+ * Static helper (not a trait) so Zend/AOT full-spine emit can compile this unit —
+ * in-file and trait-only units both failed under spine emit ("Could not find trait").
  */
-trait PgSendAsyncReturn
+final class PgSendAsyncReturn
 {
-    private function assignSendReturn(\PHPCompiler\VM\Variable $returnVar, bool|int $out): void
+    public static function assign(\PHPCompiler\VM\Variable $returnVar, bool|int $out): void
     {
         if (true === $out) {
             $returnVar->bool(true);
