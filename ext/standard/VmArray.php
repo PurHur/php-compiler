@@ -873,14 +873,48 @@ final class VmArray
     }
 
     /**
+     * Max elements array_pad() may append/prepend (php-src 8.2 Z_L(1048576)).
+     *
+     * php-src: ext/standard/array.c — PHP_FUNCTION(array_pad)
+     * pad_size_abs - input_size > 1048576 → ValueError (#26658).
+     */
+    public const ARRAY_PAD_MAX_PAD_SIZE = 1048576;
+
+    /**
      * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
      *
      * Padding direction follows the sign of {@param $length} (php-src ext/standard/array.c), or
      * optional {@param $padType} when PHP 8.4+ 4-arg form is used (#14993).
+     *
+     * Rejects oversized pad amounts before allocating (Zend 8.2 pad-size guard, #26658).
      */
     public static function pad(HashTable $array, int $length, Variable $value, ?int $padType = null): HashTable
     {
+        self::rejectOversizedPad($array->getNumElements(), $length);
+
         return $array->padCopy($length, $value, $padType);
+    }
+
+    /**
+     * Throw Zend ValueError when pad amount would exceed {@see ARRAY_PAD_MAX_PAD_SIZE}.
+     *
+     * php-src 8.2: if (pad_size_abs < 0 || pad_size_abs - input_size > 1048576).
+     * pad_size_abs < 0 covers ZEND_ABS(ZEND_LONG_MIN) overflow; in PHP abs(PHP_INT_MIN)
+     * is a float, so treat PHP_INT_MIN as oversized.
+     */
+    public static function rejectOversizedPad(int $inputSize, int $length): void
+    {
+        if (\PHP_INT_MIN === $length) {
+            throw new \ValueError(
+                'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+            );
+        }
+        $padSizeAbs = abs($length);
+        if ($padSizeAbs - $inputSize > self::ARRAY_PAD_MAX_PAD_SIZE) {
+            throw new \ValueError(
+                'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+            );
+        }
     }
 
     /**

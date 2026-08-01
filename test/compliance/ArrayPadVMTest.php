@@ -57,6 +57,10 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_enum_length_typeerror.phpt',
             'array_pad_enum_length_typeerror.phpt'
         );
+        yield 'array_pad_length_limit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_length_limit.phpt',
+            'array_pad_length_limit.phpt'
+        );
     }
 
     public function setUp(): void

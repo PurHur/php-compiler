@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\array_pad;
+use PHPCompiler\ext\standard\VmArray;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -13,6 +14,31 @@ use PHPUnit\Framework\TestCase;
 /** VM builtin for array_pad(). */
 final class ArrayPadBuiltinTest extends TestCase
 {
+    /** Issue #26658 — Zend 8.2 pad-amount guard (no megarray allocation). */
+    public function testRejectOversizedPadMatchesZend82(): void
+    {
+        // Boundary OK: pad amount == 1048576 (array_pad([1], 1048577, 0)).
+        VmArray::rejectOversizedPad(1, 1048577);
+        VmArray::rejectOversizedPad(1, -1048577);
+        VmArray::rejectOversizedPad(100, 1048676);
+        VmArray::rejectOversizedPad(0, 1048576);
+
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+        );
+        VmArray::rejectOversizedPad(1, 1048578);
+    }
+
+    public function testRejectOversizedPadNegativeLength(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'array_pad(): Argument #2 ($length) must be less than or equal to 1048576'
+        );
+        VmArray::rejectOversizedPad(1, -1048578);
+    }
+
     public function testPadRightAndLeft(): void
     {
         $runtime = new Runtime();
