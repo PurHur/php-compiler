@@ -8153,6 +8153,10 @@ class Compiler {
                                     // Per-instance `new` defaults: opcodes precede DECLARE_*; VM init at TYPE_NEW (#3391).
                                     $defaultSlot = null;
                                 } else {
+                                    $staticClassMsg = $this->propertyDefaultStaticClassRejectMessage($child);
+                                    if (null !== $staticClassMsg) {
+                                        $this->throwCompileError($staticClassMsg);
+                                    }
                                     $propName = '?';
                                     if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
                                         $propName = $child->name->value;
@@ -10474,6 +10478,15 @@ class Compiler {
 
                     return $value;
                 }
+                // self/parent/Named::class — compile-time string (zend_compile.c, #26629 / #3803).
+                // static::class stays unfolded so LSB call sites keep the runtime opcode (#19614).
+                $pseudoFqcn = $this->resolveCompileTimeClassPseudoConstFqcn($builtinClass, $block);
+                if (null !== $pseudoFqcn) {
+                    $value = new Variable(Variable::TYPE_STRING);
+                    $value->string($pseudoFqcn);
+
+                    return $value;
+                }
             }
         }
         $className = $this->staticNameFromOperand($expr->class);
@@ -10844,8 +10857,71 @@ class Compiler {
     }
 
     /**
-     * Caller class lc for compile-time class const fetch folding (#6784, zend_verify_const_access).
+     * Fold {@code self::class} / {@code parent::class} / {@code Named::class} to the FQCN string
+     * (Zend zend_compile.c class name resolution; #26629, #3803).
+     *
+     * {@code static::class} returns null — late-static binding needs the runtime opcode (#19614).
      */
+    protected function resolveCompileTimeClassPseudoConstFqcn(string $className, Block $block): ?string
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        if ('static' === $lc) {
+            return null;
+        }
+        if ('self' === $lc) {
+            $display = $this->declaringClassDisplayNameForTypeHint($block);
+
+            return null !== $display && '' !== $display ? $display : null;
+        }
+        if ('parent' === $lc) {
+            if (null !== $this->compilingClassLc) {
+                $parent = $this->compilingClassParentDisplayName();
+                if (null === $parent || '' === $parent) {
+                    $this->throwCompileError(EnumParentCompileCheck::MESSAGE);
+                }
+
+                return $parent;
+            }
+
+            return null;
+        }
+
+        return ltrim($className, '\\');
+    }
+
+    /**
+     * Zend message when {@code static::class} appears in a property default (#26629).
+     */
+    protected function propertyDefaultStaticClassRejectMessage(Op\Stmt\Property $prop): ?string
+    {
+        $expr = null;
+        if (null !== $prop->defaultBlock && [] !== $prop->defaultBlock->children) {
+            $last = $prop->defaultBlock->children[\count($prop->defaultBlock->children) - 1];
+            if ($last instanceof Op\Expr\ClassConstFetch) {
+                $expr = $last;
+            }
+        }
+        if (null === $expr) {
+            $root = null !== $prop->defaultVar ? $this->unwrapOperandChain($prop->defaultVar) : null;
+            if ($root instanceof Op\Expr\ClassConstFetch) {
+                $expr = $root;
+            }
+        }
+        if (null === $expr) {
+            return null;
+        }
+        $constName = $this->staticNameFromOperand($expr->name);
+        $className = $this->staticNameFromOperand($expr->class);
+        if (null === $constName || null === $className) {
+            return null;
+        }
+        if ('class' !== strtolower($constName) || 'static' !== strtolower($className)) {
+            return null;
+        }
+
+        return 'static::class cannot be used for compile-time class name resolution';
+    }
+
     protected function compileTimeClassConstFetchCallerLc(Block $block): ?string
     {
         if (null !== $this->compilingClassLc) {
