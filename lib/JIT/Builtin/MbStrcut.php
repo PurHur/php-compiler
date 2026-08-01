@@ -4,13 +4,25 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
-/** JIT/AOT link hook for mb_strcut() — compiles MbStrcutJitHelper into the module (#4573). */
+/**
+ * JIT/AOT link hook for mb_strcut() — compiles MbStrcutJitHelper into the module (#4573, #26598).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringZstd #26596 / MetaTags #26568).
+ */
 final class MbStrcut
 {
+    private const HELPER_PATH = '/ext/mbstring/MbStrcutJitHelper.php';
+
     private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbStrcutJitHelper::strcut';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER_LOGICAL,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -21,35 +33,20 @@ final class MbStrcut
     {
     }
 
-    public static function helperFunction(Context $context): \PHPLLVM\Value\Function_
+    public static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = strtolower(self::HELPER_LOGICAL);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException('MbStrcutJitHelper::strcut missing after compile (#4573)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#26598');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = strtolower(self::HELPER_LOGICAL);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = dirname(__DIR__, 3).'/ext/mbstring/MbStrcutJitHelper.php';
-        $block = $runtime->parseAndCompile((string) file_get_contents($path), 'MbStrcutJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('MbStrcutJitHelper.php parseAndCompile failed (#4573)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('MbStrcutJitHelper::strcut was not compiled for JIT (#4573)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26598'
+        );
     }
 }
