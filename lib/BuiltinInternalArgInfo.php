@@ -87,6 +87,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
             'file_get_contents', 'fread', 'fgets' => 'string|false',
             'file_put_contents', 'fwrite' => 'int|false',
+            // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
+            'stream_get_contents' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
@@ -496,6 +498,8 @@ final class BuiltinInternalArgInfo
             // ext/standard/file.stub.php — ?int $length = null (#24846)
             'fwrite' => 2 === $index ? '?int' : null,
             'fgets' => 1 === $index ? '?int' : null,
+            // ext/standard/file.stub.php — ?int $length = null (#25750)
+            'stream_get_contents' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24826)
             'fgetcsv' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)

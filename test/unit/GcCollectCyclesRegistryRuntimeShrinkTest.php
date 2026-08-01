@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\GcCollectCyclesRegistryJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** GcCollectCycles embed registry routes through GcCollectCyclesRegistryJitHelper PHP (#9541). */
+/** GcCollectCycles embed registry routes through GcCollectCyclesRegistryJitHelper PHP (#9541, #26333). */
 final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
 {
     public function testGcCollectCyclesRuntimeUsesRegistryJitHelperOnEmbed(): void
@@ -19,6 +19,13 @@ final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('implementDestructMarkInvokedPhpBridge', $source);
         $this->assertStringContainsString('gc_register_php_entry', $source);
         $this->assertStringContainsString('usesPhpRegistry', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
     }
 
     public function testGcCollectCyclesRegistryJitHelperRoundtrip(): void

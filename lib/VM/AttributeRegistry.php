@@ -46,6 +46,7 @@ final class AttributeRegistry
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
         $target = AttributeSupport::TARGET_METHOD;
+        $methodLc = self::resolveMethodAttributeKey($entry, $methodLc);
         $allEntries = $entry->methodAttributeEntries[$methodLc] ?? [];
         $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
@@ -59,6 +60,25 @@ final class AttributeRegistry
             ReflectionSupport::filterByName($ctx, $all, $filter, $flags),
             $target
         );
+    }
+
+    /**
+     * Map ReflectionProperty hook method names (`$prop::get`) to synthetic methods (#26328).
+     */
+    private static function resolveMethodAttributeKey(ClassEntry $entry, string $methodLc): string
+    {
+        $methodLc = strtolower($methodLc);
+        if (isset($entry->methodAttributeEntries[$methodLc]) || isset($entry->methodAttributeNames[$methodLc])) {
+            return $methodLc;
+        }
+        $resolved = \PHPCompiler\SourcePreprocessor\PropertyHooks::hookMethodFromReflectionName($methodLc);
+        if (null !== $resolved
+            && (isset($entry->methodAttributeEntries[$resolved]) || isset($entry->methodAttributeNames[$resolved]))
+        ) {
+            return $resolved;
+        }
+
+        return $methodLc;
     }
 
     public static function propertyAttributes(

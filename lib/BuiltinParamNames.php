@@ -640,6 +640,9 @@ final class BuiltinParamNames
                 return ['arg1', 'exp'];
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
+            // php-src ext/standard/filestat.stub.php — InternalArgInfo still says mode (#23346)
+            case 'chmod':
+                return ['filename', 'permissions'];
             case 'mkdir':
                 // php-src ext/standard/file.stub.php — permissions=0777, recursive=false, context=null (#23453 / #24885)
                 return ['directory', 'permissions=', 'recursive=', 'context='];
@@ -1157,6 +1160,9 @@ final class BuiltinParamNames
                 return ['table=', 'flags=', 'encoding='];
             case 'ob_get_status':
                 return ['full_status='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says flag (#24455)
+            case 'ob_implicit_flush':
+                return ['enable='];
             // php-src ext/standard/image.stub.php — InternalArgInfo still says imagefile/info (#23343)
             case 'getimagesize':
                 return ['filename', 'image_info='];

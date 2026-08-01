@@ -39,7 +39,46 @@ PHP;
     }
 
     /**
-     * @covers issue #26306 — PROFILE=8.5 keeps isFinal + override fatal (same as 8.4)
+     * @covers issue #26339 — PROFILE=8.4 issue-body: isFinal=1 + eval override Fatal
+     * (php-src Zend/zend_inheritance.c + ext/reflection/php_reflection.c).
+     */
+    public function testPlainFinalPropertyIsFinalAndOverrideFatalUnderProfile84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public final string $x = 'a';
+}
+$r = new ReflectionProperty('A', 'x');
+echo 'isFinal=', $r->isFinal() ? '1' : '0', "\n";
+eval('class B extends A { public string $x = "b"; }');
+echo "override_ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_plain_profile84.php');
+        try {
+            ob_start();
+            $runtime->run($block, false);
+            ob_end_clean();
+            $this->fail('Expected Fatal on final property override under PROFILE=8.4');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $out = ob_get_clean();
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $out = ob_get_clean();
+            self::assertSame(255, $e->status);
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringNotContainsString('override_ok', (string) $out);
+        }
+    }
+
+    /**
+     * @covers issue #26306 / #26339 — PROFILE=8.5 keeps isFinal + override fatal (same as 8.4)
      */
     public function testPlainFinalPropertyIsFinalAndOverrideFatalUnderProfile85(): void
     {

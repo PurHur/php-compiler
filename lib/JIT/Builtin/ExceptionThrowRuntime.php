@@ -45,7 +45,6 @@ final class ExceptionThrowRuntime
         JitHelperAbiBridge::implement(
             $context,
             self::HELPER_PATH,
-            'ExceptionJitHelper.php',
             '#9679',
             self::COMPILED_HELPERS,
             [

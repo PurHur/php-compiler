@@ -77,9 +77,13 @@ final class AttributeNames
      * ({@see CompilerVersion::supportsOverridePropertyTarget}). Class constants are not a valid
      * target on any shipping PHP (RFC override_constants is proposed for 8.6 only).
      *
-     * @param list<string> $names
+     * With `#[\DelayedTargetValidation]`, wrong-target errors defer to newInstance (#26329).
+     * Functional override checks are unaffected.
+     *
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertOverrideMethodTargetOnly(array $names, string $target): void
+    public static function assertOverrideMethodTargetOnly(array $names, string $target, ?array $entries = null): void
     {
         if (!CompilerVersion::supportsOverrideAttribute()) {
             return;
@@ -100,7 +104,10 @@ final class AttributeNames
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasOverride([$name]),
             'Attribute "'.self::messageName('Override').'" cannot target '.$target
             .' (allowed targets: '.$allowedMsg.')'
         );
@@ -110,15 +117,19 @@ final class AttributeNames
      * Zend compile-time target guard (zend_attributes.c, issue #5137).
      * `#[\AllowDynamicProperties]` is only valid on classes.
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertAllowDynamicPropertiesClassTargetOnly(array $names, string $target): void
+    public static function assertAllowDynamicPropertiesClassTargetOnly(array $names, string $target, ?array $entries = null): void
     {
         if (!self::hasAllowDynamicProperties($names)) {
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasAllowDynamicProperties([$name]),
             'Attribute "'.self::messageName('AllowDynamicProperties').'" cannot target '.$target.' (allowed targets: class)'
         );
     }
@@ -143,15 +154,19 @@ final class AttributeNames
      * Call only from non-class declaration sites (same pattern as
      * {@see assertAllowDynamicPropertiesClassTargetOnly}).
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertAttributeMetaClassTargetOnly(array $names, string $target): void
+    public static function assertAttributeMetaClassTargetOnly(array $names, string $target, ?array $entries = null): void
     {
         if (!self::hasAttributeMetaClass($names)) {
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasAttributeMetaClass([$name]),
             'Attribute "'.self::messageName('Attribute').'" cannot target '.$target.' (allowed targets: class)'
         );
     }
@@ -171,6 +186,45 @@ final class AttributeNames
     }
 
     /**
+     * PROFILE≥8.5 with `#[\DelayedTargetValidation]` on the same declaration (#26329).
+     *
+     * php-src: Zend/zend_attributes.c — delays internal attribute target / custom-validator
+     * CompileErrors until ReflectionAttribute::newInstance().
+     *
+     * @param list<string> $names
+     */
+    public static function shouldDelayInternalTargetValidation(array $names): bool
+    {
+        return CompilerVersion::supportsDelayedTargetValidationAttribute()
+            && self::hasDelayedTargetValidation($names);
+    }
+
+    /**
+     * Emit an internal-attribute validation failure, or store it on matching entries when delayed (#26329).
+     *
+     * @param list<AttributeEntry>|null $entries mutated when deferring ({@see AttributeEntry::$validationError})
+     * @param callable(string): bool    $matchesAttr
+     */
+    public static function deferOrThrowInternalValidationError(
+        ?array $entries,
+        array $names,
+        callable $matchesAttr,
+        string $message,
+    ): void {
+        if (self::shouldDelayInternalTargetValidation($names) && null !== $entries) {
+            foreach ($entries as $entry) {
+                if ($entry instanceof AttributeEntry && $matchesAttr($entry->name)) {
+                    $entry->validationError = $message;
+                }
+            }
+
+            return;
+        }
+
+        throw new \CompileError($message);
+    }
+
+    /**
      * PHP 8.5+ Zend compile-time guard (zend_attributes.c {@code validate_attribute}, #26241).
      *
      * `#[\Attribute]` on abstract class / interface / trait / enum is a CompileError unless
@@ -187,22 +241,17 @@ final class AttributeNames
         if (!CompilerVersion::rejectsAttributeOnNonConcreteClassLike()) {
             return;
         }
-        if (!self::hasAttributeMetaClass(AttributeEntry::namesFromList($entries))) {
+        $names = AttributeEntry::namesFromList($entries);
+        if (!self::hasAttributeMetaClass($names)) {
             return;
         }
 
-        $message = 'Cannot apply #[\\Attribute] to '.$kind.' '.$display;
-        if (self::hasDelayedTargetValidation(AttributeEntry::namesFromList($entries))) {
-            foreach ($entries as $entry) {
-                if ($entry instanceof AttributeEntry && self::hasAttributeMetaClass([$entry->name])) {
-                    $entry->validationError = $message;
-                }
-            }
-
-            return;
-        }
-
-        throw new \CompileError($message);
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasAttributeMetaClass([$name]),
+            'Cannot apply #[\\Attribute] to '.$kind.' '.$display
+        );
     }
 
     /**
@@ -264,9 +313,10 @@ final class AttributeNames
      * TARGET_CONSTANT are advertised — {@see assertDeprecatedAllowedOnClassLike} then
      * restricts TARGET_CLASS applications to traits only (rfc:deprecated_traits, #26307).
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertDeprecatedTargetAllowed(array $names, string $target): void
+    public static function assertDeprecatedTargetAllowed(array $names, string $target, ?array $entries = null): void
     {
         if (!CompilerVersion::advertisesDeprecatedAttributeClass()) {
             return;
@@ -287,7 +337,10 @@ final class AttributeNames
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasDeprecated([$name]),
             'Attribute "'.self::messageName('Deprecated').'" cannot target '.$target
             .' (allowed targets: '.$allowedMsg.')'
         );
@@ -295,18 +348,21 @@ final class AttributeNames
 
     /**
      * Zend 8.5+ validate_deprecated: #[\Deprecated] on class-likes is traits-only
-     * (zend_attributes.c, rfc:deprecated_traits, #22989 / #26307).
+     * (zend_attributes.c, rfc:deprecated_traits, #22989 / #26307 / #26329).
      *
      * TARGET_CLASS on the builtin is required so traits pass the Attribute target mask;
      * this validator then fatals for class / interface / enum (same message shape as php-src).
+     * Delayed by `#[\DelayedTargetValidation]`.
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
     public static function assertDeprecatedAllowedOnClassLike(
         array $names,
         ?DeprecatedMetadata $meta,
         string $objectType,
-        string $displayName
+        string $displayName,
+        ?array $entries = null,
     ): void {
         if (!CompilerVersion::supportsDeprecatedTraitAttribute()) {
             return;
@@ -318,7 +374,10 @@ final class AttributeNames
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasDeprecated([$name]),
             'Cannot apply #[\\Deprecated] to '.$objectType.' '.$displayName
         );
     }
@@ -340,9 +399,10 @@ final class AttributeNames
      * Zend compile-time target guard (zend_attributes.c, issue #11638).
      * `#[\SensitiveParameter]` is only valid on parameters.
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertSensitiveParameterParamTargetOnly(array $names, string $target): void
+    public static function assertSensitiveParameterParamTargetOnly(array $names, string $target, ?array $entries = null): void
     {
         if (!self::isSensitiveParameter($names)) {
             return;
@@ -352,7 +412,10 @@ final class AttributeNames
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::isSensitiveParameter([$name]),
             'Attribute "'.self::messageName('SensitiveParameter').'" cannot target '.$target.' (allowed targets: parameter)'
         );
     }
@@ -377,9 +440,10 @@ final class AttributeNames
      * AttributeTargetValidator skips builtin internals (`returntypewillchange`), so this
      * dedicated AttributeNames guard is required (same pattern as SensitiveParameter).
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertReturnTypeWillChangeMethodTargetOnly(array $names, string $target): void
+    public static function assertReturnTypeWillChangeMethodTargetOnly(array $names, string $target, ?array $entries = null): void
     {
         if (!self::hasReturnTypeWillChange($names)) {
             return;
@@ -389,7 +453,10 @@ final class AttributeNames
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasReturnTypeWillChange([$name]),
             'Attribute "'.self::messageName('ReturnTypeWillChange').'" cannot target '.$target.' (allowed targets: method)'
         );
     }
@@ -424,9 +491,10 @@ final class AttributeNames
      * Zend compile-time target guard (zend_attributes.c, issue #7300).
      * `#[\CompileTime]` is only valid on global and class constants.
      *
-     * @param list<string> $names
+     * @param list<string>              $names
+     * @param list<AttributeEntry>|null $entries
      */
-    public static function assertCompileTimeConstTargetOnly(array $names, string $target): void
+    public static function assertCompileTimeConstTargetOnly(array $names, string $target, ?array $entries = null): void
     {
         if (!self::hasCompileTime($names)) {
             return;
@@ -436,7 +504,10 @@ final class AttributeNames
             return;
         }
 
-        throw new \CompileError(
+        self::deferOrThrowInternalValidationError(
+            $entries,
+            $names,
+            static fn (string $name): bool => self::hasCompileTime([$name]),
             'Attribute "'.self::messageName('CompileTime').'" cannot target '.$target.' (allowed targets: class constant, constant)'
         );
     }

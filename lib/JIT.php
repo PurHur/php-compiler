@@ -13198,6 +13198,15 @@ class JIT {
                                 $methodLc,
                                 $attrNames
                             );
+                            $hookReflection = \PHPCompiler\SourcePreprocessor\PropertyHooks::reflectionNameFromHookMethod($methodLc);
+                            if (null !== $hookReflection) {
+                                AttributeRegistry::emitRegisterMethod(
+                                    $this->context,
+                                    $classLc,
+                                    $hookReflection,
+                                    $attrNames
+                                );
+                            }
                         }
                     }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;

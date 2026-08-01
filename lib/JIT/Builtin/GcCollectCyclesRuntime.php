@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\ext\standard\JitGcCollectCyclesStandaloneKernel;
 use PHPLLVM\Builder;
@@ -15,10 +14,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM GC registry + cycle collector for JIT/AOT (issues #3160, #5315).
+ * LLVM GC registry + cycle collector for JIT/AOT (issues #3160, #5315, #26333).
  *
- * Replaces lib/AOT/runtime/phpc_gc.c; semantics mirror Zend gc_collect_cycles subset.
- * php-src: Zend/zend_gc.c
+ * Helper compile: per-file {@see JitVmHelperLink::ensureCompiled} (peer ObGzhandler #26331 /
+ * ProcessOpen #26269). Replaces lib/AOT/runtime/phpc_gc.c; semantics mirror Zend
+ * gc_collect_cycles subset. php-src: Zend/zend_gc.c
  */
 final class GcCollectCyclesRuntime
 {
@@ -968,131 +968,53 @@ final class GcCollectCyclesRuntime
 
     private static function ensureDestructAllowDelrefJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::DESTRUCT_COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::DESTRUCT_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcDestructAllowDelrefJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GcDestructAllowDelrefJitHelper.php parseAndCompile failed (#15852)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::DESTRUCT_COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT GC destruct gate (#15852)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::DESTRUCT_HELPER_PATH,
+            self::DESTRUCT_COMPILED_HELPERS,
+            '#26333'
+        );
     }
 
     private static function destructHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureDestructAllowDelrefJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcDestructAllowDelrefJitHelper compile (#15852)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26333');
     }
 
     private static function ensureShutdownJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::SHUTDOWN_COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::SHUTDOWN_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcDestructShutdownJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GcDestructShutdownJitHelper.php parseAndCompile failed (#15852)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::SHUTDOWN_COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT GC shutdown walk (#15852)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::SHUTDOWN_HELPER_PATH,
+            self::SHUTDOWN_COMPILED_HELPERS,
+            '#26333'
+        );
     }
 
     private static function shutdownHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureShutdownJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcDestructShutdownJitHelper compile (#15852)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26333');
     }
 
     private static function ensureRegistryJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::REGISTRY_COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::REGISTRY_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcCollectCyclesRegistryJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GcCollectCyclesRegistryJitHelper.php parseAndCompile failed (#9541)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::REGISTRY_COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT GC registry (#9541)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::REGISTRY_HELPER_PATH,
+            self::REGISTRY_COMPILED_HELPERS,
+            '#26333'
+        );
     }
 
     private static function registryHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureRegistryJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcCollectCyclesRegistryJitHelper compile (#9541)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26333');
     }
 
     private static function syncRegistryCountGlobal(Context $context): void
@@ -1365,88 +1287,36 @@ final class GcCollectCyclesRuntime
 
     private static function ensureTryInvokeJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::TRY_INVOKE_COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::TRY_INVOKE_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcDestructTryInvokeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GcDestructTryInvokeJitHelper.php parseAndCompile failed (#18660)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::TRY_INVOKE_COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT GC destruct try-invoke (#18660)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::TRY_INVOKE_HELPER_PATH,
+            self::TRY_INVOKE_COMPILED_HELPERS,
+            '#26333'
+        );
     }
 
     private static function ensureReleaseStorageJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::RELEASE_STORAGE_COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::RELEASE_STORAGE_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcObjectReleaseStorageJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GcObjectReleaseStorageJitHelper.php parseAndCompile failed (#18660)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::RELEASE_STORAGE_COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT GC object release (#18660)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::RELEASE_STORAGE_HELPER_PATH,
+            self::RELEASE_STORAGE_COMPILED_HELPERS,
+            '#26333'
+        );
     }
 
     private static function tryInvokeHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureTryInvokeJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcDestructTryInvokeJitHelper compile (#18660)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26333');
     }
 
     private static function releaseStorageHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureReleaseStorageJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcObjectReleaseStorageJitHelper compile (#18660)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26333');
     }
 
     private static function collectEmbedHelperFunction(Context $context): LlvmFunction

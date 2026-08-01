@@ -1034,6 +1034,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $ctx->type);
     }
 
+    /** @covers issue #23346 */
+    public function testChmodPermissionsNamedParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('chmod');
+        self::assertSame(['filename', 'permissions'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'chmod'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'permissions', 'chmod'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mode', 'chmod'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('chmod'));
+    }
+
     /** @covers issue #11576 */
     public function testStreamSocketClientNamedTimeoutParamResolves(): void
     {
@@ -3601,6 +3612,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['full_status='], $ob);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ob, 'full_status', 'ob_get_status'));
         self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ob_get_status'));
+    }
+
+    /** @covers issue #24455 */
+    public function testObImplicitFlushZendStubNamedEnable(): void
+    {
+        $names = BuiltinParamNames::forFunction('ob_implicit_flush');
+        self::assertSame(['enable='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'enable', 'ob_implicit_flush'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects flag)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'flag', 'ob_implicit_flush'));
+        self::assertSame(
+            ['enable='],
+            BuiltinParamNames::paramNamesForInternalFunction('ob_implicit_flush')
+        );
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ob_implicit_flush'));
     }
 
     /** @covers issue #24591 */

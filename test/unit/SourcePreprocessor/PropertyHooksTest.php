@@ -1211,4 +1211,66 @@ PHP;
         self::assertSame('stored', $registry['c']['x']['setBacking'] ?? null);
     }
 
+    /** @covers issue #26328 — attributes before get/set lower onto synthetic hook methods */
+    public function testLowersAttributesOntoHookMethods(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+#[Attribute]
+class Marker {}
+class Base {
+    public string $x {
+        get => "base";
+        set {}
+    }
+}
+class Child extends Base {
+    public string $x {
+        #[\Override]
+        get => "child";
+        #[Marker]
+        set {}
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('get =>', $out);
+        self::assertStringContainsString('#[\Override]', $out);
+        self::assertStringContainsString('#[Marker]', $out);
+        self::assertMatchesRegularExpression(
+            '/#\[\\\\Override\]\s+public function __phpc_property_get_x/s',
+            $out
+        );
+        self::assertMatchesRegularExpression(
+            '/#\[Marker\]\s+public function __phpc_property_set_x/s',
+            $out
+        );
+        self::assertSame('__phpc_property_get_x', $registry['child']['x']['get'] ?? null);
+        self::assertSame('__phpc_property_set_x', $registry['child']['x']['set'] ?? null);
+    }
+
+    /** @covers issue #26328 — attributes before final &get */
+    public function testLowersAttributesBeforeFinalByRefGet(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+#[Attribute]
+class HookAttr {}
+class C {
+    private array $a = [1];
+    public array $x {
+        #[HookAttr]
+        final &get => $this->a;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertMatchesRegularExpression(
+            '/#\[HookAttr\]\s+public function &__phpc_property_get_x/s',
+            $out
+        );
+    }
+
 }
