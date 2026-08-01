@@ -97,6 +97,8 @@ final class BuiltinInternalArgInfo
             'stream_get_line' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo return int (missing |false) (#26322)
             'ftell' => 'int|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
+            'fscanf' => 'array|int|false|null',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
@@ -329,6 +331,8 @@ final class BuiltinInternalArgInfo
             'ini_get_all' => 0 === $index ? '?string' : null,
             // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
+            // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
+            'fscanf' => 2 === $index ? 'mixed' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)

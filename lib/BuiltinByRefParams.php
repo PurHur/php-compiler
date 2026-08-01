@@ -106,6 +106,10 @@ final class BuiltinByRefParams
                 return [0, 1];
             case 'flock':
                 return [2];
+            case 'fscanf':
+                // php-src basic_functions.stub.php — mixed &...$vars (#26058)
+                // Reflection reads forFunction(); runtime also uses variadicByRefFromIndex(2).
+                return [2];
             case 'getopt':
                 return [2];
             case 'is_callable':

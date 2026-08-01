@@ -288,6 +288,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftell'));
     }
 
+    /** php-src basic_functions.stub.php — fscanf return + mixed &...$vars (#26058). */
+    public function testFscanfReflectionReturnAndVarsType(): void
+    {
+        $this->assertSame('array|int|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('fscanf'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('fscanf', 2));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('fscanf', 2);
+        $this->assertNotNull($info);
+        $this->assertSame('mixed', $info['type']);
+        $this->assertSame([2], BuiltinByRefParams::forFunction('fscanf'));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511, #26342). */
     public function testGzencodeGzdecodeReflectionReturnUnions(): void
     {
