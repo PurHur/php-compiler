@@ -342,8 +342,8 @@ class OpCode {
     /** ?-> fetch arm: uninitialized nullable typed slot → null not Error (#5220, #13747). */
     public bool $nullsafeUninitNullableToNull = false;
     /**
-     * TYPE_NULLSAFE for ?-> method call: short-circuit only on null (not scalar/array).
-     * Property ?-> still treats non-objects like Zend #18026 (#26364, zend_vm_def.h).
+     * TYPE_NULLSAFE for ?-> method call (vs property): both short-circuit only on null;
+     * method fetch arm Errors on scalar, property fetch arm warns (#26364, #26365).
      */
     public bool $nullsafeMethodCall = false;
     /**

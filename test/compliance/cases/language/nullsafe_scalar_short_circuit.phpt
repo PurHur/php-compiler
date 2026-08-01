@@ -1,5 +1,5 @@
 --TEST--
-Language: nullsafe ?-> on scalar/non-object short-circuits silently (#18026, #18028)
+Language: nullsafe ?-> under ??/isset stays silent on scalar (FETCH_OBJ_IS, #18026, #26365)
 --FILE--
 <?php
 declare(strict_types=1);

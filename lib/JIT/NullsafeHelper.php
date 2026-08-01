@@ -45,10 +45,10 @@ final class NullsafeHelper
     }
 
     /**
-     * i1: receiver short-circuits ?->.
+     * i1: receiver short-circuits ?-> — null / uninitialized nullable only (#26365, #26364).
      *
-     * Property: null, scalar/non-object, or uninitialized nullable slot (#18026).
-     * Method: null / uninitialized nullable only — scalars Error in the fetch arm (#26364).
+     * Known non-null non-objects do not short-circuit: property fetch warns (#26365);
+     * METHODCALL_INIT Errors (#26364).
      */
     public static function isReceiverNull(
         JIT $jit,
@@ -58,16 +58,12 @@ final class NullsafeHelper
         $context = $jit->context;
         $builder = $context->builder;
         $i1 = $context->getTypeFromString('int1');
-        if ($forMethodCall) {
-            if (Variable::TYPE_NULL === $receiver->type) {
-                return $i1->constInt(1, false);
-            }
-            // Known non-null non-object: do not short-circuit; METHODCALL_INIT Errors (#26364).
-            if (self::receiverAlwaysShortCircuits($receiver->type)) {
-                return $i1->constInt(0, false);
-            }
-        } elseif (self::receiverAlwaysShortCircuits($receiver->type)) {
+        if (Variable::TYPE_NULL === $receiver->type) {
             return $i1->constInt(1, false);
+        }
+        // Known non-null non-object: fall through to fetch/call arm (#26365 / #26364).
+        if (self::receiverIsKnownNonNullNonObject($receiver->type)) {
+            return $i1->constInt(0, false);
         }
         if (Variable::TYPE_OBJECT === $receiver->type) {
             $obj = $context->helper->loadValue($receiver);
@@ -94,10 +90,9 @@ final class NullsafeHelper
         return self::callValueBoxShortCircuits($context, $typeByte, $nullableSlot, $forMethodCall);
     }
 
-    private static function receiverAlwaysShortCircuits(int $jitType): bool
+    private static function receiverIsKnownNonNullNonObject(int $jitType): bool
     {
         return \in_array($jitType, [
-            Variable::TYPE_NULL,
             Variable::TYPE_NATIVE_LONG,
             Variable::TYPE_NATIVE_BOOL,
             Variable::TYPE_NATIVE_DOUBLE,

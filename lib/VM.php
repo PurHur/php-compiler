@@ -8187,10 +8187,16 @@ restart:
                             break;
                         }
                         if ($op->nullsafeFetchPropertyRead) {
-                            $result->null();
-                            break;
-                        }
-                        if (Variable::TYPE_NULL === $resolved->type) {
+                            // IS-mode (??/isset/empty) or null: silent like FETCH_OBJ_IS (#18026).
+                            // R-mode nullsafe on scalar/array: warn like plain -> (#26365).
+                            if (
+                                $op->nullsafeUninitNullableToNull
+                                || Variable::TYPE_NULL === $resolved->type
+                            ) {
+                                $result->null();
+                                break;
+                            }
+                        } elseif (Variable::TYPE_NULL === $resolved->type) {
                             $this->context->errors->propertyReadOnNonObject(
                                 $name,
                                 'null',
