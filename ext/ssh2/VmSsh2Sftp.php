@@ -61,6 +61,21 @@ final class VmSsh2Sftp
         return isset(self::$state[$object->id]) && !self::$state[$object->id]['closed'];
     }
 
+    public static function requireLive(ObjectEntry $object, string $fn): ObjectEntry
+    {
+        if (!self::isLive($object)) {
+            throw new \TypeError($fn.'(): supplied resource is not a valid SSH2 SFTP resource');
+        }
+
+        return $object;
+    }
+
+    /** @return \FFI\CData|null LIBSSH2_SFTP* */
+    public static function nativeSftp(ObjectEntry $object)
+    {
+        return self::$state[$object->id]['sftp'] ?? null;
+    }
+
     public static function close(ObjectEntry $object): void
     {
         if (!isset(self::$state[$object->id]) || self::$state[$object->id]['closed']) {

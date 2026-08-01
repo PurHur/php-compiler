@@ -57,6 +57,35 @@ abstract class Ssh2Function extends Internal
 
         return VmSsh2Session::requireLive($object, $fn);
     }
+
+    protected function requireSftp(Variable $var, string $fn, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($sftp) must be of type SSH2\\Sftp, %s given',
+                $fn,
+                $argNum,
+                match ($var->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_INT => 'int',
+                    default => 'mixed',
+                }
+            ));
+        }
+        $object = $var->toObject();
+        if (VmSsh2Sftp::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($sftp) must be of type SSH2\\Sftp, %s given',
+                $fn,
+                $argNum,
+                $object->class->name
+            ));
+        }
+
+        return VmSsh2Sftp::requireLive($object, $fn);
+    }
 }
 
 /**
@@ -517,5 +546,82 @@ final class ssh2_scp_send extends Ssh2Function
             return;
         }
         $frame->returnVar->bool(VmSsh2Native::scpSend($native, $local, $remote, $mode));
+    }
+}
+
+/**
+ * ssh2_sftp_stat(resource $sftp, string $path): array|false
+ */
+final class ssh2_sftp_stat extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_stat');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        self::runStat($this, $frame, 'ssh2_sftp_stat', VmSsh2Native::SFTP_STAT);
+    }
+
+    /**
+     * Shared body for ssh2_sftp_stat / ssh2_sftp_lstat (#26609).
+     */
+    public static function runStat(Ssh2Function $self, Frame $frame, string $fn, int $statType): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects exactly 2 arguments, %d given',
+                $fn,
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $self->requireSftp($frame->calledArgs[0], $fn, 1);
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $fn, 2, 'path');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            @\trigger_error($fn.'(): Failed to stat remote file', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $raw = VmSsh2Native::sftpStat($native, $path, $statType);
+        if (false === $raw) {
+            @\trigger_error($fn.'(): Failed to stat remote file', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($raw as $key => $value) {
+            $slot = new Variable();
+            $slot->int((int) $value);
+            if (\is_int($key)) {
+                $ht->addIndex($key, $slot);
+            } else {
+                $ht->add((string) $key, $slot);
+            }
+        }
+        $frame->returnVar->array($ht);
+    }
+}
+
+/**
+ * ssh2_sftp_lstat(resource $sftp, string $path): array|false
+ */
+final class ssh2_sftp_lstat extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_lstat');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        ssh2_sftp_stat::runStat($this, $frame, 'ssh2_sftp_lstat', VmSsh2Native::SFTP_LSTAT);
     }
 }
