@@ -32,6 +32,17 @@ final class DynamicPropertyDeprecationGuard
         if ($objectType->isReadonlyClass($classId)) {
             return;
         }
+        // Internal / extension classes: Error, not E_DEPRECATED (zend_object_handlers.c; #26055).
+        if ($objectType->isExternalOnlyClass($classId)) {
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                $context,
+                sprintf('Cannot create dynamic property %s::$%s', $className, $propertyName)
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
 
         $message = sprintf(
             'Creation of dynamic property %s::$%s is deprecated',
