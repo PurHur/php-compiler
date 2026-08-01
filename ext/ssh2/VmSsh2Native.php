@@ -127,6 +127,119 @@ final class VmSsh2Native
     }
 
     /**
+     * Authenticate via local ssh-agent (PECL ssh2_auth_agent; #26713).
+     *
+     * Mirrors pecl-networking-ssh2 `PHP_FUNCTION(ssh2_auth_agent)`:
+     * init → connect → list_identities → try each identity with userauth.
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return true|string  true on success; warning message string on failure
+     */
+    public static function authAgent(\FFI\CData $session, string $username)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return 'Failure initializing ssh-agent support';
+        }
+        try {
+            $userauthlist = $ffi->libssh2_userauth_list($session, $username, \strlen($username));
+        } catch (\Throwable) {
+            return 'Failure initializing ssh-agent support';
+        }
+        if (null !== $userauthlist) {
+            try {
+                $list = \FFI::string($userauthlist);
+            } catch (\Throwable) {
+                $list = '';
+            }
+            if ('' !== $list && false === \strpos($list, 'publickey')) {
+                return '"publickey" authentication is not supported';
+            }
+        }
+        try {
+            $agent = $ffi->libssh2_agent_init($session);
+        } catch (\Throwable) {
+            return 'Failure initializing ssh-agent support';
+        }
+        if (null === $agent) {
+            return 'Failure initializing ssh-agent support';
+        }
+        $cleanup = static function () use ($ffi, $agent): void {
+            try {
+                $ffi->libssh2_agent_disconnect($agent);
+            } catch (\Throwable) {
+            }
+            try {
+                $ffi->libssh2_agent_free($agent);
+            } catch (\Throwable) {
+            }
+        };
+        try {
+            if (0 !== (int) $ffi->libssh2_agent_connect($agent)) {
+                try {
+                    $ffi->libssh2_agent_free($agent);
+                } catch (\Throwable) {
+                }
+
+                return 'Failure connecting to ssh-agent';
+            }
+        } catch (\Throwable) {
+            try {
+                $ffi->libssh2_agent_free($agent);
+            } catch (\Throwable) {
+            }
+
+            return 'Failure connecting to ssh-agent';
+        }
+        try {
+            if (0 !== (int) $ffi->libssh2_agent_list_identities($agent)) {
+                $cleanup();
+
+                return 'Failure requesting identities to ssh-agent';
+            }
+        } catch (\Throwable) {
+            $cleanup();
+
+            return 'Failure requesting identities to ssh-agent';
+        }
+        $prev = null;
+        while (true) {
+            try {
+                $identity = $ffi->new('struct libssh2_agent_publickey*');
+                $rc = (int) $ffi->libssh2_agent_get_identity($agent, \FFI::addr($identity), $prev);
+            } catch (\Throwable) {
+                $cleanup();
+
+                return 'Failure obtaining identity from ssh-agent support';
+            }
+            if (1 === $rc) {
+                $cleanup();
+
+                return "Couldn't continue authentication";
+            }
+            if ($rc < 0) {
+                $cleanup();
+
+                return 'Failure obtaining identity from ssh-agent support';
+            }
+            try {
+                $authRc = (int) $ffi->libssh2_agent_userauth($agent, $username, $identity);
+            } catch (\Throwable) {
+                $cleanup();
+
+                return "Couldn't continue authentication";
+            }
+            if (0 === $authRc) {
+                $cleanup();
+
+                return true;
+            }
+            $prev = $identity;
+        }
+    }
+
+    /**
      * Probe "none" auth / list allowed methods (PECL ssh2_auth_none; #26678).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -1008,6 +1121,15 @@ int libssh2_sftp_unlink_ex(LIBSSH2_SFTP *sftp, const char *filename, size_t file
 int libssh2_sftp_rename_ex(LIBSSH2_SFTP *sftp, const char *source_filename, unsigned int source_filename_len, const char *dest_filename, unsigned int dest_filename_len, long flags);
 int libssh2_sftp_symlink_ex(LIBSSH2_SFTP *sftp, const char *path, unsigned int path_len, char *target, unsigned int target_len, int link_type);
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
+typedef struct _LIBSSH2_LISTENER LIBSSH2_LISTENER;
+typedef struct _LIBSSH2_AGENT LIBSSH2_AGENT;
+struct libssh2_agent_publickey {
+    unsigned int magic;
+    void *node;
+    unsigned char *blob;
+    size_t blob_len;
+    char *comment;
+};
 LIBSSH2_CHANNEL *libssh2_channel_open_ex(LIBSSH2_SESSION *session, const char *channel_type, unsigned int channel_type_len, unsigned int window_size, unsigned int packet_size, const char *message, unsigned int message_len);
 int libssh2_channel_process_startup(LIBSSH2_CHANNEL *channel, const char *request, size_t request_len, const char *message, size_t message_len);
 int libssh2_channel_request_pty_ex(LIBSSH2_CHANNEL *channel, const char *term, unsigned int term_len, const char *modes, unsigned int modes_len, int width, int height, int width_px, int height_px);
@@ -1018,6 +1140,17 @@ int libssh2_channel_close(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_wait_closed(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_free(LIBSSH2_CHANNEL *channel);
 LIBSSH2_CHANNEL *libssh2_channel_direct_tcpip_ex(LIBSSH2_SESSION *session, const char *host, int port, const char *shost, int sport);
+int libssh2_userauth_hostbased_fromfile_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *pubkeyfile, const char *privkeyfile, const char *passphrase, const char *hostname, unsigned int hostname_len, const char *local_username, unsigned int local_username_len);
+LIBSSH2_LISTENER *libssh2_channel_forward_listen_ex(LIBSSH2_SESSION *session, const char *host, int port, int *bound_port, int queue_maxsize);
+int libssh2_channel_forward_cancel(LIBSSH2_LISTENER *listener);
+LIBSSH2_CHANNEL *libssh2_channel_forward_accept(LIBSSH2_LISTENER *listener);
+LIBSSH2_AGENT *libssh2_agent_init(LIBSSH2_SESSION *session);
+int libssh2_agent_connect(LIBSSH2_AGENT *agent);
+int libssh2_agent_list_identities(LIBSSH2_AGENT *agent);
+int libssh2_agent_get_identity(LIBSSH2_AGENT *agent, struct libssh2_agent_publickey **store, struct libssh2_agent_publickey *prev);
+int libssh2_agent_userauth(LIBSSH2_AGENT *agent, const char *username, struct libssh2_agent_publickey *identity);
+int libssh2_agent_disconnect(LIBSSH2_AGENT *agent);
+void libssh2_agent_free(LIBSSH2_AGENT *agent);
 C;
         foreach (['libssh2.so.1', 'libssh2.so', '/usr/lib/x86_64-linux-gnu/libssh2.so.1'] as $lib) {
             try {
