@@ -772,6 +772,10 @@ class Compiler {
                 return;
             }
             if ('mixed' === strtolower($returnType->name)) {
+                // Explicit `: mixed` is not untyped — fall-off / bare `return;` must error (#26485).
+                $block->returnTypeMixed = true;
+                $block->returnDeclaredTypeLabel = 'mixed';
+
                 return;
             }
             $returnLc = strtolower($returnType->name);
@@ -1081,6 +1085,7 @@ class Compiler {
             $child->returnTypeVoid = $parent->returnTypeVoid;
             $child->returnTypeNever = $parent->returnTypeNever;
             $child->returnTypeStatic = $parent->returnTypeStatic;
+            $child->returnTypeMixed = $parent->returnTypeMixed;
             $child->returnDeclaredType = $parent->returnDeclaredType;
             $child->returnLiteralBoolType = $parent->returnLiteralBoolType;
         }

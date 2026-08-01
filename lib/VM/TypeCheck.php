@@ -509,6 +509,20 @@ final class TypeCheck
         throw new \Error('A function with return type must return a value');
     }
 
+    /**
+     * php-src zend_verify_return_error — implicit/missing return for a declared type (#26485).
+     * Zend raises TypeError: "{fn}(): Return value must be of type {T}, none returned".
+     */
+    public static function assertNoneReturned(?string $callableName, string $expectedType): void
+    {
+        $message = "Return value must be of type {$expectedType}, none returned";
+        if (null !== $callableName && '' !== $callableName) {
+            $message = "{$callableName}(): {$message}";
+        }
+
+        throw new \TypeError($message);
+    }
+
     public static function assertNeverReturn(?string $functionName = null): void
     {
         if (null !== $functionName && '' !== $functionName) {
