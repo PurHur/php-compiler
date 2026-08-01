@@ -771,6 +771,47 @@ PHP;
         }
     }
 
+    /**
+     * php-src php_dom.stub.php — Dom\Element attribute getters expose nullable returns (#26065).
+     */
+    public function test_dom_element_getattr_reflection_return_types(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#26065)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$d = Dom\HTMLDocument::createEmpty();
+$el = $d->createElement('div');
+foreach (['getAttribute', 'getAttributeNS', 'getAttributeNode', 'getAttributeNodeNS'] as $m) {
+    $rm = new ReflectionMethod($el, $m);
+    $t = $rm->getReturnType();
+    echo $m, '=', $t ? $t->__toString() : '(none)', "\n";
+}
+PHP;
+            $block = $runtime->parseAndCompile($code, 'dom_element_getattr_reflection.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame(
+                "getAttribute=?string\n"
+                ."getAttributeNS=?string\n"
+                ."getAttributeNode=?Dom\\Attr\n"
+                ."getAttributeNodeNS=?Dom\\Attr\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
