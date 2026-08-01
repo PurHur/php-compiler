@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -55,6 +56,10 @@ final class StringChmod
             return;
         }
 
+        // Restore caller insert block after bridge emit (#19283 / #23346) — clearInsertionPosition
+        // left the user-script builder detached ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15458');
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -76,6 +81,10 @@ final class StringChmod
         $context->builder->returnValue($bool);
 
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
