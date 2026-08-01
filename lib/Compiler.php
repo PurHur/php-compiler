@@ -28866,6 +28866,17 @@ class Compiler {
         $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         if (null !== $consumerIndex) {
             $consumer = $ops[$consumerIndex] ?? null;
+            // Bare stmt MethodCall before trailing true/false/null ConstFetch multi-arg consumer
+            // (appendChild then insertBefore($x, null)) must not be deferred (#26458).
+            if (
+                $op instanceof Op\Expr\MethodCall
+                && null !== $consumer
+                && (null === $op->result || empty($op->result->usages))
+                && $this->onlyScalarConstFetchPreludesBetween($producerIndex, $consumerIndex, $ops)
+                && !$this->methodCallFeedsMultiArgConsumerAcrossScalarConstFetch($op, $consumer)
+            ) {
+                return false;
+            }
             if (
                 $op instanceof Op\Expr
                 && null !== $consumer
@@ -29054,14 +29065,26 @@ class Compiler {
             }
             if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
                 if ($this->isSiblingMultiArgFuncCallProducer($op, $next, $producerIndex, $j, $ops)) {
+                    // ConstFetch-null/true/false between MethodCalls: only defer when the leaf feeds
+                    // the consumer (importNode item+true — #25702). Skip stmt appendChild (#26458).
+                    if (
+                        $op instanceof Op\Expr\MethodCall
+                        && $this->onlyScalarConstFetchPreludesBetween($producerIndex, $j, $ops)
+                        && !$this->methodCallFeedsMultiArgConsumerAcrossScalarConstFetch($op, $next)
+                    ) {
+                        continue;
+                    }
                     return $j;
                 }
                 // importNode(...->item(0), true) — only true/false/null ConstFetch between leaf MethodCall
                 // and consumer; detect structurally (isNestedCallArg can fail under firstSibling reentry) (#25702).
+                // Require the leaf to feed the consumer — bare stmt MethodCalls such as appendChild
+                // before insertBefore($x, null) must not be deferred (#26458).
                 if (
                     $op instanceof Op\Expr\MethodCall
                     && $this->isSiblingMultiArgInlineCallConsumer($next)
                     && $this->onlyScalarConstFetchPreludesBetween($producerIndex, $j, $ops)
+                    && $this->methodCallFeedsMultiArgConsumerAcrossScalarConstFetch($op, $next)
                 ) {
                     return $j;
                 }
@@ -32089,6 +32112,71 @@ class Compiler {
     }
 
     /**
+     * Whether a MethodCall before trailing true/false/null ConstFetch actually feeds the multi-arg
+     * consumer (live result usage or dead-temp call arg) — #25702 / #26458.
+     *
+     * Bare statement MethodCalls such as {@code $r->appendChild($a)} before
+     * {@code $r->insertBefore($b, null)} share the ConstFetch-null CFG shape but must not be
+     * treated as sibling arg producers (that deferred the append and dropped prior children).
+     */
+    private function methodCallFeedsMultiArgConsumerAcrossScalarConstFetch(
+        Op\Expr\MethodCall $producer,
+        Op $consumer
+    ): bool {
+        if (!\is_array($consumer->args ?? null) || \count($consumer->args) < 2) {
+            return false;
+        }
+        if (null === $producer->result) {
+            return false;
+        }
+        if (!empty($producer->result->usages)) {
+            foreach ($producer->result->usages as $usage) {
+                if ($usage === $consumer) {
+                    return true;
+                }
+            }
+        }
+        // Dead-temp leaf (importNode(...->item(0), true) — #25702). php-cfg may use distinct
+        // result/arg temporaries, so also accept a non-scalar-ConstFetch dead temp when this
+        // MethodCall is the leaf before the ConstFetch prelude. Skip true/false/null ConstFetch
+        // temps — those are not feeds from a prior stmt MethodCall such as appendChild (#26458).
+        $sawNonScalarDeadTemp = false;
+        foreach ($consumer->args as $arg) {
+            if (!$this->callArgIsDeadInlineTemporary($arg)) {
+                continue;
+            }
+            if ($this->callArgTemporaryIsHoistedTrueFalseNullConstFetch($arg)) {
+                continue;
+            }
+            if ($this->operandsReferToSameVariable($producer->result, $arg)) {
+                return true;
+            }
+            $sawNonScalarDeadTemp = true;
+        }
+
+        return $sawNonScalarDeadTemp && empty($producer->result->usages);
+    }
+
+    /** True when a call-arg Temporary is the hoisted true/false/null ConstFetch prelude (#26458). */
+    private function callArgTemporaryIsHoistedTrueFalseNullConstFetch(?Operand $arg): bool
+    {
+        if (!$arg instanceof Operand\Temporary) {
+            return false;
+        }
+        foreach ($arg->ops ?? [] as $embedded) {
+            if (!$embedded instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($embedded->name);
+            if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall stmts before the consumer (#9463, #10981).
      * Compile each producer once with its own EXEC_RETURN slot before ARG_SEND wiring.
      */
@@ -32326,11 +32414,14 @@ class Compiler {
                     $j
                 );
             // Leaf MethodCall before trailing true/false/null ConstFetch multi-arg consumer (#25702).
+            // Must feed the consumer (live usage or dead-temp arg) — not prior stmts like
+            // appendChild before insertBefore($x, null) (#26458).
             if (
                 !$isSib
                 && $producer instanceof Op\Expr\MethodCall
                 && $this->onlyScalarConstFetchPreludesBetween($j, $callIndex, $cfgChildren)
                 && $this->isSiblingMultiArgInlineCallConsumer($cfgCallOp)
+                && $this->methodCallFeedsMultiArgConsumerAcrossScalarConstFetch($producer, $cfgCallOp)
             ) {
                 $isSib = true;
             }
