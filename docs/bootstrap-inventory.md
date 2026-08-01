@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6702 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21600 |
+| Source constructs flagged (warnings) | 21599 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5067,7 +5067,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Hebrev.php` | 0 | 1 |
 | `lib/JIT/Builtin/Hebrevc.php` | 0 | 1 |
 | `lib/JIT/Builtin/Highlight.php` | 0 | 1 |
-| `lib/JIT/Builtin/HtmlEntitiesJit.php` | 0 | 2 |
+| `lib/JIT/Builtin/HtmlEntitiesJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/HtmlEntityDecodeJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/HttpResponseCode.php` | 0 | 1 |
 | `lib/JIT/Builtin/HttpResponseCodeJit.php` | 0 | 1 |
@@ -42898,17 +42898,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/InheritanceVariance.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 62)
-- new CompileFatal (line 232)
-- new TypeSig (line 377)
-- new self (line 928)
-- new self (line 1025)
-- new self (line 1113)
-- new Op\Type\Literal (line 1241)
-- new self (line 1288)
-- new self (line 1305)
-- new self (line 1311)
-- 50 class method(s)
+- new self (line 71)
+- new CompileFatal (line 353)
+- new TypeSig (line 498)
+- new self (line 1049)
+- new self (line 1146)
+- new self (line 1234)
+- new Op\Type\Literal (line 1362)
+- new self (line 1409)
+- new self (line 1426)
+- new self (line 1432)
+- 52 class method(s)
 - 7 closure(s)
 
 ### `lib/Compiler/InterfaceConstAmbiguityCheck.php`
@@ -44330,7 +44330,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/HtmlEntitiesJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 41)
 - 2 class method(s)
 
 ### `lib/JIT/Builtin/HtmlEntityDecodeJit.php`
