@@ -1243,6 +1243,9 @@ final class BuiltinParamNames
             // php-src ext/filter/filter.stub.php — filter=FILTER_DEFAULT, options=0 (#23383, #26184)
             case 'filter_input':
                 return ['type', 'var_name', 'filter=', 'options='];
+            // php-src ext/filter/filter.stub.php — InternalArgInfo still says type/variable_name (#26234)
+            case 'filter_has_var':
+                return ['input_type', 'var_name'];
             // php-src ext/filter/filter.stub.php — options=FILTER_DEFAULT, add_empty=true (#26201)
             case 'filter_input_array':
                 return ['type', 'options=', 'add_empty='];

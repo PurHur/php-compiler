@@ -37,7 +37,7 @@ final class filter_has_var extends Internal
             $frame->calledArgs[1],
             'filter_has_var',
             1,
-            'variable_name'
+            'var_name'
         );
         $frame->returnVar->bool(VmFilter::hasInputVar($ctx, $typeInt, $keyStr));
     }
@@ -48,7 +48,7 @@ final class filter_has_var extends Internal
             throw new \LogicException('filter_has_var() requires exactly two arguments in this compiler build');
         }
         $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);
-        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_has_var', 1, 'variable_name');
+        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_has_var', 1, 'var_name');
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 
         $i64 = $context->getTypeFromString('int64');

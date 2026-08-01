@@ -2586,6 +2586,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'variable_name', 'filter_input'));
     }
 
+    /** @covers issue #26234 */
+    public function testFilterHasVarStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('filter_has_var');
+        self::assertSame(['input_type', 'var_name'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'input_type', 'filter_has_var'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'var_name', 'filter_has_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'type', 'filter_has_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'variable_name', 'filter_has_var'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('filter_has_var'));
+    }
+
     /** @covers issue #23205 */
     public function testHashEqualsZendStubNamedParams(): void
     {
