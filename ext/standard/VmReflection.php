@@ -761,16 +761,17 @@ final class VmReflection
     }
 
     /**
-     * method_exists() operand dispatch — php-src ext/standard/class.c (#4360, #19178).
+     * method_exists() operand dispatch — php-src Zend/zend_builtin_functions.c (#4360, #19178, #26407).
      *
-     * Class-name strings walk inheritance (parent-private methods excluded).
-     * Object operands walk inheritance (private parent methods included).
+     * Class-name strings autoload via zend_lookup_class, then walk inheritance
+     * (parent-private methods excluded). Object operands walk inheritance
+     * (private parent methods included).
      */
     public static function methodExists(Context $ctx, Variable $objectOrClass, string $method): bool
     {
         $objectOrClass = $objectOrClass->resolveIndirect();
         if (Variable::TYPE_STRING === $objectOrClass->type) {
-            $class = self::resolveClassEntry($ctx, $objectOrClass->toString());
+            $class = self::lookupClassEntryWithAutoload($ctx, $objectOrClass->toString());
             if (null === $class) {
                 return false;
             }
@@ -1398,7 +1399,8 @@ final class VmReflection
     ): bool {
         $objectOrClass = $objectOrClass->resolveIndirect();
         if (Variable::TYPE_STRING === $objectOrClass->type) {
-            $class = self::resolveClassEntry($ctx, $objectOrClass->toString());
+            // zend_lookup_class — autoload string class name (#26407).
+            $class = self::lookupClassEntryWithAutoload($ctx, $objectOrClass->toString());
             if (null === $class) {
                 return false;
             }
