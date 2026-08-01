@@ -96,6 +96,7 @@ use PHPCompiler\Compiler\ClassConstVisibilityInheritCheck;
 use PHPCompiler\Compiler\PropertyVisibilityInheritCheck;
 use PHPCompiler\Compiler\TypedClassConstInheritCheck;
 use PHPCompiler\Compiler\TypedPropertyInheritCheck;
+use PHPCompiler\Compiler\VariadicPromotedPropertyCompileCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
 use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
@@ -621,6 +622,7 @@ class Compiler {
         ClassConstDuplicateCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly, $this->propertyHookRegistry);
         AsymmetricVisibilityCompileCheck::validate($script);
+        VariadicPromotedPropertyCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
         GeneratorNeverReturnCompileCheck::validate($script);
 
@@ -8620,6 +8622,18 @@ class Compiler {
 
     protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
     {
+        // php-src Zend/zend_compile.c — variadic + promotion incompatible (#26515).
+        if ($param->variadic) {
+            $sourceFile = $param->getFile();
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            throw new CompileFatal(
+                $sourceFile,
+                max(1, $param->getLine()),
+                VariadicPromotedPropertyCompileCheck::MESSAGE
+            );
+        }
         $propName = '?';
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
             $propName = $param->name->value;
