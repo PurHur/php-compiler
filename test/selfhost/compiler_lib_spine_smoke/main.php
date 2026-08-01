@@ -408,6 +408,7 @@ require_once __DIR__.'/../../../ext/dom/ImplementationGetFeature.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationHasFeature.php';
 require_once __DIR__.'/../../../ext/dom/LivingImplementationCreateDocument.php';
 require_once __DIR__.'/../../../ext/dom/LivingImplementationCreateDocumentType.php';
+require_once __DIR__.'/../../../ext/dom/LivingPrivateConstruct.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAppendChildUserScript.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAttributeNodeNS.php';
