@@ -177,6 +177,21 @@ PHP;
         $runtime->parseAndCompile($code, 'static_readonly.php');
     }
 
+    /** @covers issue #26487 */
+    public function testStaticReadonlyPropertyWithDefaultPrefersDefaultMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public static readonly int $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly property A::$x cannot have default value');
+        $runtime->parseAndCompile($code, 'static_readonly_default.php');
+    }
+
     public function testStaticMutablePropertyStillCompiles(): void
     {
         $runtime = new Runtime();
