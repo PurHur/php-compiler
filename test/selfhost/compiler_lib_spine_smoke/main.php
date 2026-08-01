@@ -5603,6 +5603,7 @@ require_once __DIR__.'/../../../lib/JIT/RuntimeEmitTuInit.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/../../../lib/JIT/ScalarDimFetchHelper.php';
+require_once __DIR__.'/../../../lib/JIT/ScalarReturnCheck.php';
 require_once __DIR__.'/../../../lib/JIT/Scope.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinDefinedLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinEmitHelper.php';
