@@ -209,6 +209,36 @@ final class EnumCaseSupport
         return "Cannot modify readonly property {$enum->name}::\${$propLc}";
     }
 
+    /**
+     * Undeclared property write on an enum case — Zend Error, not warn-and-continue (#26588).
+     *
+     * php-src: Zend/zend_object_handlers.c zend_std_write_property / Zend/zend_enum.c
+     */
+    public static function dynamicPropertyCreateViolationMessage(
+        ClassEntry $enum,
+        string $property
+    ): string {
+        return sprintf('Cannot create dynamic property %s::$%s', $enum->name, $property);
+    }
+
+    /**
+     * Property-write guard for enum cases: readonly name/value, else reject dynamic create (#26588).
+     *
+     * @return string|null Error message when the write must throw; null when not a write violation
+     *                     (caller should not use this for reads)
+     */
+    public static function propertyWriteViolationMessage(
+        ClassEntry $enum,
+        string $property
+    ): ?string {
+        $readonlyMsg = self::readonlyPseudoPropertyViolationMessage($enum, $property, false);
+        if (null !== $readonlyMsg) {
+            return $readonlyMsg;
+        }
+
+        return self::dynamicPropertyCreateViolationMessage($enum, $property);
+    }
+
     public static function getProperty(
         ObjectEntry $object,
         string $name,
