@@ -2533,8 +2533,23 @@ final class ReflectionSupport
         );
     }
 
-    /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337, #22064, #25406). */
+    /**
+     * Declared parameter type for ReflectionParameter::getType()/hasType() (#18337, #22064, #25406).
+     *
+     * Implicit nullable (`string $s = null`) is reflected as {@see CfgType\Nullable} so
+     * getType()/allowsNull() match php-src (#26469) even when CFG stored a bare type.
+     */
     public static function declaredParamTypeForReflection(Context $ctx, ObjectEntry $reflection): ?CfgType
+    {
+        return self::withImplicitNullableParamReflectionType(
+            $ctx,
+            $reflection,
+            self::declaredParamTypeForReflectionRaw($ctx, $reflection)
+        );
+    }
+
+    /** Raw declared type before implicit-nullable Reflection normalization (#26469). */
+    private static function declaredParamTypeForReflectionRaw(Context $ctx, ObjectEntry $reflection): ?CfgType
     {
         $className = self::parameterDeclaringClassNameOrNull($reflection);
         if (null !== $className) {
@@ -2586,6 +2601,46 @@ final class ReflectionSupport
         return self::userDeclaredParamTypeOrNull(
             null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null
         );
+    }
+
+    /**
+     * php-src zim_reflection_parameter_getType — typed param with `= null` default is nullable
+     * even when the AST/CFG type was not written as {@see CfgType\Nullable} (#26469).
+     */
+    private static function withImplicitNullableParamReflectionType(
+        Context $ctx,
+        ObjectEntry $reflection,
+        ?CfgType $type,
+    ): ?CfgType {
+        if (null === $type || $type instanceof CfgType\Nullable) {
+            return $type;
+        }
+        if (ReflectionTypeSupport::allowsNullFromCfg($type)) {
+            return $type;
+        }
+        if (!self::userParamIsImplicitNullable($ctx, $reflection)) {
+            return $type;
+        }
+
+        return new CfgType\Nullable($type);
+    }
+
+    /**
+     * True when compile marked the parameter scope slot as implicit nullable (#4449 / #26469).
+     */
+    private static function userParamIsImplicitNullable(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return false;
+        }
+        try {
+            $block = self::resolveParameterBlock($ctx, $reflection);
+        } catch (\Throwable) {
+            return false;
+        }
+        $slot = self::parameterScopeSlot($block, self::parameterIndexForReflection($reflection));
+
+        return null !== $slot && isset($block->paramImplicitNullable[$slot]);
     }
 
     /**

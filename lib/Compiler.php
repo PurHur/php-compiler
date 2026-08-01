@@ -6620,6 +6620,8 @@ class Compiler {
 
     /**
      * Zend _function_string / parameter dump type label (#22522).
+     *
+     * Implicit nullable (`string $s = null`) dumps as `?string` for Reflection metadata (#26469).
      */
     protected function parameterTypeStringForDump(Op\Expr\Param $param): ?string
     {
@@ -6627,8 +6629,36 @@ class Compiler {
         if (null === $type || $type instanceof Op\Type\Mixed_) {
             return null;
         }
+        if (
+            !($type instanceof Op\Type\Nullable)
+            && !$this->cfgTypeUsesDnfShape($type)
+            && $this->paramAstDefaultIsNull($param)
+        ) {
+            $type = new Op\Type\Nullable($type);
+        }
 
         return ReflectionTypeSupport::cfgTypeStringForDump($type);
+    }
+
+    /** AST-side `= null` default (literal null / null const) for Reflection dump labels (#26469). */
+    protected function paramAstDefaultIsNull(Op\Expr\Param $param): bool
+    {
+        if ($param->defaultVar instanceof NullOperand) {
+            return true;
+        }
+        if (null === $param->defaultVar) {
+            return false;
+        }
+        $unwrapped = $this->unwrapOperandChain($param->defaultVar);
+        if ($unwrapped instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($unwrapped->name);
+            if (null !== $name && 'null' === strtolower(ltrim($name, '\\'))) {
+                return true;
+            }
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($param->defaultVar);
+
+        return null !== $vm && Variable::TYPE_NULL === $vm->type;
     }
 
     /**
