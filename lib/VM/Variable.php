@@ -842,18 +842,12 @@ final class Variable {
                 return $this->toArray()->getNumElements() > 0;
             case self::TYPE_OBJECT:
                 $object = $this->resolveIndirect()->toObject();
-                // SimpleXMLElement: sxe_object_cast_ex(_IS_BOOL), not __toString truthiness (#22714).
+                // SimpleXMLElement: sxe_object_cast_ex(_IS_BOOL), not zend_std (always true) (#22714).
                 if (\PHPCompiler\ext\simplexml\VmSimpleXml::handlesObjectCast($object)) {
                     return \PHPCompiler\ext\simplexml\VmSimpleXml::objectIsTruthy($object);
                 }
-                if (null === $vm) {
-                    return true;
-                }
-                if (!$vm->hasInstanceMethod($object->class, '__tostring')) {
-                    return true;
-                }
-
-                return $this->objectToBoolViaToString($vm)->toBool($vm);
+                // zend_std_cast_object_to_type(_IS_BOOL) → 1; __toString is not consulted (#26409).
+                return true;
             case self::TYPE_ENUM_CASE:
                 return true;
             case self::TYPE_PROPERTY_HOOK_REF:
@@ -2039,30 +2033,6 @@ restart:
         } catch (\LogicException|\TypeError) {
             return false;
         }
-    }
-
-    /**
-     * Zend cast_object IS_BOOL: invoke __toString when defined (zend_operators.c).
-     * Int/float casts use convert_to_long/double — warning + legacy 1 / 1.0 (#18444).
-     */
-    private function objectToBoolViaToString(?\PHPCompiler\VM $vm): self
-    {
-        $var = $this->resolveIndirect();
-        if (self::TYPE_OBJECT !== $var->type) {
-            throw new \LogicException('Expected object operand for scalar cast');
-        }
-        $className = $var->object->class->name;
-        if (null === $vm) {
-            throw new \LogicException('VM required for explicit object scalar cast');
-        }
-        if (!$vm->hasInstanceMethod($var->object->class, '__tostring')) {
-            throw new \TypeError("Object of class {$className} could not be converted to bool");
-        }
-        $str = $vm->invokeInstanceMethod($var->object, '__toString')->toString();
-        $tmp = new self(self::TYPE_STRING);
-        $tmp->string($str);
-
-        return $tmp;
     }
 
     private static function throwObjectNumericCompareError(Variable $object): never
