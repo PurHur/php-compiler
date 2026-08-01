@@ -7025,8 +7025,9 @@ restart:
                     }
                     $lcname = $this->context->resolveFunctionCallLc($name);
                     if (null === $lcname) {
+                        // Zend preserves source spelling (FCC / $fn(), zend_execute_API.c) (#26690).
                         $catchFrame = $this->dispatchVmError(
-                            'Call to undefined function '.strtolower($name).'()',
+                            'Call to undefined function '.$name.'()',
                             $frame
                         );
                         if (null !== $catchFrame) {

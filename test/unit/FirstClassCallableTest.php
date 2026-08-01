@@ -610,4 +610,25 @@ PHP;
         $this->expectExceptionMessage('Constant expression contains invalid operations');
         $rt->parseAndCompile($code, 'test.php');
     }
+
+    /** Issue #26690: undefined-function FCC Error preserves source identifier case (zend_execute_API.c). */
+    public function testVmUndefinedFunctionFccPreservesIdentifierCase(): void
+    {
+        $code = <<<'PHP'
+<?php
+try {
+    $f = FooBar(...);
+    echo "ok\n";
+} catch (Throwable $e) {
+    echo $e->getMessage(), "\n";
+}
+function MixedCaseFn() { return 7; }
+echo mixedcasefn(...)(), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("Call to undefined function FooBar()\n7\n", ob_get_clean());
+    }
 }
