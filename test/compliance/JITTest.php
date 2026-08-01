@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'dom_createfromstring_reflection')) {
                 continue;
             }
+            // Dom\Element getAttribute* Reflection returns — same JIT ReflectionMethod abort (#26065).
+            if (str_contains($name, 'dom_element_getattr_reflection')) {
+                continue;
+            }
             if (str_contains($name, 'extension_loaded_zip_phantom')
                 || str_contains($name, 'zip/extension_loaded_zip_phantom')) {
                 continue;

@@ -11,6 +11,7 @@ use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 
 /** Register PHP 8.4 Dom\ living-standard classes (php-src ext/dom/php_dom.stub.php; #6506). */
@@ -346,6 +347,8 @@ final class DomLivingBuiltinClasses
         $element->methods['rename'] = new ElementRename();
         $element->methodVisibility['rename'] = $pub;
         $element->methodNames['rename'] = 'rename';
+        // php-src php_dom.stub.php — Dom\Element attribute getters are nullable (#26065).
+        self::applyElementAttributeGetterReturnTypes($element);
         $ctx->classes[VmDomLiving::CLASS_ELEMENT] = $element;
 
         $htmlElement = new ClassEntry('Dom\\HTMLElement');
@@ -590,6 +593,29 @@ final class DomLivingBuiltinClasses
     }
 
     /** Share classic DOM* method handlers with living Dom\* types (#20418). */
+    /**
+     * php-src ext/dom/php_dom.stub.php — Dom\Element attribute getter return types (#26065).
+     *
+     * Living Standard missing-attr nullability (`?string` / `?Attr`); legacy DOMElement keeps
+     * tentative `string` / untyped node returns and is not updated here.
+     */
+    private static function applyElementAttributeGetterReturnTypes(ClassEntry $element): void
+    {
+        $returns = [
+            'getattribute' => '?string',
+            'getattributens' => '?string',
+            // Stub `?Attr` resolves to Dom\Attr (ReflectionNamedType FQCN).
+            'getattributenode' => '?Dom\\Attr',
+            'getattributenodens' => '?Dom\\Attr',
+        ];
+        foreach ($returns as $methodLc => $label) {
+            $type = ReflectionTypeSupport::cfgTypeFromLabel($label);
+            if (null !== $type) {
+                $element->methodReturnDeclaredTypes[$methodLc] = $type;
+            }
+        }
+    }
+
     private static function copyMethods(?ClassEntry $from, ClassEntry $to): void
     {
         if (null === $from) {
