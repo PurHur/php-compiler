@@ -119,7 +119,10 @@ final class TypeCheck
                 if (null !== $typeConstraint) {
                     $resolved->typeConstraint = $typeConstraint;
                 }
+                // Coerce a probe so typeConstraint is not left on the caller's arg slot,
+                // then write the coerced value back (Zend zend_verify_variadic_arg_type, #26587).
                 self::coerceParameter($probe, $strict, $arraySpec);
+                $element->copyFrom($probe);
             };
             if (null !== $baseCtx && null !== $callArgIndexes && isset($callArgIndexes[$i])) {
                 $ctx = new UserParamErrorContext(

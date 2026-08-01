@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\JitZendScalarCast;
+use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Builder;
 
 /**
  * Strict scalar type checks for typed JIT call arguments (issues #156, #1229).
  *
- * Weak coercion is handled in {@see Call\Native::compileArg} when lowering to native LLVM types.
+ * Fixed-arity weak coercion is handled in {@see Call\Native::compileArg} when lowering to
+ * native LLVM types. Typed variadic elements are packed as a hashtable of values, so weak
+ * coercion must happen before pack (#26587).
  */
 final class TypeCheck
 {
@@ -38,6 +42,76 @@ final class TypeCheck
             return;
         }
         $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    /**
+     * Weak-mode coerce a trailing variadic element to the declared scalar type (#26587).
+     *
+     * @return Variable|null coerced value, or null when coercion is impossible (TypeError)
+     */
+    public static function coerceParameterWeak(
+        Context $context,
+        Variable $var,
+        int $vmConstraint
+    ): ?Variable {
+        $expected = Variable::fromVMVariable($vmConstraint);
+        if ($var->type === $expected) {
+            return $var;
+        }
+        if (
+            Variable::TYPE_HASHTABLE === $expected
+            && 0 !== ($var->type & Variable::IS_NATIVE_ARRAY)
+        ) {
+            return $var;
+        }
+        switch ($expected) {
+            case Variable::TYPE_STRING:
+                try {
+                    return JitNativeString::coerce($context, $var);
+                } catch (\LogicException $e) {
+                    return null;
+                }
+            case Variable::TYPE_NATIVE_LONG:
+                try {
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_NATIVE_LONG,
+                        Variable::KIND_VALUE,
+                        JitZendScalarCast::emitIntCast($context, $var)
+                    );
+                } catch (\LogicException $e) {
+                    return null;
+                }
+            case Variable::TYPE_NATIVE_DOUBLE:
+                try {
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_NATIVE_DOUBLE,
+                        Variable::KIND_VALUE,
+                        JitZendScalarCast::emitFloatCast($context, $var)
+                    );
+                } catch (\LogicException $e) {
+                    return null;
+                }
+            case Variable::TYPE_NATIVE_BOOL:
+                try {
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_NATIVE_BOOL,
+                        Variable::KIND_VALUE,
+                        JitBoolArg::lowerCoerce($context, $var, 'Argument')
+                    );
+                } catch (\LogicException $e) {
+                    return null;
+                }
+            default:
+                // Non-scalar constraints (array/object) — leave unchanged; other enforcers apply.
+                if (VMVariable::TYPE_ARRAY === $vmConstraint || VMVariable::TYPE_OBJECT === $vmConstraint) {
+                    return $var;
+                }
+
+                return null;
+        }
     }
 
     private static function enforceExactValueBox(Context $context, Variable $var, int $expected): void
