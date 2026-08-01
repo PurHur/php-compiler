@@ -16231,6 +16231,8 @@ class JIT {
                     $this->assignOperand($resultOp, $newVar, true);
                 }
             } else {
+                // PHP 8.3+: null -- is a no-op with E_WARNING (#26378).
+                $this->emitIncDecNoEffectWarning(false, 'null');
                 if (!$prefix) {
                     $this->assignOperand($resultOp, $read, true);
                 }
@@ -16245,6 +16247,8 @@ class JIT {
 
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
             // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
+            // PHP 8.3+: E_WARNING — will change in next major (#26378).
+            $this->emitIncDecNoEffectWarning($increment, 'bool');
             if (!$prefix) {
                 $this->assignOperand($resultOp, $read, true);
             }
@@ -16388,6 +16392,43 @@ class JIT {
         $phi->addIncoming($readLong, $okBlock);
 
         return $phi;
+    }
+
+    /**
+     * PHP 8.3+ E_WARNING for no-op bool ++/-- or null -- (zend_operators.c, #26378).
+     */
+    private function emitIncDecNoEffectWarning(bool $increment, string $typeName): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        if (JIT\NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JIT\Builtin\StringTriggerError::ensureLinked($this->context);
+        $message = VM\Variable::incDecNoEffectWarningMessage(
+            $increment ? 'Increment' : 'Decrement',
+            $typeName
+        );
+        $i8p = $this->context->getTypeFromString('int8*');
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i32 = $this->context->getTypeFromString('int32');
+        $msgPtr = $this->context->builder->pointerCast(
+            $this->context->constantFromString($message),
+            $i8p
+        );
+        $emptyFile = $this->context->builder->pointerCast(
+            $this->context->constantFromString(''),
+            $i8p
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(VM\ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     /** True when ++/-- should read/write a boxed local slot via __value__* helpers. */

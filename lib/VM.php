@@ -5580,7 +5580,7 @@ restart:
                             $op->isIncDec
                             && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)
                         ) {
-                            $arg1->incDecOp($op->type, $numericArg2, $numericArg3);
+                            $arg1->incDecOp($op->type, $numericArg2, $numericArg3, $this, $frame);
                         } else {
                             $arg1->numericOp($op->type, $numericArg2, $numericArg3, $this, $frame);
                         }
@@ -10115,9 +10115,9 @@ restart:
         try {
             if ($prefix) {
                 if ($increment) {
-                    $working->applyIncrement();
+                    $working->applyIncrement($this, $frame);
                 } else {
-                    $working->applyDecrement();
+                    $working->applyDecrement($this, $frame);
                 }
                 $write->copyFrom($working);
                 $result->copyFrom($working);
@@ -10125,9 +10125,9 @@ restart:
                 $old = new Variable();
                 $old->copyFrom($working);
                 if ($increment) {
-                    $working->applyIncrement();
+                    $working->applyIncrement($this, $frame);
                 } else {
-                    $working->applyDecrement();
+                    $working->applyDecrement($this, $frame);
                 }
                 $write->copyFrom($working);
                 $result->copyFrom($old);
@@ -10196,9 +10196,9 @@ restart:
         try {
             if ($prefix) {
                 if ($increment) {
-                    $working->applyIncrement();
+                    $working->applyIncrement($this, $frame);
                 } else {
-                    $working->applyDecrement();
+                    $working->applyDecrement($this, $frame);
                 }
                 if ($writeUsesMagic) {
                     $this->invokeMagicSet($owner, $propName, $working);
@@ -10219,9 +10219,9 @@ restart:
                 $old = new Variable();
                 $old->copyFrom($working);
                 if ($increment) {
-                    $working->applyIncrement();
+                    $working->applyIncrement($this, $frame);
                 } else {
-                    $working->applyDecrement();
+                    $working->applyDecrement($this, $frame);
                 }
                 if ($writeUsesMagic) {
                     $this->invokeMagicSet($owner, $propName, $working);
@@ -10578,9 +10578,9 @@ restart:
         try {
             if ($prefix) {
                 if ($increment) {
-                    $working->applyIncrement();
+                    $working->applyIncrement($this, $frame);
                 } else {
-                    $working->applyDecrement();
+                    $working->applyDecrement($this, $frame);
                 }
                 $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
                 if (null !== $catchFrame) {
@@ -10600,9 +10600,9 @@ restart:
             $old = new Variable();
             $old->copyFrom($working);
             if ($increment) {
-                $working->applyIncrement();
+                $working->applyIncrement($this, $frame);
             } else {
-                $working->applyDecrement();
+                $working->applyDecrement($this, $frame);
             }
             $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
             if (null !== $catchFrame) {
