@@ -840,6 +840,18 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionAttribute::newInstance() — refuse abstract / interface / trait / enum (#26238).
+     *
+     * php-src: zend_get_attribute_object() → object_init_ex fails the same way as `new`
+     * (ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)).
+     * Call after attribute-marker / target / repeatable checks; before ObjectEntry allocate.
+     */
+    public static function assertAttributeNewInstanceInstantiable(ClassEntry $attributeClass): void
+    {
+        ClassValidator::assertInstantiable($attributeClass);
+    }
+
+    /**
      * ReflectionAttribute::newInstance() — reject non-IS_REPEATABLE user duplicates (#22930).
      *
      * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)
