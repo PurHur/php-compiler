@@ -1227,6 +1227,9 @@ final class BuiltinParamNames
                 return ['haystack', 'needle', 'offset', 'encoding'];
             case 'iconv_strrpos':
                 return ['haystack', 'needle', 'encoding'];
+            // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says preference (#24567)
+            case 'iconv_mime_encode':
+                return ['field_name', 'field_value', 'options='];
             case 'base64_decode':
                 return ['string', 'strict'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str (#23257)

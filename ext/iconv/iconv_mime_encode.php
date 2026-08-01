@@ -53,7 +53,7 @@ final class iconv_mime_encode extends Internal
             if (Variable::TYPE_NULL !== $arg->type) {
                 if (Variable::TYPE_ARRAY !== $arg->type) {
                     throw new \TypeError(\sprintf(
-                        'iconv_mime_encode(): Argument #3 ($preference) must be of type ?array, %s given',
+                        'iconv_mime_encode(): Argument #3 ($options) must be of type array, %s given',
                         self::typeLabel($arg)
                     ));
                 }

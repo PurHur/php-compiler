@@ -2919,7 +2919,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(5, BuiltinParamNames::paramCountForInternalFunction('hash_hkdf'));
     }
 
-    /** @covers issue #23307, #24364 */
+    /** @covers issue #23307, #24364, #24567 */
     public function testIconvFamilyZendStubNamedParams(): void
     {
         $iconv = BuiltinParamNames::forFunction('iconv');
@@ -2963,6 +2963,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strrpos, 'needle', 'iconv_strrpos'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($strrpos, 'encoding', 'iconv_strrpos'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strrpos, 'charset', 'iconv_strrpos'));
+
+        // php-src iconv.stub.php — options not preference (#24567)
+        $mime = BuiltinParamNames::forFunction('iconv_mime_encode');
+        self::assertSame(['field_name', 'field_value', 'options='], $mime);
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('iconv_mime_encode'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('iconv_mime_encode'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($mime, 'field_name', 'iconv_mime_encode'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($mime, 'field_value', 'iconv_mime_encode'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($mime, 'options', 'iconv_mime_encode'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($mime, 'preference', 'iconv_mime_encode'));
     }
 
     /** @covers issue #23192 */
