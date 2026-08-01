@@ -1023,6 +1023,9 @@ class JIT {
         if (!$this->emitJitClassReturnTypeCheck($cfgBlock, $return)) {
             return;
         }
+        if (!$this->emitJitScalarReturnTypeCheck($cfgBlock, $return)) {
+            return;
+        }
         $retval = $this->context->helper->loadValue($return);
         $expected = $this->cfgFunctionReturnCallbackType($cfgBlock->func);
         if (null === $expected && null !== $this->context->activeFunction) {
@@ -10309,6 +10312,9 @@ class JIT {
                         if (!$this->emitJitClassReturnTypeCheck($block, $return)) {
                             return $origBasicBlock;
                         }
+                        if (!$this->emitJitScalarReturnTypeCheck($block, $return)) {
+                            return $origBasicBlock;
+                        }
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->cfgFunctionReturnCallbackType($block->func);
                         if (null === $expected && null !== $this->context->activeFunction) {
@@ -11783,6 +11789,9 @@ class JIT {
         if (!$this->emitJitClassReturnTypeCheck($block, $value)) {
             return;
         }
+        if (!$this->emitJitScalarReturnTypeCheck($block, $value)) {
+            return;
+        }
         $expected = $this->cfgFunctionReturnCallbackType($block->func);
         if (null === $expected && null !== $this->context->activeFunction) {
             $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
@@ -11796,6 +11805,16 @@ class JIT {
     private function emitJitClassReturnTypeCheck(Block $block, Variable $return): bool
     {
         return JIT\ClassReturnCheck::enforce($this->context, $block, $return);
+    }
+
+    /**
+     * Scalar `: string`/`: int`/… return enforce under strict_types, weak coerce otherwise (#26427).
+     *
+     * @return bool false when TypeError was emitted (skip ret)
+     */
+    private function emitJitScalarReturnTypeCheck(Block $block, Variable &$return): bool
+    {
+        return JIT\ScalarReturnCheck::enforce($this->context, $block, $return);
     }
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
