@@ -275,6 +275,65 @@ final class ssh2_auth_none extends Ssh2Function
     }
 }
 
+/**
+ * ssh2_methods_negotiated(resource $session): array|false
+ *
+ * Negotiated KEX/crypt/mac/comp map (PECL ssh2_methods_negotiated; #26679).
+ */
+final class ssh2_methods_negotiated extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_methods_negotiated');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_methods_negotiated() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_methods_negotiated', 1);
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $raw = VmSsh2Native::sessionMethodsNegotiated($native);
+        if (false === $raw) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        $kex = new Variable();
+        $kex->string($raw['kex']);
+        $ht->add('kex', $kex);
+        $hostkey = new Variable();
+        $hostkey->string($raw['hostkey']);
+        $ht->add('hostkey', $hostkey);
+        foreach (['client_to_server', 'server_to_client'] as $endpointKey) {
+            $endpoint = new \PHPCompiler\VM\HashTable();
+            foreach (['crypt', 'mac', 'comp', 'lang'] as $field) {
+                $slot = new Variable();
+                $slot->string($raw[$endpointKey][$field]);
+                $endpoint->add($field, $slot);
+            }
+            $endpointVar = new Variable();
+            $endpointVar->array($endpoint);
+            $ht->add($endpointKey, $endpointVar);
+        }
+        $frame->returnVar->array($ht);
+    }
+}
+
 final class ssh2_auth_pubkey_file extends Ssh2Function
 {
     public function __construct()

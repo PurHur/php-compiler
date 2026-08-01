@@ -170,6 +170,59 @@ final class VmSsh2Native
     }
 
     /**
+     * Negotiated KEX/crypt/mac/comp map (PECL ssh2_methods_negotiated; #26679).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return array{
+     *   kex: string,
+     *   hostkey: string,
+     *   client_to_server: array{crypt: string, mac: string, comp: string, lang: string},
+     *   server_to_client: array{crypt: string, mac: string, comp: string, lang: string}
+     * }|false
+     */
+    public static function sessionMethodsNegotiated(\FFI\CData $session)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        // libssh2.h LIBSSH2_METHOD_* 
+        $method = static function (int $type) use ($ffi, $session): string {
+            try {
+                $ptr = $ffi->libssh2_session_methods($session, $type);
+            } catch (\Throwable) {
+                return '';
+            }
+            if (null === $ptr) {
+                return '';
+            }
+            try {
+                return \FFI::string($ptr);
+            } catch (\Throwable) {
+                return '';
+            }
+        };
+
+        return [
+            'kex' => $method(0),
+            'hostkey' => $method(1),
+            'client_to_server' => [
+                'crypt' => $method(2),
+                'mac' => $method(4),
+                'comp' => $method(6),
+                'lang' => $method(8),
+            ],
+            'server_to_client' => [
+                'crypt' => $method(3),
+                'mac' => $method(5),
+                'comp' => $method(7),
+                'lang' => $method(9),
+            ],
+        ];
+    }
+
+    /**
      * Host-key fingerprint after handshake (PECL ssh2_fingerprint / libssh2_hostkey_hash; #26575).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -928,6 +981,7 @@ int libssh2_userauth_publickey_fromfile_ex(LIBSSH2_SESSION *session, const char 
 int libssh2_session_last_error(LIBSSH2_SESSION *session, char **errmsg, int *errmsg_len, int want_buf);
 char *libssh2_userauth_list(LIBSSH2_SESSION *session, const char *username, unsigned int username_len);
 int libssh2_userauth_authenticated(LIBSSH2_SESSION *session);
+const char *libssh2_session_methods(LIBSSH2_SESSION *session, int method_type);
 int libssh2_session_disconnect_ex(LIBSSH2_SESSION *session, int reason, const char *description, const char *lang);
 int libssh2_session_free(LIBSSH2_SESSION *session);
 typedef struct _LIBSSH2_SFTP LIBSSH2_SFTP;
