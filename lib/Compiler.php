@@ -719,6 +719,7 @@ class Compiler {
         $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
         $this->assertIntersectionTypeMembers($returnType);
         $this->assertFunctionSignatureNeverType($returnType);
+        $this->assertMixedTypeRules($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
@@ -7543,6 +7544,110 @@ class Compiler {
     }
 
     /**
+     * Zend zend_compile_type — mixed already includes null; mixed is standalone-only (#26554).
+     *
+     * {@code ?mixed} → "Type mixed cannot be marked as nullable since mixed already includes null"
+     * {@code mixed|null} / {@code mixed|T} → "Type mixed can only be used as a standalone type"
+     * Bare {@code Mixed_} (php-cfg untyped) is not a user-written mixed hint — callers skip it.
+     */
+    protected function assertMixedTypeRules(?Op\Type $type): void
+    {
+        if (null === $type) {
+            return;
+        }
+        if ($this->cfgTypeIsNullableMixed($type)) {
+            $this->throwCompileError('Type mixed cannot be marked as nullable since mixed already includes null');
+        }
+        if ($this->cfgTypeContainsNonStandaloneMixed($type)) {
+            $this->throwCompileError('Type mixed can only be used as a standalone type');
+        }
+    }
+
+    protected function cfgTypeIsPureMixed(?Op\Type $type): bool
+    {
+        if ($type instanceof Op\Type\Literal && 'mixed' === strtolower($type->name)) {
+            return true;
+        }
+
+        return $type instanceof Op\Type\Mixed_;
+    }
+
+    protected function cfgTypeIsNullableMixed(?Op\Type $type): bool
+    {
+        return $type instanceof Op\Type\Nullable && $this->cfgTypeIsPureMixed($type->subtype);
+    }
+
+    /**
+     * True when user-written {@code mixed} appears in a union/intersection (not as a lone type).
+     * Nullable-of-pure-mixed is handled by {@see cfgTypeIsNullableMixed} instead.
+     */
+    protected function cfgTypeContainsNonStandaloneMixed(?Op\Type $type): bool
+    {
+        if (null === $type || $this->cfgTypeIsPureMixed($type)) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            if ($this->cfgTypeIsPureMixed($type->subtype)) {
+                return false;
+            }
+
+            return $this->cfgTypeContainsNonStandaloneMixed($type->subtype);
+        }
+        if ($type instanceof Op\Type\Union_) {
+            $hasMixed = false;
+            $hasOther = false;
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeIsPureMixed($member) || $this->cfgTypeContainsPureMixed($member)) {
+                    $hasMixed = true;
+                } else {
+                    $hasOther = true;
+                }
+                if ($this->cfgTypeContainsNonStandaloneMixed($member)) {
+                    return true;
+                }
+            }
+
+            return $hasMixed && $hasOther;
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeIsPureMixed($member) || $this->cfgTypeContainsPureMixed($member)) {
+                    return true;
+                }
+                if ($this->cfgTypeContainsNonStandaloneMixed($member)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function cfgTypeContainsPureMixed(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($this->cfgTypeIsPureMixed($type)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_ || $type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsPureMixed($member)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsPureMixed($type->subtype);
+        }
+
+        return false;
+    }
+
+    /**
      * True when callable appears anywhere in a declared type tree (union / nullable / intersection).
      */
     protected function cfgTypeContainsCallable(?Op\Type $type): bool
@@ -7581,6 +7686,7 @@ class Compiler {
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
         $this->assertIntersectionTypeMembers($type);
+        $this->assertMixedTypeRules($type);
         // void before never — Zend capitalizes "Void" in the standalone-only message.
         if ($this->cfgTypeContainsVoid($type)) {
             if ($this->cfgTypeIsStandaloneVoid($type)) {
@@ -7736,6 +7842,7 @@ class Compiler {
         $this->rejectPseudoClassTypeHintOutsideClassScope($declared, $block, $func);
         $this->assertIntersectionTypeMembers($declared);
         $this->assertFunctionSignatureNeverType($declared);
+        $this->assertMixedTypeRules($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
         }
