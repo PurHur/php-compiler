@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\ErrorReporter;
@@ -35,18 +34,10 @@ final class UndefinedPropertyFetchRuntime
 
     public static function emitWarning(Context $context, string $className, string $propertyName): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::emitStandaloneWarning($context, $className, $propertyName);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-        $context->builder->call(
-            self::helperFunction($context, self::EMIT_WARNING_HELPER),
-            $context->constantFromString($className),
-            $context->constantFromString($propertyName)
-        );
+        // Always lower via libc trigger_error — NestedJIT helper + constantStringFromString
+        // mid-body corrupts the module (parentless loads) when SoapFault/Exception props
+        // pull this path into a large verify (#26511 / #23174).
+        self::emitStandaloneWarning($context, $className, $propertyName);
     }
 
     private static function emitStandaloneWarning(

@@ -41,6 +41,16 @@ final class ini_get_ extends Internal
 
             return;
         }
+        if (\PHPCompiler\ext\soap\SoapWsdlCache::isIniKey($key)) {
+            $v = \PHPCompiler\ext\soap\SoapWsdlCache::iniGet($option);
+            if (false === $v) {
+                $frame->returnVar->bool(false);
+            } else {
+                $frame->returnVar->string($v);
+            }
+
+            return;
+        }
         $result = VmIni::get($frame->vmContext, $option);
         if (false === $result) {
             $frame->returnVar->bool(false);

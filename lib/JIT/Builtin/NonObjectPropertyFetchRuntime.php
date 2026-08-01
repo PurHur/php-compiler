@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\ErrorReporter;
@@ -36,18 +35,8 @@ final class NonObjectPropertyFetchRuntime
 
     public static function emitWarning(Context $context, string $propertyName, string $typeName): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::emitStandaloneWarning($context, $propertyName, $typeName);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-        $context->builder->call(
-            self::helperFunction($context, self::EMIT_WARNING_HELPER),
-            $context->constantFromString($propertyName),
-            $context->constantFromString($typeName)
-        );
+        // Peer #26511 — avoid NestedJIT string ABI / mid-body constantStringFromString.
+        self::emitStandaloneWarning($context, $propertyName, $typeName);
     }
 
     private static function emitStandaloneWarning(Context $context, string $propertyName, string $typeName): void

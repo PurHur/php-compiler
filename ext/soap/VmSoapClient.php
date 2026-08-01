@@ -312,6 +312,8 @@ final class VmSoapClient
         if (isset($options['typemap']) && \is_array($options['typemap'])) {
             $state->typemap = self::normalizeTypemap($options['typemap']);
         }
+        // php-src SoapClient ctor: cache_wsdl / soap.wsdl_cache_* (#26511 / php_sdl.c get_sdl).
+        $state->cacheWsdl = SoapWsdlCache::resolveCacheMode($options);
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -1480,9 +1482,17 @@ final class VmSoapClient
 
     private static function loadWsdl(SoapClientState $state, string $wsdl): void
     {
-        $xml = @\file_get_contents($wsdl);
-        if (false === $xml) {
+        $cacheMode = $state->cacheWsdl;
+        $xml = SoapWsdlCache::get($wsdl, $cacheMode);
+        $fromCache = null !== $xml;
+        if (null === $xml) {
+            $xml = @\file_get_contents($wsdl);
+        }
+        if (false === $xml || null === $xml) {
             throw new \SoapFault('WSDL', 'SOAP-ERROR: Parsing WSDL: Couldn\'t load from \''.$wsdl.'\'');
+        }
+        if (!$fromCache) {
+            SoapWsdlCache::put($wsdl, $xml, $cacheMode);
         }
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($xml)) {
@@ -2783,6 +2793,9 @@ final class VmSoapClient
 final class SoapClientState
 {
     public ?string $wsdl = null;
+
+    /** php-src cache_wsdl bitmask (WSDL_CACHE_*) (#26511). */
+    public int $cacheWsdl = SoapConstants::WSDL_CACHE_DISK;
 
     /** Owning VM context — Soap\Url / Soap\Sdl factories (#23246). */
     public ?Context $vmContext = null;
