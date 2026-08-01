@@ -23,6 +23,7 @@ final class EvalBuiltinTest extends BaseTest
             'eval_magic_consts.phpt',
             'eval_parse_error.phpt',
             'eval_parse_error_file.phpt',
+            'eval_parseerror_unclosed_brace.phpt',
             'eval_return_value.phpt',
             'eval_this_scope.phpt',
         ] as $file) {
