@@ -2988,6 +2988,10 @@ final class VmReflection
      *
      * php-src / PHP 8.2: zero-arg get_class() matches __CLASS__ (method definition scope),
      * not get_class($this). Use get_called_class() for the call-site / LSB class name.
+     *
+     * Callers that implement the user-visible get_class() builtin must emit the PHP 8.3+
+     * parameterless E_DEPRECATED themselves ({@see CompilerVersion::supportsGetClassParentClassParameterlessDeprecation()})
+     * — this helper is also used for self/parent scope resolution (#26369).
      */
     public static function zeroArgGetClassName(Frame $frame): string
     {
@@ -3000,6 +3004,31 @@ final class VmReflection
         }
 
         return $current->block->func->class->value;
+    }
+
+    /**
+     * Parent class name for get_parent_class() with no arguments, or null → false (#26369).
+     *
+     * php-src: Zend/zend_builtin_functions.c — zend_get_executed_scope() then ce->parent.
+     * Outside a class scope returns null (Zend false) after the caller emits E_DEPRECATED.
+     */
+    public static function zeroArgGetParentClassName(Frame $frame): ?string
+    {
+        $current = $frame->parent;
+        if (null === $current) {
+            return null;
+        }
+        if (null === $current->block || null === $current->block->func || null === $current->block->func->class) {
+            return null;
+        }
+        $className = $current->block->func->class->value;
+        $ctx = self::requireContext($frame);
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry || $entry->isInterface || $entry->isTrait || $entry->isEnum) {
+            return null;
+        }
+
+        return self::parentClassName($entry, $ctx);
     }
 
     /** php-src ZEND_ACC_* filter bitmask for getProperties() (ReflectionProperty::IS_*). */

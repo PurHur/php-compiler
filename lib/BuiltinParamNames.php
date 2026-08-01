@@ -1389,12 +1389,12 @@ final class BuiltinParamNames
                 return ['value', 'syntax_only', 'callable_name'];
             case 'get_class':
                 return \PHPCompiler\CompilerVersion::supportsGetClassAllowString()
-                    ? ['object', 'allow_string']
-                    : ['object'];
-            // php-src Zend/zend_builtin_functions.stub.php — arity 1 on every profile (#23948);
+                    ? ['object=', 'allow_string=']
+                    : ['object='];
+            // php-src Zend/zend_builtin_functions.stub.php — arity 0–1 on every profile (#23948, #26369);
             // $allow_string belongs to is_a / is_subclass_of only (not get_parent_class).
             case 'get_parent_class':
-                return ['object_or_class'];
+                return ['object_or_class='];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says obj/class (#23401)
             case 'get_object_vars':
                 return ['object'];

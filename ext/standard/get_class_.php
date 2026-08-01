@@ -31,6 +31,9 @@ final class get_class_ extends Internal
         $argc = \count($frame->calledArgs);
         VmReflection::enforceGetClassMaxArgs($argc);
         if (0 === $argc) {
+            if (CompilerVersion::supportsGetClassParentClassParameterlessDeprecation()) {
+                VmEngineBuiltinDeprecation::emitCallingWithoutArguments($frame, 'get_class');
+            }
             $definingClass = VmReflection::zeroArgGetClassName($frame);
             BuiltinExecute::writeReturn(
                 $frame,

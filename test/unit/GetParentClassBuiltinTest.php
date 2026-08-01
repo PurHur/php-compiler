@@ -96,4 +96,45 @@ PHP;
         $rt->run($block);
         $this->assertSame('false', ob_get_clean());
     }
+
+    public function testVmGetParentClassZeroArgMatchesZendUnderProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $code = <<<'PHP'
+<?php
+set_error_handler(static function (int $n, string $s): bool {
+    echo 'DEP:', $s, "\n";
+    return true;
+});
+class P {}
+class C extends P {
+    public function f() { return get_parent_class(); }
+}
+echo (new C)->f(), "\n";
+class D {
+    public function g() { return get_class(); }
+}
+echo (new D)->g(), "\n";
+PHP;
+            $rt = new Runtime();
+            $block = $rt->parseAndCompile($code, 'get_parent_class_zero_arg.php');
+            ob_start();
+            $rt->run($block);
+            $this->assertSame(
+                "DEP:Calling get_parent_class() without arguments is deprecated\n"
+                ."P\n"
+                ."DEP:Calling get_class() without arguments is deprecated\n"
+                ."D\n",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

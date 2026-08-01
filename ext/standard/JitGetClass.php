@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Block;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -26,6 +27,9 @@ final class JitGetClass
 
     public static function invokeNoArg(Context $context): Value
     {
+        if (CompilerVersion::supportsGetClassParentClassParameterlessDeprecation()) {
+            VmEngineBuiltinDeprecation::emitJitCallingWithoutArguments($context, 'get_class');
+        }
         $block = $context->jitEnclosingBlock;
         if (!$block instanceof Block || null === $block->func || null === $block->func->class) {
             self::emitNoThisErrorAndAbort($context);
