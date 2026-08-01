@@ -393,6 +393,55 @@ final class VmPgsqlNative
         return self::ffiString(self::requireFfi()->PQtty($conn));
     }
 
+    /**
+     * Whether libpq exports PQclosePrepared (PostgreSQL 17+; php-src HAVE_PG_CLOSE_STMT; #26191).
+     */
+    public static function hasClosePrepared(): bool
+    {
+        return null !== self::closePreparedFfi();
+    }
+
+    /**
+     * PQclosePrepared — close a prepared statement by name (php-src pg_close_stmt; #26191).
+     *
+     * @return \FFI\CData|null PGresult*
+     */
+    public static function closePrepared(\FFI\CData $conn, string $statementName): ?\FFI\CData
+    {
+        $ffi = self::closePreparedFfi();
+        if (null === $ffi) {
+            return null;
+        }
+
+        return $ffi->PQclosePrepared($conn, $statementName);
+    }
+
+    /**
+     * Whether libpq exports PQservice (PostgreSQL 18+; php-src HAVE_PG_SERVICE; #26191).
+     */
+    public static function hasService(): bool
+    {
+        return null !== self::serviceFfi();
+    }
+
+    /**
+     * PQservice — service name from the connection (php-src pg_service; #26191).
+     * Null / unavailable → empty string (php-src RETURN_EMPTY_STRING).
+     */
+    public static function service(\FFI\CData $conn): string
+    {
+        $ffi = self::serviceFfi();
+        if (null === $ffi) {
+            return '';
+        }
+        $raw = $ffi->PQservice($conn);
+        if (null === $raw) {
+            return '';
+        }
+
+        return self::ffiString($raw);
+    }
+
     public static function parameterStatus(\FFI\CData $conn, string $name): ?string
     {
         $raw = self::requireFfi()->PQparameterStatus($conn, $name);
@@ -1029,5 +1078,74 @@ CDEF;
         }
 
         return true;
+    }
+
+    /** @var \FFI|null|false */
+    private static $closePreparedFfi = false;
+
+    /** @var \FFI|null|false */
+    private static $serviceFfi = false;
+
+    /**
+     * Separate cdef so missing PQclosePrepared does not poison the main libpq FFI (libpq 14 CI).
+     *
+     * @return \FFI|null
+     */
+    private static function closePreparedFfi()
+    {
+        if (false !== self::$closePreparedFfi) {
+            return self::$closePreparedFfi;
+        }
+        self::$closePreparedFfi = self::optionalSymbolFfi(
+            'typedef struct pg_conn PGconn; typedef struct pg_result PGresult; PGresult *PQclosePrepared(PGconn *conn, const char *stmtName);'
+        );
+
+        return self::$closePreparedFfi;
+    }
+
+    /**
+     * Separate cdef so missing PQservice does not poison the main libpq FFI.
+     *
+     * @return \FFI|null
+     */
+    private static function serviceFfi()
+    {
+        if (false !== self::$serviceFfi) {
+            return self::$serviceFfi;
+        }
+        self::$serviceFfi = self::optionalSymbolFfi(
+            'typedef struct pg_conn PGconn; char *PQservice(const PGconn *conn);'
+        );
+
+        return self::$serviceFfi;
+    }
+
+    /**
+     * Probe an optional libpq symbol via a dedicated FFI::cdef (succeeds only when the symbol exists).
+     *
+     * @return \FFI|null
+     */
+    private static function optionalSymbolFfi(string $cdef)
+    {
+        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+            return null;
+        }
+        // Ensure the main libpq library is loadable first.
+        if (null === self::ffi()) {
+            return null;
+        }
+        foreach ([
+            'libpq.so.5',
+            'libpq.so',
+            '/usr/lib/x86_64-linux-gnu/libpq.so.5',
+            '/usr/lib/x86_64-linux-gnu/libpq.so',
+        ] as $lib) {
+            try {
+                return \FFI::cdef($cdef, $lib);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
     }
 }

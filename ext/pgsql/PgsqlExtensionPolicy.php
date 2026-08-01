@@ -87,6 +87,25 @@ final class PgsqlExtensionPolicy
         );
     }
 
+    /**
+     * PHP 8.5 helpers {@code pg_close_stmt} / {@code pg_service} (#26191).
+     *
+     * Advertised when the language profile is ≥ 8.5 (same pattern as {@see advertisesPhp84Helpers()}).
+     * Call sites probe optional libpq symbols ({@code PQclosePrepared} / {@code PQservice}); when the
+     * host libpq lacks them the builtins still exist but degrade like php-src builds without
+     * {@code HAVE_PG_*} only at the call boundary (false / empty string).
+     * php-src: ext/pgsql/pgsql.stub.php ({@code HAVE_PG_CLOSE_STMT} / {@code HAVE_PG_SERVICE}).
+     */
+    public static function advertisesPhp85Helpers(): bool
+    {
+        return self::advertisesBuiltins()
+            && version_compare(
+                \PHPCompiler\CompilerVersion::languageProfileVersion(),
+                '8.5.0',
+                '>='
+            );
+    }
+
     /** Compliance filenames that exercise pg_* / PgSql\\* / extension_loaded('pgsql'). */
     public static function isPgsqlComplianceCase(string $testFileName): bool
     {

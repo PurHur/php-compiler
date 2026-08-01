@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6703 |
-| Phase A inventory files (M2 ratio SSOT) | 6703 |
+| PHP files on vm.php path | 6705 |
+| Phase A inventory files (M2 ratio SSOT) | 6705 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21603 |
+| Source constructs flagged (warnings) | 21609 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1651,7 +1651,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 67 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
-| `ext/pgsql/Module.php` | 0 | 123 |
+| `ext/pgsql/Module.php` | 0 | 125 |
 | `ext/pgsql/PgSendAsyncReturn.php` | 0 | 1 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
@@ -1665,6 +1665,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/pg_async_builtins.php` | 0 | 18 |
 | `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
+| `ext/pgsql/pg_close_stmt.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 3 |
 | `ext/pgsql/pg_connection_info_builtins.php` | 0 | 10 |
 | `ext/pgsql/pg_copy_meta_builtins.php` | 0 | 13 |
@@ -1682,6 +1683,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/pg_query.php` | 0 | 2 |
 | `ext/pgsql/pg_result_diag_builtins.php` | 0 | 4 |
 | `ext/pgsql/pg_result_memory_size.php` | 0 | 2 |
+| `ext/pgsql/pg_service.php` | 0 | 2 |
 | `ext/pgsql/pg_set_chunked_rows_size.php` | 0 | 2 |
 | `ext/pgsql/pg_socket_poll.php` | 0 | 2 |
 | `ext/pgsql/pg_trace.php` | 0 | 2 |
@@ -19981,15 +19983,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_fetch_all_columns (line 199)
 - new pg_num_fields (line 200)
 - new pg_num_fields (line 201)
-- new pg_set_error_context_visibility (line 216)
-- new pg_change_password (line 230)
-- new pg_jit (line 231)
-- new pg_put_copy_data (line 232)
-- new pg_put_copy_end (line 233)
-- new pg_result_memory_size (line 234)
-- new pg_set_chunked_rows_size (line 235)
-- new pg_socket_poll (line 236)
-- 8 class method(s)
+- new pg_set_error_context_visibility (line 217)
+- new pg_change_password (line 231)
+- new pg_jit (line 232)
+- new pg_put_copy_data (line 233)
+- new pg_put_copy_end (line 234)
+- new pg_result_memory_size (line 235)
+- new pg_set_chunked_rows_size (line 236)
+- new pg_socket_poll (line 237)
+- new pg_close_stmt (line 251)
+- new pg_service (line 252)
+- 9 class method(s)
 
 ### `ext/pgsql/PgSendAsyncReturn.php`
 
@@ -20004,7 +20008,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/PgsqlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/pgsql/PgsqlSerializeDeny.php`
 
@@ -20070,7 +20074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/VmPgsqlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 96 class method(s)
+- 103 class method(s)
 - 1 closure(s)
 
 ### `ext/pgsql/VmPgsqlResult.php`
@@ -20113,6 +20117,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_close_stmt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/pgsql/pg_connect.php`
@@ -20270,6 +20280,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_service.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/pgsql/pg_set_chunked_rows_size.php`

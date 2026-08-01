@@ -34,6 +34,41 @@ final class PgsqlExtensionPolicyTest extends TestCase
             self::assertFalse(PgsqlExtensionPolicy::advertisesExtension());
             self::assertFalse(PgsqlExtensionPolicy::advertisesPhp83ErrorContextVisibility());
             self::assertFalse(PgsqlExtensionPolicy::advertisesPhp84Helpers());
+            self::assertFalse(PgsqlExtensionPolicy::advertisesPhp85Helpers());
+        } finally {
+            if (false === $prevProfile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prevProfile);
+            }
+            if (false === $prevEnable) {
+                putenv('PHP_COMPILER_ENABLE_PGSQL');
+            } else {
+                putenv('PHP_COMPILER_ENABLE_PGSQL='.$prevEnable);
+            }
+        }
+    }
+
+    public function testProfile85HelpersRequireEnableAndProfile(): void
+    {
+        if (\extension_loaded('pgsql')) {
+            self::markTestSkipped('host ext/pgsql loaded');
+        }
+
+        $prevProfile = getenv('PHP_COMPILER_PROFILE');
+        $prevEnable = getenv('PHP_COMPILER_ENABLE_PGSQL');
+        putenv('PHP_COMPILER_ENABLE_PGSQL=1');
+        try {
+            putenv('PHP_COMPILER_PROFILE=8.4');
+            $available = \PHPCompiler\ext\pgsql\VmPgsqlNative::available();
+            if (!$available) {
+                self::markTestSkipped('libpq FFI unavailable');
+            }
+            self::assertTrue(PgsqlExtensionPolicy::advertisesPhp84Helpers());
+            self::assertFalse(PgsqlExtensionPolicy::advertisesPhp85Helpers());
+
+            putenv('PHP_COMPILER_PROFILE=8.5');
+            self::assertTrue(PgsqlExtensionPolicy::advertisesPhp85Helpers());
         } finally {
             if (false === $prevProfile) {
                 putenv('PHP_COMPILER_PROFILE');
