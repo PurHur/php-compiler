@@ -40,6 +40,16 @@ final class CurlConstants
     public const CURLINFO_REDIRECT_URL = 1048607;
     /** CURLINFO_REFERER — libcurl CURLINFO_STRING+60 / php-src 8.2+ curl.stub.php (#22837). */
     public const CURLINFO_REFERER = 1048636;
+    /**
+     * CURLINFO_CAINFO — libcurl CURLINFO_STRING+61 / ≥ 7.84 (php-src curl.stub.php; #23899).
+     * Path of the CA certificate bundle used for the previous transfer.
+     */
+    public const CURLINFO_CAINFO = 1048637;
+    /**
+     * CURLINFO_CAPATH — libcurl CURLINFO_STRING+62 / ≥ 7.84 (php-src curl.stub.php; #23899).
+     * Directory holding CA certificates used for the previous transfer.
+     */
+    public const CURLINFO_CAPATH = 1048638;
     public const CURLINFO_REQUEST_SIZE = 2097164;
     public const CURLINFO_RESPONSE_CODE = 2097154;
     /** CURLINFO_RETRY_AFTER — libcurl CURLINFO_OFF_T+57 / php-src 8.2+ curl.stub.php (#22837). */
@@ -204,6 +214,11 @@ final class CurlConstants
      * Connection upkeep interval for curl_upkeep() / curl_easy_upkeep (default 60000 ms).
      */
     public const CURLOPT_UPKEEP_INTERVAL_MS = 281;
+    /**
+     * CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS — libcurl LONG+271 (curl.h; php-src curl.stub.php; #23899).
+     * Head-start timeout for Happy Eyeballs (IPv4/IPv6 racing).
+     */
+    public const CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS = 271;
     public const CURLOPT_URL = 10002;
     public const CURLOPT_USERAGENT = 10018;
     public const CURLOPT_USERNAME = 10173;
@@ -394,6 +409,7 @@ final class CurlConstants
         self::CURLOPT_TCP_KEEPINTVL => true,
         self::CURLOPT_TCP_KEEPCNT => true,
         self::CURLOPT_UPKEEP_INTERVAL_MS => true,
+        self::CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS => true,
         self::CURLOPT_FTP_RESPONSE_TIMEOUT => true,
         self::CURLOPT_SERVER_RESPONSE_TIMEOUT => true,
         self::CURLOPT_PREREQFUNCTION => true,
@@ -619,6 +635,7 @@ final class CurlConstants
             'CURLOPT_TCP_KEEPIDLE' => self::CURLOPT_TCP_KEEPIDLE,
             'CURLOPT_TCP_KEEPINTVL' => self::CURLOPT_TCP_KEEPINTVL,
             'CURLOPT_UPKEEP_INTERVAL_MS' => self::CURLOPT_UPKEEP_INTERVAL_MS,
+            'CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS' => self::CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS,
             'CURLOPT_EXPECT_100_TIMEOUT_MS' => self::CURLOPT_EXPECT_100_TIMEOUT_MS,
             'CURLOPT_CONNECT_TO' => self::CURLOPT_CONNECT_TO,
             'CURLOPT_TLS13_CIPHERS' => self::CURLOPT_TLS13_CIPHERS,
@@ -671,6 +688,9 @@ final class CurlConstants
             $constants['CURL_HTTP_VERSION_3'] = self::CURL_HTTP_VERSION_3;
             $constants['CURL_HTTP_VERSION_3ONLY'] = self::CURL_HTTP_VERSION_3ONLY;
             $constants['CURLINFO_POSTTRANSFER_TIME_T'] = self::CURLINFO_POSTTRANSFER_TIME_T;
+            // libcurl ≥ 7.84 CURLINFO_STRING+61/+62 — present on Zend 8.3+/8.4 builds (#23899).
+            $constants['CURLINFO_CAINFO'] = self::CURLINFO_CAINFO;
+            $constants['CURLINFO_CAPATH'] = self::CURLINFO_CAPATH;
             $constants['CURLOPT_TCP_KEEPCNT'] = self::CURLOPT_TCP_KEEPCNT;
             $constants['CURLOPT_SERVER_RESPONSE_TIMEOUT'] = self::CURLOPT_SERVER_RESPONSE_TIMEOUT;
             $constants['CURLOPT_PREREQFUNCTION'] = self::CURLOPT_PREREQFUNCTION;

@@ -241,6 +241,10 @@ PHP;
             self::assertArrayNotHasKey('CURLOPT_TCP_KEEPCNT', $ref);
             self::assertArrayNotHasKey('CURLOPT_PREREQFUNCTION', $ref);
             self::assertArrayNotHasKey('CURLOPT_SERVER_RESPONSE_TIMEOUT', $ref);
+            self::assertArrayNotHasKey('CURLINFO_CAINFO', $ref);
+            self::assertArrayNotHasKey('CURLINFO_CAPATH', $ref);
+            self::assertArrayHasKey('CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS', $ref);
+            self::assertSame(271, $ref['CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS']);
         } finally {
             if (false === $prev || null === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -257,7 +261,11 @@ PHP;
             $fwd = \PHPCompiler\ext\curl\CurlConstants::registeredConstants();
             self::assertArrayHasKey('CURLOPT_TCP_KEEPCNT', $fwd);
             self::assertArrayHasKey('CURLOPT_SERVER_RESPONSE_TIMEOUT', $fwd);
+            self::assertArrayHasKey('CURLINFO_CAINFO', $fwd);
+            self::assertArrayHasKey('CURLINFO_CAPATH', $fwd);
             self::assertSame(326, $fwd['CURLOPT_TCP_KEEPCNT']);
+            self::assertSame(1048637, $fwd['CURLINFO_CAINFO']);
+            self::assertSame(1048638, $fwd['CURLINFO_CAPATH']);
         } finally {
             if (false === $prev || null === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
