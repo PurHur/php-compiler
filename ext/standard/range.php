@@ -27,7 +27,7 @@ use PHPLLVM\Value;
  */
 final class range extends Internal
 {
-    private const ZERO_STEP_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
+    private const STEP_RANGE_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
 
     private static int $jitGuardSeq = 0;
 
@@ -74,6 +74,7 @@ final class range extends Internal
             $step = $context->builder->select($cmp, $negOne, $one);
         }
         self::emitZeroStepGuard($context, $step);
+        self::emitOversizedStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::intRange($context, $start, $end, $step);
     }
@@ -90,7 +91,47 @@ final class range extends Internal
         $context->builder->positionAtEnd($err);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitValueError($context, self::ZERO_STEP_ERROR);
+        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
+    }
+
+    /**
+     * php-src PHP_FUNCTION(range): when endpoints differ, |step| must be <= |end-start| (#26657).
+     * Emit before RangeIntRuntime so AOT/JIT raise ValueError without relying on PHP helper throws.
+     */
+    private static function emitOversizedStepGuard(
+        Context $context,
+        Value $start,
+        Value $end,
+        Value $step
+    ): void {
+        $tag = 'rb'.(string) ++self::$jitGuardSeq;
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $diff = $context->builder->sub($end, $start);
+        $diffNeg = $context->builder->icmp(Builder::INT_SLT, $diff, $zero);
+        $diffAbs = $context->builder->select(
+            $diffNeg,
+            $context->builder->sub($zero, $diff),
+            $diff
+        );
+        $stepNeg = $context->builder->icmp(Builder::INT_SLT, $step, $zero);
+        $stepAbs = $context->builder->select(
+            $stepNeg,
+            $context->builder->sub($zero, $step),
+            $step
+        );
+        $endpointsDiffer = $context->builder->icmp(Builder::INT_NE, $start, $end);
+        $stepTooBig = $context->builder->icmp(Builder::INT_ULT, $diffAbs, $stepAbs);
+        $bad = $context->builder->and($endpointsDiffer, $stepTooBig);
+        $ok = BasicBlockHelper::append($context, 'range_span_ok_'.$tag);
+        $err = BasicBlockHelper::append($context, 'range_span_err_'.$tag);
+        $context->builder->branchIf($bad, $err, $ok);
+        $context->builder->positionAtEnd($err);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($ok);
     }
