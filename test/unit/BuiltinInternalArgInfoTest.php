@@ -282,6 +282,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_get_line'));
     }
 
+    /** php-src file.stub.php — InternalArgInfo return int (missing |false) (#26322). */
+    public function testFtellReflectionReturnUnion(): void
+    {
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftell'));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511, #26342). */
     public function testGzencodeGzdecodeReflectionReturnUnions(): void
     {
