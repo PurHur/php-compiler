@@ -12534,7 +12534,12 @@ class Compiler {
                         $block->forceFreshVarSlot($expr->result);
                     }
                     // Receiver must not alias ?: echo phi (condition var is often reused, #5506).
+                    // Copy PHPCfg type so __call / method resolution keep the class (#26427 try+echo).
                     $recvTemp = new Operand\Temporary();
+                    $srcOp = $block->getOperand($receiverSlot);
+                    if (null !== $srcOp?->type) {
+                        $recvTemp->type = $srcOp->type;
+                    }
                     $recvSlot = $block->forceFreshVarSlot($recvTemp);
                     $prefix[] = new OpCode(OpCode::TYPE_ASSIGN, $recvSlot, $recvSlot, $receiverSlot);
                     $receiverSlot = $recvSlot;

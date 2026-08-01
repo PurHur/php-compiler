@@ -6,7 +6,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * File-level declare(strict_types=1) must mark nested Funcs (#26428/#26431, zend_compile.c).
+ * File-level declare(strict_types=1) must mark nested Funcs (#26428/#26431/#26427, zend_compile.c).
  */
 final class FileStrictTypesPropagateTest extends TestCase
 {
@@ -20,6 +20,8 @@ final class FileStrictTypesPropagateTest extends TestCase
             class C {
                 public function __isset(string $n): bool { return 1; }
                 public function __get(string $n): int { return "42"; }
+                public function __call(string $n, array $a): string { return 5; }
+                public static function __callStatic(string $n, array $a): string { return 5; }
                 public function foo(): bool { return 1; }
             }
             function top(): bool { return 1; }
@@ -40,6 +42,8 @@ final class FileStrictTypesPropagateTest extends TestCase
         }
         $this->assertContains('__isset', $names);
         $this->assertContains('__get', $names);
+        $this->assertContains('__call', $names);
+        $this->assertContains('__callStatic', $names);
         $this->assertContains('foo', $names);
         $this->assertContains('top', $names);
     }
@@ -53,6 +57,7 @@ final class FileStrictTypesPropagateTest extends TestCase
             class C {
                 public function __isset(string $n): bool { return 1; }
                 public function __get(string $n): int { return "42"; }
+                public function __call(string $n, array $a): string { return 5; }
             }
             PHP,
             'file_weak_propagate.php'
