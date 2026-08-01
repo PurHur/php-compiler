@@ -222,6 +222,48 @@ final class JitPropertyExists
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
+        // __PHP_Incomplete_Class — route through PHP helper so property_exists warns + false (#26366).
+        $incompleteId = $context->type->object->classIdByName('__PHP_Incomplete_Class');
+        if (null === $incompleteId) {
+            $incompleteId = $context->type->object->classIdForLowerName('__php_incomplete_class');
+        }
+        if (null !== $incompleteId) {
+            $isIncomplete = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($incompleteId, 'int64')
+            );
+            $incBlock = BasicBlockHelper::append($context, 'prop_exists_incomplete');
+            $normBlock = BasicBlockHelper::append($context, 'prop_exists_complete');
+            $mergeBlock = BasicBlockHelper::append($context, 'prop_exists_obj_merge');
+            $context->builder->branchIf($isIncomplete, $incBlock, $normBlock);
+
+            $context->builder->positionAtEnd($incBlock);
+            $incResult = self::routeObjectThroughPhpHelper($context, $objectArg, $propertyArg);
+            $context->builder->branch($mergeBlock);
+
+            $context->builder->positionAtEnd($normBlock);
+            $normResult = self::forCompleteObject($context, $objectArg, $propertyArg, $propLiteral, $classId);
+            $context->builder->branch($mergeBlock);
+
+            $context->builder->positionAtEnd($mergeBlock);
+            $phi = $context->builder->phi($incResult->typeOf());
+            $phi->addIncoming($incResult, $incBlock);
+            $phi->addIncoming($normResult, $normBlock);
+
+            return $phi;
+        }
+
+        return self::forCompleteObject($context, $objectArg, $propertyArg, $propLiteral, $classId);
+    }
+
+    private static function forCompleteObject(
+        Context $context,
+        JITVariable $objectArg,
+        JITVariable $propertyArg,
+        ?string $propLiteral,
+        Value $classId
+    ): Value {
         if (null !== $propLiteral) {
             // Enum pseudo-props name/value are case-sensitive (#23532).
             if ('name' === $propLiteral || 'value' === $propLiteral) {
@@ -233,6 +275,7 @@ final class JitPropertyExists
 
             return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
         }
+
         return self::routeObjectThroughPhpHelper($context, $objectArg, $propertyArg);
     }
 

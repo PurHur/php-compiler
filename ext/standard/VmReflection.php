@@ -21,6 +21,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\IncompleteClassSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\VM\ReflectionSupport;
@@ -1371,8 +1372,18 @@ final class VmReflection
         return $ctx->functions[$lc];
     }
 
-    public static function propertyExists(Context $ctx, Variable $objectOrClass, string $property): bool
-    {
+    /**
+     * property_exists() — declared / dynamic / enum pseudo-props.
+     *
+     * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(property_exists)
+     * Incomplete objects: warn + false like isset/read (#26366, zend_object_handlers.c).
+     */
+    public static function propertyExists(
+        Context $ctx,
+        Variable $objectOrClass,
+        string $property,
+        ?Frame $frame = null
+    ): bool {
         $objectOrClass = $objectOrClass->resolveIndirect();
         if (Variable::TYPE_STRING === $objectOrClass->type) {
             $class = self::resolveClassEntry($ctx, $objectOrClass->toString());
@@ -1384,6 +1395,12 @@ final class VmReflection
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             $object = $objectOrClass->toObject();
+            // __PHP_Incomplete_Class — Zend refuses property introspection (#26366 / #19632).
+            if (IncompleteClassSupport::isIncomplete($object)) {
+                IncompleteClassSupport::emitAccessWarning($object, $ctx, $frame);
+
+                return false;
+            }
             if (EnumCaseSupport::isEnumCase($object)) {
                 return EnumCaseSupport::propertyExistsOnCase($object->class, $property);
             }

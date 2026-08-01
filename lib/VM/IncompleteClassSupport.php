@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 /**
  * Zend __PHP_Incomplete_Class property handlers (zend_object_handlers.c, #19632 / #4638).
  *
- * Userland property read/isset warn and yield null/false; write/unset throw Error.
+ * Userland property read/isset/property_exists warn and yield null/false; write/unset throw Error.
  * Internals (serialize, get_object_vars, var_export) still see stored properties.
  *
  * @see https://github.com/php/php-src/blob/master/Zend/zend_object_handlers.c

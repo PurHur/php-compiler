@@ -22,6 +22,8 @@ var_export($obj->secret);
 echo "\n";
 var_export(empty($obj->secret));
 echo "\n";
+var_export(property_exists($obj, 'secret'));
+echo "\n";
 
 try {
     $obj->secret = 99;
@@ -48,7 +50,8 @@ incomplete
 false
 NULL
 true
+false
 write_err
 unset_err
-warnings=3
+warnings=4
 vars_ok

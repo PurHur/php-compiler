@@ -25,6 +25,7 @@ final class PropertyExistsBuiltinTest extends BaseTest
             'property_exists_case_sensitive_jit.phpt',
             'property_exists_null.phpt',
             'property_exists_null_jit.phpt',
+            'property_exists_incomplete_class.phpt',
             'property_exists_private_parent.phpt',
             'property_exists_private_parent_jit.phpt',
             'unset_dynamic_property_exists.phpt',
