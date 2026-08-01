@@ -540,7 +540,8 @@ final class PropertyHookDispatchLlvm
     }
 
     /**
-     * Block unset() on get-only or write-only virtual hooked properties (#6425, #6491).
+     * Block unset() on hooked properties without an unset hook (#6425, #6491, #26373).
+     * Matches Zend: backed get+set and virtual hooks all Error unless an unset hook exists.
      *
      * @return bool true when unset was blocked (caller must skip propertyStore)
      */
@@ -555,12 +556,21 @@ final class PropertyHookDispatchLlvm
         $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
             ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
             ?? null;
-        if (!is_array($meta) || empty($meta['virtual'])) {
+        if (!is_array($meta)) {
             return false;
         }
         $hasSet = isset($meta['set']);
         $hasGet = isset($meta['get']);
-        if ($hasSet && $hasGet) {
+        if (!$hasSet && !$hasGet) {
+            return false;
+        }
+        if (isset($meta['unset'])) {
+            return false;
+        }
+        $unsetLc = strtolower(PropertyHooks::unsetHookMethodName($propertyName));
+        $unsetProxy = self::resolveHookProxy($context, $className, $unsetLc)
+            ?? self::resolveStaticHookProxy($context, $className, $unsetLc);
+        if (null !== $unsetProxy) {
             return false;
         }
 
