@@ -10213,5 +10213,58 @@ PHP;
         self::assertSame("int(42)\nint(7)\n", ob_get_clean());
     }
 
+    /**
+     * Issue #26458 — appendChild then insertBefore($n, null) must keep prior siblings
+     * (literal null ≡ append; #25702 ConstFetch-null hoist must not drop the append).
+     */
+    public function testDomInsertBeforeLiteralNullAfterAppendChildPreservesSiblings(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$d = new DOMDocument();
+$r = $d->appendChild($d->createElement('root'));
+$a = $d->createElement('a');
+$b = $d->createElement('b');
+$r->appendChild($a);
+$r->insertBefore($b, null);
+echo $r->childNodes->length, ' ', $r->C14N(), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_insertbefore_literal_null_26458.php');
+
+        $sawAppendChildForA = false;
+        $sawInsertBefore = false;
+        $afterCreateA = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_SEND === $op->type
+                && null !== $op->arg1
+                && isset($block->constants[$op->arg1])
+                && 'a' === $block->constants[$op->arg1]->toString()
+            ) {
+                $afterCreateA = true;
+            }
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            if (!isset($block->constants[$op->arg2])) {
+                continue;
+            }
+            $name = $block->constants[$op->arg2]->toString();
+            if ($afterCreateA && 'appendChild' === $name) {
+                $sawAppendChildForA = true;
+            }
+            if ('insertBefore' === $name) {
+                $sawInsertBefore = true;
+            }
+        }
+        self::assertTrue($sawAppendChildForA, 'appendChild($a) METHODCALL_INIT must remain before insertBefore($b, null)');
+        self::assertTrue($sawInsertBefore, 'insertBefore METHODCALL_INIT missing');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2 <root><a></a><b></b></root>\n", ob_get_clean());
+    }
+
 }
 
