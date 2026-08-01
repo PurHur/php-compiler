@@ -6,7 +6,11 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** get_meta_tags JIT routes through MetaTagsJitHelper PHP, not hand-written LLVM (#9338). */
+/**
+ * get_meta_tags JIT routes through MetaTagsJitHelper PHP, not hand-written LLVM (#9338).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (#26568, peer #26532).
+ */
 final class MetaTagsJitRuntimeShrinkTest extends TestCase
 {
     public function testMetaTagsJitHelperDelegatesToVmMetaTags(): void
@@ -25,7 +29,19 @@ final class MetaTagsJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('strncasecmp', $source);
 
         $lineCount = \substr_count($source, "\n");
-        $this->assertLessThan(140, $lineCount, 'MetaTagsRuntime must be a thin bridge');
+        $this->assertLessThan(120, $lineCount, 'MetaTagsRuntime must be a thin bridge');
+    }
+
+    public function testMetaTagsRuntimeUsesJitVmHelperLink(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MetaTagsRuntime.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString("putenv('PHP_COMPILER_SELFHOST_AOT", $source);
     }
 
     public function testJitGetMetaTagsStillUsesCompilerGetMetaTagsAbi(): void

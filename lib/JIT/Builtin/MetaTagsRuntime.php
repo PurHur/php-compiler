@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_get_meta_tags via MetaTagsJitHelper PHP (#9338).
+ * JIT/AOT link for __compiler_get_meta_tags via MetaTagsJitHelper PHP (#9338, #26568).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcCollectCyclesCollectRuntime #26532).
  * Replaces ~650-line LLVM HTML walker; SSOT {@see \PHPCompiler\ext\standard\VmMetaTags}.
  * php-src: ext/standard/php_meta_tags.c — PHP_FUNCTION(get_meta_tags)
  */
@@ -80,42 +81,18 @@ final class MetaTagsRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after MetaTagsJitHelper compile (#9338)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26568');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'MetaTagsJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('MetaTagsJitHelper.php parseAndCompile failed (#9338)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9338)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26568'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
