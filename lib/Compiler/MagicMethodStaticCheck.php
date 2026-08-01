@@ -11,18 +11,18 @@ use PHPCfg\Script;
 use PHPCompiler\MethodVisibility;
 
 /**
- * Compile-time static-ness checks for magic methods (Zend parity).
+ * Compile-time static-ness and visibility checks for magic methods (Zend parity).
  *
- * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
+ * php-src: Zend/zend_API.c — zend_check_magic_method_implementation
  * - "Method …::…() cannot be static" (#25026, #25027)
  * - "Method …::…() must be static" for __callStatic / __set_state (#25028)
- * - "The magic method … must have public visibility" for __callStatic / __set_state (#26437)
+ * - "The magic method … must have public visibility" Warning (#26437, #26439)
  *
  * `__construct` / `__destruct` / `__clone` are already rejected by nikic/php-parser
- * at parse time. `__toString` is also covered by MagicMethodReturnTypeCheck (#25025);
- * kept here so the "cannot be static" set stays complete.
+ * at parse time. `__toString` visibility+Stringable fatal is MagicMethodReturnTypeCheck
+ * (#25025); kept in CANNOT_BE_STATIC so the "cannot be static" set stays complete.
  *
- * Instance magic visibility Warnings are #26439 (separate).
+ * `__invoke` visibility Warning+dispatch is #26438 (separate — VM may still fatal).
  */
 final class MagicMethodStaticCheck
 {
@@ -55,6 +55,27 @@ final class MagicMethodStaticCheck
         '__set_state' => '__set_state',
     ];
 
+    /**
+     * Instance magics that emit E_WARNING when non-public, then still dispatch (#26439).
+     *
+     * php-src: zend_check_magic_method_public — uses declared method name casing.
+     * Excludes __toString (Stringable fatal) and __invoke (#26438).
+     *
+     * @var array<string, true>
+     */
+    private const INSTANCE_MUST_BE_PUBLIC = [
+        '__get' => true,
+        '__set' => true,
+        '__isset' => true,
+        '__unset' => true,
+        '__call' => true,
+        '__serialize' => true,
+        '__unserialize' => true,
+        '__sleep' => true,
+        '__wakeup' => true,
+        '__debuginfo' => true,
+    ];
+
     public static function validate(Script $script): void
     {
         $check = new self();
@@ -85,6 +106,7 @@ final class MagicMethodStaticCheck
                         "Method {$classDisplay}::{$methodName}() cannot be static"
                     );
                 }
+                $this->warnIfInstanceMagicNonPublic($member, $classDisplay, $methodLc, $methodName);
                 continue;
             }
             if (isset(self::MUST_BE_STATIC[$methodLc])) {
@@ -101,8 +123,29 @@ final class MagicMethodStaticCheck
                         "The magic method {$classDisplay}::{$canonical}() must have public visibility"
                     );
                 }
+                continue;
             }
+            $this->warnIfInstanceMagicNonPublic($member, $classDisplay, $methodLc, $methodName);
         }
+    }
+
+    private function warnIfInstanceMagicNonPublic(
+        Op\Stmt\ClassMethod $member,
+        string $classDisplay,
+        string $methodLc,
+        string $methodName
+    ): void {
+        if (!isset(self::INSTANCE_MUST_BE_PUBLIC[$methodLc])) {
+            return;
+        }
+        if (MethodVisibility::isPublic(MethodVisibility::mask($member->func->flags))) {
+            return;
+        }
+        // Zend uses the declared spelling (fptr->common.function_name).
+        $this->compileWarning(
+            $member,
+            "The magic method {$classDisplay}::{$methodName}() must have public visibility"
+        );
     }
 
     private function compileWarning(Op\Stmt\ClassMethod $method, string $message): void
