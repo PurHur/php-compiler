@@ -1777,6 +1777,9 @@ final class BuiltinParamNames
             // php-src ext/xml/xml.stub.php — InternalArgInfo still says isfinal (#23605)
             case 'xml_parse':
                 return ['parser', 'data', 'is_final='];
+            // php-src ext/libxml/libxml.stub.php — InternalArgInfo still says streams_context (#26236)
+            case 'libxml_set_streams_context':
+                return ['context'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says additional_parameters (#23605)
             case 'mail':
                 return ['to', 'subject', 'message', 'additional_headers=', 'additional_params='];

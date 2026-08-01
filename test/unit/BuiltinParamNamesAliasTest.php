@@ -3454,6 +3454,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'obj', 'xml_set_object'));
     }
 
+    /** @covers issue #26236 */
+    public function testLibxmlSetStreamsContextStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('libxml_set_streams_context');
+        self::assertSame(['context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'libxml_set_streams_context'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $streams_context)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'streams_context', 'libxml_set_streams_context'));
+    }
+
     /** @covers issue #23342 */
     public function testGetResourceTypeZendStubNamedParams(): void
     {
