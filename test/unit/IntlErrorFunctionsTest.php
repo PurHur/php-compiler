@@ -23,7 +23,8 @@ final class IntlErrorFunctionsTest extends TestCase
     public function test_idle_error_state(): void
     {
         self::assertSame(0, $this->runGetErrorCode());
-        self::assertSame('', $this->runGetErrorMessage());
+        // php-src intl_error_get_message with no custom → u_errorName(U_ZERO_ERROR)
+        self::assertSame('U_ZERO_ERROR', $this->runGetErrorMessage());
         self::assertFalse($this->runIsFailure(0));
     }
 
@@ -41,8 +42,21 @@ final class IntlErrorFunctionsTest extends TestCase
     {
         IntlError::set(5, 'test message');
         self::assertSame(5, $this->runGetErrorCode());
-        self::assertSame('test message', $this->runGetErrorMessage());
+        // php-src intl_error_get_message appends ": " + u_errorName (#23546)
+        self::assertSame('test message: U_INTERNAL_PROGRAM_ERROR', $this->runGetErrorMessage());
         self::assertTrue($this->runIsFailure(5));
+    }
+
+    public function test_get_message_does_not_double_suffix(): void
+    {
+        IntlError::set(
+            IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+            'idn_to_ascii: empty domain name: U_ILLEGAL_ARGUMENT_ERROR'
+        );
+        self::assertSame(
+            'idn_to_ascii: empty domain name: U_ILLEGAL_ARGUMENT_ERROR',
+            $this->runGetErrorMessage()
+        );
     }
 
     private function runGetErrorCode(): int

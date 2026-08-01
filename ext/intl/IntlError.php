@@ -46,8 +46,11 @@ final class IntlError
 
     private static int $code = self::U_ZERO_ERROR;
 
-    /** Idle / cleared state matches php-src intl_error_reset → "U_ZERO_ERROR" (#22577). */
-    private static string $message = 'U_ZERO_ERROR';
+    /**
+     * Custom prose from intl_error_set / intl_error_set_custom_msg (php-src intl_error.c).
+     * Null means no custom message — {@see getMessage()} returns only u_errorName(code).
+     */
+    private static ?string $customMessage = null;
 
     private static ?\FFI $errorNameFfi = null;
 
@@ -60,21 +63,39 @@ final class IntlError
         return self::$code;
     }
 
+    /**
+     * php-src intl_error_get_message — "<custom>: <u_errorName>" or just u_errorName when idle.
+     *
+     * Call sites that already bake in ": U_…" keep a single suffix (#23546).
+     */
     public static function getMessage(): string
     {
-        return self::$message;
+        $name = self::errorName(self::$code);
+        if (null === self::$customMessage || '' === self::$customMessage) {
+            return $name;
+        }
+        // Idle stand-in used by older setters: custom was literally the ICU name alone.
+        if (self::$customMessage === $name) {
+            return $name;
+        }
+        $suffix = ': '.$name;
+        if (\str_ends_with(self::$customMessage, $suffix)) {
+            return self::$customMessage;
+        }
+
+        return self::$customMessage.$suffix;
     }
 
     public static function set(int $code, string $message): void
     {
         self::$code = $code;
-        self::$message = $message;
+        self::$customMessage = $message;
     }
 
     public static function clear(): void
     {
         self::$code = self::U_ZERO_ERROR;
-        self::$message = 'U_ZERO_ERROR';
+        self::$customMessage = null;
     }
 
     /** php-src PHP_FUNCTION(intl_is_failure) */
