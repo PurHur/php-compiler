@@ -775,6 +775,9 @@ final class Variable {
     }
 
     public function addref(): void {
+        if (null !== $this->superglobalName) {
+            return;
+        }
         if ($this->type & self::IS_NATIVE_ARRAY) {
             $elemType = $this->type & ~self::IS_NATIVE_ARRAY;
             if (0 === ($elemType & self::IS_REFCOUNTED)) {
@@ -803,6 +806,10 @@ final class Variable {
             return;
         }
         if ($this->scriptGlobalSlot) {
+            return;
+        }
+        // KIND_VARIABLE $_SESSION re-loads sg_* — must not delref process-owned HT (#26411).
+        if (null !== $this->superglobalName) {
             return;
         }
         if ($this->kind === self::KIND_VALUE) {
@@ -863,6 +870,10 @@ final class Variable {
 
     public function initialize(): void {
         if ($this->kind === self::KIND_VALUE) {
+            return;
+        }
+        // Never null out sg_SESSION / other process-owned superglobal slots (#26411).
+        if (null !== $this->superglobalName) {
             return;
         }
         switch ($this->type) {
