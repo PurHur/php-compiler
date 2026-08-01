@@ -686,6 +686,7 @@ final class BuiltinClasses
                 new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto),
                 new ClassProperty(ReflectionSupport::PROP_ATTR_IS_REPEATED, null, $boolProto),
                 new ClassProperty(ReflectionSupport::PROP_ATTR_TARGET, null, $intProto),
+                new ClassProperty(ReflectionSupport::PROP_ATTR_VALIDATION_ERROR, null, $strProto),
             ] as $attrProp
         ) {
             $attrProp->phpInvisible = true;

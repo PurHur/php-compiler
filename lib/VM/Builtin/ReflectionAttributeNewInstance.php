@@ -43,6 +43,8 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
         ReflectionSupport::assertAttributeNewInstanceTargetAllowed($receiver, $classEntry);
         // Userland non-IS_REPEATABLE duplicates: Error at newInstance, not compile (#22930).
         ReflectionSupport::assertAttributeNewInstanceNotIllegalRepeat($receiver, $classEntry);
+        // Delayed #[\DelayedTargetValidation] internal validator errors (#26241).
+        ReflectionSupport::assertAttributeNewInstanceNoDelayedValidationError($receiver);
         // Abstract / interface / trait / enum: Error like `new` (php-src zend_get_attribute_object, #26238).
         ReflectionSupport::assertAttributeNewInstanceInstantiable($classEntry);
         $object = new ObjectEntry($classEntry);

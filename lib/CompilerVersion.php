@@ -1243,6 +1243,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ compile-time rejection of {@code #[\Attribute]} on abstract class / interface / trait / enum (#26241).
+     *
+     * Withheld on PROFILE≤8.4 (Zend only fails at ReflectionAttribute::newInstance of the attribute class).
+     * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
+     * php-src: Zend/zend_attributes.c {@code validate_attribute}; defer with {@code #[\DelayedTargetValidation]}.
+     */
+    public static function rejectsAttributeOnNonConcreteClassLike(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ {@code Attribute::TARGET_CONSTANT} and 8.5 Attribute flag bit layout (#20727).
      *
      * On ≤8.4: no TARGET_CONSTANT; TARGET_ALL=63; IS_REPEATABLE=(1<<6)=64.

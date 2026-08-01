@@ -11,11 +11,14 @@ final class AttributeEntry
 {
     /**
      * @param list<array{name: ?string, value: mixed}> $args compile-time constant constructor args
+     * @param ?string                                 $validationError delayed internal-attribute error
+     *                                                                  ({@see #[\DelayedTargetValidation]}, #26241)
      */
     public function __construct(
         public readonly string $name,
         public readonly array $args = [],
         public bool $isRepeated = false,
+        public ?string $validationError = null,
     ) {
     }
 

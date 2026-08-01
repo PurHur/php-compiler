@@ -6281,6 +6281,11 @@ class Compiler {
             'interface',
             $name
         );
+        AttributeNames::assertAttributeMetaOnConcreteClassLike(
+            $return->attributeEntries,
+            'interface',
+            $name
+        );
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
@@ -6315,6 +6320,11 @@ class Compiler {
         AttributeNames::assertDeprecatedAllowedOnClassLike(
             $return->attributeNames,
             $return->deprecatedMetadata,
+            'trait',
+            $name
+        );
+        AttributeNames::assertAttributeMetaOnConcreteClassLike(
+            $return->attributeEntries,
             'trait',
             $name
         );
@@ -6365,6 +6375,11 @@ class Compiler {
                 $enumName
             );
             AttributeNames::assertAllowDynamicPropertiesNotOnEnum($return->attributeNames, $enumName);
+            AttributeNames::assertAttributeMetaOnConcreteClassLike(
+                $return->attributeEntries,
+                'enum',
+                $enumName
+            );
             $this->registerAttributeClassFromEntries($enumName, $return->attributeEntries);
         }
         [$enumIfaceLcs, $enumIfaceDisplays] = $this->interfaceLcAndDisplayFromOperands($enum->implements);
@@ -6677,6 +6692,13 @@ class Compiler {
         );
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
+        if ($return->classIsAbstract) {
+            AttributeNames::assertAttributeMetaOnConcreteClassLike(
+                $return->attributeEntries,
+                'abstract class',
+                $className
+            );
+        }
         $classLc = strtolower(ltrim($className, '\\'));
         $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
         if (null !== $parentLc) {

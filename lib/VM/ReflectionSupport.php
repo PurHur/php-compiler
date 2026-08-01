@@ -154,6 +154,9 @@ final class ReflectionSupport
     /** Attribute::TARGET_* bitmask for the declaration site (#22044). */
     public const PROP_ATTR_TARGET = 'target';
 
+    /** Delayed #[\DelayedTargetValidation] error text from compile (#26241). */
+    public const PROP_ATTR_VALIDATION_ERROR = 'validationError';
+
     public const PROP_EXTENSION_NAME = 'extension';
 
     /** Public `$name` on ReflectionZendExtension (php-src, #22248). */
@@ -326,6 +329,9 @@ final class ReflectionSupport
             $obj->getProperty(self::PROP_ATTR_ARGS)->copyFrom(self::argsToVariable($entry->args, $ctx));
             $obj->getProperty(self::PROP_ATTR_IS_REPEATED)->bool($entry->isRepeated);
             $obj->getProperty(self::PROP_ATTR_TARGET)->int($target);
+            $obj->getProperty(self::PROP_ATTR_VALIDATION_ERROR)->string(
+                null !== $entry->validationError ? $entry->validationError : ''
+            );
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
@@ -837,6 +843,26 @@ final class ReflectionSupport
             : $attributeClass->name;
 
         throw new \Error(AttributeTargetValidator::runtimeWrongTargetMessage($name, $siteTarget, $allowed));
+    }
+
+    /**
+     * ReflectionAttribute::newInstance() — raise compile-deferred internal attribute errors (#26241).
+     *
+     * php-src: ext/reflection/php_reflection.c — zend_attribute.validation_error set when
+     * #[\DelayedTargetValidation] suppressed a compile-time validator failure.
+     */
+    public static function assertAttributeNewInstanceNoDelayedValidationError(ObjectEntry $receiver): void
+    {
+        $errVar = $receiver->getProperty(self::PROP_ATTR_VALIDATION_ERROR)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $errVar->type) {
+            return;
+        }
+        $message = $errVar->toString();
+        if ('' === $message) {
+            return;
+        }
+
+        throw new \Error($message);
     }
 
     /**
