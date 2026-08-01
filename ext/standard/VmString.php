@@ -34,9 +34,9 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * wordwrap/str_pad, str_increment/str_decrement,
-     * and other typed string builtins use this guard (php-src ext/standard/string.c).
+     * wordwrap/str_pad and other typed string builtins use this guard (php-src ext/standard/string.c).
      * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords soft-null on 8.4 (#24598, reverts #24213/#20080).
+     * str_increment/str_decrement soft-null then empty ValueError (#26264, reverts #21005 TypeError).
      * strlen/strtolower/strtoupper/strrev, trim/ltrim/rtrim/chop (#21404, reverts #21350),
      * and md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data)/hash_hmac($key)/hash_update($data) coerce null with
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181 #21209 #21557).
@@ -53,7 +53,6 @@ final class VmString
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
      * htmlspecialchars/htmlentities/nl2br/addslashes soft-null on 8.4 (#21405/#21406; reverts #21351 TypeError).
      * convert_uudecode soft-null on 8.4 (#21420; empty decode → warning+false like Zend).
-     * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare soft-null on 8.4 (#21515, reverts #20164 TypeError; peers strncmp #21317).
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
      * fsockopen/stream_socket_client (#23823) Z_PARAM_STR null TypeError on 8.4.
@@ -76,6 +75,7 @@ final class VmString
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
      * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords soft-null (#24598, reverts #24213/#20080).
+     * str_increment/str_decrement soft-null then empty ValueError (#26264, reverts #21005 TypeError).
      * Used by strlen/strtolower/strtoupper/strrev (#20007), trim/ltrim/rtrim/chop (#21404),
      * md5/sha1/crc32/bin2hex/hash($data) (#21181),
      * hash_hmac($data)/hash_hmac($key)/hash_update($data) (#21209, #21557),

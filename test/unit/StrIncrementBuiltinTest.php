@@ -96,6 +96,29 @@ final class StrIncrementBuiltinTest extends TestCase
         $this->runDecrement('');
     }
 
+    /** Null soft-coerces then empty ValueError under PROFILE≥8.4 (#26264). */
+    public function testNullSoftCoerceThenEmptyValueError(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            foreach ([new str_increment(), new str_decrement()] as $fn) {
+                try {
+                    $this->runBuiltinNull($fn);
+                    $this->fail(get_class($fn).' should throw');
+                } catch (\ValueError $e) {
+                    $this->assertStringContainsString('must not be empty', $e->getMessage());
+                }
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     private function runIncrement(string $value): string
     {
         return $this->runBuiltin(new str_increment(), $value);
@@ -117,5 +140,16 @@ final class StrIncrementBuiltinTest extends TestCase
         $fn->execute($frame);
 
         return $frame->returnVar->toString();
+    }
+
+    private function runBuiltinNull(str_increment|str_decrement $fn): void
+    {
+        $runtime = new Runtime();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->null();
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
     }
 }

@@ -108,6 +108,7 @@ final class JitStringBuiltinArg
      * Soft-null string args — coerce+deprecate on forward profile (not Z_PARAM_STR TypeError).
      *
      * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords soft-null (#24598, reverts #24213/#20080).
+     * str_increment/str_decrement soft-null then empty ValueError (#26264, reverts #21005 TypeError).
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data)/hash_hmac($key)/hash_update($data) (#21181, #21209, #21557),
      * hash()/hash_hmac()/hash_file()/hash_init() $algo soft-null (#21490/#21572, reverts #20304 TypeError),
      * version_compare($version1/$version2) soft-null (#21556, reverts #20254 TypeError; ext/standard/versioning.c),
