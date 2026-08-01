@@ -6,5 +6,5 @@ class C {
     public callable $c;
 }
 echo "ok\n";
---EXPECTF--
-Fatal error: Property C::$c cannot have type callable in %s on line %d
+--EXPECT_EXIT--
+255
