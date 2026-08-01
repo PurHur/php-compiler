@@ -11,6 +11,7 @@ use PHPCfg\Script;
 
 /**
  * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
+ * Unit (non-backed) enum cases must not declare a value (#26382, zend_compile.c).
  * Duplicate case names are rejected at compile (#5218, zend_compile.c).
  * Duplicate backing values are validated at first case use via {@see \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique()} (#5773, #8687, zend_enum.c).
  *
@@ -61,6 +62,8 @@ final class EnumBackedCaseCheck
         $this->validateDuplicateCaseNames($enum, $enumDisplay);
 
         if (null === $enum->backedType || !$enum->backedType instanceof Op\Type\Literal) {
+            $this->validateUnitEnumCasesHaveNoValue($enum, $enumDisplay);
+
             return;
         }
         $backedType = $enum->backedType->name;
@@ -82,6 +85,30 @@ final class EnumBackedCaseCheck
                     "Enum case {$enumDisplay}::{$caseName} must have a value"
                 );
             }
+        }
+    }
+
+    /**
+     * Zend: "Case A of non-backed enum E must not have a value" (#26382, zend_compile.c).
+     */
+    private function validateUnitEnumCasesHaveNoValue(Op\Stmt\Enum_ $enum, string $enumDisplay): void
+    {
+        foreach ($enum->stmts->children as $member) {
+            if (!$member instanceof Op\Terminal\Const_) {
+                continue;
+            }
+            if (!$this->memberIsEnumCase($member, $enum)) {
+                continue;
+            }
+            if (!$this->enumCaseHasExplicitValue($member, $enum)) {
+                continue;
+            }
+            $caseName = $this->operandDisplayName($member->name, 'case');
+            throw new CompileFatal(
+                $member->getFile(),
+                $member->getLine(),
+                "Case {$caseName} of non-backed enum {$enumDisplay} must not have a value"
+            );
         }
     }
 
