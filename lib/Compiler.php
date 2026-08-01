@@ -696,7 +696,18 @@ class Compiler {
             return;
         }
         $returnType = $func->returnType;
-        if (null === $returnType) {
+        // php-cfg represents “no return type” as null or Mixed_; Zend auto-declares `: string`
+        // for untyped `__toString` (zend_compile.c / #26402).
+        if (null === $returnType || $returnType instanceof Op\Type\Mixed_) {
+            if ($this->applyImplicitToStringStringReturn($block, $func)) {
+                return;
+            }
+            if (null === $returnType) {
+                return;
+            }
+            // Untyped (Mixed_) non-__toString: no scalar constraint.
+            $block->returnDeclaredType = $returnType;
+
             return;
         }
         $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
@@ -784,6 +795,41 @@ class Compiler {
                 $block->returnTypeConstraint = $mapped;
             }
         }
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — untyped `__toString` is compiled as returning string.
+     * Enables zend_verify_return_type under strict_types (#26402); Reflection sees `: string`.
+     *
+     * @return bool true when the implicit string return was applied
+     */
+    private function applyImplicitToStringStringReturn(Block $block, CfgFunc $func): bool
+    {
+        $stringType = $this->implicitToStringReturnType($func);
+        if (null === $stringType) {
+            return false;
+        }
+        $block->returnDeclaredType = $stringType;
+        $block->returnTypeConstraint = Variable::TYPE_STRING;
+
+        return true;
+    }
+
+    /**
+     * Zend auto-declares `: string` when `__toString` has no user-written return type.
+     * php-cfg represents that absence as {@see Op\Type\Mixed_}.
+     */
+    private function implicitToStringReturnType(CfgFunc $func): ?Op\Type\Literal
+    {
+        if ('__tostring' !== strtolower($func->name)) {
+            return null;
+        }
+        $returnType = $func->returnType;
+        if (null !== $returnType && !($returnType instanceof Op\Type\Mixed_)) {
+            return null;
+        }
+
+        return new Op\Type\Literal('string');
     }
 
     /**
@@ -6525,7 +6571,9 @@ class Compiler {
         AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'method', $declare->attributeEntries);
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         // Abstract/interface methods have no method body block — keep return AST for cross-file LSP (#25384).
-        $declare->returnDeclaredType = $child->func->returnType;
+        // Untyped `__toString` is `: string` for Reflection / LSP (zend_compile.c, #26402).
+        $declare->returnDeclaredType = $this->implicitToStringReturnType($child->func)
+            ?? $child->func->returnType;
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
     }
