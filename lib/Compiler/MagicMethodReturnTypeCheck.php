@@ -329,8 +329,12 @@ final class MagicMethodReturnTypeCheck
         if ('object' === $sig->builtinScalar && null === $sig->classLc) {
             return true;
         }
-        // Named class (including parent) — not a non-object builtin scalar.
-        return null === $sig->builtinScalar && null !== $sig->classLc;
+        // Named class (including parent) — not a non-object builtin / true|false literal type.
+        if (null !== $sig->builtinScalar || null === $sig->classLc) {
+            return false;
+        }
+
+        return 'true' !== $sig->classLc && 'false' !== $sig->classLc;
     }
 
     private function fatal(Op\Stmt\ClassMethod $method, string $message): void

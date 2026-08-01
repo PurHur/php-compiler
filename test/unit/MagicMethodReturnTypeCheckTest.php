@@ -216,6 +216,20 @@ class Ss7 { public static function __set_state(array $a): object|array { return 
 PHP,
             'Ss7::__set_state(): Return type must be object when declared',
         ];
+        yield '__set_state true' => [
+            <<<'PHP'
+<?php
+class Ss8 { public static function __set_state(array $a): true { return true; } }
+PHP,
+            'Ss8::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state false' => [
+            <<<'PHP'
+<?php
+class Ss9 { public static function __set_state(array $a): false { return false; } }
+PHP,
+            'Ss9::__set_state(): Return type must be object when declared',
+        ];
     }
 
     public function testValidMagicMethodReturnTypesCompile(): void
