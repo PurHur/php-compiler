@@ -130,6 +130,173 @@ final class VmSsh2Native
     }
 
     /**
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return \FFI\CData|null LIBSSH2_SFTP*
+     */
+    public static function sftpInit(\FFI\CData $session)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $sftp = $ffi->libssh2_sftp_init($session);
+        if (null === $sftp) {
+            return null;
+        }
+
+        return $sftp;
+    }
+
+    /**
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     */
+    public static function sftpShutdown(\FFI\CData $sftp): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            $ffi->libssh2_sftp_shutdown($sftp);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Transfer remote→local via SFTP (PECL ssh2_scp_recv surface; #26510).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function scpRecv(\FFI\CData $session, string $remoteFile, string $localFile): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $sftp = $ffi->libssh2_sftp_init($session);
+        if (null === $sftp) {
+            return false;
+        }
+        // LIBSSH2_FXF_READ = 0x00000001, LIBSSH2_SFTP_OPENFILE = 0
+        $handle = $ffi->libssh2_sftp_open_ex($sftp, $remoteFile, \strlen($remoteFile), 0x00000001, 0, 0);
+        if (null === $handle) {
+            self::sftpShutdown($sftp);
+
+            return false;
+        }
+        $out = @\fopen($localFile, 'wb');
+        if (false === $out) {
+            $ffi->libssh2_sftp_close_handle($handle);
+            self::sftpShutdown($sftp);
+
+            return false;
+        }
+        $buf = $ffi->new('char[8192]');
+        $ok = true;
+        while (true) {
+            $nInt = (int) $ffi->libssh2_sftp_read($handle, $buf, 8192);
+            if (-37 === $nInt) {
+                usleep(1000);
+                continue;
+            }
+            if ($nInt < 0) {
+                $ok = false;
+                break;
+            }
+            if (0 === $nInt) {
+                break;
+            }
+            if (false === \fwrite($out, \FFI::string($buf, $nInt))) {
+                $ok = false;
+                break;
+            }
+        }
+        \fclose($out);
+        $ffi->libssh2_sftp_close_handle($handle);
+        self::sftpShutdown($sftp);
+        if (!$ok) {
+            @\unlink($localFile);
+        }
+
+        return $ok;
+    }
+
+    /**
+     * Transfer local→remote via SFTP (PECL ssh2_scp_send surface; #26510).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function scpSend(\FFI\CData $session, string $localFile, string $remoteFile, int $mode = 0644): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if (!\is_file($localFile) || !\is_readable($localFile)) {
+            return false;
+        }
+        $sftp = $ffi->libssh2_sftp_init($session);
+        if (null === $sftp) {
+            return false;
+        }
+        // LIBSSH2_FXF_WRITE|CREAT|TRUNC = 0x1a, OPENFILE = 0
+        $handle = $ffi->libssh2_sftp_open_ex(
+            $sftp,
+            $remoteFile,
+            \strlen($remoteFile),
+            0x0000001a,
+            $mode,
+            0
+        );
+        if (null === $handle) {
+            self::sftpShutdown($sftp);
+
+            return false;
+        }
+        $in = @\fopen($localFile, 'rb');
+        if (false === $in) {
+            $ffi->libssh2_sftp_close_handle($handle);
+            self::sftpShutdown($sftp);
+
+            return false;
+        }
+        $ok = true;
+        $cbuf = $ffi->new('char[8192]');
+        while (!\feof($in)) {
+            $data = \fread($in, 8192);
+            if (false === $data) {
+                $ok = false;
+                break;
+            }
+            if ('' === $data) {
+                break;
+            }
+            $len = \strlen($data);
+            \FFI::memcpy($cbuf, $data, $len);
+            $off = 0;
+            while ($off < $len) {
+                $ptr = \FFI::addr($cbuf[$off]);
+                $nInt = (int) $ffi->libssh2_sftp_write($handle, $ptr, $len - $off);
+                if (-37 === $nInt) {
+                    usleep(1000);
+                    continue;
+                }
+                if ($nInt < 0) {
+                    $ok = false;
+                    break 2;
+                }
+                $off += $nInt;
+            }
+        }
+        \fclose($in);
+        $ffi->libssh2_sftp_close_handle($handle);
+        self::sftpShutdown($sftp);
+
+        return $ok;
+    }
+
+    /**
      * @return \FFI|null
      */
     private static function ffi()
@@ -152,6 +319,14 @@ void libssh2_session_set_blocking(LIBSSH2_SESSION *session, int blocking);
 int libssh2_userauth_password_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *password, unsigned int password_len, void *passwd_change_cb);
 int libssh2_session_disconnect_ex(LIBSSH2_SESSION *session, int reason, const char *description, const char *lang);
 int libssh2_session_free(LIBSSH2_SESSION *session);
+typedef struct _LIBSSH2_SFTP LIBSSH2_SFTP;
+typedef struct _LIBSSH2_SFTP_HANDLE LIBSSH2_SFTP_HANDLE;
+LIBSSH2_SFTP *libssh2_sftp_init(LIBSSH2_SESSION *session);
+int libssh2_sftp_shutdown(LIBSSH2_SFTP *sftp);
+LIBSSH2_SFTP_HANDLE *libssh2_sftp_open_ex(LIBSSH2_SFTP *sftp, const char *filename, unsigned int filename_len, unsigned long flags, long mode, int open_type);
+ssize_t libssh2_sftp_read(LIBSSH2_SFTP_HANDLE *handle, char *buffer, size_t buffer_maxlen);
+ssize_t libssh2_sftp_write(LIBSSH2_SFTP_HANDLE *handle, const char *buffer, size_t count);
+int libssh2_sftp_close_handle(LIBSSH2_SFTP_HANDLE *handle);
 C;
         foreach (['libssh2.so.1', 'libssh2.so', '/usr/lib/x86_64-linux-gnu/libssh2.so.1'] as $lib) {
             try {
