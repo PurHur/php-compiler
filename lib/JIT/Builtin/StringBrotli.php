@@ -4,18 +4,41 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for brotli_* — compiles BrotliJitHelper into the module (#6814).
+ * JIT/AOT link hook for brotli_* — compiles BrotliJitHelper into the module (#6814, #26668).
+ *
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (VmBrotliNative →
+ * BrotliJitHelper) in one NestedJIT scope (peer StringLzf #26649 / ObGzhandler #26331).
  */
 final class StringBrotli
 {
+    private const NATIVE_PATH = '/ext/brotli/VmBrotliNative.php';
+
+    private const HELPER_PATH = '/ext/brotli/BrotliJitHelper.php';
+
+    /**
+     * Ordered NestedJIT sources — VmBrotliNative before BrotliJitHelper (#26668).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::NATIVE_PATH,
+        self::HELPER_PATH,
+    ];
+
     private const COMPRESS_HELPER = 'PHPCompiler\\ext\\brotli\\BrotliJitHelper::compress';
 
     private const UNCOMPRESS_HELPER = 'PHPCompiler\\ext\\brotli\\BrotliJitHelper::uncompress';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::COMPRESS_HELPER,
+        self::UNCOMPRESS_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -40,48 +63,17 @@ final class StringBrotli
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after compile (#6814)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26668');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $needed = [\strtolower(self::COMPRESS_HELPER), \strtolower(self::UNCOMPRESS_HELPER)];
-        $missing = false;
-        foreach ($needed as $lc) {
-            if (!isset($context->functions[$lc])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $helperPath = \dirname(__DIR__, 3).'/ext/brotli/BrotliJitHelper.php';
-        $nativePath = \dirname(__DIR__, 3).'/ext/brotli/VmBrotliNative.php';
-        $block = $runtime->parseAndCompile((string) \file_get_contents($nativePath), 'VmBrotliNative.php');
-        if (null === $block) {
-            throw new \LogicException('VmBrotliNative.php parseAndCompile failed (#6814)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        $block = $runtime->parseAndCompile((string) \file_get_contents($helperPath), 'BrotliJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('BrotliJitHelper.php parseAndCompile failed (#6814)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach ($needed as $lc) {
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT brotli (#6814)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#26668'
+        );
     }
 }
