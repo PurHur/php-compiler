@@ -99,6 +99,63 @@ final class VmSsh2Native
     }
 
     /**
+     * Host-key fingerprint after handshake (PECL ssh2_fingerprint / libssh2_hostkey_hash; #26575).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return string|false
+     */
+    public static function hostkeyFingerprint(\FFI\CData $session, int $flags)
+    {
+        require_once __DIR__.'/Ssh2Constants.php';
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $useSha1 = (0 !== ($flags & Ssh2Constants::FINGERPRINT_SHA1));
+        $hashType = $useSha1 ? 2 /* LIBSSH2_HOSTKEY_HASH_SHA1 */ : 1 /* MD5 */;
+        $digestLen = $useSha1 ? 20 : 16;
+        try {
+            $ptr = $ffi->libssh2_hostkey_hash($session, $hashType);
+        } catch (\Throwable) {
+            return false;
+        }
+        if (null === $ptr) {
+            return false;
+        }
+        // Declare as void* so PHP FFI does not coerce to a NUL-truncated string.
+        try {
+            $buf = $ffi->new('unsigned char['.$digestLen.']');
+            \FFI::memcpy($buf, $ptr, $digestLen);
+            $bytes = \FFI::string($buf, $digestLen);
+        } catch (\Throwable) {
+            return false;
+        }
+        if ($digestLen !== \strlen($bytes)) {
+            return false;
+        }
+        $allZero = true;
+        for ($i = 0; $i < $digestLen; ++$i) {
+            if ("\0" !== $bytes[$i]) {
+                $allZero = false;
+                break;
+            }
+        }
+        if ($allZero) {
+            return false;
+        }
+        if (0 !== ($flags & Ssh2Constants::FINGERPRINT_RAW)) {
+            return $bytes;
+        }
+        $hex = '';
+        for ($i = 0; $i < $digestLen; ++$i) {
+            $hex .= \sprintf('%02X', \ord($bytes[$i]));
+        }
+
+        return $hex;
+    }
+
+    /**
      * @param \FFI\CData $session LIBSSH2_SESSION*
      */
     public static function sessionDisconnect(\FFI\CData $session): void
@@ -317,6 +374,7 @@ LIBSSH2_SESSION *libssh2_session_init_ex(void *(*alloc)(size_t), void (*free)(vo
 int libssh2_session_handshake(LIBSSH2_SESSION *session, int sock);
 void libssh2_session_set_blocking(LIBSSH2_SESSION *session, int blocking);
 int libssh2_userauth_password_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *password, unsigned int password_len, void *passwd_change_cb);
+void *libssh2_hostkey_hash(LIBSSH2_SESSION *session, int hash_type);
 int libssh2_session_disconnect_ex(LIBSSH2_SESSION *session, int reason, const char *description, const char *lang);
 int libssh2_session_free(LIBSSH2_SESSION *session);
 typedef struct _LIBSSH2_SFTP LIBSSH2_SFTP;
