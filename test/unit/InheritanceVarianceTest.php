@@ -10,7 +10,7 @@ use PHPCompiler\Compiler\TypeSig;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3323, #23504, #25727 */
+/** @covers issue #3323, #23504, #25727, #26520 */
 final class InheritanceVarianceTest extends TestCase
 {
     public function testInterfaceExtendsIncompatibleStaticReturnFailsAtCompileTime(): void
@@ -986,5 +986,67 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame("1\n", ob_get_clean());
+    }
+
+    /** Child dropping parent default is incompatible (zend_inheritance.c, #26520). */
+    public function testChildDroppingParentDefaultFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(int $x = 1) {} }
+class B extends A { public function f(int $x) {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(int $x) must be compatible with A::f(int $x = 1)');
+        $runtime->parseAndCompile($code, 'default_drop.php');
+    }
+
+    /** Abstract parent: same default-drop LSP (#26520). */
+    public function testChildDroppingAbstractParentDefaultFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A { abstract public function f(int $x = 1); }
+class B extends A { public function f(int $x) {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(int $x) must be compatible with A::f(int $x = 1)');
+        $runtime->parseAndCompile($code, 'default_drop_abstract.php');
+    }
+
+    /** Child may add a default when the parent has none (#26520). */
+    public function testChildAddingDefaultAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(int $x) {} }
+class B extends A { public function f(int $x = 1) { echo "ok\n"; } }
+(new B)->f();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'default_add.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Different default values remain compatible (#26520). */
+    public function testChildChangingDefaultValueAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(int $x = 1) {} }
+class B extends A { public function f(int $x = 2) { echo $x, "\n"; } }
+(new B)->f();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'default_change.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("2\n", ob_get_clean());
     }
 }

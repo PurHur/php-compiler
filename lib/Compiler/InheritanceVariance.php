@@ -19,7 +19,7 @@ use PHPCfg\Script;
  * Compile-time parameter contravariance / return covariance, staticness,
  * abstract-from-concrete, visibility, and trait abstract signature composition
  * (Zend zend_inheritance.c / zend_traits.c, issues #3323, #25634, #25660,
- * #25662, #26381).
+ * #25662, #26381, #26520).
  *
  * Visibility applies to concrete overrides and abstract→concrete implementations:
  * child must be the parent visibility or weaker (public > protected > private).
@@ -459,6 +459,13 @@ final class InheritanceVariance
             $childByRef = (bool) ($child->paramByRef[$i] ?? false);
             $parentByRef = (bool) ($parent->paramByRef[$i] ?? false);
             if ($childByRef !== $parentByRef) {
+                return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+            }
+            // zend_inheritance.c: child must keep parent default (cannot make optional→required, #26520).
+            // Child may *add* a default when the parent has none.
+            $parentHasDefault = (bool) ($parent->paramHasDefault[$i] ?? false);
+            $childHasDefault = (bool) ($child->paramHasDefault[$i] ?? false);
+            if ($parentHasDefault && !$childHasDefault) {
                 return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
             }
             if (!self::isParameterCompatibleStatic(
@@ -988,6 +995,13 @@ final class MethodSig
     /** @var list<bool> */
     public array $paramHasDefault;
 
+    /**
+     * Zend inheritance-error default exports (e.g. "1", "null", "[]", "'hi'").
+     *
+     * @var list<?string>
+     */
+    public array $paramDefaultExports;
+
     /** @var list<bool> per-param by-ref flags (zend_inheritance.c, #25633) */
     public array $paramByRef;
 
@@ -1013,6 +1027,7 @@ final class MethodSig
      * @param list<string>     $paramNames
      * @param list<bool>       $paramHasDefault
      * @param list<bool>       $paramByRef
+     * @param list<?string>    $paramDefaultExports
      */
     public function __construct(
         string $ownerLc,
@@ -1025,7 +1040,8 @@ final class MethodSig
         bool $isFinal = false,
         array $paramByRef = [],
         bool $isStatic = false,
-        bool $returnsByRef = false
+        bool $returnsByRef = false,
+        array $paramDefaultExports = []
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -1038,6 +1054,7 @@ final class MethodSig
         $this->paramByRef = $paramByRef;
         $this->isStatic = $isStatic;
         $this->returnsByRef = $returnsByRef;
+        $this->paramDefaultExports = $paramDefaultExports;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -1045,11 +1062,14 @@ final class MethodSig
         $params = [];
         $names = [];
         $hasDefault = [];
+        $defaultExports = [];
         $byRef = [];
         foreach ($func->params as $param) {
             $params[] = TypeSig::fromCfgType($param->declaredType);
             $names[] = self::paramNameFromOperand($param->name);
-            $hasDefault[] = null !== $param->defaultVar;
+            $hasDef = null !== $param->defaultVar || null !== $param->defaultBlock;
+            $hasDefault[] = $hasDef;
+            $defaultExports[] = $hasDef ? self::formatParamDefaultExport($param) : null;
             $byRef[] = (bool) $param->byRef;
         }
         $isAbstract = 0 !== ($func->flags & Func::FLAG_ABSTRACT);
@@ -1073,7 +1093,8 @@ final class MethodSig
             $isFinal,
             $byRef,
             $isStatic,
-            $returnsByRef
+            $returnsByRef,
+            $defaultExports
         );
     }
 
@@ -1097,6 +1118,7 @@ final class MethodSig
         $params = [];
         $names = [];
         $hasDefault = [];
+        $defaultExports = [];
         $byRef = [];
         $returnType = null;
 
@@ -1123,6 +1145,9 @@ final class MethodSig
                 $hasDefault[] = isset($paramMetas[$i])
                     ? $paramMetas[$i]->isOptional
                     : false;
+                $defaultExports[] = isset($paramMetas[$i])
+                    ? self::inheritanceDefaultExportFromMetadata($paramMetas[$i]->defaultExport)
+                    : null;
                 $byRef[] = isset($paramMetas[$i])
                     ? $paramMetas[$i]->byRef
                     : false;
@@ -1137,6 +1162,7 @@ final class MethodSig
                 $params[] = TypeSig::fromDumpTypeString($meta->typeString);
                 $names[] = $meta->name;
                 $hasDefault[] = $meta->isOptional;
+                $defaultExports[] = self::inheritanceDefaultExportFromMetadata($meta->defaultExport);
                 $byRef[] = $meta->byRef;
             }
             if (isset($entry->methodReturnDeclaredTypes[$methodLc])) {
@@ -1176,7 +1202,8 @@ final class MethodSig
             $isFinal,
             $byRef,
             $isStatic,
-            $returnsByRef
+            $returnsByRef,
+            $defaultExports
         );
     }
 
@@ -1202,13 +1229,177 @@ final class MethodSig
         return 'param';
     }
 
+    /**
+     * Map Reflection dump defaults (NULL) to zend_inheritance error form (null).
+     */
+    private static function inheritanceDefaultExportFromMetadata(?string $defaultExport): ?string
+    {
+        if (null === $defaultExport || '' === $defaultExport) {
+            return null;
+        }
+        if ('NULL' === $defaultExport) {
+            return 'null';
+        }
+
+        return $defaultExport;
+    }
+
+    /**
+     * Zend inheritance fatal default fragment (zend_inheritance.c / zend_error).
+     *
+     * Prefer literal / const-foldable values; empty arrays render as `[]`.
+     * Named constants keep their identifier (e.g. SOME_CONST).
+     */
+    private static function formatParamDefaultExport(Op\Expr\Param $param): ?string
+    {
+        if (null === $param->defaultVar) {
+            return null;
+        }
+
+        return self::formatDefaultOperand($param->defaultVar);
+    }
+
+    private static function formatDefaultOperand(Operand $var): ?string
+    {
+        if ($var instanceof Operand\Literal) {
+            return self::formatLiteralDefaultValue($var->value);
+        }
+        $ops = $var->ops ?? [];
+        foreach ($ops as $op) {
+            if ($op instanceof Op\Expr\ConstFetch) {
+                $constName = self::operandStringName($op->name);
+                if (null === $constName) {
+                    return null;
+                }
+                $lc = strtolower(ltrim($constName, '\\'));
+                if ('null' === $lc) {
+                    return 'null';
+                }
+                if ('true' === $lc || 'false' === $lc) {
+                    return $lc;
+                }
+
+                return $constName;
+            }
+            if ($op instanceof Op\Expr\Array_) {
+                $n = is_countable($op->values ?? null) ? count($op->values) : 0;
+
+                return 0 === $n ? '[]' : null;
+            }
+            if ($op instanceof Op\Expr\BinaryOp) {
+                $folded = self::foldBinaryDefaultOp($op);
+                if (null !== $folded) {
+                    return self::formatLiteralDefaultValue($folded);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Fold compile-time numeric/string binary defaults (Zend shows the result, e.g. 1+2 → 3). */
+    private static function foldBinaryDefaultOp(Op\Expr\BinaryOp $op): int|float|string|null
+    {
+        $left = self::scalarOperandValue($op->left ?? null);
+        $right = self::scalarOperandValue($op->right ?? null);
+        if (null === $left || null === $right) {
+            return null;
+        }
+        if ($op instanceof Op\Expr\BinaryOp\Plus) {
+            return $left + $right;
+        }
+        if ($op instanceof Op\Expr\BinaryOp\Minus) {
+            return $left - $right;
+        }
+        if ($op instanceof Op\Expr\BinaryOp\Mul) {
+            return $left * $right;
+        }
+        if ($op instanceof Op\Expr\BinaryOp\Div) {
+            return 0 != $right ? $left / $right : null;
+        }
+        if ($op instanceof Op\Expr\BinaryOp\Concat) {
+            return (string) $left.(string) $right;
+        }
+
+        return null;
+    }
+
+    private static function scalarOperandValue(?Operand $op): int|float|string|null
+    {
+        if (null === $op) {
+            return null;
+        }
+        if ($op instanceof Operand\Literal) {
+            $v = $op->value;
+            if (is_int($v) || is_float($v) || is_string($v)) {
+                return $v;
+            }
+
+            return null;
+        }
+        // Nested temps (e.g. (1+2)+3) — recurse through producing BinaryOp.
+        foreach ($op->ops ?? [] as $prod) {
+            if ($prod instanceof Op\Expr\BinaryOp) {
+                return self::foldBinaryDefaultOp($prod);
+            }
+            if ($prod instanceof Op\Expr\ConstFetch) {
+                $name = self::operandStringName($prod->name);
+                if (null !== $name && 'null' === strtolower(ltrim($name, '\\'))) {
+                    return null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function formatLiteralDefaultValue(mixed $value): string
+    {
+        if (null === $value) {
+            return 'null';
+        }
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        if (is_string($value)) {
+            return var_export($value, true);
+        }
+        if (is_array($value) && [] === $value) {
+            return '[]';
+        }
+
+        return var_export($value, true);
+    }
+
+    private static function operandStringName(Operand $op): ?string
+    {
+        if ($op instanceof Operand\Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return self::operandStringName($op->name);
+        }
+
+        return null;
+    }
+
     public function formatParams(): string
     {
         $parts = [];
         foreach ($this->params as $i => $type) {
             $prefix = $type instanceof TypeSig ? $type->format().' ' : '';
             $amp = !empty($this->paramByRef[$i]) ? '&' : '';
-            $parts[] = $prefix.$amp.'$'.($this->paramNames[$i] ?? 'param');
+            $default = '';
+            if (!empty($this->paramHasDefault[$i])) {
+                $export = $this->paramDefaultExports[$i] ?? null;
+                if (null !== $export && '' !== $export) {
+                    $default = ' = '.$export;
+                }
+            }
+            $parts[] = $prefix.$amp.'$'.($this->paramNames[$i] ?? 'param').$default;
         }
 
         return implode(', ', $parts);
