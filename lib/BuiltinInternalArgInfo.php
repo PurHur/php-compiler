@@ -93,8 +93,8 @@ final class BuiltinInternalArgInfo
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
             'realpath' => 'string|false',
-            // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511)
-            'gzencode', 'gzdecode' => 'string|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511, #26342)
+            'gzencode', 'gzdecode', 'gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate' => 'string|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
