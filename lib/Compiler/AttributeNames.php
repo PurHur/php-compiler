@@ -156,6 +156,55 @@ final class AttributeNames
         );
     }
 
+    /** True when `#[\DelayedTargetValidation]` is present (#26241 / PHP 8.5). */
+    public static function hasDelayedTargetValidation(array $names): bool
+    {
+        foreach ($names as $name) {
+            $normalized = strtolower(ltrim((string) $name, '\\'));
+            if ('delayedtargetvalidation' === $normalized
+                || str_ends_with($normalized, '\\delayedtargetvalidation')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * PHP 8.5+ Zend compile-time guard (zend_attributes.c {@code validate_attribute}, #26241).
+     *
+     * `#[\Attribute]` on abstract class / interface / trait / enum is a CompileError unless
+     * `#[\DelayedTargetValidation]` is also present (error stored for ReflectionAttribute::newInstance).
+     *
+     * @param list<AttributeEntry> $entries mutated when deferring (sets {@see AttributeEntry::$validationError})
+     * @param 'abstract class'|'interface'|'trait'|'enum' $kind
+     */
+    public static function assertAttributeMetaOnConcreteClassLike(
+        array $entries,
+        string $kind,
+        string $display,
+    ): void {
+        if (!CompilerVersion::rejectsAttributeOnNonConcreteClassLike()) {
+            return;
+        }
+        if (!self::hasAttributeMetaClass(AttributeEntry::namesFromList($entries))) {
+            return;
+        }
+
+        $message = 'Cannot apply #[\\Attribute] to '.$kind.' '.$display;
+        if (self::hasDelayedTargetValidation(AttributeEntry::namesFromList($entries))) {
+            foreach ($entries as $entry) {
+                if ($entry instanceof AttributeEntry && self::hasAttributeMetaClass([$entry->name])) {
+                    $entry->validationError = $message;
+                }
+            }
+
+            return;
+        }
+
+        throw new \CompileError($message);
+    }
+
     /**
      * Zend compile-time guard (zend_compile.c, issue #7299).
      * `#[\AllowDynamicProperties]` and `readonly class` are mutually exclusive.
