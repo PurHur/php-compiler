@@ -72,6 +72,58 @@ final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
 
         $single = ArrayMergeRecursiveJitHelper::mergeSingleCopy($left);
         $this->assertSame(1, $single->find('a')?->resolveIndirect()->toInt());
+
+        // Top-level int keys renumber (#26559); nested string-key path keeps dest ints.
+        $intLeft = self::indexTable([1 => 'a']);
+        $intRight = self::indexTable([1 => 'b']);
+        $intMerged = ArrayMergeRecursiveJitHelper::mergeTwo($intLeft, $intRight);
+        $this->assertSame(['a', 'b'], self::readStringList($intMerged));
+
+        $nestedLeft = self::mapTableNested(['k' => [1 => 'a']]);
+        $nestedRight = self::mapTableNested(['k' => [1 => 'b']]);
+        $nested = ArrayMergeRecursiveJitHelper::mergeTwo($nestedLeft, $nestedRight);
+        $k = $nested->find('k')?->resolveIndirect()->toArray();
+        $this->assertNotNull($k);
+        $this->assertSame('a', $k->findIndex(1)?->resolveIndirect()->toString());
+        $this->assertSame('b', $k->findIndex(2)?->resolveIndirect()->toString());
+    }
+
+    /** @param array<int, string> $pairs */
+    private static function indexTable(array $pairs): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($pairs as $key => $value) {
+            $v = new Variable();
+            $v->string($value);
+            $ht->addIndex($key, $v);
+        }
+
+        return $ht;
+    }
+
+    /** @param array<string, array<int, string>> $pairs */
+    private static function mapTableNested(array $pairs): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($pairs as $key => $inner) {
+            $innerHt = self::indexTable($inner);
+            $v = new Variable();
+            $v->array($innerHt);
+            $ht->add($key, $v);
+        }
+
+        return $ht;
+    }
+
+    /** @return list<string> */
+    private static function readStringList(HashTable $ht): array
+    {
+        $out = [];
+        foreach ($ht->iterate(true) as $value) {
+            $out[] = $value->resolveIndirect()->toString();
+        }
+
+        return $out;
     }
 
     /** @param array<string, int> $pairs */
