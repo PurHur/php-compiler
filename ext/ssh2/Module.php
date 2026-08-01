@@ -53,6 +53,7 @@ class Module extends ModuleAbstract
             new ssh2_auth_password(),
             new ssh2_auth_none(),
             new ssh2_auth_agent(),
+            new ssh2_auth_hostbased_file(),
             new ssh2_methods_negotiated(),
             new ssh2_auth_pubkey_file(),
             new ssh2_fingerprint(),

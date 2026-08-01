@@ -335,6 +335,86 @@ final class ssh2_methods_negotiated extends Ssh2Function
 }
 
 /**
+ * ssh2_auth_hostbased_file(
+ *   resource $session,
+ *   string $username,
+ *   string $hostname,
+ *   string $pubkeyfile,
+ *   string $privkeyfile,
+ *   ?string $passphrase = null,
+ *   ?string $local_username = null
+ * ): bool
+ *
+ * Hostbased pubkey auth (PECL ssh2_auth_hostbased_file; #26714).
+ */
+final class ssh2_auth_hostbased_file extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_auth_hostbased_file');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 5 || $argc > 7) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_auth_hostbased_file() expects between 5 and 7 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_auth_hostbased_file', 1);
+        $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_auth_hostbased_file', 2, 'username');
+        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_auth_hostbased_file', 3, 'hostname');
+        $pubkey = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'ssh2_auth_hostbased_file', 4, 'pubkeyfile');
+        $privkey = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'ssh2_auth_hostbased_file', 5, 'privkeyfile');
+        $passphrase = null;
+        if ($argc >= 6 && Variable::TYPE_NULL !== $frame->calledArgs[5]->resolveIndirect()->type) {
+            $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[5], 'ssh2_auth_hostbased_file', 6, 'passphrase');
+        }
+        $localUser = $user;
+        if ($argc >= 7 && Variable::TYPE_NULL !== $frame->calledArgs[6]->resolveIndirect()->type) {
+            $localUser = VmString::coerceStringBuiltinArg($frame->calledArgs[6], 'ssh2_auth_hostbased_file', 7, 'local_username');
+        }
+        if ('' === $user) {
+            throw new \ValueError('ssh2_auth_hostbased_file(): Argument #2 ($username) must not be empty');
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error(
+                'ssh2_auth_hostbased_file(): Authentication failed for '.$user.' using hostbased public key',
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!VmSsh2Native::authHostbasedFromFile(
+            $native,
+            $user,
+            $hostname,
+            $pubkey,
+            $privkey,
+            $passphrase,
+            $localUser
+        )) {
+            @\trigger_error(
+                'ssh2_auth_hostbased_file(): Authentication failed for '.$user.' using hostbased public key',
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        VmSsh2Session::markAuthed($session);
+        $frame->returnVar->bool(true);
+    }
+}
+
+/**
  * ssh2_auth_agent(resource $session, string $username): bool
  *
  * Authenticate via local ssh-agent (PECL ssh2_auth_agent; #26713).
