@@ -11882,7 +11882,7 @@ class JIT {
         }
         if (null !== $block->returnClassConstraint) {
             $label = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
-            if ($block->isGenerator && in_array($label, ['Generator', 'Iterator', 'Traversable'], true)) {
+            if ($block->isGenerator && in_array($label, ['Generator', 'Iterator', 'Traversable', 'iterable', 'object'], true)) {
                 return false;
             }
 
