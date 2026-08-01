@@ -1705,6 +1705,12 @@ final class BuiltinParamNames
             case 'stat':
             case 'lstat':
                 return ['filename'];
+            // php-src ext/intl/intl_error.stub.php — InternalArgInfo still says error_code (#25587)
+            case 'intl_error_name':
+                return ['errorCode'];
+            // php-src ext/intl/resourcebundle/resourcebundle.stub.php — bundlename + fallback infer false (#25587)
+            case 'resourcebundle_create':
+                return ['locale', 'bundle', 'fallback='];
             case 'msgfmt_create':
                 return ['locale', 'pattern'];
             case 'msgfmt_format':

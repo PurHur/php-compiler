@@ -142,6 +142,8 @@ final class BuiltinInternalArgInfo
             'mb_convert_encoding' => 'array|string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
+            // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
+            'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
@@ -440,6 +442,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
+            // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25587)
+            'resourcebundle_create' => ($index === 0 || $index === 1) ? '?string' : null,
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
