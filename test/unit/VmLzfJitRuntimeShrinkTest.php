@@ -6,7 +6,11 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** lzf_* JIT lowering via LzfJitHelper — no native liblzf (#6384, #8805). */
+/**
+ * lzf_* JIT lowering via LzfJitHelper — no native liblzf (#6384, #8805).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (#26649, peer #26596).
+ */
 final class VmLzfJitRuntimeShrinkTest extends TestCase
 {
     public function testLzfCompressCallUsesJitLzf(): void
@@ -28,8 +32,21 @@ final class VmLzfJitRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLzf.php');
         $this->assertStringContainsString('LzfJitHelper::compress', $source);
         $this->assertStringContainsString('LzfJitHelper::decompress', $source);
+        $this->assertStringContainsString('/ext/lzf/LzfJitHelper.php', $source);
         $this->assertStringNotContainsString('NativeDlopen', $source);
         $this->assertStringNotContainsString('liblzf', $source);
+    }
+
+    public function testStringLzfUsesJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLzf.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString("putenv('PHP_COMPILER_SELFHOST_AOT", $source);
     }
 
     /** AOT link no longer embeds bundled liblzf (#8805). */
