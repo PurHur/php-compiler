@@ -864,4 +864,78 @@ PHP;
         $this->expectExceptionMessage('S::__toString(): Return type must be string when declared');
         $runtime->parseAndCompile($code, 'stringable_int_tostring.php');
     }
+
+    /** Two traits with incompatible abstract return types (#26381, Zend/zend_inheritance.c). */
+    public function testIncompatibleTraitAbstractReturnTypesFailAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T1 { abstract public function f(): int; }
+trait T2 { abstract public function f(): string; }
+class C {
+    use T1, T2;
+    public function f(): int { return 1; }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of C::f(): int must be compatible with T2::f(): string');
+        $runtime->parseAndCompile($code, 'trait_abs_return_conflict.php');
+    }
+
+    /** Two traits with incompatible abstract parameter types (#26381). */
+    public function testIncompatibleTraitAbstractParamTypesFailAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T1 { abstract public function f(int $x); }
+trait T2 { abstract public function f(string $x); }
+class C {
+    use T1, T2;
+    public function f(int $x) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of C::f(int $x) must be compatible with T2::f(string $x)');
+        $runtime->parseAndCompile($code, 'trait_abs_param_conflict.php');
+    }
+
+    /** Trait-vs-trait abstract conflict when composing class has no method (#26381). */
+    public function testTraitVersusTraitAbstractConflictWithoutClassMethod(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T1 { abstract public function f(): int; }
+trait T2 { abstract public function f(): string; }
+abstract class C {
+    use T1, T2;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of T1::f(): int must be compatible with T2::f(): string');
+        $runtime->parseAndCompile($code, 'trait_abs_vs_trait.php');
+    }
+
+    /** Compatible identical trait abstracts compose (#26381). */
+    public function testCompatibleTraitAbstractsAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T1 { abstract public function f(): int; }
+trait T2 { abstract public function f(): int; }
+class C {
+    use T1, T2;
+    public function f(): int { return 1; }
+}
+echo (new C)->f(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_abs_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }

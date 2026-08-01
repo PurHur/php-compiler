@@ -11,13 +11,15 @@ use PHPCfg\Op\Stmt\ClassLike;
 use PHPCfg\Op\Stmt\ClassMethod;
 use PHPCfg\Op\Stmt\Interface_;
 use PHPCfg\Op\Stmt\Trait_;
+use PHPCfg\Op\Stmt\TraitUse;
 use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
  * Compile-time parameter contravariance / return covariance, staticness,
- * abstract-from-concrete, and visibility (Zend zend_inheritance.c, issues
- * #3323, #25634, #25660, #25662).
+ * abstract-from-concrete, visibility, and trait abstract signature composition
+ * (Zend zend_inheritance.c / zend_traits.c, issues #3323, #25634, #25660,
+ * #25662, #26381).
  *
  * Visibility applies to concrete overrides and abstract→concrete implementations:
  * child must be the parent visibility or weaker (public > protected > private).
@@ -49,6 +51,13 @@ final class InheritanceVariance
 
     /** @var array<string, array<string, MethodSig>> */
     private array $methods = [];
+
+    /**
+     * Composing-class trait use lists in source order (Zend zend_traits.c flatten).
+     *
+     * @var array<string, list<string>>
+     */
+    private array $classTraitUses = [];
 
     /**
      * @param callable(string): void $report
@@ -89,6 +98,7 @@ final class InheritanceVariance
             : null;
         $this->implements[$lc] = $this->interfaceNamesFromOperands($class->implements);
         $this->methods[$lc] = $this->extractMethods($class, $lc);
+        $this->classTraitUses[$lc] = $this->collectTraitUses($class);
     }
 
     private function indexInterface(Interface_ $iface): void
@@ -208,6 +218,117 @@ final class InheritanceVariance
                 }
             }
         }
+
+        $this->validateTraitComposition($childLc, $class, $childName, $childMethods, $report);
+    }
+
+    /**
+     * Trait abstract (and concrete) method signatures must be mutually compatible under
+     * zend_inheritance.c / zend_traits.c composition (#26381).
+     *
+     * When the composing class declares the method, check that body against each used trait
+     * (class methods take precedence over trait abstracts). Otherwise check earlier traits as
+     * overrides of later traits in use-list order.
+     *
+     * @param array<string, MethodSig> $childMethods
+     * @param callable(string): void   $report
+     */
+    private function validateTraitComposition(
+        string $childLc,
+        Class_ $class,
+        string $childName,
+        array $childMethods,
+        callable $report
+    ): void {
+        $traitLcs = $this->classTraitUses[$childLc] ?? [];
+        if (count($traitLcs) < 1) {
+            return;
+        }
+
+        /** @var array<string, list<array{lc: string, name: string, sig: MethodSig}>> */
+        $byMethod = [];
+        foreach ($traitLcs as $traitLc) {
+            if (!isset($this->units[$traitLc]) || !($this->units[$traitLc] instanceof Trait_)) {
+                continue;
+            }
+            $traitMethods = $this->methods[$traitLc] ?? [];
+            $traitName = $this->displayNameFromOperand($this->units[$traitLc]->name) ?? $traitLc;
+            foreach ($traitMethods as $methodLc => $sig) {
+                $byMethod[$methodLc][] = [
+                    'lc' => $traitLc,
+                    'name' => $traitName,
+                    'sig' => $sig,
+                ];
+            }
+        }
+
+        foreach ($byMethod as $methodLc => $sources) {
+            if (isset($childMethods[$methodLc])) {
+                $childSig = $childMethods[$methodLc];
+                foreach ($sources as $source) {
+                    $msg = $this->compatibilityError(
+                        $childName,
+                        $methodLc,
+                        $childSig,
+                        $source['name'],
+                        $source['sig']
+                    );
+                    if (null !== $msg) {
+                        $this->reportWithLocation($class, $methodLc, $msg, $report);
+                    }
+                }
+                continue;
+            }
+
+            $n = count($sources);
+            for ($i = 0; $i < $n; ++$i) {
+                for ($j = $i + 1; $j < $n; ++$j) {
+                    $earlier = $sources[$i];
+                    $later = $sources[$j];
+                    $msg = $this->compatibilityError(
+                        $earlier['name'],
+                        $methodLc,
+                        $earlier['sig'],
+                        $later['name'],
+                        $later['sig']
+                    );
+                    if (null !== $msg) {
+                        $traitUnit = $this->units[$earlier['lc']];
+                        if ($traitUnit instanceof Trait_) {
+                            $this->reportWithLocation($traitUnit, $methodLc, $msg, $report);
+                        } else {
+                            $report($msg);
+                        }
+
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @return list<string> trait name LCs in use order (duplicate uses skipped)
+     */
+    private function collectTraitUses(Class_ $class): array
+    {
+        $traits = [];
+        $seen = [];
+        foreach ($class->stmts->children as $member) {
+            if (!$member instanceof TraitUse) {
+                continue;
+            }
+            foreach ($member->traits as $traitOperand) {
+                $traitLc = $this->classLcFromOperand($traitOperand);
+                if (null === $traitLc || isset($seen[$traitLc])) {
+                    continue;
+                }
+                $seen[$traitLc] = true;
+                $traits[] = $traitLc;
+            }
+        }
+
+        return $traits;
     }
 
     /**
