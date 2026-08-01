@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6702 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21597 |
+| Source constructs flagged (warnings) | 21599 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4829,7 +4829,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Compiler/CompileFatal.php` | 0 | 1 |
 | `lib/Compiler/DeprecatedMetadata.php` | 0 | 6 |
 | `lib/Compiler/EnumAbstractMethodCompileCheck.php` | 0 | 4 |
-| `lib/Compiler/EnumBackedCaseCheck.php` | 0 | 4 |
+| `lib/Compiler/EnumBackedCaseCheck.php` | 0 | 5 |
 | `lib/Compiler/EnumMagicMethodCheck.php` | 0 | 3 |
 | `lib/Compiler/EnumParentCompileCheck.php` | 0 | 3 |
 | `lib/Compiler/FinalClassConstCheck.php` | 0 | 4 |
@@ -5865,7 +5865,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
-| `lib/JIT/SuperglobalInit.php` | 0 | 4 |
+| `lib/JIT/SuperglobalInit.php` | 0 | 5 |
 | `lib/JIT/TryCatchHelper.php` | 0 | 8 |
 | `lib/JIT/TryCatchState.php` | 0 | 2 |
 | `lib/JIT/TypeCheck.php` | 0 | 1 |
@@ -42111,7 +42111,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 812)
+- new InternalArgInfo (line 826)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -42127,8 +42127,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2090)
-- new ArgumentCountError (line 2101)
+- new ArgumentCountError (line 2091)
+- new ArgumentCountError (line 2102)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -42802,10 +42802,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/EnumBackedCaseCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 50)
-- new CompileFatal (line 79)
-- new CompileFatal (line 105)
-- 11 class method(s)
+- new self (line 51)
+- new CompileFatal (line 82)
+- new CompileFatal (line 107)
+- new CompileFatal (line 132)
+- 12 class method(s)
 
 ### `lib/Compiler/EnumMagicMethodCheck.php`
 
@@ -47912,18 +47913,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeSetTimezone (line 1082)
 - new Result (line 1450)
 - new Result (line 1472)
-- new Variable (line 2119)
-- new Variable (line 2256)
-- new Variable (line 2510)
-- new Variable (line 2568)
-- new VMVariable (line 2730)
-- new VMVariable (line 2746)
-- new VMVariable (line 2752)
-- new VMVariable (line 2758)
-- new VMVariable (line 2769)
-- new Variable (line 2799)
-- new Variable (line 2839)
-- 105 class method(s)
+- new Variable (line 2145)
+- new Variable (line 2282)
+- new Variable (line 2536)
+- new Variable (line 2594)
+- new VMVariable (line 2756)
+- new VMVariable (line 2772)
+- new VMVariable (line 2778)
+- new VMVariable (line 2784)
+- new VMVariable (line 2795)
+- new Variable (line 2825)
+- new Variable (line 2865)
+- 106 class method(s)
 - 32 closure(s)
 
 ### `lib/JIT/DnfParamCheck.php`
@@ -48850,9 +48851,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SuperglobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 296)
-- new Variable (line 310)
-- new VMVariable (line 362)
+- new Variable (line 305)
+- new Variable (line 324)
+- new Variable (line 335)
+- new VMVariable (line 389)
 - 13 class method(s)
 
 ### `lib/JIT/TryCatchHelper.php`
@@ -48947,21 +48949,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new self (line 742)
 - new self (line 755)
 - new self (line 765)
-- new Variable (line 908)
-- new Variable (line 924)
-- new Variable (line 933)
-- new Variable (line 963)
-- new Variable (line 1009)
-- new Variable (line 1031)
-- new Variable (line 1045)
-- new Variable (line 1078)
-- new Variable (line 1102)
-- new Variable (line 1123)
-- new Variable (line 1145)
-- new Variable (line 1198)
-- new Variable (line 1249)
-- new Variable (line 1262)
-- new self (line 1332)
+- new Variable (line 919)
+- new Variable (line 935)
+- new Variable (line 944)
+- new Variable (line 974)
+- new Variable (line 1020)
+- new Variable (line 1042)
+- new Variable (line 1056)
+- new Variable (line 1089)
+- new Variable (line 1113)
+- new Variable (line 1134)
+- new Variable (line 1156)
+- new Variable (line 1209)
+- new Variable (line 1260)
+- new Variable (line 1273)
+- new self (line 1343)
 - 23 class method(s)
 
 ### `lib/JIT/VariableFunctionCallHelper.php`
