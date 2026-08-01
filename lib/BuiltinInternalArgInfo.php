@@ -91,6 +91,8 @@ final class BuiltinInternalArgInfo
             'file_put_contents', 'fwrite' => 'int|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
+            // ext/standard/file.stub.php — InternalArgInfo omits |false (#26357, re-#23921)
+            'stream_get_line' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
