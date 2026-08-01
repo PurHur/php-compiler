@@ -57496,7 +57496,40 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: mutating a const/class-const array is a compile-time fatal (#6935, #5409).
+     * Any ConstFetch / ClassConstFetch (registered or not).
+     *
+     * Zend rejects dim/prop write and assign-by-ref on constant fetches as
+     * "temporary expression in write context" even when the name is undefined
+     * or only exists via runtime define() (#5409, #26488). Registration in
+     * compileTimeGlobalConsts must not gate this — #17676 correctly stopped
+     * seeding define() array values for folding, which regressed write-context.
+     */
+    protected function operandIsConstOrClassConstFetch(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr\ConstFetch || $root instanceof Op\Expr\ClassConstFetch) {
+            return true;
+        }
+        if (null === $block || null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\ConstFetch && !$child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($this->unwrapOperandChain($child->result) === $root) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_compile.c: mutating a const/class-const array is a compile-time fatal (#6935, #5409, #26488).
      */
     protected function lvalueContainsGlobalConstFetch(?Operand $operand, ?Block $block = null): bool
     {
@@ -57507,7 +57540,7 @@ class Compiler {
             if ($operand->original instanceof Op\Expr\PropertyFetch) {
                 /** @var Op\Expr\PropertyFetch $propFetch */
                 $propFetch = $operand->original;
-                if ($this->operandIsCompileTimeConstFetch($propFetch->var, $block)) {
+                if ($this->operandIsConstOrClassConstFetch($propFetch->var, $block)) {
                     return true;
                 }
 
@@ -57516,7 +57549,7 @@ class Compiler {
             if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
                 /** @var Op\Expr\ArrayDimFetch $dimFetch */
                 $dimFetch = $operand->original;
-                if ($this->operandIsCompileTimeConstFetch($dimFetch->var, $block)) {
+                if ($this->operandIsConstOrClassConstFetch($dimFetch->var, $block)) {
                     return true;
                 }
 
@@ -57528,7 +57561,7 @@ class Compiler {
         if (null !== $block->orig) {
             $propFetch = $this->findPropertyFetchForResult($operand, $block);
             if (null !== $propFetch) {
-                if ($this->operandIsCompileTimeConstFetch($propFetch->var, $block)) {
+                if ($this->operandIsConstOrClassConstFetch($propFetch->var, $block)) {
                     return true;
                 }
 
@@ -57536,7 +57569,7 @@ class Compiler {
             }
             $dimFetch = $this->findArrayDimFetchForResult($operand, $block);
             if (null !== $dimFetch) {
-                if ($this->operandIsCompileTimeConstFetch($dimFetch->var, $block)) {
+                if ($this->operandIsConstOrClassConstFetch($dimFetch->var, $block)) {
                     return true;
                 }
 
@@ -57544,7 +57577,7 @@ class Compiler {
             }
         }
 
-        return $this->operandIsCompileTimeConstFetch($operand, $block);
+        return $this->operandIsConstOrClassConstFetch($operand, $block);
     }
 
     /**
