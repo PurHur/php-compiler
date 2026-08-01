@@ -898,6 +898,8 @@ final class VmSerialize
         ?Frame $frame = null
     ): Variable {
         $entry = new ObjectEntry($class);
+        // Zend marks the object constructed before/around __wakeup (var_unserializer.c; #26673).
+        $entry->constructed = true;
         self::restoreObjectProperties($ctx, $entry, $data, $frame);
         $method = self::resolveInstanceMethod($ctx, $class, '__wakeup');
         if ($method instanceof VmClassMethod) {
@@ -1555,16 +1557,7 @@ final class VmSerialize
     ): void {
         $vm = $ctx->runtime->vm();
         foreach ($data as $name => $raw) {
-            $propName = (string) $name;
-            $value = VmJson::import($raw);
-            if (null !== $frame) {
-                $vm->assignUnserializeProperty($entry, $propName, $value, $frame);
-                continue;
-            }
-            $prop = $entry->hasProperty($propName)
-                ? $entry->getProperty($propName)
-                : $entry->allocateProperty($propName);
-            $prop->copyFrom($value);
+            $vm->assignUnserializeProperty($entry, (string) $name, VmJson::import($raw), $frame);
         }
     }
 

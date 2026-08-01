@@ -148,14 +148,7 @@ final class VmUnserializeFormat
             $localCanonical = [];
             $localSlotForCell = [];
             $value = self::cellToVariableWithContext($ctx, $child, $localCanonical, $localSlotForCell, $frame);
-            if (null !== $frame) {
-                $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
-                continue;
-            }
-            $prop = $entry->hasProperty((string) $name)
-                ? $entry->getProperty((string) $name)
-                : $entry->allocateProperty((string) $name);
-            $prop->copyFrom($value);
+            $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
         }
 
         return $objectVar;
@@ -723,14 +716,7 @@ final class VmUnserializeFormat
             foreach ($payload->properties as $name => $child) {
                 \assert($child instanceof VmUnserializeCell);
                 $value = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
-                if (null !== $frame) {
-                    $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
-                    continue;
-                }
-                $prop = $entry->hasProperty((string) $name)
-                    ? $entry->getProperty((string) $name)
-                    : $entry->allocateProperty((string) $name);
-                $prop->copyFrom($value);
+                $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
             }
 
             return $objectVar;
