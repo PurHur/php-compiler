@@ -46,11 +46,9 @@ final class array_merge_recursive extends Internal
             'array_merge_recursive',
             1
         );
-        if (1 === $argc) {
-            $frame->returnVar->array($first->duplicate());
-
-            return;
-        }
+        // Always merge into a fresh table so int keys renumber (php-src empty dest +
+        // php_array_merge_recursive per arg). A plain duplicate would preserve sparse
+        // keys on the single-arg path (#26559).
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
             $others[] = VmArray::requireArrayArgNum(

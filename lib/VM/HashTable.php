@@ -1230,16 +1230,35 @@ final class HashTable {
     }
 
     /**
-     * array_merge_recursive(): copy this array, then merge each source recursively.
+     * array_merge_recursive(): merge this array and each source recursively.
      *
-     * php-src: ext/standard/array.c — php_array_merge_recursive()
+     * php-src: ext/standard/array.c — PHP_FUNCTION(array_merge_recursive) starts with an
+     * empty HashTable then php_array_merge_recursive(dest, each arg). Integer keys from
+     * every operand (including the first) therefore renumber via next_index_insert —
+     * matching array_merge (#26559). Nested string-key collisions keep the destination
+     * table's existing int keys and only append from the overlay (see mergeRecursiveOverlay).
      *
      * @param HashTable ...$others
      */
     public function mergeRecursiveCopy(HashTable ...$others): HashTable
     {
         $out = new self();
-        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+        self::mergeRecursiveOverlay($out, $this);
+        foreach ($others as $other) {
+            self::mergeRecursiveOverlay($out, $other);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Key-preserving duplicate of a table for nested recursive merge destinations.
+     * Unlike mergeRecursiveCopy, int keys are kept (php-src SEPARATE_ARRAY + in-place merge).
+     */
+    private static function mergeRecursiveDuplicateTable(HashTable $src): HashTable
+    {
+        $out = new self();
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
             $copy->duplicateFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
@@ -1247,9 +1266,6 @@ final class HashTable {
             } else {
                 $out->add($key->toString(), $copy);
             }
-        }
-        foreach ($others as $other) {
-            self::mergeRecursiveOverlay($out, $other);
         }
 
         return $out;
@@ -1271,7 +1287,10 @@ final class HashTable {
                     $existing = $existing->resolveIndirect();
                     $overlay = $copy->resolveIndirect();
                     if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
-                        $merged = $existing->toArray()->mergeRecursiveCopy($overlay->toArray());
+                        // php-src: SEPARATE_ARRAY(dest_entry); php_array_merge_recursive(dest, src)
+                        // — preserve dest int keys; only append int keys from src (#26559).
+                        $merged = self::mergeRecursiveDuplicateTable($existing->toArray());
+                        self::mergeRecursiveOverlay($merged, $overlay->toArray());
                         $slot = $dest->find($k);
                         if (null !== $slot) {
                             $slot->array($merged);
