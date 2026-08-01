@@ -1214,6 +1214,10 @@ final class BuiltinParamNames
             case 'convert_uuencode':
             case 'convert_uudecode':
                 return ['string'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says data (#26235)
+            case 'utf8_encode':
+            case 'utf8_decode':
+                return ['string'];
             case 'resetaslazyghost':
                 return ['object', 'initializer', 'options'];
             // php-src Zend/zend_builtin_functions.stub.php — string|int $status = 0 only (#23957; reverts #6718 two-arg)
