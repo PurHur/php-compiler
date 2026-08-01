@@ -672,6 +672,13 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'null'],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/xml/xml.stub.php — separator=":"; &$index = null (string/untyped; no infer) (#26687)
+        'xml_parser_create_ns' => [
+            1 => ['kind' => 'string', 'value' => ':'],
+        ],
+        'xml_parse_into_struct' => [
+            3 => ['kind' => 'null'],
+        ],
         // php-src ext/libxml/libxml.stub.php — ?bool $use_errors = null (bool infer → false) (#25844)
         'libxml_use_internal_errors' => [
             0 => ['kind' => 'null'],

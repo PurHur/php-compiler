@@ -189,6 +189,9 @@ final class BuiltinInternalArgInfo
             // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / true (#26319)
             'xml_parser_create' => 'XMLParser',
             'xml_set_object' => 'true',
+            // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / int|false (#26687)
+            'xml_parser_create_ns' => 'XMLParser',
+            'xml_parse_into_struct' => 'int|false',
             // ext/xml/xml.stub.php — InternalArgInfo return int; Zend true (#26589)
             'xml_set_character_data_handler',
             'xml_set_default_handler',
@@ -662,6 +665,14 @@ final class BuiltinInternalArgInfo
             'xml_set_object' => 0 === $index ? 'XMLParser' : null,
             'xml_parser_create' => 0 === $index ? '?string' : null,
             'xml_parse' => 0 === $index ? 'XMLParser' : null,
+            // ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687)
+            'xml_parser_create_ns' => 0 === $index ? '?string' : null,
+            'xml_parse_into_struct' => match ($index) {
+                0 => 'XMLParser',
+                // Zend @param array but ReflectionParameter type is empty (#26687)
+                2, 3 => '',
+                default => null,
+            },
             // ext/xml/xml.stub.php — XMLParser + untyped handler; InternalArgInfo hdl:string (#26589)
             'xml_set_character_data_handler',
             'xml_set_default_handler',

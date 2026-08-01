@@ -1809,6 +1809,12 @@ final class BuiltinParamNames
             // php-src ext/xml/xml.stub.php — InternalArgInfo still says isfinal (#23605)
             case 'xml_parse':
                 return ['parser', 'data', 'is_final='];
+            // php-src ext/xml/xml.stub.php — InternalArgInfo still has sep= (#26687)
+            case 'xml_parser_create_ns':
+                return ['encoding=', 'separator='];
+            // php-src ext/xml/xml.stub.php — values/index by-ref; InternalArgInfo types array (#26687)
+            case 'xml_parse_into_struct':
+                return ['parser', 'data', '&values', '&index='];
             // php-src ext/libxml/libxml.stub.php — InternalArgInfo still says streams_context (#26236)
             case 'libxml_set_streams_context':
                 return ['context'];
