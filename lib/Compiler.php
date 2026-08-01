@@ -66,6 +66,7 @@ use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\MagicMethodStaticCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
 use PHPCompiler\Compiler\DuplicateUnionMemberCompileCheck;
+use PHPCompiler\Compiler\RedundantObjectClassUnionCompileCheck;
 use PHPCompiler\Compiler\IntersectionTypeMemberCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
@@ -7538,7 +7539,7 @@ class Compiler {
     /**
      * Zend: only class/interface types may appear in intersection types (#26401);
      * duplicate intersection members are redundant (#26605); duplicate union arms
-     * are redundant (#26556).
+     * are redundant (#26556); object + class/interface is redundant (#26563).
      */
     protected function assertIntersectionTypeMembers(?Op\Type $type): void
     {
@@ -7553,6 +7554,10 @@ class Compiler {
         $unionDup = DuplicateUnionMemberCompileCheck::findDuplicateMemberName($type);
         if (null !== $unionDup) {
             $this->throwCompileError(DuplicateUnionMemberCompileCheck::duplicateMessageFor($unionDup));
+        }
+        if (RedundantObjectClassUnionCompileCheck::isRedundant($type)) {
+            $label = $this->dnfTypeLabelFromCfgType($type);
+            $this->throwCompileError(RedundantObjectClassUnionCompileCheck::messageFor($label));
         }
     }
 
