@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6701 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21599 |
+| Source constructs flagged (warnings) | 21598 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6539,7 +6539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/UserParamErrorContext.php` | 0 | 2 |
 | `lib/VM/ValueEchoJitHelper.php` | 0 | 1 |
 | `lib/VM/ValueEchoSupport.php` | 0 | 1 |
-| `lib/VM/Variable.php` | 0 | 35 |
+| `lib/VM/Variable.php` | 0 | 34 |
 | `lib/VM/VariableFunctionCall.php` | 0 | 1 |
 | `lib/VM/VariableFunctionCallJitHelper.php` | 0 | 2 |
 | `lib/VM/VariableObject.php` | 0 | 1 |
@@ -54065,37 +54065,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 298)
 - new HashTable (line 302)
 - new Error (line 750)
-- new Error (line 930)
-- new Error (line 941)
-- new self (line 1322)
-- new Error (line 1359)
-- new Variable (line 1513)
-- new EnumCaseEntry (line 1515)
-- new self (line 2062)
-- new self (line 2095)
-- new self (line 2267)
-- new self (line 2275)
-- new self (line 2283)
-- new self (line 2285)
-- new self (line 2542)
-- new ArithmeticError (line 2659)
-- new self (line 2679)
-- new self (line 2787)
-- new Error (line 2794)
-- new DivisionByZeroError (line 2899)
-- new DivisionByZeroError (line 2906)
-- new self (line 2966)
-- new Error (line 2998)
-- new self (line 3019)
-- new self (line 3033)
-- new Error (line 3066)
-- new self (line 3087)
-- new self (line 3095)
-- new Error (line 3285)
-- new Error (line 3291)
-- new Error (line 3316)
-- new Error (line 3324)
-- 133 class method(s)
+- new Error (line 924)
+- new Error (line 935)
+- new self (line 1316)
+- new Error (line 1353)
+- new Variable (line 1507)
+- new EnumCaseEntry (line 1509)
+- new self (line 2065)
+- new self (line 2237)
+- new self (line 2245)
+- new self (line 2253)
+- new self (line 2255)
+- new self (line 2512)
+- new ArithmeticError (line 2629)
+- new self (line 2649)
+- new self (line 2757)
+- new Error (line 2764)
+- new DivisionByZeroError (line 2869)
+- new DivisionByZeroError (line 2876)
+- new self (line 2936)
+- new Error (line 2968)
+- new self (line 2989)
+- new self (line 3003)
+- new Error (line 3036)
+- new self (line 3057)
+- new self (line 3065)
+- new Error (line 3255)
+- new Error (line 3261)
+- new Error (line 3286)
+- new Error (line 3294)
+- 132 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
 
