@@ -418,6 +418,7 @@
         "ext/dom/JitDomXPathQueryUserScript.php",
         "ext/dom/LivingImplementationCreateDocument.php",
         "ext/dom/LivingImplementationCreateDocumentType.php",
+        "ext/dom/LivingPrivateConstruct.php",
         "ext/dom/LivingXPathConstruct.php",
         "ext/dom/Module.php",
         "ext/dom/NamedNodeMapCount.php",
@@ -6888,9 +6889,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6654,
+        "inventory_files": 6655,
         "excluded": 0,
-        "eligible": 6654,
+        "eligible": 6655,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
