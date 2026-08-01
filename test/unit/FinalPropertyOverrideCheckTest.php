@@ -38,6 +38,34 @@ PHP;
         self::assertSame("a\n", ob_get_clean());
     }
 
+    /**
+     * @covers issue #26222 / #22341 — ReflectionProperty::IS_FINAL must resolve from the
+     * VM ClassEntry (case-sensitive keys, #25910), not only via host native fallback.
+     * Plain final remains inheritance-only for writes (php-src-strict, #23683).
+     */
+    public function testReflectionPropertyIsFinalConstantAndModifiers(): void
+    {
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public final int $x = 1;
+}
+$r = new ReflectionProperty('C', 'x');
+echo 'isFinal=', $r->isFinal() ? '1' : '0', "\n";
+echo 'IS_FINAL=', ReflectionProperty::IS_FINAL, "\n";
+echo 'bit=', ($r->getModifiers() & ReflectionProperty::IS_FINAL) ? '1' : '0', "\n";
+$c = new C();
+$c->x = 2;
+echo 'wrote=', $c->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_plain_is_final_const.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("isFinal=1\nIS_FINAL=32\nbit=1\nwrote=2\n", ob_get_clean());
+    }
+
     public function testPlainFinalPropertyRejectedOnReferenceProfile(): void
     {
         putenv('PHP_COMPILER_PROFILE');
