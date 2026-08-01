@@ -50,6 +50,7 @@
             <file>./test/compliance/TraitSelfClassStaticComposingVMTest.php</file>
             <file>./test/compliance/MagicConstClassInTraitVMTest.php</file>
             <file>./test/compliance/LspSelfResolveVMTest.php</file>
+            <file>./test/compliance/InterfaceConstAmbiguityVMTest.php</file>
             <file>./test/compliance/GeneratorJITTest.php</file>
             <file>./test/compliance/VisibilityTest.php</file>
             <file>./test/compliance/VisibilityJitTest.php</file>
