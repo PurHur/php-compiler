@@ -10,7 +10,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** ObGzhandlerJitRuntime must route through ObGzhandlerJitHelper PHP, not LLVM handler body (#9091, #9798, #12881). */
+/** ObGzhandlerJitRuntime must route through ObGzhandlerJitHelper PHP, not LLVM handler body (#9091, #9798, #12881, #26331). */
 final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
 {
     public function testObGzhandlerJitRuntimeUsesObGzhandlerJitHelperNotLlvmHandleBody(): void
@@ -20,6 +20,15 @@ final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ObGzhandlerStandaloneLlvm', $source);
         $this->assertStringContainsString('ObGzhandlerServerJitHelper', $source);
         $this->assertStringContainsString('readAcceptEncodingFromServer', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('/ext/standard/ObGzhandlerJitHelper.php', $source);
+        $this->assertStringContainsString('/ext/standard/ObGzhandlerServerJitHelper.php', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('emitReadAcceptEncodingString', $source);
         $this->assertStringNotContainsString('emitHandleBody', $source);
         $this->assertStringNotContainsString('emitPassthroughBody', $source);

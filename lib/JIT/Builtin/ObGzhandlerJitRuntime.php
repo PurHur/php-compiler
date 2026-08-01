@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for ob_gzhandler() via ObGzhandlerJitHelper PHP (#4655, #8818, #9091, #9798, #12881).
+ * JIT/AOT link for ob_gzhandler() via ObGzhandlerJitHelper PHP (#4655, #8818, #9091, #9798, #12881, #26331).
  *
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\ObGzhandlerJitHelper}; thin LLVM bridges
- * forward the ABI. VM SSOT: {@see \PHPCompiler\ext\standard\VmObGzhandler}
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (ObGzhandlerJitHelper →
+ * ObGzhandlerServerJitHelper) in one NestedJIT scope (peer ProcessOpen #26269 / NetworkServices #26247).
+ * Thin LLVM bridges forward the ABI. VM SSOT: {@see \PHPCompiler\ext\standard\VmObGzhandler}
  * php-src: ext/zlib/zlib.c — php_ob_gzhandler
  */
 final class ObGzhandlerJitRuntime
@@ -31,6 +31,16 @@ final class ObGzhandlerJitRuntime
 
     private const SERVER_HELPER_PATH = '/ext/standard/ObGzhandlerServerJitHelper.php';
 
+    /**
+     * Ordered NestedJIT sources — ObGzhandlerJitHelper before Server (#26331).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::HELPER_PATH,
+        self::SERVER_HELPER_PATH,
+    ];
+
     private const READ_ACCEPT_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerServerJitHelper::readAcceptEncodingFromServer';
 
     private const RESOLVE_ENCODING_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerJitHelper::resolveEncodingFromAcceptHeader';
@@ -44,10 +54,6 @@ final class ObGzhandlerJitRuntime
         self::RESOLVE_ENCODING_HELPER,
         self::HANDLE_HELPER,
         self::FLUSH_HELPER,
-    ];
-
-    /** @var list<string> */
-    private const EMBED_COMPILED_HELPERS = [
         self::READ_ACCEPT_HELPER,
     ];
 
@@ -317,58 +323,21 @@ final class ObGzhandlerJitRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ObGzhandlerJitHelper compile (#9798)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26331');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $required = [...self::COMPILED_HELPERS, ...self::EMBED_COMPILED_HELPERS];
-        $missing = false;
-        foreach ($required as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         CallArgv::implement($context);
         StringZlib::ensureLinked($context);
 
-        $runtime = $context->runtime;
-        $repoRoot = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $repoRoot): void {
-            $corePath = $repoRoot.self::HELPER_PATH;
-            $block = $runtime->parseAndCompile((string) \file_get_contents($corePath), 'ObGzhandlerJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9798)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        $serverPath = $repoRoot.self::SERVER_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $serverPath): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($serverPath), 'ObGzhandlerServerJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ObGzhandlerServerJitHelper.php parseAndCompile failed (#12881)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach ($required as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9798)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#26331'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
