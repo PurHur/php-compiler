@@ -17,6 +17,12 @@ final class Ssh2Constants
 
     public const FINGERPRINT_RAW = 0x0002;
 
+    /** PHP_SSH2_TERM_UNIT_CHARS (php_ssh2.h; #26663). */
+    public const TERM_UNIT_CHARS = 0;
+
+    /** PHP_SSH2_TERM_UNIT_PIXELS (php_ssh2.h; #26663). */
+    public const TERM_UNIT_PIXELS = 1;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -25,6 +31,8 @@ final class Ssh2Constants
             'SSH2_FINGERPRINT_SHA1' => self::FINGERPRINT_SHA1,
             'SSH2_FINGERPRINT_HEX' => self::FINGERPRINT_HEX,
             'SSH2_FINGERPRINT_RAW' => self::FINGERPRINT_RAW,
+            'SSH2_TERM_UNIT_CHARS' => self::TERM_UNIT_CHARS,
+            'SSH2_TERM_UNIT_PIXELS' => self::TERM_UNIT_PIXELS,
         ];
     }
 }

@@ -720,6 +720,112 @@ final class VmSsh2Native
     }
 
     /**
+     * Open interactive shell channel (PECL ssh2_shell; #26663).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return \FFI\CData|null LIBSSH2_CHANNEL*
+     */
+    public static function channelShellOpen(
+        \FFI\CData $session,
+        string $term,
+        int $width,
+        int $height,
+        int $unitChars
+    ) {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $ffi->libssh2_session_set_blocking($session, 1);
+        $sessionType = 'session';
+        $channel = $ffi->libssh2_channel_open_ex(
+            $session,
+            $sessionType,
+            \strlen($sessionType),
+            2 * 1024 * 1024,
+            32768,
+            null,
+            0
+        );
+        if (null === $channel) {
+            return null;
+        }
+        if ($unitChars) {
+            $rc = (int) $ffi->libssh2_channel_request_pty_ex(
+                $channel,
+                $term,
+                \strlen($term),
+                null,
+                0,
+                $width,
+                $height,
+                0,
+                0
+            );
+        } else {
+            $rc = (int) $ffi->libssh2_channel_request_pty_ex(
+                $channel,
+                $term,
+                \strlen($term),
+                null,
+                0,
+                0,
+                0,
+                $width,
+                $height
+            );
+        }
+        if (0 !== $rc) {
+            try {
+                $ffi->libssh2_channel_free($channel);
+            } catch (\Throwable) {
+            }
+
+            return null;
+        }
+        $request = 'shell';
+        $rc = (int) $ffi->libssh2_channel_process_startup(
+            $channel,
+            $request,
+            \strlen($request),
+            null,
+            0
+        );
+        if (0 !== $rc) {
+            try {
+                $ffi->libssh2_channel_free($channel);
+            } catch (\Throwable) {
+            }
+
+            return null;
+        }
+
+        return $channel;
+    }
+
+    /**
+     * Free a shell/exec channel (PECL stream destructor; #26663).
+     *
+     * @param \FFI\CData $channel LIBSSH2_CHANNEL*
+     */
+    public static function channelFree(\FFI\CData $channel): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            $ffi->libssh2_channel_close($channel);
+        } catch (\Throwable) {
+        }
+        try {
+            $ffi->libssh2_channel_free($channel);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
      * @return \FFI|null
      */
     private static function ffi()
@@ -772,6 +878,7 @@ int libssh2_sftp_symlink_ex(LIBSSH2_SFTP *sftp, const char *path, unsigned int p
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
 LIBSSH2_CHANNEL *libssh2_channel_open_ex(LIBSSH2_SESSION *session, const char *channel_type, unsigned int channel_type_len, unsigned int window_size, unsigned int packet_size, const char *message, unsigned int message_len);
 int libssh2_channel_process_startup(LIBSSH2_CHANNEL *channel, const char *request, size_t request_len, const char *message, size_t message_len);
+int libssh2_channel_request_pty_ex(LIBSSH2_CHANNEL *channel, const char *term, unsigned int term_len, const char *modes, unsigned int modes_len, int width, int height, int width_px, int height_px);
 ssize_t libssh2_channel_read_ex(LIBSSH2_CHANNEL *channel, int stream_id, char *buf, size_t buflen);
 int libssh2_channel_eof(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_send_eof(LIBSSH2_CHANNEL *channel);
