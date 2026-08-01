@@ -71,6 +71,26 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertSame('Function f() is deprecated since 1.0', $meta->formatFunction('f'));
     }
 
+    /** @covers issue #26370 */
+    public function testFormatPropertyHookMessage(): void
+    {
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertSame(
+            'Method C::$x::get() is deprecated',
+            $meta->formatPropertyHook('C', 'x', 'get')
+        );
+        $this->assertSame(
+            'Method C::$x::set() is deprecated',
+            $meta->formatPropertyHook('C', 'x', 'set')
+        );
+
+        $meta = new DeprecatedMetadata('old', '8.4');
+        $this->assertSame(
+            'Method D::$x::get() is deprecated since 8.4, old',
+            $meta->formatPropertyHook('D', 'x', 'get')
+        );
+    }
+
     public function testBareDeprecatedDoesNotEmitRuntimeNotice(): void
     {
         $meta = new DeprecatedMetadata(null, null);

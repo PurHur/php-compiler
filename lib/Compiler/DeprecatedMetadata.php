@@ -229,11 +229,29 @@ final class DeprecatedMetadata
     }
 
     /**
+     * Property-hook accessor notice (PHP 8.4+, Zend zend_attributes.c / zend_property_hooks.c, #26370).
+     *
+     * Zend formats hook methods as `Method Class::$prop::get()` / `::set()`, not the
+     * synthetic `__phpc_property_*` names. Bare `#[\Deprecated]` still emits (same as
+     * property targets — do not gate on {@see emitsRuntimeNotice()}).
+     */
+    public function formatPropertyHook(string $class, string $property, string $hook): string
+    {
+        $hook = strtolower($hook);
+        if ('set' !== $hook && 'get' !== $hook) {
+            $hook = 'get';
+        }
+
+        return 'Method '.$class.'::$'.$property.'::'.$hook.'() is deprecated'.$this->suffix();
+    }
+
+    /**
      * Whether call/const/class use sites emit E_USER_DEPRECATED (#4392).
      *
      * Bare #[\Deprecated] (no message/since) stays reflection-only on those targets.
-     * Property read/write and trait-use paths do not consult this — attribute presence
-     * alone emits (Zend zend_object_handlers.c / rfc:deprecated_traits, #23536, #22989).
+     * Property read/write, property-hook accessors, and trait-use paths do not consult
+     * this — attribute presence alone emits (Zend zend_object_handlers.c /
+     * zend_property_hooks.c / rfc:deprecated_traits, #23536, #22989, #26370).
      */
     public function emitsRuntimeNotice(): bool
     {
