@@ -12,6 +12,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -128,9 +129,11 @@ final class MathBaseConvertRuntime
         $fromI64 = $context->builder->sext($from, $i64);
         $toI64 = $context->builder->sext($to, $i64);
 
+        // NestedJIT helpers take `__string__*`; bridge ABI is NUL-terminated i8* (#26511).
+        $str = self::stringFromCstr($context, $fn->getParam(0));
         $result = $context->builder->call(
             self::helperFunction($context, self::BASE_CONVERT),
-            $fn->getParam(0),
+            $str,
             $fromI64,
             $toI64
         );
@@ -149,11 +152,14 @@ final class MathBaseConvertRuntime
         $base = $context->builder->trunc($fn->getParam(1), $i32);
         $baseI64 = $context->builder->sext($base, $i64);
 
-        $tag = $context->builder->call(
+        // NestedJIT maps PHP `int` returns to i64; phpc_basetozval_result is i32 (#26511).
+        $str = self::stringFromCstr($context, $fn->getParam(0));
+        $tagWide = $context->builder->call(
             self::helperFunction($context, self::PARSE_BASE_TO_ZVAL),
-            $fn->getParam(0),
+            $str,
             $baseI64
         );
+        $tag = $context->builder->trunc($tagWide, $i32);
         self::emitInvalidRadixCharsDeprecationIfNeeded($context);
 
         $outLong = $fn->getParam(2);
@@ -180,10 +186,8 @@ final class MathBaseConvertRuntime
         $context->builder->branchIf($isDouble, $fetchDouble, $fetchLong);
 
         $context->builder->positionAtEnd($fetchLong);
-        $longI64 = $context->builder->sext(
-            $context->builder->call(self::helperFunction($context, self::LAST_LONG)),
-            $i64
-        );
+        // NestedJIT `int` → i64; keep as i64 for __value__writeLong (#26511).
+        $longI64 = $context->builder->call(self::helperFunction($context, self::LAST_LONG));
         $context->builder->branch($afterFetch);
 
         $context->builder->positionAtEnd($fetchDouble);
@@ -227,7 +231,8 @@ final class MathBaseConvertRuntime
         }
         StringTriggerErrorJit::implement($context);
         $i32 = $context->getTypeFromString('int32');
-        $had = $context->builder->call(self::helperFunction($context, self::LAST_INVALID_CHARS));
+        $hadWide = $context->builder->call(self::helperFunction($context, self::LAST_INVALID_CHARS));
+        $had = $context->builder->trunc($hadWide, $i32);
         $isSet = $context->builder->icmp(Builder::INT_NE, $had, $i32->constInt(0, false));
         $warn = BasicBlockHelper::append($context, 'mbc_invalid_radix_dep');
         $cont = BasicBlockHelper::append($context, 'mbc_invalid_radix_cont');
@@ -297,6 +302,28 @@ final class MathBaseConvertRuntime
         }
 
         return $fn;
+    }
+
+    /** Bridge i8* C strings into NestedJIT `__string__*` (peer StringNaturalCompare; no entryAlloca). */
+    private static function stringFromCstr(Context $context, Value $cstr): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $null = $i8p->constNull();
+        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $cstr, $null);
+        $ptr = $context->builder->select($isNull, $empty, $cstr);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $ptr);
+        $lenI64 = $len->typeOf() === $i64
+            ? $len
+            : $context->builder->zExt($len, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $ptr
+        );
     }
 
     private static function ensureJitHelperCompiled(Context $context): void

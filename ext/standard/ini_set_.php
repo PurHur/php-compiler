@@ -55,6 +55,19 @@ final class ini_set_ extends Internal
 
             return;
         }
+        // php-src soap.wsdl_cache_* PHP_INI_ALL (#26511 / peer url_rewriter).
+        if (\PHPCompiler\ext\soap\SoapWsdlCache::isIniKey($key)) {
+            $old = \PHPCompiler\ext\soap\SoapWsdlCache::iniSet($option, $value);
+            if (null !== $frame->returnVar) {
+                if (false === $old) {
+                    $frame->returnVar->bool(false);
+                } else {
+                    $frame->returnVar->string($old);
+                }
+            }
+
+            return;
+        }
         $result = VmIni::set($frame->vmContext, $option, $value);
         if (null === $frame->returnVar) {
             return;
