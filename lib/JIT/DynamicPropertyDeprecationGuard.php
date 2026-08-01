@@ -33,7 +33,8 @@ final class DynamicPropertyDeprecationGuard
         if ($objectType->isReadonlyClass($classId)) {
             return;
         }
-        // ZEND_ACC_NO_DYNAMIC_PROPERTIES: Error, not E_DEPRECATED (zend_object_handlers.c; #26055, #26371).
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES: Error, not E_DEPRECATED (zend_object_handlers.c; #26371).
+        // Dom\* are not sealed — Deprecated+write like other internals (#26566).
         if ($objectType->rejectsDynamicProperties($classId)) {
             \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
                 $context,

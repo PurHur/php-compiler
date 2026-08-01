@@ -1,7 +1,7 @@
 <?php
 /**
  * Repro #26265 — legacy DOMElement allows dynamic props with E_DEPRECATED (Zend php-src-strict).
- * Dom\ living nodes remain Error (#26055).
+ * Dom\ living nodes match the same Deprecated+write path (#26566; re-#26055).
  */
 ini_set('error_reporting', (string) E_ALL);
 set_error_handler(static function (int $no, string $msg): bool {

@@ -14858,8 +14858,8 @@ restart:
     }
 
     /**
-     * ZEND_ACC_NO_DYNAMIC_PROPERTIES → catchable Error (zend_object_handlers.c; #26055, #26371).
-     * Other internals (DateTime, ArrayObject, legacy DOM*) still allow with E_DEPRECATED.
+     * ZEND_ACC_NO_DYNAMIC_PROPERTIES → catchable Error (zend_object_handlers.c; #26371).
+     * Closure/Fiber/Generator/WeakMap reject; Dom\* and other internals allow with E_DEPRECATED (#26566).
      *
      * @return ?Frame catch frame when handled; null when allowed or after uncaught raise
      */

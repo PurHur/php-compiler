@@ -514,28 +514,9 @@ final class DomLivingBuiltinClasses
         }
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
 
-        // ZEND_ACC_NO_DYNAMIC_PROPERTIES on living Dom\* objects (php_dom.c; #26055, #26371).
-        // Skip interfaces/enums and Dom\DOMException (alias of legacy DOMException).
-        self::sealDomLivingDynamicProperties($ctx);
-    }
-
-    /**
-     * Mark concrete Dom\* class entries as rejecting dynamic properties (#26371).
-     */
-    private static function sealDomLivingDynamicProperties(Context $ctx): void
-    {
-        foreach ($ctx->classes as $lc => $entry) {
-            if (!str_starts_with($lc, 'dom\\')) {
-                continue;
-            }
-            if ($entry->isInterface || $entry->isEnum) {
-                continue;
-            }
-            if (VmDomLiving::CLASS_DOM_EXCEPTION === $lc) {
-                continue;
-            }
-            $entry->noDynamicProperties = true;
-        }
+        // Living Dom\* classes do NOT set ZEND_ACC_NO_DYNAMIC_PROPERTIES on php-src 8.4/8.5
+        // (Deprecated + allow write, same as legacy DOM*). #26055/#26371 sealed them in error;
+        // corrected in #26566 after re-probe vs php:8.4.24 / 8.5.8.
     }
 
     /**

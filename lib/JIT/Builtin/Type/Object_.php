@@ -3220,19 +3220,12 @@ class Object_ extends Type {
     }
 
     /**
-     * Engine classes with ZEND_ACC_NO_DYNAMIC_PROPERTIES (Closure/Fiber/Dom\\; #26371).
+     * Engine classes with ZEND_ACC_NO_DYNAMIC_PROPERTIES (Closure/Fiber/Generator/WeakMap; #26371).
+     * Living Dom\* are NOT sealed — php-src 8.4/8.5 allow Deprecated+write (#26566; re-#26055).
      */
     private static function externalClassRejectsDynamicProperties(string $lcname): bool
     {
-        if (\in_array($lcname, ['closure', 'fiber', 'generator', 'weakmap'], true)) {
-            return true;
-        }
-        // Living Dom\* nodes — not legacy DOM*, not Dom\DOMException alias.
-        if (str_starts_with($lcname, 'dom\\') && 'dom\\domexception' !== $lcname) {
-            return true;
-        }
-
-        return false;
+        return \in_array($lcname, ['closure', 'fiber', 'generator', 'weakmap'], true);
     }
 
     /**
