@@ -12,7 +12,9 @@ echo 'Element: ', (int) class_exists('Dom\\Element'), "\n";
 $doc = Dom\HTMLDocument::createFromString('<p>hi</p>');
 echo $doc->body->textContent, "\n";
 $empty = Dom\HTMLDocument::createEmpty();
-echo ($empty->body !== null ? 'empty_body' : 'empty_fail'), "\n";
+// php-src createEmpty() starts with no documentElement / body (#26035).
+echo ($empty->body !== null ? 'empty_body' : 'empty_null'), "\n";
+echo ($empty->documentElement !== null ? 'empty_root' : 'empty_root_null'), "\n";
 
 $html = '<!DOCTYPE html><html><head><title>T</title></head><body><div id="x"><span>s</span></div></body></html>';
 $d = Dom\HTMLDocument::createFromString($html);
@@ -46,7 +48,8 @@ Document: 1
 Node: 1
 Element: 1
 hi
-empty_body
+empty_null
+empty_root_null
 body=BODY
 title=T
 isset_body=1 empty_body=0

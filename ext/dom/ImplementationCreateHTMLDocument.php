@@ -30,10 +30,7 @@ final class ImplementationCreateHTMLDocument extends DomClassMethod
                 $title = $this->stringArg($frame->calledArgs[1], 'Dom\\Implementation::createHTMLDocument()', 0);
             }
         }
-        $docVar = VmDomLiving::createEmpty($frame->vmContext, 'UTF-8');
-        if (null !== $title) {
-            VmDomLiving::setHtmlDocumentTitle($frame->vmContext, $docVar->toObject(), $title);
-        }
+        $docVar = VmDomLiving::createHTMLDocument($frame->vmContext, $title);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($docVar);
         }
