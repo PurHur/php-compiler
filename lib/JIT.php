@@ -10362,6 +10362,9 @@ class JIT {
                         $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
                         break;
                     }
+                    // Mirror VM TYPE_CLOSURE: definition-site class scope on the nested Func so
+                    // self::class / __CLASS__→self::class lower during AOT (#26459, #25793).
+                    $this->propagateEnclosingClassOntoClosureFunc($block, $op->block1);
                     if (JIT\FiberHelper::blockContainsFiberSuspend($op->block1)) {
                         $internalName = JIT\ClosureHelper::nextInternalName();
                         $resumeName = strtolower($internalName.'__fiber_resume');
@@ -17098,6 +17101,32 @@ class JIT {
         }
 
         return $this->resolveJitStaticScopeClass($block, $classOp);
+    }
+
+    /**
+     * Copy enclosing method/trait class onto a nested closure Func before its body is lowered.
+     *
+     * php-cfg leaves closure Func->class unset; VM installs it at TYPE_CLOSURE runtime (#25793).
+     * AOT compiles the body first, so self::class otherwise hits PseudoClassScope::fatalInGlobalScope
+     * (#26459 — __CLASS__ in traits rewrites to self::class).
+     */
+    private function propagateEnclosingClassOntoClosureFunc(Block $enclosing, Block $closureBody): void
+    {
+        if (null === $closureBody->func) {
+            return;
+        }
+        $existing = $closureBody->func->class;
+        if (null !== $existing && null !== $existing->value && '' !== (string) $existing->value) {
+            return;
+        }
+        if (null === $enclosing->func || null === $enclosing->func->class) {
+            return;
+        }
+        $enclosingClass = $enclosing->func->class;
+        if (null === $enclosingClass->value || '' === (string) $enclosingClass->value) {
+            return;
+        }
+        $closureBody->func->class = $enclosingClass;
     }
 
     private function resolveJitStaticScopeClass(Block $block, Operand\Literal $classOp): string
