@@ -666,7 +666,8 @@ class VM {
     }
 
     /**
-     * Invoke Countable::count() for count() builtin — Zend skips return-type check (#12867).
+     * @deprecated Prefer {@see invokeInstanceMethod()} — suppress was wrong for
+     *             strict_types Countable::count() (#26433); kept for rare callers.
      */
     public function invokeInstanceMethodWithoutReturnCheck(
         ObjectEntry $object,
@@ -728,17 +729,34 @@ class VM {
         }
 
         // Isolated stack: nested user method must not resume the caller frame mid-builtin (#11452).
-        // Property magic keeps outer try/catch visible so user throws remain catchable (#25911).
-        $catchablePropertyMagic = \in_array($methodLc, ['__get', '__set', '__isset', '__unset'], true);
+        // Property magic + engine-invoked interface protocol keep outer try/catch visible so
+        // return TypeErrors remain catchable like Zend (#25911, #26433).
+        $catchableEngineInvoke = $this->isCatchableEngineInvokedMethod($methodLc);
         if ($omitThis) {
-            return $catchablePropertyMagic
+            return $catchableEngineInvoke
                 ? $this->invokePhpFunctionIsolatedCatchable($func, ...$extraArgs)
                 : $this->invokePhpFunctionIsolated($func, ...$extraArgs);
         }
 
-        return $catchablePropertyMagic
+        return $catchableEngineInvoke
             ? $this->invokePhpFunctionIsolatedCatchable($func, $thisVar, ...$extraArgs)
             : $this->invokePhpFunctionIsolated($func, $thisVar, ...$extraArgs);
+    }
+
+    /**
+     * Methods the engine invokes on behalf of builtins/opcodes whose throws Zend delivers
+     * to the caller's try/catch (zend_object_handlers / zend_interfaces / php_count).
+     */
+    private function isCatchableEngineInvokedMethod(string $methodLc): bool
+    {
+        return \in_array($methodLc, [
+            '__get', '__set', '__isset', '__unset',
+            // Countable / ArrayAccess / Iterator / IteratorAggregate (#26433)
+            'count',
+            'offsetexists', 'offsetget', 'offsetset', 'offsetunset',
+            'valid', 'current', 'key', 'next', 'rewind',
+            'getiterator',
+        ], true);
     }
 
     /**
@@ -873,7 +891,8 @@ class VM {
         }
 
         // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
-        $resultOut->copyFrom($this->invokePhpFunctionIsolated($func, $thisVar, $key));
+        // Keep outer try/catch for return TypeError under strict_types (#26433).
+        $resultOut->copyFrom($this->invokePhpFunctionIsolatedCatchable($func, $thisVar, $key));
 
         return null;
     }
@@ -892,7 +911,8 @@ class VM {
             return $this->invokeVmClassMethod($func, $callerFrame, null, $thisVar, $key, $value);
         }
         // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
-        $this->invokePhpFunctionIsolated($func, $thisVar, $key, $value);
+        // Keep outer try/catch for return TypeError under strict_types (#26433).
+        $this->invokePhpFunctionIsolatedCatchable($func, $thisVar, $key, $value);
 
         return null;
     }
@@ -919,7 +939,8 @@ class VM {
             return;
         }
         // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
-        $this->invokePhpFunctionIsolated($func, $thisVar, $key, $value);
+        // Keep outer try/catch for return TypeError under strict_types (#26433).
+        $this->invokePhpFunctionIsolatedCatchable($func, $thisVar, $key, $value);
     }
 
     public function invokeArrayAccessOffsetExists(
@@ -944,7 +965,8 @@ class VM {
         }
 
         // Isolated stack: nested user offsetExists must not resume the caller mid-isset/empty (#23450, #11452).
-        $resultOut->copyFrom($this->invokePhpFunctionIsolated($func, $thisVar, $key));
+        // Keep outer try/catch for return TypeError under strict_types (#26433).
+        $resultOut->copyFrom($this->invokePhpFunctionIsolatedCatchable($func, $thisVar, $key));
 
         return null;
     }
@@ -980,7 +1002,8 @@ class VM {
             return $this->invokeVmClassMethod($func, $callerFrame, null, $thisVar, $key);
         }
         // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
-        $this->invokePhpFunctionIsolated($func, $thisVar, $key);
+        // Keep outer try/catch for return TypeError under strict_types (#26433).
+        $this->invokePhpFunctionIsolatedCatchable($func, $thisVar, $key);
 
         return null;
     }

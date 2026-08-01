@@ -1615,7 +1615,10 @@ final class VmArray
                     . $entry->name . ' given'
                 );
             }
-            $result = $ctx->runtime->vm->invokeInstanceMethodWithoutReturnCheck(
+            // php-src zend_call_method + zend_verify_return_type: typed count() under
+            // declare(strict_types=1) TypeErrors; weak/untyped still coerce via zval_get_long (#26433).
+            // Do not suppress return checks (#12867 was untyped scalar returns only).
+            $result = $ctx->runtime->vm->invokeInstanceMethod(
                 $v->toObject(),
                 'count'
             )->resolveIndirect();
