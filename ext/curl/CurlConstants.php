@@ -199,6 +199,11 @@ final class CurlConstants
     public const CURLOPT_UNIX_SOCKET_PATH = 10231;
     public const CURLOPT_UNRESTRICTED_AUTH = 105;
     public const CURLOPT_UPLOAD = 46;
+    /**
+     * CURLOPT_UPKEEP_INTERVAL_MS — libcurl LONG+281 / PHP 8.2+ (curl.h; php-src curl.stub.php; #26263, #23899).
+     * Connection upkeep interval for curl_upkeep() / curl_easy_upkeep (default 60000 ms).
+     */
+    public const CURLOPT_UPKEEP_INTERVAL_MS = 281;
     public const CURLOPT_URL = 10002;
     public const CURLOPT_USERAGENT = 10018;
     public const CURLOPT_USERNAME = 10173;
@@ -388,6 +393,7 @@ final class CurlConstants
         self::CURLOPT_TCP_KEEPIDLE => true,
         self::CURLOPT_TCP_KEEPINTVL => true,
         self::CURLOPT_TCP_KEEPCNT => true,
+        self::CURLOPT_UPKEEP_INTERVAL_MS => true,
         self::CURLOPT_FTP_RESPONSE_TIMEOUT => true,
         self::CURLOPT_SERVER_RESPONSE_TIMEOUT => true,
         self::CURLOPT_PREREQFUNCTION => true,
@@ -612,6 +618,7 @@ final class CurlConstants
             'CURLOPT_TCP_KEEPALIVE' => self::CURLOPT_TCP_KEEPALIVE,
             'CURLOPT_TCP_KEEPIDLE' => self::CURLOPT_TCP_KEEPIDLE,
             'CURLOPT_TCP_KEEPINTVL' => self::CURLOPT_TCP_KEEPINTVL,
+            'CURLOPT_UPKEEP_INTERVAL_MS' => self::CURLOPT_UPKEEP_INTERVAL_MS,
             'CURLOPT_EXPECT_100_TIMEOUT_MS' => self::CURLOPT_EXPECT_100_TIMEOUT_MS,
             'CURLOPT_CONNECT_TO' => self::CURLOPT_CONNECT_TO,
             'CURLOPT_TLS13_CIPHERS' => self::CURLOPT_TLS13_CIPHERS,
