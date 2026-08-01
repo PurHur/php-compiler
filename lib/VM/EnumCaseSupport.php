@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\spl\SplDualIteratorStorage;
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
@@ -425,6 +426,9 @@ final class EnumCaseSupport
 
     /**
      * Zend zend_hash illegal offset — objects, enum cases, and arrays cannot be keys (#5594, #6500, zend_hash.c).
+     *
+     * Under PROFILE≥8.3, upgrades legacy {@code Illegal offset type*} strings to
+     * {@code Cannot access offset of type %s on array} (#26380; Zend/zend.c zend_illegal_container_offset).
      */
     public static function rejectIllegalArrayOffset(Variable $index, string $message = 'Illegal offset type'): void
     {
@@ -432,8 +436,31 @@ final class EnumCaseSupport
         if (Variable::TYPE_ENUM_CASE === $index->type
             || Variable::TYPE_OBJECT === $index->type
             || Variable::TYPE_ARRAY === $index->type) {
-            throw new \TypeError($message);
+            throw new \TypeError(self::illegalArrayOffsetMessage($index, $message));
         }
+    }
+
+    /**
+     * php-src Zend/zend.c — zend_illegal_container_offset() message for array key writes (#26380).
+     *
+     * Only rewrites known Zend 8.2 legacy strings when {@see CompilerVersion::supportsTypedIllegalContainerOffset()}.
+     */
+    public static function illegalArrayOffsetMessage(
+        Variable $index,
+        string $legacyMessage = 'Illegal offset type'
+    ): string {
+        if (!CompilerVersion::supportsTypedIllegalContainerOffset()) {
+            return $legacyMessage;
+        }
+
+        $typeName = self::typeNameForVariable($index);
+
+        return match ($legacyMessage) {
+            'Illegal offset type in isset or empty' => 'Cannot access offset of type '.$typeName.' in isset or empty',
+            'Illegal offset type in unset' => 'Cannot unset offset of type '.$typeName.' on array',
+            'Illegal offset type' => 'Cannot access offset of type '.$typeName.' on array',
+            default => $legacyMessage,
+        };
     }
 
     public static function entryForInstanceOfCheck(Variable $value): ?ClassEntry

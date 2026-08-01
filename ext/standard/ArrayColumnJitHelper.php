@@ -226,7 +226,10 @@ final class ArrayColumnJitHelper
 
     /**
      * php-src: zend_hash_update on the extracted index_key cell — illegal offsets
-     * (objects/enum cases/arrays) throw TypeError "Illegal offset type" (#19742).
+     * (objects/enum cases/arrays) throw TypeError (#19742, #26380).
+     *
+     * Message: Zend 8.2 {@code Illegal offset type}; PROFILE≥8.3
+     * {@code Cannot access offset of type E on array} via {@see EnumCaseSupport::illegalArrayOffsetMessage()}.
      */
     private static function storeAtKey(HashTable $out, Variable $key, Variable $value): void
     {
@@ -243,6 +246,6 @@ final class ArrayColumnJitHelper
 
             return;
         }
-        throw new \TypeError('Illegal offset type');
+        throw new \TypeError(EnumCaseSupport::illegalArrayOffsetMessage($key));
     }
 }
