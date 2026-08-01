@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_ini_parse_quantity via IniParseQuantityJitHelper PHP (#9237).
+ * JIT/AOT link for __compiler_ini_parse_quantity via IniParseQuantityJitHelper PHP (#9237, #26444).
  *
  * Replaces former strtoll/suffix LLVM with thin bridge into {@see VmIniQuantity} SSOT.
  * php-src: Zend/zend_ini.c — zend_ini_parse_quantity
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer HtmlEntityDecodeJit #26441 / IconvRuntime #25570).
  */
 final class IniParseQuantityRuntime
 {
@@ -70,65 +72,28 @@ final class IniParseQuantityRuntime
         $entry = $fn->appendBasicBlock('ini_parse_quantity_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
-            self::helperFunction($context, self::PARSE_HELPER),
+            self::helperFunction($context),
             $fn->getParam(0)
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after IniParseQuantityJitHelper compile (#9237)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::PARSE_HELPER, '#26444');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'IniParseQuantityJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('IniParseQuantityJitHelper.php parseAndCompile failed (#9237)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9237)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26444'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
