@@ -7513,8 +7513,40 @@ class Compiler {
     }
 
     /**
-     * Zend zend_handle_property_type — void/never invalid on properties, including unions
-     * (#6967, #7052, #26518).
+     * True when callable appears anywhere in a declared type tree (union / nullable / intersection).
+     */
+    protected function cfgTypeContainsCallable(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Literal && 'callable' === strtolower($type->name)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsCallable($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsCallable($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsCallable($type->subtype);
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_handle_property_type — void/never/callable invalid on properties, including unions
+     * (#6967, #7052, #26518, #26516).
      */
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
@@ -7527,17 +7559,22 @@ class Compiler {
             }
             $this->throwCompileError('Void can only be used as a standalone type');
         }
-        if (!$this->cfgTypeContainsNever($type)) {
-            return;
+        if ($this->cfgTypeContainsNever($type)) {
+            if ($this->cfgTypeIsStandaloneNever($type)) {
+                $class = $this->compilingClassDisplayName ?? 'class';
+                $this->throwCompileError(sprintf('Property %s::$%s cannot have type never', $class, $propName));
+            }
+            if ($this->cfgTypeContainsNeverInIntersection($type)) {
+                $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor('never'));
+            }
+            $this->throwCompileError('never can only be used as a standalone type');
         }
-        if ($this->cfgTypeIsStandaloneNever($type)) {
+        // callable (including ?callable / unions) — Zend prints the full type string (#26516).
+        if ($this->cfgTypeContainsCallable($type)) {
             $class = $this->compilingClassDisplayName ?? 'class';
-            $this->throwCompileError(sprintf('Property %s::$%s cannot have type never', $class, $propName));
+            $label = DnfType::zendTypeErrorLabel($this->dnfTypeLabelFromCfgType($type));
+            $this->throwCompileError(sprintf('Property %s::$%s cannot have type %s', $class, $propName, $label));
         }
-        if ($this->cfgTypeContainsNeverInIntersection($type)) {
-            $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor('never'));
-        }
-        $this->throwCompileError('never can only be used as a standalone type');
     }
 
     protected function dnfTypeLabelFromCfgType(?Op\Type $declared, ?Block $block = null): string
