@@ -546,10 +546,17 @@ class Runtime {
         }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);
-        // `declare(strict_types=1)` is file-scoped and influences call-site scalar type checks.
-        // Some parser paths miss the directive when `<?php declare(...)` shares a line (#4411).
+        // `declare(strict_types=1)` is file-scoped (zend_compile.c ZEND_ACC_STRICT_TYPES): it
+        // applies to every function/method/closure defined in the unit — not only {main}.
+        // Some parser paths miss the directive when `<?php declare(...)` shares a line (#4411);
+        // php-cfg also leaves nested Func.strictTypes false after file-level declare (#26428).
         if ($fileStrictTypes) {
             $script->main->strictTypes = true;
+        }
+        if ($script->main->strictTypes) {
+            foreach ($script->functions as $func) {
+                $func->strictTypes = true;
+            }
         }
         return $script;
     }
