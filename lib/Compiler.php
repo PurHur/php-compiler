@@ -721,6 +721,7 @@ class Compiler {
             return;
         }
         $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
+        $this->rejectParentTypeHintWithoutParent($returnType);
         $this->assertIntersectionTypeMembers($returnType);
         // void before never — Zend prefers "Void can only…" when both appear in a union (#26517).
         $this->assertFunctionSignatureVoidType($returnType);
@@ -7716,11 +7717,38 @@ class Compiler {
     }
 
     /**
+     * Zend rejects `parent` type atoms when the current class/enum/interface has no parent (#26540).
+     * Traits keep an unresolved `parent` keyword (skipped via {@see ClassCompileRegistry::isTrait}).
+     */
+    protected function rejectParentTypeHintWithoutParent(?Op\Type $type): void
+    {
+        if (!PseudoClassTypeHintCompileCheck::containsKeyword($type, 'parent')) {
+            return;
+        }
+        $declaringLc = $this->compilingClassLc;
+        if (null === $declaringLc || '' === $declaringLc) {
+            return;
+        }
+        if ($this->classCompileRegistry->isTrait($declaringLc)) {
+            return;
+        }
+        if (null !== $this->compilingClassParentLc && '' !== $this->compilingClassParentLc) {
+            return;
+        }
+        $resolved = $this->classCompileRegistry->parentDisplayName($declaringLc);
+        if (null !== $resolved && '' !== $resolved) {
+            return;
+        }
+        $this->throwCompileError(EnumParentCompileCheck::MESSAGE);
+    }
+
+    /**
      * Zend zend_handle_property_type — void/never/callable invalid on properties, including unions
      * (#6967, #7052, #26518, #26516).
      */
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
+        $this->rejectParentTypeHintWithoutParent($type);
         $this->assertIntersectionTypeMembers($type);
         $this->assertMixedTypeRules($type);
         // void before never — Zend capitalizes "Void" in the standalone-only message.
@@ -7831,6 +7859,10 @@ class Compiler {
             if (null === $declaringLc) {
                 return $lexical;
             }
+            // Traits keep unresolved `parent` (Zend Reflection shows the keyword) (#26540).
+            if ($this->classCompileRegistry->isTrait($declaringLc)) {
+                return $lexical;
+            }
             $resolved = $this->classCompileRegistry->parentDisplayName($declaringLc);
             if ((null === $resolved || '' === $resolved)
                 && $declaringLc === $this->compilingClassLc
@@ -7838,8 +7870,15 @@ class Compiler {
                 && '' !== $this->compilingClassParentLc) {
                 $resolved = $this->classCompileRegistry->traitDisplayName($this->compilingClassParentLc);
             }
+            if (null !== $resolved && '' !== $resolved) {
+                return $resolved;
+            }
+            // Class/enum/interface/anonymous without a parent — Zend compile fatal (#26540).
+            if ($declaringLc === $this->compilingClassLc) {
+                $this->throwCompileError(EnumParentCompileCheck::MESSAGE);
+            }
 
-            return (null !== $resolved && '' !== $resolved) ? $resolved : $lexical;
+            return $lexical;
         }
 
         return $lexical;
@@ -7876,6 +7915,7 @@ class Compiler {
     protected function assertParamDeclaredType(?Op\Type $declared, Block $block, CfgFunc $func): void
     {
         $this->rejectPseudoClassTypeHintOutsideClassScope($declared, $block, $func);
+        $this->rejectParentTypeHintWithoutParent($declared);
         $this->assertIntersectionTypeMembers($declared);
         // void before never — Zend prefers "Void can only…" for void|never params (#26517).
         $this->assertFunctionSignatureVoidType($declared);
