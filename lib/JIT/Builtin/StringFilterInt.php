@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_filter_validate_int_string via FilterIntJitHelper PHP (#11757).
+ * JIT/AOT link for __compiler_filter_validate_int_string via FilterIntJitHelper PHP (#11757, #26699).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterMac #25019 / StringFilterIp #24650).
  * php-src: ext/filter/logical_filters.c — php_filter_validate_int
  */
 final class StringFilterInt
@@ -43,10 +45,18 @@ final class StringFilterInt
             return;
         }
 
+        // Restore caller insert block after bridge emit (#20988 / peer StringFilterMac #25019) —
+        // clearInsertionPosition left the user-script builder detached
+        // ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementValidateBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementValidateBridge(Context $context): void
@@ -80,56 +90,18 @@ final class StringFilterInt
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after FilterIntJitHelper compile (#11757)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26699');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FilterIntJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('FilterIntJitHelper.php parseAndCompile failed (#11757)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#11757)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26699'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
