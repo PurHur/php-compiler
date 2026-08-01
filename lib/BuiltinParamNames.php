@@ -668,6 +668,9 @@ final class BuiltinParamNames
             case 'spl_object_hash':
             case 'spl_object_id':
                 return ['object'];
+            // php-src ext/standard/basic_functions.stub.php — PHP 8.3+; InternalArgInfo omits (#26210)
+            case 'get_object_id':
+                return ['object'];
             // php-src ext/standard/file.stub.php — ?int $mtime = null, ?int $atime = null (#24971)
             case 'touch':
                 return ['filename', 'mtime=', 'atime='];
