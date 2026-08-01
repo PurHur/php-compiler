@@ -14790,6 +14790,7 @@ class Compiler {
             $resultSlot,
             $receiverSlot
         );
+        $nullsafeOp->nullsafeMethodCall = true;
         $nullsafeOp->block1 = $nullBlock;
         $nullsafeOp->block2 = $fetchBlock;
         $nullsafeOp->block3 = $endBlock;
