@@ -936,13 +936,13 @@ final class InheritanceVariance
             $child->returnsByRef ? '& ' : '',
             $childClass,
             $methodLc,
-            $child->formatParams(),
-            $child->formatReturn(),
+            $child->formatParams($childClass),
+            $child->formatReturn($childClass),
             $parent->returnsByRef ? '& ' : '',
             $parentClass,
             $methodLc,
-            $parent->formatParams(),
-            $parent->formatReturn()
+            $parent->formatParams($parentClass),
+            $parent->formatReturn($parentClass)
         );
     }
 
@@ -1386,11 +1386,11 @@ final class MethodSig
         return null;
     }
 
-    public function formatParams(): string
+    public function formatParams(?string $selfDisplayClass = null): string
     {
         $parts = [];
         foreach ($this->params as $i => $type) {
-            $prefix = $type instanceof TypeSig ? $type->format().' ' : '';
+            $prefix = $type instanceof TypeSig ? $type->format($selfDisplayClass).' ' : '';
             $amp = !empty($this->paramByRef[$i]) ? '&' : '';
             $default = '';
             if (!empty($this->paramHasDefault[$i])) {
@@ -1405,13 +1405,13 @@ final class MethodSig
         return implode(', ', $parts);
     }
 
-    public function formatReturn(): string
+    public function formatReturn(?string $selfDisplayClass = null): string
     {
         if (null === $this->returnType || $this->returnType->isMixed()) {
             return '';
         }
 
-        return ': '.$this->returnType->format();
+        return ': '.$this->returnType->format($selfDisplayClass);
     }
 }
 
@@ -1821,7 +1821,13 @@ final class TypeSig
         return $class.($this->nullable ? '?' : '').($this->static ? ':static' : '');
     }
 
-    public function format(): string
+    /**
+     * Human-readable type for diagnostics.
+     *
+     * When $selfDisplayClass is set (LSP fatals), Zend resolves `self` to the declaring
+     * class name and keeps `static` as `static` (zend_inheritance.c, #26641).
+     */
+    public function format(?string $selfDisplayClass = null): string
     {
         if ($this->void) {
             return 'void';
@@ -1832,7 +1838,7 @@ final class TypeSig
         if ($this->isUnion()) {
             $parts = [];
             foreach ($this->unionMembers as $member) {
-                $parts[] = $member->format();
+                $parts[] = $member->format($selfDisplayClass);
             }
 
             return ($this->nullable ? '?' : '').implode('|', $parts);
@@ -1840,7 +1846,7 @@ final class TypeSig
         if ($this->isIntersection()) {
             $parts = [];
             foreach ($this->intersectionMembers as $member) {
-                $parts[] = $member->format();
+                $parts[] = $member->format($selfDisplayClass);
             }
 
             return ($this->nullable ? '?' : '').implode('&', $parts);
@@ -1849,7 +1855,11 @@ final class TypeSig
             return ($this->nullable ? '?' : '').$this->builtinScalar;
         }
         if ($this->self) {
-            return ($this->nullable ? '?' : '').'self';
+            $name = null !== $selfDisplayClass && '' !== $selfDisplayClass
+                ? $selfDisplayClass
+                : 'self';
+
+            return ($this->nullable ? '?' : '').$name;
         }
         if ($this->static) {
             return ($this->nullable ? '?' : '').'static';
