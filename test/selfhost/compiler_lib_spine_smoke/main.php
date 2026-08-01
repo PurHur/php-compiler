@@ -4634,6 +4634,7 @@ require_once __DIR__.'/../../../lib/Compiler/OverrideValidator.php';
 require_once __DIR__.'/../../../lib/Compiler/ParameterMetadata.php';
 require_once __DIR__.'/../../../lib/Compiler/PseudoClassTypeHintCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/ReadonlyClassCompileCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/RedundantObjectClassUnionCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/SourceLocation.php';
 require_once __DIR__.'/../../../lib/Compiler/ThrowInClassConstCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/TraitClassConstConflictCheck.php';
