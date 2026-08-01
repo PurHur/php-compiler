@@ -3313,6 +3313,90 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #24639 */
+    public function testFtpResidualNamedParamsMatchZendStub(): void
+    {
+        $expected = [
+            'ftp_pwd' => ['ftp'],
+            'ftp_cdup' => ['ftp'],
+            'ftp_systype' => ['ftp'],
+            'ftp_nb_continue' => ['ftp'],
+            'ftp_close' => ['ftp'],
+            'ftp_quit' => ['ftp'],
+            'ftp_chdir' => ['ftp', 'directory'],
+            'ftp_mkdir' => ['ftp', 'directory'],
+            'ftp_rmdir' => ['ftp', 'directory'],
+            'ftp_nlist' => ['ftp', 'directory'],
+            'ftp_mlsd' => ['ftp', 'directory'],
+            'ftp_rawlist' => ['ftp', 'directory', 'recursive'],
+            'ftp_exec' => ['ftp', 'command'],
+            'ftp_raw' => ['ftp', 'command'],
+            'ftp_site' => ['ftp', 'command'],
+            'ftp_chmod' => ['ftp', 'permissions', 'filename'],
+            'ftp_alloc' => ['ftp', 'size', '&response='],
+            'ftp_pasv' => ['ftp', 'enable'],
+            'ftp_size' => ['ftp', 'filename'],
+            'ftp_mdtm' => ['ftp', 'filename'],
+            'ftp_delete' => ['ftp', 'filename'],
+            'ftp_rename' => ['ftp', 'from', 'to'],
+            'ftp_get_option' => ['ftp', 'option'],
+            'ftp_set_option' => ['ftp', 'option', 'value'],
+            'ftp_nb_get' => ['ftp', 'local_filename', 'remote_filename', 'mode', 'offset'],
+            'ftp_nb_put' => ['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'],
+            'ftp_append' => ['ftp', 'remote_filename', 'local_filename', 'mode'],
+            'ftp_fget' => ['ftp', 'stream', 'remote_filename', 'mode', 'offset'],
+            'ftp_nb_fget' => ['ftp', 'stream', 'remote_filename', 'mode', 'offset'],
+            'ftp_fput' => ['ftp', 'remote_filename', 'stream', 'mode', 'offset'],
+            'ftp_nb_fput' => ['ftp', 'remote_filename', 'stream', 'mode', 'offset'],
+        ];
+
+        foreach ($expected as $fn => $names) {
+            self::assertSame($names, BuiltinParamNames::forFunction($fn), $fn);
+            self::assertSame(
+                0,
+                BuiltinParamNames::lookupNamedParamIndex($names, 'ftp', $fn),
+                $fn . ' accepts ftp:'
+            );
+            // Connection must not keep the pre-stub InternalArgInfo name.
+            self::assertNotSame('stream', $names[0] ?? null, $fn);
+        }
+
+        $chmod = BuiltinParamNames::forFunction('ftp_chmod');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($chmod, 'permissions', 'ftp_chmod'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($chmod, 'mode', 'ftp_chmod'));
+
+        $rename = BuiltinParamNames::forFunction('ftp_rename');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($rename, 'from', 'ftp_rename'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($rename, 'to', 'ftp_rename'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($rename, 'src', 'ftp_rename'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($rename, 'dest', 'ftp_rename'));
+
+        $pasv = BuiltinParamNames::forFunction('ftp_pasv');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pasv, 'enable', 'ftp_pasv'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($pasv, 'pasv', 'ftp_pasv'));
+
+        $delete = BuiltinParamNames::forFunction('ftp_delete');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($delete, 'filename', 'ftp_delete'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($delete, 'file', 'ftp_delete'));
+
+        $site = BuiltinParamNames::forFunction('ftp_site');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($site, 'command', 'ftp_site'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($site, 'cmd', 'ftp_site'));
+
+        $fget = BuiltinParamNames::forFunction('ftp_fget');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fget, 'stream', 'ftp_fget'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fget, 'remote_filename', 'ftp_fget'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($fget, 'offset', 'ftp_fget'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fget, 'fp', 'ftp_fget'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fget, 'remote_file', 'ftp_fget'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fget, 'resumepos', 'ftp_fget'));
+
+        $nbGet = BuiltinParamNames::forFunction('ftp_nb_get');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($nbGet, 'local_filename', 'ftp_nb_get'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($nbGet, 'local_file', 'ftp_nb_get'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($nbGet, 'resume_pos', 'ftp_nb_get'));
+    }
+
     /** @covers issue #24365 */
     public function testOpensslDigestSignVerifyNamedParamsResolve(): void
     {
