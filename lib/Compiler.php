@@ -66,6 +66,7 @@ use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\MagicMethodStaticCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
 use PHPCompiler\Compiler\DuplicateUnionMemberCompileCheck;
+use PHPCompiler\Compiler\RedundantDnfArmSubsetCompileCheck;
 use PHPCompiler\Compiler\RedundantObjectClassUnionCompileCheck;
 use PHPCompiler\Compiler\IntersectionTypeMemberCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
@@ -7539,7 +7540,8 @@ class Compiler {
     /**
      * Zend: only class/interface types may appear in intersection types (#26401);
      * duplicate intersection members are redundant (#26605); duplicate union arms
-     * are redundant (#26556); object + class/interface is redundant (#26563).
+     * are redundant (#26556); object + class/interface is redundant (#26563);
+     * DNF intersection arm proper-subset is more restrictive (#26607).
      */
     protected function assertIntersectionTypeMembers(?Op\Type $type): void
     {
@@ -7554,6 +7556,10 @@ class Compiler {
         $unionDup = DuplicateUnionMemberCompileCheck::findDuplicateMemberName($type);
         if (null !== $unionDup) {
             $this->throwCompileError(DuplicateUnionMemberCompileCheck::duplicateMessageFor($unionDup));
+        }
+        $subsetMsg = RedundantDnfArmSubsetCompileCheck::findRedundantMessage($type);
+        if (null !== $subsetMsg) {
+            $this->throwCompileError($subsetMsg);
         }
         if (RedundantObjectClassUnionCompileCheck::isRedundant($type)) {
             $label = $this->dnfTypeLabelFromCfgType($type);
