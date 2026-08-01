@@ -2598,6 +2598,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('filter_has_var'));
     }
 
+    /** @covers issue #26235 */
+    public function testUtf8EncodeDecodeStubNamedParamsResolve(): void
+    {
+        foreach (['utf8_encode', 'utf8_decode'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'data', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        }
+    }
+
     /** @covers issue #23205 */
     public function testHashEqualsZendStubNamedParams(): void
     {
