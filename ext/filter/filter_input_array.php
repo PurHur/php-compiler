@@ -44,10 +44,15 @@ final class filter_input_array extends Internal
 
             return;
         }
-        // php-src stub default add_empty=true (ext/filter/filter.stub.php).
+        // php-src stub default add_empty=true (ext/filter/filter.stub.php; #26201).
         $addEmpty = 1;
         if (3 === $argc) {
-            $addEmpty = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'filter_input_array', 'add_empty')->toInt();
+            $addEmpty = InternalStrictArg::requireBuiltinTypedBoolArg(
+                $frame->calledArgs[2],
+                'filter_input_array',
+                2,
+                'add_empty'
+            ) ? 1 : 0;
         }
         $result = VmFilter::filterInputArray($ctx, $typeInt, $definition, $addEmpty, $frame);
         if (null === $result) {
@@ -69,8 +74,8 @@ final class filter_input_array extends Internal
         }
         $addEmpty = 1;
         if (3 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            JitInternalStrictArg::requireInt($context, $args[2], 'filter_input_array', 'add_empty', 3);
-            $addEmpty = self::compileTimeInt($context, $args[2]) ?? 1;
+            JitInternalStrictArg::requireBool($context, $args[2], 'filter_input_array', 'add_empty', 3);
+            $addEmpty = self::compileTimeBoolAsInt($context, $args[2]) ?? 1;
         }
 
         return FilterInputArrayRuntime::filter($context, $args[0], $args[1], $addEmpty);
@@ -95,13 +100,22 @@ final class filter_input_array extends Internal
         if (Variable::TYPE_ARRAY === $defArg->type) {
             return $defArg->toArray();
         }
-        VmArray::requireArrayParam($arg, 'filter_input_array', 2, 'definition', 'array|int|null');
+        VmArray::requireArrayParam($arg, 'filter_input_array', 2, 'options', 'array|int|null');
 
         return null;
     }
 
-    private static function compileTimeInt(Context $context, JITVariable $var): ?int
+    /** Compile-time bool → 0/1 for FilterInputArrayRuntime add_empty (#26201). */
+    private static function compileTimeBoolAsInt(Context $context, JITVariable $var): ?int
     {
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null === $lib->LLVMIsAConstantInt($var->value->value)) {
+                return null;
+            }
+
+            return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value) ? 1 : 0;
+        }
         if (JITVariable::TYPE_NATIVE_LONG !== $var->type || JITVariable::KIND_VALUE !== $var->kind) {
             return null;
         }
@@ -110,6 +124,6 @@ final class filter_input_array extends Internal
             return null;
         }
 
-        return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value) ? 1 : 0;
     }
 }
