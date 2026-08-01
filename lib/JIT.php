@@ -10239,24 +10239,34 @@ class JIT {
                                     ? "{$neverFunc}(): never-returning function must not implicitly return"
                                     : 'A never-returning function must not return'
                             );
-                        } elseif ($block->returnTypeMixed) {
-                            // Explicit `: mixed` still requires a return value (#26485).
-                            $mixedName = $this->jitReturnTypeCallableName($block->func);
+                        } elseif ($this->jitDeclaredReturnTypeRequiresValue($block)) {
+                            // php-src zend_verify_return_error — TypeError + "none returned" (#26485, #26486).
+                            $expected = VM\TypeCheck::expectedReturnTypeLabelForNoneReturned($block);
+                            if ($block->returnTypeStatic && null !== $block->func && null !== $block->func->class) {
+                                $className = $block->func->class->value ?? null;
+                                if (is_string($className) && '' !== $className) {
+                                    $expected = $className;
+                                }
+                            }
+                            $callableName = $this->jitReturnTypeCallableName($block->func);
+                            $message = "Return value must be of type {$expected}, none returned";
+                            if (null !== $callableName && '' !== $callableName) {
+                                $message = "{$callableName}(): {$message}";
+                            }
                             JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
                             JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-                            JIT\Builtin\TypeErrorRaise::emitRaise(
-                                $this->context,
-                                null !== $mixedName && '' !== $mixedName
-                                    ? "{$mixedName}(): Return value must be of type mixed, none returned"
-                                    : 'Return value must be of type mixed, none returned'
-                            );
-                        } elseif ($this->jitDeclaredReturnTypeRequiresValue($block)) {
-                            JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
-                            JIT\Builtin\ErrorRaise::ensureLinked($this->context);
-                            JIT\Builtin\ErrorRaise::emitRaise(
-                                $this->context,
-                                'A function with return type must return a value'
-                            );
+                            if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+                                // Cross-function catchable TypeError (Enum::from pattern, #24219 / #26486).
+                                JIT\Builtin\TypeErrorRaise::ensureStandaloneBodies($this->context);
+                                JIT\TryCatchHelper::emitPendTypeErrorForCaller($this->context, $message);
+                                JIT\Builtin\TypeErrorRaise::emitRaise($this->context, $message);
+                                JIT\TryCatchHelper::emitPropagateReturnAfterPendingThrow($this->context, $func);
+
+                                return $this->context->inlineIncludeDepth > 0
+                                    ? $returnBlock
+                                    : $origBasicBlock;
+                            }
+                            JIT\Builtin\TypeErrorRaise::emitRaise($this->context, $message);
                         }
                         if ($this->isVoidLlvmFunction($func)) {
                             $this->context->builder->returnVoid();
@@ -11902,6 +11912,11 @@ class JIT {
             if (is_string($className) && '' !== $className) {
                 return $className.'::'.$func->name;
             }
+        }
+
+        // Zend TypeError prefixes use `{closure}` for anonymous funcs (#26486).
+        if (is_string($func->name) && preg_match('/^\{anonymous\}#\d+$/', $func->name)) {
+            return '{closure}';
         }
 
         return $func->name;

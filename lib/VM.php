@@ -20633,13 +20633,18 @@ restart:
             return;
         }
         if (null === $value && $this->declaredReturnTypeRequiresValue($block)) {
-            if ($block->returnTypeMixed) {
-                TypeCheck::assertNoneReturned(
-                    $this->returnTypeCallableName($block->func),
-                    'mixed'
-                );
+            $expected = TypeCheck::expectedReturnTypeLabelForNoneReturned($block);
+            // Zend resolves `: static` to the late-bound class in the TypeError (#26486).
+            if ($block->returnTypeStatic) {
+                $lc = $this->lateStaticClassLc($frame);
+                if (isset($this->context->classes[$lc])) {
+                    $expected = $this->context->classes[$lc]->name;
+                }
             }
-            TypeCheck::assertReturnValueProvided();
+            TypeCheck::assertNoneReturned(
+                $this->returnTypeCallableName($block->func),
+                $expected
+            );
         }
         if ($block->returnTypeStatic) {
             TypeCheck::assertStaticReturn(
@@ -20741,6 +20746,11 @@ restart:
             if (is_string($className) && '' !== $className) {
                 return $className.'::'.$func->name;
             }
+        }
+
+        // Zend TypeError prefixes use `{closure}` for anonymous funcs (#26486).
+        if (is_string($func->name) && preg_match('/^\{anonymous\}#\d+$/', $func->name)) {
+            return '{closure}';
         }
 
         return $func->name;

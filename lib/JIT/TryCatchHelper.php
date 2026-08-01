@@ -434,6 +434,44 @@ final class TryCatchHelper
     }
 
     /**
+     * Pend a TypeError object for the caller's after-call check (no local try) (#26486).
+     *
+     * Mirrors {@see \PHPCompiler\JIT\Builtin\BackedEnumFromRuntime} cross-function ValueError:
+     * object pending for try/catch; pair with {@see TypeErrorRaise::emitRaise} for uncaught abort.
+     */
+    public static function emitPendTypeErrorForCaller(Context $context, string $message): void
+    {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            JitThrow::ensureStandaloneBodies($context);
+        }
+
+        $object = $context->type->object;
+        $classId = $object->lookup('TypeError');
+        $obj = $object->allocate($classId);
+        $object->markObjectConstructed($obj);
+        $msgStr = $context->builder->load($context->constantStringFromString($message));
+        $msgVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $msgStr
+        );
+        // Store on Error — TypeError inherits message; declaring on TypeError can miss getMessage (#26486).
+        $object->storeInstanceProperty($obj, 'Error', ExceptionSupport::PROP_MESSAGE, $msgVar);
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+    }
+
+    /**
+     * Public wrapper for {@see emitPropagateReturn} after cross-function pending throw (#26486).
+     */
+    public static function emitPropagateReturnAfterPendingThrow(Context $context, Function_ $func): void
+    {
+        self::emitPropagateReturn($context, $func);
+    }
+
+    /**
      * Raise a catchable Error inside an active try block (asymmetric visibility #4029).
      */
     public static function emitCatchableErrorMessage(
