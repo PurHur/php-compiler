@@ -3510,6 +3510,53 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #26464 */
+    public function testDomSimpleXmlBridgeReflectionStubTypesAndDefaults(): void
+    {
+        self::assertSame(
+            'DOMAttr|DOMElement',
+            BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('dom_import_simplexml')
+        );
+        self::assertSame(
+            'DOMAttr|DOMElement',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('dom_import_simplexml')
+        );
+        self::assertSame('object', BuiltinInternalArgInfo::stubParamTypeOverride('dom_import_simplexml', 0));
+        $domNode = BuiltinInternalArgInfo::paramInfoForFunction('dom_import_simplexml', 0);
+        self::assertNotNull($domNode);
+        self::assertSame('object', $domNode['type']);
+        self::assertFalse($domNode['isOptional']);
+
+        self::assertSame(
+            '?SimpleXMLElement',
+            BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('simplexml_import_dom')
+        );
+        self::assertSame(
+            '?SimpleXMLElement',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('simplexml_import_dom')
+        );
+        self::assertSame(
+            'SimpleXMLElement|DOMNode',
+            BuiltinInternalArgInfo::stubParamTypeOverride('simplexml_import_dom', 0)
+        );
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('simplexml_import_dom', 1));
+
+        $nodeInfo = BuiltinInternalArgInfo::paramInfoForFunction('simplexml_import_dom', 0);
+        self::assertNotNull($nodeInfo);
+        self::assertSame('SimpleXMLElement|DOMNode', $nodeInfo['type']);
+        self::assertFalse($nodeInfo['isOptional']);
+
+        $classInfo = BuiltinInternalArgInfo::paramInfoForFunction('simplexml_import_dom', 1);
+        self::assertNotNull($classInfo);
+        self::assertSame('?string', $classInfo['type']);
+        self::assertTrue($classInfo['isOptional']);
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('simplexml_import_dom', 1, $classInfo, false));
+        $classDef = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($classDef, 'simplexml_import_dom', 1, $classInfo));
+        self::assertSame(Variable::TYPE_STRING, $classDef->type);
+        self::assertSame('SimpleXMLElement', $classDef->toString());
+    }
+
     /** @covers issue #23624 */
     public function testXmlSetElementHandlerStubNamedParamsResolve(): void
     {

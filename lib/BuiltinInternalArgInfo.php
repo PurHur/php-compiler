@@ -128,6 +128,10 @@ final class BuiltinInternalArgInfo
             'finfo_file', 'finfo_buffer' => 'string|false',
             // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#25510)
             'simplexml_load_string', 'simplexml_load_file' => 'SimpleXMLElement|false',
+            // ext/dom/php_dom.stub.php — php-types typo somNode (#26464)
+            'dom_import_simplexml' => 'DOMAttr|DOMElement',
+            // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#26464)
+            'simplexml_import_dom' => '?SimpleXMLElement',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
@@ -526,6 +530,15 @@ final class BuiltinInternalArgInfo
             },
             // ext/simplexml/simplexml.stub.php — ?string $class_name (InternalArgInfo string) (#25510)
             'simplexml_load_string', 'simplexml_load_file' => 1 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — object $node (InternalArgInfo typo sxeobject) (#26464)
+            'dom_import_simplexml' => 0 === $index ? 'object' : null,
+            // ext/simplexml/simplexml.stub.php — SimpleXMLElement|DOMNode + ?string $class_name (#26464)
+            // InternalArgInfo: domnode / string (non-nullable).
+            'simplexml_import_dom' => match ($index) {
+                0 => 'SimpleXMLElement|DOMNode',
+                1 => '?string',
+                default => null,
+            },
             // ext/standard/string.stub.php — ?string $token = null (InternalArgInfo type "str", required) (#25171)
             'strtok' => 1 === $index ? '?string' : null,
             // ext/standard/string.stub.php — int $insertion_cost/$replacement_cost/$deletion_cost = 1
