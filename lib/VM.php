@@ -7773,7 +7773,17 @@ restart:
                     if (null !== $op->block1) {
                         self::defineClass($ifaceEntry, $op->block1, $frame);
                     }
-                    $this->inheritFromInterfaces($ifaceEntry);
+                    try {
+                        $this->inheritFromInterfaces($ifaceEntry);
+                    } catch (\CompileError $e) {
+                        // Ambiguous iface constants on `interface K extends I, J` (#26672).
+                        if (VmEval::EVAL_FILENAME === $frame->scriptPath
+                            || str_ends_with((string) $frame->scriptPath, VmEval::EVAL_FILENAME)
+                        ) {
+                            throw $e;
+                        }
+                        $this->raiseClassDeclareCompileFatal($e, $frame);
+                    }
                     $this->context->classes[$lcname] = $ifaceEntry;
                     $this->propagateInterfaceConstantsToImplementors($lcname);
                     $this->flushDeferredTraitUses($frame);
@@ -7889,7 +7899,16 @@ restart:
                         }
                     }
                     self::defineClass($classEntry, $op->block1, $frame);
-                    $this->inheritFromInterfaces($classEntry);
+                    try {
+                        $this->inheritFromInterfaces($classEntry);
+                    } catch (\CompileError $e) {
+                        if (VmEval::EVAL_FILENAME === $frame->scriptPath
+                            || str_ends_with((string) $frame->scriptPath, VmEval::EVAL_FILENAME)
+                        ) {
+                            throw $e;
+                        }
+                        $this->raiseClassDeclareCompileFatal($e, $frame);
+                    }
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
@@ -18621,6 +18640,29 @@ restart:
             }
             foreach ($iface->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
+                    $existingDeclLc = $entry->constDeclaringClassLc[$name] ?? $entryLc;
+                    $incomingDeclLc = $iface->constDeclaringClassLc[$name]
+                        ?? strtolower(ltrim($iface->name, '\\'));
+                    // Two different declaring interfaces contributing the same constant name
+                    // → Zend E_COMPILE_ERROR (do_inherit_iface_constant). Shared parent iface
+                    // (same declaring lc) is fine; class/enum body own constants use the
+                    // final-override path below (#26672 require/include + #24699).
+                    if ($existingDeclLc !== $incomingDeclLc && $existingDeclLc !== $entryLc) {
+                        $constDisplay = $entry->constNames[$name]
+                            ?? $iface->constNames[$name]
+                            ?? $name;
+                        $subjectKind = $entry->isInterface ? 'Interface' : ($entry->isEnum ? 'Enum' : 'Class');
+                        $subjectDisplay = $this->ambiguousIfaceConstSubjectDisplay($entry);
+                        throw new \CompileError(sprintf(
+                            '%s %s inherits both %s::%s and %s::%s, which is ambiguous',
+                            $subjectKind,
+                            $subjectDisplay,
+                            $this->ambiguousIfaceConstOwnerDisplay($existingDeclLc),
+                            $constDisplay,
+                            $this->ambiguousIfaceConstOwnerDisplay($incomingDeclLc),
+                            $constDisplay
+                        ));
+                    }
                     // Class/interface body redeclared a final interface constant (#22329).
                     $this->rejectChildOverrideOfFinalClassConst($entry, $iface, $name);
                     continue;
@@ -18639,6 +18681,29 @@ restart:
                 }
             }
         }
+    }
+
+    /** Short display name for ambiguous-iface-const fatals (Zend zend_inheritance.c, #26672). */
+    private function ambiguousIfaceConstSubjectDisplay(ClassEntry $entry): string
+    {
+        $name = $entry->name;
+        if (str_contains($name, '\\')) {
+            $parts = explode('\\', ltrim($name, '\\'));
+
+            return end($parts) ?: $name;
+        }
+
+        return $name;
+    }
+
+    /** Declaring interface display for ambiguous-iface-const fatals (#26672). */
+    private function ambiguousIfaceConstOwnerDisplay(string $lc): string
+    {
+        if (isset($this->context->classes[$lc])) {
+            return $this->ambiguousIfaceConstSubjectDisplay($this->context->classes[$lc]);
+        }
+
+        return $lc;
     }
 
     /**

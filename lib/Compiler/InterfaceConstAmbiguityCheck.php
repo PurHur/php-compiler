@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
-use PHPCfg\AbstractVisitor;
-use PHPCfg\Block;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
 use PHPCfg\Traverser;
 use PHPCfg\Visitor\DeclarationFinder;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context as VMContext;
 
 /**
  * Compile-time check: class implementing two interfaces with the same constant name
  * is ambiguous — Zend E_COMPILE_ERROR (#24699, Zend/zend_inheritance.c).
  *
  * php-src: Zend/zend_inheritance.c — do_inherit_iface_constant()
+ *
+ * Same-script units are covered by collecting interface decls from the CFG. Eval and
+ * cross-file `require` units resolve already-declared interfaces via {@see VMContext}
+ * (#26672) — the same ClassEntry table Runtime::compile() passes into the compiler.
  */
 final class InterfaceConstAmbiguityCheck
 {
@@ -26,9 +30,14 @@ final class InterfaceConstAmbiguityCheck
     /** @var array<string, string> lc => display name */
     private array $interfaceDisplayNames = [];
 
-    public static function validate(Script $script): void
+    public function __construct(
+        private readonly ?VMContext $vmContext = null,
+    ) {
+    }
+
+    public static function validate(Script $script, ?VMContext $vmContext = null): void
     {
-        $check = new self();
+        $check = new self($vmContext);
         $check->collect($script);
         $check->verify($script);
     }
@@ -81,21 +90,25 @@ final class InterfaceConstAmbiguityCheck
     private function verifyClass(Op\Stmt\Class_ $class): void
     {
         $classDisplay = $this->operandDisplayName($class->name, 'class');
-        $this->checkImplementsForAmbiguity($class->implements, $classDisplay, $class);
+        $this->checkImplementsForAmbiguity($class->implements, 'Class', $classDisplay, $class);
     }
 
     private function verifyEnum(Op\Stmt\Enum_ $enum): void
     {
         $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
-        $this->checkImplementsForAmbiguity($enum->implements, $enumDisplay, $enum);
+        $this->checkImplementsForAmbiguity($enum->implements, 'Enum', $enumDisplay, $enum);
     }
 
     /**
      * @param list<Operand> $implements
      */
-    private function checkImplementsForAmbiguity(array $implements, string $subjectDisplay, Op $subject): void
-    {
-        /** @var array<string, string> constant-name => interface-display-name (first seen) */
+    private function checkImplementsForAmbiguity(
+        array $implements,
+        string $subjectKind,
+        string $subjectDisplay,
+        Op $subject
+    ): void {
+        /** @var array<string, string> constant-name => declaring-interface-display-name (first seen) */
         $seen = [];
 
         foreach ($implements as $ifaceOperand) {
@@ -103,27 +116,83 @@ final class InterfaceConstAmbiguityCheck
             if (null === $ifaceLc) {
                 continue;
             }
-            $ifaceDisplay = $this->interfaceDisplayNames[$ifaceLc] ?? $ifaceLc;
-            $constants = $this->interfaceConstants[$ifaceLc] ?? [];
 
-            foreach ($constants as $constName) {
+            foreach ($this->constantsForInterface($ifaceLc) as [$constName, $declaringDisplay]) {
                 if (isset($seen[$constName])) {
                     throw new CompileFatal(
                         $subject->getFile(),
                         $subject->getLine(),
                         sprintf(
-                            'Class %s inherits both %s::%s and %s::%s, which is ambiguous',
+                            '%s %s inherits both %s::%s and %s::%s, which is ambiguous',
+                            $subjectKind,
                             $subjectDisplay,
                             $seen[$constName],
                             $constName,
-                            $ifaceDisplay,
+                            $declaringDisplay,
                             $constName
                         )
                     );
                 }
-                $seen[$constName] = $ifaceDisplay;
+                $seen[$constName] = $declaringDisplay;
             }
         }
+    }
+
+    /**
+     * Direct script-local interface constants, else already-declared ClassEntry constants (#26672).
+     *
+     * @return list<array{0: string, 1: string}> list of [constName, declaringInterfaceDisplay]
+     */
+    private function constantsForInterface(string $ifaceLc): array
+    {
+        if (array_key_exists($ifaceLc, $this->interfaceConstants)) {
+            $ifaceDisplay = $this->interfaceDisplayNames[$ifaceLc] ?? $ifaceLc;
+            $out = [];
+            foreach ($this->interfaceConstants[$ifaceLc] as $constName) {
+                $out[] = [$constName, $ifaceDisplay];
+            }
+
+            return $out;
+        }
+
+        $entry = $this->vmContext?->classes[$ifaceLc] ?? null;
+        if (!$entry instanceof ClassEntry || !$entry->isInterface) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($entry->constants as $constKey => $_) {
+            $constName = $entry->constNames[$constKey] ?? (string) $constKey;
+            $declLc = $entry->constDeclaringClassLc[$constKey] ?? $ifaceLc;
+            $out[] = [$constName, $this->displayNameForLc($declLc)];
+        }
+
+        return $out;
+    }
+
+    private function displayNameForLc(string $lc): string
+    {
+        if (isset($this->interfaceDisplayNames[$lc])) {
+            return $this->interfaceDisplayNames[$lc];
+        }
+        $entry = $this->vmContext?->classes[$lc] ?? null;
+        if ($entry instanceof ClassEntry) {
+            return $this->classEntryDisplayName($entry);
+        }
+
+        return $lc;
+    }
+
+    private function classEntryDisplayName(ClassEntry $entry): string
+    {
+        $name = $entry->name;
+        if (str_contains($name, '\\')) {
+            $parts = explode('\\', ltrim($name, '\\'));
+
+            return end($parts) ?: $name;
+        }
+
+        return $name;
     }
 
     private function operandLcName(Operand $op): ?string

@@ -614,7 +614,7 @@ class Compiler {
         ClassConstVisibilityInheritCheck::validate($script);
         PropertyVisibilityInheritCheck::validate($script);
         InterfaceConstVisibilityCheck::validate($script);
-        InterfaceConstAmbiguityCheck::validate($script);
+        InterfaceConstAmbiguityCheck::validate($script, $this->vmContext);
         InterfaceMethodVisibilityCheck::validate($script);
         InterfaceMethodFinalCheck::validate($script);
         InterfaceMethodBodyCheck::validate($script);
