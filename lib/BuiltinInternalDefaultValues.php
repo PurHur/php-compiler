@@ -291,6 +291,11 @@ final class BuiltinInternalDefaultValues
         'strtotime' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — utcOffset/isDST = -1 (InternalArgInfo int → 0) (#26358)
+        'timezone_name_from_abbr' => [
+            1 => ['kind' => 'int', 'value' => -1],
+            2 => ['kind' => 'int', 'value' => -1],
+        ],
         // php-src ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int → 0) (#25440)
         'idate' => [
             1 => ['kind' => 'null'],

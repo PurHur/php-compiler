@@ -68,6 +68,8 @@ final class BuiltinInternalArgInfo
             'idate' => 'int|false',
             // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#26325)
             'strtotime', 'mktime', 'gmmktime' => 'int|false',
+            // ext/date/php_date.stub.php — InternalArgInfo return string (missing |false) (#26358)
+            'timezone_name_from_abbr' => 'string|false',
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             'strstr', 'stristr' => 'string|false',
