@@ -4297,7 +4297,9 @@ final class VmDateTimeNative
     }
 
     /**
-     * Calendar diff between two timestamps (php-src php_date_diff v1, #4604).
+     * Calendar diff between two timestamps (php-src php_date_diff / timelib_diff, #4604, #26693).
+     *
+     * Microseconds participate in ordering, invert, and DateInterval::$f (fractional seconds).
      *
      * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: int}
      */
@@ -4305,17 +4307,32 @@ final class VmDateTimeNative
         int $baseTs,
         int $targetTs,
         string $tzName,
-        bool $absolute = false
+        bool $absolute = false,
+        int $baseUs = 0,
+        int $targetUs = 0
     ): array {
-        $invert = $targetTs < $baseTs ? 1 : 0;
+        $baseUs = self::normalizeMicrosecond($baseUs);
+        $targetUs = self::normalizeMicrosecond($targetUs);
+        $targetEarlier = $targetTs < $baseTs
+            || ($targetTs === $baseTs && $targetUs < $baseUs);
+        $invert = $targetEarlier ? 1 : 0;
         $earlier = $invert ? $targetTs : $baseTs;
         $later = $invert ? $baseTs : $targetTs;
+        $earlierUs = $invert ? $targetUs : $baseUs;
+        $laterUs = $invert ? $baseUs : $targetUs;
         if ($absolute) {
             $invert = 0;
         }
         $days = (int) \floor(\abs($targetTs - $baseTs) / 86_400);
 
-        return self::withTimezone($tzName, static function () use ($earlier, $later, $invert, $days): array {
+        return self::withTimezone($tzName, static function () use (
+            $earlier,
+            $later,
+            $earlierUs,
+            $laterUs,
+            $invert,
+            $days
+        ): array {
             $tm1 = self::localtime($earlier);
             $tm2 = self::localtime($later);
             if (null === $tm1 || null === $tm2) {
@@ -4336,6 +4353,8 @@ final class VmDateTimeNative
             $i2 = self::tmInt($tm2, 'tm_min');
             $s2 = self::tmInt($tm2, 'tm_sec');
 
+            // Fractional seconds first (timelib relative us → DateInterval::$f).
+            $f = ($laterUs - $earlierUs) / 1_000_000.0;
             $s = $s2 - $s1;
             $i = $i2 - $i1;
             $h = $h2 - $h1;
@@ -4343,6 +4362,10 @@ final class VmDateTimeNative
             $m = $m2 - $m1;
             $y = $y2 - $y1;
 
+            if ($f < 0.0) {
+                $f += 1.0;
+                --$s;
+            }
             if ($s < 0) {
                 $s += 60;
                 --$i;
@@ -4380,11 +4403,23 @@ final class VmDateTimeNative
                 'h' => $h,
                 'i' => $i,
                 's' => $s,
-                'f' => 0.0,
+                'f' => $f,
                 'invert' => $invert,
                 'days' => $days,
             ];
         });
+    }
+
+    private static function normalizeMicrosecond(int $us): int
+    {
+        if ($us < 0) {
+            return 0;
+        }
+        if ($us > 999_999) {
+            return 999_999;
+        }
+
+        return $us;
     }
 
     private static function daysInMonth(int $year, int $month): int

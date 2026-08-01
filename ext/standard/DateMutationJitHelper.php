@@ -28,6 +28,8 @@ final class DateMutationJitHelper
 
     private static int $diffS = 0;
 
+    private static float $diffF = 0.0;
+
     private static int $diffInvert = 0;
 
     private static int $diffDays = 0;
@@ -92,15 +94,25 @@ final class DateMutationJitHelper
         int $baseTs,
         int $targetTs,
         bool $absolute,
-        string $tzName
+        string $tzName,
+        int $baseUs = 0,
+        int $targetUs = 0
     ): void {
-        $diff = VmDateTimeNative::diffTimestamps($baseTs, $targetTs, $tzName, $absolute);
+        $diff = VmDateTimeNative::diffTimestamps(
+            $baseTs,
+            $targetTs,
+            $tzName,
+            $absolute,
+            $baseUs,
+            $targetUs
+        );
         self::$diffY = $diff['y'];
         self::$diffM = $diff['m'];
         self::$diffD = $diff['d'];
         self::$diffH = $diff['h'];
         self::$diffI = $diff['i'];
         self::$diffS = $diff['s'];
+        self::$diffF = $diff['f'];
         self::$diffInvert = $diff['invert'];
         self::$diffDays = $diff['days'];
     }
@@ -133,6 +145,11 @@ final class DateMutationJitHelper
     public static function diffOutS(): int
     {
         return self::$diffS;
+    }
+
+    public static function diffOutF(): float
+    {
+        return self::$diffF;
     }
 
     public static function diffOutInvert(): int

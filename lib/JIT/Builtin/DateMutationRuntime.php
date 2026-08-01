@@ -44,6 +44,8 @@ final class DateMutationRuntime
 
     private const DIFF_OUT_S = 'PHPCompiler\\ext\\standard\\DateMutationJitHelper::diffOutS';
 
+    private const DIFF_OUT_F = 'PHPCompiler\\ext\\standard\\DateMutationJitHelper::diffOutF';
+
     private const DIFF_OUT_INVERT = 'PHPCompiler\\ext\\standard\\DateMutationJitHelper::diffOutInvert';
 
     private const DIFF_OUT_DAYS = 'PHPCompiler\\ext\\standard\\DateMutationJitHelper::diffOutDays';
@@ -61,6 +63,7 @@ final class DateMutationRuntime
         self::DIFF_OUT_H,
         self::DIFF_OUT_I,
         self::DIFF_OUT_S,
+        self::DIFF_OUT_F,
         self::DIFF_OUT_INVERT,
         self::DIFF_OUT_DAYS,
     ];
@@ -208,9 +211,13 @@ final class DateMutationRuntime
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
         $i64p = $context->getTypeFromString('int64*');
+        $dblp = $context->getTypeFromString('double*');
+        // baseTs, baseUs, targetTs, targetUs, absolute, tz, outY..outS, outF, outInvert, outDays (#26693)
         $ft = $context->context->functionType(
             $voidTy,
             false,
+            $i64,
+            $i64,
             $i64,
             $i64,
             $i1,
@@ -221,6 +228,7 @@ final class DateMutationRuntime
             $i64p,
             $i64p,
             $i64p,
+            $dblp,
             $i64p,
             $i64p
         );
@@ -229,22 +237,25 @@ final class DateMutationRuntime
         $entry = $fn->appendBasicBlock('date_df_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
-        $tzStr = self::cstrToString($context, $fn->getParam(3));
+        $tzStr = self::cstrToString($context, $fn->getParam(5));
         $context->builder->call(
             self::helperFunction($context, self::COMPUTE_DIFF),
             $fn->getParam(0),
-            $fn->getParam(1),
             $fn->getParam(2),
-            $tzStr
+            $fn->getParam(4),
+            $tzStr,
+            $fn->getParam(1),
+            $fn->getParam(3)
         );
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_Y)), $fn->getParam(4));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_M)), $fn->getParam(5));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_D)), $fn->getParam(6));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_H)), $fn->getParam(7));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_I)), $fn->getParam(8));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_S)), $fn->getParam(9));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_INVERT)), $fn->getParam(10));
-        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_DAYS)), $fn->getParam(11));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_Y)), $fn->getParam(6));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_M)), $fn->getParam(7));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_D)), $fn->getParam(8));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_H)), $fn->getParam(9));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_I)), $fn->getParam(10));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_S)), $fn->getParam(11));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_F)), $fn->getParam(12));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_INVERT)), $fn->getParam(13));
+        $context->builder->store($context->builder->call(self::helperFunction($context, self::DIFF_OUT_DAYS)), $fn->getParam(14));
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }

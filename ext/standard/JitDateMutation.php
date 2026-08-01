@@ -109,11 +109,14 @@ final class JitDateMutation
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
         $baseTs = self::readLongProp($context, $object, $baseObj, 'DateTime', DateTimeSupport::TS_PROPERTY);
+        $baseUs = self::readLongProp($context, $object, $baseObj, 'DateTime', DateTimeSupport::MICROSECOND_PROPERTY);
         $targetTs = self::readLongProp($context, $object, $targetObj, 'DateTime', DateTimeSupport::TS_PROPERTY);
+        $targetUs = self::readLongProp($context, $object, $targetObj, 'DateTime', DateTimeSupport::MICROSECOND_PROPERTY);
         $tz = self::readStringProp($context, $object, $baseObj, 'DateTime', DateTimeSupport::TZ_PROPERTY);
         $tzCstr = self::stringData($context, $tz);
 
         $i64 = $context->getTypeFromString('int64');
+        $dbl = $context->getTypeFromString('double');
         $i1 = $context->getTypeFromString('int1');
         $i64p = $context->getTypeFromString('int64*');
         $outY = $context->builder->alloca($i64, 1, 'date_df_y');
@@ -122,13 +125,16 @@ final class JitDateMutation
         $outH = $context->builder->alloca($i64, 1, 'date_df_h');
         $outI = $context->builder->alloca($i64, 1, 'date_df_i');
         $outS = $context->builder->alloca($i64, 1, 'date_df_s');
+        $outF = $context->builder->alloca($dbl, 1, 'date_df_f');
         $outInvert = $context->builder->alloca($i64, 1, 'date_df_inv');
         $outDays = $context->builder->alloca($i64, 1, 'date_df_days');
 
         $context->builder->call(
             $context->lookupFunction('__phpc_date_diff_scalars'),
             $baseTs,
+            $baseUs,
             $targetTs,
+            $targetUs,
             $i1->constInt($absolute ? 1 : 0, false),
             $tzCstr,
             $outY,
@@ -137,6 +143,7 @@ final class JitDateMutation
             $outH,
             $outI,
             $outS,
+            $outF,
             $outInvert,
             $outDays
         );
@@ -149,6 +156,7 @@ final class JitDateMutation
             $context->builder->load($outH),
             $context->builder->load($outI),
             $context->builder->load($outS),
+            $context->builder->load($outF),
             $context->builder->load($outInvert),
             $context->builder->load($outDays)
         );
@@ -251,7 +259,7 @@ final class JitDateMutation
         return ['amount' => $amount, 'unit' => $code];
     }
 
-  private static function materializeDateIntervalFromScalars(
+    private static function materializeDateIntervalFromScalars(
         Context $context,
         Value $y,
         Value $m,
@@ -259,6 +267,7 @@ final class JitDateMutation
         Value $h,
         Value $i,
         Value $s,
+        Value $f,
         Value $invert,
         Value $days
     ): Value {
@@ -279,6 +288,16 @@ final class JitDateMutation
                 JITVariable::TYPE_NATIVE_LONG
             );
         }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, 'DateInterval', 'f'),
+            new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_DOUBLE,
+                JITVariable::KIND_VALUE,
+                $f
+            ),
+            JITVariable::TYPE_NATIVE_DOUBLE
+        );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, 'DateInterval', 'days'),
             new JITVariable(
