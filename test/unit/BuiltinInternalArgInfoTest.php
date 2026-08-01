@@ -114,6 +114,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src array.stub.php — absent from InternalArgInfo; Zend array→string|int|null (#26111). */
+    public function testArrayKeyFirstLastReflectionStubTypes(): void
+    {
+        foreach (['array_key_first', 'array_key_last'] as $f) {
+            $this->assertSame('string|int|null', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($info, $f);
+            $this->assertSame('array', $info['type'], $f);
+            $this->assertSame('array', $info['name'], $f);
+        }
+    }
+
     /** php-src array.stub.php — InternalArgInfo return bool; Zend true (#26172). */
     public function testUsortKsortFamilyReturnTypeIsTrue(): void
     {
