@@ -14,7 +14,8 @@ use PHPCompiler\MethodVisibility;
  * Compile-time magic method return type and arity rules (PHP 8.0+).
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
- * (#4988 return types; #25023 zero-parameter magic methods; #25025/#25029 __toString)
+ * (#4988 return types; #25023 zero-parameter magic methods; #25025/#25029 __toString;
+ * #26432 __set/__unset void return)
  */
 final class MagicMethodReturnTypeCheck
 {
@@ -112,6 +113,24 @@ final class MagicMethodReturnTypeCheck
                         $this->fatal(
                             $member,
                             "{$classDisplay}::__clone(): Return type must be void when declared"
+                        );
+                    }
+                    break;
+                case '__set':
+                    // php-src zend_check_magic_method_implementation — void (or never) only (#26432)
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidOrNeverType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "{$classDisplay}::__set(): Return type must be void when declared"
+                        );
+                    }
+                    break;
+                case '__unset':
+                    // php-src zend_check_magic_method_implementation — void (or never) only (#26432)
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidOrNeverType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "{$classDisplay}::__unset(): Return type must be void when declared"
                         );
                     }
                     break;

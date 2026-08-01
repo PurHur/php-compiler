@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4988 */
+/** @covers issues #4988 #26432 */
 final class MagicMethodReturnTypeCheckTest extends TestCase
 {
     /**
@@ -61,6 +61,20 @@ PHP,
 class C3 { public function __clone(): int { return 1; } }
 PHP,
             'C3::__clone(): Return type must be void when declared',
+        ];
+        yield '__set int' => [
+            <<<'PHP'
+<?php
+class Cs { public function __set(string $n, mixed $v): int { return 1; } }
+PHP,
+            'Cs::__set(): Return type must be void when declared',
+        ];
+        yield '__unset int' => [
+            <<<'PHP'
+<?php
+class Cu { public function __unset(string $n): int { return 1; } }
+PHP,
+            'Cu::__unset(): Return type must be void when declared',
         ];
         yield '__construct return type' => [
             <<<'PHP'
@@ -146,6 +160,8 @@ class Good {
     public function __serialize(): array { return []; }
     public function __unserialize(array $d): void {}
     public function __clone(): void {}
+    public function __set(string $n, mixed $v): void {}
+    public function __unset(string $n): void {}
     public function __debugInfo(): ?array { return null; }
     public function __destruct() {}
     public function __toString(): string { return 'Good'; }
@@ -168,6 +184,8 @@ class Good {
     public function __wakeup(): never { throw new Exception('no wakeup'); }
     public function __unserialize(array $d): never { throw new Exception('no unserialize'); }
     public function __clone(): never { throw new Exception('no clone'); }
+    public function __set(string $n, mixed $v): never { throw new Exception('no set'); }
+    public function __unset(string $n): never { throw new Exception('no unset'); }
 }
 echo Good::class, "\n";
 PHP;
