@@ -39,6 +39,8 @@
             <file>./test/compliance/EnumTraitMethodJitTest.php</file>
             <file>./test/compliance/EnumTraitPropertyFatalVMTest.php</file>
             <file>./test/compliance/EnumTraitPropertyFatalJITTest.php</file>
+            <file>./test/compliance/ReadonlyClassTraitPropertyFatalVMTest.php</file>
+            <file>./test/compliance/ReadonlyClassTraitPropertyFatalJITTest.php</file>
             <file>./test/compliance/IterableArrayUnionRedundantVMTest.php</file>
             <file>./test/compliance/ObjectClassUnionRedundantVMTest.php</file>
             <file>./test/compliance/PropertyDefaultClassPseudoConstVMTest.php</file>

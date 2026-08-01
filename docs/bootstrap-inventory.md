@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6722 |
-| Phase A inventory files (M2 ratio SSOT) | 6722 |
+| PHP files on vm.php path | 6723 |
+| Phase A inventory files (M2 ratio SSOT) | 6723 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21694 |
+| Source constructs flagged (warnings) | 21697 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4791,6 +4791,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/NewDereferenceableDesugar.php` | 0 | 2 |
 | `lib/Ast/PipeOperatorDesugar.php` | 0 | 1 |
 | `lib/Ast/ReadonlyAnonymousClassSyntax.php` | 0 | 1 |
+| `lib/Ast/ReadonlyClassTraitPropertyCompileCheck.php` | 0 | 2 |
 | `lib/Ast/ReadonlyFunctionAnnotator.php` | 0 | 1 |
 | `lib/Ast/ReadonlyFunctionRewriter.php` | 0 | 2 |
 | `lib/Ast/SealedClassAnnotator.php` | 0 | 1 |
@@ -5936,7 +5937,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 38 |
+| `lib/Runtime.php` | 0 | 39 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 7 |
@@ -42125,6 +42126,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `lib/Ast/ReadonlyClassTraitPropertyCompileCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 256)
+- 13 class method(s)
+
 ### `lib/Ast/ReadonlyFunctionAnnotator.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49409,35 +49416,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassAnnotator (line 145)
 - new StaticClassAnnotator (line 147)
 - new Ast\EnumPropertyCompileCheck (line 149)
-- new Ast\GeneratorYieldSourceMarker (line 150)
-- new ReadonlyFunctionAnnotator (line 151)
-- new TryCatchElseAttacher (line 152)
-- new Parser (line 153)
-- new ParserFactory (line 154)
-- new Traverser (line 158)
-- new InOperatorResolver (line 159)
-- new ExitFunctionResolver (line 160)
-- new VoidCastResolver (line 161)
-- new Visitor\Simplifier (line 162)
-- new Visitor\DeadBlockEliminator (line 163)
-- new Traverser (line 164)
-- new Visitor\PhiResolver (line 165)
-- new NullSafeLivenessDetector (line 166)
-- new Optimizer\AssignOp (line 167)
-- new CompilerTypeReconstructor (line 169)
-- new Compiler (line 187)
-- new VMContext (line 192)
-- new VM (line 198)
-- new JIT (line 308)
-- new JITContext (line 322)
-- new SealedClassPreprocessor (line 388)
-- new StaticClassPreprocessor (line 391)
-- new SourcePreprocessor\PropertyHooks (line 394)
-- new State (line 545)
-- new ReflectionProperty (line 579)
-- new ReflectionProperty (line 582)
-- new LintCompiler (line 994)
-- new Variable (line 1124)
+- new Ast\ReadonlyClassTraitPropertyCompileCheck (line 150)
+- new Ast\GeneratorYieldSourceMarker (line 151)
+- new ReadonlyFunctionAnnotator (line 152)
+- new TryCatchElseAttacher (line 153)
+- new Parser (line 154)
+- new ParserFactory (line 155)
+- new Traverser (line 159)
+- new InOperatorResolver (line 160)
+- new ExitFunctionResolver (line 161)
+- new VoidCastResolver (line 162)
+- new Visitor\Simplifier (line 163)
+- new Visitor\DeadBlockEliminator (line 164)
+- new Traverser (line 165)
+- new Visitor\PhiResolver (line 166)
+- new NullSafeLivenessDetector (line 167)
+- new Optimizer\AssignOp (line 168)
+- new CompilerTypeReconstructor (line 170)
+- new Compiler (line 188)
+- new VMContext (line 193)
+- new VM (line 199)
+- new JIT (line 309)
+- new JITContext (line 323)
+- new SealedClassPreprocessor (line 389)
+- new StaticClassPreprocessor (line 392)
+- new SourcePreprocessor\PropertyHooks (line 395)
+- new State (line 546)
+- new ReflectionProperty (line 580)
+- new ReflectionProperty (line 583)
+- new LintCompiler (line 995)
+- new Variable (line 1125)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

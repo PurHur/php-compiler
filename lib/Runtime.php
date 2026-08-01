@@ -147,6 +147,7 @@ class Runtime {
         $this->staticClassAnnotator = new StaticClassAnnotator();
         $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
+        $astTraverser->addVisitor(new Ast\ReadonlyClassTraitPropertyCompileCheck());
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
         $astTraverser->addVisitor(new ReadonlyFunctionAnnotator());
         $astTraverser->addVisitor(new TryCatchElseAttacher());
