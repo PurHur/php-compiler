@@ -159,4 +159,75 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'intersection_class_interface.php'));
         $this->assertSame("IntersectionConcrete\nIntersectionConcrete\nok\n", ob_get_clean());
     }
+
+    /** @covers issue #26605 */
+    public function testDuplicateIntersectionParamIsCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+function f(A&B&A $x) {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate type A is redundant');
+        $runtime->parseAndCompile($code, 'intersection_dup_param.php');
+    }
+
+    /** @covers issue #26605 */
+    public function testDuplicateIntersectionReturnIsCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+function f(): A&B&A { throw new Exception(); }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate type A is redundant');
+        $runtime->parseAndCompile($code, 'intersection_dup_return.php');
+    }
+
+    /** @covers issue #26605 */
+    public function testDuplicateIntersectionPropertyIsCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+class C { public A&B&A $x; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate type A is redundant');
+        $runtime->parseAndCompile($code, 'intersection_dup_prop.php');
+    }
+
+    /** @covers issue #26605 */
+    public function testDuplicateTraversableIntersectionIsCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(Traversable&Countable&Traversable $x) {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate type Traversable is redundant');
+        $runtime->parseAndCompile($code, 'intersection_dup_traversable.php');
+    }
+
+    /** @covers issue #26605 */
+    public function testDuplicateIntersectionCaseInsensitiveUsesSecondSpelling(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(Traversable&traversable $x) {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate type traversable is redundant');
+        $runtime->parseAndCompile($code, 'intersection_dup_case.php');
+    }
 }

@@ -7534,15 +7534,19 @@ class Compiler {
     }
 
     /**
-     * Zend: only class/interface types may appear in intersection types (#26401).
+     * Zend: only class/interface types may appear in intersection types (#26401);
+     * duplicate members are redundant (#26605).
      */
     protected function assertIntersectionTypeMembers(?Op\Type $type): void
     {
         $invalid = IntersectionTypeMemberCompileCheck::findInvalidMemberName($type);
-        if (null === $invalid) {
-            return;
+        if (null !== $invalid) {
+            $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor($invalid));
         }
-        $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor($invalid));
+        $duplicate = IntersectionTypeMemberCompileCheck::findDuplicateMemberName($type);
+        if (null !== $duplicate) {
+            $this->throwCompileError(IntersectionTypeMemberCompileCheck::duplicateMessageFor($duplicate));
+        }
     }
 
     /**

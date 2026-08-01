@@ -8,11 +8,15 @@ use PHPCfg\Op;
 use PHPCfg\Operand;
 
 /**
- * Reject non-class/interface members inside intersection types (#26401).
+ * Intersection type compile checks (zend_compile.c).
+ *
+ * - Non-class/interface members (#26401): {@code Type X cannot be part of an intersection type}.
+ * - Duplicate members (#26605): {@code Duplicate type X is redundant}.
  *
  * php-src: Zend/zend_compile.c — only class/interface types may appear in `&` intersections;
  * scalars, void/never/mixed/iterable/callable/object, true/false/null, and self/static/parent
- * produce: {@code Type X cannot be part of an intersection type}.
+ * are illegal; the same class/interface name must not appear twice (case-insensitive, leading
+ * `\` ignored; message uses the second occurrence's spelling).
  */
 final class IntersectionTypeMemberCompileCheck
 {
@@ -40,6 +44,11 @@ final class IntersectionTypeMemberCompileCheck
     public static function messageFor(string $typeName): string
     {
         return sprintf('Type %s cannot be part of an intersection type', $typeName);
+    }
+
+    public static function duplicateMessageFor(string $typeName): string
+    {
+        return sprintf('Duplicate type %s is redundant', $typeName);
     }
 
     /**
@@ -77,6 +86,71 @@ final class IntersectionTypeMemberCompileCheck
             }
 
             return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * First duplicate intersection member display name (second occurrence spelling), or null.
+     *
+     * Does not claim DNF arm redundancy {@code (A&B)|(A&B)} — that is a separate check.
+     */
+    public static function findDuplicateMemberName(?Op\Type $type): ?string
+    {
+        if (null === $type) {
+            return null;
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return self::findDuplicateMemberName($type->subtype);
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                $dup = self::findDuplicateMemberName($member);
+                if (null !== $dup) {
+                    return $dup;
+                }
+            }
+
+            return null;
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            $seen = [];
+            foreach ($type->types as $member) {
+                $display = self::memberCanonicalDisplayName($member);
+                if (null === $display) {
+                    // Nested intersection / unexpected shape — recurse.
+                    $nested = self::findDuplicateMemberName($member);
+                    if (null !== $nested) {
+                        return $nested;
+                    }
+                    continue;
+                }
+                $key = strtolower($display);
+                if (isset($seen[$key])) {
+                    return $display;
+                }
+                $seen[$key] = true;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Class/interface member name with leading {@code \} stripped; casing preserved.
+     */
+    private static function memberCanonicalDisplayName(Op\Type $member): ?string
+    {
+        if ($member instanceof Op\Type\Literal) {
+            return ltrim($member->name, '\\');
+        }
+        if ($member instanceof Op\Type\Reference) {
+            $name = self::referenceName($member);
+
+            return null !== $name ? ltrim($name, '\\') : null;
         }
 
         return null;
