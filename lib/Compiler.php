@@ -24981,6 +24981,10 @@ class Compiler {
     /**
      * php-cfg dead temps for `var_export($o->p)` / `var_export($a[0])` / `var_export($o->x++)`
      * — immediate prelude feeds arg #0 (#17540, #26491 / re-#10123).
+     *
+     * Do not list ConcatList / BinaryOp\Concat here: resolvePrecedingExpressionPreludeCallArgSlot
+     * and sibling producers compile via compileExpr(), which does not lower ConcatList (#26489).
+     * Encapsed skip lives in rewireVarExportNestedInlineCallArgSendSlots instead.
      */
     private function isImmediateVarExportExpressionPrelude(mixed $expr): bool
     {
@@ -55977,6 +55981,16 @@ class Compiler {
                 // var_export($text->data) / var_export(JSON_HEX_TAG | JSON_HEX_AMP) — expression prelude feeds arg #0, not stale FuncCall EXEC_RETURN (#17540, #17562).
                 $producerExpr = $producer instanceof Op\Expr\Assign ? $producer->expr : $producer;
                 if ($this->isImmediateVarExportExpressionPrelude($producerExpr)) {
+                    return;
+                }
+                // var_export("{$c}") / var_export("a{$c}b") — ConcatList already lowered via
+                // tryResolveEncapsedConcatListCallArgSlot; do not steal prior New_ EXEC_RETURN (#26489 / #13466).
+                // Keep this check out of isImmediateVarExportExpressionPrelude: that helper's other
+                // callers compileExpr() the prelude, and ConcatList is not an Expr compile path.
+                if (
+                    $producerExpr instanceof Op\Expr\ConcatList
+                    || $producerExpr instanceof Op\Expr\BinaryOp\Concat
+                ) {
                     return;
                 }
                 if ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall) {
