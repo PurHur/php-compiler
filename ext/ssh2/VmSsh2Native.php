@@ -390,6 +390,15 @@ final class VmSsh2Native
     /** LIBSSH2_SFTP_SETSTAT — set attributes (PECL ssh2_sftp_chmod; #26611). */
     public const SFTP_SETSTAT = 2;
 
+    /** LIBSSH2_SFTP_SYMLINK — create symlink (PECL ssh2_sftp_symlink; #26662). */
+    public const SFTP_SYMLINK = 0;
+
+    /** LIBSSH2_SFTP_READLINK — resolve symlink (PECL ssh2_sftp_readlink; #26662). */
+    public const SFTP_READLINK = 1;
+
+    /** LIBSSH2_SFTP_REALPATH — canonicalize path (PECL ssh2_sftp_realpath; #26661). */
+    public const SFTP_REALPATH = 2;
+
     private const SFTP_ATTR_SIZE = 0x00000001;
 
     private const SFTP_ATTR_UIDGID = 0x00000002;
@@ -553,6 +562,81 @@ final class VmSsh2Native
     }
 
     /**
+     * Canonicalize remote path (PECL ssh2_sftp_realpath; #26661).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     *
+     * @return string|false
+     */
+    public static function sftpRealpath(\FFI\CData $sftp, string $path)
+    {
+        return self::sftpSymlinkExRead($sftp, $path, self::SFTP_REALPATH);
+    }
+
+    /**
+     * Resolve remote symlink target (PECL ssh2_sftp_readlink; #26662).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     *
+     * @return string|false
+     */
+    public static function sftpReadlink(\FFI\CData $sftp, string $path)
+    {
+        return self::sftpSymlinkExRead($sftp, $path, self::SFTP_READLINK);
+    }
+
+    /**
+     * Create remote symlink (PECL ssh2_sftp_symlink; #26662).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     */
+    public static function sftpSymlink(\FFI\CData $sftp, string $target, string $link): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || '' === $target || '' === $link) {
+            return false;
+        }
+
+        return 0 === (int) $ffi->libssh2_sftp_symlink_ex(
+            $sftp,
+            $target,
+            \strlen($target),
+            $link,
+            \strlen($link),
+            self::SFTP_SYMLINK
+        );
+    }
+
+    /**
+     * READLINK / REALPATH via libssh2_sftp_symlink_ex (PECL 8192-byte buffer).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     *
+     * @return string|false
+     */
+    private static function sftpSymlinkExRead(\FFI\CData $sftp, string $path, int $linkType)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $buf = $ffi->new('char[8192]');
+        $n = (int) $ffi->libssh2_sftp_symlink_ex(
+            $sftp,
+            $path,
+            \strlen($path),
+            $buf,
+            8192,
+            $linkType
+        );
+        if ($n < 0) {
+            return false;
+        }
+
+        return \FFI::string($buf, $n);
+    }
+
+    /**
      * Open session channel, exec command, drain stdout (PECL ssh2_exec; #26576).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -684,6 +768,7 @@ int libssh2_sftp_mkdir_ex(LIBSSH2_SFTP *sftp, const char *path, size_t path_len,
 int libssh2_sftp_rmdir_ex(LIBSSH2_SFTP *sftp, const char *path, size_t path_len);
 int libssh2_sftp_unlink_ex(LIBSSH2_SFTP *sftp, const char *filename, size_t filename_len);
 int libssh2_sftp_rename_ex(LIBSSH2_SFTP *sftp, const char *source_filename, unsigned int source_filename_len, const char *dest_filename, unsigned int dest_filename_len, long flags);
+int libssh2_sftp_symlink_ex(LIBSSH2_SFTP *sftp, const char *path, unsigned int path_len, char *target, unsigned int target_len, int link_type);
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
 LIBSSH2_CHANNEL *libssh2_channel_open_ex(LIBSSH2_SESSION *session, const char *channel_type, unsigned int channel_type_len, unsigned int window_size, unsigned int packet_size, const char *message, unsigned int message_len);
 int libssh2_channel_process_startup(LIBSSH2_CHANNEL *channel, const char *request, size_t request_len, const char *message, size_t message_len);

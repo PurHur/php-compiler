@@ -805,3 +805,51 @@ final class ssh2_sftp_chmod extends Ssh2Function
         $frame->returnVar->bool(VmSsh2Native::sftpChmod($native, $filename, $mode));
     }
 }
+
+/**
+ * ssh2_sftp_realpath(resource $sftp, string $filename): string|false
+ */
+final class ssh2_sftp_realpath extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_realpath');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_realpath() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_realpath', 1);
+        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_realpath', 2, 'filename');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            @\trigger_error(
+                \sprintf("ssh2_sftp_realpath(): Unable to resolve realpath for '%s'", $filename),
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $resolved = VmSsh2Native::sftpRealpath($native, $filename);
+        if (false === $resolved) {
+            @\trigger_error(
+                \sprintf("ssh2_sftp_realpath(): Unable to resolve realpath for '%s'", $filename),
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($resolved);
+    }
+}
