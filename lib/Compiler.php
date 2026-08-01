@@ -78,6 +78,7 @@ use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Compiler\AttributeClassRegistry;
+use PHPCompiler\Compiler\AttributeConstantEvaluator;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
@@ -920,20 +921,26 @@ class Compiler {
     /**
      * @param list<Op\Expr\Param> $params
      */
-    protected function assertNoDuplicateParameterAttributes(array $params): void
+    protected function assertNoDuplicateParameterAttributes(array $params, ?CfgFunc $func = null): void
     {
-        foreach ($params as $param) {
-            $entries = AttributeMetadata::fromOp($param);
-            $names = AttributeEntry::namesFromList($entries);
-            AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter', $entries);
-            AttributeNames::assertAttributeMetaClassTargetOnly($names, 'parameter', $entries);
-            AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter', $entries);
-            AttributeNames::assertCompileTimeConstTargetOnly($names, 'parameter', $entries);
-            AttributeNames::assertSensitiveParameterParamTargetOnly($names, 'parameter', $entries);
-            AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($names, 'parameter', $entries);
-            AttributeNames::assertDeprecatedTargetAllowed($names, 'parameter', $entries);
-            AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
-        }
+        AttributeConstantEvaluator::withUserlandConstContext(
+            $this->userlandConstScalarsForAttributes(),
+            $this->namespaceHintFromFunc($func),
+            function () use ($params): void {
+                foreach ($params as $param) {
+                    $entries = AttributeMetadata::fromOp($param);
+                    $names = AttributeEntry::namesFromList($entries);
+                    AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter', $entries);
+                    AttributeNames::assertAttributeMetaClassTargetOnly($names, 'parameter', $entries);
+                    AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter', $entries);
+                    AttributeNames::assertCompileTimeConstTargetOnly($names, 'parameter', $entries);
+                    AttributeNames::assertSensitiveParameterParamTargetOnly($names, 'parameter', $entries);
+                    AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($names, 'parameter', $entries);
+                    AttributeNames::assertDeprecatedTargetAllowed($names, 'parameter', $entries);
+                    AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
+                }
+            }
+        );
     }
 
     /**
@@ -996,7 +1003,7 @@ class Compiler {
             }
             if ([] !== $params) {
                 $this->assertNoDuplicateParameterNames($params);
-                $this->assertNoDuplicateParameterAttributes($params);
+                $this->assertNoDuplicateParameterAttributes($params, $func);
                 $this->assertReadonlyParamOnlyInConstructor($params, $func);
                 $this->assertVariadicParamIsLast($params);
             }
@@ -1020,6 +1027,9 @@ class Compiler {
                 && null === $func->class
                 && $block === $func->cfg
             ) {
+                // Attribute args on early-bound FUNCDEFs fold userland consts; those consts are
+                // otherwise prescanned only inside compileOps, which runs after this hoist (#26628).
+                $this->prescanCompileTimeGlobalConsts($block->children, $new);
                 $this->emitEarlyBoundFunctionDefs($block, $new);
             }
             $this->compileBlock($new);
@@ -6614,7 +6624,7 @@ class Compiler {
         AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'method', $declare->attributeEntries);
         AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($declare->attributeNames, 'method', $declare->attributeEntries);
         AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'method', $declare->attributeEntries);
-        $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
+        $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params, $child->func);
         // Abstract/interface methods have no method body block — keep return AST for cross-file LSP (#25384).
         // Untyped `__toString` is `: string` for Reflection / LSP (zend_compile.c, #26402).
         $declare->returnDeclaredType = $this->implicitToStringReturnType($child->func)
@@ -6628,28 +6638,34 @@ class Compiler {
      *
      * @return list<ParameterMetadata>
      */
-    protected function parameterMetadataFromParams(array $params): array
+    protected function parameterMetadataFromParams(array $params, ?CfgFunc $func = null): array
     {
-        $metadata = [];
-        foreach ($params as $param) {
-            if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
-                continue;
-            }
-            $isVariadic = (bool) $param->variadic;
-            $hasDefault = null !== $param->defaultVar || null !== $param->defaultBlock;
-            $metadata[] = new ParameterMetadata(
-                $param->name->value,
-                AttributeMetadata::fromOp($param),
-                $this->isPromotedParam($param),
-                $isVariadic || $hasDefault,
-                $isVariadic,
-                (bool) $param->byRef,
-                $this->parameterTypeStringForDump($param),
-                $this->parameterDefaultExportForDump($param),
-            );
-        }
+        return AttributeConstantEvaluator::withUserlandConstContext(
+            $this->userlandConstScalarsForAttributes(),
+            $this->namespaceHintFromFunc($func),
+            function () use ($params): array {
+                $metadata = [];
+                foreach ($params as $param) {
+                    if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                        continue;
+                    }
+                    $isVariadic = (bool) $param->variadic;
+                    $hasDefault = null !== $param->defaultVar || null !== $param->defaultBlock;
+                    $metadata[] = new ParameterMetadata(
+                        $param->name->value,
+                        AttributeMetadata::fromOp($param),
+                        $this->isPromotedParam($param),
+                        $isVariadic || $hasDefault,
+                        $isVariadic,
+                        (bool) $param->byRef,
+                        $this->parameterTypeStringForDump($param),
+                        $this->parameterDefaultExportForDump($param),
+                    );
+                }
 
-        return $metadata;
+                return $metadata;
+            }
+        );
     }
 
     /**
@@ -6749,9 +6765,112 @@ class Compiler {
 
     protected function assignAttributeMetadata(OpCode $op, Op $cfgOp): void
     {
-        $entries = AttributeMetadata::fromOp($cfgOp);
+        $entries = AttributeConstantEvaluator::withUserlandConstContext(
+            $this->userlandConstScalarsForAttributes(),
+            $this->namespaceHintFromCfgOp($cfgOp),
+            static fn (): array => AttributeMetadata::fromOp($cfgOp)
+        );
         $op->attributeEntries = AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
         $op->attributeNames = AttributeEntry::namesFromList($op->attributeEntries);
+    }
+
+    /**
+     * Scalar map of file/namespace consts for attribute ConstFetch folding (#26628).
+     *
+     * @return array<string, mixed>
+     */
+    private function userlandConstScalarsForAttributes(): array
+    {
+        $out = [];
+        foreach ($this->compileTimeGlobalConsts as $lc => $var) {
+            try {
+                $out[$lc] = AttributeConstantEvaluator::phpScalarFromVariable($var);
+            } catch (\LogicException $e) {
+                // Non-scalar compile-time values cannot appear in attribute args.
+            }
+        }
+
+        return $out;
+    }
+
+    /** Declaring namespace for relative ConstFetch in attribute args (#26628). */
+    private function namespaceHintFromCfgOp(Op $cfgOp): string
+    {
+        if ($cfgOp instanceof Op\Stmt\Function_) {
+            return $this->namespaceHintFromFunc($cfgOp->func);
+        }
+        if ($cfgOp instanceof Op\Stmt\ClassMethod) {
+            return $this->namespaceHintFromFunc($cfgOp->func);
+        }
+        if ($cfgOp instanceof Op\Stmt\ClassLike) {
+            $name = $this->staticNameFromOperand($cfgOp->name);
+
+            return null !== $name ? $this->namespaceFromFqcn($name) : '';
+        }
+        if ($cfgOp instanceof Op\Terminal\Const_) {
+            $name = $this->staticNameFromOperand($cfgOp->name);
+
+            return null !== $name ? $this->namespaceFromFqcn($name) : '';
+        }
+        if ($cfgOp instanceof Op\Expr\Param || $cfgOp instanceof Op\Expr\Closure || $cfgOp instanceof Op\Expr\ArrowFunction) {
+            if (null !== $this->compilingClassDisplayName && '' !== $this->compilingClassDisplayName) {
+                return $this->namespaceFromFqcn($this->compilingClassDisplayName);
+            }
+        }
+        if (null !== $this->compilingClassDisplayName && '' !== $this->compilingClassDisplayName) {
+            return $this->namespaceFromFqcn($this->compilingClassDisplayName);
+        }
+
+        return '';
+    }
+
+    private function namespaceHintFromFunc(?CfgFunc $func): string
+    {
+        if (null === $func) {
+            if (null !== $this->compilingClassDisplayName && '' !== $this->compilingClassDisplayName) {
+                return $this->namespaceFromFqcn($this->compilingClassDisplayName);
+            }
+
+            return '';
+        }
+        $className = $this->funcClassNameString($func);
+        if (null !== $className && '' !== $className) {
+            return $this->namespaceFromFqcn($className);
+        }
+        if ('{main}' === $func->name || '' === $func->name) {
+            return '';
+        }
+
+        return $this->namespaceFromFqcn($func->name);
+    }
+
+    private function funcClassNameString(CfgFunc $func): ?string
+    {
+        if (!isset($func->class) || null === $func->class) {
+            return null;
+        }
+        if (is_string($func->class)) {
+            return $func->class;
+        }
+        if ($func->class instanceof Operand\Literal && is_string($func->class->value)) {
+            return $func->class->value;
+        }
+        if ($func->class instanceof Operand) {
+            return $this->staticNameFromOperand($func->class);
+        }
+
+        return null;
+    }
+
+    private function namespaceFromFqcn(string $fqcn): string
+    {
+        $fqcn = ltrim($fqcn, '\\');
+        $pos = strrpos($fqcn, '\\');
+        if (false === $pos) {
+            return '';
+        }
+
+        return substr($fqcn, 0, $pos);
     }
 
     protected function assignSourceMetadata(OpCode $op, Op $cfgOp): void
@@ -11394,7 +11513,7 @@ class Compiler {
         );
         $return->block1 = $funcBlock;
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($function);
-        $return->parameterMetadata = $this->parameterMetadataFromParams($function->func->params);
+        $return->parameterMetadata = $this->parameterMetadataFromParams($function->func->params, $function->func);
         $this->assignAttributeMetadata($return, $function);
         $this->assignSourceMetadata($return, $function);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($return->attributeNames, 'function', $return->attributeEntries);
@@ -13285,7 +13404,7 @@ class Compiler {
             $this->compileOperand($expr->result, $block, false),
         );
         $op->block1 = $funcBlock;
-        $op->parameterMetadata = $this->parameterMetadataFromParams($func->params);
+        $op->parameterMetadata = $this->parameterMetadataFromParams($func->params, $func);
         $this->assignAttributeMetadata($op, $expr);
         $this->assignSourceMetadata($op, $expr);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($op->attributeNames, 'function', $op->attributeEntries);
