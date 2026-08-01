@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringClassExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -49,9 +51,8 @@ final class is_a_ extends Internal
         if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
             $matches = VmReflection::isInstanceOfObject($ctx, $subject, $className);
         } elseif ($allowString && Variable::TYPE_STRING === $subject->type) {
-            $child = VmReflection::resolveClassEntry($ctx, $subject->toString());
-            $matches = null !== $child
-                && VmReflection::isInstanceOf($ctx, $child, $className);
+            // zend_lookup_class — autoload string subject (#26406).
+            $matches = VmReflection::isAString($ctx, $subject->toString(), $className);
         }
         // null/scalar/array subjects — false without TypeError (php-src class.c, #10873).
         if (null !== $frame->returnVar) {
@@ -99,16 +100,11 @@ final class is_a_ extends Internal
             if ($allowStringKnownFalse) {
                 return $falseVal;
             }
-            $subjectName = ReflectionBuiltinHelper::requireCompileTimeClassName(
-                $context,
-                $args[0],
-                'is_a() subject class name'
-            );
-            $match = ReflectionBuiltinHelper::classIsInstanceOfLiteral(
-                $context,
-                $subjectName,
-                $className
-            );
+            // Runtime helper — autoloads like zend_lookup_class (#26406). Compile-time
+            // fold would skip registered autoloaders for not-yet-loaded class strings.
+            $childStr = JitStringArg::lower($context, $args[0], 'is_a() subject');
+            $classStr = $context->builder->load($context->constantStringFromString($className));
+            $match = StringClassExists::invokeIsAString($context, $childStr, $classStr);
 
             return $context->builder->select(
                 $allowString,

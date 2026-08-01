@@ -215,6 +215,18 @@ final class VmReflection
     }
 
     /**
+     * zend_lookup_class — resolve a class name with autoload (#26406, #26407).
+     *
+     * php-src: Zend/zend_builtin_functions.c — is_a / is_subclass_of / method_exists / property_exists
+     */
+    public static function lookupClassEntryWithAutoload(Context $ctx, string $className): ?ClassEntry
+    {
+        self::maybeAutoloadClass($ctx, $className, true);
+
+        return self::resolveClassEntry($ctx, $className);
+    }
+
+    /**
      * Second parameter for class_exists/interface_exists/trait_exists/enum_exists (php-src zif_* autoload flag).
      */
     public static function autoloadFlagFromFrame(Frame $frame, int $argIndex = 1, bool $default = true): bool
@@ -2508,10 +2520,12 @@ final class VmReflection
 
     /**
      * is_subclass_of() class-string operand — strict subclass (excludes same class).
+     *
+     * Autoloads the subject like zend_lookup_class (#26406).
      */
     public static function isSubclassOf(Context $ctx, string $childName, string $parentName): bool
     {
-        $child = self::resolveClassEntry($ctx, $childName);
+        $child = self::lookupClassEntryWithAutoload($ctx, $childName);
         if (null === $child) {
             return false;
         }
@@ -2521,6 +2535,21 @@ final class VmReflection
         }
 
         return InterfaceCheck::entryIsInstanceOf($child, $parentLc, $ctx);
+    }
+
+    /**
+     * is_a() class-string operand with allow_string — includes same class (#26406).
+     *
+     * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(is_a) + zend_lookup_class
+     */
+    public static function isAString(Context $ctx, string $childName, string $className): bool
+    {
+        $child = self::lookupClassEntryWithAutoload($ctx, $childName);
+        if (null === $child) {
+            return false;
+        }
+
+        return self::isInstanceOf($ctx, $child, $className);
     }
 
     /**

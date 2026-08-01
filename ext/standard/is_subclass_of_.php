@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringClassExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -50,6 +52,7 @@ final class is_subclass_of_ extends Internal
             $matches = VmReflection::isSubclassOfObject($ctx, $subject, $parentName);
         } elseif (Variable::TYPE_STRING === $subject->type) {
             if ($allowString) {
+                // zend_lookup_class — autoload string subject (#26406).
                 $matches = VmReflection::isSubclassOf($ctx, $subject->toString(), $parentName);
             }
         }
@@ -74,8 +77,10 @@ final class is_subclass_of_ extends Internal
             ));
         }
         $allowString = $context->constantFromBool(true);
+        $allowStringKnownFalse = false;
         if (3 === \count($args)) {
             $allowString = JitBoolArg::lower($context, $args[2], 'is_subclass_of() allow_string');
+            $allowStringKnownFalse = self::jitAllowStringKnownFalse($context, $args[2]);
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'is_subclass_of() subject');
@@ -90,21 +95,29 @@ final class is_subclass_of_ extends Internal
                 ReflectionBuiltinHelper::emitSubclassOf($context, $args[0], $parentName)
             );
         }
-        $childName = ReflectionBuiltinHelper::requireCompileTimeClassName(
-            $context,
-            $args[0],
-            'is_subclass_of() child class'
-        );
-        $match = ReflectionBuiltinHelper::classIsSubclassOfLiteral(
-            $context,
-            $childName,
-            $parentName
-        );
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        if ($allowStringKnownFalse) {
+            return $falseVal;
+        }
+        // Runtime helper — autoloads like zend_lookup_class (#26406).
+        $childStr = JitStringArg::lower($context, $args[0], 'is_subclass_of() child class');
+        $parentStr = $context->builder->load($context->constantStringFromString($parentName));
+        $match = StringClassExists::invokeIsSubclassOfString($context, $childStr, $parentStr);
 
         return $context->builder->select(
             $allowString,
             $match,
-            $context->getTypeFromString('int1')->constInt(0, false)
+            $falseVal
         );
+    }
+
+    private static function jitAllowStringKnownFalse(Context $context, JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            return 0 === (int) $context->llvm->lib->LLVMConstIntGetZExtValue($arg->value->value);
+        }
+
+        return false;
     }
 }
