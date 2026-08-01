@@ -51,6 +51,7 @@ use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceConstAmbiguityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceMethodBodyCheck;
+use PHPCompiler\Compiler\InterfaceMethodFinalCheck;
 use PHPCompiler\Compiler\InterfaceMethodVisibilityCheck;
 use PHPCompiler\Compiler\EnumAbstractMethodCompileCheck;
 use PHPCompiler\Compiler\ClassConstDuplicateCheck;
@@ -608,6 +609,7 @@ class Compiler {
         InterfaceConstVisibilityCheck::validate($script);
         InterfaceConstAmbiguityCheck::validate($script);
         InterfaceMethodVisibilityCheck::validate($script);
+        InterfaceMethodFinalCheck::validate($script);
         InterfaceMethodBodyCheck::validate($script);
         AbstractMethodBodyCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);

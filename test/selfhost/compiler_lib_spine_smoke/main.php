@@ -4613,6 +4613,7 @@ require_once __DIR__.'/../../../lib/Compiler/InterfaceConstAmbiguityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceConstVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceImplementationCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodBodyCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodFinalCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodArityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodParamTypeCheck.php';
