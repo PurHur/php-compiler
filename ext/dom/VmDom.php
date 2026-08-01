@@ -6947,7 +6947,7 @@ final class VmDom
     }
 
     /**
-     * DOMElement::insertAdjacentHTML() — parse HTML and insert by position (php-src ext/dom/dom_element.c; #16128).
+     * DOMElement::insertAdjacentHTML() — parse HTML and insert by position (php-src PHP-8.5+ php_dom.stub.php; #26063).
      */
     public static function insertAdjacentHTML(
         Context $ctx,

@@ -1,5 +1,5 @@
 --TEST--
-stdlib DOMElement::insertAdjacentHTML() — PHP 8.4 profile (#16128, ext/dom/dom_element.c)
+stdlib DOMElement::insertAdjacentHTML() — PHP 8.5+ profile (#26063, re-#16128, ext/dom/php_dom.stub.php)
 --FILE--
 <?php
 $doc = new DOMDocument();

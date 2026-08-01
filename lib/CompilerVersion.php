@@ -3673,11 +3673,16 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMElement::insertAdjacentHTML() (ext/dom/dom_element.c, #16128).
+     * PHP 8.5+ Dom\Element::insertAdjacentHTML() / legacy DOMElement advertisement
+     * (php-src PHP-8.5+ ext/dom/php_dom.stub.php; #26063, re-#16128).
+     *
+     * PHP-8.4 stubs list insertAdjacentElement/Text only — no insertAdjacentHTML on
+     * Dom\Element or DOMElement. Withheld on PROFILE=8.4 / Zend 8.4. Enable via stable
+     * 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
      */
     public static function supportsDomElementInsertAdjacentHtml(): bool
     {
-        return self::supportsDomApiSince('8.4.0');
+        return self::supportsDomApiSince('8.5.0');
     }
 
     /**
