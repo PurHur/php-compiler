@@ -24902,7 +24902,8 @@ class Compiler {
     }
 
     /**
-     * php-cfg dead temps for `var_export($o->p)` / `var_export($a[0])` — immediate prelude feeds arg #0 (#17540).
+     * php-cfg dead temps for `var_export($o->p)` / `var_export($a[0])` / `var_export($o->x++)`
+     * — immediate prelude feeds arg #0 (#17540, #26491 / re-#10123).
      */
     private function isImmediateVarExportExpressionPrelude(mixed $expr): bool
     {
@@ -24917,6 +24918,10 @@ class Compiler {
             || $expr instanceof Op\Expr\Cast
             || $expr instanceof Op\Expr\UnaryMinus
             || $expr instanceof Op\Expr\UnaryPlus
+            || $expr instanceof Op\Expr\PostInc
+            || $expr instanceof Op\Expr\PreInc
+            || $expr instanceof Op\Expr\PostDec
+            || $expr instanceof Op\Expr\PreDec
             || $expr instanceof Op\Expr\Include_
             || $expr instanceof Op\Expr\Eval_
             || $this->isComparisonInlineCallArgProducer($expr)
@@ -42988,6 +42993,11 @@ class Compiler {
             ],
             $prelude instanceof Op\Expr\UnaryMinus => [OpCode::TYPE_UNARY_MINUS],
             $prelude instanceof Op\Expr\UnaryPlus => [OpCode::TYPE_UNARY_PLUS],
+            // Typed property ++/-- inline call-arg (#26491 / re-#10123, zend_execute.c).
+            $prelude instanceof Op\Expr\PostInc => [OpCode::TYPE_POST_INC],
+            $prelude instanceof Op\Expr\PreInc => [OpCode::TYPE_PRE_INC],
+            $prelude instanceof Op\Expr\PostDec => [OpCode::TYPE_POST_DEC],
+            $prelude instanceof Op\Expr\PreDec => [OpCode::TYPE_PRE_DEC],
             $this->isComparisonInlineCallArgProducer($prelude) => [OpCode::TYPE_IDENTICAL, OpCode::TYPE_NOT_IDENTICAL, OpCode::TYPE_EQUAL, OpCode::TYPE_NOT_EQUAL, OpCode::TYPE_SPACESHIP, OpCode::TYPE_SMALLER, OpCode::TYPE_GREATER, OpCode::TYPE_SMALLER_OR_EQUAL, OpCode::TYPE_GREATER_OR_EQUAL, OpCode::TYPE_INSTANCEOF, OpCode::TYPE_IN],
             $this->isArithmeticInlineCallArgProducer($prelude) => [
                 OpCode::TYPE_BITWISE_AND,
