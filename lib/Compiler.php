@@ -2485,6 +2485,10 @@ class Compiler {
                         if ($this->isNullsafePropertyFetchInWriteContext($ops, $i)) {
                             $this->throwCompileError("Can't use nullsafe operator in write context");
                         }
+                        // Zend: &$a?->x / &$a?->x->y — AssignRef RHS, not write-context LHS (#26638).
+                        if ($this->isNullsafeOperandUsedAsAssignRefRhs($ops, $i + 1, $child->result)) {
+                            $this->throwCompileError('Cannot take reference of a nullsafe chain');
+                        }
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                         $this->syncNullsafePropertyFetchResultToFollowingFuncCallArg($child, $block);
                     } elseif (
@@ -2494,6 +2498,10 @@ class Compiler {
                         // Lowered inside compileCoalesce nullsafe method eval (#19591).
                         break;
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
+                        // Zend: &$obj?->m() — AssignRef of nullsafe method result (#26638).
+                        if ($this->isNullsafeOperandUsedAsAssignRefRhs($ops, $i + 1, $child->result)) {
+                            $this->throwCompileError('Cannot take reference of a nullsafe chain');
+                        }
                         $block = $this->compileNullsafeMethodCall(
                             $child,
                             $block,
@@ -13134,6 +13142,8 @@ class Compiler {
                 $this->rejectCallReturnInWriteContext($expr->var, $block);
                 // Zend zend_compile.c: cannot acquire a reference to $GLOBALS (#15627).
                 $this->rejectGlobalsReferenceAcquisition($expr->expr);
+                // Zend zend_compile.c: &$a?->x / &$a?->m() (#26638).
+                $this->rejectNullsafeReferenceAcquisition($expr->expr, $block);
                 // Zend zend_compile.c: ref-binding to const/class-const array element (#5409).
                 $this->rejectGlobalConstInWriteContext($expr->expr, $block);
                 $bindRefFlags = 0;
@@ -57394,6 +57404,116 @@ class Compiler {
         }
 
         return $this->operandUsedInWriteContext($ops, $index + 1, $fetch->result);
+    }
+
+    /**
+     * Zend zend_compile.c: &$nullsafeChain is a distinct compile fatal from write-context (#26638).
+     *
+     * php-cfg hoists NullsafePropertyFetch / NullsafeMethodCall before AssignRef; the result may
+     * feed AssignRef.expr directly or via PropertyFetch / ArrayDimFetch / further nullsafe hops.
+     *
+     * @param Op[] $ops
+     */
+    private function isNullsafeOperandUsedAsAssignRefRhs(array $ops, int $startIndex, Operand $operand): bool
+    {
+        for ($j = $startIndex, $count = count($ops); $j < $count; ++$j) {
+            $op = $ops[$j];
+            if ($op instanceof Op\Expr\AssignRef && $this->operandsChainEqual($op->expr, $operand)) {
+                return true;
+            }
+            if ($op instanceof Op\Expr\NullsafePropertyFetch
+                && $this->operandsChainEqual($op->var, $operand)) {
+                return $this->isNullsafeOperandUsedAsAssignRefRhs($ops, $j + 1, $op->result);
+            }
+            if ($op instanceof Op\Expr\PropertyFetch
+                && $this->operandsChainEqual($op->var, $operand)) {
+                return $this->isNullsafeOperandUsedAsAssignRefRhs($ops, $j + 1, $op->result);
+            }
+            if ($op instanceof Op\Expr\ArrayDimFetch
+                && $this->operandsChainEqual($op->var, $operand)) {
+                return $this->isNullsafeOperandUsedAsAssignRefRhs($ops, $j + 1, $op->result);
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_compile.c: Cannot take reference of a nullsafe chain (#26638).
+     */
+    protected function rejectNullsafeReferenceAcquisition(?Operand $expr, ?Block $block = null): void
+    {
+        if (null === $expr) {
+            return;
+        }
+        if ($this->rvalueContainsNullsafeChain($expr, $block)) {
+            $this->throwCompileError('Cannot take reference of a nullsafe chain');
+        }
+    }
+
+    /**
+     * True when AssignRef RHS resolves to a ?-> property/method (or chain thereof).
+     */
+    protected function rvalueContainsNullsafeChain(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\NullsafePropertyFetch
+                || $operand->original instanceof Op\Expr\NullsafeMethodCall) {
+                return true;
+            }
+            if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
+                return $this->rvalueContainsNullsafeChain($operand->original->var, $block);
+            }
+            if ($operand->original instanceof Op\Expr\PropertyFetch) {
+                return $this->rvalueContainsNullsafeChain($operand->original->var, $block);
+            }
+            if (null === $operand->original) {
+                break;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\NullsafePropertyFetch
+            || $operand instanceof Op\Expr\NullsafeMethodCall) {
+            return true;
+        }
+        if ($operand instanceof Op\Expr\PropertyFetch || $operand instanceof Op\Expr\ArrayDimFetch) {
+            return $this->rvalueContainsNullsafeChain($operand->var, $block);
+        }
+        if (null !== $block && null !== $block->orig) {
+            if ($this->operandIsNullsafePropertyFetchResult($operand, $block->orig->children)
+                || $this->operandIsNullsafeMethodCallResult($operand, $block->orig->children)) {
+                return true;
+            }
+            $propFetch = $this->findPropertyFetchForResult($operand, $block);
+            if (null !== $propFetch) {
+                return $this->rvalueContainsNullsafeChain($propFetch->var, $block);
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function operandIsNullsafeMethodCallResult(?Operand $operand, array $ops): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        foreach ($ops as $child) {
+            if (!$child instanceof Op\Expr\NullsafeMethodCall) {
+                continue;
+            }
+            if ($this->operandsChainEqual($child->result, $operand)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
