@@ -61,6 +61,7 @@ use PHPCompiler\Compiler\MagicMethodArityCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\MagicMethodStaticCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
+use PHPCompiler\Compiler\IntersectionTypeMemberCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\NonAbstractMethodBodyCheck;
@@ -699,6 +700,7 @@ class Compiler {
             return;
         }
         $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
+        $this->assertIntersectionTypeMembers($returnType);
         $this->assertFunctionSignatureNeverType($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
@@ -7372,6 +7374,18 @@ class Compiler {
     }
 
     /**
+     * Zend: only class/interface types may appear in intersection types (#26401).
+     */
+    protected function assertIntersectionTypeMembers(?Op\Type $type): void
+    {
+        $invalid = IntersectionTypeMemberCompileCheck::findInvalidMemberName($type);
+        if (null === $invalid) {
+            return;
+        }
+        $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor($invalid));
+    }
+
+    /**
      * Zend zend_handle_never_type — never is only valid as a standalone signature type (#14334).
      */
     protected function assertFunctionSignatureNeverType(?Op\Type $type): void
@@ -7382,6 +7396,10 @@ class Compiler {
         if ($this->cfgTypeIsStandaloneNever($type)) {
             return;
         }
+        // Prefer intersection-specific wording when never appears under `&` (#26401).
+        if ($this->cfgTypeContainsNeverInIntersection($type)) {
+            $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor('never'));
+        }
         $this->throwCompileError('never can only be used as a standalone type');
     }
 
@@ -7390,12 +7408,16 @@ class Compiler {
      */
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
+        $this->assertIntersectionTypeMembers($type);
         if (!$this->cfgTypeContainsNever($type)) {
             return;
         }
         if ($this->cfgTypeIsStandaloneNever($type)) {
             $class = $this->compilingClassDisplayName ?? 'class';
             $this->throwCompileError(sprintf('Property %s::$%s cannot have type never', $class, $propName));
+        }
+        if ($this->cfgTypeContainsNeverInIntersection($type)) {
+            $this->throwCompileError(IntersectionTypeMemberCompileCheck::messageFor('never'));
         }
         $this->throwCompileError('never can only be used as a standalone type');
     }
@@ -7527,6 +7549,7 @@ class Compiler {
     protected function assertParamDeclaredType(?Op\Type $declared, Block $block, CfgFunc $func): void
     {
         $this->rejectPseudoClassTypeHintOutsideClassScope($declared, $block, $func);
+        $this->assertIntersectionTypeMembers($declared);
         $this->assertFunctionSignatureNeverType($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
