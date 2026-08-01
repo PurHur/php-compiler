@@ -2593,7 +2593,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(5, BuiltinParamNames::paramCountForInternalFunction('hash_hkdf'));
     }
 
-    /** @covers issue #23307 */
+    /** @covers issue #23307, #24364 */
     public function testIconvFamilyZendStubNamedParams(): void
     {
         $iconv = BuiltinParamNames::forFunction('iconv');
@@ -2621,6 +2621,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($substr, 'encoding', 'iconv_substr'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($substr, 'str', 'iconv_substr'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($substr, 'charset', 'iconv_substr'));
+
+        // php-src iconv.stub.php — encoding not charset (#24364)
+        $strpos = BuiltinParamNames::forFunction('iconv_strpos');
+        self::assertSame(['haystack', 'needle', 'offset', 'encoding'], $strpos);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strpos, 'haystack', 'iconv_strpos'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strpos, 'needle', 'iconv_strpos'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($strpos, 'offset', 'iconv_strpos'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($strpos, 'encoding', 'iconv_strpos'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strpos, 'charset', 'iconv_strpos'));
+
+        $strrpos = BuiltinParamNames::forFunction('iconv_strrpos');
+        self::assertSame(['haystack', 'needle', 'encoding'], $strrpos);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strrpos, 'haystack', 'iconv_strrpos'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strrpos, 'needle', 'iconv_strrpos'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($strrpos, 'encoding', 'iconv_strrpos'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strrpos, 'charset', 'iconv_strrpos'));
     }
 
     /** @covers issue #23192 */
