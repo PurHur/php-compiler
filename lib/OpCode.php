@@ -369,8 +369,12 @@ class OpCode {
     public bool $isEnumCaseDeclare = false;
     /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
     public bool $staticCallParentScope = false;
-    /** TYPE_FROM_CALLABLE: `parent::instanceMethod(...)` bound closure (#17655, #26252, zend_compile.c). */
-    public bool $fromCallableParentScope = false;
+    /**
+     * TYPE_FROM_CALLABLE: scoped `parent::` / `self::` instance FCC (#17655, #26630, zend_compile.c).
+     *
+     * null = virtual/`static::` or `$obj->m(...)`; `'parent'` / `'self'` pin the resolve class.
+     */
+    public ?string $fromCallableScope = null;
     /**
      * TYPE_FUNCCALL_INIT: callee was a variable/expression, not a literal name (#23591).
      *

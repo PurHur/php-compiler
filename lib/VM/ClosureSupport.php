@@ -150,13 +150,14 @@ final class ClosureSupport
     }
 
     /**
-     * @param bool $fromCallableApi true for Closure::fromCallable() (TypeError); false for FCC `$name(...)` (Error)
+     * @param null|'parent'|'self' $scope  scoped FCC resolve class (#17655, #26630); null = virtual
+     * @param bool                 $fromCallableApi true for Closure::fromCallable() (TypeError); false for FCC `$name(...)` (Error)
      */
     public static function fromCallable(
         Context $ctx,
         Frame $frame,
         Variable $callable,
-        bool $parentScope = false,
+        ?string $scope = null,
         bool $fromCallableApi = false
     ): ObjectEntry {
         $callable = $callable->resolveIndirect();
@@ -200,7 +201,7 @@ final class ClosureSupport
             return self::wrapState($ctx, self::fromFunctionName($ctx, $name, $fromCallableApi));
         }
         if (Variable::TYPE_ARRAY === $callable->type) {
-            return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $parentScope, $fromCallableApi));
+            return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $scope, $fromCallableApi));
         }
 
         // Scalars / resources: Closure::fromCallable → TypeError; FCC keeps LogicException (#26457).
@@ -681,7 +682,7 @@ final class ClosureSupport
         Context $ctx,
         Frame $frame,
         Variable $callable,
-        bool $parentScope = false,
+        ?string $scope = null,
         bool $fromCallableApi = false
     ): ClosureState {
         $table = $callable->toArray();
@@ -719,7 +720,7 @@ final class ClosureSupport
         $receiverOk = Variable::TYPE_OBJECT === $receiver->type
             || Variable::TYPE_ENUM_CASE === $receiver->type
             || Variable::TYPE_STRING === $receiver->type
-            || $parentScope;
+            || null !== $scope;
         if ($fromCallableApi && !$receiverOk) {
             throw new \TypeError(
                 self::fromCallableFailedMessage(
@@ -739,7 +740,7 @@ final class ClosureSupport
                 $frame,
                 $receiver,
                 $methodName,
-                $parentScope,
+                $scope,
                 $fromCallableApi
             );
         }
@@ -749,7 +750,7 @@ final class ClosureSupport
                 $frame,
                 EnumCaseSupport::receiverForInstanceMethod($receiver),
                 $methodName,
-                false,
+                null,
                 $fromCallableApi
             );
         }
@@ -761,18 +762,18 @@ final class ClosureSupport
                 $fromCallableApi
             );
         }
-        // `parent::m(...)` from a static method: compiler may still emit [$this, m] with a
-        // null/unset $this (#26252). Resolve as parent static callable (Zend Error if non-static).
-        if ($parentScope) {
-            $parentLc = self::resolveClassScopeName('parent', $frame, $ctx);
-            if (!isset($ctx->classes[$parentLc])) {
-                throw new \LogicException('parent:: used when class has no parent');
+        // `parent::`/`self::` from a static method: compiler may still emit [$this, m] with a
+        // null/unset $this (#26252, #26630). Resolve as scoped static callable (Zend Error if non-static).
+        if (null !== $scope) {
+            $scopeLc = self::resolveClassScopeName($scope, $frame, $ctx);
+            if (!isset($ctx->classes[$scopeLc])) {
+                throw new \LogicException($scope.':: used when class scope is unresolved');
             }
 
             return self::fromStaticStringCallable(
                 $ctx,
                 $frame,
-                $ctx->classes[$parentLc]->name.'::'.$methodName,
+                $ctx->classes[$scopeLc]->name.'::'.$methodName,
                 $fromCallableApi
             );
         }
@@ -800,7 +801,7 @@ final class ClosureSupport
             return null;
         }
 
-        return self::fromInstanceMethodCallable($ctx, $frame, $callable, '__invoke', false, $fromCallableApi);
+        return self::fromInstanceMethodCallable($ctx, $frame, $callable, '__invoke', null, $fromCallableApi);
     }
 
     private static function fromInstanceMethodCallable(
@@ -808,7 +809,7 @@ final class ClosureSupport
         Frame $frame,
         Variable $receiver,
         string $methodName,
-        bool $parentScope = false,
+        ?string $scope = null,
         bool $fromCallableApi = false
     ): ClosureState {
         $object = $receiver->toObject();
@@ -816,10 +817,11 @@ final class ClosureSupport
         $class = $object->class;
         $resolveFromLc = strtolower($class->name);
         $boundScopeClass = $class->name;
-        if ($parentScope) {
-            $resolveFromLc = self::resolveClassScopeName('parent', $frame, $ctx);
+        $scoped = null !== $scope;
+        if ($scoped) {
+            $resolveFromLc = self::resolveClassScopeName($scope, $frame, $ctx);
             if (!isset($ctx->classes[$resolveFromLc])) {
-                throw new \LogicException('parent:: used when class has no parent');
+                throw new \LogicException($scope.':: used when class scope is unresolved');
             }
             $boundScopeClass = $ctx->classes[$resolveFromLc]->name;
         }
@@ -864,7 +866,7 @@ final class ClosureSupport
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
         $parentScopeAllows = false;
-        if ($parentScope) {
+        if ($scoped) {
             $parentScopeAllows = MethodVisibility::parentScopeAllows(
                 $vis,
                 $callerClassLc,
@@ -888,8 +890,8 @@ final class ClosureSupport
         $boundThis->copyFrom($receiver);
         $state = ClosureState::fromMethodCallable($declaringClass->methods[$methodLc], $boundThis, $methodName);
         $state->boundScopeClass = $boundScopeClass;
-        if ($parentScope) {
-            // Invoke the resolved parent Func directly — virtual dispatch would hit child overrides (#17655).
+        if ($scoped) {
+            // Invoke the resolved Func directly — virtual dispatch would hit child overrides (#17655, #26630).
             $state->methodReceiver = null;
             $state->methodName = null;
             $state->boundThis = $boundThis;

@@ -28,7 +28,7 @@ final class ClosureFromCallable extends VmClassMethod
             $frame->vmContext,
             $frame,
             $frame->calledArgs[0],
-            false,
+            null,
             true
         );
         if (null !== $frame->returnVar) {
