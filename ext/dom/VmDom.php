@@ -6362,6 +6362,8 @@ final class VmDom
      * Parse HTML/XML markup attribute substring (libxml HTML semantics; #18319).
      *
      * Supports double-quoted, single-quoted, and unquoted HTML attribute values.
+     * Valueless names (`hidden`, `disabled`, …) become empty-string values per
+     * WHATWG empty attribute syntax / php-src html5_parser (#26099).
      *
      * @return array<string, string>
      */
@@ -6395,6 +6397,9 @@ final class VmDom
                 ++$pos;
             }
             if ($pos >= $len || '=' !== $attrString[$pos]) {
+                // HTML empty attribute syntax — keep name with '' value (#26099).
+                $attrs[$name] = '';
+
                 continue;
             }
             ++$pos;
