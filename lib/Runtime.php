@@ -80,6 +80,7 @@ class Runtime {
     public Traverser $preprocessor;
     public Traverser $postprocessor;
     private Ast\AbstractEnumMarker $abstractEnumMarker;
+    private Ast\ConfusableBuiltinTypeHintCheck $confusableBuiltinTypeHintCheck;
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
     public VMContext $vmContext;
@@ -136,6 +137,9 @@ class Runtime {
     /** PhpParser + PHPCfg traversers; LLVM 9 crashes when inlined in __construct (#1402, #1494). */
     private function initParsePipeline(): void {
         $astTraverser = new NodeTraverser;
+        // Before NameResolver — bare `resource`/`integer`/… must stay ZEND_NAME_NOT_FQ (#26639).
+        $this->confusableBuiltinTypeHintCheck = new Ast\ConfusableBuiltinTypeHintCheck();
+        $astTraverser->addVisitor($this->confusableBuiltinTypeHintCheck);
         $astTraverser->addVisitor(new MultiBlockNameResolver());
         $astTraverser->addVisitor(new Ast\EnumCaseImportRewriter());
         // Bare enum case names in match/switch are not in scope outside qualified fetch (#16720, re-#6947).
@@ -537,8 +541,10 @@ class Runtime {
         $this->resetParserNameResolverState();
         try {
             $script = $this->parser->parse($code, $filename);
+            $this->confusableBuiltinTypeHintCheck->emitPending($this->vmContext, $filename);
         } finally {
             $this->abstractEnumMarker->clear();
+            $this->confusableBuiltinTypeHintCheck->clearPending();
         }
         $this->preprocessor->traverse($script);
         $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
