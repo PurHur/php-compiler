@@ -119,6 +119,9 @@ final class EnumVMTest extends BaseTest
                 'enum_duplicate_backing_value_compile.phpt',
                 'enum_typed_param_dnf.phpt',
                 'enum_typed_param_reject_backing_scalar.phpt',
+                'enum_redeclare_cases_fatal.phpt',
+                'enum_redeclare_from_fatal.phpt',
+                'enum_redeclare_tryfrom_fatal.phpt',
             ] as $file
         ) {
             if (CompilerVersion::supportsEnumCaseList()
