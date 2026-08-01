@@ -11075,6 +11075,7 @@ restart:
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
         try {
+            $this->emitPropertyHookDeprecationNotice($func, $rawProperty, $parentFrame);
             $child = $func->getFrame($this->context, $parentFrame);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledArgs = $args;
@@ -13433,6 +13434,7 @@ restart:
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
         try {
+            $this->emitPropertyHookDeprecationNotice($func, $rawProperty, $parentFrame);
             $child = $func->getFrame($this->context, null);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledClass = $classLc;
@@ -14206,6 +14208,7 @@ restart:
         $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
         $this->context->propertyHookExternalCatchFrame = null;
         try {
+            $this->emitPropertyHookDeprecationNotice($func, $rawProperty, $parentFrame);
             $child = $func->getFrame($this->context, $parentFrame);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledArgs = $args;
@@ -20738,10 +20741,20 @@ restart:
             return;
         }
         $meta = $frame->call->deprecated;
-        if (null === $meta || !$meta->emitsRuntimeNotice()) {
+        if (null === $meta) {
             return;
         }
         $name = $frame->call->getName();
+        // Property-hook methods: bare #[\Deprecated] emits; Zend message is Class::$prop::get/set (#26370).
+        $hookMessage = $this->formatPropertyHookDeprecationMessage($meta, $name, null);
+        if (null !== $hookMessage) {
+            $this->emitDeprecatedNotice($hookMessage, $frame);
+
+            return;
+        }
+        if (!$meta->emitsRuntimeNotice()) {
+            return;
+        }
         if (str_contains($name, '::')) {
             [$class, $method] = explode('::', $name, 2);
             $message = $meta->formatMethod($class, $method);
@@ -20749,6 +20762,61 @@ restart:
             $message = $meta->formatFunction($name);
         }
         $this->emitDeprecatedNotice($message, $frame);
+    }
+
+    /**
+     * #[\Deprecated] on property get/set hooks — Zend Method Class::$prop::get/set() (#26370).
+     *
+     * Hook dispatch bypasses FUNCCALL_EXEC ({@see invokePhpFunctionWithPropertyHookRaw});
+     * bare attribute still emits (unlike ordinary methods gated by emitsRuntimeNotice()).
+     */
+    private function emitPropertyHookDeprecationNotice(
+        Func\PHP $func,
+        string $rawProperty,
+        Frame $frame
+    ): void {
+        $meta = $func->deprecated;
+        if (null === $meta) {
+            return;
+        }
+        $message = $this->formatPropertyHookDeprecationMessage($meta, $func->getName(), $rawProperty);
+        if (null === $message) {
+            return;
+        }
+        $this->emitDeprecatedNotice($message, $frame);
+    }
+
+    /**
+     * @return ?string Zend-shaped deprecation, or null when $name is not a property-hook method
+     */
+    private function formatPropertyHookDeprecationMessage(
+        \PHPCompiler\Compiler\DeprecatedMetadata $meta,
+        string $qualifiedName,
+        ?string $rawProperty
+    ): ?string {
+        $methodPart = $qualifiedName;
+        $class = '';
+        if (str_contains($qualifiedName, '::')) {
+            [$class, $methodPart] = explode('::', $qualifiedName, 2);
+        }
+        $methodLc = strtolower($methodPart);
+        $prop = SourcePreprocessor\PropertyHooks::propertyNameFromGetHookMethod($methodLc);
+        $hook = 'get';
+        if (null === $prop) {
+            $prop = SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc);
+            $hook = 'set';
+        }
+        if (null === $prop) {
+            return null;
+        }
+        if (is_string($rawProperty) && '' !== $rawProperty) {
+            $prop = $rawProperty;
+        }
+        if ('' === $class) {
+            $class = 'unknown';
+        }
+
+        return $meta->formatPropertyHook($class, $prop, $hook);
     }
 
     private function emitCallNoDiscardNotice(Frame $frame, OpCode $op): void

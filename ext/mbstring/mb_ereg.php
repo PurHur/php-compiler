@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
-use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
@@ -46,9 +45,9 @@ final class mb_ereg extends Internal
             VmMbstring::warnMbEregRegexFailure($frame, 'mb_ereg', $pattern, false);
         }
 
-        if (isset($frame->calledArgs[2]) && $out['matched']) {
-            $target = $frame->calledArgs[2]->resolveIndirect();
-            $target->array(VmPregMatches::hostMatchesToHashTable($out['registers'], 0));
+        // Always assign $regs when passed — empty array on no-match (php_mbregex.c; #26408).
+        if (isset($frame->calledArgs[2])) {
+            VmMbstring::writeEregRegistersArg($frame->calledArgs[2]->resolveIndirect(), $out);
         }
 
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($out): void {
