@@ -1150,6 +1150,11 @@ final class BuiltinParamNames
                 return ['string', 'encoding'];
             case 'iconv_substr':
                 return ['string', 'offset', 'length', 'encoding'];
+            // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says charset (#24364)
+            case 'iconv_strpos':
+                return ['haystack', 'needle', 'offset', 'encoding'];
+            case 'iconv_strrpos':
+                return ['haystack', 'needle', 'encoding'];
             case 'base64_decode':
                 return ['string', 'strict'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str (#23257)
