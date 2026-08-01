@@ -625,3 +625,113 @@ final class ssh2_sftp_lstat extends Ssh2Function
         ssh2_sftp_stat::runStat($this, $frame, 'ssh2_sftp_lstat', VmSsh2Native::SFTP_LSTAT);
     }
 }
+
+/**
+ * ssh2_sftp_mkdir(resource $sftp, string $dirname, int $mode = 0777, bool $recursive = false): bool
+ */
+final class ssh2_sftp_mkdir extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_mkdir');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_mkdir() expects between 2 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_mkdir', 1);
+        $dirname = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_mkdir', 2, 'dirname');
+        $mode = 0777;
+        if ($argc >= 3) {
+            $mode = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'ssh2_sftp_mkdir', 3, 'mode');
+        }
+        $recursive = false;
+        if ($argc >= 4) {
+            $recursive = (bool) $frame->calledArgs[3]->resolveIndirect()->toBool();
+        }
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native || '' === $dirname) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::sftpMkdir($native, $dirname, $mode, $recursive));
+    }
+}
+
+/**
+ * ssh2_sftp_rmdir(resource $sftp, string $dirname): bool
+ */
+final class ssh2_sftp_rmdir extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_rmdir');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_rmdir() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_rmdir', 1);
+        $dirname = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_rmdir', 2, 'dirname');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::sftpRmdir($native, $dirname));
+    }
+}
+
+/**
+ * ssh2_sftp_unlink(resource $sftp, string $filename): bool
+ */
+final class ssh2_sftp_unlink extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_unlink');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_unlink() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_unlink', 1);
+        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_unlink', 2, 'filename');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::sftpUnlink($native, $filename));
+    }
+}
