@@ -1742,6 +1742,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'now', 'strtotime'));
     }
 
+    /** @covers issue #26325 */
+    public function testStrtotimeMktimeGmmktimeIntFalseReturn(): void
+    {
+        foreach (['strtotime', 'mktime', 'gmmktime'] as $fn) {
+            self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
+    }
+
     /** @covers issue #24845 */
     public function testDateGmdateStrtotimeNullableTimestampTypeOverride(): void
     {

@@ -66,6 +66,8 @@ final class BuiltinInternalArgInfo
             'date_create_immutable' => 'DateTimeImmutable|false',
             // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#25440)
             'idate' => 'int|false',
+            // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#26325)
+            'strtotime', 'mktime', 'gmmktime' => 'int|false',
             // ext/standard/string.stub.php — InternalArgInfo omits |false (#25442)
             'strpos', 'stripos', 'strrpos', 'strripos' => 'int|false',
             'strstr', 'stristr' => 'string|false',
