@@ -38,7 +38,15 @@ final class ProcessOpenRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessOpenEmbedBridge.php');
         $this->assertStringContainsString('ProcessOpenJitHelper', $bridge);
         $this->assertStringContainsString('procOpenArgv', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
+        $this->assertStringContainsString('/ext/standard/ProcessSlotJitHelper.php', $bridge);
+        $this->assertStringContainsString('/ext/standard/ProcessOpenJitHelper.php', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
+        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString('new JIT(', $bridge);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $bridge);
         $this->assertStringNotContainsString('ProcessOpenStandaloneLlvm', $bridge);
         $this->assertStringNotContainsString('emitProcClose', $bridge);
         $this->assertStringNotContainsString('emitProcGetStatus', $bridge);
