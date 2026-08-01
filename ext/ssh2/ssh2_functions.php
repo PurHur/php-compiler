@@ -735,3 +735,73 @@ final class ssh2_sftp_unlink extends Ssh2Function
         $frame->returnVar->bool(VmSsh2Native::sftpUnlink($native, $filename));
     }
 }
+
+/**
+ * ssh2_sftp_rename(resource $sftp, string $from, string $to): bool
+ */
+final class ssh2_sftp_rename extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_rename');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_rename() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_rename', 1);
+        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_rename', 2, 'from');
+        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_sftp_rename', 3, 'to');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::sftpRename($native, $from, $to));
+    }
+}
+
+/**
+ * ssh2_sftp_chmod(resource $sftp, string $filename, int $mode): bool
+ */
+final class ssh2_sftp_chmod extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_chmod');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_chmod() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_chmod', 1);
+        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_chmod', 2, 'filename');
+        $mode = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'ssh2_sftp_chmod', 3, 'mode');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native || '' === $filename) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::sftpChmod($native, $filename, $mode));
+    }
+}
