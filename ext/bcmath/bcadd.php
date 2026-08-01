@@ -22,8 +22,7 @@ final class bcadd extends BcmathFunction
         return VmBcmath::add(
             $left,
             $right,
-            $this->optionalScale($frame, 2),
-            $this->optionalRoundingMode($frame, 3)
+            $this->optionalScale($frame, 2)
         );
     }
 }

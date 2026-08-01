@@ -1432,6 +1432,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #26143 — bcadd/bcsub/bcmul/bcdiv/bcmod/bcpowmod have no rounding_mode (reverts #9946/#9919) */
+    public function testBcmathClassicHasNoRoundingModeNamedParameter(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            foreach (['bcadd', 'bcsub', 'bcmul', 'bcdiv', 'bcmod'] as $fn) {
+                $names = BuiltinParamNames::forFunction($fn);
+                self::assertSame(['num1', 'num2', 'scale'], $names, $fn);
+                self::assertFalse(
+                    BuiltinParamNames::lookupNamedParamIndex($names, 'rounding_mode', $fn),
+                    $fn
+                );
+                self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+            }
+            $powmod = BuiltinParamNames::forFunction('bcpowmod');
+            self::assertSame(['num', 'exponent', 'modulus', 'scale'], $powmod);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($powmod, 'rounding_mode', 'bcpowmod'));
+            self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('bcpowmod'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #24578 — bcdivmod PHP 8.4 stub names; not in php-types InternalArgInfo */
     public function testBcdivmodReflectionNamedParameters(): void
     {

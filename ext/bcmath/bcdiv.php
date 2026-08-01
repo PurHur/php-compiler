@@ -22,8 +22,7 @@ final class bcdiv extends BcmathFunction
         return VmBcmath::div(
             $left,
             $right,
-            $this->optionalScale($frame, 2),
-            $this->optionalRoundingMode($frame, 3)
+            $this->optionalScale($frame, 2)
         );
     }
 }
