@@ -28762,8 +28762,10 @@ class Compiler {
     /**
      * php-cfg dead temps for inline call args keep inferred value types (#9351, #10816);
      * void statement calls stay inferred:unknown (#10778).
+     * StaticCall producers (Fiber::getCurrent() !== null before var_export/print_r) share the same
+     * result-type check as MethodCall (#26703).
      */
-    private function methodCallInlineProducerSuppliesCallArgValue(Op\Expr\MethodCall $producer): bool
+    private function methodCallInlineProducerSuppliesCallArgValue(Op\Expr\MethodCall|Op\Expr\StaticCall $producer): bool
     {
         if (!property_exists($producer, 'result')) {
             return false;
