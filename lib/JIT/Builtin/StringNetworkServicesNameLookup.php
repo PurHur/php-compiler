@@ -4,20 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT bridges for getprotobyname()/getservbyname() via NetworkServicesNameLookupJitHelper PHP (#13441).
+ * JIT/AOT bridges for getprotobyname()/getservbyname() via NetworkServicesNameLookupJitHelper PHP (#13441, #26247).
+ *
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (VmNetworkServices →
+ * NameLookupJitHelper) in one NestedJIT scope (peer StringSscanfByRef #25691 / Gettext #26226).
+ * php-src: ext/standard/network.c — PHP_FUNCTION(getprotobyname) / getservbyname
  */
 final class StringNetworkServicesNameLookup
 {
     private const HELPER_PATH = '/ext/standard/NetworkServicesNameLookupJitHelper.php';
 
     private const VM_NETWORK_PATH = '/ext/standard/VmNetworkServices.php';
+
+    /**
+     * Ordered NestedJIT sources — VmNetworkServices before NameLookupJitHelper (#26247).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::VM_NETWORK_PATH,
+        self::HELPER_PATH,
+    ];
 
     private const GETPROTOBYNAME_HELPER = 'PHPCompiler\\ext\\standard\\NetworkServicesNameLookupJitHelper::getprotobynameLookup';
 
@@ -167,54 +180,18 @@ final class StringNetworkServicesNameLookup
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after NetworkServicesNameLookupJitHelper compile (#13441)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26247');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            $jit = new JIT($context);
-            foreach ([self::VM_NETWORK_PATH, self::HELPER_PATH] as $relative) {
-                $path = $root.$relative;
-                $real = \realpath($path) ?: $path;
-                if ($context->hasJitIncludedFileCompiled($real)) {
-                    continue;
-                }
-                $block = $runtime->parseAndCompile(
-                    (string) \file_get_contents($path),
-                    \basename($path)
-                );
-                if (null === $block) {
-                    throw new \LogicException(\basename($path).' parseAndCompile failed (#13441)');
-                }
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($real);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#13441)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#26247'
+        );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void

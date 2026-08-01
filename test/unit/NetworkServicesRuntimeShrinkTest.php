@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Network service lookups C runtime shrink (#6218, #5333, #9777). */
+/** Network service lookups C runtime shrink (#6218, #5333, #9777, #26247). */
 final class NetworkServicesRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -39,6 +39,14 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NetworkServicesNameLookupJitHelper', $nameLookup);
         $this->assertStringContainsString('getprotobynameLookup', $nameLookup);
         $this->assertStringContainsString('getservbynameLookup', $nameLookup);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $nameLookup);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $nameLookup);
+        $this->assertStringContainsString('/ext/standard/VmNetworkServices.php', $nameLookup);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $nameLookup);
+        $this->assertStringNotContainsString('parseAndCompile', $nameLookup);
+        $this->assertStringNotContainsString('new JIT(', $nameLookup);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $nameLookup);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $nameLookup);
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesJit.php');
         $this->assertFileExists($this->repoRoot.'/ext/standard/NetworkServicesNameLookupJitHelper.php');
     }
@@ -50,7 +58,6 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('buildJitTables', $source);
         $this->assertStringNotContainsString('ns_proto_name_match_', $source);
     }
-
     public function testDeadVmNetworkHostDelegationRemoved(): void
     {
         $this->assertFileDoesNotExist($this->repoRoot.'/ext/standard/VmNetwork.php');
