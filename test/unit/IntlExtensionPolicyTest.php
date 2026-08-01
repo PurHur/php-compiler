@@ -256,4 +256,58 @@ final class IntlExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    /** Host INTL_ICU_VERSION major must win FFI candidate order (#22898 / #25081). */
+    public function testLibicuucFfiCandidatesPreferHostIntlMajor(): void
+    {
+        if (!\extension_loaded('intl') || !\defined('INTL_ICU_VERSION')) {
+            self::markTestSkipped('host php-intl required');
+        }
+        $major = IntlExtensionPolicy::hostIntlIcuMajor();
+        self::assertGreaterThan(0, $major);
+        $candidates = IntlExtensionPolicy::libicuucFfiCandidates();
+        self::assertNotEmpty($candidates);
+        self::assertSame($major, $candidates[0][2]);
+        self::assertSame($major, IntlExtensionPolicy::icuMajorVersion());
+    }
+
+    /** ICUDATA-region catalog must match host Zend on the same ICU (#22898). */
+    public function testIcudataRegionCatalogMatchesHostZend(): void
+    {
+        if (!\extension_loaded('intl')) {
+            self::markTestSkipped('host php-intl required');
+        }
+        $script = <<<'PHP'
+<?php
+$r = ResourceBundle::create('en', 'ICUDATA-region');
+$keys = [];
+foreach ($r as $k => $_) {
+    $keys[] = (string) $k;
+}
+sort($keys);
+$c = $r->get('Countries');
+echo count($r), '|', implode(',', $keys), '|', count($c);
+PHP;
+        $tmp = tempnam(sys_get_temp_dir(), 'rb22898_');
+        self::assertNotFalse($tmp);
+        file_put_contents($tmp, $script);
+        try {
+            $zend = [];
+            $vm = [];
+            $codeZ = 1;
+            $codeV = 1;
+            exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($tmp).' 2>/dev/null', $zend, $codeZ);
+            $repo = dirname(__DIR__, 2);
+            exec(
+                escapeshellarg(PHP_BINARY).' '.escapeshellarg($repo.'/bin/vm.php').' '.escapeshellarg($tmp).' 2>/dev/null',
+                $vm,
+                $codeV
+            );
+            self::assertSame(0, $codeZ, 'Zend repro failed');
+            self::assertSame(0, $codeV, 'VM repro failed');
+            self::assertSame(implode("\n", $zend), implode("\n", $vm));
+        } finally {
+            @unlink($tmp);
+        }
+    }
 }

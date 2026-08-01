@@ -995,15 +995,32 @@ final class VmResourceBundle
 
             return null;
         }
-        $candidates = [
-            ['libicuuc.so.70', '_70'],
-            ['libicuuc.so.74', '_74'],
-            ['libicuuc.so.72', '_72'],
-            ['libicuuc.so.71', '_71'],
+        // Prefer host php-intl ICU major so ICUDATA-* catalogs match Zend (#22898 / #25081).
+        $candidates = [];
+        foreach (IntlExtensionPolicy::libicuucFfiCandidates() as [$lib, $suffix, $_major]) {
+            $candidates[] = [$lib, $suffix];
+        }
+        // ures_* live in libicui18n on some builds; try i18n sonames after uc.
+        $i18nExtras = [
+            ['libicui18n.so.74', '_74'],
+            ['libicui18n.so.72', '_72'],
+            ['libicui18n.so.71', '_71'],
             ['libicui18n.so.70', '_70'],
-            ['libicuuc.so', '_70'],
-            ['libicuuc.dylib', ''],
         ];
+        $prefer = IntlExtensionPolicy::hostIntlIcuMajor();
+        if ($prefer > 0) {
+            usort($i18nExtras, static function (array $a, array $b) use ($prefer): int {
+                $ma = (int) \substr($a[1], 1);
+                $mb = (int) \substr($b[1], 1);
+                $da = $ma === $prefer ? 0 : 1;
+                $db = $mb === $prefer ? 0 : 1;
+
+                return $da <=> $db;
+            });
+        }
+        foreach ($i18nExtras as $row) {
+            $candidates[] = $row;
+        }
         foreach ($candidates as [$lib, $suffix]) {
             try {
                 self::$ffi = \FFI::cdef(self::cdefForSuffix($suffix), $lib);

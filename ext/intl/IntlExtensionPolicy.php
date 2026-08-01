@@ -59,6 +59,58 @@ final class IntlExtensionPolicy
         return self::advertisesBuiltins() && self::icuMajorVersion() >= 74;
     }
 
+    /**
+     * libicuuc soname candidates for FFI, host {@see INTL_ICU_VERSION} major first (#22898).
+     *
+     * Hosts often ship both system ICU (e.g. .so.74) and the ICU php-intl was built against
+     * (e.g. /opt/icu72 → .so.72). Preferring a newer soname first makes ResourceBundle /
+     * getLocales disagree with Zend on the same machine (extra keys like Countries%chagos).
+     *
+     * @return list<array{0: string, 1: string, 2: int}> [lib, symbolSuffix, major]
+     */
+    public static function libicuucFfiCandidates(): array
+    {
+        $all = [
+            ['libicuuc.so.74', '_74', 74],
+            ['libicuuc.so.72', '_72', 72],
+            ['libicuuc.so.71', '_71', 71],
+            ['libicuuc.so.70', '_70', 70],
+            ['libicuuc.so', '_70', 70],
+            ['libicuuc.dylib', '', 74],
+        ];
+        $prefer = self::hostIntlIcuMajor();
+        if ($prefer <= 0) {
+            return $all;
+        }
+        $preferred = [];
+        $rest = [];
+        foreach ($all as $row) {
+            if ($row[2] === $prefer) {
+                $preferred[] = $row;
+            } else {
+                $rest[] = $row;
+            }
+        }
+
+        return [...$preferred, ...$rest];
+    }
+
+    /**
+     * Major from host php-intl {@see INTL_ICU_VERSION} when the extension is loaded; else 0.
+     */
+    public static function hostIntlIcuMajor(): int
+    {
+        if (!\extension_loaded('intl') || !\defined('INTL_ICU_VERSION')) {
+            return 0;
+        }
+        $ver = (string) \constant('INTL_ICU_VERSION');
+        if (1 !== \preg_match('/^(\d+)/', $ver, $m)) {
+            return 0;
+        }
+
+        return (int) $m[1];
+    }
+
     /** libicuuc present — gate for claiming ext/intl (#20630). */
     public static function icuAvailable(): bool
     {
@@ -70,15 +122,7 @@ final class IntlExtensionPolicy
             return self::$icuAvailable = false;
         }
 
-        $candidates = [
-            ['libicuuc.so.74', '_74', 74],
-            ['libicuuc.so.72', '_72', 72],
-            ['libicuuc.so.71', '_71', 71],
-            ['libicuuc.so.70', '_70', 70],
-            ['libicuuc.so', '_70', 70],
-            ['libicuuc.dylib', '', 74],
-        ];
-        foreach ($candidates as [$lib, $suffix, $major]) {
+        foreach (self::libicuucFfiCandidates() as [$lib, $suffix, $major]) {
             try {
                 $sym = 'u_errorName'.$suffix;
                 $ffi = \FFI::cdef('const char *'.$sym.'(int code);', $lib);
