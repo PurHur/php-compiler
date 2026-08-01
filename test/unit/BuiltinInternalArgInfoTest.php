@@ -187,6 +187,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($depth['isOptional']);
     }
 
+    /** php-src ext/mbstring/mbstring.stub.php — array|string unions + |false return (#26466). */
+    public function testMbConvertEncodingReflectionStubTypes(): void
+    {
+        $this->assertSame('array|string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('mb_convert_encoding'));
+        $this->assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('mb_convert_encoding', 0));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('mb_convert_encoding', 1));
+        $this->assertSame('array|string|null', BuiltinInternalArgInfo::stubParamTypeOverride('mb_convert_encoding', 2));
+        $string = BuiltinInternalArgInfo::paramInfoForFunction('mb_convert_encoding', 0);
+        $this->assertNotNull($string);
+        $this->assertSame('array|string', $string['type']);
+        $this->assertFalse($string['isOptional']);
+        $to = BuiltinInternalArgInfo::paramInfoForFunction('mb_convert_encoding', 1);
+        $this->assertNotNull($to);
+        $this->assertSame('string', $to['type']);
+        $this->assertFalse($to['isOptional']);
+        $from = BuiltinInternalArgInfo::paramInfoForFunction('mb_convert_encoding', 2);
+        $this->assertNotNull($from);
+        $this->assertSame('array|string|null', $from['type']);
+        $this->assertTrue($from['isOptional']);
+    }
+
     /** php-src ext/standard/basic_functions.stub.php — PHP 8.3+ get_object_id; absent from InternalArgInfo (#26210). */
     public function testGetObjectIdReflectionStubTypes(): void
     {

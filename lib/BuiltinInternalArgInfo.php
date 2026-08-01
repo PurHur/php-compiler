@@ -127,6 +127,8 @@ final class BuiltinInternalArgInfo
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
             'mb_ucfirst', 'mb_lcfirst' => 'string',
+            // ext/mbstring/mbstring.stub.php — InternalArgInfo return string (missing array| / |false) (#26466)
+            'mb_convert_encoding' => 'array|string|false',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
@@ -555,6 +557,13 @@ final class BuiltinInternalArgInfo
             'mb_ucfirst', 'mb_lcfirst' => match ($index) {
                 0 => 'string',
                 1 => '?string',
+                default => null,
+            },
+            // ext/mbstring/mbstring.stub.php — array|string $string; array|string|null $from_encoding (#26466)
+            // InternalArgInfo still has str:string / from-encoding= untyped.
+            'mb_convert_encoding' => match ($index) {
+                0 => 'array|string',
+                2 => 'array|string|null',
                 default => null,
             },
             // ext/spl/spl.stub.php — Traversable|array (InternalArgInfo says traversable) (#25066)
