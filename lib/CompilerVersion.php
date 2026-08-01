@@ -835,6 +835,36 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ typed illegal array/string offset TypeError messages (#26380).
+     *
+     * Replaces bare {@code Illegal offset type} with
+     * {@code Cannot access offset of type %s on array} (zend_zval_type_name; class name for objects/enums).
+     * php-src: Zend/zend.c — zend_illegal_container_offset(); Zend/zend_API.c — zend_zval_type_name().
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 "Illegal offset type"). Enable via
+     * stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.3} / {@code 8.4} forward profile.
+     * Same withhold shape as {@see supportsTypedClassConstants()} — do not use bare
+     * languageProfileVersion() alone (VERSION is 8.4.0-dev).
+     */
+    public static function supportsTypedIllegalContainerOffset(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ TENTATIVE_RETURN Core constant (Zend/zend_attributes.h, issue #18060).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or
