@@ -21443,15 +21443,19 @@ restart:
      *
      * Same-function locals as the handler stay alive (catch may still read them). Nested call
      * frames are released innermost-first; within a frame, scope slot order matches normal return.
+     *
+     * CFG merge / sequential try frames may have {@see Block::$func} null; resolve via ancestors
+     * so `{main}` throw sites are not mistaken for callees when the TYPE_TRY handler block lacks
+     * func (#26203 DatePeriod typed-uninit catch destroyForGc).
      */
     private function releaseCalleeObjectRefsBeforeExceptionHandler(Frame $throwFrame, Frame $handler): void
     {
-        $handlerFunc = $handler->block->func ?? null;
+        $handlerFunc = $this->resolveFrameFunc($handler) ?? $this->resolveFrameFunc($throwFrame);
         $pendingOuter = null;
         $pendingFunc = null;
         $toRelease = [];
         for ($f = $throwFrame; null !== $f && $f !== $handler; $f = $f->parent) {
-            $frameFunc = $f->block->func ?? null;
+            $frameFunc = $this->resolveFrameFunc($f);
             if ($frameFunc === $handlerFunc) {
                 break;
             }
@@ -21471,6 +21475,21 @@ restart:
         foreach ($toRelease as $frame) {
             $this->releaseFrameObjectRefs($frame);
         }
+    }
+
+    /**
+     * Owning PHPCfg Func for a VM frame — walk parents when the CFG block omitted func (#26203).
+     */
+    private function resolveFrameFunc(Frame $frame): ?\PHPCfg\Func
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            $func = $f->block->func ?? null;
+            if (null !== $func) {
+                return $func;
+            }
+        }
+
+        return null;
     }
 
     /**
