@@ -1557,6 +1557,7 @@ require_once __DIR__.'/../../../ext/ssh2/VmSsh2Native.php';
 require_once __DIR__.'/../../../ext/ssh2/VmSsh2Session.php';
 require_once __DIR__.'/../../../ext/ssh2/VmSsh2Sftp.php';
 require_once __DIR__.'/../../../ext/ssh2/VmSsh2Stream.php';
+require_once __DIR__.'/../../../ext/ssh2/VmSsh2Listener.php';
 require_once __DIR__.'/../../../ext/ssh2/ssh2_functions.php';
 require_once __DIR__.'/../../../ext/redis/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/redis/Module.php';

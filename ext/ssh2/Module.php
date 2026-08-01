@@ -37,6 +37,8 @@ class Module extends ModuleAbstract
         VmSsh2Session::registerClass($runtime->vmContext);
         VmSsh2Stream::registerClass($runtime->vmContext);
         VmSsh2Sftp::registerClass($runtime->vmContext);
+        require_once __DIR__.'/VmSsh2Listener.php';
+        VmSsh2Listener::registerClass($runtime->vmContext);
     }
 
     public function getFunctions(): array
@@ -61,6 +63,8 @@ class Module extends ModuleAbstract
             new ssh2_fetch_stream(),
             new ssh2_shell(),
             new ssh2_tunnel(),
+            new ssh2_forward_listen(),
+            new ssh2_forward_accept(),
             new ssh2_sftp(),
             new ssh2_scp_recv(),
             new ssh2_scp_send(),
