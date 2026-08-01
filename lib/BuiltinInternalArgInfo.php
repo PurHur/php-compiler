@@ -127,6 +127,8 @@ final class BuiltinInternalArgInfo
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
             // Zend/zend_builtin_functions.stub.php — sizeof alias absent from InternalArgInfo (#25966)
             'sizeof' => 'int',
+            // ext/standard/basic_functions.stub.php — PHP 8.3+; InternalArgInfo omits (#26210)
+            'get_object_id' => 'int',
             // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)
             'exit', 'die' => 'never',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
@@ -315,6 +317,8 @@ final class BuiltinInternalArgInfo
             'unixtojd' => 0 === $index ? '?int' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
+            // ext/standard/basic_functions.stub.php — object $object (InternalArgInfo omits) (#26210)
+            'get_object_id' => 0 === $index ? 'object' : null,
             // Zend/zend_builtin_functions.stub.php — object|string untyped in Reflection (InternalArgInfo object) (#25498)
             'class_parents' => 0 === $index ? '' : null,
             // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)

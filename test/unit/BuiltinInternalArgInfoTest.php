@@ -187,6 +187,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($depth['isOptional']);
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — PHP 8.3+ get_object_id; absent from InternalArgInfo (#26210). */
+    public function testGetObjectIdReflectionStubTypes(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_object_id'));
+        $this->assertSame('object', BuiltinInternalArgInfo::stubParamTypeOverride('get_object_id', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('get_object_id', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('object', $info['name']);
+        $this->assertSame('object', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $this->assertSame(1, BuiltinParamNames::paramCountForInternalFunction('get_object_id'));
+        $this->assertSame(['object'], BuiltinParamNames::paramNamesForInternalFunction('get_object_id'));
+    }
+
     /** php-src ext/curl/curl.stub.php — CurlHandle stubs; InternalArgInfo still resource/ch (#26186). */
     public function testCurlEasyReflectionStubTypes(): void
     {
