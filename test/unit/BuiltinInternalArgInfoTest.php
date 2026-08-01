@@ -318,6 +318,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('sys_getloadavg'));
     }
 
+    /** php-src link.stub.php — InternalArgInfo return int; Zend bool (#26323). */
+    public function testSymlinkReflectionReturnBool(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('symlink'));
+    }
+
     /** php-src basic_functions.stub.php — fscanf return + mixed &...$vars (#26058). */
     public function testFscanfReflectionReturnAndVarsType(): void
     {
