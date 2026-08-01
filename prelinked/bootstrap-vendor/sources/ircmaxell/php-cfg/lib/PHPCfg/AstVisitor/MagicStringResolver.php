@@ -183,6 +183,16 @@ class MagicStringResolver extends NodeVisitorAbstract
                     }
             }
         } elseif ($node instanceof Node\Scalar\MagicConst\Class_) {
+            // Inside a trait, __CLASS__ is the composing (using) class — same as self::class
+            // (#26459, Zend/zend_compile.c). Do not bake the trait name as a string literal.
+            // Lexical `self` is preserved above so TraitSelfClassScope binds at runtime.
+            if (! empty($this->traitStack)) {
+                return new Node\Expr\ClassConstFetch(
+                    new Node\Name('self'),
+                    new Node\Identifier('class'),
+                    $node->getAttributes()
+                );
+            }
             if (! empty($this->classStack)) {
                 return new Node\Scalar\String_(end($this->classStack), $node->getAttributes());
             }

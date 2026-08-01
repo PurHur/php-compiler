@@ -176,6 +176,30 @@ PHP;
         $this->assertSame('ok', $this->runVm($code));
     }
 
+    /** @covers issue #26459 — __CLASS__ in trait methods is the using class. */
+    public function testClassMagicConstInsideTraitIsUsingClass(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T {
+    public function f() { return __CLASS__; }
+    public static function s() { return __CLASS__; }
+    public function m() {
+        $inner = function () { return __CLASS__; };
+        return $inner();
+    }
+    public function meta() { return __TRAIT__ . '|' . __METHOD__; }
+}
+class C { use T; }
+class D { use T; }
+echo (new C)->f(), ',', (new D)->f(), "\n";
+echo 'static=', C::s(), ',', D::s(), "\n";
+echo 'closure=', (new C)->m(), "\n";
+echo 'meta=', (new C)->meta(), "\n";
+PHP;
+        $this->assertSame("C,D\nstatic=C,D\nclosure=C\nmeta=T|T::meta\n", $this->runVm($code));
+    }
+
     private function runVm(string $code): string
     {
         $runtime = new Runtime(Runtime::MODE_NORMAL);
