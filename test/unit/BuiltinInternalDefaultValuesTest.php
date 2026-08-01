@@ -581,4 +581,38 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+
+    /** @covers issue #26184 */
+    public function testFilterVarArrayAndFilterInputReflectionDefaults(): void
+    {
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'filter_var_array',
+            1,
+            ['name' => 'options', 'type' => 'array|int', 'isOptional' => true]
+        ));
+        self::assertSame(516, $dest->toInt());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'filter_var_array',
+            2,
+            ['name' => 'add_empty', 'type' => 'bool', 'isOptional' => true]
+        ));
+        self::assertTrue($dest->toBool());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'filter_input',
+            2,
+            ['name' => 'filter', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(516, $dest->toInt());
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'filter_input',
+            3,
+            ['name' => 'options', 'type' => 'array|int', 'isOptional' => true]
+        ));
+        self::assertSame(0, $dest->toInt());
+    }
 }
