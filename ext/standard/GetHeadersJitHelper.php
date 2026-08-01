@@ -17,6 +17,9 @@ final class GetHeadersJitHelper
     public static function getHeaders(string $url, bool $associative): ?HashTable
     {
         if (!VmHttpLastResponseHeaders::isHttpUrl($url)) {
+            // php-src head.c — same Warning as VM {@see get_headers::execute} (#26383).
+            TriggerErrorJitHelper::warning(get_headers::NON_HTTP_URL_WARNING);
+
             return null;
         }
 
