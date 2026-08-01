@@ -3015,21 +3015,33 @@ class VM {
 
     /**
      * unserialize() property restore — set hooks when declared (#6474, var_unserializer.c).
+     *
+     * Wire keys are ZEND_PROP_PURPOSE_SERIALIZE mangled names (`\0*\0message`); resolve to the
+     * declared slot so typed protected/private props initialize (#26673).
      */
     public function assignUnserializeProperty(
         ObjectEntry $object,
         string $propName,
         Variable $value,
-        Frame $frame
+        ?Frame $frame = null
     ): void {
-        if ($this->assignHookedPropertyBackingStorage($object, $propName, $value)) {
+        $meta = VM\PropertyMangle::findPropertyForSerializeKey($object, $propName, $this->context->classes);
+        $storageName = null !== $meta ? $meta->name : $propName;
+        if ($this->assignHookedPropertyBackingStorage($object, $storageName, $value)) {
             return;
         }
-        $hookFrame = $this->resolvePropertyHookParentFrame($frame);
-        $writeLvalue = new Variable();
-        $writeLvalue->objectPropertyOwner = $object;
-        $writeLvalue->objectPropertyName = $propName;
-        if ($this->dispatchPropertySetHookAssign($writeLvalue, $value, $hookFrame)) {
+        if (null !== $frame) {
+            $hookFrame = $this->resolvePropertyHookParentFrame($frame);
+            $writeLvalue = new Variable();
+            $writeLvalue->objectPropertyOwner = $object;
+            $writeLvalue->objectPropertyName = $storageName;
+            if ($this->dispatchPropertySetHookAssign($writeLvalue, $value, $hookFrame)) {
+                return;
+            }
+        }
+        if (null !== $meta) {
+            $object->getPropertyForMeta($meta)->copyFrom($value->resolveIndirect());
+
             return;
         }
         $prop = $object->hasProperty($propName)
