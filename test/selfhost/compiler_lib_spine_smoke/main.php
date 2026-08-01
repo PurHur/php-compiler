@@ -5628,6 +5628,7 @@ require_once __DIR__.'/../../../lib/Runtime.php';
 require_once __DIR__.'/../../../lib/RuntimeStrictness.php';
 require_once __DIR__.'/../../../lib/SourceBareThrowRewriter.php';
 require_once __DIR__.'/../../../lib/SourcePreprocessor/PropertyHooks.php';
+require_once __DIR__.'/../../../lib/SwitchCaseSemicolonDeprecation.php';
 require_once __DIR__.'/../../../lib/SwitchCommaCaseRewriter.php';
 require_once __DIR__.'/../../../lib/TraitMethodFunctionStatic.php';
 require_once __DIR__.'/../../../lib/TryCatchElseSyntaxRejector.php';
