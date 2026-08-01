@@ -14,6 +14,12 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
+require_once __DIR__.'/Ssh2Constants.php';
+require_once __DIR__.'/VmSsh2Native.php';
+require_once __DIR__.'/VmSsh2Session.php';
+require_once __DIR__.'/VmSsh2Stream.php';
+require_once __DIR__.'/VmSsh2Sftp.php';
+
 /** Shared JIT stub for ssh2_* v1 (#6385). */
 abstract class Ssh2Function extends Internal
 {
@@ -208,9 +214,26 @@ final class ssh2_fingerprint extends Ssh2Function
         if (null === $frame->returnVar) {
             return;
         }
-        $this->requireSession($frame->calledArgs[0], 'ssh2_fingerprint', 1);
-        // No host key without handshake — PECL returns false.
-        $frame->returnVar->bool(false);
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_fingerprint', 1);
+        $flags = Ssh2Constants::FINGERPRINT_MD5 | Ssh2Constants::FINGERPRINT_HEX;
+        if ($argc >= 2) {
+            $flags = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ssh2_fingerprint', 2, 'flags');
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_fingerprint(): Unable to retrieve fingerprint from specified session', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $fp = VmSsh2Native::hostkeyFingerprint($native, $flags);
+        if (false === $fp) {
+            @\trigger_error('ssh2_fingerprint(): No fingerprint available using specified hash', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($fp);
     }
 }
 

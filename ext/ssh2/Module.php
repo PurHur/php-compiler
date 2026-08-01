@@ -28,6 +28,12 @@ class Module extends ModuleAbstract
         if (!Ssh2ExtensionPolicy::advertisesExtension()) {
             return;
         }
+        require_once __DIR__.'/Ssh2Constants.php';
+        foreach (Ssh2Constants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
         VmSsh2Session::registerClass($runtime->vmContext);
         VmSsh2Stream::registerClass($runtime->vmContext);
         VmSsh2Sftp::registerClass($runtime->vmContext);
