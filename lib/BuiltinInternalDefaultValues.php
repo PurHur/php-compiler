@@ -140,6 +140,19 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/mbstring/mbstring.stub.php — ?string $characters = null, ?string $encoding = null (#26283)
+        'mb_trim' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+        ],
+        'mb_ltrim' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+        ],
+        'mb_rtrim' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+        ],
         'json_encode' => [
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'int', 'value' => 512],

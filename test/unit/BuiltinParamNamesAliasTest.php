@@ -2597,6 +2597,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_ucfirst'));
     }
 
+    /** @covers issue #26283 */
+    public function testMbTrimFamilyZendStubReflectionTypes(): void
+    {
+        foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'characters=', 'encoding='], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'characters', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+            self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+            self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+            self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 2));
+            $infoCharacters = ['name' => 'characters', 'type' => '?string', 'isOptional' => true];
+            $infoEncoding = ['name' => 'encoding', 'type' => '?string', 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $infoCharacters, false));
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 2, $infoEncoding, false));
+            $characters = new Variable();
+            $encoding = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($characters, $fn, 1, $infoCharacters));
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($encoding, $fn, 2, $infoEncoding));
+            self::assertSame(Variable::TYPE_NULL, $characters->type);
+            self::assertSame(Variable::TYPE_NULL, $encoding->type);
+        }
+    }
+
     /** @covers issue #23657 */
     public function testMbStrtolowerStrtoupperZendStubNamedParams(): void
     {
