@@ -286,6 +286,9 @@ abstract class BaseTest extends TestCase {
     /**
      * True when a PHPT EXPECT section includes CLI diagnostics that land on stderr with display_errors=0.
      *
+     * Matches both Zend CLI `PHP Warning:` and compile-time magic visibility lines that
+     * fwrite bare `Warning:` (MagicMethodStaticCheck, #26439 / #26438).
+     *
      * @param array<string, string> $sections
      */
     protected static function phptExpectReferencesCliDiagnostics(array $sections): bool
@@ -294,7 +297,7 @@ abstract class BaseTest extends TestCase {
             if (!isset($sections[$key])) {
                 continue;
             }
-            if (preg_match('/PHP (?:Warning|Notice|Deprecated):/', $sections[$key])) {
+            if (preg_match('/(?:^|\n)(?:PHP )?(?:Warning|Notice|Deprecated):/', $sections[$key])) {
                 return true;
             }
         }
@@ -304,7 +307,7 @@ abstract class BaseTest extends TestCase {
 
     protected static function stdoutAlreadyContainsCliDiagnostics(string $stdout): bool
     {
-        return (bool) preg_match('/PHP (?:Warning|Notice|Deprecated):/', $stdout);
+        return (bool) preg_match('/(?:^|\n)(?:PHP )?(?:Warning|Notice|Deprecated):/', $stdout);
     }
 
     protected function normalize(string $string): string {

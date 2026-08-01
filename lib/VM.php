@@ -6947,7 +6947,7 @@ restart:
 
                             return self::EXCEPTION;
                         }
-                        $catchFrame = $this->initMethodCall($frame, $callee, '__invoke');
+                        $catchFrame = $this->initMethodCall($frame, $callee, '__invoke', true);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
@@ -6968,7 +6968,7 @@ restart:
 
                             return self::EXCEPTION;
                         }
-                        $catchFrame = $this->initMethodCall($frame, $receiver, '__invoke');
+                        $catchFrame = $this->initMethodCall($frame, $receiver, '__invoke', true);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
@@ -7081,7 +7081,12 @@ restart:
                         return self::EXCEPTION;
                     }
                     $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
-                    $catchFrame = $this->initMethodCall($frame, $receiver, $methodName);
+                    $catchFrame = $this->initMethodCall(
+                        $frame,
+                        $receiver,
+                        $methodName,
+                        $op->objectCallInvoke
+                    );
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
@@ -17241,7 +17246,12 @@ restart:
         return $frame->calledClass;
     }
 
-    protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): ?Frame
+    protected function initMethodCall(
+        Frame $frame,
+        Variable $receiver,
+        string $methodName,
+        bool $objectCallInvoke = false
+    ): ?Frame
     {
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
@@ -17316,25 +17326,30 @@ restart:
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
         $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
-        try {
-            MethodVisibility::assertCallable(
-                $vis,
-                $callerClassLc,
-                strtolower($declaringClass->name),
-                $declaringClass->name,
-                $declaredName,
-                false,
-                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-                $callerDisplay
-            );
-        } catch (\LogicException $e) {
-            // Inaccessible private/protected instance → __call fallback (zend_std_get_method /
-            // #25669, re-#146) — same shape as static get_static_method_fallback (#25670).
-            if ($this->tryDispatchCall($frame, $receiver, $class, $methodName)) {
-                return null;
-            }
+        // `$obj(...)` object-call handler ignores __invoke visibility (zend_object_handlers.c, #26438).
+        // Explicit `$obj->__invoke()` and `[$obj,'__invoke']()` still enforce it.
+        $skipInvokeVisibility = $objectCallInvoke && '__invoke' === $methodLc;
+        if (!$skipInvokeVisibility) {
+            try {
+                MethodVisibility::assertCallable(
+                    $vis,
+                    $callerClassLc,
+                    strtolower($declaringClass->name),
+                    $declaringClass->name,
+                    $declaredName,
+                    false,
+                    fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                    $callerDisplay
+                );
+            } catch (\LogicException $e) {
+                // Inaccessible private/protected instance → __call fallback (zend_std_get_method /
+                // #25669, re-#146) — same shape as static get_static_method_fallback (#25670).
+                if ($this->tryDispatchCall($frame, $receiver, $class, $methodName)) {
+                    return null;
+                }
 
-            return $this->dispatchVmError($e->getMessage(), $frame);
+                return $this->dispatchVmError($e->getMessage(), $frame);
+            }
         }
         $frame->call = $declaringClass->methods[$methodLc];
         // Zend: `$obj->staticMethod($arg)` does not bind $obj as argument #1 (zend_execute.c;

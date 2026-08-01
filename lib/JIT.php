@@ -10494,7 +10494,7 @@ class JIT {
                             break;
                         }
                         if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
-                            $this->initJitMethodCall($block, $nameOp, '__invoke');
+                            $this->initJitMethodCall($block, $nameOp, '__invoke', true);
                             break;
                         }
                         $nameSlot = $block->slotForOperand($nameOp);
@@ -11374,7 +11374,7 @@ class JIT {
                     $receiverOp = $block->getOperand($op->arg1);
                     $nameOp = $block->getOperand($op->arg2);
                     assert($nameOp instanceof Operand\Literal);
-                    $this->initJitMethodCall($block, $receiverOp, $nameOp->value);
+                    $this->initJitMethodCall($block, $receiverOp, $nameOp->value, $op->objectCallInvoke);
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
@@ -17360,7 +17360,12 @@ class JIT {
         return $receiverVar;
     }
 
-    private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
+    private function initJitMethodCall(
+        Block $block,
+        Operand $receiverOp,
+        string $methodName,
+        bool $objectCallInvoke = false
+    ): void
     {
         if ('__invoke' === strtolower($methodName)) {
             $receiver = $this->context->getVariableFromOp($receiverOp);
@@ -17882,13 +17887,16 @@ class JIT {
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
-        MethodVisibility::assertCallable(
-            $visFlags,
-            $callerClassLc,
-            $resolvedClassLc,
-            $className,
-            $methodName
-        );
+        // `$obj(...)` object-call ignores __invoke visibility; `$obj->__invoke()` does not (#26438).
+        if (!($objectCallInvoke && '__invoke' === $methodLc)) {
+            MethodVisibility::assertCallable(
+                $visFlags,
+                $callerClassLc,
+                $resolvedClassLc,
+                $className,
+                $methodName
+            );
+        }
         if (
             null !== $receiverUserType
             && 'object' !== strtolower(ltrim((string) $receiverUserType, '\\'))

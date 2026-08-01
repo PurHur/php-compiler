@@ -216,4 +216,32 @@ PHP;
         $runtime->run($block);
         $this->assertSame("got:x\ncall:foo\n", ob_get_clean());
     }
+
+    /** @covers issue #26438 — non-public __invoke: $obj() ok, $obj->__invoke() fatals. */
+    public function testNonPublicInvokeObjectCallDispatches(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+error_reporting(E_ALL);
+class C {
+    private function __invoke(): mixed { return 42; }
+}
+$o = new C;
+echo $o(), "\n";
+try {
+    echo $o->__invoke(), "\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $block = $runtime->parseAndCompile($code, 'nonpublic_invoke.php');
+        $this->assertNotNull($block);
+        $runtime->run($block);
+        $this->assertSame(
+            "42\nCall to private method C::__invoke() from global scope\n",
+            ob_get_clean()
+        );
+    }
 }

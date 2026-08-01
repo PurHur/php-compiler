@@ -12477,7 +12477,8 @@ class Compiler {
                         $expr->result,
                         $block,
                         max(0, $expr->getLine()),
-                        $expr
+                        $expr,
+                        true
                     );
                 }
 
@@ -12506,7 +12507,8 @@ class Compiler {
                         $expr->result,
                         $block,
                         max(0, $expr->getLine()),
-                        $expr
+                        $expr,
+                        true
                     );
                 }
 
@@ -53952,7 +53954,8 @@ class Compiler {
         Operand $result,
         Block $block,
         int $startLine = 0,
-        ?Op $cfgCallOp = null
+        ?Op $cfgCallOp = null,
+        bool $objectCallInvoke = false
     ): array {
         $argSends = $this->compileCallArgSends($args, $block, null, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
@@ -53971,11 +53974,14 @@ class Compiler {
         foreach ($nestedProducerOps as $op) {
             $return[] = $op;
         }
-        $return[] = new OpCode(
+        $init = new OpCode(
             OpCode::TYPE_METHODCALL_INIT,
             $receiver,
             $methodName
         );
+        // `$obj(...)` → `__invoke`: Zend object-call handler skips visibility (#26438).
+        $init->objectCallInvoke = $objectCallInvoke;
+        $return[] = $init;
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;

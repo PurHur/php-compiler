@@ -21,8 +21,6 @@ use PHPCompiler\MethodVisibility;
  * `__construct` / `__destruct` / `__clone` are already rejected by nikic/php-parser
  * at parse time. `__toString` visibility+Stringable fatal is MagicMethodReturnTypeCheck
  * (#25025); kept in CANNOT_BE_STATIC so the "cannot be static" set stays complete.
- *
- * `__invoke` visibility Warning+dispatch is #26438 (separate — VM may still fatal).
  */
 final class MagicMethodStaticCheck
 {
@@ -56,10 +54,11 @@ final class MagicMethodStaticCheck
     ];
 
     /**
-     * Instance magics that emit E_WARNING when non-public, then still dispatch (#26439).
+     * Instance magics that emit E_WARNING when non-public, then still dispatch (#26439, #26438).
      *
      * php-src: zend_check_magic_method_public — uses declared method name casing.
-     * Excludes __toString (Stringable fatal) and __invoke (#26438).
+     * Excludes __toString (Stringable fatal). `__invoke` warns here; object-call
+     * `$obj()` still dispatches — explicit `$obj->__invoke()` keeps visibility (#26438).
      *
      * @var array<string, true>
      */
@@ -69,6 +68,7 @@ final class MagicMethodStaticCheck
         '__isset' => true,
         '__unset' => true,
         '__call' => true,
+        '__invoke' => true,
         '__serialize' => true,
         '__unserialize' => true,
         '__sleep' => true,

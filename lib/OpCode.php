@@ -377,6 +377,13 @@ class OpCode {
      * Zend ZEND_ACC_FORBIDDEN_WHEN_DYNAMIC — even when the name folds to a compile-time string.
      */
     public bool $funcCallDynamic = false;
+    /**
+     * TYPE_METHODCALL_INIT: FuncCall `$obj(...)` rewritten to `__invoke` (zend_object_handlers.c).
+     *
+     * Object-call dispatch ignores declared visibility (warns at declare); explicit
+     * `$obj->__invoke()` still enforces it (#26438).
+     */
+    public bool $objectCallInvoke = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
