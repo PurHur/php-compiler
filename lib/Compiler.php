@@ -11984,6 +11984,7 @@ class Compiler {
         $this->rejectNullsafeInWriteContext($write, $block);
         $this->rejectNewExprInWriteContext($write, $block);
         $this->rejectGlobalConstInWriteContext($write, $block);
+        $this->rejectCallReturnInWriteContext($write, $block);
 
         return [new OpCode(
             $opcode,
@@ -12117,6 +12118,7 @@ class Compiler {
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
                     $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr, $expr);
                     $this->rejectGlobalConstInWriteContext($expr->var, $block);
+                    $this->rejectCallReturnInWriteContext($expr->var, $block);
                 }
                 if ($this->assignIsListSpread($expr)) {
                     $this->rejectListSpreadAssignExpr($expr);
@@ -12680,6 +12682,7 @@ class Compiler {
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $this->rejectNewExprInWriteContext($expr->var, $block);
                 $this->rejectGlobalConstInWriteContext($expr->var, $block);
+                $this->rejectCallReturnInWriteContext($expr->var, $block);
                 // Zend zend_compile.c: cannot acquire a reference to $GLOBALS (#15627).
                 $this->rejectGlobalsReferenceAcquisition($expr->expr);
                 // Zend zend_compile.c: ref-binding to const/class-const array element (#5409).
@@ -41168,6 +41171,7 @@ class Compiler {
                     $this->rejectThisUnset($unsetExpr);
                     if ($unsetExpr instanceof Operand) {
                         $this->rejectGlobalConstInWriteContext($unsetExpr, $block);
+                        $this->rejectCallReturnInWriteContext($unsetExpr, $block);
                     }
                     $staticPropertyFetch = $unsetExpr instanceof Op\Expr\StaticPropertyFetch
                         ? $unsetExpr
@@ -57612,6 +57616,69 @@ class Compiler {
             $this->throwCompileError('Assignments can only happen to writable values');
         }
         $this->throwCompileError('Cannot use temporary expression in write context');
+    }
+
+    /**
+     * True when $op is a call whose return may not be used as a write target (zend_compile.c).
+     */
+    protected function isCallReturnWriteExpr(Op $op): bool
+    {
+        return $op instanceof Op\Expr\MethodCall
+            || $op instanceof Op\Expr\StaticCall
+            || $op instanceof Op\Expr\NullsafeMethodCall
+            || $op instanceof Op\Expr\FuncCall
+            || $op instanceof Op\Expr\NsFuncCall;
+    }
+
+    /**
+     * Direct call-result lvalue only — dim/prop of a call return remain writable (#26436).
+     */
+    protected function findDirectCallReturnForWriteOperand(?Operand $operand, ?Block $block): ?Op\Expr
+    {
+        if (null === $operand || null === $block || null === $block->orig) {
+            return null;
+        }
+        if (
+            $operand instanceof Operand\Temporary
+            && null !== $operand->original
+            && $operand->original instanceof Op
+            && $this->isCallReturnWriteExpr($operand->original)
+        ) {
+            return $operand->original;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr || !$this->isCallReturnWriteExpr($child)) {
+                continue;
+            }
+            if ($child->result === $operand) {
+                return $child;
+            }
+            if ($this->operandsReferToSameVariable($child->result, $operand)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Zend zend_compile.c: method/function call results are illegal write targets (#26436).
+     *
+     * @return never
+     */
+    protected function rejectCallReturnInWriteContext(?Operand $var, ?Block $block = null): void
+    {
+        $call = $this->findDirectCallReturnForWriteOperand($var, $block);
+        if (null === $call) {
+            return;
+        }
+        if (
+            $call instanceof Op\Expr\FuncCall
+            || $call instanceof Op\Expr\NsFuncCall
+        ) {
+            $this->throwCompileError("Can't use function return value in write context");
+        }
+        $this->throwCompileError("Can't use method return value in write context");
     }
 
 }
