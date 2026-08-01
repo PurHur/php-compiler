@@ -3603,6 +3603,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ob_get_status'));
     }
 
+    /** @covers issue #24455 */
+    public function testObImplicitFlushZendStubNamedEnable(): void
+    {
+        $names = BuiltinParamNames::forFunction('ob_implicit_flush');
+        self::assertSame(['enable='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'enable', 'ob_implicit_flush'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects flag)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'flag', 'ob_implicit_flush'));
+        self::assertSame(
+            ['enable='],
+            BuiltinParamNames::paramNamesForInternalFunction('ob_implicit_flush')
+        );
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ob_implicit_flush'));
+    }
+
     /** @covers issue #24591 */
     public function testClosureBindCallBindToNamedParamsResolve(): void
     {
