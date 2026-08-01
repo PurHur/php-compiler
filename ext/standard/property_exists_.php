@@ -37,7 +37,7 @@ final class property_exists_ extends Internal
         self::requireValidObjectOrClass($frame->calledArgs[0]->resolveIndirect());
         // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
         $property = VmString::trimFamilyStringArgForFrame($frame, 1, 'property_exists', 1, 'property');
-        $exists = VmReflection::propertyExists($ctx, $frame->calledArgs[0], $property);
+        $exists = VmReflection::propertyExists($ctx, $frame->calledArgs[0], $property, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
         }
