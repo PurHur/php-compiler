@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * ssh2 extension module entry (PECL ssh2 / libssh2; #6385).
  *
- * Phase-1 procedural API — PHP-in-PHP; optional libssh2 FFI when present.
+ * Phase-1b procedural API — PHP-in-PHP; real libssh2 FFI handshake when present (#26509).
  * Advertise when {@see Ssh2ExtensionPolicy::advertisesExtension()}. JIT/AOT: VM-only v1.
  */
 class Module extends ModuleAbstract

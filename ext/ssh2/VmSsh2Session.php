@@ -10,7 +10,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Opaque SSH2 session object (PECL ssh2 resource; #6385).
+ * Opaque SSH2 session object (PECL ssh2 resource; #6385 / #26509).
  */
 final class VmSsh2Session
 {
@@ -18,7 +18,17 @@ final class VmSsh2Session
 
     public const CLASS_NAME = 'SSH2\\Session';
 
-    /** @var array<int, array{host: string, port: int, closed: bool, authed: bool, object: ObjectEntry}> */
+    /**
+     * @var array<int, array{
+     *   host: string,
+     *   port: int,
+     *   closed: bool,
+     *   authed: bool,
+     *   object: ObjectEntry,
+     *   sock: int|null,
+     *   session: \FFI\CData|null
+     * }>
+     */
     private static array $state = [];
 
     public static function registerClass(Context $ctx): void
@@ -31,8 +41,16 @@ final class VmSsh2Session
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
-    public static function wrap(Context $ctx, string $host, int $port): Variable
-    {
+    /**
+     * @param \FFI\CData|null $session LIBSSH2_SESSION*
+     */
+    public static function wrap(
+        Context $ctx,
+        string $host,
+        int $port,
+        ?int $sock = null,
+        $session = null
+    ): Variable {
         self::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
@@ -42,6 +60,8 @@ final class VmSsh2Session
             'closed' => false,
             'authed' => false,
             'object' => $object,
+            'sock' => $sock,
+            'session' => $session,
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
@@ -85,12 +105,32 @@ final class VmSsh2Session
         return self::$state[$object->id]['port'] ?? 22;
     }
 
+    /** @return \FFI\CData|null */
+    public static function nativeSession(ObjectEntry $object)
+    {
+        return self::$state[$object->id]['session'] ?? null;
+    }
+
+    public static function hasNativeSession(ObjectEntry $object): bool
+    {
+        return null !== (self::$state[$object->id]['session'] ?? null);
+    }
+
     public static function close(ObjectEntry $object): bool
     {
         if (!isset(self::$state[$object->id]) || self::$state[$object->id]['closed']) {
             return false;
         }
-        self::$state[$object->id]['closed'] = true;
+        $st = &self::$state[$object->id];
+        if (null !== $st['session']) {
+            VmSsh2Native::sessionDisconnect($st['session']);
+            $st['session'] = null;
+        }
+        if (null !== $st['sock']) {
+            VmSsh2Native::closeFd($st['sock']);
+            $st['sock'] = null;
+        }
+        $st['closed'] = true;
 
         return true;
     }
