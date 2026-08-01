@@ -624,6 +624,11 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'string', 'value' => 'SimpleXMLElement'],
             3 => ['kind' => 'string', 'value' => ''],
         ],
+        // php-src ext/simplexml/simplexml.stub.php — class_name=SimpleXMLElement::class (#26464)
+        // ?string would otherwise infer null.
+        'simplexml_import_dom' => [
+            1 => ['kind' => 'string', 'value' => 'SimpleXMLElement'],
+        ],
         // php-src ext/filter/filter.stub.php — int $filter = FILTER_DEFAULT (516), array|int $options = 0 (#25046)
         // InternalArgInfo int → 0; options untyped → no inferrable default.
         'filter_var' => [
