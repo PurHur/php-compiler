@@ -1935,11 +1935,11 @@ class Compiler {
         if ($this->isArrayDimWriteAssign($assign, $branch)) {
             return null;
         }
-        // Try/catch/finally branch assigns target existing CV slots, not ?: merge phi temps (#17158, #12040).
-        if (
-            null !== Block::resolveVariableName($assign->var)
-            && null !== $branch->slotForNamedAssignDest($assign->var)
-        ) {
+        // Named CV assigns keep their own slots — never rebind to ?: / try-merge phi temps.
+        // #17158 covered re-assigns that already had a named-assign dest; first assigns inside
+        // try/catch (e.g. `$rhs = 123` before `$o instanceof $rhs`) were still classified as
+        // merge-branch phi seeds and stole an outer local's slot (#26490, re-#4339).
+        if (null !== Block::resolveVariableName($assign->var)) {
             return null;
         }
         $mergeCfg = $this->branchJumpMergeTarget($branch->orig);

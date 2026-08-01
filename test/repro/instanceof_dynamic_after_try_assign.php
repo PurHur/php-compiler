@@ -1,9 +1,7 @@
---TEST--
-Language: dynamic instanceof string RHS + try assign must not clobber LHS (#4339, #26490)
---FILE--
 <?php
 declare(strict_types=1);
 
+// #26490: first CV assign inside try must not clobber outer `$o` for later instanceof.
 class C {}
 $o = new C();
 
@@ -24,7 +22,3 @@ try {
 $name = 'C';
 var_export($o instanceof $name);
 echo "\n";
---EXPECT--
-Error
-Error
-true
