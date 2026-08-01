@@ -25,8 +25,7 @@ final class bcpowmod extends BcmathFunction
             $base,
             $exponent,
             $modulus,
-            $this->optionalScale($frame, 3),
-            $this->optionalRoundingMode($frame, 4)
+            $this->optionalScale($frame, 3)
         );
     }
 }

@@ -22,8 +22,7 @@ final class bcsub extends BcmathFunction
         return VmBcmath::sub(
             $left,
             $right,
-            $this->optionalScale($frame, 2),
-            $this->optionalRoundingMode($frame, 3)
+            $this->optionalScale($frame, 2)
         );
     }
 }
