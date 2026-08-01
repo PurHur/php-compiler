@@ -826,6 +826,40 @@ final class VmSsh2Native
     }
 
     /**
+     * Open direct-tcpip tunnel channel (PECL ssh2_tunnel; #26677).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return \FFI\CData|null LIBSSH2_CHANNEL*
+     */
+    public static function channelDirectTcpip(\FFI\CData $session, string $host, int $port)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $ffi->libssh2_session_set_blocking($session, 1);
+        // PECL php_ssh2_direct_tcpip → libssh2_channel_direct_tcpip (shost=127.0.0.1, sport=22).
+        $shost = '127.0.0.1';
+        try {
+            $channel = $ffi->libssh2_channel_direct_tcpip_ex(
+                $session,
+                $host,
+                $port,
+                $shost,
+                22
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+        if (null === $channel) {
+            return null;
+        }
+
+        return $channel;
+    }
+
+    /**
      * @return \FFI|null
      */
     private static function ffi()
@@ -885,6 +919,7 @@ int libssh2_channel_send_eof(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_close(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_wait_closed(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_free(LIBSSH2_CHANNEL *channel);
+LIBSSH2_CHANNEL *libssh2_channel_direct_tcpip_ex(LIBSSH2_SESSION *session, const char *host, int port, const char *shost, int sport);
 C;
         foreach (['libssh2.so.1', 'libssh2.so', '/usr/lib/x86_64-linux-gnu/libssh2.so.1'] as $lib) {
             try {

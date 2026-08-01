@@ -40,7 +40,7 @@ abstract class Ssh2Function extends Internal
                 match ($var->type) {
                     Variable::TYPE_NULL => 'null',
                     Variable::TYPE_STRING => 'string',
-                    Variable::TYPE_INT => 'int',
+                    Variable::TYPE_INTEGER => 'int',
                     default => 'mixed',
                 }
             ));
@@ -69,7 +69,7 @@ abstract class Ssh2Function extends Internal
                 match ($var->type) {
                     Variable::TYPE_NULL => 'null',
                     Variable::TYPE_STRING => 'string',
-                    Variable::TYPE_INT => 'int',
+                    Variable::TYPE_INTEGER => 'int',
                     default => 'mixed',
                 }
             ));
@@ -494,6 +494,62 @@ final class ssh2_shell extends Ssh2Function
             return;
         }
         $wrapped = VmSsh2Stream::wrap($ctx, $session, 'shell:'.$term, $channel);
+        $frame->returnVar->object($wrapped->toObject());
+    }
+}
+
+/**
+ * ssh2_tunnel(resource $session, string $host, int $port): resource|false
+ *
+ * Direct-tcpip channel stream (PECL ssh2_tunnel; #26677).
+ */
+final class ssh2_tunnel extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_tunnel');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_tunnel() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_tunnel', 1);
+        $host = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_tunnel', 2, 'host');
+        $port = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'ssh2_tunnel', 3, 'port');
+        if (!VmSsh2Session::isAuthed($session)) {
+            @\trigger_error('ssh2_tunnel(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_tunnel(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ssh2_tunnel() requires a VM context');
+        }
+        $channel = VmSsh2Native::channelDirectTcpip($native, $host, $port);
+        if (null === $channel) {
+            @\trigger_error('ssh2_tunnel(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $wrapped = VmSsh2Stream::wrap($ctx, $session, 'tunnel:'.$host.':'.$port, $channel);
         $frame->returnVar->object($wrapped->toObject());
     }
 }
