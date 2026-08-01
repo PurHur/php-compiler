@@ -3592,6 +3592,14 @@ class VM {
         if ($this->instanceMethodReturnsByRef($object, '__get')) {
             return $this->invokeMagicGet($object, $name);
         }
+        // Defense in depth — primary gate is enforceInternalDynamicPropertyCreate (#26055).
+        if (!$object->class->allowsDynamicProperties && $object->class->isInternal) {
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+            );
+            $this->raiseUncaughtException($thrown);
+        }
         if (!$object->class->allowsDynamicProperties) {
             $scriptPath = $frame->scriptPath;
             $this->context->errors->deprecatedDynamicProperty(
@@ -8397,6 +8405,11 @@ restart:
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                            $catchFrame = $this->enforceInternalDynamicPropertyCreate($propertyObject, $name, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
                                 $result->propertyAssignLvalue = true;
@@ -8523,6 +8536,11 @@ restart:
                             }
                         }
                         $catchFrame = $this->enforceReadonlyDynamicPropertyCreate($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $catchFrame = $this->enforceInternalDynamicPropertyCreate($propertyObject, $name, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
@@ -14757,6 +14775,44 @@ restart:
             return null;
         }
         if ($object->hasProperty($name)) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Internal classes without ZEND_ACC_ALLOW_DYNAMIC_PROPERTIES → catchable Error
+     * (zend_object_handlers.c; Dom\ / DOM* / DateTime; #26055).
+     *
+     * @return ?Frame catch frame when handled; null when allowed or after uncaught raise
+     */
+    private function enforceInternalDynamicPropertyCreate(ObjectEntry $object, string $name, Frame $frame): ?Frame
+    {
+        if ($object->class->allowsDynamicProperties || !$object->class->isInternal) {
+            return null;
+        }
+        if ($object->hasProperty($name)) {
+            return null;
+        }
+        // Declared ClassProperty (possibly not yet distinguished from dynamic) — leave to write path.
+        if (null !== $this->classPropertyMeta($object, $name, $frame)) {
+            return null;
+        }
+        if ($this->hasInstanceMethod($object->class, '__set')) {
+            return null;
+        }
+        if (SplArrayStorage::hasArrayAsProps($object)) {
             return null;
         }
 
