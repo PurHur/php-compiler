@@ -605,35 +605,61 @@ class Native implements Call {
     }
 
     /**
-     * @param list<Variable> $args
+     * @param array<int, Variable> $args
      */
-    private function enforceVariadicTrailingArgs(Context $context, array $args): void
+    private function enforceVariadicTrailingArgs(Context $context, array &$args): void
     {
         $idx = $this->variadicArgIndex;
         assert(null !== $idx);
         if (!$this->variadicSlotUsesElementTypeChecks($idx)) {
             return;
         }
-        $extra = array_slice($args, $idx);
+        $extra = [];
+        foreach ($args as $key => $arg) {
+            if ((int) $key >= $idx) {
+                $extra[(int) $key] = $arg;
+            }
+        }
         if (
             1 === \count($extra)
-            && Variable::TYPE_HASHTABLE === $extra[0]->type
-            && !empty($extra[0]->variadicElementChecksDone)
+            && Variable::TYPE_HASHTABLE === reset($extra)->type
+            && !empty(reset($extra)->variadicElementChecksDone)
         ) {
             return;
         }
         $strict = $context->callerStrictTypes;
-        foreach ($extra as $arg) {
+        foreach ($extra as $key => $arg) {
             if (
                 isset($this->paramTypeConstraintsByArg[$idx])
                 && !$this->skipImplicitNullableTypeCheck($idx, $arg)
             ) {
-                \PHPCompiler\JIT\TypeCheck::enforceParameter(
-                    $context,
-                    $arg,
-                    $this->paramTypeConstraintsByArg[$idx],
-                    $strict
-                );
+                $constraint = $this->paramTypeConstraintsByArg[$idx];
+                if ($strict) {
+                    \PHPCompiler\JIT\TypeCheck::enforceParameter(
+                        $context,
+                        $arg,
+                        $constraint,
+                        true
+                    );
+                } else {
+                    // Weak: coerce in place before pack so packed elements match Zend (#26587).
+                    $coerced = \PHPCompiler\JIT\TypeCheck::coerceParameterWeak(
+                        $context,
+                        $arg,
+                        $constraint
+                    );
+                    if (null === $coerced) {
+                        \PHPCompiler\JIT\TypeCheck::enforceParameter(
+                            $context,
+                            $arg,
+                            $constraint,
+                            true
+                        );
+                    } else {
+                        $args[$key] = $coerced;
+                        $arg = $coerced;
+                    }
+                }
             }
             if (isset($this->paramIntersectionConstraintsByArg[$idx])) {
                 \PHPCompiler\JIT\IntersectionParamCheck::enforce(
