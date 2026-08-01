@@ -195,6 +195,8 @@ final class BuiltinInternalArgInfo
             'xml_set_unparsed_entity_decl_handler' => 'true',
             // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
             'array_sum', 'array_product' => 'int|float',
+            // ext/standard/array.stub.php — absent from InternalArgInfo (#26111)
+            'array_key_first', 'array_key_last' => 'string|int|null',
             // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
             'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
             default => null,
@@ -409,6 +411,8 @@ final class BuiltinInternalArgInfo
                 2 => 'int',
                 default => null,
             },
+            // ext/standard/array.stub.php — array $array; absent from InternalArgInfo (#26111)
+            'array_key_first', 'array_key_last' => 0 === $index ? 'array' : null,
             // ext/standard/array.stub.php — ?int $length = null, mixed $replacement = [] (#24824)
             'array_splice' => match ($index) {
                 2 => '?int',
