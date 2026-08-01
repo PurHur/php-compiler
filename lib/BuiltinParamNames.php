@@ -144,6 +144,9 @@ final class BuiltinParamNames
             'dom\\cdatasection::before' => ['...nodes'],
             'dom\\cdatasection::after' => ['...nodes'],
             'dom\\cdatasection::replacewith' => ['...nodes'],
+            // php-src ext/dom/php_dom.stub.php — createFromString(string $source, int $options = 0, ?string $overrideEncoding = null) (#26080)
+            'dom\\htmldocument::createfromstring',
+            'dom\\xmldocument::createfromstring' => ['source', 'options=', 'overrideEncoding='],
             'domdocument::appendchild' => ['node'],
             'domdocument::createattribute' => ['localName'],
             'domdocument::createattributens' => ['namespace', 'qualifiedName'],

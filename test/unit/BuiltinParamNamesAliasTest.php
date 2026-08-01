@@ -1206,6 +1206,38 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTimeImmutable', 'createFromTimestamp'));
     }
 
+    /** @covers issue #26080 */
+    public function testDomCreateFromStringNamedParameters(): void
+    {
+        $expected = ['source', 'options=', 'overrideEncoding='];
+        foreach (['Dom\\HTMLDocument::createFromString', 'Dom\\XMLDocument::createFromString'] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame($expected, $names, $qual);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'source', $qual), $qual);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'options', $qual), $qual);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'overrideEncoding', $qual), $qual);
+        }
+        foreach (['Dom\\HTMLDocument', 'Dom\\XMLDocument'] as $class) {
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod($class, 'createFromString'), $class);
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod($class, 'createFromString'), $class);
+            self::assertSame(
+                'string',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'createfromstring', 0),
+                $class
+            );
+            self::assertSame(
+                'int',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'createfromstring', 1),
+                $class
+            );
+            self::assertSame(
+                '?string',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'createfromstring', 2),
+                $class
+            );
+        }
+    }
+
     /** @covers issue #23707 */
     public function testDateIntervalConstructStubNamedParamsResolve(): void
     {

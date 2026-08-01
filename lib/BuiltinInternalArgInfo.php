@@ -627,6 +627,14 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — int|float $timestamp (PHP 8.4+; missing from InternalArgInfo) (#26097)
             'datetime::createfromtimestamp',
             'datetimeimmutable::createfromtimestamp' => 0 === $index ? 'int|float' : null,
+            // ext/dom/php_dom.stub.php — string $source / int $options = 0 / ?string $overrideEncoding = null (#26080)
+            'dom\\htmldocument::createfromstring',
+            'dom\\xmldocument::createfromstring' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                2 => '?string',
+                default => null,
+            },
             // ext/fileinfo/fileinfo.stub.php — ?string $magic_database = null (InternalArgInfo string) (#26181)
             'finfo::__construct' => 1 === $index ? '?string' : null,
             // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
