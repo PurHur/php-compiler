@@ -40,10 +40,9 @@ final class JitMethodExists
             return $i1->constInt(0, false);
         }
         $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral && null !== $methodLiteral) {
-            return ReflectionBuiltinHelper::methodExistsLiteral($context, $classLiteral, $methodLiteral);
-        }
         if (null !== $classLiteral) {
+            // Runtime helper — autoloads like zend_lookup_class (#26407). Compile-time
+            // fold would skip registered autoloaders for not-yet-loaded class strings.
             return self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
         }
 
@@ -113,13 +112,8 @@ final class JitMethodExists
 
         $context->builder->positionAtEnd($stringBlock);
         $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
-        if (null !== $classLiteral && null !== $methodLiteral) {
-            $strResult = ReflectionBuiltinHelper::methodExistsLiteral(
-                $context,
-                $classLiteral,
-                $methodLiteral
-            );
-        } elseif (null !== $classLiteral) {
+        if (null !== $classLiteral) {
+            // Runtime helper — autoloads like zend_lookup_class (#26407).
             $strResult = self::routeThroughPhpHelper($context, $objectOrClass, $methodArg);
         } else {
             $i1 = $context->getTypeFromString('int1');
