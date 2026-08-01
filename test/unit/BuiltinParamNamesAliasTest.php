@@ -2629,6 +2629,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('mb_ucfirst'));
     }
 
+    /** @covers issue #26282 */
+    public function testMbUcfirstLcfirstZendStubReflectionTypes(): void
+    {
+        foreach (['mb_ucfirst', 'mb_lcfirst'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'encoding='], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+            self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0));
+            self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1));
+            $infoEncoding = ['name' => 'encoding', 'type' => '?string', 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, 1, $infoEncoding, false));
+            $encoding = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($encoding, $fn, 1, $infoEncoding));
+            self::assertSame(Variable::TYPE_NULL, $encoding->type);
+        }
+    }
+
     /** @covers issue #26283 */
     public function testMbTrimFamilyZendStubReflectionTypes(): void
     {

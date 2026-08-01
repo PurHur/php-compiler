@@ -1481,6 +1481,7 @@ final class BuiltinParamNames
             // php-src ext/mbstring/mbstring.stub.php — Reflection was empty (#23805)
             case 'mb_str_pad':
                 return ['string', 'length', 'pad_string=', 'pad_type=', 'encoding='];
+            // php-src ext/mbstring/mbstring.stub.php — types + encoding=null (#26282, re-#23805)
             case 'mb_lcfirst':
             case 'mb_ucfirst':
                 return ['string', 'encoding='];
