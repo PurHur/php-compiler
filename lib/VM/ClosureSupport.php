@@ -170,11 +170,20 @@ final class ClosureSupport
                 return self::wrapState($ctx, $invokeState);
             }
 
+            // Closure::fromCallable($obj): Zend TypeError (not Error) for non-invokable (#26457).
+            if ($fromCallableApi) {
+                throw new \TypeError(self::fromCallableNoArrayOrStringMessage());
+            }
+
             throw new \Error(
                 'Object of type '.self::valueTypeName($callable).' is not callable'
             );
         }
         if (Variable::TYPE_ENUM_CASE === $callable->type) {
+            if ($fromCallableApi) {
+                throw new \TypeError(self::fromCallableNoArrayOrStringMessage());
+            }
+
             throw new \Error(
                 'Object of type '.self::valueTypeName($callable).' is not callable'
             );
@@ -194,9 +203,26 @@ final class ClosureSupport
             return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $parentScope, $fromCallableApi));
         }
 
+        // Scalars / resources: Closure::fromCallable → TypeError; FCC keeps LogicException (#26457).
+        if ($fromCallableApi) {
+            throw new \TypeError(self::fromCallableNoArrayOrStringMessage());
+        }
+
         throw new \LogicException(
             'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
         );
+    }
+
+    /** php-src zend_closures.c — invalid scalar/object for Closure::fromCallable (#26457). */
+    private static function fromCallableNoArrayOrStringMessage(): string
+    {
+        return 'Failed to create closure from callable: no array or string given';
+    }
+
+    /** php-src zend_closures.c — Closure::fromCallable TypeError prefix (#26457). */
+    private static function fromCallableFailedMessage(string $detail): string
+    {
+        return 'Failed to create closure from callable: '.$detail;
     }
 
     public static function bindTo(
@@ -543,6 +569,12 @@ final class ClosureSupport
             $ctx->autoloadClass($className);
         }
         if (!isset($ctx->classes[$lcClass])) {
+            if ($fromCallableApi) {
+                throw new \TypeError(
+                    self::fromCallableFailedMessage('class "'.$className.'" not found')
+                );
+            }
+
             throw new \LogicException(
                 "Closure::fromCallable(): Class '{$className}' not found"
             );
@@ -566,6 +598,13 @@ final class ClosureSupport
             $magicState = self::tryMagicStaticCallable($ctx, $namedClassLc, $namedClass->name, $methodName);
             if (null !== $magicState) {
                 return $magicState;
+            }
+            if ($fromCallableApi) {
+                throw new \TypeError(
+                    self::fromCallableFailedMessage(
+                        'class '.$namedClass->name.' does not have a method "'.$methodName.'"'
+                    )
+                );
             }
             throw $e;
         }
@@ -650,13 +689,50 @@ final class ClosureSupport
         $idx0->int(0);
         $idx1 = new Variable(Variable::TYPE_INTEGER);
         $idx1->int(1);
-        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+        $has0 = $table->keyExists($idx0);
+        $has1 = $table->keyExists($idx1);
+        if (!$has0 || !$has1) {
+            if ($fromCallableApi) {
+                // zend_is_callable_ex: wrong arity vs missing 0/1 keys (#26457).
+                if (2 !== $table->getNumElements()) {
+                    throw new \TypeError(
+                        self::fromCallableFailedMessage(
+                            'array callback must have exactly two members'
+                        )
+                    );
+                }
+
+                throw new \TypeError(
+                    self::fromCallableFailedMessage(
+                        'array callback has to contain indices 0 and 1'
+                    )
+                );
+            }
+
             throw new \LogicException(
                 'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
             );
         }
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
-        $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
+        $methodVar = $table->findVariable($idx1, false)->resolveIndirect();
+        // Zend checks receiver kind before method kind (zend_is_callable_ex, #26457).
+        $receiverOk = Variable::TYPE_OBJECT === $receiver->type
+            || Variable::TYPE_ENUM_CASE === $receiver->type
+            || Variable::TYPE_STRING === $receiver->type
+            || $parentScope;
+        if ($fromCallableApi && !$receiverOk) {
+            throw new \TypeError(
+                self::fromCallableFailedMessage(
+                    'first array member is not a valid class name or object'
+                )
+            );
+        }
+        if ($fromCallableApi && Variable::TYPE_STRING !== $methodVar->type) {
+            throw new \TypeError(
+                self::fromCallableFailedMessage('second array member is not a valid method')
+            );
+        }
+        $methodName = $methodVar->toString();
         if (Variable::TYPE_OBJECT === $receiver->type) {
             return self::fromInstanceMethodCallable(
                 $ctx,
@@ -759,8 +835,31 @@ final class ClosureSupport
             if (null !== $magicState) {
                 return $magicState;
             }
+            if ($fromCallableApi) {
+                $displayClass = ($ctx->classes[$resolveFromLc] ?? $class)->name;
+
+                throw new \TypeError(
+                    self::fromCallableFailedMessage(
+                        'class '.$displayClass.' does not have a method "'.$methodName.'"'
+                    )
+                );
+            }
         }
-        [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc);
+        try {
+            [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc);
+        } catch (\LogicException $e) {
+            if ($fromCallableApi) {
+                $displayClass = ($ctx->classes[$resolveFromLc] ?? $class)->name;
+
+                throw new \TypeError(
+                    self::fromCallableFailedMessage(
+                        'class '.$displayClass.' does not have a method "'.$methodName.'"'
+                    )
+                );
+            }
+
+            throw $e;
+        }
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
