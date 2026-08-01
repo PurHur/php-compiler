@@ -62,6 +62,26 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** Zend/zend_builtin_functions.stub.php — mixed $object_or_class (InternalArgInfo empty) (#26359). */
+    public function testIsAIsSubclassOfObjectOrClassIsMixed(): void
+    {
+        foreach (['is_a', 'is_subclass_of'] as $f) {
+            $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+            $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0), $f);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+            $this->assertNotNull($info, $f);
+            // InternalArgInfo still says object_or_string; Reflection uses BuiltinParamNames object_or_class.
+            $this->assertSame('object_or_string', $info['name'], $f);
+            $this->assertSame('mixed', $info['type'], $f);
+            $this->assertFalse($info['isOptional'], $f);
+            $this->assertSame(
+                ['object_or_class', 'class', 'allow_string'],
+                BuiltinParamNames::forFunction($f),
+                $f
+            );
+        }
+    }
+
     /** Zend/zend_builtin_functions.stub.php — exit/die string|int $status = 0 : never (#26056). */
     public function testExitDieReflectionStubTypes(): void
     {
