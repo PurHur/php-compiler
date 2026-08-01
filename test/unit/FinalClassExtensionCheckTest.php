@@ -119,4 +119,63 @@ PHP;
         $runtime->run($block);
         $this->assertSame("true\nok\n", ob_get_clean());
     }
+
+    /** @covers issue #26531 */
+    public function testExtendUnitEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E { case A; }
+class C extends E {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C cannot extend final class E');
+        $runtime->parseAndCompile($code, 'extend_unit_enum.php');
+    }
+
+    /** @covers issue #26531 */
+    public function testExtendBackedEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+class C extends E {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C cannot extend final class E');
+        $runtime->parseAndCompile($code, 'extend_backed_enum.php');
+    }
+
+    /** @covers issue #26531 */
+    public function testEnumReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E { case A; }
+var_export((new ReflectionClass(E::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\n", ob_get_clean());
+    }
+
+    /** @covers issue #26531 */
+    public function testImplementsEnumStillRejected(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E { case A; }
+class C implements E {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessageMatches('/cannot implement E - it is not an interface/');
+        $runtime->parseAndCompile($code, 'implements_enum.php');
+    }
 }
