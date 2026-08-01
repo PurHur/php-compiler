@@ -853,3 +853,86 @@ final class ssh2_sftp_realpath extends Ssh2Function
         $frame->returnVar->string($resolved);
     }
 }
+
+/**
+ * ssh2_sftp_symlink(resource $sftp, string $target, string $link): bool
+ */
+final class ssh2_sftp_symlink extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_symlink');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_symlink() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_symlink', 1);
+        $target = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_symlink', 2, 'target');
+        $link = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_sftp_symlink', 3, 'link');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native || '' === $target || '' === $link) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::sftpSymlink($native, $target, $link));
+    }
+}
+
+/**
+ * ssh2_sftp_readlink(resource $sftp, string $link): string|false
+ */
+final class ssh2_sftp_readlink extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_readlink');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_readlink() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_readlink', 1);
+        $link = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_readlink', 2, 'link');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            @\trigger_error(
+                \sprintf("ssh2_sftp_readlink(): Unable to read link '%s'", $link),
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $resolved = VmSsh2Native::sftpReadlink($native, $link);
+        if (false === $resolved) {
+            @\trigger_error(
+                \sprintf("ssh2_sftp_readlink(): Unable to read link '%s'", $link),
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($resolved);
+    }
+}
