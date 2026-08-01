@@ -59,6 +59,12 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/standard/html.c / basic_functions.stub.php — ENT_QUOTES|ENT_SUBSTITUTE, encoding=null, double_encode=true (#24970)
+        'htmlentities' => [
+            1 => ['kind' => 'int', 'value' => 11],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'bool', 'value' => true],
+        ],
         // php-src ext/intl/spoofchecker/spoofchecker.stub.php — &$errorCode = null (#25055)
         'spoofchecker::issuspicious' => [
             1 => ['kind' => 'null'],
