@@ -258,6 +258,10 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'bool', 'value' => false],
             3 => ['kind' => 'array'],
         ],
+        // php-src ext/standard/password.stub.php — array $options = [] (#23292)
+        'password_needs_rehash' => [
+            2 => ['kind' => 'array'],
+        ],
         // php-src ext/hash/hash.stub.php — length=0, info="", salt="" (string defaults not inferred) (#25018)
         'hash_hkdf' => [
             2 => ['kind' => 'int', 'value' => 0],

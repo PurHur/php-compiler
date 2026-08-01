@@ -299,6 +299,34 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('fscanf'));
     }
 
+    /** php-src password.stub.php — absent from InternalArgInfo (#23292). */
+    public function testPasswordGetInfoNeedsRehashReflectionStubTypes(): void
+    {
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('password_get_info'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('password_get_info', 0));
+        $hash = BuiltinInternalArgInfo::paramInfoForFunction('password_get_info', 0);
+        $this->assertNotNull($hash);
+        $this->assertSame('hash', $hash['name']);
+        $this->assertSame('string', $hash['type']);
+        $this->assertFalse($hash['isOptional']);
+
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('password_needs_rehash'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('password_needs_rehash', 0));
+        $this->assertSame('string|int|null', BuiltinInternalArgInfo::stubParamTypeOverride('password_needs_rehash', 1));
+        $this->assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('password_needs_rehash', 2));
+        $options = BuiltinInternalArgInfo::paramInfoForFunction('password_needs_rehash', 2);
+        $this->assertNotNull($options);
+        $this->assertSame('options', $options['name']);
+        $this->assertSame('array', $options['type']);
+        $this->assertTrue($options['isOptional']);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'password_needs_rehash',
+            2,
+            ['name' => 'options', 'type' => 'array', 'isOptional' => true],
+            false
+        ));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511, #26342). */
     public function testGzencodeGzdecodeReflectionReturnUnions(): void
     {
