@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\HtmlEntityTable;
 use PHPCompiler\ext\standard\mail as MailBuiltin;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmPregMatches;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -3350,6 +3351,24 @@ final class VmMbstring
         }
 
         return ['matched' => true, 'registers' => $matches];
+    }
+
+    /**
+     * Write mb_ereg / mb_eregi by-ref $regs (php-src _php_mb_regex_ereg_exec; #26408).
+     *
+     * Zend always assigns an array when argc≥3: capture groups on match, empty array on no-match.
+     *
+     * @param array{matched: bool, registers: array<int, string>} $out
+     */
+    public static function writeEregRegistersArg(Variable $target, array $out): void
+    {
+        if ($out['matched']) {
+            $target->array(VmPregMatches::hostMatchesToHashTable($out['registers'], 0));
+
+            return;
+        }
+
+        $target->array(new HashTable());
     }
 
     /**
