@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6658 |
-| Phase A inventory files (M2 ratio SSOT) | 6658 |
+| PHP files on vm.php path | 6673 |
+| Phase A inventory files (M2 ratio SSOT) | 6673 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21462 |
+| Source constructs flagged (warnings) | 21485 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1359,6 +1359,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/mbstring/mb_ucfirst.php` | 0 | 3 |
 | `ext/mbstring/mb_ucwords.php` | 0 | 3 |
+| `ext/memcached/BuiltinClasses.php` | 0 | 1 |
+| `ext/memcached/MemcachedAddServer.php` | 0 | 2 |
+| `ext/memcached/MemcachedClassMethod.php` | 0 | 1 |
+| `ext/memcached/MemcachedConstruct.php` | 0 | 1 |
+| `ext/memcached/MemcachedDelete.php` | 0 | 2 |
+| `ext/memcached/MemcachedExtensionPolicy.php` | 0 | 1 |
+| `ext/memcached/MemcachedGet.php` | 0 | 2 |
+| `ext/memcached/MemcachedGetResultCode.php` | 0 | 1 |
+| `ext/memcached/MemcachedSet.php` | 0 | 2 |
+| `ext/memcached/Module.php` | 0 | 1 |
+| `ext/memcached/VmMemcached.php` | 0 | 10 |
+| `ext/memcached/VmMemcachedNative.php` | 0 | 1 |
 | `ext/mongodb/BuiltinClasses.php` | 0 | 1 |
 | `ext/mongodb/BulkWriteConstruct.php` | 0 | 1 |
 | `ext/mongodb/ManagerConstruct.php` | 0 | 1 |
@@ -1618,6 +1630,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
 | `ext/pgsql/Module.php` | 0 | 123 |
+| `ext/pgsql/PgSendAsyncReturn.php` | 0 | 1 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/PgsqlSerializeDeny.php` | 0 | 3 |
@@ -1627,7 +1640,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 2 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
-| `ext/pgsql/pg_async_builtins.php` | 0 | 19 |
+| `ext/pgsql/pg_async_builtins.php` | 0 | 18 |
 | `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 3 |
@@ -5045,7 +5058,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Internal.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsAnonymousClassRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsNullFn.php` | 0 | 2 |
-| `lib/JIT/Builtin/JitHelperAbiBridge.php` | 0 | 3 |
+| `lib/JIT/Builtin/JitHelperAbiBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitReturnPending.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitThrow.php` | 0 | 2 |
 | `lib/JIT/Builtin/KeySortRuntime.php` | 0 | 1 |
@@ -17268,6 +17281,79 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 1 closure(s)
 
+### `ext/memcached/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/memcached/MemcachedAddServer.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/memcached/MemcachedClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/memcached/MemcachedConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/memcached/MemcachedDelete.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/memcached/MemcachedExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/memcached/MemcachedGet.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/memcached/MemcachedGetResultCode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/memcached/MemcachedSet.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/memcached/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/memcached/VmMemcached.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 32)
+- new Variable (line 35)
+- new MemcachedConstruct (line 42)
+- new MemcachedAddServer (line 47)
+- new MemcachedSet (line 48)
+- new MemcachedGet (line 49)
+- new MemcachedDelete (line 50)
+- new MemcachedGetResultCode (line 51)
+- new MemcachedState (line 68)
+- 9 class method(s)
+
+### `ext/memcached/VmMemcachedNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `ext/mongodb/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19712,6 +19798,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_socket_poll (line 236)
 - 8 class method(s)
 
+### `ext/pgsql/PgSendAsyncReturn.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/pgsql/PgsqlConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19800,25 +19891,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/pg_async_builtins.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new ArgumentCountError (line 62)
-- new ArgumentCountError (line 101)
-- new ArgumentCountError (line 130)
-- new ArgumentCountError (line 173)
-- new ArgumentCountError (line 224)
-- new ArgumentCountError (line 278)
-- new ArgumentCountError (line 330)
-- trait PgSendAsyncReturn (line 377)
-- new ArgumentCountError (line 411)
-- new ArgumentCountError (line 446)
-- new ArgumentCountError (line 482)
-- new ArgumentCountError (line 518)
-- new ArgumentCountError (line 552)
-- new ArgumentCountError (line 594)
-- new ArgumentCountError (line 626)
-- new ArgumentCountError (line 689)
-- new ArgumentCountError (line 746)
-- 35 class method(s)
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 64)
+- new ArgumentCountError (line 103)
+- new ArgumentCountError (line 132)
+- new ArgumentCountError (line 175)
+- new ArgumentCountError (line 226)
+- new ArgumentCountError (line 280)
+- new ArgumentCountError (line 332)
+- new ArgumentCountError (line 395)
+- new ArgumentCountError (line 428)
+- new ArgumentCountError (line 462)
+- new ArgumentCountError (line 496)
+- new ArgumentCountError (line 530)
+- new ArgumentCountError (line 572)
+- new ArgumentCountError (line 604)
+- new ArgumentCountError (line 667)
+- new ArgumentCountError (line 724)
+- 34 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
 
@@ -42769,7 +42859,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 286 class method(s)
+- 287 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -44082,9 +44172,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/JitHelperAbiBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 326)
 - 10 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/JitReturnPending.php`
 

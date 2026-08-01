@@ -823,6 +823,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsMemcachedFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMemcached());
+    }
+
+    public function testSupportsMemcachedTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMemcached());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsXmlrpcFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsXmlrpc());

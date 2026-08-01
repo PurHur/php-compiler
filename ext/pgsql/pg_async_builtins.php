@@ -11,6 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
+require_once __DIR__.'/PgSendAsyncReturn.php';
+
 /**
  * pg_socket / pg_consume_input / pg_flush / pg_connect_poll (php-src ext/pgsql; #20636, #21896).
  * Loaded via Module::getFunctions() + spine require.
@@ -373,32 +375,14 @@ final class pg_set_error_context_visibility extends Internal
 
 /**
  * Shared true / 0 / false return for pg_send_* (#20681).
+ * Helper lives in {@see PgSendAsyncReturn.php} (own spine unit).
  */
-trait PgSendAsyncReturn
-{
-    private function assignSendReturn(\PHPCompiler\VM\Variable $returnVar, bool|int $out): void
-    {
-        if (true === $out) {
-            $returnVar->bool(true);
-
-            return;
-        }
-        if (false === $out) {
-            $returnVar->bool(false);
-
-            return;
-        }
-        $returnVar->int($out);
-    }
-}
 
 /**
  * pg_send_query (php-src ext/pgsql/pgsql.c; #20681).
  */
 final class pg_send_query extends Internal
 {
-    use PgSendAsyncReturn;
-
     public function __construct()
     {
         parent::__construct('pg_send_query');
@@ -418,7 +402,7 @@ final class pg_send_query extends Internal
         }
         $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_query', 1);
         $query = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_query', 1, 'query');
-        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendQuery($conn, $query));
+        PgSendAsyncReturn::assign($frame->returnVar, VmPgsqlCore::sendQuery($conn, $query));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -432,8 +416,6 @@ final class pg_send_query extends Internal
  */
 final class pg_send_query_params extends Internal
 {
-    use PgSendAsyncReturn;
-
     public function __construct()
     {
         parent::__construct('pg_send_query_params');
@@ -454,7 +436,7 @@ final class pg_send_query_params extends Internal
         $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_query_params', 1);
         $query = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_query_params', 1, 'query');
         $params = pg_query_params::coerceParamList($frame->calledArgs[2], 'pg_send_query_params', 2);
-        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendQueryParams($conn, $query, $params));
+        PgSendAsyncReturn::assign($frame->returnVar, VmPgsqlCore::sendQueryParams($conn, $query, $params));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -468,8 +450,6 @@ final class pg_send_query_params extends Internal
  */
 final class pg_send_prepare extends Internal
 {
-    use PgSendAsyncReturn;
-
     public function __construct()
     {
         parent::__construct('pg_send_prepare');
@@ -490,7 +470,7 @@ final class pg_send_prepare extends Internal
         $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_prepare', 1);
         $stmt = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_prepare', 1, 'statement_name');
         $query = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'pg_send_prepare', 2, 'query');
-        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendPrepare($conn, $stmt, $query));
+        PgSendAsyncReturn::assign($frame->returnVar, VmPgsqlCore::sendPrepare($conn, $stmt, $query));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -504,8 +484,6 @@ final class pg_send_prepare extends Internal
  */
 final class pg_send_execute extends Internal
 {
-    use PgSendAsyncReturn;
-
     public function __construct()
     {
         parent::__construct('pg_send_execute');
@@ -526,7 +504,7 @@ final class pg_send_execute extends Internal
         $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_execute', 1);
         $stmt = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_execute', 1, 'statement_name');
         $params = pg_query_params::coerceParamList($frame->calledArgs[2], 'pg_send_execute', 2);
-        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendExecute($conn, $stmt, $params));
+        PgSendAsyncReturn::assign($frame->returnVar, VmPgsqlCore::sendExecute($conn, $stmt, $params));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
