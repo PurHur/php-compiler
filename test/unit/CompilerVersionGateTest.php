@@ -1694,6 +1694,41 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsNullArrayOffsetDeprecationFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsNullArrayOffsetDeprecation());
+    }
+
+    public function testSupportsNullArrayOffsetDeprecationFalseWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsNullArrayOffsetDeprecation());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsNullArrayOffsetDeprecationTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsNullArrayOffsetDeprecation());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsDereferencableNewWithoutOuterParensFalseOnDefault84DevReference(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

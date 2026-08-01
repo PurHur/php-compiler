@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\ArrayKeyExistsRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -41,10 +42,13 @@ final class array_key_exists extends Internal
             2,
             'array'
         );
+        if (Variable::TYPE_NULL === $key->type) {
+            HashTable::warnNullArrayKeyExistsIfNeeded($frame);
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool($array->hasKey($key));
+        $frame->returnVar->bool($array->hasKey($key, false));
     }
 
     public Context $context;

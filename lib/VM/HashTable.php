@@ -10,11 +10,21 @@
 namespace PHPCompiler\VM;
 
 use php\MaskedArray;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
+use PHPCompiler\VM as VmEngine;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmMath;
 
 final class HashTable {
+    /** php-src Zend/zend_execute.c — null dim fetch/assign E_DEPRECATED (#26276). */
+    public const NULL_ARRAY_OFFSET_DEPRECATED_MESSAGE =
+        'Using null as an array offset is deprecated, use an empty string instead';
+
+    /** php-src ext/standard/array.c — array_key_exists(null, …) E_DEPRECATED (#26276). */
+    public const NULL_ARRAY_KEY_EXISTS_DEPRECATED_MESSAGE =
+        'Using null as the key parameter for array_key_exists() is deprecated, use an empty string instead';
+
     const OKAY                     = 0b0000000;
     const IS_DESTROYING            = 0b0000001;
     const DESTROYED                = 0b0000010;
@@ -489,14 +499,24 @@ final class HashTable {
      *
      * Float→int coercion is silent for read/isset/unset (#5123, #16739). Dimension / literal
      * key writes use {@see normalizeIndexKeyForWrite} so non-integral floats emit E_DEPRECATED (#19730).
+     *
+     * Under PROFILE≥8.5, null→"" also emits {@see NULL_ARRAY_OFFSET_DEPRECATED_MESSAGE} unless
+     * {@param $emitNullOffsetDeprecation} is false (array_key_exists uses a distinct message; #26276).
      */
-    public static function normalizeIndexKey(Variable $index, string $illegalOffsetMessage = 'Illegal offset type'): Variable
-    {
+    public static function normalizeIndexKey(
+        Variable $index,
+        string $illegalOffsetMessage = 'Illegal offset type',
+        bool $emitNullOffsetDeprecation = true,
+        ?Frame $frame = null
+    ): Variable {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
         }
         EnumCaseSupport::rejectIllegalArrayOffset($index, $illegalOffsetMessage);
         if (Variable::TYPE_NULL === $index->type) {
+            if ($emitNullOffsetDeprecation) {
+                self::warnNullArrayOffsetIfNeeded($frame);
+            }
             $empty = new Variable();
             $empty->string('');
 
@@ -520,6 +540,58 @@ final class HashTable {
     }
 
     /**
+     * PHP 8.5+ null array-offset E_DEPRECATED (Zend/zend_execute.c; #26276).
+     */
+    public static function warnNullArrayOffsetIfNeeded(?Frame $frame = null): void
+    {
+        if (!CompilerVersion::supportsNullArrayOffsetDeprecation()) {
+            return;
+        }
+        $vm = VmEngine::running();
+        if (null === $vm) {
+            return;
+        }
+        if (null === $frame) {
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
+        }
+        $vm->context->errors->internalDeprecated(
+            self::NULL_ARRAY_OFFSET_DEPRECATED_MESSAGE,
+            $vm->context,
+            $frame
+        );
+    }
+
+    /**
+     * PHP 8.5+ array_key_exists(null, …) E_DEPRECATED (ext/standard/array.c; #26276).
+     */
+    public static function warnNullArrayKeyExistsIfNeeded(?Frame $frame = null): void
+    {
+        if (!CompilerVersion::supportsNullArrayOffsetDeprecation()) {
+            return;
+        }
+        $vm = VmEngine::running();
+        if (null === $vm) {
+            return;
+        }
+        if (null === $frame) {
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
+        }
+        $vm->context->errors->internalDeprecated(
+            self::NULL_ARRAY_KEY_EXISTS_DEPRECATED_MESSAGE,
+            $vm->context,
+            $frame
+        );
+    }
+
+    /**
      * Array key write path: Zend zend_hash float→long with precision-loss E_DEPRECATED (#19730).
      */
     public static function normalizeIndexKeyForWrite(
@@ -536,7 +608,7 @@ final class HashTable {
             VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $vmContext, $frame);
         }
 
-        return self::normalizeIndexKey($index, $illegalOffsetMessage);
+        return self::normalizeIndexKey($index, $illegalOffsetMessage, true, $frame);
     }
 
     /**
@@ -556,9 +628,9 @@ final class HashTable {
         }
     }
 
-    public function keyExists(Variable $index): bool
+    public function keyExists(Variable $index, bool $emitNullOffsetDeprecation = true, ?Frame $frame = null): bool
     {
-        $index = self::normalizeIndexKey($index);
+        $index = self::normalizeIndexKey($index, 'Illegal offset type', $emitNullOffsetDeprecation, $frame);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());
@@ -575,7 +647,7 @@ final class HashTable {
         if ($forWrite && null !== $vmContext) {
             $index = self::normalizeIndexKeyForWrite($index, $vmContext, $frame);
         } else {
-            $index = self::normalizeIndexKey($index);
+            $index = self::normalizeIndexKey($index, 'Illegal offset type', true, $frame);
         }
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
@@ -1964,10 +2036,10 @@ final class HashTable {
         return $out;
     }
 
-    public function hasKey(Variable $index): bool
+    public function hasKey(Variable $index, bool $emitNullOffsetDeprecation = true, ?Frame $frame = null): bool
     {
         $this->assertConsistent();
-        $index = self::normalizeIndexKey($index);
+        $index = self::normalizeIndexKey($index, 'Illegal offset type', $emitNullOffsetDeprecation, $frame);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $value = $this->findIndex($index->toInt());
@@ -1988,9 +2060,9 @@ final class HashTable {
     /**
      * Whether an offset exists and is not null (PHP isset() on arrays).
      */
-    public function offsetIsSet(Variable $index): bool
+    public function offsetIsSet(Variable $index, ?Frame $frame = null): bool
     {
-        $index = self::normalizeIndexKey($index, 'Illegal offset type in isset or empty');
+        $index = self::normalizeIndexKey($index, 'Illegal offset type in isset or empty', true, $frame);
         $stored = null;
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
@@ -2013,7 +2085,7 @@ final class HashTable {
         return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
     }
 
-    public function offsetUnset(Variable $index): void
+    public function offsetUnset(Variable $index, ?Frame $frame = null): void
     {
         $this->assertConsistent();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
@@ -2022,7 +2094,7 @@ final class HashTable {
         $this->assertSeparatedForWrite();
         $bucket = null;
         $bucketIndex = self::INVALID_INDEX;
-        $index = self::normalizeIndexKey($index, 'Illegal offset type in unset');
+        $index = self::normalizeIndexKey($index, 'Illegal offset type in unset', true, $frame);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $bucketIndex = $this->findBucketIndex($index->toInt(), null);

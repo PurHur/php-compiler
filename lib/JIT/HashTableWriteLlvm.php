@@ -775,6 +775,7 @@ final class HashTableWriteLlvm
             return;
         }
         if (Variable::TYPE_NULL === $key->type) {
+            DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
             $emptyKey = $context->builder->load($context->constantStringFromString(''));
             self::setAtStringKey($context, $ht, $emptyKey, $element);
 
@@ -935,6 +936,23 @@ final class HashTableWriteLlvm
         self::setAtIndex($context, $ht, $floatIndex, $element);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterFloat);
+        $nullBlock = $fn->appendBasicBlock('ht_set_vk_null');
+        $afterNull = $fn->appendBasicBlock('ht_set_vk_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            ),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
+        $emptyKey = $context->builder->load($context->constantStringFromString(''));
+        self::setAtStringKey($context, $ht, $emptyKey, $element);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterNull);
         $illegalBlock = $fn->appendBasicBlock('ht_set_vk_illegal');
         $afterObject = $fn->appendBasicBlock('ht_set_vk_after_obj');
         $context->builder->branchIf(
