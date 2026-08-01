@@ -112,8 +112,10 @@ final class BuiltinInternalArgInfo
             'curl_close' => 'void',
             // InternalArgInfo bool|string; Zend Reflection string|bool (#26186)
             'curl_exec' => 'string|bool',
-            // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046)
+            // ext/filter/filter.stub.php — InternalArgInfo return empty (#25046, #26184)
             'filter_var' => 'mixed',
+            'filter_input' => 'mixed',
+            'filter_var_array' => 'array|false|null',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
             // Zend/zend_builtin_functions.stub.php — sizeof alias absent from InternalArgInfo (#25966)
@@ -378,6 +380,14 @@ final class BuiltinInternalArgInfo
                 2 => 'array|int',
                 default => null,
             },
+            // ext/filter/filter.stub.php — array|int $options / bool $add_empty (#26184)
+            'filter_var_array' => match ($index) {
+                1 => 'array|int',
+                2 => 'bool',
+                default => null,
+            },
+            // ext/filter/filter.stub.php — array|int $options = 0 (#26184)
+            'filter_input' => 3 === $index ? 'array|int' : null,
             // ext/standard/file.stub.php — &$would_block untyped; InternalArgInfo int (#23352)
             'flock' => 2 === $index ? '' : null,
             // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)

@@ -578,6 +578,16 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 516], // FILTER_DEFAULT
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/filter/filter.stub.php — options=FILTER_DEFAULT, add_empty=true (#26184)
+        'filter_var_array' => [
+            1 => ['kind' => 'int', 'value' => 516], // FILTER_DEFAULT
+            2 => ['kind' => 'bool', 'value' => true],
+        ],
+        // php-src ext/filter/filter.stub.php — filter=FILTER_DEFAULT, options=0 (#26184)
+        'filter_input' => [
+            2 => ['kind' => 'int', 'value' => 516], // FILTER_DEFAULT
+            3 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/standard/file.stub.php — ?bool &$would_block = null (InternalArgInfo int → 0) (#23352)
         'flock' => [
             2 => ['kind' => 'null'],

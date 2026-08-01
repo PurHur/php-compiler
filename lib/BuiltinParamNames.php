@@ -1179,12 +1179,12 @@ final class BuiltinParamNames
             // php-src ext/filter/filter.stub.php — InternalArgInfo still says filtername (#23658)
             case 'filter_id':
                 return ['name'];
-            // php-src ext/filter/filter.stub.php — InternalArgInfo still says data/definition (#23598)
+            // php-src ext/filter/filter.stub.php — options=FILTER_DEFAULT, add_empty=true (#23598, #26184)
             case 'filter_var_array':
-                return ['array', 'options', 'add_empty'];
-            // php-src ext/filter/filter.stub.php — Zend stub uses var_name (#23383)
+                return ['array', 'options=', 'add_empty='];
+            // php-src ext/filter/filter.stub.php — filter=FILTER_DEFAULT, options=0 (#23383, #26184)
             case 'filter_input':
-                return ['type', 'var_name', 'filter', 'options'];
+                return ['type', 'var_name', 'filter=', 'options='];
             case 'explode':
                 return ['separator', 'string', 'limit'];
             // php-src ext/standard/string.stub.php — array|string $separator, ?array $array = null (#24811)

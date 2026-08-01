@@ -269,6 +269,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('class_implements', 0));
     }
 
+    /** php-src ext/filter/filter.stub.php — filter_var_array / filter_input Reflection (#26184). */
+    public function testFilterVarArrayAndFilterInputReflectionStubs(): void
+    {
+        $this->assertSame('array|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('filter_var_array'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('filter_input'));
+        $this->assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('filter_var_array', 1));
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('filter_var_array', 2));
+        $this->assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('filter_input', 3));
+        $options = BuiltinInternalArgInfo::paramInfoForFunction('filter_var_array', 1);
+        $this->assertNotNull($options);
+        $this->assertSame('array|int', $options['type']);
+        $this->assertTrue($options['isOptional']);
+        $addEmpty = BuiltinInternalArgInfo::paramInfoForFunction('filter_var_array', 2);
+        $this->assertNotNull($addEmpty);
+        $this->assertSame('bool', $addEmpty['type']);
+        $this->assertTrue($addEmpty['isOptional']);
+    }
+
     public function testSplFileObjectSeekMethodParamCount(): void
     {
         $this->assertSame(1, BuiltinInternalArgInfo::paramCountForClassMethod('SplFileObject', 'seek'));
