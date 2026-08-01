@@ -13773,8 +13773,10 @@ restart:
     /**
      * Bind `$r = &$obj->prop` when `&get` is declared (zend_property_hooks.c, #22475).
      *
-     * Prefer the live `&get` return so writes alias backing storage. When a set hook is
-     * also present, PropertyHookRef write-through stays valid for private backing cells.
+     * Prefer recorded getBacking (same as dim writes, #21098) so `$r = &$obj->hooked; $r = $v`
+     * mutates the private arrow-target — fetchPropertyWithHooksByRef alone can return a value
+     * copy when return-by-ref of object props is not yet a live alias (#26368). When a set hook
+     * is also present, PropertyHookRef write-through stays valid for private backing cells.
      *
      * @return ?Frame catch frame when hook throws
      */
@@ -13793,6 +13795,13 @@ restart:
 
                 return null;
             }
+            // `&get`-only with known backing: alias the storage cell directly (#26368).
+            $backing = $this->resolveByRefGetHookBackingStorage($owner, $propName);
+            if (null !== $backing) {
+                $this->bindAssignRefSharedCell($writeTarget, $backing);
+
+                return null;
+            }
             try {
                 $byRef = $this->fetchPropertyWithHooksByRef($owner, $propName, $frame);
             } catch (VM\PropertyHookRefWriteSignal $signal) {
@@ -13804,17 +13813,10 @@ restart:
                     $frame
                 );
             }
-            // Promote to a shared IS_REFERENCE-style cell so outer writes alias backing
-            // without re-checking private visibility on the property storage (#22475).
             $cell = $byRef->isIndirect()
                 ? ($byRef->directIndirectTarget() ?? $byRef->resolveIndirect())
                 : $byRef;
-            if (Variable::TYPE_INDIRECT !== $cell->type) {
-                $shared = new Variable();
-                $shared->copyFrom($cell);
-                $cell->indirect($shared);
-            }
-            $writeTarget->indirect($cell->resolveIndirect());
+            $this->bindAssignRefSharedCell($writeTarget, $cell);
 
             return null;
         }
@@ -13831,6 +13833,36 @@ restart:
             $this->indirectModificationOfHookedPropertyMessage($hookLvalue),
             $frame
         );
+    }
+
+    /**
+     * Object property cell named by registry getBacking for an `&get` arrow/block (#21098 / #26368).
+     */
+    private function resolveByRefGetHookBackingStorage(ObjectEntry $owner, string $propName): ?Variable
+    {
+        $lcClass = strtolower($owner->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        $backingName = is_array($propMeta) ? ($propMeta['getBacking'] ?? null) : null;
+        if (!is_string($backingName) || '' === $backingName || !$owner->hasProperty($backingName)) {
+            return null;
+        }
+
+        return $owner->getProperty($backingName);
+    }
+
+    /**
+     * Promote storage to a shared IS_REFERENCE-style cell and bind the assign-ref LHS (#22475).
+     */
+    private function bindAssignRefSharedCell(Variable $writeTarget, Variable $cell): void
+    {
+        if (Variable::TYPE_INDIRECT !== $cell->type) {
+            $shared = new Variable();
+            $shared->copyFrom($cell);
+            $cell->indirect($shared);
+        }
+        $writeTarget->indirect($cell->resolveIndirect());
     }
 
     /** Live property storage cell for hooked ref bindings (#6426). */
