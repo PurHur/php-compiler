@@ -28516,10 +28516,18 @@ class Compiler {
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
             if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                // false/true/null (and other consts) inside ['k'=>false] feed the Array_, not a call arg (#26367).
+                if ($this->hoistedExprFeedsLaterArrayBeforeConsumer($mid, $j, $consumerIndex, $cfgChildren)) {
+                    continue;
+                }
                 ++$literalPreludeCount;
                 continue;
             }
             if ($mid instanceof Op\Expr\Array_) {
+                // Nested [] inside ['k'=>[]] is an element prelude, not a separate call arg (#26367).
+                if ($this->hoistedExprFeedsLaterArrayBeforeConsumer($mid, $j, $consumerIndex, $cfgChildren)) {
+                    continue;
+                }
                 ++$literalPreludeCount;
                 continue;
             }
@@ -28635,6 +28643,10 @@ class Compiler {
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
             if ($mid instanceof Op\Expr\ConstFetch) {
+                // Array-element true/false/null must not look like trailing callee ConstFetch args (#26367).
+                if ($this->hoistedExprFeedsLaterArrayBeforeConsumer($mid, $j, $consumerIndex, $cfgChildren)) {
+                    continue;
+                }
                 $name = $this->staticNameFromOperand($mid->name);
                 if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
                     ++$scalarPreludeCount;
@@ -28659,6 +28671,86 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * php-cfg hoists ConstFetch/Array_ element values before the consuming Array_ call arg (#26367).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function hoistedExprFeedsLaterArrayBeforeConsumer(
+        Op\Expr $expr,
+        int $exprIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (null === $expr->result) {
+            return false;
+        }
+        for ($k = $exprIndex + 1; $k < $consumerIndex; ++$k) {
+            $later = $cfgChildren[$k] ?? null;
+            if (!$later instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->cfgExprUsesOperand($later, $expr->result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Sole FuncCall before Array_ (± element ConstFetch/nested Array_) feeds arg #0 — not distance-1 (#26367).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function soleFuncCallBeforeArrayLiteralCallArgTargetIndex(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren,
+        Op $consumer
+    ): ?int {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return null;
+        }
+        $hasArrayPrelude = false;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\Array_) {
+                $hasArrayPrelude = true;
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
+
+            return null;
+        }
+        if (!$hasArrayPrelude) {
+            return null;
+        }
+        if (
+            !($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            || !property_exists($consumer, 'args')
+            || !\is_array($consumer->args)
+            || \count($consumer->args) < 2
+        ) {
+            return null;
+        }
+        $leadingEmbedded = 0;
+        foreach ($consumer->args as $arg) {
+            if ($this->isEmbeddedCallLiteralArg($arg)) {
+                ++$leadingEmbedded;
+                continue;
+            }
+            break;
+        }
+
+        return $leadingEmbedded;
     }
 
     /**
@@ -29757,6 +29849,19 @@ class Compiler {
             // fwrite/rewind before var_export(fread(...), true) must not re-emit (#25084).
             return false;
         }
+        // show(strtoupper(...), [...]); show(...) — prior multi-arg statement with dead-temp args is
+        // not a hoisted value producer for the next call (#26367). Nested value producers that feed
+        // the consumer (array_merge(array_merge(...), ...)) still match via feedsConsumer.
+        if (
+            ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && property_exists($producer, 'args')
+            && \is_array($producer->args)
+            && \count($producer->args) >= 2
+            && $this->deadInlineTemporaryArgCount($producer) >= 2
+            && !$this->inlineCallArgProducerFeedsConsumer($producer, $consumer)
+        ) {
+            return false;
+        }
         if (
             $producer instanceof Op\Expr\MethodCall
             && $this->methodCallHasStatementLevelSideEffects($producer)
@@ -30427,10 +30532,31 @@ class Compiler {
                 }
             }
 
+            $arrayLiteralTarget = $this->soleFuncCallBeforeArrayLiteralCallArgTargetIndex(
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren,
+                $consumer
+            );
+            if (null !== $arrayLiteralTarget) {
+                // show(strtoupper(...), ['k'=>false]) — ConstFetch+Array_ must not yield distance-1 (#26367).
+                return $arrayLiteralTarget;
+            }
+
             return $distance - 1;
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
         if (null === $firstSibling) {
+            $arrayLiteralTarget = $this->soleFuncCallBeforeArrayLiteralCallArgTargetIndex(
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren,
+                $consumer
+            );
+            if (null !== $arrayLiteralTarget) {
+                return $arrayLiteralTarget;
+            }
+
             return $distance - 1;
         }
         if ($producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
@@ -30635,9 +30761,22 @@ class Compiler {
         $funcProducerCount = 0;
         for ($j = $producerIndex; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
-            if ($mid instanceof Op\Expr\FuncCall || $mid instanceof Op\Expr\NsFuncCall) {
-                ++$funcProducerCount;
+            if (!($mid instanceof Op\Expr\FuncCall || $mid instanceof Op\Expr\NsFuncCall)) {
+                continue;
             }
+            // Prior show(strtoupper(...), [...]) statements are not value producers in this chain (#26367).
+            if (
+                \is_array($mid->args ?? null)
+                && \count($mid->args) >= 2
+                && $this->deadInlineTemporaryArgCount($mid) >= 2
+                && (
+                    null === ($cfgChildren[$consumerIndex] ?? null)
+                    || !$this->inlineCallArgProducerFeedsConsumer($mid, $cfgChildren[$consumerIndex])
+                )
+            ) {
+                continue;
+            }
+            ++$funcProducerCount;
         }
 
         return $funcProducerCount >= 2;
