@@ -1636,7 +1636,8 @@ class VM {
     }
 
     /**
-     * unset($obj->hooked) — invoke unset hook, reset separate backing, or Error (#6471, #6502).
+     * unset($obj->hooked) — invoke unset hook, or Error for any get/set-hooked property (#6471, #6502, #26373).
+     * Zend rejects unset on hooked properties without a dedicated unset hook (backed get+set included).
      * Inaccessible declared props: __unset or Error before touching the slot (#25668).
      */
     private function dispatchHookedInstancePropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
@@ -1655,25 +1656,23 @@ class VM {
         }
         $meta = $this->classPropertyMeta($object, $propName);
         if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
-            if (!$this->hookedPropertyHasSeparateBacking($object, $propName)) {
-                $className = $object->class->name;
-                if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
-                    $className = $this->context->classes[$meta->declaringClassLc]->name;
-                }
-
-                return $this->raiseVirtualPropertyHookUnsetError(
-                    $className,
-                    $propName,
-                    $frame
-                );
+            $className = $object->class->name;
+            if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+                $className = $this->context->classes[$meta->declaringClassLc]->name;
             }
+
+            return $this->raiseVirtualPropertyHookUnsetError(
+                $className,
+                $propName,
+                $frame
+            );
         }
         $this->unsetHookedInstanceProperty($object, $propName);
 
         return null;
     }
 
-    /** unset(Class::$hooked) — unset hook, separate backing reset, or Error (#6502). */
+    /** unset(Class::$hooked) — unset hook, or Error for get/set-hooked statics (#6502, #26373). */
     private function dispatchHookedStaticPropertyUnset(
         string $classLc,
         string $propLc,
@@ -1692,44 +1691,18 @@ class VM {
         }
         $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
         if (null !== $hooks && (!empty($hooks['get']) || !empty($hooks['set']))) {
-            $propMeta = $this->context->propertyHookRegistry[$classLc][$propLc]
-                ?? $this->context->propertyHookRegistry[$classLc][$propNameRaw]
-                ?? null;
-            $backingName = is_array($propMeta)
-                ? ($propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null)
-                : null;
-            $separateBacking = null !== $backingName && strcasecmp($backingName, $propLc) !== 0;
-            if (!$separateBacking) {
-                $className = $this->context->classes[$classLc]->name ?? $classLc;
+            $className = $this->context->classes[$classLc]->name ?? $classLc;
 
-                return $this->raiseVirtualPropertyHookUnsetError(
-                    $className,
-                    $propNameRaw,
-                    $frame
-                );
-            }
+            return $this->raiseVirtualPropertyHookUnsetError(
+                $className,
+                $propNameRaw,
+                $frame
+            );
         }
         $storage->reset();
         $storage->type = Variable::TYPE_UNDEFINED;
 
         return null;
-    }
-
-    private function hookedPropertyHasSeparateBacking(ObjectEntry $object, string $propName): bool
-    {
-        $lcClass = strtolower($object->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        if (!is_array($propMeta)) {
-            return false;
-        }
-        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
-        if (null === $backingName) {
-            return false;
-        }
-
-        return strcasecmp($backingName, $propName) !== 0 && $object->hasProperty($backingName);
     }
 
     /**
@@ -14354,7 +14327,10 @@ restart:
         return null;
     }
 
-    /** Reject unset() on get-only or write-only virtual hooked instance properties (#6425, #6491). */
+    /**
+     * Reject unset() on virtual hooked instance properties without an unset hook (#6425, #6491, #26373).
+     * Backed hooked properties are rejected in dispatchHookedInstancePropertyUnset.
+     */
     private function enforceVirtualPropertyHookUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
         $meta = $this->classPropertyMeta($object, $propName);
@@ -14366,7 +14342,7 @@ restart:
         if (null !== $meta->unsetHookMethodLc) {
             return null;
         }
-        if ($hasSet && $hasGet) {
+        if (!$hasSet && !$hasGet) {
             return null;
         }
         $className = $object->class->name;
@@ -14403,7 +14379,7 @@ restart:
         return null;
     }
 
-    /** Reject unset() on get-only or write-only virtual hooked static properties (#6425, #6491). */
+    /** Reject unset() on virtual hooked static properties without an unset hook (#6425, #6491, #26373). */
     private function enforceVirtualStaticPropertyHookUnset(
         string $classLc,
         string $propLc,
@@ -14419,7 +14395,7 @@ restart:
         if (!empty($hooks['unset'])) {
             return null;
         }
-        if ($hasSet && $hasGet) {
+        if (!$hasSet && !$hasGet) {
             return null;
         }
         $className = $this->context->classes[$classLc]->name ?? $classLc;

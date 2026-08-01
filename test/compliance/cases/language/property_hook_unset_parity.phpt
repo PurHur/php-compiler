@@ -1,5 +1,5 @@
 --TEST--
-unset() on property hooks — get-only Error, read/write clears backing (issue #6609, zend_property_hooks.c)
+unset() on property hooks — get-only and read/write both Error without unset hook (issue #6609 / #26373, zend_property_hooks.c)
 --FILE--
 <?php
 class RO {
@@ -19,8 +19,12 @@ class RW {
     public string $x { get => $this->v ?? 'u'; set => $this->v = $value; }
 }
 $h = new RW();
-unset($h->x);
-echo 'RW isset=', var_export(isset($h->x), true), ' value=', $h->x, "\n";
+try {
+    unset($h->x);
+    echo "RW: done\n";
+} catch (Throwable $e) {
+    echo 'RW: ', get_class($e), ': ', $e->getMessage(), "\n";
+}
 --EXPECT--
 RO: Error: Cannot unset hooked property RO::$x
-RW isset=false value=u
+RW: Error: Cannot unset hooked property RW::$x
