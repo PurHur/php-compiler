@@ -63,6 +63,8 @@ class Module extends ModuleAbstract
             new ssh2_sftp_mkdir(),
             new ssh2_sftp_rmdir(),
             new ssh2_sftp_unlink(),
+            new ssh2_sftp_rename(),
+            new ssh2_sftp_chmod(),
         ];
     }
 }

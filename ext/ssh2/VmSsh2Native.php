@@ -387,6 +387,9 @@ final class VmSsh2Native
     /** LIBSSH2_SFTP_LSTAT — do not follow symlinks (PECL ssh2_sftp_lstat; #26609). */
     public const SFTP_LSTAT = 1;
 
+    /** LIBSSH2_SFTP_SETSTAT — set attributes (PECL ssh2_sftp_chmod; #26611). */
+    public const SFTP_SETSTAT = 2;
+
     private const SFTP_ATTR_SIZE = 0x00000001;
 
     private const SFTP_ATTR_UIDGID = 0x00000002;
@@ -499,6 +502,54 @@ final class VmSsh2Native
         }
 
         return 0 === (int) $ffi->libssh2_sftp_unlink_ex($sftp, $path, \strlen($path));
+    }
+
+    /**
+     * Rename remote path (PECL ssh2_sftp_rename; #26611).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     */
+    public static function sftpRename(\FFI\CData $sftp, string $from, string $to): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        // LIBSSH2_SFTP_RENAME_OVERWRITE|ATOMIC|NATIVE — PECL default flags
+        $flags = 0x00000001 | 0x00000002 | 0x00000004;
+
+        return 0 === (int) $ffi->libssh2_sftp_rename_ex(
+            $sftp,
+            $from,
+            \strlen($from),
+            $to,
+            \strlen($to),
+            $flags
+        );
+    }
+
+    /**
+     * Set remote file mode (PECL ssh2_sftp_chmod; #26611).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     */
+    public static function sftpChmod(\FFI\CData $sftp, string $filename, int $mode): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || '' === $filename) {
+            return false;
+        }
+        $attrs = $ffi->new('LIBSSH2_SFTP_ATTRIBUTES');
+        $attrs->permissions = $mode;
+        $attrs->flags = self::SFTP_ATTR_PERMISSIONS;
+
+        return 0 === (int) $ffi->libssh2_sftp_stat_ex(
+            $sftp,
+            $filename,
+            \strlen($filename),
+            self::SFTP_SETSTAT,
+            \FFI::addr($attrs)
+        );
     }
 
     /**
@@ -632,6 +683,7 @@ int libssh2_sftp_stat_ex(LIBSSH2_SFTP *sftp, const char *path, unsigned int path
 int libssh2_sftp_mkdir_ex(LIBSSH2_SFTP *sftp, const char *path, size_t path_len, long mode);
 int libssh2_sftp_rmdir_ex(LIBSSH2_SFTP *sftp, const char *path, size_t path_len);
 int libssh2_sftp_unlink_ex(LIBSSH2_SFTP *sftp, const char *filename, size_t filename_len);
+int libssh2_sftp_rename_ex(LIBSSH2_SFTP *sftp, const char *source_filename, unsigned int source_filename_len, const char *dest_filename, unsigned int dest_filename_len, long flags);
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
 LIBSSH2_CHANNEL *libssh2_channel_open_ex(LIBSSH2_SESSION *session, const char *channel_type, unsigned int channel_type_len, unsigned int window_size, unsigned int packet_size, const char *message, unsigned int message_len);
 int libssh2_channel_process_startup(LIBSSH2_CHANNEL *channel, const char *request, size_t request_len, const char *message, size_t message_len);
