@@ -125,9 +125,9 @@ PHP;
         $this->assertTrue(true);
     }
 
-    public function testExactDuplicateArmsNotClaimedBySubsetCheck(): void
+    public function testExactDuplicateArmsRejectedByEqualityCheck(): void
     {
-        // Equality / commutative redundancy is sibling #26606 — still accepted here.
+        // Equality / commutative redundancy is sibling #26606 — now a compile fatal.
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -135,7 +135,8 @@ interface A {}
 interface B {}
 function f((A&B)|(B&A) $x) { return $x; }
 PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Type B&A is redundant with type A&B');
         $runtime->parseAndCompile($code, 'dnf_eq_deferred.php');
-        $this->assertTrue(true);
     }
 }

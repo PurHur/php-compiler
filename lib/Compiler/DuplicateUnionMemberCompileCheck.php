@@ -20,6 +20,7 @@ use PHPCfg\Operand;
  * php-src: Zend/zend_compile.c — zend_compile_type duplicate type-arm rejection.
  *
  * @see IntersectionTypeMemberCompileCheck for {@code &} member duplicates (#26605)
+ * @see RedundantDnfArmCompileCheck for equivalent DNF intersection arms (#26606)
  * @see RedundantTrueFalseUnionCheck for {@code bool|true} / {@code true|false} (#26555)
  */
 final class DuplicateUnionMemberCompileCheck
