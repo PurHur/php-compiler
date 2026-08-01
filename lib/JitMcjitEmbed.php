@@ -71,9 +71,10 @@ final class JitMcjitEmbed
 
     private static function padPropertylessUserClassesForMcjit(string $code, bool &$needsReadonlyPromotedBootstrap): string
     {
-        // Match against comment-blanked text so docblock phrases like
-        // "class constant E::a" cannot span into a following class/enum (#25929).
-        $mask = self::blankPhpCommentsPreservingLength($code);
+        // Match against comment/string-blanked text so:
+        // - docblock phrases like "class constant E::a" cannot span into a following class/enum (#25929)
+        // - `eval("class Foo {}")` / string payloads are not rewritten (pad is for top-level JIT IR only, #26424)
+        $mask = self::blankPhpOpaqueRegionsPreservingLength($code);
         if (!preg_match_all(
             '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+)\b[^{]*)\{((?:[^{}]|\{[^{}]*\})*)\}/',
             $mask,
@@ -125,9 +126,70 @@ final class JitMcjitEmbed
     }
 
     /**
-     * Replace // and /* * / comments with spaces so regex class matching ignores them (#25929).
+     * Blank comments, string literals, and heredoc/nowdoc bodies (spaces; newlines kept)
+     * so regex class matching only sees real declarations (#25929, #26424).
+     *
+     * Length-preserving so match offsets map back into the original source.
      */
-    private static function blankPhpCommentsPreservingLength(string $code): string
+    private static function blankPhpOpaqueRegionsPreservingLength(string $code): string
+    {
+        if ('' === $code) {
+            return $code;
+        }
+        $tokens = @token_get_all($code);
+        if ([] === $tokens) {
+            return self::blankPhpCommentsPreservingLengthFallback($code);
+        }
+        $out = '';
+        $inHeredoc = false;
+        foreach ($tokens as $token) {
+            if (\is_string($token)) {
+                if ($inHeredoc) {
+                    $out .= preg_replace('/[^\r\n]/', ' ', $token) ?? $token;
+                    continue;
+                }
+                $out .= $token;
+                continue;
+            }
+            [$id, $text] = $token;
+            if (\T_START_HEREDOC === $id) {
+                $inHeredoc = true;
+                $out .= $text;
+                continue;
+            }
+            if (\T_END_HEREDOC === $id) {
+                $inHeredoc = false;
+                $out .= $text;
+                continue;
+            }
+            $opaque = $inHeredoc
+                || \T_COMMENT === $id
+                || \T_DOC_COMMENT === $id
+                || \T_CONSTANT_ENCAPSED_STRING === $id
+                || \T_ENCAPSED_AND_WHITESPACE === $id;
+            if ($opaque) {
+                $out .= preg_replace('/[^\r\n]/', ' ', $text) ?? $text;
+                continue;
+            }
+            $out .= $text;
+        }
+
+        // token_get_all can drop a trailing incomplete fragment; keep length exact for offsets.
+        $outLen = \strlen($out);
+        $codeLen = \strlen($code);
+        if ($outLen < $codeLen) {
+            $out .= str_repeat(' ', $codeLen - $outLen);
+        } elseif ($outLen > $codeLen) {
+            $out = substr($out, 0, $codeLen);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Fallback when tokenization yields nothing — comments only (#25929).
+     */
+    private static function blankPhpCommentsPreservingLengthFallback(string $code): string
     {
         $len = \strlen($code);
         $out = $code;

@@ -178,6 +178,49 @@ PHP;
         $this->assertStringNotContainsString('__phpcMcjitClassPad = false', $out);
     }
 
+    /** @covers issue #26424 — pad must not rewrite class text inside string / eval payloads */
+    public function testDoesNotPadClassInsideDoubleQuotedString(): void
+    {
+        $in = <<<'PHP'
+<?php
+$code = "class PadProbe {}";
+eval($code);
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertSame($in, $out);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+    }
+
+    /** @covers issue #26424 */
+    public function testDoesNotPadClassInsideSingleQuotedEvalString(): void
+    {
+        $in = <<<'PHP'
+<?php
+eval('class PadProbeSq {}');
+echo class_exists('PadProbeSq') ? "ok\n" : "no\n";
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertSame($in, $out);
+        $this->assertStringNotContainsString('__phpcMcjitClassPad', $out);
+    }
+
+    /** @covers issue #26424 — real top-level empty class still needs the MCJIT pad */
+    public function testStillPadsTopLevelEmptyClassAlongsideEvalString(): void
+    {
+        $in = <<<'PHP'
+<?php
+eval('class FromEval {}');
+class TopLevel {}
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString("__phpcMcjitClassPad", $out);
+        $this->assertStringContainsString("eval('class FromEval {}')", $out);
+        $this->assertDoesNotMatchRegularExpression(
+            "/eval\\('class FromEval \\{[^']*__phpcMcjitClassPad/",
+            $out
+        );
+    }
+
     /** @covers issue #10312 */
     public function testEmbedClassPadHiddenFromVarExport(): void
     {
