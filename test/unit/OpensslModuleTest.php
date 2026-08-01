@@ -295,6 +295,56 @@ PEM;
         self::assertSame(1, $verifyFrame->returnVar->toInt());
     }
 
+    public function test_openssl_pkey_derive_softfails_non_key_scalars(): void
+    {
+        $runtime = new Runtime();
+        $deriveFn = new \PHPCompiler\ext\openssl\openssl_pkey_derive();
+
+        foreach ([false, true, 0, 1, 1.5] as $scalar) {
+            $frame = $deriveFn->getFrame($runtime->vmContext);
+            $pubVar = new \PHPCompiler\VM\Variable();
+            $privVar = new \PHPCompiler\VM\Variable();
+            if (\is_bool($scalar)) {
+                $pubVar->bool($scalar);
+                $privVar->bool($scalar);
+            } elseif (\is_int($scalar)) {
+                $pubVar->int($scalar);
+                $privVar->int($scalar);
+            } else {
+                $pubVar->float($scalar);
+                $privVar->float($scalar);
+            }
+            $frame->calledArgs = [$pubVar, $privVar];
+            $frame->returnVar = new \PHPCompiler\VM\Variable();
+            $deriveFn->execute($frame);
+            self::assertSame(
+                \PHPCompiler\VM\Variable::TYPE_BOOLEAN,
+                $frame->returnVar->type,
+                'scalar '.var_export($scalar, true)
+            );
+            self::assertFalse($frame->returnVar->toBool());
+        }
+
+        $empty = new \PHPCompiler\VM\Variable();
+        $empty->array(new \PHPCompiler\VM\HashTable());
+        $falsePriv = new \PHPCompiler\VM\Variable();
+        $falsePriv->bool(false);
+        $frame = $deriveFn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$empty, $falsePriv];
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
+        $deriveFn->execute($frame);
+        self::assertFalse($frame->returnVar->toBool());
+
+        $emptyPriv = new \PHPCompiler\VM\Variable();
+        $emptyPriv->array(new \PHPCompiler\VM\HashTable());
+        $frame = $deriveFn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$empty, $emptyPriv];
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('Key array must be of the form array(0 => key, 1 => phrase)');
+        $deriveFn->execute($frame);
+    }
+
     public function test_openssl_pkey_derive_ecdh_when_ffi_available(): void
     {
         if (!\PHPCompiler\ext\openssl\VmOpensslPkeyDeriveNative::available()) {

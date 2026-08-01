@@ -11,7 +11,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/pkey.c; issue #15428).
+ * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/openssl.c / pkey.c; issue #15428, #26689).
+ *
+ * Args are untyped zvals in php-src (`zend_parse_parameters(..., "zz|l")`); invalid scalars soft-fail
+ * to false via php_openssl_pkey_from_zval — not TypeError.
  */
 final class openssl_pkey_derive extends Internal
 {
@@ -32,15 +35,20 @@ final class openssl_pkey_derive extends Internal
             return;
         }
 
-        $publicArg = $frame->calledArgs[0]->resolveIndirect();
-        if (\PHPCompiler\VM\Variable::TYPE_NULL === $publicArg->type) {
+        // php-src loads private_key first, then peer public_key (order affects ValueError vs false).
+        $privatePem = VmOpenssl::tryPkeyPemFromDeriveZval($frame->calledArgs[1], false);
+        if (null === $privatePem) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $publicPem = VmOpenssl::tryPkeyPemFromDeriveZval($frame->calledArgs[0], true);
+        if (null === $publicPem) {
             $frame->returnVar->bool(false);
 
             return;
         }
 
-        $publicPem = VmOpenssl::coercePkeyPem($frame->calledArgs[0], 'openssl_pkey_derive', 0, 'public_key');
-        $privatePem = VmOpenssl::coercePkeyPem($frame->calledArgs[1], 'openssl_pkey_derive', 1, 'private_key');
         $keyLength = 0;
         if (3 === $argc) {
             $keyLength = self::coerceKeyLengthArg($frame->calledArgs[2], 'openssl_pkey_derive', 2, 'key_length');

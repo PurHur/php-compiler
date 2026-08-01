@@ -1695,6 +1695,112 @@ final class VmOpenssl
         ));
     }
 
+    /**
+     * Soft key material for openssl_pkey_derive() — php-src parses untyped zvals ("zz|l") then
+     * php_openssl_pkey_from_zval (ext/openssl/openssl.c). Non-string/non-object scalars and
+     * unrelated objects return null (caller → false); incomplete key arrays throw ValueError.
+     *
+     * @return string|null PEM / key material, or null when derive should return false
+     */
+    public static function tryPkeyPemFromDeriveZval(Variable $var, bool $wantPublic): ?string
+    {
+        $var = $var->resolveIndirect();
+
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $ht = $var->toArray();
+            // php-src: zend_hash_index_find(..., 1) then index 0 — missing either → ValueError.
+            $phraseVar = $ht->find('1');
+            if (null === $phraseVar) {
+                throw new \ValueError('Key array must be of the form array(0 => key, 1 => phrase)');
+            }
+            $keyVar = $ht->find('0');
+            if (null === $keyVar) {
+                throw new \ValueError('Key array must be of the form array(0 => key, 1 => phrase)');
+            }
+            $keyVar = $keyVar->resolveIndirect();
+            $passphrase = '';
+            $phraseVar = $phraseVar->resolveIndirect();
+            if (Variable::TYPE_STRING === $phraseVar->type) {
+                $passphrase = $phraseVar->toString();
+            } elseif (Variable::TYPE_NULL !== $phraseVar->type) {
+                // php-src try_convert_to_string; keep soft-fail for non-coercible phrase material.
+                if (Variable::TYPE_BOOLEAN === $phraseVar->type
+                    || Variable::TYPE_INTEGER === $phraseVar->type
+                    || Variable::TYPE_FLOAT === $phraseVar->type) {
+                    $passphrase = $phraseVar->toString();
+                }
+            }
+            if (Variable::TYPE_OBJECT === $keyVar->type) {
+                return self::tryPkeyPemFromDeriveObject($keyVar, $wantPublic, $passphrase);
+            }
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                return null;
+            }
+            $material = $keyVar->toString();
+            if ($wantPublic) {
+                return $material;
+            }
+            $normalized = VmOpensslPkeyNative::normalizePrivateKeyPem($material, '' !== $passphrase ? $passphrase : null);
+
+            return false === $normalized ? null : $normalized;
+        }
+
+        if (Variable::TYPE_OBJECT === $var->type) {
+            return self::tryPkeyPemFromDeriveObject($var, $wantPublic, '');
+        }
+
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+
+        // php-src: !(IS_STRING || IS_OBJECT) → return NULL (no TypeError) — #26689 / re-#15768.
+        return null;
+    }
+
+    /**
+     * @return string|null
+     */
+    private static function tryPkeyPemFromDeriveObject(Variable $var, bool $wantPublic, string $passphrase): ?string
+    {
+        $object = $var->toObject();
+        $lc = strtolower($object->class->name);
+        if (VmOpensslObjects::KEY_LC === $lc) {
+            $pem = VmOpensslObjects::keyPem($object);
+            if ('' === $pem) {
+                return null;
+            }
+            if ($wantPublic) {
+                $normalized = VmOpensslPkeyNative::normalizePublicKeyPem($pem);
+                if (false !== $normalized) {
+                    return $normalized;
+                }
+                // Private OpenSSLAsymmetricKey used as peer public — php-src warns and fails.
+                return null;
+            }
+            $normalized = VmOpensslPkeyNative::normalizePrivateKeyPem(
+                $pem,
+                '' !== $passphrase ? $passphrase : null
+            );
+
+            return false === $normalized ? null : $normalized;
+        }
+        if (VmOpensslObjects::CERT_LC === $lc) {
+            if (!$wantPublic) {
+                return null;
+            }
+            $certPem = VmOpensslObjects::certificatePem($object);
+            if ('' === $certPem) {
+                return null;
+            }
+            $pub = VmOpensslX509Native::extractPublicKeyPem($certPem);
+
+            return false === $pub ? null : $pub;
+        }
+
+        // Unrelated objects: php-src zval_try_get_string / soft fail → NULL.
+        return null;
+    }
+
     public static function coerceSignatureArg(Variable $var, string $function, int $argIndex, string $paramName): string
     {
         $var = $var->resolveIndirect();
