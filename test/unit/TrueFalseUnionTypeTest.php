@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM\RedundantTrueFalseUnionCheck;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #12045, #17996 */
+/** @covers issue #12045, #17996, #26555 */
 final class TrueFalseUnionTypeTest extends TestCase
 {
     public function testTrueFalseUnionParamCompilesThenFatalsAtRuntime(): void
@@ -69,5 +69,65 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'standalone_true.php'));
         $this->assertSame('t', ob_get_clean());
+    }
+
+    public function testBoolTrueUnionParamFatalsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(bool|true $x): string {
+    return 't';
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'bool_true_union_param.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(RedundantTrueFalseUnionCheck::DUPLICATE_TRUE_MESSAGE);
+        $runtime->run($block, false);
+    }
+
+    public function testBoolFalseUnionReturnFatalsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): bool|false {
+    return false;
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'bool_false_union_return.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(RedundantTrueFalseUnionCheck::DUPLICATE_FALSE_MESSAGE);
+        $runtime->run($block, false);
+    }
+
+    public function testTrueBoolUnionPropertyFatalsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public true|bool $x;
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'true_bool_union_property.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(RedundantTrueFalseUnionCheck::DUPLICATE_TRUE_MESSAGE);
+        $runtime->run($block, false);
+    }
+
+    public function testTrueFalseBoolStillUsesBothMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(true|false|bool $x): string {
+    return 't';
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'true_false_bool_union.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(RedundantTrueFalseUnionCheck::FATAL_MESSAGE);
+        $runtime->run($block, false);
     }
 }
