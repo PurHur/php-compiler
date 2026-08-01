@@ -180,6 +180,9 @@ final class BuiltinInternalArgInfo
             'ob_get_status', 'ob_list_handlers' => 'array',
             // ext/libxml/libxml.stub.php — InternalArgInfo return object (#25844)
             'libxml_get_errors' => 'array',
+            // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / true (#26319)
+            'xml_parser_create' => 'XMLParser',
+            'xml_set_object' => 'true',
             // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
             'array_sum', 'array_product' => 'int|float',
             // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
@@ -622,6 +625,10 @@ final class BuiltinInternalArgInfo
             'getmxrr', 'dns_get_mx' => ($index >= 1 && $index <= 2) ? '' : null,
             // ext/libxml/libxml.stub.php — ?bool $use_errors = null (InternalArgInfo bool) (#25844)
             'libxml_use_internal_errors' => 0 === $index ? '?bool' : null,
+            // ext/xml/xml.stub.php — XMLParser / ?string; InternalArgInfo untyped / string / resource (#26319)
+            'xml_set_object' => 0 === $index ? 'XMLParser' : null,
+            'xml_parser_create' => 0 === $index ? '?string' : null,
+            'xml_parse' => 0 === $index ? 'XMLParser' : null,
             default => null,
         };
     }

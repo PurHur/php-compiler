@@ -240,6 +240,29 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src ext/xml/xml.stub.php — XMLParser stubs; InternalArgInfo still resource/untyped/int (#26319). */
+    public function testXmlParserReflectionStubTypes(): void
+    {
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_parser_create'));
+        $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_set_object'));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parser_create', 0));
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride('xml_set_object', 0));
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parse', 0));
+        $createEnc = BuiltinInternalArgInfo::paramInfoForFunction('xml_parser_create', 0);
+        $this->assertNotNull($createEnc);
+        $this->assertSame('encoding', $createEnc['name']);
+        $this->assertSame('?string', $createEnc['type']);
+        $this->assertTrue($createEnc['isOptional']);
+        $setParser = BuiltinInternalArgInfo::paramInfoForFunction('xml_set_object', 0);
+        $this->assertNotNull($setParser);
+        $this->assertSame('parser', $setParser['name']);
+        $this->assertSame('XMLParser', $setParser['type']);
+        $parseParser = BuiltinInternalArgInfo::paramInfoForFunction('xml_parse', 0);
+        $this->assertNotNull($parseParser);
+        $this->assertSame('parser', $parseParser['name']);
+        $this->assertSame('XMLParser', $parseParser['type']);
+    }
+
     /** php-src string.stub.php — cost params stub-only; InternalArgInfo has string1/string2 only (#25538). */
     public function testLevenshteinCostParamTypesAreInt(): void
     {
