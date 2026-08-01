@@ -65,6 +65,7 @@ use PHPCompiler\Compiler\MagicMethodParamTypeCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\MagicMethodStaticCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
+use PHPCompiler\Compiler\DuplicateUnionMemberCompileCheck;
 use PHPCompiler\Compiler\IntersectionTypeMemberCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
@@ -7536,7 +7537,8 @@ class Compiler {
 
     /**
      * Zend: only class/interface types may appear in intersection types (#26401);
-     * duplicate members are redundant (#26605).
+     * duplicate intersection members are redundant (#26605); duplicate union arms
+     * are redundant (#26556).
      */
     protected function assertIntersectionTypeMembers(?Op\Type $type): void
     {
@@ -7547,6 +7549,10 @@ class Compiler {
         $duplicate = IntersectionTypeMemberCompileCheck::findDuplicateMemberName($type);
         if (null !== $duplicate) {
             $this->throwCompileError(IntersectionTypeMemberCompileCheck::duplicateMessageFor($duplicate));
+        }
+        $unionDup = DuplicateUnionMemberCompileCheck::findDuplicateMemberName($type);
+        if (null !== $unionDup) {
+            $this->throwCompileError(DuplicateUnionMemberCompileCheck::duplicateMessageFor($unionDup));
         }
     }
 
@@ -8341,6 +8347,7 @@ class Compiler {
                 $this->rejectTypedClassConstantIfUnsupported($child->name);
                 $this->rejectTypedTraitConstantIfUnsupported($child->name);
                 $this->rejectTypedInterfaceConstantIfUnsupported($child->name);
+                $this->assertIntersectionTypeMembers($child->declaredType);
                 $declared = $this->typeFromClassConstDecl($child);
                 $typeSlot = $this->compileTypeConstrainedVariable($result, $declared, $child->declaredType);
                 if (isset($result->constants[$valueSlot])) {
