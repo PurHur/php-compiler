@@ -10,7 +10,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Opaque SSH2 channel/stream object (PECL ssh2 stream; #6385).
+ * Opaque SSH2 channel/stream object (PECL ssh2 stream; #6385 / #26663).
  */
 final class VmSsh2Stream
 {
@@ -18,7 +18,14 @@ final class VmSsh2Stream
 
     public const CLASS_NAME = 'SSH2\\Stream';
 
-    /** @var array<int, array{session: ObjectEntry, command: string, closed: bool}> */
+    /**
+     * @var array<int, array{
+     *   session: ObjectEntry,
+     *   command: string,
+     *   closed: bool,
+     *   channel: \FFI\CData|null
+     * }>
+     */
     private static array $state = [];
 
     public static function registerClass(Context $ctx): void
@@ -31,7 +38,10 @@ final class VmSsh2Stream
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
-    public static function wrap(Context $ctx, ObjectEntry $session, string $command): Variable
+    /**
+     * @param \FFI\CData|null $channel LIBSSH2_CHANNEL*
+     */
+    public static function wrap(Context $ctx, ObjectEntry $session, string $command, $channel = null): Variable
     {
         self::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
@@ -40,6 +50,7 @@ final class VmSsh2Stream
             'session' => $session,
             'command' => $command,
             'closed' => false,
+            'channel' => $channel,
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
@@ -59,5 +70,24 @@ final class VmSsh2Stream
         }
 
         return $object;
+    }
+
+    /** @return \FFI\CData|null LIBSSH2_CHANNEL* */
+    public static function nativeChannel(ObjectEntry $object)
+    {
+        return self::$state[$object->id]['channel'] ?? null;
+    }
+
+    public static function close(ObjectEntry $object): void
+    {
+        if (!isset(self::$state[$object->id]) || self::$state[$object->id]['closed']) {
+            return;
+        }
+        $st = &self::$state[$object->id];
+        if (null !== $st['channel']) {
+            VmSsh2Native::channelFree($st['channel']);
+            $st['channel'] = null;
+        }
+        $st['closed'] = true;
     }
 }

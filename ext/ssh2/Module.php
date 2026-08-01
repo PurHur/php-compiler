@@ -55,6 +55,7 @@ class Module extends ModuleAbstract
             new ssh2_fingerprint(),
             new ssh2_exec(),
             new ssh2_fetch_stream(),
+            new ssh2_shell(),
             new ssh2_sftp(),
             new ssh2_scp_recv(),
             new ssh2_scp_send(),

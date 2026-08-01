@@ -424,6 +424,81 @@ final class ssh2_fetch_stream extends Ssh2Function
 }
 
 /**
+ * ssh2_shell(resource $session, string $term_type = "vanilla", ?array $env = null, int $width = 80, int $height = 25, int $width_height_type = SSH2_TERM_UNIT_CHARS): resource|false
+ */
+final class ssh2_shell extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_shell');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 6) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_shell() expects between 1 and 6 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_shell', 1);
+        $term = 'vanilla';
+        if ($argc >= 2) {
+            $term = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_shell', 2, 'term_type');
+        }
+        // env ($argc >= 3) accepted for arity parity; ignored in v1 (PECL setenv path).
+        $width = 80;
+        $height = 25;
+        $unit = Ssh2Constants::TERM_UNIT_CHARS;
+        if ($argc >= 4) {
+            $width = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'ssh2_shell', 4, 'width');
+        }
+        if ($argc >= 5) {
+            $height = VmMath::parseIntBuiltinArgForFrame($frame, 4, 'ssh2_shell', 5, 'height');
+        }
+        if ($argc >= 6) {
+            $unit = VmMath::parseIntBuiltinArgForFrame($frame, 5, 'ssh2_shell', 6, 'width_height_type');
+        }
+        if (!VmSsh2Session::isAuthed($session)) {
+            @\trigger_error('ssh2_shell(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_shell(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ssh2_shell() requires a VM context');
+        }
+        $channel = VmSsh2Native::channelShellOpen(
+            $native,
+            $term,
+            $width,
+            $height,
+            Ssh2Constants::TERM_UNIT_CHARS === $unit ? 1 : 0
+        );
+        if (null === $channel) {
+            @\trigger_error('ssh2_shell(): Unable to request shell from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $wrapped = VmSsh2Stream::wrap($ctx, $session, 'shell:'.$term, $channel);
+        $frame->returnVar->object($wrapped->toObject());
+    }
+}
+
+/**
  * ssh2_sftp(resource $session): resource|false
  */
 final class ssh2_sftp extends Ssh2Function
