@@ -11197,6 +11197,8 @@ restart:
             return $this->dispatchVmIntlException($e, $callerFrame);
         } catch (\RedisException $e) {
             return $this->dispatchVmRedisException($e, $callerFrame);
+        } catch (\RarException $e) {
+            return $this->dispatchVmRarException($e, $callerFrame);
         } catch (\PHPCompiler\ext\simdjson\SimdJsonException $e) {
             return $this->dispatchVmSimdJsonException($e, $callerFrame);
         } catch (\FFI\ParserException $e) {
@@ -12011,6 +12013,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeRedisException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native RarException from ext/rar builtins into user catch handlers (#6237). */
+    private function dispatchVmRarException(\RarException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeRarException(
             $this->context,
             $error->getMessage(),
             $file,

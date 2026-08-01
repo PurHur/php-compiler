@@ -808,6 +808,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsRedis());
     }
 
+    public function testSupportsRarFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRar());
+    }
+
+    public function testSupportsRarTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsRar());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsRedisTrueOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

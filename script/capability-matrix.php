@@ -42,6 +42,7 @@ function collectCapabilities(string $root): array
         'zmq' => new PHPCompiler\ext\zmq\Module(),
         'curl' => new PHPCompiler\ext\curl\Module(),
         'zip' => new PHPCompiler\ext\zip\Module(),
+        'rar' => new PHPCompiler\ext\rar\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'enchant' => new PHPCompiler\ext\enchant\Module(),
