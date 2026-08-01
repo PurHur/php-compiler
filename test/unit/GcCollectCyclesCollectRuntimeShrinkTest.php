@@ -7,7 +7,11 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\GcCollectCyclesJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** GcCollectCyclesCollectRuntime routes stats through GcCollectCyclesJitHelper PHP (#9183, #13882). */
+/**
+ * GcCollectCyclesCollectRuntime routes stats through GcCollectCyclesJitHelper PHP (#9183, #13882, #26532).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #26472).
+ */
 final class GcCollectCyclesCollectRuntimeShrinkTest extends TestCase
 {
     private const EMBED_IMPL_MAX_LINES = 20;
@@ -24,6 +28,22 @@ final class GcCollectCyclesCollectRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('GcCollectCyclesJitHelper', $bridgeSource);
         $this->assertStringContainsString('recordNativeCollect', $bridgeSource);
         $this->assertStringContainsString('collectCyclesEmbed', $bridgeSource);
+    }
+
+    public function testGcCollectCyclesCollectRuntimeUsesJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPLLVM\\BasicBlock;', $source);
+        $this->assertStringNotContainsString("putenv('PHP_COMPILER_SELFHOST_AOT", $source);
+        $this->assertStringNotContainsString('captureInsertBlock', $source);
+        $this->assertStringNotContainsString('restoreInsertBlock', $source);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
     }
 
     public function testEmbedCollectCyclesImplIsThinPhpBridge(): void
