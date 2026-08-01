@@ -296,6 +296,37 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('XMLParser', $parseParser['type']);
     }
 
+    /** php-src ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687). */
+    public function testXmlParserCreateNsAndIntoStructReflectionStubTypes(): void
+    {
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_parser_create_ns'));
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_parse_into_struct'));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parser_create_ns', 0));
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parse_into_struct', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parse_into_struct', 2));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parse_into_struct', 3));
+        $enc = BuiltinInternalArgInfo::paramInfoForFunction('xml_parser_create_ns', 0);
+        $this->assertNotNull($enc);
+        $this->assertSame('encoding', $enc['name']);
+        $this->assertSame('?string', $enc['type']);
+        $this->assertTrue($enc['isOptional']);
+        $sep = BuiltinInternalArgInfo::paramInfoForFunction('xml_parser_create_ns', 1);
+        $this->assertNotNull($sep);
+        // Name comes from BuiltinParamNames (sep → separator); type stays string from InternalArgInfo.
+        $this->assertSame('string', $sep['type']);
+        $this->assertTrue($sep['isOptional']);
+        $parser = BuiltinInternalArgInfo::paramInfoForFunction('xml_parse_into_struct', 0);
+        $this->assertNotNull($parser);
+        $this->assertSame('XMLParser', $parser['type']);
+        $values = BuiltinInternalArgInfo::paramInfoForFunction('xml_parse_into_struct', 2);
+        $this->assertNotNull($values);
+        $this->assertSame('', $values['type']);
+        $index = BuiltinInternalArgInfo::paramInfoForFunction('xml_parse_into_struct', 3);
+        $this->assertNotNull($index);
+        $this->assertSame('', $index['type']);
+        $this->assertTrue($index['isOptional']);
+    }
+
     /** php-src ext/xml/xml.stub.php — xml_set_*_handler; InternalArgInfo hdl:string / return int (#26589). */
     public function testXmlSetHandlerReflectionStubTypes(): void
     {
