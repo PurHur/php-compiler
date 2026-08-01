@@ -31,10 +31,6 @@ final class ClassReturnCheck
         if (null === $block->returnClassConstraint) {
             return true;
         }
-        $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
-        if ($block->isGenerator && 'Generator' === $returnLabel) {
-            return true;
-        }
         if (self::generatorHasTraversableReturnTypeLabel($block)) {
             return true;
         }
@@ -224,7 +220,8 @@ final class ClassReturnCheck
         }
         $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
 
-        return \in_array($returnLabel, ['Iterator', 'Traversable'], true);
+        // Mirror VM (#16141, #26468): wrapper types only — not getReturn()/body completion.
+        return \in_array($returnLabel, ['Generator', 'Iterator', 'Traversable', 'iterable', 'object'], true);
     }
 
     private static function callableName(?Func $func): ?string

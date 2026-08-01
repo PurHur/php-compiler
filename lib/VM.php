@@ -20664,32 +20664,26 @@ restart:
             return;
         }
         if (null !== $block->returnClassConstraint && null !== $value) {
-            $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
-            if (!($block->isGenerator && 'Generator' === $returnLabel)) {
-                TypeCheck::assertObjectReturn(
-                    $value,
-                    $block->returnClassConstraint,
-                    $block->returnDeclaredTypeLabel ?? $block->returnClassConstraint,
-                    $this->returnTypeCallableName($block->func)
-                );
+            // Wrapper return types apply at invoke time, not getReturn() (#16141, #26468).
+            if ($this->generatorHasTraversableReturnTypeLabel($block)) {
+                return;
             }
+            TypeCheck::assertObjectReturn(
+                $value,
+                $block->returnClassConstraint,
+                $block->returnDeclaredTypeLabel ?? $block->returnClassConstraint,
+                $this->returnTypeCallableName($block->func)
+            );
 
             return;
         }
-        // `: Generator`/`: Iterator`/`: Traversable` apply at call time (wrap object), not on
-        // generator body completion / getReturn() (#16141, Zend/zend_generators.c).
+        // `: Generator`/`: Iterator`/`: Traversable`/`: iterable`/`: object` apply at call time
+        // (wrap object), not on generator body completion / getReturn() (#16141, #26468).
         if ($this->generatorHasTraversableReturnTypeLabel($block)) {
             return;
         }
         if (null === $block->returnTypeConstraint) {
             return;
-        }
-        // `: Generator` on a generator body applies to the wrapper at invoke time, not completion (#16141).
-        if ($block->isGenerator && null === $value) {
-            $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint ?? '', '\\');
-            if ('Generator' === $returnLabel) {
-                return;
-            }
         }
         // Return type checks use the declaring function's strict_types (zend_verify_return_type).
         TypeCheck::coerceReturn(
@@ -20708,7 +20702,8 @@ restart:
         }
         $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
 
-        return in_array($returnLabel, ['Generator', 'Iterator', 'Traversable'], true);
+        // Zend: these declare the Generator wrapper at invoke, not getReturn() (#16141, #26468).
+        return in_array($returnLabel, ['Generator', 'Iterator', 'Traversable', 'iterable', 'object'], true);
     }
 
     private function declaredReturnTypeRequiresValue(Block $block): bool
