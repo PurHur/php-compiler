@@ -77,6 +77,19 @@ final class JitDomLoadXMLUserScript
         if (null === $lit || '' === trim($lit)) {
             return null;
         }
+        // Match VmDom::loadXML / libxml: drop leading UTF-8 BOM before the thin parse (#26565).
+        $lit = VmDom::stripLeadingUtf8Bom($lit);
+        $forParse = ltrim($lit);
+        // Whitespace-before-BOM (or other non-'<' junk) must not use the thin path — Zend rejects
+        // it via libxml; fall through to DomLoadXMLRuntime → VmDom::loadXML (#26565).
+        if ('' === $forParse || '<' !== $forParse[0]) {
+            return null;
+        }
+        // Incomplete / non-element markup (e.g. BOM+"<") — defer to real parser (#26565).
+        if (1 !== preg_match('/<([a-zA-Z_][\w:.-]*)/', $forParse)) {
+            return null;
+        }
+        $lit = $forParse;
 
         // Inter-element blank text needs a real DomRegistry tree so preserveWhiteSpace=false
         // / LIBXML_NOBLANKS can strip via VmDom::loadXML (#20476). Compact ID-map fixtures stay here.
