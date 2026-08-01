@@ -4600,6 +4600,7 @@ require_once __DIR__.'/../../../lib/Compiler/GeneratorNeverReturnCompileCheck.ph
 require_once __DIR__.'/../../../lib/Compiler/GeneratorStaticMethodCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/ImplementsHierarchyCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InheritanceVariance.php';
+require_once __DIR__.'/../../../lib/Compiler/IntersectionTypeMemberCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceConstAmbiguityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceConstVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceImplementationCheck.php';
