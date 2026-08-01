@@ -140,6 +140,14 @@ class ClassEntry {
     public array $methodReturnDeclaredTypes = [];
     /** @var array<string, string> method (lowercase) => trait FQCN when imported via use Trait (#3416). */
     public array $traitMethodSources = [];
+    /**
+     * Property (lowercase) => trait FQCN that supplied it via `use Trait`.
+     * Declaring class of the ClassProperty is the composing class after import (#26593);
+     * this map preserves trait origin for composition conflict messages.
+     *
+     * @var array<string, string>
+     */
+    public array $traitPropertySources = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */
     public array $methodDeprecated = [];
     /**

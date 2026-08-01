@@ -171,6 +171,13 @@ class Object_ extends Type {
     /** @var array<int, array<string, int>> class id => instance prop lc => declaring trait/class id (#7418) */
     private array $instancePropertyDeclaringClassId = [];
     /**
+     * Trait FQCN origin for instance props imported via `use Trait` (#26593).
+     * Declaring class id is the composing class; this map keeps conflict messages accurate.
+     *
+     * @var array<int, array<string, int>> class id => prop lc => trait class id
+     */
+    private array $instancePropertyTraitSourceId = [];
+    /**
      * Trait instance property snapshot awaiting class-body merge check (#22850).
      *
      * @var array<int, array<string, array<string, mixed>>>
@@ -4127,21 +4134,24 @@ class Object_ extends Type {
                 continue;
             }
             $declaringId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
-            if ($declaringId === $classId) {
+            $traitSourceId = $this->instancePropertyTraitSourceId[$classId][$nameLc] ?? null;
+            if ($declaringId === $classId && null === $traitSourceId) {
                 // Same class already declared this property — keep the first slot.
                 return;
             }
             // Class body redeclares a trait property: reuse the slot; finish with
-            // assertClassTraitInstancePropertyMerge after defaults/flags (#22850).
+            // assertClassTraitInstancePropertyMerge after defaults/flags (#22850, #26593).
+            $originId = $traitSourceId ?? $declaringId;
             $this->pendingTraitInstancePropertyOverride[$classId][$nameLc] = $this->snapshotInstanceProperty(
                 $classId,
-                $declaringId,
+                $originId,
                 $existing
             );
             $this->properties[$classId][$idx] = [
                 $existing[0], $name, $type, $existing[3],
             ];
             $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $classId;
+            unset($this->instancePropertyTraitSourceId[$classId][$nameLc]);
             // Drop trait default so a class body without an initializer stays unset.
             unset($this->propertyDefaults[$classId][$existing[3]]);
             unset($this->runtimePropertyNewDefaults[$classId][$existing[3]]);
@@ -5108,8 +5118,14 @@ class Object_ extends Type {
                     if ($this->jitInstancePropertiesCompatible($classId, $traitId, $name, $existing, $propset)) {
                         continue 2;
                     }
-                    $prevTraitId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
-                    if ($prevTraitId === $classId) {
+                    $prevTraitId = $this->instancePropertyTraitSourceId[$classId][$nameLc]
+                        ?? (
+                            // Before #26593 remapping, declaring id was the trait.
+                            (($this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId) !== $classId)
+                                ? ($this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? null)
+                                : null
+                        );
+                    if (null === $prevTraitId) {
                         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                             $className,
                             $traitName,
@@ -5126,7 +5142,9 @@ class Object_ extends Type {
             }
             $type = $propset[2];
             $this->defineProperty($classId, $name, $type);
-            $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $traitId;
+            // zend_inheritance.c: composing class owns trait-imported properties (#26593).
+            $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $classId;
+            $this->instancePropertyTraitSourceId[$classId][$nameLc] = $traitId;
             $this->definePropertyVisibility($classId, $name, $this->propertyVisibility($traitId, $name));
             $setVis = $this->propertySetVisibility($traitId, $name);
             if (0 !== $setVis) {

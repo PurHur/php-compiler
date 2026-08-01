@@ -18421,15 +18421,24 @@ restart:
     protected function inheritTraitInstanceProperties(ClassEntry $entry, ClassEntry $trait, string $traitName): void
     {
         $traitLc = strtolower(ltrim($traitName, '\\'));
+        $classLc = strtolower($entry->name);
         foreach ($trait->properties as $property) {
             $propLc = strtolower($property->name);
             foreach ($entry->properties as $existing) {
                 if (strtolower($existing->name) === $propLc) {
-                    if ($existing->declaringClassLc === $traitLc) {
+                    $existingFromTraitLc = isset($entry->traitPropertySources[$propLc])
+                        ? strtolower(ltrim($entry->traitPropertySources[$propLc], '\\'))
+                        : (
+                            // Legacy / trait-using-trait: declaringClassLc may still name the trait.
+                            (isset($this->context->classes[$existing->declaringClassLc])
+                                && $this->context->classes[$existing->declaringClassLc]->isTrait)
+                                ? $existing->declaringClassLc
+                                : null
+                        );
+                    if ($existingFromTraitLc === $traitLc) {
                         continue 2;
                     }
-                    $classLc = strtolower($entry->name);
-                    if ($existing->declaringClassLc === $classLc) {
+                    if (null === $existingFromTraitLc && $existing->declaringClassLc === $classLc) {
                         if ($trait->isTrait
                             && VM\AbstractPropertyHookCheck::isAbstractHookProperty($trait, $property, $this->context)) {
                             $this->mergeTraitAbstractPropertyHookOverride($entry, $trait, $property, $existing);
@@ -18452,10 +18461,12 @@ restart:
                         // Two traits with identical definitions — keep the first (#22850).
                         continue 2;
                     }
-                    $prevTraitLc = $existing->declaringClassLc;
-                    $prevTrait = isset($this->context->classes[$prevTraitLc])
-                        ? $this->context->classes[$prevTraitLc]->name
-                        : $prevTraitLc;
+                    $prevTrait = $entry->traitPropertySources[$propLc]
+                        ?? (
+                            isset($this->context->classes[$existing->declaringClassLc])
+                                ? $this->context->classes[$existing->declaringClassLc]->name
+                                : $existing->declaringClassLc
+                        );
                     $this->throwTraitPropertyCompositionFatal(
                         TraitCompositionConflictMessage::incompatibleProperty(
                             $prevTrait,
@@ -18467,7 +18478,13 @@ restart:
                     );
                 }
             }
-            $entry->properties[] = $this->cloneClassPropertyForEntry($property, $entry);
+            $cloned = $this->cloneClassPropertyForEntry($property, $entry);
+            // zend_inheritance.c: trait instance properties are owned by the composing class (#26593).
+            if (!$entry->isTrait) {
+                $cloned->declaringClassLc = $classLc;
+                $entry->traitPropertySources[$propLc] = $trait->name !== '' ? $trait->name : $traitName;
+            }
+            $entry->properties[] = $cloned;
             if (isset($trait->propertyAttributeNames[$propLc])) {
                 $entry->propertyAttributeNames[$propLc] = $trait->propertyAttributeNames[$propLc];
             }
@@ -19356,8 +19373,13 @@ restart:
                             continue;
                         }
                         $declaringLc = $existing->declaringClassLc;
-                        if ($declaringLc !== $classLc) {
-                            $traitEntry = $this->context->classes[$declaringLc] ?? null;
+                        $fromTrait = isset($entry->traitPropertySources[$propLc]);
+                        // Trait imports remapped to composing class (#26593) still need class-body merge.
+                        if ($declaringLc !== $classLc || $fromTrait) {
+                            $traitOriginLc = $fromTrait
+                                ? strtolower(ltrim($entry->traitPropertySources[$propLc], '\\'))
+                                : $declaringLc;
+                            $traitEntry = $this->context->classes[$traitOriginLc] ?? null;
                             if (null !== $traitEntry
                                 && $traitEntry->isTrait
                                 && VM\AbstractPropertyHookCheck::isAbstractHookProperty(
@@ -19367,18 +19389,23 @@ restart:
                                 )) {
                                 $traitAbstractHookOverride = [$traitEntry, $existing];
                                 unset($entry->properties[$idx]);
+                                unset($entry->traitPropertySources[$propLc]);
                                 $entry->properties = array_values($entry->properties);
                                 break;
                             }
                             // Class redeclare of trait property: identical → replace with class (#22850).
                             if (VM\TraitPropertyCompatibility::instancePropertiesCompatible($existing, $incoming)) {
                                 unset($entry->properties[$idx]);
+                                unset($entry->traitPropertySources[$propLc]);
                                 $entry->properties = array_values($entry->properties);
                                 break;
                             }
-                            $traitName = isset($this->context->classes[$declaringLc])
-                                ? $this->context->classes[$declaringLc]->name
-                                : $declaringLc;
+                            $traitName = $entry->traitPropertySources[$propLc]
+                                ?? (
+                                    isset($this->context->classes[$declaringLc])
+                                        ? $this->context->classes[$declaringLc]->name
+                                        : $declaringLc
+                                );
                             $this->throwTraitPropertyCompositionFatal(
                                 TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                                     $entry->name,
