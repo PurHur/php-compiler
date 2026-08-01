@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
 /**
@@ -19,6 +20,9 @@ use PHPLLVM\Value;
  */
 final class get_headers extends Internal
 {
+    /** php-src head.c — non-http(s) URL warning (#26383). */
+    public const NON_HTTP_URL_WARNING = 'get_headers(): This function may only be used against URLs';
+
     public function __construct()
     {
         parent::__construct('get_headers');
@@ -53,6 +57,13 @@ final class get_headers extends Internal
         }
 
         if (!VmHttpLastResponseHeaders::isHttpUrl($url)) {
+            $frame->vmContext->errors->triggerError(
+                self::NON_HTTP_URL_WARNING,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
             $frame->returnVar->bool(false);
 
             return;
