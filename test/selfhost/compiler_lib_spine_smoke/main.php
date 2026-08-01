@@ -1419,6 +1419,8 @@ require_once __DIR__.'/../../../ext/pgsql/pg_set_chunked_rows_size.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_socket_poll.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_change_password.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_jit.php';
+require_once __DIR__.'/../../../ext/pgsql/pg_close_stmt.php';
+require_once __DIR__.'/../../../ext/pgsql/pg_service.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_trace.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_untrace.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlLob.php';

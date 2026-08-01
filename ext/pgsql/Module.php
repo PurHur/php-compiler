@@ -200,6 +200,7 @@ class Module extends ModuleAbstract
             new pg_num_fields(),
             new pg_num_fields('pg_numfields'), // PHP_FALIAS (#22219)
             ...self::php84Functions(),
+            ...self::php85Functions(),
         ];
     }
 
@@ -234,6 +235,21 @@ class Module extends ModuleAbstract
             new pg_result_memory_size(),
             new pg_set_chunked_rows_size(),
             new pg_socket_poll(),
+        ];
+    }
+
+    /**
+     * @return list<\PHPCompiler\Func\Internal>
+     */
+    private function php85Functions(): array
+    {
+        if (!PgsqlExtensionPolicy::advertisesPhp85Helpers()) {
+            return [];
+        }
+
+        return [
+            new pg_close_stmt(),
+            new pg_service(),
         ];
     }
 }
