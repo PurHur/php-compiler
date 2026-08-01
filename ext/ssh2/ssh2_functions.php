@@ -224,6 +224,57 @@ final class ssh2_auth_password extends Ssh2Function
     }
 }
 
+/**
+ * ssh2_auth_none(resource $session, string $username): array|bool
+ *
+ * Probe none-auth / list allowed methods (PECL ssh2_auth_none; #26678).
+ */
+final class ssh2_auth_none extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_auth_none');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_auth_none() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_auth_none', 1);
+        $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_auth_none', 2, 'username');
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $result = VmSsh2Native::authNone($native, $user);
+        if (\is_bool($result)) {
+            if ($result) {
+                VmSsh2Session::markAuthed($session);
+            }
+            $frame->returnVar->bool($result);
+
+            return;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($result as $method) {
+            $slot = new Variable();
+            $slot->string((string) $method);
+            $ht->append($slot);
+        }
+        $frame->returnVar->array($ht);
+    }
+}
+
 final class ssh2_auth_pubkey_file extends Ssh2Function
 {
     public function __construct()

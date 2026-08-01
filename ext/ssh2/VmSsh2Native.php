@@ -127,6 +127,49 @@ final class VmSsh2Native
     }
 
     /**
+     * Probe "none" auth / list allowed methods (PECL ssh2_auth_none; #26678).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return list<string>|bool  method names, or bool when list is unavailable
+     */
+    public static function authNone(\FFI\CData $session, string $username)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $ptr = $ffi->libssh2_userauth_list($session, $username, \strlen($username));
+        } catch (\Throwable) {
+            return false;
+        }
+        if (null === $ptr) {
+            try {
+                return 0 !== (int) $ffi->libssh2_userauth_authenticated($session);
+            } catch (\Throwable) {
+                return false;
+            }
+        }
+        try {
+            $methods = \FFI::string($ptr);
+        } catch (\Throwable) {
+            return false;
+        }
+        if ('' === $methods) {
+            return [];
+        }
+        $out = [];
+        foreach (\explode(',', $methods) as $part) {
+            if ('' !== $part) {
+                $out[] = $part;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Host-key fingerprint after handshake (PECL ssh2_fingerprint / libssh2_hostkey_hash; #26575).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -884,6 +927,7 @@ void *libssh2_hostkey_hash(LIBSSH2_SESSION *session, int hash_type);
 int libssh2_userauth_publickey_fromfile_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *publickey, const char *privatekey, const char *passphrase);
 int libssh2_session_last_error(LIBSSH2_SESSION *session, char **errmsg, int *errmsg_len, int want_buf);
 char *libssh2_userauth_list(LIBSSH2_SESSION *session, const char *username, unsigned int username_len);
+int libssh2_userauth_authenticated(LIBSSH2_SESSION *session);
 int libssh2_session_disconnect_ex(LIBSSH2_SESSION *session, int reason, const char *description, const char *lang);
 int libssh2_session_free(LIBSSH2_SESSION *session);
 typedef struct _LIBSSH2_SFTP LIBSSH2_SFTP;
