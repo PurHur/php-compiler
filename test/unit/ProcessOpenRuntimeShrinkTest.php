@@ -11,7 +11,7 @@ use PHPCompiler\ext\standard\VmProcessProcOpenNative;
 use PHPCompiler\VM\HashTable;
 use PHPUnit\Framework\TestCase;
 
-/** ProcessOpenRuntime routes standalone + embed through ProcessOpenJitHelper PHP (#9408, #12958). */
+/** ProcessOpenRuntime routes standalone + embed through ProcessOpenJitHelper PHP (#9408, #12958, #26269). */
 final class ProcessOpenRuntimeShrinkTest extends TestCase
 {
     public function testProcessOpenRuntimeIsThinRouter(): void

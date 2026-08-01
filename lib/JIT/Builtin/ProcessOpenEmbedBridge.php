@@ -15,7 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (ProcessSlotJitHelper →
  * ProcessOpenJitHelper) in one NestedJIT scope (peer NetworkServices #26247 / Gettext #26226).
  * SSOT: {@see \PHPCompiler\ext\standard\ProcessOpenJitHelper}
- * php-src: ext/standard/proc_open.c
+ * php-src: ext/standard/proc_open.c — PHP_FUNCTION(proc_open) / proc_close / proc_get_status / proc_terminate
  */
 final class ProcessOpenEmbedBridge
 {
@@ -51,7 +51,6 @@ final class ProcessOpenEmbedBridge
         self::PROC_GET_STATUS,
         self::PROC_TERMINATE,
     ];
-
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_is_process_resource',
