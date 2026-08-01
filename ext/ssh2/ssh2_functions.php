@@ -93,7 +93,7 @@ final class ssh2_connect extends Ssh2Function
 
             return;
         }
-        // TCP open but no libssh2 handshake available — PECL would negotiate; we cannot.
+        // TCP open but no libssh2 — PECL would negotiate; we cannot.
         if (!VmSsh2Native::hasLibssh2()) {
             @\trigger_error(
                 \sprintf('ssh2_connect(): Error starting up SSH connection to %s:%d', $host, $port),
@@ -107,9 +107,17 @@ final class ssh2_connect extends Ssh2Function
         if (null === $ctx) {
             throw new \LogicException('ssh2_connect() requires a VM context');
         }
-        // Full libssh2 session handshake is a follow-up; for now succeed only the object wrap path
-        // after TCP+libssh2 presence (handshake deferred — see #6385 phase-1b).
-        $wrapped = VmSsh2Session::wrap($ctx, $host, $port);
+        $native = VmSsh2Native::handshake($host, $port);
+        if (null === $native) {
+            @\trigger_error(
+                \sprintf('ssh2_connect(): Error starting up SSH connection to %s:%d', $host, $port),
+                \E_USER_WARNING
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $wrapped = VmSsh2Session::wrap($ctx, $host, $port, $native['sock'], $native['session']);
         $frame->returnVar->object($wrapped->toObject());
     }
 }
@@ -159,13 +167,25 @@ final class ssh2_auth_password extends Ssh2Function
         }
         $session = $this->requireSession($frame->calledArgs[0], 'ssh2_auth_password', 1);
         $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_auth_password', 2, 'username');
-        VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_auth_password', 3, 'password');
+        $password = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_auth_password', 3, 'password');
         if ('' === $user) {
             throw new \ValueError('ssh2_auth_password(): Argument #2 ($username) must not be empty');
         }
-        // Without a real libssh2 session, password auth cannot succeed.
-        @\trigger_error('ssh2_auth_password(): Authentication failed for '.$user.' using password', \E_USER_WARNING);
-        $frame->returnVar->bool(false);
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_auth_password(): Authentication failed for '.$user.' using password', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!VmSsh2Native::authPassword($native, $user, $password)) {
+            @\trigger_error('ssh2_auth_password(): Authentication failed for '.$user.' using password', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        VmSsh2Session::markAuthed($session);
+        $frame->returnVar->bool(true);
     }
 }
 
