@@ -3221,6 +3221,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $idDefault->type);
     }
 
+    /** @covers issue #25587 */
+    public function testIntlErrorNameAndResourcebundleCreateZendStubReflection(): void
+    {
+        $ie = BuiltinParamNames::forFunction('intl_error_name');
+        self::assertSame(['errorCode'], $ie);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ie, 'errorCode', 'intl_error_name'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ie, 'error_code', 'intl_error_name'));
+        self::assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('intl_error_name'));
+        self::assertSame('int', BuiltinInternalArgInfo::paramInfoForFunction('intl_error_name', 0)['type']);
+
+        $rb = BuiltinParamNames::forFunction('resourcebundle_create');
+        self::assertSame(['locale', 'bundle', 'fallback='], $rb);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($rb, 'locale', 'resourcebundle_create'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($rb, 'bundle', 'resourcebundle_create'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($rb, 'fallback', 'resourcebundle_create'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($rb, 'bundlename', 'resourcebundle_create'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('resourcebundle_create'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('resourcebundle_create', 0));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('resourcebundle_create', 1));
+        self::assertSame('?string', BuiltinInternalArgInfo::paramInfoForFunction('resourcebundle_create', 0)['type']);
+        self::assertSame('?string', BuiltinInternalArgInfo::paramInfoForFunction('resourcebundle_create', 1)['type']);
+        self::assertSame('?ResourceBundle', BuiltinInternalArgInfo::returnTypeLabelForFunction('resourcebundle_create'));
+        $infoFallback = ['name' => 'fallback', 'type' => 'bool', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('resourcebundle_create', 2, $infoFallback, false));
+        $fallbackDefault = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($fallbackDefault, 'resourcebundle_create', 2, $infoFallback));
+        self::assertSame(Variable::TYPE_BOOLEAN, $fallbackDefault->type);
+        self::assertTrue($fallbackDefault->toBool());
+    }
+
     /** @covers issue #24456 */
     public function testFuncGetArgZendStubNamedPositionParam(): void
     {
