@@ -23,7 +23,8 @@ use PHPCompiler\VM\ClassReadonly;
  * PHP 8.2+ readonly class (ZEND_ACC_READONLY) inherits readonly on instance props — defaults rejected (#18090, re-#18074);
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
  * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991);
- * PHP 8.4+ hooked properties cannot be readonly (#19172, zend_compile_property_hooks).
+ * PHP 8.4+ hooked properties cannot be readonly (#19172, zend_compile_property_hooks);
+ * static readonly with default → "cannot have default value" before static ban (#26487).
  */
 final class ReadonlyClassCompileCheck
 {
@@ -140,6 +141,12 @@ final class ReadonlyClassCompileCheck
                 continue;
             }
             $propName = $this->propertyDisplayName($member->name);
+            // php-src zend_compile_property_info: default-value fatal before static-readonly (#26487)
+            if (null !== $member->defaultVar || null !== $member->defaultBlock) {
+                throw new \CompileError(
+                    "Readonly property {$classDisplay}::\${$propName} cannot have default value"
+                );
+            }
             throw new \CompileError(
                 "Static property {$classDisplay}::\${$propName} cannot be readonly"
             );
