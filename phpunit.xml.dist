@@ -37,6 +37,8 @@
             <file>./test/compliance/EnumTypedParamJITTest.php</file>
             <file>./test/compliance/EnumTraitConstTest.php</file>
             <file>./test/compliance/EnumTraitMethodJitTest.php</file>
+            <file>./test/compliance/EnumTraitPropertyFatalVMTest.php</file>
+            <file>./test/compliance/EnumTraitPropertyFatalJITTest.php</file>
             <file>./test/compliance/GeneratorJITTest.php</file>
             <file>./test/compliance/VisibilityTest.php</file>
             <file>./test/compliance/VisibilityJitTest.php</file>
