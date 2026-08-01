@@ -1009,8 +1009,17 @@ final class DateTimeSupport
         $targetLabel = self::classLabel($target);
         $baseTs = self::requireIntProperty($base, self::TS_PROPERTY, $baseLabel)->toInt();
         $targetTs = self::requireIntProperty($target, self::TS_PROPERTY, $targetLabel)->toInt();
+        $baseUs = self::requireIntProperty($base, self::MICROSECOND_PROPERTY, $baseLabel)->toInt();
+        $targetUs = self::requireIntProperty($target, self::MICROSECOND_PROPERTY, $targetLabel)->toInt();
         $tzName = self::requireStringProperty($base, self::TZ_PROPERTY, $baseLabel)->toString();
-        $diffState = VmDateTimeNative::diffTimestamps($baseTs, $targetTs, $tzName, $absolute);
+        $diffState = VmDateTimeNative::diffTimestamps(
+            $baseTs,
+            $targetTs,
+            $tzName,
+            $absolute,
+            $baseUs,
+            $targetUs
+        );
 
         return DateIntervalSupport::createFromState($ctx, $diffState);
     }
