@@ -183,6 +183,51 @@ PHP;
         }
     }
 
+    /** @covers issue #26238 — abstract / interface attribute classes Error like `new` */
+    public function testReflectionAttributeNewInstanceRejectsAbstractAndInterface(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute]
+abstract class AbsAttr {}
+#[AbsAttr]
+class TAbs {}
+try {
+    (new ReflectionClass(TAbs::class))->getAttributes()[0]->newInstance();
+    echo "abs:ok\n";
+} catch (Throwable $e) {
+    echo 'abs:', get_class($e), ':', $e->getMessage(), "\n";
+}
+
+#[Attribute]
+interface IAttr {}
+#[IAttr]
+class TIface {}
+try {
+    (new ReflectionClass(TIface::class))->getAttributes()[0]->newInstance();
+    echo "iface:ok\n";
+} catch (Throwable $e) {
+    echo 'iface:', get_class($e), ':', $e->getMessage(), "\n";
+}
+
+#[Attribute]
+class ConcreteAttr {}
+#[ConcreteAttr]
+class TOk {}
+$o = (new ReflectionClass(TOk::class))->getAttributes()[0]->newInstance();
+echo 'concrete:', get_class($o), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attr_new_instance_abstract.php'));
+        $this->assertSame(
+            "abs:Error:Cannot instantiate abstract class AbsAttr\n"
+            ."iface:Error:Cannot instantiate interface IAttr\n"
+            ."concrete:ConcreteAttr\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #3467, #3253 */
     public function testPlainClassAllowsUndeclaredWritesWithDeprecation(): void
     {
