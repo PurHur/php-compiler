@@ -820,6 +820,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'redis_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMemcached()
+                && str_contains($name, 'memcached')
+                && !str_contains($name, 'memcached_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMemcached()
+                && str_contains($name, 'memcached_phantom')) {
+                continue;
+            }
             // snmp_* PROFILE=8.4 via --ENV--; always include those cases.
             // Other snmp_* need forward profile.
             if (!CompilerVersion::supportsSnmp()

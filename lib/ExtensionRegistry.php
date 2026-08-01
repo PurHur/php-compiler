@@ -17,7 +17,7 @@ declare(strict_types=1);
  * The entries are literal `new` expressions on purpose: the AOT compiler resolves these statically,
  * and instantiating from a string would leave every module unreferenced and uncompiled.
  *
- * 76 extensions, all default-enabled — matching current behaviour, where every build pays for
+ * 77 extensions, all default-enabled — matching current behaviour, where every build pays for
  * every extension. Selecting a subset is the next step and will filter on
  * {@see \PHPCompiler\Module::isDefaultEnabled}.
  */
@@ -79,6 +79,7 @@ final class ExtensionRegistry
             new \PHPCompiler\ext\simdjson\Module(),
             new \PHPCompiler\ext\yaml\Module(),
             new \PHPCompiler\ext\redis\Module(),
+            new \PHPCompiler\ext\memcached\Module(),
             new \PHPCompiler\ext\mongodb\Module(),
             new \PHPCompiler\ext\snmp\Module(),
             new \PHPCompiler\ext\zstd\Module(),
