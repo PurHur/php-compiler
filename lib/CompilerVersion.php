@@ -3474,6 +3474,18 @@ final class CompilerVersion
     }
 
     /**
+     * ext/ssh2 via PHP {@see \PHPCompiler\ext\ssh2\VmSsh2Native} — withheld on reference profile (#6385).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host pecl-ssh2 / libssh2 absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * or explicit {@code PHP_COMPILER_ENABLE_SSH2=1}.
+     */
+    public static function supportsSsh2(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/mongodb via pure PHP {@see \PHPCompiler\ext\mongodb\VmMongodb} — withheld on reference profile (#6575).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
