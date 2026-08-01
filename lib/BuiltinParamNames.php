@@ -1489,9 +1489,10 @@ final class BuiltinParamNames
             case 'mb_strtolower':
             case 'mb_strtoupper':
                 return ['string', 'encoding='];
+            // php-src ext/standard/basic_functions.stub.php — flags/encoding/double_encode optional (#24970)
             case 'htmlspecialchars':
             case 'htmlentities':
-                return ['string', 'flags', 'encoding', 'double_encode'];
+                return ['string', 'flags=', 'encoding=', 'double_encode='];
             // php-src ext/standard/basic_functions.stub.php — ?string $operator = null (#24971)
             case 'version_compare':
                 return ['version1', 'version2', 'operator='];

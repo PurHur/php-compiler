@@ -55,10 +55,38 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testHtmlspecialcharsDoubleEncodeNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('htmlspecialchars');
-        self::assertSame(['string', 'flags', 'encoding', 'double_encode'], $names);
+        self::assertSame(['string', 'flags=', 'encoding=', 'double_encode='], $names);
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'double_encode', 'htmlspecialchars'));
         $entities = BuiltinParamNames::forFunction('htmlentities');
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($entities, 'double_encode', 'htmlentities'));
+    }
+
+    /** @covers issue #24970 */
+    public function testHtmlentitiesZendStubReflectionDefaults(): void
+    {
+        $names = BuiltinParamNames::forFunction('htmlentities');
+        self::assertSame(['string', 'flags=', 'encoding=', 'double_encode='], $names);
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('htmlentities'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('htmlentities'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('htmlentities', 2));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('htmlspecialchars', 2));
+        $infoFlags = ['name' => 'flags', 'type' => 'int', 'isOptional' => true];
+        $infoEncoding = ['name' => 'encoding', 'type' => '?string', 'isOptional' => true];
+        $infoDouble = ['name' => 'double_encode', 'type' => 'bool', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('htmlentities', 1, $infoFlags, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('htmlentities', 2, $infoEncoding, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('htmlentities', 3, $infoDouble, false));
+        $flags = new Variable();
+        $encoding = new Variable();
+        $double = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($flags, 'htmlentities', 1, $infoFlags));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($encoding, 'htmlentities', 2, $infoEncoding));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($double, 'htmlentities', 3, $infoDouble));
+        self::assertSame(Variable::TYPE_INTEGER, $flags->type);
+        self::assertSame(11, $flags->toInt());
+        self::assertSame(Variable::TYPE_NULL, $encoding->type);
+        self::assertSame(Variable::TYPE_BOOLEAN, $double->type);
+        self::assertTrue($double->toBool());
     }
 
     public function testLevenshteinNamedCostParamsResolve(): void
