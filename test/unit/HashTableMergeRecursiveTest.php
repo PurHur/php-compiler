@@ -55,6 +55,30 @@ final class HashTableMergeRecursiveTest extends TestCase
         );
     }
 
+    /** php-src empty-dest overlay: top-level int keys renumber (#26559). */
+    public function testTopLevelIntKeysRenumberLikeArrayMerge(): void
+    {
+        $left = $this->array([1 => 'a']);
+        $right = $this->array([1 => 'b']);
+        $merged = $left->mergeRecursiveCopy($right);
+        $this->assertSame([0 => 'a', 1 => 'b'], $this->export($merged));
+
+        $sparse = $this->array([1 => 'a', 5 => 'b']);
+        $this->assertSame([0 => 'a', 1 => 'b'], $this->export($sparse->mergeRecursiveCopy()));
+    }
+
+    /** Nested string-key collision keeps dest int keys; overlay appends (#26559). */
+    public function testNestedUnderStringKeyPreservesDestIntKeys(): void
+    {
+        $left = $this->array(['k' => [1 => 'a']]);
+        $right = $this->array(['k' => [1 => 'b']]);
+        $merged = $left->mergeRecursiveCopy($right);
+        $this->assertSame(
+            ['k' => [1 => 'a', 2 => 'b']],
+            $this->export($merged)
+        );
+    }
+
     /** @param array<string|int, mixed> $data */
     private function array(array $data): HashTable
     {
