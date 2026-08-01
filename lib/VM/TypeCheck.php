@@ -503,14 +503,8 @@ final class TypeCheck
         }
     }
 
-    /** php-src zend_verify_return_error — bare `return;` in a typed non-void function (#16117). */
-    public static function assertReturnValueProvided(): void
-    {
-        throw new \Error('A function with return type must return a value');
-    }
-
     /**
-     * php-src zend_verify_return_error — implicit/missing return for a declared type (#26485).
+     * php-src zend_verify_return_error — missing/bare return for a declared type (#26485, #26486).
      * Zend raises TypeError: "{fn}(): Return value must be of type {T}, none returned".
      */
     public static function assertNoneReturned(?string $callableName, string $expectedType): void
@@ -521,6 +515,42 @@ final class TypeCheck
         }
 
         throw new \TypeError($message);
+    }
+
+    /**
+     * Expected-type label for zend_verify_return_error "none returned" (#26486).
+     * Prefer {@see ReflectionTypeSupport::cfgTypeStringForDump} so nullable/union match Zend.
+     */
+    public static function expectedReturnTypeLabelForNoneReturned(Block $block): string
+    {
+        if (null !== $block->returnDeclaredType) {
+            return ReflectionTypeSupport::cfgTypeStringForDump($block->returnDeclaredType);
+        }
+        if ($block->returnTypeMixed) {
+            return 'mixed';
+        }
+        if (null !== $block->returnLiteralBoolType && '' !== $block->returnLiteralBoolType) {
+            return $block->returnLiteralBoolType;
+        }
+        if (null !== $block->returnDeclaredTypeLabel && '' !== $block->returnDeclaredTypeLabel) {
+            return ltrim($block->returnDeclaredTypeLabel, '\\');
+        }
+        if (null !== $block->returnDnfConstraints) {
+            return \PHPCompiler\DnfType::zendTypeErrorLabel(
+                \PHPCompiler\DnfType::formatUnionType($block->returnDnfConstraints)
+            );
+        }
+        if (null !== $block->returnClassConstraint && '' !== $block->returnClassConstraint) {
+            return ltrim($block->returnClassConstraint, '\\');
+        }
+        if (null !== $block->returnTypeConstraint) {
+            return self::typeNameForConstraint($block->returnTypeConstraint, $block->returnLiteralBoolType);
+        }
+        if ($block->returnTypeStatic) {
+            return 'static';
+        }
+
+        return 'mixed';
     }
 
     public static function assertNeverReturn(?string $functionName = null): void

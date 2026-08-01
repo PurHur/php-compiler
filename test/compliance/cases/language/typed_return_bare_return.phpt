@@ -1,5 +1,5 @@
 --TEST--
-Language: typed return with bare return; fatals (#16117, Zend/zend_execute.c)
+Language: typed return with bare return; TypeError none returned (#16117/#26486, Zend/zend_execute.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -28,5 +28,5 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-Error: A function with return type must return a value
-Error: A function with return type must return a value
+TypeError: {closure}(): Return value must be of type int, none returned
+TypeError: C::f(): Return value must be of type int, none returned
