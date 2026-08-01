@@ -4,17 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** JIT/AOT link hook for html_entity_decode() ENT_HTML5 (#4130). */
+/**
+ * JIT/AOT link hook for html_entity_decode() ENT_HTML5 (#4130, #26441).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer HtmlEntitiesJit #26417).
+ */
 final class HtmlEntityDecodeJit
 {
+    private const HELPER_PATH = '/ext/standard/HtmlEntityDecodeJitHelper.php';
+
     private const HELPER_LOGICAL = 'PHPCompiler\\ext\\standard\\HtmlEntityDecodeJitHelper::decode';
+
     private const HELPER_ENCODING_LOGICAL = 'PHPCompiler\\ext\\standard\\HtmlEntityDecodeJitHelper::decodeWithEncoding';
+
     private const DISPATCH = '__compiler_html_entity_decode_dispatch';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER_LOGICAL,
+        self::HELPER_ENCODING_LOGICAL,
+    ];
 
     public static function decode(Context $context, Value $strPtr, Value $flags): Value
     {
@@ -33,14 +47,10 @@ final class HtmlEntityDecodeJit
         Value $flags,
         Value $encodingPtr
     ): Value {
-        self::ensureEncodingHelperCompiled($context);
-        $lc = strtolower(self::HELPER_ENCODING_LOGICAL);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException('HtmlEntityDecodeJitHelper::decodeWithEncoding missing after compile (#11653)');
-        }
+        self::ensureJitHelperCompiled($context);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::HELPER_ENCODING_LOGICAL, '#26441');
 
-        return $context->builder->call($fn, $strPtr, $flags, $encodingPtr);
+        return $context->builder->call($helperFn, $strPtr, $flags, $encodingPtr);
     }
 
     private static function ensureDispatch(Context $context): void
@@ -61,7 +71,7 @@ final class HtmlEntityDecodeJit
         $context->registerFunction(self::DISPATCH, $wrapper);
 
         $fastFn = $context->lookupFunction('__string__htmlspecialchars_decode');
-        $helperFn = self::helperFunction($context);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#26441');
         $html5Mask = $i64->constInt(48, false);
         $zero = $i64->constInt(0, false);
 
@@ -96,47 +106,13 @@ final class HtmlEntityDecodeJit
         $context->builder->clearInsertionPosition();
     }
 
-    private static function helperFunction(Context $context): \PHPLLVM\Value\Function_
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = strtolower(self::HELPER_LOGICAL);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException('HtmlEntityDecodeJitHelper::decode missing after compile (#4130)');
-        }
-
-        return $fn;
-    }
-
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = strtolower(self::HELPER_LOGICAL);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = dirname(__DIR__, 3).'/ext/standard/HtmlEntityDecodeJitHelper.php';
-        $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HtmlEntityDecodeJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('HtmlEntityDecodeJitHelper.php parseAndCompile failed (#4130)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('HtmlEntityDecodeJitHelper::decode was not compiled for JIT (#4130)');
-        }
-    }
-
-    private static function ensureEncodingHelperCompiled(Context $context): void
-    {
-        $lc = strtolower(self::HELPER_ENCODING_LOGICAL);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-        self::ensureJitHelperCompiled($context);
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('HtmlEntityDecodeJitHelper::decodeWithEncoding was not compiled for JIT (#11653)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26441'
+        );
     }
 }
