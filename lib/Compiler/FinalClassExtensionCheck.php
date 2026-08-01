@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCfg\AbstractVisitor;
+use PHPCfg\Block;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
@@ -16,6 +18,7 @@ use PhpParser\Node\Stmt\Class_;
  *
  * php-src: Zend/zend_compile.c — zend_compile_class_decl;
  * Zend/zend_inheritance.c — do_inheritance_on_class
+ * Enums are implicitly final (ZEND_ACC_FINAL; #26531).
  */
 final class FinalClassExtensionCheck
 {
@@ -32,6 +35,9 @@ final class FinalClassExtensionCheck
 
     /** @var array<string, array{display: string, final: bool, extends: ?string}> */
     private array $classes = [];
+
+    /** @var array<string, string> lowercase enum name => display name (implicitly final) */
+    private array $enums = [];
 
     public static function validate(Script $script): void
     {
@@ -50,6 +56,24 @@ final class FinalClassExtensionCheck
         foreach ($finder->getClasses() as $class) {
             $this->collectClass($class);
         }
+
+        $enumCollector = new class extends AbstractVisitor {
+            /** @var list<Op\Stmt\Enum_> */
+            public array $enums = [];
+
+            public function enterOp(Op $op, Block $block): void
+            {
+                if ($op instanceof Op\Stmt\Enum_) {
+                    $this->enums[] = $op;
+                }
+            }
+        };
+        $enumTraverser = new Traverser();
+        $enumTraverser->addVisitor($enumCollector);
+        $enumTraverser->traverse($script);
+        foreach ($enumCollector->enums as $enum) {
+            $this->collectEnum($enum);
+        }
     }
 
     private function collectClass(Op\Stmt\Class_ $class): void
@@ -67,6 +91,15 @@ final class FinalClassExtensionCheck
             'final' => 0 !== ($class->flags & Class_::MODIFIER_FINAL),
             'extends' => $parentLc,
         ];
+    }
+
+    private function collectEnum(Op\Stmt\Enum_ $enum): void
+    {
+        $lc = $this->operandLcName($enum->name);
+        if (null === $lc) {
+            return;
+        }
+        $this->enums[$lc] = $this->operandDisplayName($enum->name, $lc);
     }
 
     private function verify(): void
@@ -88,6 +121,9 @@ final class FinalClassExtensionCheck
 
     private function finalParentDisplay(string $parentLc): ?string
     {
+        if (isset($this->enums[$parentLc])) {
+            return $this->enums[$parentLc];
+        }
         if (isset($this->classes[$parentLc])) {
             return $this->classes[$parentLc]['final']
                 ? $this->classes[$parentLc]['display']

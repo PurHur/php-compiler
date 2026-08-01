@@ -18883,7 +18883,8 @@ restart:
         }
         $parent = $this->context->classes[$entry->parentLc];
         // php-src zend_inheritance.c — cannot extend ZEND_ACC_FINAL (#21669, #3406).
-        if ($parent->isFinal) {
+        // Enums are implicitly final (zend_enum.c ZEND_ACC_FINAL; #26531).
+        if ($parent->isFinal || $parent->isEnum) {
             throw new \CompileError(
                 "Class {$entry->name} cannot extend final class {$parent->name}"
             );

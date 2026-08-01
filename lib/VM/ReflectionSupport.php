@@ -1265,10 +1265,10 @@ final class ReflectionSupport
         return [$obj, $entry, $ctx];
     }
 
-    /** php-src zim_ReflectionClass_isFinal — ce->ce_flags & ZEND_ACC_FINAL (#18297). */
+    /** php-src zim_ReflectionClass_isFinal — ce->ce_flags & ZEND_ACC_FINAL (#18297, #26531 enums). */
     public static function reflectionClassIsFinal(ClassEntry $entry): bool
     {
-        return $entry->isFinal;
+        return $entry->isFinal || $entry->isEnum;
     }
 
     /** php-src zim_ReflectionClass_isInterface — ce->ce_flags & ZEND_ACC_INTERFACE (#18335). */

@@ -70,6 +70,10 @@ final class EnumSupport
     /** Zend implicit UnitEnum / BackedEnum on all enums (#3550). */
     public static function ensureBuiltinEnumInterfaces(ClassEntry $entry): void
     {
+        // php-src zend_enum.c — enums carry ZEND_ACC_FINAL; cannot be extended (#26531).
+        if ($entry->isEnum) {
+            $entry->isFinal = true;
+        }
         if (!in_array('unitenum', $entry->interfaces, true)) {
             $entry->interfaces[] = 'unitenum';
         }
