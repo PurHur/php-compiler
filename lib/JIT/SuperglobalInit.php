@@ -27,6 +27,15 @@ final class SuperglobalInit
         '_COOKIE',
     ];
 
+    /**
+     * Populated by session_start()/load — not by __superglobals__refresh, but still
+     * runtime-dynamic. Compile-time isset/read folds would freeze empty $_SESSION
+     * and break SessionsWeb flash (#26411).
+     */
+    private const RUNTIME_SESSION_SUPERGLOBALS = [
+        '_SESSION',
+    ];
+
     /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235, #296, #302, #295, #314, #453, #2257). */
     private const RUNTIME_SERVER_KEYS = [
         'REQUEST_METHOD',
@@ -307,6 +316,22 @@ final class SuperglobalInit
             throw new \LogicException("Superglobal not initialized for JIT: {$name}");
         }
 
+        // session_start() replaces sg_SESSION mid-request. Snapshotting the HT pointer
+        // as KIND_VALUE leaves $_SESSION writes on the pre-start table while
+        // phpc_session_save_to_disk reads the post-start table — empty sess_* files and
+        // lost flash (#26411, examples/005-SessionsWeb AOT smoke).
+        if (in_array($name, self::RUNTIME_SESSION_SUPERGLOBALS, true)) {
+            $var = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VARIABLE,
+                self::$globals[$name]
+            );
+            $var->superglobalName = $name;
+
+            return $var;
+        }
+
         $var = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
@@ -332,7 +357,9 @@ final class SuperglobalInit
      */
     public static function requiresRuntimeOffsetIsSet(Context $context, string $superglobalName): bool
     {
-        if (!in_array($superglobalName, self::STANDALONE_REFRESHED, true)) {
+        $isRuntimeTable = in_array($superglobalName, self::STANDALONE_REFRESHED, true)
+            || in_array($superglobalName, self::RUNTIME_SESSION_SUPERGLOBALS, true);
+        if (!$isRuntimeTable) {
             return false;
         }
 

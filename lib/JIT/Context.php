@@ -2026,7 +2026,14 @@ class Context {
 
     public function constantStringFromString(string $string): PHPLLVM\Value {
         if (!isset($this->stringConstantMap[$string])) {
-            $global = $this->module->addGlobal($this->type->string->pointer, 'string_const_' . count($this->stringConstantMap));
+            // Per-unit / main suffix — same collision class as __init__/__shutdown__ (#15889 /
+            // #16075). Bare string_const_N merges across helper-runtime .o files; later unit
+            // __init__ overwrites the main script's literals (SessionsWeb sid became
+            // "/index.php"; session wire encode emptied — #26411).
+            $global = $this->module->addGlobal(
+                $this->type->string->pointer,
+                $this->moduleLocalConstGlobalName('string_const_', count($this->stringConstantMap))
+            );
             $global->setInitializer($this->type->string->pointer->constNull());
             $oldBuilder = $this->builder;
             $resumeInitEmission = $this->emitsInitLinearIR();
@@ -2056,13 +2063,32 @@ class Context {
     {
         if (!isset($this->arrayConstantMap[$cacheKey])) {
             $ptrTy = $this->getTypeFromString('__value__*');
-            $global = $this->module->addGlobal($ptrTy, 'array_const_' . \count($this->arrayConstantMap));
+            $global = $this->module->addGlobal(
+                $ptrTy,
+                $this->moduleLocalConstGlobalName('array_const_', \count($this->arrayConstantMap))
+            );
             $global->setInitializer($ptrTy->constNull());
             $this->arrayConstantMap[$cacheKey] = $global;
             $this->emitConstantArrayInitInInitBlock($global, $table);
         }
 
         return $this->arrayConstantMap[$cacheKey];
+    }
+
+    /**
+     * LLVM global name for module-local compile-time constants.
+     *
+     * Helper units set {@see PHP_COMPILER_INIT_SYMBOL_SUFFIX}; the main script uses
+     * `_main` so bare string_const_N from stale prelinked helpers cannot clobber it.
+     */
+    private function moduleLocalConstGlobalName(string $prefix, int $index): string
+    {
+        $suffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
+        if ('' === $suffix) {
+            $suffix = '_main';
+        }
+
+        return $prefix.$index.$suffix;
     }
 
     /** @deprecated Inline lazy-init removed; arrays initialize in __init__ (#4941). */
