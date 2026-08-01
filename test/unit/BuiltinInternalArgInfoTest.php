@@ -261,6 +261,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('realpath'));
     }
 
+    /** php-src basic_functions.stub.php — InternalArgInfo omits |false (#26317). */
+    public function testGetmyFamilyReflectionReturnUnions(): void
+    {
+        foreach (['getmyuid', 'getmygid', 'getmypid', 'getlastmod'] as $f) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     /** php-src file.stub.php — InternalArgInfo omits |false / ?int $length (#25750). */
     public function testStreamGetContentsReflectionTypes(): void
     {
