@@ -15,9 +15,10 @@ use PHPCfg\Traverser;
 use PHPCfg\Visitor\DeclarationFinder;
 
 /**
- * Compile-time check: implements/extends targets must match Zend hierarchy rules (#12971, #12972).
+ * Compile-time check: implements/extends targets must match Zend hierarchy rules (#12971, #12972, #26537).
  *
- * php-src: Zend/zend_compile.c — zend_do_implement_interface(), zend_do_inheritance()
+ * php-src: Zend/zend_compile.c — zend_do_implement_interface(), zend_do_inheritance();
+ * Zend/zend_inheritance.c — parent must not be ZEND_ACC_TRAIT
  */
 final class ImplementsHierarchyCompileCheck
 {
@@ -26,6 +27,9 @@ final class ImplementsHierarchyCompileCheck
 
     /** @var array<string, string> lc => display (class, enum, trait) */
     private array $nonInterfaces = [];
+
+    /** @var array<string, string> lc => display (traits only — cannot be extended; #26537) */
+    private array $traits = [];
 
     /** @var array<string, array{display: string, implements: list<string>, extends: ?string}> */
     private array $classes = [];
@@ -156,7 +160,9 @@ final class ImplementsHierarchyCompileCheck
         if (null === $lc) {
             return;
         }
-        $this->nonInterfaces[$lc] = $this->operandDisplayName($trait->name, $lc);
+        $display = $this->operandDisplayName($trait->name, $lc);
+        $this->nonInterfaces[$lc] = $display;
+        $this->traits[$lc] = $display;
     }
 
     private function verify(): void
@@ -191,6 +197,14 @@ final class ImplementsHierarchyCompileCheck
                     'Class %s cannot extend interface %s',
                     $class['display'],
                     $this->interfaces[$extendsLc]
+                ));
+            }
+            // php-src zend_inheritance.c — parent must not be ZEND_ACC_TRAIT (#26537).
+            if (null !== $extendsLc && isset($this->traits[$extendsLc])) {
+                throw new \CompileError(sprintf(
+                    'Class %s cannot extend trait %s',
+                    $class['display'],
+                    $this->traits[$extendsLc]
                 ));
             }
         }
