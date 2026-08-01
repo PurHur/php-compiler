@@ -1321,6 +1321,20 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ asymmetric visibility on static properties (`public private(set) static $x`).
+     *
+     * PHP 8.4 allows aviz on instance properties only; static + explicit read/set is a
+     * "Multiple access type modifiers are not allowed" compile fatal (#7013). PHP 8.5
+     * extends aviz to static properties (RFC static-aviz / UPGRADING).
+     * Gated on {@see languageProfileVersion()} so unset / ≤8.4 profiles keep the reject.
+     * php-src: Zend/zend_language_parser.y; Zend/zend_compile.c zend_add_member_modifier().
+     */
+    public static function supportsStaticAsymmetricVisibility(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2

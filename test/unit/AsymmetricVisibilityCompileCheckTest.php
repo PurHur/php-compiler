@@ -139,6 +139,19 @@ PHP, 'asymmetric_ok.php');
         if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
             $this->markTestSkipped('parenthesized asymmetric set modifier disabled on 8.4.0-dev reference profile (#16450)');
         }
+        // PHP 8.5+ accepts static aviz (#26239); ≤8.4 still compile-fatal (#7013).
+        if (CompilerVersion::supportsStaticAsymmetricVisibility()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public (private(set)) static int $x = 1;
+}
+PHP, 'static_asymmetric_ok.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(<<<'PHP'

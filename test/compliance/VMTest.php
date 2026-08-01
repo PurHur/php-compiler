@@ -1209,6 +1209,8 @@ class VMTest extends BaseTest {
                 // gate wrongly returns true on the reference profile (#24819).
                 && !str_contains($name, 'asymmetric_visibility_default_profile')
                 && !str_contains($name, 'asymmetric_visibility_forward_84')
+                && !str_contains($name, 'static_asymmetric_visibility_forward_85')
+                && !str_contains($name, 'static_asymmetric_visibility_reject')
                 && !str_contains($name, 'asymmetric_probes_profile')) {
                 continue;
             }

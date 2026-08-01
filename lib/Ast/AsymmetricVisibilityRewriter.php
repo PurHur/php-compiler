@@ -83,7 +83,9 @@ final class AsymmetricVisibilityRewriter
             if (self::lineViolatesMultipleSetModifierRulesForReferenceProfile($line)) {
                 return $lineNum;
             }
-            if (self::lineViolatesStaticAsymmetricSetRules($line)) {
+            // Static aviz is PHP 8.5+ (#26239); ≤8.4 still treat read+set on static as fatal (#7013).
+            if (!CompilerVersion::supportsStaticAsymmetricVisibility()
+                && self::lineViolatesStaticAsymmetricSetRules($line)) {
                 return $lineNum;
             }
         }
@@ -375,6 +377,7 @@ final class AsymmetricVisibilityRewriter
         return (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
             .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
+            .'(?P<static>(?:static\s+)?)'
             .'(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*'
             .'(?P<readAfter>(?:(?:public|protected|private)\s+)?)/i',
             static function (array $m): string {
@@ -392,7 +395,8 @@ final class AsymmetricVisibilityRewriter
                     $readPrefix = self::implicitReadPrefixForBareSetModifier($set);
                 }
 
-                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix;
+                // Preserve leading `static` (`public static private(set)`); trailing static stays after match (#26239).
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$explicitReadMarker.$readPrefix.$m['static'];
             },
             $source
         );
@@ -707,13 +711,17 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
+     * Static properties reject asymmetric visibility with an explicit read modifier before PHP 8.5 (#7013).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); public read with private set on static is fatal
-     * (Multiple access type modifiers are not allowed). private set on static alone remains valid (#6769).
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); on ≤8.4 public read with private set on
+     * static is fatal (Multiple access type modifiers are not allowed). PHP 8.5 adds static aviz
+     * (RFC static-aviz, #26239) — skip this reject when {@see CompilerVersion::supportsStaticAsymmetricVisibility()}.
      */
     private static function rejectAsymmetricSetOnStaticProperty(string $source): void
     {
+        if (CompilerVersion::supportsStaticAsymmetricVisibility()) {
+            return;
+        }
         if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
             return;
         }
