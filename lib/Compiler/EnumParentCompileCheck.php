@@ -11,9 +11,13 @@ use PHPCfg\Script;
 use PHPCompiler\Cfg\OpSubBlockAccess;
 
 /**
- * Compile-time check: parent:: when current class scope has no parent (#5410, #7381).
+ * Compile-time check: parent:: / parent type atom when current class scope has no parent
+ * (#5410, #7381, #26540).
  *
- * php-src: Zend/zend_compile.c — parent fetch when current scope has no parent
+ * php-src: Zend/zend_compile.c — parent fetch / type resolve when current scope has no parent
+ *
+ * Traits keep a literal `parent` type keyword (Zend leaves it unresolved until use-site) and
+ * are intentionally not scanned here.
  */
 final class EnumParentCompileCheck
 {
@@ -24,21 +28,28 @@ final class EnumParentCompileCheck
         $check = new self();
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Enum_) {
-                $check->validateScopeWithoutParent($child);
+                $check->validateScopeWithoutParent($child, true);
             } elseif ($child instanceof Op\Stmt\Class_ && null === $child->extends) {
-                $check->validateScopeWithoutParent($child);
-            } elseif ($child instanceof Op\Stmt\Interface_ && [] === $child->extends) {
-                $check->validateScopeWithoutParent($child);
+                $check->validateScopeWithoutParent($child, true);
+            } elseif ($child instanceof Op\Stmt\Interface_) {
+                // `parent` type atoms are always illegal on interfaces; `parent::` in const
+                // expressions is allowed when the interface extends another (#5410 vs Zend).
+                $check->validateScopeWithoutParent($child, [] === $child->extends);
             }
         }
     }
 
-    private function validateScopeWithoutParent(Op\Stmt\ClassLike $class): void
+    private function validateScopeWithoutParent(Op\Stmt\ClassLike $class, bool $rejectParentExpr): void
     {
         foreach ($class->stmts->children as $member) {
             if ($member instanceof Op\Stmt\ClassMethod) {
-                $this->validateMethod($member);
+                $this->validateMethod($member, $rejectParentExpr);
+            } elseif ($member instanceof Op\Stmt\Property) {
+                $this->rejectParentInType($member->declaredType, $member);
             } elseif ($member instanceof Op\Terminal\Const_) {
+                if (!$rejectParentExpr) {
+                    continue;
+                }
                 $valueBlock = $member->valueBlock;
                 if (null !== $valueBlock && [] !== $valueBlock->children) {
                     $this->walkCfg($valueBlock);
@@ -47,13 +58,35 @@ final class EnumParentCompileCheck
         }
     }
 
-    private function validateMethod(Op\Stmt\ClassMethod $method): void
+    private function validateMethod(Op\Stmt\ClassMethod $method, bool $rejectParentExpr): void
     {
-        $cfg = $method->func->cfg;
+        $func = $method->func;
+        $this->rejectParentInType($func->returnType, $method);
+        foreach ($func->params as $param) {
+            if ($param instanceof Op\Expr\Param) {
+                $this->rejectParentInType($param->declaredType, $param);
+            }
+        }
+        if (!$rejectParentExpr) {
+            return;
+        }
+        $cfg = $func->cfg;
         if (null === $cfg || [] === $cfg->children) {
             return;
         }
         $this->walkCfg($cfg);
+    }
+
+    private function rejectParentInType(?Op\Type $type, Op $op): void
+    {
+        if (!PseudoClassTypeHintCompileCheck::containsKeyword($type, 'parent')) {
+            return;
+        }
+        throw new CompileFatal(
+            $op->getFile(),
+            max(1, $op->getLine()),
+            self::MESSAGE
+        );
     }
 
     private function walkCfg(CfgBlock $entry): void

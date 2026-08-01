@@ -64,6 +64,78 @@ PHP,
         $this->assertNotNull($block);
     }
 
+    /** @covers issue #26540 */
+    public function testParentUnionTypeInParentlessClassFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(EnumParentCompileCheck::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class A {
+    function f(): parent|int {
+        return 1;
+    }
+}
+PHP,
+            'parent_union_type.php'
+        );
+    }
+
+    /** @covers issue #26540 */
+    public function testParentReturnTypeOnEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(EnumParentCompileCheck::MESSAGE);
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case A;
+    public function f(): parent {
+        return $this;
+    }
+}
+PHP,
+            'enum_parent_type.php'
+        );
+    }
+
+    /** @covers issue #26540 */
+    public function testParentUnionTypeWithParentStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class Base {}
+class A extends Base {
+    function f(): parent|int {
+        return 1;
+    }
+}
+PHP,
+            'parent_union_ok.php'
+        );
+        $this->assertNotNull($block);
+    }
+
+    /** @covers issue #26540 */
+    public function testTraitParentTypeStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+trait T {
+    function f(): parent {
+        return $this;
+    }
+}
+PHP,
+            'trait_parent_type.php'
+        );
+        $this->assertNotNull($block);
+    }
+
     /** @covers issue #7381 */
     public function testParentInParentlessClassMethodFailsAtCompileTime(): void
     {

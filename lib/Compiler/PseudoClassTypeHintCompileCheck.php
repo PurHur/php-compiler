@@ -57,6 +57,35 @@ final class PseudoClassTypeHintCompileCheck
         return null;
     }
 
+    /** True when $keyword appears as a type atom in any union/intersection/nullable arm (#26540). */
+    public static function containsKeyword(?Op\Type $type, string $keyword): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        $want = strtolower($keyword);
+        if ($type instanceof Op\Type\Nullable) {
+            return self::containsKeyword($type->subtype, $want);
+        }
+        if ($type instanceof Op\Type\Union_ || $type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if (self::containsKeyword($member, $want)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($type instanceof Op\Type\Literal) {
+            return $want === self::pseudoClassKeywordFromName($type->name);
+        }
+        if ($type instanceof Op\Type\Reference) {
+            return $want === self::pseudoClassKeywordFromOperand($type->declaration);
+        }
+
+        return false;
+    }
+
     private static function pseudoClassKeywordFromOperand(Operand $op): ?string
     {
         if ($op instanceof Operand\Literal && is_string($op->value)) {

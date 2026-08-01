@@ -52,4 +52,14 @@ final class PseudoClassTypeHintCompileCheckTest extends TestCase
         $type = new Op\Type\Reference($decl);
         self::assertSame('self', PseudoClassTypeHintCompileCheck::findKeyword($type));
     }
+
+    public function testContainsKeywordFindsParentInUnion(): void
+    {
+        $type = new Op\Type\Union_([
+            new Op\Type\Literal('int'),
+            new Op\Type\Reference(new Operand\Literal('parent')),
+        ]);
+        self::assertTrue(PseudoClassTypeHintCompileCheck::containsKeyword($type, 'parent'));
+        self::assertFalse(PseudoClassTypeHintCompileCheck::containsKeyword($type, 'self'));
+    }
 }
