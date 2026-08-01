@@ -748,6 +748,8 @@ final class BuiltinParamNames
             case 'ini_get_all':
                 return ['extension=', 'details='];
             case 'ini_set':
+            case 'ini_alter':
+                // php-src basic_functions.stub.php — ini_alter is PHP_FALIAS of ini_set (#6085, #26465)
                 return ['option', 'value'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says varname (#23568)
             case 'ini_restore':

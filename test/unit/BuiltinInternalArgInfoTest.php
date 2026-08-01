@@ -320,6 +320,31 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('fscanf'));
     }
 
+    /** php-src basic_functions.stub.php — ini_alter alias + string|false (#26465). */
+    public function testIniSetIniAlterReflectionStubTypes(): void
+    {
+        foreach (['ini_set', 'ini_alter'] as $fn) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $this->assertSame('string|int|float|bool|null', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1), $fn);
+            $option = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($option, $fn);
+            $this->assertSame('string', $option['type'], $fn);
+            $this->assertFalse($option['isOptional'], $fn);
+            $value = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($value, $fn);
+            $this->assertSame('string|int|float|bool|null', $value['type'], $fn);
+            $this->assertFalse($value['isOptional'], $fn);
+        }
+        // ini_alter is absent from InternalArgInfo — names come from BuiltinParamNames (#26465).
+        $alterOption = BuiltinInternalArgInfo::paramInfoForFunction('ini_alter', 0);
+        $this->assertNotNull($alterOption);
+        $this->assertSame('option', $alterOption['name']);
+        $alterValue = BuiltinInternalArgInfo::paramInfoForFunction('ini_alter', 1);
+        $this->assertNotNull($alterValue);
+        $this->assertSame('value', $alterValue['name']);
+    }
+
     /** php-src password.stub.php — absent from InternalArgInfo (#23292). */
     public function testPasswordGetInfoNeedsRehashReflectionStubTypes(): void
     {

@@ -99,6 +99,8 @@ final class BuiltinInternalArgInfo
             'ftell' => 'int|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
             'fscanf' => 'array|int|false|null',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false; ini_alter absent (#26465, #26187)
+            'ini_set', 'ini_alter' => 'string|false',
             // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
             'password_get_info' => 'array',
             'password_needs_rehash' => 'bool',
@@ -334,6 +336,12 @@ final class BuiltinInternalArgInfo
             'timezone_identifiers_list' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#25276)
             'ini_get_all' => 0 === $index ? '?string' : null,
+            // ext/standard/basic_functions.stub.php — ini_alter absent; value union (#26465, #26187)
+            'ini_set', 'ini_alter' => match ($index) {
+                0 => 'string',
+                1 => 'string|int|float|bool|null',
+                default => null,
+            },
             // ext/date/php_date.stub.php — hour required; ?int minute…year = null (#25147)
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
