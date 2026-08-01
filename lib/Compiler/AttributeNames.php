@@ -420,6 +420,32 @@ final class AttributeNames
         );
     }
 
+    /**
+     * Drop parameter-only internal attrs from the property side of constructor promotion.
+     *
+     * php-src zend_attributes.c / GH-9420 (#9661): #[\SensitiveParameter] stays on the
+     * parameter; ReflectionProperty must not list it (#26379, re-#20351).
+     *
+     * @param list<AttributeEntry> $entries
+     *
+     * @return list<AttributeEntry>
+     */
+    public static function filterPromotedPropertyAttributeEntries(array $entries): array
+    {
+        $out = [];
+        foreach ($entries as $entry) {
+            if (!$entry instanceof AttributeEntry) {
+                continue;
+            }
+            if (self::isSensitiveParameter([$entry->name])) {
+                continue;
+            }
+            $out[] = $entry;
+        }
+
+        return $out;
+    }
+
     /** True when `#[\ReturnTypeWillChange]` is present (#25722). */
     public static function hasReturnTypeWillChange(array $names): bool
     {

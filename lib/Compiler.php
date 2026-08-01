@@ -8635,14 +8635,19 @@ class Compiler {
         );
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($param);
         $this->assignAttributeMetadata($declare, $param);
+        // GH-9420 / #9661: parameter-only internals (SensitiveParameter) stay on the param,
+        // not ReflectionProperty (#26379, re-#20351). Param metadata still has the full list.
+        $declare->attributeEntries = AttributeNames::filterPromotedPropertyAttributeEntries(
+            $declare->attributeEntries
+        );
+        $declare->attributeNames = AttributeEntry::namesFromList($declare->attributeEntries);
         AttributeTargetValidator::assertPromotedParameterTargets($declare->attributeEntries, $this->attributeClassRegistry);
         AttributeNames::assertAttributeMetaClassTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
         AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
-        // Promoted ctor params keep parameter attribute targets (zend_compile.c / #20351).
-        AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'parameter', $declare->attributeEntries);
-        AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($declare->attributeNames, 'parameter', $declare->attributeEntries);
-        AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'parameter', $declare->attributeEntries);
+        AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
+        AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($declare->attributeNames, 'property', $declare->attributeEntries);
+        AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'property', $declare->attributeEntries);
         $result->addOpCode($declare);
     }
 
