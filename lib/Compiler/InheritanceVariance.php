@@ -433,6 +433,12 @@ final class InheritanceVariance
             return $visErr;
         }
 
+        // Parent by-ref return must be kept on override (zend_inheritance.c, #26530).
+        // Child may add by-ref when the parent returns by-value (Zend accepts that).
+        if ($parent->returnsByRef && !$child->returnsByRef) {
+            return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+        }
+
         if (count($child->params) < count($parent->params)) {
             for ($i = count($child->params); $i < count($parent->params); ++$i) {
                 if (!($parent->paramHasDefault[$i] ?? false)) {
@@ -916,12 +922,16 @@ final class InheritanceVariance
         string $parentClass,
         MethodSig $parent
     ): string {
+        // Zend prefixes `& ` before Class::method when the declaration returns by-ref
+        // (zend_inheritance.c / zend_error, #26530).
         return sprintf(
-            'Declaration of %s::%s(%s)%s must be compatible with %s::%s(%s)%s',
+            'Declaration of %s%s::%s(%s)%s must be compatible with %s%s::%s(%s)%s',
+            $child->returnsByRef ? '& ' : '',
             $childClass,
             $methodLc,
             $child->formatParams(),
             $child->formatReturn(),
+            $parent->returnsByRef ? '& ' : '',
             $parentClass,
             $methodLc,
             $parent->formatParams(),
@@ -995,6 +1005,9 @@ final class MethodSig
     /** Whether the method was declared static (FLAG_STATIC). */
     public bool $isStatic;
 
+    /** Whether declared `function &name()` (FLAG_RETURNS_REF, #26530). */
+    public bool $returnsByRef;
+
     /**
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
@@ -1011,7 +1024,8 @@ final class MethodSig
         int $visibilityFlags = Func::FLAG_PUBLIC,
         bool $isFinal = false,
         array $paramByRef = [],
-        bool $isStatic = false
+        bool $isStatic = false,
+        bool $returnsByRef = false
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -1023,6 +1037,7 @@ final class MethodSig
         $this->visibilityFlags = $visibilityFlags;
         $this->paramByRef = $paramByRef;
         $this->isStatic = $isStatic;
+        $this->returnsByRef = $returnsByRef;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -1045,6 +1060,7 @@ final class MethodSig
 
         $isFinal = 0 !== ($func->flags & Func::FLAG_FINAL);
         $isStatic = 0 !== ($func->flags & Func::FLAG_STATIC);
+        $returnsByRef = 0 !== ($func->flags & Func::FLAG_RETURNS_REF);
 
         return new self(
             $ownerLc,
@@ -1056,7 +1072,8 @@ final class MethodSig
             $visibility,
             $isFinal,
             $byRef,
-            $isStatic
+            $isStatic,
+            $returnsByRef
         );
     }
 
@@ -1135,11 +1152,16 @@ final class MethodSig
         $isAbstract = isset($entry->abstractMethods[$methodLc]) && !isset($entry->methods[$methodLc]);
         $isFinal = 0 !== ($vis & Func::FLAG_FINAL);
         $isStatic = 0 !== ($vis & Func::FLAG_STATIC);
-        // Fallback: CFG Func flags when ClassEntry visibility omitted FLAG_STATIC.
-        if (!$isStatic) {
-            $decl = $entry->methods[$methodLc] ?? $entry->abstractMethods[$methodLc] ?? null;
-            if ($decl instanceof \PHPCompiler\Func\PHP && null !== $decl->block && null !== $decl->block->func) {
-                $isStatic = 0 !== ($decl->block->func->flags & Func::FLAG_STATIC);
+        $returnsByRef = 0 !== ($vis & Func::FLAG_RETURNS_REF);
+        // Fallback: CFG Func flags when ClassEntry visibility omitted FLAG_STATIC / FLAG_RETURNS_REF.
+        $decl = $entry->methods[$methodLc] ?? $entry->abstractMethods[$methodLc] ?? null;
+        if ($decl instanceof \PHPCompiler\Func\PHP && null !== $decl->block && null !== $decl->block->func) {
+            $cfgFlags = $decl->block->func->flags;
+            if (!$isStatic) {
+                $isStatic = 0 !== ($cfgFlags & Func::FLAG_STATIC);
+            }
+            if (!$returnsByRef) {
+                $returnsByRef = 0 !== ($cfgFlags & Func::FLAG_RETURNS_REF);
             }
         }
 
@@ -1153,7 +1175,8 @@ final class MethodSig
             $visibility,
             $isFinal,
             $byRef,
-            $isStatic
+            $isStatic,
+            $returnsByRef
         );
     }
 

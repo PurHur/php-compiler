@@ -555,6 +555,55 @@ PHP;
         $this->assertSame("accepted\n", ob_get_clean());
     }
 
+    /** Zend: dropping by-ref return on override must fatal (#26530, zend_inheritance.c). */
+    public function testByRefReturnDroppedFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function &f(): int { $x = 1; return $x; } }
+class B extends A { public function f(): int { return 1; } }
+echo "accepted\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(): int must be compatible with & A::f(): int');
+        $runtime->parseAndCompile($code, 'byref_ret_drop.php');
+    }
+
+    /** Matching by-ref returns on both sides is accepted (#26530). */
+    public function testMatchingByRefReturnOverrideAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function &f(): int { $x = 1; return $x; } }
+class B extends A { public function &f(): int { $x = 2; return $x; } }
+echo "accepted\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'byref_ret_match.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("accepted\n", ob_get_clean());
+    }
+
+    /** Zend: child may add by-ref return when parent returns by-value (#26530). */
+    public function testByRefReturnAddedOnOverrideAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(): int { return 1; } }
+class B extends A { public function &f(): int { $x = 1; return $x; } }
+echo "accepted\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'byref_ret_add.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("accepted\n", ob_get_clean());
+    }
+
     /** Zend: child cannot narrow a union param (int|string → int) (#25632). */
     public function testUnionParamNarrowFailsAtCompileTime(): void
     {
