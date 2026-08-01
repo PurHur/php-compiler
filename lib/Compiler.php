@@ -7294,6 +7294,21 @@ class Compiler {
         return $type instanceof Op\Type\Literal && 'never' === strtolower($type->name);
     }
 
+    /**
+     * Zend void type node or literal — standalone only (returns / not properties).
+     */
+    protected function cfgTypeIsStandaloneVoid(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Void_) {
+            return true;
+        }
+
+        return $type instanceof Op\Type\Literal && 'void' === strtolower($type->name);
+    }
+
     protected function cfgTypeContainsNever(?Op\Type $type): bool
     {
         if (null === $type) {
@@ -7321,6 +7336,41 @@ class Compiler {
         }
         if ($type instanceof Op\Type\Nullable) {
             return $this->cfgTypeContainsNever($type->subtype);
+        }
+
+        return false;
+    }
+
+    /**
+     * True when void appears anywhere in a declared type tree (union / nullable / intersection).
+     */
+    protected function cfgTypeContainsVoid(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Void_) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Literal && 'void' === strtolower($type->name)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsVoid($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsVoid($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsVoid($type->subtype);
         }
 
         return false;
@@ -7461,11 +7511,20 @@ class Compiler {
     }
 
     /**
-     * Zend zend_handle_property_type — never invalid on properties, including unions (#6967, #7052).
+     * Zend zend_handle_property_type — void/never invalid on properties, including unions
+     * (#6967, #7052, #26518).
      */
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
         $this->assertIntersectionTypeMembers($type);
+        // void before never — Zend capitalizes "Void" in the standalone-only message.
+        if ($this->cfgTypeContainsVoid($type)) {
+            if ($this->cfgTypeIsStandaloneVoid($type)) {
+                $class = $this->compilingClassDisplayName ?? 'class';
+                $this->throwCompileError(sprintf('Property %s::$%s cannot have type void', $class, $propName));
+            }
+            $this->throwCompileError('Void can only be used as a standalone type');
+        }
         if (!$this->cfgTypeContainsNever($type)) {
             return;
         }
