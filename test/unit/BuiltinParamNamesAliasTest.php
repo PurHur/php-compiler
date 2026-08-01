@@ -1867,6 +1867,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, $options->toInt());
     }
 
+    /** @covers issue #23260 */
+    public function testSerializeUnserializeZendStubNamedParamsAndTypes(): void
+    {
+        $ser = BuiltinParamNames::forFunction('serialize');
+        self::assertSame(['value'], $ser);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ser, 'value', 'serialize'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ser, 'variable', 'serialize'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('serialize'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('serialize'));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('serialize', 0));
+
+        $uns = BuiltinParamNames::forFunction('unserialize');
+        self::assertSame(['data', 'options='], $uns);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($uns, 'data', 'unserialize'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($uns, 'options', 'unserialize'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($uns, 'variable_representation', 'unserialize'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($uns, 'allowed_classes', 'unserialize'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('unserialize'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('unserialize'));
+        self::assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('unserialize'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('unserialize', 0));
+        self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('unserialize', 1));
+        $infoOptions = ['name' => 'options', 'type' => 'array', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('unserialize', 1, $infoOptions, false));
+        $options = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($options, 'unserialize', 1, $infoOptions));
+        self::assertSame(Variable::TYPE_ARRAY, $options->type);
+        self::assertSame(0, $options->toArray()->getNumElements());
+    }
+
     /** @covers issue #23446 */
     public function testDateDefaultTimezoneSetZendStubNamedParams(): void
     {

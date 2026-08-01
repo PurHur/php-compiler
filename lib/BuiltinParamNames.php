@@ -850,6 +850,11 @@ final class BuiltinParamNames
             case 'max':
             case 'min':
                 return ['value', 'values'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still variable / variable_representation+allowed_classes (#23260)
+            case 'serialize':
+                return ['value'];
+            case 'unserialize':
+                return ['data', 'options='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo var_names + phantom ... (#23803)
             case 'compact':
                 return ['var_name', 'var_names'];
