@@ -334,7 +334,7 @@ final class VmDateInterval
 
                 return null;
             }
-            [$field, $consumed, $weekFactor] = $unitMatch;
+            [$field, $consumed, $scale] = $unitMatch;
             $pos += $consumed;
 
             switch ($field) {
@@ -345,7 +345,7 @@ final class VmDateInterval
                     $m += $num;
                     break;
                 case 'd':
-                    $d += $num * $weekFactor;
+                    $d += (int) ($num * $scale);
                     break;
                 case 'h':
                     $h += $num;
@@ -355,6 +355,10 @@ final class VmDateInterval
                     break;
                 case 's':
                     $s += $num;
+                    break;
+                case 'f':
+                    // millisecond(s)/ms/msec → 1e-3; microsecond(s)/usec → 1e-6 (#26694)
+                    $f += ((float) $num) * $scale;
                     break;
             }
             $hasValue = true;
@@ -455,10 +459,17 @@ final class VmDateInterval
         return null;
     }
 
-    /** @return array{0: string, 1: int, 2: int}|null field, consumed chars, week multiplier */
+    /**
+     * @return array{0: string, 1: int, 2: float|int}|null field, consumed chars, scale (weeks→d, ms/us→f)
+     */
     private static function matchFromDateStringUnit(string $spec, int $pos): ?array
     {
+        // Longest-first: milliseconds before ms; microseconds before usec (timelib relative units).
         static $units = [
+            'milliseconds' => ['f', 0.001],
+            'millisecond' => ['f', 0.001],
+            'microseconds' => ['f', 0.000001],
+            'microsecond' => ['f', 0.000001],
             'years' => ['y', 1],
             'year' => ['y', 1],
             'months' => ['m', 1],
@@ -473,10 +484,13 @@ final class VmDateInterval
             'minute' => ['i', 1],
             'seconds' => ['s', 1],
             'second' => ['s', 1],
+            'msec' => ['f', 0.001],
+            'usec' => ['f', 0.000001],
+            'ms' => ['f', 0.001],
         ];
         $tail = strtolower(\substr($spec, $pos));
         $best = null;
-        foreach ($units as $word => [$field, $factor]) {
+        foreach ($units as $word => [$field, $scale]) {
             if (!str_starts_with($tail, $word)) {
                 continue;
             }
@@ -485,7 +499,7 @@ final class VmDateInterval
                 continue;
             }
             if (null === $best || \strlen($word) > $best[1]) {
-                $best = [$field, \strlen($word), $factor];
+                $best = [$field, \strlen($word), $scale];
             }
         }
 
