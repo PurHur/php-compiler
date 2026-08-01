@@ -19455,12 +19455,20 @@ restart:
                     $entry->methodNames[$name] = $declaredName;
                     if ([] !== $op->attributeNames) {
                         $entry->methodAttributeNames[$name] = $op->attributeNames;
+                        $hookReflection = \PHPCompiler\SourcePreprocessor\PropertyHooks::reflectionNameFromHookMethod($name);
+                        if (null !== $hookReflection) {
+                            $entry->methodAttributeNames[$hookReflection] = $op->attributeNames;
+                        }
                     }
                     if (null !== $op->deprecatedMetadata) {
                         $entry->methodDeprecated[$name] = $op->deprecatedMetadata;
                     }
                     if ([] !== $op->attributeEntries) {
                         $entry->methodAttributeEntries[$name] = $op->attributeEntries;
+                        $hookReflection = \PHPCompiler\SourcePreprocessor\PropertyHooks::reflectionNameFromHookMethod($name);
+                        if (null !== $hookReflection) {
+                            $entry->methodAttributeEntries[$hookReflection] = $op->attributeEntries;
+                        }
                     }
                     if ([] !== $op->parameterMetadata) {
                         $entry->methodParameterMetadata[$name] = $op->parameterMetadata;
