@@ -268,11 +268,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('stream_get_contents', 1));
     }
 
-    /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511). */
+    /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511, #26342). */
     public function testGzencodeGzdecodeReflectionReturnUnions(): void
     {
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzencode'));
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gzdecode'));
+    }
+
+    /** php-src zlib.stub.php — InternalArgInfo omits |false (#26342). */
+    public function testGzcompressFamilyReflectionReturnUnions(): void
+    {
+        foreach (['gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate'] as $fn) {
+            $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn));
+        }
     }
 
     /** php-src base64.c / string.stub.php — InternalArgInfo omits |false (#25477). */
