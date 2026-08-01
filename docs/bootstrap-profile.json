@@ -4887,6 +4887,7 @@
         "lib/Compiler.php",
         "lib/Compiler/AbstractMethodBodyCheck.php",
         "lib/Compiler/AbstractMethodVisibilityCheck.php",
+        "lib/Compiler/AbstractPromotedPropertyCompileCheck.php",
         "lib/Compiler/AsymmetricVisibilityCompileCheck.php",
         "lib/Compiler/AttributeClassRegistry.php",
         "lib/Compiler/AttributeConstantEvaluator.php",

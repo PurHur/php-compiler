@@ -48,6 +48,7 @@ use PHPCompiler\Ast\GeneratorYieldSourceMarker;
 use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\Compiler\AbstractMethodBodyCheck;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\AbstractPromotedPropertyCompileCheck;
 use PHPCompiler\Compiler\InterfaceConstAmbiguityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceMethodBodyCheck;
@@ -627,6 +628,7 @@ class Compiler {
         ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly, $this->propertyHookRegistry);
         AsymmetricVisibilityCompileCheck::validate($script);
         VariadicPromotedPropertyCompileCheck::validate($script);
+        AbstractPromotedPropertyCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
         GeneratorNeverReturnCompileCheck::validate($script);
 
@@ -6533,7 +6535,7 @@ class Compiler {
         return $result;
     }
 
-    protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result): void
+    protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result, ?int $declaringType = null): void
     {
         $this->registerMethodDeclaration($child->func->name);
         foreach ($child->func->params as $param) {
@@ -6542,8 +6544,22 @@ class Compiler {
             $this->assertParamDeclaredType($param->declaredType, $methodBlock, $child->func);
         }
         if ('__construct' === $child->func->name) {
+            // php-src Zend/zend_compile.c — promotion requires a concrete constructor body (#26529).
+            $abstractCtor = OpCode::TYPE_DECLARE_INTERFACE === $declaringType
+                || 0 !== ($child->func->flags & CfgFunc::FLAG_ABSTRACT);
             foreach ($child->func->params as $param) {
                 if ($this->isPromotedParam($param)) {
+                    if ($abstractCtor) {
+                        $sourceFile = $child->getFile();
+                        if ('' === $sourceFile) {
+                            $sourceFile = 'unknown';
+                        }
+                        throw new CompileFatal(
+                            $sourceFile,
+                            max(1, $child->getLine()),
+                            AbstractPromotedPropertyCompileCheck::MESSAGE
+                        );
+                    }
                     $this->compilePromotedPropertyDeclaration($param, $result);
                 }
             }
@@ -8194,7 +8210,7 @@ class Compiler {
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
-                    $this->compileClassMethodDeclaration($child, $result);
+                    $this->compileClassMethodDeclaration($child, $result, $type);
                     break;
                 case Op\Terminal\Const_::class:
                     if (
