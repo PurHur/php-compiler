@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -55,6 +56,10 @@ final class StringSymlink
             return;
         }
 
+        // Restore caller insert block after bridge emit (#19283 / #26323) — clearInsertionPosition
+        // left the user-script builder detached ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, 'symlink-jit-php');
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -71,10 +76,15 @@ final class StringSymlink
 
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, 'symlink-jit-php');
         $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0), $fn->getParam(1)]);
-        $bool = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
+        // NestedJIT may box bool as __value__; coerceHelperScalarResult leaves it as always-false (#20652 / #26323).
+        $bool = JitNestedHelperCoerce::extractBoolFromHelperResult($context, $raw);
         $context->builder->returnValue($bool);
 
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
