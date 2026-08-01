@@ -42248,6 +42248,11 @@ class Compiler {
      */
     protected function declaredClassHasInstanceMethod(string $lcClass, string $methodLc, Block $block): bool
     {
+        $methodLc = strtolower($methodLc);
+        // Prefer ClassCompileRegistry — class stmts are hoisted into other CFG blocks (#26426).
+        if ($this->classCompileRegistry->hasMethod($lcClass, $methodLc)) {
+            return true;
+        }
         if (null === $block->orig) {
             return false;
         }
@@ -42579,9 +42584,15 @@ class Compiler {
     protected function newExprHasInvokeMethod(Op\Expr\New_ $new, Block $block): bool
     {
         $className = $this->literalScopeClassName($new->class);
+        // Named classes: registry sees decls hoisted out of try/catch CFG blocks (#26426).
+        if (null !== $className && '' !== $className
+            && $this->classCompileRegistry->hasMethod($className, '__invoke')) {
+            return true;
+        }
         if (null === $className || null === $block->orig) {
             return false;
         }
+        // Same-block fallback (anonymous `new class { function __invoke… }` / #10176).
         foreach ($block->orig->children as $child) {
             if (!$child instanceof Op\Stmt\Class_) {
                 continue;
