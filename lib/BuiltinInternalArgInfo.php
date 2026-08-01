@@ -87,6 +87,10 @@ final class BuiltinInternalArgInfo
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
             'file_get_contents', 'fread', 'fgets' => 'string|false',
             'file_put_contents', 'fwrite' => 'int|false',
+            // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
+            'filesize', 'filemtime' => 'int|false',
+            'glob', 'scandir' => 'array|false',
+            'realpath' => 'string|false',
             // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511)
             'gzencode', 'gzdecode' => 'string|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)

@@ -216,6 +216,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('file_put_contents', 1));
     }
 
+    /** php-src file.stub.php — InternalArgInfo omits |false for filestat/glob (#26185). */
+    public function testFilestatGlobReflectionReturnUnions(): void
+    {
+        foreach (['filesize', 'filemtime'] as $f) {
+            $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        foreach (['glob', 'scandir'] as $f) {
+            $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('realpath'));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511). */
     public function testGzencodeGzdecodeReflectionReturnUnions(): void
     {
