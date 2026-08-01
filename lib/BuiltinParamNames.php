@@ -1341,6 +1341,9 @@ final class BuiltinParamNames
                 return ['callback', 'args'];
             case 'call_user_func_array':
                 return ['callback', 'args'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still function/parameters (#26237)
+            case 'forward_static_call_array':
+                return ['callback', 'args'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
             case 'get_class':
