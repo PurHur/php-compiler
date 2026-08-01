@@ -227,6 +227,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_living_register_node_class.phpt',
             'dom_living_register_node_class.phpt'
         );
+        yield 'dom_html_createempty_empty.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_html_createempty_empty.phpt',
+            'dom_html_createempty_empty.phpt'
+        );
         yield 'dom_document_schema_validate_arity_message.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_document_schema_validate_arity_message.phpt',
             'dom_document_schema_validate_arity_message.phpt'

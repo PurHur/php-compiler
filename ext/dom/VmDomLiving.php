@@ -287,18 +287,53 @@ final class VmDomLiving
         return $var;
     }
 
+    /**
+     * Dom\HTMLDocument::createEmpty() — php-src ext/dom/html_document.c (#26035).
+     *
+     * Yields a document with no doctype and no documentElement (unlike
+     * {@see createHTMLDocument()}, which seeds html/head/body).
+     */
     public static function createEmpty(Context $ctx, string $encoding = 'UTF-8'): Variable
     {
-        if ('' === $encoding) {
-            throw new \ValueError('Dom\\HTMLDocument::createEmpty(): Argument #1 ($encoding) must not be empty');
+        self::assertValidDocumentEncoding(
+            $encoding,
+            'Dom\\HTMLDocument::createEmpty()',
+            1,
+            'encoding'
+        );
+
+        $document = self::allocateHtmlDocument($ctx);
+        $state = DomRegistry::state($document);
+        $state->encoding = $encoding;
+        if ($document->hasProperty(VmDom::PROP_ENCODING)) {
+            $document->getProperty(VmDom::PROP_ENCODING)->string($encoding);
         }
 
-        return self::createFromString(
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($document);
+
+        return $var;
+    }
+
+    /**
+     * Dom\Implementation::createHTMLDocument() — php-src ext/dom/domimplementation.c (#20898, #26035).
+     *
+     * Seeds doctype + html/head/(optional title)/body. Distinct from {@see createEmpty()}.
+     */
+    public static function createHTMLDocument(Context $ctx, ?string $title = null): Variable
+    {
+        // Skeleton matches WHATWG createHTMLDocument / php-src Dom_Implementation::createHTMLDocument.
+        $docVar = self::createFromString(
             $ctx,
             '<!DOCTYPE html><html><head></head><body></body></html>',
             0,
-            $encoding
+            'UTF-8'
         );
+        if (null !== $title) {
+            self::setHtmlDocumentTitle($ctx, $docVar->toObject(), $title);
+        }
+
+        return $docVar;
     }
 
     /**
@@ -660,7 +695,7 @@ final class VmDomLiving
     /**
      * Dom\XMLDocument::createEmpty() — php-src ext/dom/xml_document.c (#19581).
      *
-     * Unlike HTMLDocument::createEmpty(), this yields a document with no root element.
+     * Like {@see createEmpty()}, yields a document with no root element.
      */
     public static function createXmlEmpty(
         Context $ctx,

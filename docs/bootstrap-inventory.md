@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6654 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21463 |
+| Source constructs flagged (warnings) | 21464 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -493,7 +493,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 48 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 20 |
+| `ext/dom/VmDomLiving.php` | 0 | 21 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 17 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -10079,20 +10079,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 248)
 - new DOMException (line 281)
 - new Variable (line 284)
-- new DOMException (line 324)
-- new DOMException (line 420)
-- new DOMException (line 425)
-- new DOMException (line 432)
-- new DOMException (line 463)
-- new DOMException (line 475)
-- new Exception (line 622)
-- new DOMException (line 648)
-- new Variable (line 654)
-- new Variable (line 688)
-- new ObjectEntry (line 1391)
-- new HashTable (line 1415)
-- new Variable (line 1417)
-- 58 class method(s)
+- new Variable (line 312)
+- new DOMException (line 359)
+- new DOMException (line 455)
+- new DOMException (line 460)
+- new DOMException (line 467)
+- new DOMException (line 498)
+- new DOMException (line 510)
+- new Exception (line 657)
+- new DOMException (line 683)
+- new Variable (line 689)
+- new Variable (line 723)
+- new ObjectEntry (line 1426)
+- new HashTable (line 1450)
+- new Variable (line 1452)
+- 59 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
