@@ -334,6 +334,54 @@ final class ssh2_methods_negotiated extends Ssh2Function
     }
 }
 
+/**
+ * ssh2_auth_agent(resource $session, string $username): bool
+ *
+ * Authenticate via local ssh-agent (PECL ssh2_auth_agent; #26713).
+ */
+final class ssh2_auth_agent extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_auth_agent');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_auth_agent() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_auth_agent', 1);
+        $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_auth_agent', 2, 'username');
+        if ('' === $user) {
+            throw new \ValueError('ssh2_auth_agent(): Argument #2 ($username) must not be empty');
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_auth_agent(): Failure initializing ssh-agent support', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $result = VmSsh2Native::authAgent($native, $user);
+        if (true === $result) {
+            VmSsh2Session::markAuthed($session);
+            $frame->returnVar->bool(true);
+
+            return;
+        }
+        @\trigger_error('ssh2_auth_agent(): '.(string) $result, \E_USER_WARNING);
+        $frame->returnVar->bool(false);
+    }
+}
+
 final class ssh2_auth_pubkey_file extends Ssh2Function
 {
     public function __construct()
