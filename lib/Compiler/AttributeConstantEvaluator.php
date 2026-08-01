@@ -16,7 +16,7 @@ use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\VM\Variable;
 
 /**
- * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725, #26030, #26627).
+ * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725, #26030, #26627, #26628).
  *
  * php-src: zend_compile_attribute / zend_ast_evaluate constant expression rules (subset).
  */
@@ -24,6 +24,16 @@ final class AttributeConstantEvaluator
 {
     /** Compilation-unit path for folding `__DIR__` / `__FILE__` in attribute args (#26030). */
     private static string $scriptFile = '';
+
+    /**
+     * Userland file/namespace `const` values keyed by lowercase FQCN (#26628).
+     *
+     * @var array<string, mixed>
+     */
+    private static array $userlandConsts = [];
+
+    /** Current namespace (no leading `\`) for relative ConstFetch resolution (#26628). */
+    private static string $currentNamespace = '';
 
     /**
      * @template T
@@ -41,6 +51,37 @@ final class AttributeConstantEvaluator
         } finally {
             self::$scriptFile = $prev;
         }
+    }
+
+    /**
+     * Supply compile-unit userland consts + declaring namespace for ConstFetch folding (#26628).
+     *
+     * @param array<string, mixed> $userlandConsts lowercase FQCN => scalar
+     *
+     * @template T
+     *
+     * @param callable(): T $fn
+     *
+     * @return T
+     */
+    public static function withUserlandConstContext(array $userlandConsts, string $namespace, callable $fn): mixed
+    {
+        $prevConsts = self::$userlandConsts;
+        $prevNs = self::$currentNamespace;
+        self::$userlandConsts = $userlandConsts;
+        self::$currentNamespace = ltrim($namespace, '\\');
+        try {
+            return $fn();
+        } finally {
+            self::$userlandConsts = $prevConsts;
+            self::$currentNamespace = $prevNs;
+        }
+    }
+
+    /** Convert a folded VM Variable into a PHP scalar for attribute metadata storage. */
+    public static function phpScalarFromVariable(Variable $var): mixed
+    {
+        return self::variableToPhpScalar($var);
     }
 
     /**
@@ -143,7 +184,10 @@ final class AttributeConstantEvaluator
     }
 
     /**
-     * Built-in / stdlib ConstFetch — mirrors Compiler::tryFoldGlobalConstFetch (#26030).
+     * Built-in / stdlib / userland ConstFetch — mirrors Compiler::tryFoldGlobalConstFetch (#26030, #26628).
+     *
+     * php-src zend_compile.c: relative names try current namespace then global; FQ / use-aliased
+     * names are already absolute after NameResolver.
      */
     private static function evalConstFetch(Expr\ConstFetch $expr): mixed
     {
@@ -186,9 +230,56 @@ final class AttributeConstantEvaluator
             return $stdlibStr;
         }
 
+        $userland = self::lookupUserlandConst($expr);
+        if (null !== $userland) {
+            return $userland;
+        }
+
         throw new \LogicException(
             'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
         );
+    }
+
+    /**
+     * Resolve userland `const` / namespaced ConstFetch for attribute args (#26628).
+     *
+     * Returns null when the name is not a known compile-time userland const (caller rejects).
+     */
+    private static function lookupUserlandConst(Expr\ConstFetch $expr): mixed
+    {
+        if ([] === self::$userlandConsts) {
+            return null;
+        }
+
+        foreach (self::userlandConstLookupCandidates($expr) as $candidate) {
+            $lc = strtolower(ltrim($candidate, '\\'));
+            if (array_key_exists($lc, self::$userlandConsts)) {
+                return self::$userlandConsts[$lc];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function userlandConstLookupCandidates(Expr\ConstFetch $expr): array
+    {
+        $name = $expr->name;
+        $written = $name->toString();
+        if ($name instanceof Node\Name\FullyQualified) {
+            return [$written];
+        }
+
+        // Relative / unqualified: current namespace first, then global (zend_compile.c).
+        $candidates = [];
+        if ('' !== self::$currentNamespace) {
+            $candidates[] = self::$currentNamespace.'\\'.$written;
+        }
+        $candidates[] = $written;
+
+        return $candidates;
     }
 
     private static function variableToPhpScalar(Variable $var): mixed
