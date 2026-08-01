@@ -168,6 +168,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('json_encode', 0));
     }
 
+    /** php-src ext/json/json.stub.php — PHP 8.3+ json_validate; absent from InternalArgInfo (#26211). */
+    public function testJsonValidateReflectionStubTypes(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('json_validate'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('json_validate', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('json_validate', 1));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('json_validate', 2));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('json_validate', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('json', $info['name']);
+        $this->assertSame('string', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $depth = BuiltinInternalArgInfo::paramInfoForFunction('json_validate', 1);
+        $this->assertNotNull($depth);
+        $this->assertSame('depth', $depth['name']);
+        $this->assertSame('int', $depth['type']);
+        $this->assertTrue($depth['isOptional']);
+    }
+
     /** php-src ext/curl/curl.stub.php — CurlHandle stubs; InternalArgInfo still resource/ch (#26186). */
     public function testCurlEasyReflectionStubTypes(): void
     {

@@ -109,6 +109,8 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
+            // ext/json/json.stub.php — PHP 8.3+; InternalArgInfo omits function entirely (#26211)
+            'json_validate' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo return int; Zend bool (#26107)
             'curl_multi_setopt' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo resource / empty; Zend CurlHandle|false / void (#26186)
@@ -364,6 +366,12 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
+            // ext/json/json.stub.php — string $json, int $depth, int $flags (#26211, re-#23876)
+            'json_validate' => match ($index) {
+                0 => 'string',
+                1, 2 => 'int',
+                default => null,
+            },
             // ext/curl/curl.stub.php — CurlHandle / CurlMultiHandle + mixed $value (#26107, #26186)
             // InternalArgInfo still has resource url, untyped ch/mh/value, and return int on curl_multi_setopt.
             'curl_init' => 0 === $index ? '?string' : null,
