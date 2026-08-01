@@ -2591,6 +2591,37 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'array_change_key_case'));
     }
 
+    /** @covers issue #23274 */
+    public function testArrayKeysValuesUniqueFlipZendStubNamedParams(): void
+    {
+        $keys = BuiltinParamNames::forFunction('array_keys');
+        self::assertSame(['array', 'filter_value=', 'strict='], $keys);
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('array_keys'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_keys'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($keys, 'array', 'array_keys'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($keys, 'filter_value', 'array_keys'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($keys, 'strict', 'array_keys'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($keys, 'input', 'array_keys'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($keys, 'search_value', 'array_keys'));
+
+        foreach (['array_values', 'array_flip'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array'], $names);
+            self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', $fn));
+        }
+
+        $unique = BuiltinParamNames::forFunction('array_unique');
+        self::assertSame(['array', 'flags='], $unique);
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('array_unique'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_unique'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($unique, 'array', 'array_unique'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($unique, 'flags', 'array_unique'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($unique, 'input', 'array_unique'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($unique, 'sort_flags', 'array_unique'));
+    }
+
     /** @covers issue #23460 */
     public function testEscapeshellZendStubNamedParams(): void
     {
