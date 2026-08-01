@@ -17,9 +17,9 @@ final class ReflectionClassIsInstantiable extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        [, $entry] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
+        [, $entry, $ctx] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(ReflectionSupport::reflectionClassIsInstantiable($entry));
+            $frame->returnVar->bool(ReflectionSupport::reflectionClassIsInstantiable($entry, $ctx));
         }
     }
 }

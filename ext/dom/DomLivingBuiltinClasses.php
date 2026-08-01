@@ -99,6 +99,8 @@ final class DomLivingBuiltinClasses
         $nsInfo->properties[] = new ClassProperty(VmDomLiving::PROP_NAMESPACE_INFO_PREFIX, $nullProto, $strProto);
         $nsInfo->properties[] = new ClassProperty(VmDomLiving::PROP_NAMESPACE_INFO_NAMESPACE_URI, $nullProto, $strProto);
         $nsInfo->properties[] = new ClassProperty(VmDomLiving::PROP_NAMESPACE_INFO_ELEMENT, $nullProto, $objProto);
+        // php-src php_dom.stub.php — private __construct (#26059).
+        self::installPrivateConstruct($nsInfo, false);
         $ctx->classes[VmDomLiving::CLASS_NAMESPACE_INFO] = $nsInfo;
 
         // Dom\Implementation — Document::$implementation (php-src php_dom.stub.php; #20898, #20910).
@@ -124,6 +126,10 @@ final class DomLivingBuiltinClasses
             $node->properties[] = new ClassProperty(VmDom::PROP_IS_CONNECTED, null, new Variable(Variable::TYPE_BOOLEAN));
         }
         self::copyMethods($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
+        // php-src php_dom.stub.php — private final function __construct() (#26059).
+        // Subclasses inherit this via parentLc; copyMethods skips __construct so legacy
+        // public DOMElement/DOMText ctors are not re-advertised on Dom\* leaves.
+        self::installPrivateConstruct($node, true);
         $ctx->classes[VmDomLiving::CLASS_NODE] = $node;
 
         // Dom\DocumentType — living doctype nodes (php-src php_dom.stub.php; #20910).
@@ -359,6 +365,8 @@ final class DomLivingBuiltinClasses
             $tokenList->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
             $tokenList->properties[] = new ClassProperty(VmDom::PROP_VALUE, null, new Variable(Variable::TYPE_STRING));
             self::copyMethods($ctx->classes[VmDom::CLASS_TOKEN_LIST] ?? null, $tokenList);
+            // php-src php_dom.stub.php — private __construct (not final; #26059).
+            self::installPrivateConstruct($tokenList, false);
             $ctx->classes[VmDomLiving::CLASS_TOKEN_LIST] = $tokenList;
         }
 
@@ -405,6 +413,8 @@ final class DomLivingBuiltinClasses
 
         $document = new ClassEntry('Dom\\Document');
         $document->isInternal = true;
+        // php-src php_dom.stub.php — abstract class Dom\Document (#26059).
+        $document->isAbstract = true;
         $document->parentLc = VmDomLiving::CLASS_NODE;
         $document->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
         $document->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
@@ -535,6 +545,25 @@ final class DomLivingBuiltinClasses
         }
     }
 
+    /**
+     * Install Dom\ non-user-constructible __construct (php-src php_dom.stub.php; #26059).
+     *
+     * @param bool $final true → private final (Dom\Node); false → private only (TokenList / NamespaceInfo)
+     */
+    private static function installPrivateConstruct(ClassEntry $entry, bool $final): void
+    {
+        $ctor = new LivingPrivateConstruct();
+        $vis = CfgFunc::FLAG_PRIVATE;
+        if ($final) {
+            $vis |= CfgFunc::FLAG_FINAL;
+        }
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $vis;
+        $entry->methodNames['__construct'] = '__construct';
+        $entry->methodDeclaringClassLc['__construct'] = strtolower($entry->name);
+    }
+
     /** Share classic DOM* method handlers with living Dom\* types (#20418). */
     private static function copyMethods(?ClassEntry $from, ClassEntry $to): void
     {
@@ -542,6 +571,10 @@ final class DomLivingBuiltinClasses
             return;
         }
         foreach ($from->methods as $lc => $method) {
+            // Never copy legacy public __construct onto Dom\* — Node's private final wins (#26059).
+            if ('__construct' === $lc) {
+                continue;
+            }
             if (isset($to->methods[$lc])) {
                 continue;
             }
@@ -570,6 +603,9 @@ final class DomLivingBuiltinClasses
             return;
         }
         foreach ($methodLcs as $lc) {
+            if ('__construct' === $lc) {
+                continue;
+            }
             if (!isset($from->methods[$lc]) || isset($to->methods[$lc])) {
                 continue;
             }
