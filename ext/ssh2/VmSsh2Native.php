@@ -127,6 +127,44 @@ final class VmSsh2Native
     }
 
     /**
+     * Hostbased public-key auth from files (PECL ssh2_auth_hostbased_file; #26714).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function authHostbasedFromFile(
+        \FFI\CData $session,
+        string $username,
+        string $hostname,
+        string $pubkeyFile,
+        string $privkeyFile,
+        ?string $passphrase,
+        string $localUsername
+    ): bool {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $rc = $ffi->libssh2_userauth_hostbased_fromfile_ex(
+                $session,
+                $username,
+                \strlen($username),
+                $pubkeyFile,
+                $privkeyFile,
+                $passphrase,
+                $hostname,
+                \strlen($hostname),
+                $localUsername,
+                \strlen($localUsername)
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return 0 === $rc;
+    }
+
+    /**
      * Authenticate via local ssh-agent (PECL ssh2_auth_agent; #26713).
      *
      * Mirrors pecl-networking-ssh2 `PHP_FUNCTION(ssh2_auth_agent)`:
