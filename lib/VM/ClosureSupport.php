@@ -685,6 +685,21 @@ final class ClosureSupport
                 $fromCallableApi
             );
         }
+        // `parent::m(...)` from a static method: compiler may still emit [$this, m] with a
+        // null/unset $this (#26252). Resolve as parent static callable (Zend Error if non-static).
+        if ($parentScope) {
+            $parentLc = self::resolveClassScopeName('parent', $frame, $ctx);
+            if (!isset($ctx->classes[$parentLc])) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+
+            return self::fromStaticStringCallable(
+                $ctx,
+                $frame,
+                $ctx->classes[$parentLc]->name.'::'.$methodName,
+                $fromCallableApi
+            );
+        }
 
         throw new \LogicException(
             'Closure::fromCallable(): Argument #1 ($callback) must be a valid callback'
