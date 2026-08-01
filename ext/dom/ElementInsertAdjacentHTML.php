@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMElement::insertAdjacentHTML() — PHP 8.4 Living Standard HTML insertion (php-src ext/dom/dom_element.c; #16128). */
+/** DOMElement::insertAdjacentHTML() — PHP 8.5+ HTML insertion (php-src ext/dom/php_dom.stub.php; #26063, re-#16128). */
 final class ElementInsertAdjacentHTML extends DomClassMethod
 {
     public function __construct()

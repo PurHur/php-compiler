@@ -3714,9 +3714,24 @@ final class CompilerVersionGateTest extends TestCase
     public function testSupportsDomElementInsertAdjacentHtmlOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $this->assertTrue(CompilerVersion::supportsDomElementInsertAdjacentHtml());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomElementInsertAdjacentHtmlWithheldOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomElementInsertAdjacentHtml());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -3807,12 +3822,36 @@ final class CompilerVersionGateTest extends TestCase
     public function testVmRegistersDomElementInsertAdjacentHtmlOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $runtime = new Runtime();
             $element = $runtime->vmContext->classes['domelement'] ?? null;
             $this->assertNotNull($element);
             $this->assertTrue(isset($element->methods['insertadjacenthtml']));
+            $living = $runtime->vmContext->classes['dom\\element'] ?? null;
+            $this->assertNotNull($living);
+            $this->assertTrue(isset($living->methods['insertadjacenthtml']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmWithholdsDomElementInsertAdjacentHtmlOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $element = $runtime->vmContext->classes['domelement'] ?? null;
+            $this->assertNotNull($element);
+            $this->assertFalse(isset($element->methods['insertadjacenthtml']));
+            $living = $runtime->vmContext->classes['dom\\element'] ?? null;
+            $this->assertNotNull($living);
+            $this->assertFalse(isset($living->methods['insertadjacenthtml']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
