@@ -523,6 +523,8 @@ class Runtime {
         DollarBraceStringDeprecation::emitForSource($code, $filename, $this->vmContext);
         // Original source — switch `case;` / `default;` before comma-case rewrite (#26279).
         SwitchCaseSemicolonDeprecation::emitForSource($code, $filename, $this->vmContext);
+        // Original source — backtick shell-exec before CFG rewrites to shell_exec() (#26280).
+        BacktickShellExecDeprecation::emitForSource($code, $filename, $this->vmContext);
         [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);

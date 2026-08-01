@@ -339,6 +339,9 @@ patch_already_applied() {
       grep -q 'function parseExpr_YieldFrom' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php" ]]
       ;;
+    php-cfg-shell-exec.overlay)
+      grep -q 'function parseExpr_ShellExec' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-asymmetric-visibility.patch)
       grep -q 'public int \$setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
         && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
@@ -828,6 +831,47 @@ parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-cfg yield-from overlay"
 }
+
+# Backtick shell-exec → shell_exec() FuncCall (upstream php-cfg + prelinked; #26280).
+apply_php_cfg_shell_exec_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if patch_already_applied "$PATCH_DIR/php-cfg-shell-exec.overlay"; then
+    echo "Skip php-cfg shell-exec overlay (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/shell-exec-parser-method.php" ]]; then
+    echo "Skip php-cfg shell-exec overlay (overlay files missing)" >&2
+    return 1
+  fi
+  python3 - "$parser" "$overlay/shell-exec-parser-method.php" <<'PYINNER'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+
+if 'function parseExpr_ShellExec' in text:
+    raise SystemExit(0)
+
+anchor = """    protected function parseExpr_YieldFrom(Expr\YieldFrom $expr)
+    {
+        $inner = $this->readVariable($this->parseExprNode($expr->expr));
+
+        return new Op\Expr\YieldFrom($inner, $this->mapAttributes($expr));
+    }
+"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-shell-exec: parseExpr_YieldFrom anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+parser_path.write_text(text.replace(anchor, anchor + "\n" + insert, 1))
+PYINNER
+  echo "Applied php-cfg shell-exec overlay (#26280)"
+}
+
 
 # Vendor may ship promotionSetVisibility on Param without promotionFlags (#1492 partial vendor).
 apply_php_cfg_ctor_promotion_overlay() {
@@ -6770,6 +6814,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-asymmetric-visibility.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_php_cfg_yield_from_overlay
+  apply_php_cfg_shell_exec_overlay
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"

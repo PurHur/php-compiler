@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6656 |
-| Phase A inventory files (M2 ratio SSOT) | 6656 |
+| PHP files on vm.php path | 6657 |
+| Phase A inventory files (M2 ratio SSOT) | 6657 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21468 |
+| Source constructs flagged (warnings) | 21471 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4751,6 +4751,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/TypedFunctionStaticRewriter.php` | 0 | 1 |
 | `lib/Ast/VoidCastDesugar.php` | 0 | 2 |
 | `lib/AsymmetricVisibilityRejector.php` | 0 | 6 |
+| `lib/BacktickShellExecDeprecation.php` | 0 | 3 |
 | `lib/BareThrowSyntaxRejector.php` | 0 | 2 |
 | `lib/Block.php` | 0 | 17 |
 | `lib/BuiltinByRefParams.php` | 0 | 1 |
@@ -41715,6 +41716,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileFatal (line 75)
 - 3 class method(s)
 
+### `lib/BacktickShellExecDeprecation.php`
+
+**Warnings** (review for bootstrap subset):
+- new Block (line 93)
+- new Frame (line 94)
+- 3 class method(s)
+
 ### `lib/BareThrowSyntaxRejector.php`
 
 **Warnings** (review for bootstrap subset):
@@ -42763,7 +42771,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 284 class method(s)
+- 285 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -48898,11 +48906,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassPreprocessor (line 388)
 - new StaticClassPreprocessor (line 391)
 - new SourcePreprocessor\PropertyHooks (line 394)
-- new State (line 540)
-- new ReflectionProperty (line 567)
-- new ReflectionProperty (line 570)
-- new LintCompiler (line 982)
-- new Variable (line 1112)
+- new State (line 542)
+- new ReflectionProperty (line 569)
+- new ReflectionProperty (line 572)
+- new LintCompiler (line 984)
+- new Variable (line 1114)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
