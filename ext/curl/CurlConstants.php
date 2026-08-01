@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 /**
- * curl extension constants (php-src ext/curl/curl.stub.php; issue #6999, #3325, #21137, #21336, #22837).
+ * curl extension constants (php-src ext/curl/curl.stub.php; issue #6999, #3325, #21137, #21336, #22837, #24132).
  *
  * CURLOPT_RETURNTRANSFER / CURLOPT_BINARYTRANSFER / CURLOPT_SAFE_UPLOAD are PHP-level
  * options (not forwarded to libcurl). Values match Zend/php-src + libcurl curl.h.
  *
+ * Registration advertises the full Zend 8.2 stub surface (CURLAUTH_*, CURLE_*, CURLALTSVC_*, ...).
  * PHP 8.4-only option/info names are gated via {@see CurlExtensionPolicy::advertisesPhp84OptionConstants()}
  * so defined() matches Zend 8.2 on the reference profile (#22837).
+ * Intentional advertisement delta vs Zend: CURLOPT_ERRORBUFFER (FFI path / #25814).
  */
 final class CurlConstants
 {
@@ -254,6 +256,453 @@ final class CurlConstants
     public const CURL_LOCK_DATA_PSL = 6;
     public const CURL_LOCK_DATA_SSL_SESSION = 4;
 
+    // Zend 8.2.32 stub surface previously unregistered (#24132 — CURLAUTH_, CURLE_, CURLALTSVC_, ...).
+    public const CURLALTSVC_H1 = 8;
+    public const CURLALTSVC_H2 = 16;
+    public const CURLALTSVC_H3 = 32;
+    public const CURLALTSVC_READONLYFILE = 4;
+    public const CURLAUTH_ANY = -17;
+    public const CURLAUTH_ANYSAFE = -18;
+    public const CURLAUTH_AWS_SIGV4 = 128;
+    public const CURLAUTH_BASIC = 1;
+    public const CURLAUTH_BEARER = 64;
+    public const CURLAUTH_DIGEST = 2;
+    public const CURLAUTH_DIGEST_IE = 16;
+    public const CURLAUTH_GSSAPI = 4;
+    public const CURLAUTH_GSSNEGOTIATE = 4;
+    public const CURLAUTH_NEGOTIATE = 4;
+    public const CURLAUTH_NONE = 0;
+    public const CURLAUTH_NTLM = 8;
+    public const CURLAUTH_NTLM_WB = 32;
+    public const CURLAUTH_ONLY = 2147483648;
+    public const CURLE_ABORTED_BY_CALLBACK = 42;
+    public const CURLE_BAD_CALLING_ORDER = 44;
+    public const CURLE_BAD_CONTENT_ENCODING = 61;
+    public const CURLE_BAD_DOWNLOAD_RESUME = 36;
+    public const CURLE_BAD_FUNCTION_ARGUMENT = 43;
+    public const CURLE_BAD_PASSWORD_ENTERED = 46;
+    public const CURLE_COULDNT_CONNECT = 7;
+    public const CURLE_COULDNT_RESOLVE_HOST = 6;
+    public const CURLE_COULDNT_RESOLVE_PROXY = 5;
+    public const CURLE_FAILED_INIT = 2;
+    public const CURLE_FILESIZE_EXCEEDED = 63;
+    public const CURLE_FILE_COULDNT_READ_FILE = 37;
+    public const CURLE_FTP_ACCESS_DENIED = 9;
+    public const CURLE_FTP_BAD_DOWNLOAD_RESUME = 36;
+    public const CURLE_FTP_CANT_GET_HOST = 15;
+    public const CURLE_FTP_CANT_RECONNECT = 16;
+    public const CURLE_FTP_COULDNT_GET_SIZE = 32;
+    public const CURLE_FTP_COULDNT_RETR_FILE = 19;
+    public const CURLE_FTP_COULDNT_SET_ASCII = 29;
+    public const CURLE_FTP_COULDNT_SET_BINARY = 17;
+    public const CURLE_FTP_COULDNT_STOR_FILE = 25;
+    public const CURLE_FTP_COULDNT_USE_REST = 31;
+    public const CURLE_FTP_PARTIAL_FILE = 18;
+    public const CURLE_FTP_PORT_FAILED = 30;
+    public const CURLE_FTP_QUOTE_ERROR = 21;
+    public const CURLE_FTP_SSL_FAILED = 64;
+    public const CURLE_FTP_USER_PASSWORD_INCORRECT = 10;
+    public const CURLE_FTP_WEIRD_227_FORMAT = 14;
+    public const CURLE_FTP_WEIRD_PASS_REPLY = 11;
+    public const CURLE_FTP_WEIRD_PASV_REPLY = 13;
+    public const CURLE_FTP_WEIRD_SERVER_REPLY = 8;
+    public const CURLE_FTP_WEIRD_USER_REPLY = 12;
+    public const CURLE_FTP_WRITE_ERROR = 20;
+    public const CURLE_FUNCTION_NOT_FOUND = 41;
+    public const CURLE_GOT_NOTHING = 52;
+    public const CURLE_HTTP_NOT_FOUND = 22;
+    public const CURLE_HTTP_PORT_FAILED = 45;
+    public const CURLE_HTTP_POST_ERROR = 34;
+    public const CURLE_HTTP_RANGE_ERROR = 33;
+    public const CURLE_HTTP_RETURNED_ERROR = 22;
+    public const CURLE_LDAP_CANNOT_BIND = 38;
+    public const CURLE_LDAP_INVALID_URL = 62;
+    public const CURLE_LDAP_SEARCH_FAILED = 39;
+    public const CURLE_LIBRARY_NOT_FOUND = 40;
+    public const CURLE_MALFORMAT_USER = 24;
+    public const CURLE_OBSOLETE = 50;
+    public const CURLE_OPERATION_TIMEDOUT = 28;
+    public const CURLE_OPERATION_TIMEOUTED = 28;
+    public const CURLE_OUT_OF_MEMORY = 27;
+    public const CURLE_PARTIAL_FILE = 18;
+    public const CURLE_PROXY = 97;
+    public const CURLE_READ_ERROR = 26;
+    public const CURLE_RECV_ERROR = 56;
+    public const CURLE_SEND_ERROR = 55;
+    public const CURLE_SHARE_IN_USE = 57;
+    public const CURLE_SSH = 79;
+    public const CURLE_SSL_CACERT = 60;
+    public const CURLE_SSL_CACERT_BADFILE = 77;
+    public const CURLE_SSL_CERTPROBLEM = 58;
+    public const CURLE_SSL_CIPHER = 59;
+    public const CURLE_SSL_CONNECT_ERROR = 35;
+    public const CURLE_SSL_ENGINE_NOTFOUND = 53;
+    public const CURLE_SSL_ENGINE_SETFAILED = 54;
+    public const CURLE_SSL_PEER_CERTIFICATE = 60;
+    public const CURLE_SSL_PINNEDPUBKEYNOTMATCH = 90;
+    public const CURLE_TELNET_OPTION_SYNTAX = 49;
+    public const CURLE_TOO_MANY_REDIRECTS = 47;
+    public const CURLE_UNKNOWN_TELNET_OPTION = 48;
+    public const CURLE_UNSUPPORTED_PROTOCOL = 1;
+    public const CURLE_URL_MALFORMAT = 3;
+    public const CURLE_URL_MALFORMAT_USER = 4;
+    public const CURLE_WEIRD_SERVER_REPLY = 8;
+    public const CURLE_WRITE_ERROR = 23;
+    public const CURLFTPAUTH_DEFAULT = 0;
+    public const CURLFTPAUTH_SSL = 1;
+    public const CURLFTPAUTH_TLS = 2;
+    public const CURLFTPMETHOD_DEFAULT = 0;
+    public const CURLFTPMETHOD_MULTICWD = 1;
+    public const CURLFTPMETHOD_NOCWD = 2;
+    public const CURLFTPMETHOD_SINGLECWD = 3;
+    public const CURLFTPSSL_ALL = 3;
+    public const CURLFTPSSL_CCC_ACTIVE = 2;
+    public const CURLFTPSSL_CCC_NONE = 0;
+    public const CURLFTPSSL_CCC_PASSIVE = 1;
+    public const CURLFTPSSL_CONTROL = 2;
+    public const CURLFTPSSL_NONE = 0;
+    public const CURLFTPSSL_TRY = 1;
+    public const CURLFTP_CREATE_DIR = 1;
+    public const CURLFTP_CREATE_DIR_NONE = 0;
+    public const CURLFTP_CREATE_DIR_RETRY = 2;
+    public const CURLGSSAPI_DELEGATION_FLAG = 2;
+    public const CURLGSSAPI_DELEGATION_POLICY_FLAG = 1;
+    public const CURLHEADER_SEPARATE = 1;
+    public const CURLHEADER_UNIFIED = 0;
+    public const CURLHSTS_ENABLE = 1;
+    public const CURLHSTS_READONLYFILE = 2;
+    public const CURLINFO_APPCONNECT_TIME = 3145761;
+    public const CURLINFO_APPCONNECT_TIME_T = 6291512;
+    public const CURLINFO_CERTINFO = 4194338;
+    public const CURLINFO_CONDITION_UNMET = 2097187;
+    public const CURLINFO_CONNECT_TIME_T = 6291508;
+    public const CURLINFO_CONTENT_LENGTH_DOWNLOAD_T = 6291471;
+    public const CURLINFO_CONTENT_LENGTH_UPLOAD_T = 6291472;
+    public const CURLINFO_COOKIELIST = 4194332;
+    public const CURLINFO_FILETIME_T = 6291470;
+    public const CURLINFO_FTP_ENTRY_PATH = 1048606;
+    public const CURLINFO_HTTPAUTH_AVAIL = 2097175;
+    public const CURLINFO_HTTP_CONNECTCODE = 2097174;
+    public const CURLINFO_HTTP_VERSION = 2097198;
+    public const CURLINFO_LASTONE = 62;
+    public const CURLINFO_NAMELOOKUP_TIME_T = 6291507;
+    public const CURLINFO_NUM_CONNECTS = 2097178;
+    public const CURLINFO_OS_ERRNO = 2097177;
+    public const CURLINFO_PRETRANSFER_TIME_T = 6291509;
+    public const CURLINFO_PRIVATE = 1048597;
+    public const CURLINFO_PROTOCOL = 2097200;
+    public const CURLINFO_PROXYAUTH_AVAIL = 2097176;
+    public const CURLINFO_PROXY_ERROR = 2097211;
+    public const CURLINFO_PROXY_SSL_VERIFYRESULT = 2097199;
+    public const CURLINFO_REDIRECT_TIME_T = 6291511;
+    public const CURLINFO_RTSP_CLIENT_CSEQ = 2097189;
+    public const CURLINFO_RTSP_CSEQ_RECV = 2097191;
+    public const CURLINFO_RTSP_SERVER_CSEQ = 2097190;
+    public const CURLINFO_RTSP_SESSION_ID = 1048612;
+    public const CURLINFO_SCHEME = 1048625;
+    public const CURLINFO_SIZE_DOWNLOAD_T = 6291464;
+    public const CURLINFO_SIZE_UPLOAD_T = 6291463;
+    public const CURLINFO_SPEED_DOWNLOAD_T = 6291465;
+    public const CURLINFO_SPEED_UPLOAD_T = 6291466;
+    public const CURLINFO_SSL_ENGINES = 4194331;
+    public const CURLINFO_STARTTRANSFER_TIME_T = 6291510;
+    public const CURLINFO_TOTAL_TIME_T = 6291506;
+    public const CURLMOPT_PUSHFUNCTION = 20014;
+    public const CURLOPT_ABSTRACT_UNIX_SOCKET = 10264;
+    public const CURLOPT_ACCEPTTIMEOUT_MS = 212;
+    public const CURLOPT_ADDRESS_SCOPE = 171;
+    public const CURLOPT_APPEND = 50;
+    public const CURLOPT_CRLF = 27;
+    public const CURLOPT_CRLFILE = 10169;
+    public const CURLOPT_DIRLISTONLY = 48;
+    public const CURLOPT_DISALLOW_USERNAME_IN_URL = 278;
+    public const CURLOPT_DNS_INTERFACE = 10221;
+    public const CURLOPT_DNS_LOCAL_IP4 = 10222;
+    public const CURLOPT_DNS_LOCAL_IP6 = 10223;
+    public const CURLOPT_DNS_SHUFFLE_ADDRESSES = 275;
+    public const CURLOPT_DNS_USE_GLOBAL_CACHE = 91;
+    public const CURLOPT_DOH_SSL_VERIFYHOST = 307;
+    public const CURLOPT_DOH_SSL_VERIFYPEER = 306;
+    public const CURLOPT_DOH_SSL_VERIFYSTATUS = 308;
+    public const CURLOPT_DOH_URL = 10279;
+    public const CURLOPT_EGDSOCKET = 10077;
+    public const CURLOPT_FNMATCH_FUNCTION = 20200;
+    public const CURLOPT_FTPAPPEND = 50;
+    public const CURLOPT_FTPLISTONLY = 48;
+    public const CURLOPT_FTPPORT = 10017;
+    public const CURLOPT_FTPSSLAUTH = 129;
+    public const CURLOPT_FTP_ACCOUNT = 10134;
+    public const CURLOPT_FTP_ALTERNATIVE_TO_USER = 10147;
+    public const CURLOPT_FTP_CREATE_MISSING_DIRS = 110;
+    public const CURLOPT_FTP_FILEMETHOD = 138;
+    public const CURLOPT_FTP_SKIP_PASV_IP = 137;
+    public const CURLOPT_FTP_SSL = 119;
+    public const CURLOPT_FTP_SSL_CCC = 154;
+    public const CURLOPT_FTP_USE_EPRT = 106;
+    public const CURLOPT_FTP_USE_EPSV = 85;
+    public const CURLOPT_FTP_USE_PRET = 188;
+    public const CURLOPT_GSSAPI_DELEGATION = 210;
+    public const CURLOPT_HEADEROPT = 229;
+    public const CURLOPT_HTTP09_ALLOWED = 285;
+    public const CURLOPT_HTTP200ALIASES = 10104;
+    public const CURLOPT_HTTP_CONTENT_DECODING = 158;
+    public const CURLOPT_HTTP_TRANSFER_DECODING = 157;
+    public const CURLOPT_IGNORE_CONTENT_LENGTH = 136;
+    public const CURLOPT_ISSUERCERT = 10170;
+    public const CURLOPT_ISSUERCERT_BLOB = 40295;
+    public const CURLOPT_KEEP_SENDING_ON_ERROR = 245;
+    public const CURLOPT_KRB4LEVEL = 10063;
+    public const CURLOPT_KRBLEVEL = 10063;
+    public const CURLOPT_LOCALPORTRANGE = 140;
+    public const CURLOPT_LOGIN_OPTIONS = 10224;
+    public const CURLOPT_MAIL_AUTH = 10217;
+    public const CURLOPT_MAIL_FROM = 10186;
+    public const CURLOPT_MAIL_RCPT = 10187;
+    public const CURLOPT_MAIL_RCPT_ALLLOWFAILS = 290;
+    public const CURLOPT_MAXAGE_CONN = 288;
+    public const CURLOPT_MAXLIFETIME_CONN = 314;
+    public const CURLOPT_MAX_RECV_SPEED_LARGE = 30146;
+    public const CURLOPT_MAX_SEND_SPEED_LARGE = 30145;
+    public const CURLOPT_NETRC = 51;
+    public const CURLOPT_NETRC_FILE = 10118;
+    public const CURLOPT_NEW_DIRECTORY_PERMS = 160;
+    public const CURLOPT_NEW_FILE_PERMS = 159;
+    public const CURLOPT_NOPROXY = 10177;
+    public const CURLOPT_NOSIGNAL = 99;
+    public const CURLOPT_PINNEDPUBLICKEY = 10230;
+    public const CURLOPT_POSTQUOTE = 10039;
+    public const CURLOPT_PREQUOTE = 10093;
+    public const CURLOPT_PRE_PROXY = 10262;
+    public const CURLOPT_PROXYHEADER = 10228;
+    public const CURLOPT_PROXYPASSWORD = 10176;
+    public const CURLOPT_PROXYUSERNAME = 10175;
+    public const CURLOPT_PROXY_CAINFO = 10246;
+    public const CURLOPT_PROXY_CAINFO_BLOB = 40310;
+    public const CURLOPT_PROXY_CAPATH = 10247;
+    public const CURLOPT_PROXY_CRLFILE = 10260;
+    public const CURLOPT_PROXY_ISSUERCERT = 10296;
+    public const CURLOPT_PROXY_ISSUERCERT_BLOB = 40297;
+    public const CURLOPT_PROXY_KEYPASSWD = 10258;
+    public const CURLOPT_PROXY_PINNEDPUBLICKEY = 10263;
+    public const CURLOPT_PROXY_SERVICE_NAME = 10235;
+    public const CURLOPT_PROXY_SSLCERT = 10254;
+    public const CURLOPT_PROXY_SSLCERTTYPE = 10255;
+    public const CURLOPT_PROXY_SSLCERT_BLOB = 40293;
+    public const CURLOPT_PROXY_SSLKEY = 10256;
+    public const CURLOPT_PROXY_SSLKEYTYPE = 10257;
+    public const CURLOPT_PROXY_SSLKEY_BLOB = 40294;
+    public const CURLOPT_PROXY_SSLVERSION = 250;
+    public const CURLOPT_PROXY_SSL_CIPHER_LIST = 10259;
+    public const CURLOPT_PROXY_SSL_OPTIONS = 261;
+    public const CURLOPT_PROXY_SSL_VERIFYHOST = 249;
+    public const CURLOPT_PROXY_SSL_VERIFYPEER = 248;
+    public const CURLOPT_PROXY_TLS13_CIPHERS = 10277;
+    public const CURLOPT_PROXY_TLSAUTH_PASSWORD = 10252;
+    public const CURLOPT_PROXY_TLSAUTH_TYPE = 10253;
+    public const CURLOPT_PROXY_TLSAUTH_USERNAME = 10251;
+    public const CURLOPT_PROXY_TRANSFER_MODE = 166;
+    public const CURLOPT_QUOTE = 10028;
+    public const CURLOPT_RANDOM_FILE = 10076;
+    public const CURLOPT_READDATA = 10009;
+    public const CURLOPT_REQUEST_TARGET = 10266;
+    public const CURLOPT_RESOLVE = 10203;
+    public const CURLOPT_RTSP_CLIENT_CSEQ = 193;
+    public const CURLOPT_RTSP_REQUEST = 189;
+    public const CURLOPT_RTSP_SERVER_CSEQ = 194;
+    public const CURLOPT_RTSP_SESSION_ID = 10190;
+    public const CURLOPT_RTSP_STREAM_URI = 10191;
+    public const CURLOPT_RTSP_TRANSPORT = 10192;
+    public const CURLOPT_SASL_AUTHZID = 10289;
+    public const CURLOPT_SASL_IR = 218;
+    public const CURLOPT_SERVICE_NAME = 10236;
+    public const CURLOPT_SOCKS5_AUTH = 267;
+    public const CURLOPT_SOCKS5_GSSAPI_NEC = 180;
+    public const CURLOPT_SOCKS5_GSSAPI_SERVICE = 10179;
+    public const CURLOPT_SSH_AUTH_TYPES = 151;
+    public const CURLOPT_SSH_COMPRESSION = 268;
+    public const CURLOPT_SSH_HOST_PUBLIC_KEY_MD5 = 10162;
+    public const CURLOPT_SSH_HOST_PUBLIC_KEY_SHA256 = 10311;
+    public const CURLOPT_SSH_KNOWNHOSTS = 10183;
+    public const CURLOPT_SSH_PRIVATE_KEYFILE = 10153;
+    public const CURLOPT_SSH_PUBLIC_KEYFILE = 10152;
+    public const CURLOPT_SSLCERTPASSWD = 10026;
+    public const CURLOPT_SSLCERT_BLOB = 40291;
+    public const CURLOPT_SSLENGINE = 10089;
+    public const CURLOPT_SSLENGINE_DEFAULT = 90;
+    public const CURLOPT_SSLKEYPASSWD = 10026;
+    public const CURLOPT_SSLKEY_BLOB = 40292;
+    public const CURLOPT_SSL_EC_CURVES = 10298;
+    public const CURLOPT_SSL_ENABLE_ALPN = 226;
+    public const CURLOPT_SSL_ENABLE_NPN = 225;
+    public const CURLOPT_SSL_FALSESTART = 233;
+    public const CURLOPT_SSL_OPTIONS = 216;
+    public const CURLOPT_SSL_SESSIONID_CACHE = 150;
+    public const CURLOPT_SSL_VERIFYSTATUS = 232;
+    public const CURLOPT_STREAM_WEIGHT = 239;
+    public const CURLOPT_SUPPRESS_CONNECT_HEADERS = 265;
+    public const CURLOPT_TCP_FASTOPEN = 244;
+    public const CURLOPT_TELNETOPTIONS = 10070;
+    public const CURLOPT_TFTP_BLKSIZE = 178;
+    public const CURLOPT_TFTP_NO_OPTIONS = 242;
+    public const CURLOPT_TIMECONDITION = 33;
+    public const CURLOPT_TIMEVALUE = 34;
+    public const CURLOPT_TIMEVALUE_LARGE = 30270;
+    public const CURLOPT_TLSAUTH_PASSWORD = 10205;
+    public const CURLOPT_TLSAUTH_TYPE = 10206;
+    public const CURLOPT_TLSAUTH_USERNAME = 10204;
+    public const CURLOPT_TRANSFERTEXT = 53;
+    public const CURLOPT_TRANSFER_ENCODING = 207;
+    public const CURLOPT_UPLOAD_BUFFERSIZE = 280;
+    public const CURLOPT_USE_SSL = 119;
+    public const CURLOPT_WILDCARDMATCH = 197;
+    public const CURLOPT_WRITEHEADER = 10029;
+    public const CURLOPT_XFERINFOFUNCTION = 20219;
+    public const CURLOPT_XOAUTH2_BEARER = 10220;
+    public const CURLPIPE_HTTP1 = 1;
+    public const CURLPIPE_MULTIPLEX = 2;
+    public const CURLPIPE_NOTHING = 0;
+    public const CURLPROTO_ALL = -1;
+    public const CURLPROTO_DICT = 512;
+    public const CURLPROTO_FILE = 1024;
+    public const CURLPROTO_FTP = 4;
+    public const CURLPROTO_FTPS = 8;
+    public const CURLPROTO_GOPHER = 33554432;
+    public const CURLPROTO_HTTP = 1;
+    public const CURLPROTO_HTTPS = 2;
+    public const CURLPROTO_IMAP = 4096;
+    public const CURLPROTO_IMAPS = 8192;
+    public const CURLPROTO_LDAP = 128;
+    public const CURLPROTO_LDAPS = 256;
+    public const CURLPROTO_MQTT = 268435456;
+    public const CURLPROTO_POP3 = 16384;
+    public const CURLPROTO_POP3S = 32768;
+    public const CURLPROTO_RTMP = 524288;
+    public const CURLPROTO_RTMPE = 2097152;
+    public const CURLPROTO_RTMPS = 8388608;
+    public const CURLPROTO_RTMPT = 1048576;
+    public const CURLPROTO_RTMPTE = 4194304;
+    public const CURLPROTO_RTMPTS = 16777216;
+    public const CURLPROTO_RTSP = 262144;
+    public const CURLPROTO_SCP = 16;
+    public const CURLPROTO_SFTP = 32;
+    public const CURLPROTO_SMB = 67108864;
+    public const CURLPROTO_SMBS = 134217728;
+    public const CURLPROTO_SMTP = 65536;
+    public const CURLPROTO_SMTPS = 131072;
+    public const CURLPROTO_TELNET = 64;
+    public const CURLPROTO_TFTP = 2048;
+    public const CURLPROXY_HTTP = 0;
+    public const CURLPROXY_HTTPS = 2;
+    public const CURLPROXY_HTTP_1_0 = 1;
+    public const CURLPROXY_SOCKS4 = 4;
+    public const CURLPROXY_SOCKS4A = 6;
+    public const CURLPROXY_SOCKS5 = 5;
+    public const CURLPROXY_SOCKS5_HOSTNAME = 7;
+    public const CURLPX_BAD_ADDRESS_TYPE = 1;
+    public const CURLPX_BAD_VERSION = 2;
+    public const CURLPX_CLOSED = 3;
+    public const CURLPX_GSSAPI = 4;
+    public const CURLPX_GSSAPI_PERMSG = 5;
+    public const CURLPX_GSSAPI_PROTECTION = 6;
+    public const CURLPX_IDENTD = 7;
+    public const CURLPX_IDENTD_DIFFER = 8;
+    public const CURLPX_LONG_HOSTNAME = 9;
+    public const CURLPX_LONG_PASSWD = 10;
+    public const CURLPX_LONG_USER = 11;
+    public const CURLPX_NO_AUTH = 12;
+    public const CURLPX_OK = 0;
+    public const CURLPX_RECV_ADDRESS = 13;
+    public const CURLPX_RECV_AUTH = 14;
+    public const CURLPX_RECV_CONNECT = 15;
+    public const CURLPX_RECV_REQACK = 16;
+    public const CURLPX_REPLY_ADDRESS_TYPE_NOT_SUPPORTED = 17;
+    public const CURLPX_REPLY_COMMAND_NOT_SUPPORTED = 18;
+    public const CURLPX_REPLY_CONNECTION_REFUSED = 19;
+    public const CURLPX_REPLY_GENERAL_SERVER_FAILURE = 20;
+    public const CURLPX_REPLY_HOST_UNREACHABLE = 21;
+    public const CURLPX_REPLY_NETWORK_UNREACHABLE = 22;
+    public const CURLPX_REPLY_NOT_ALLOWED = 23;
+    public const CURLPX_REPLY_TTL_EXPIRED = 24;
+    public const CURLPX_REPLY_UNASSIGNED = 25;
+    public const CURLPX_REQUEST_FAILED = 26;
+    public const CURLPX_RESOLVE_HOST = 27;
+    public const CURLPX_SEND_AUTH = 28;
+    public const CURLPX_SEND_CONNECT = 29;
+    public const CURLPX_SEND_REQUEST = 30;
+    public const CURLPX_UNKNOWN_FAIL = 31;
+    public const CURLPX_UNKNOWN_MODE = 32;
+    public const CURLPX_USER_REJECTED = 33;
+    public const CURLSSH_AUTH_AGENT = 16;
+    public const CURLSSH_AUTH_ANY = -1;
+    public const CURLSSH_AUTH_DEFAULT = -1;
+    public const CURLSSH_AUTH_GSSAPI = 32;
+    public const CURLSSH_AUTH_HOST = 4;
+    public const CURLSSH_AUTH_KEYBOARD = 8;
+    public const CURLSSH_AUTH_NONE = 0;
+    public const CURLSSH_AUTH_PASSWORD = 2;
+    public const CURLSSH_AUTH_PUBLICKEY = 1;
+    public const CURLSSLOPT_ALLOW_BEAST = 1;
+    public const CURLSSLOPT_AUTO_CLIENT_CERT = 32;
+    public const CURLSSLOPT_NATIVE_CA = 16;
+    public const CURLSSLOPT_NO_PARTIALCHAIN = 4;
+    public const CURLSSLOPT_NO_REVOKE = 2;
+    public const CURLSSLOPT_REVOKE_BEST_EFFORT = 8;
+    public const CURLUSESSL_ALL = 3;
+    public const CURLUSESSL_CONTROL = 2;
+    public const CURLUSESSL_NONE = 0;
+    public const CURLUSESSL_TRY = 1;
+    public const CURLVERSION_NOW = 10;
+    public const CURL_FNMATCHFUNC_FAIL = 2;
+    public const CURL_FNMATCHFUNC_MATCH = 0;
+    public const CURL_FNMATCHFUNC_NOMATCH = 1;
+    public const CURL_IPRESOLVE_V4 = 1;
+    public const CURL_IPRESOLVE_V6 = 2;
+    public const CURL_IPRESOLVE_WHATEVER = 0;
+    public const CURL_MAX_READ_SIZE = 10485760;
+    public const CURL_NETRC_IGNORED = 0;
+    public const CURL_NETRC_OPTIONAL = 1;
+    public const CURL_NETRC_REQUIRED = 2;
+    public const CURL_PUSH_DENY = 1;
+    public const CURL_PUSH_OK = 0;
+    public const CURL_READFUNC_PAUSE = 268435457;
+    public const CURL_REDIR_POST_301 = 1;
+    public const CURL_REDIR_POST_302 = 2;
+    public const CURL_REDIR_POST_303 = 4;
+    public const CURL_REDIR_POST_ALL = 7;
+    public const CURL_RTSPREQ_ANNOUNCE = 3;
+    public const CURL_RTSPREQ_DESCRIBE = 2;
+    public const CURL_RTSPREQ_GET_PARAMETER = 8;
+    public const CURL_RTSPREQ_OPTIONS = 1;
+    public const CURL_RTSPREQ_PAUSE = 6;
+    public const CURL_RTSPREQ_PLAY = 5;
+    public const CURL_RTSPREQ_RECEIVE = 11;
+    public const CURL_RTSPREQ_RECORD = 10;
+    public const CURL_RTSPREQ_SETUP = 4;
+    public const CURL_RTSPREQ_SET_PARAMETER = 9;
+    public const CURL_RTSPREQ_TEARDOWN = 7;
+    public const CURL_SSLVERSION_DEFAULT = 0;
+    public const CURL_SSLVERSION_MAX_DEFAULT = 65536;
+    public const CURL_SSLVERSION_MAX_NONE = 0;
+    public const CURL_SSLVERSION_MAX_TLSv1_0 = 262144;
+    public const CURL_SSLVERSION_MAX_TLSv1_1 = 327680;
+    public const CURL_SSLVERSION_MAX_TLSv1_2 = 393216;
+    public const CURL_SSLVERSION_MAX_TLSv1_3 = 458752;
+    public const CURL_SSLVERSION_SSLv2 = 2;
+    public const CURL_SSLVERSION_SSLv3 = 3;
+    public const CURL_SSLVERSION_TLSv1 = 1;
+    public const CURL_SSLVERSION_TLSv1_0 = 4;
+    public const CURL_SSLVERSION_TLSv1_1 = 5;
+    public const CURL_SSLVERSION_TLSv1_2 = 6;
+    public const CURL_SSLVERSION_TLSv1_3 = 7;
+    public const CURL_TIMECOND_IFMODSINCE = 1;
+    public const CURL_TIMECOND_IFUNMODSINCE = 2;
+    public const CURL_TIMECOND_LASTMOD = 3;
+    public const CURL_TIMECOND_NONE = 0;
+    public const CURL_TLSAUTH_SRP = 1;
+    public const CURL_VERSION_CURLDEBUG = 8192;
+    public const CURL_VERSION_DEBUG = 64;
+    public const CURL_WRITEFUNC_PAUSE = 268435457;
+
     /** CURL_VERSION_* feature-bit constants (curl.h; php-src curl.stub.php; #21337). */
     public const CURL_VERSION_IPV6 = 1;
     public const CURL_VERSION_KERBEROS4 = 2;
@@ -475,227 +924,59 @@ final class CurlConstants
         return intdiv($option, 10000);
     }
 
+    /**
+     * PHP 8.4-only CURLOPT/CURLINFO names (php-src curl.stub.php; #21336, #22837, #24132).
+     *
+     * Withheld on the 8.2 reference profile so defined() matches Zend 8.2.
+     *
+     * @var list<string>
+     */
+    private const PHP84_OPTION_CONSTANT_NAMES = [
+        'CURL_HTTP_VERSION_3',
+        'CURL_HTTP_VERSION_3ONLY',
+        'CURLINFO_POSTTRANSFER_TIME_T',
+        'CURLINFO_CAINFO',
+        'CURLINFO_CAPATH',
+        'CURLOPT_TCP_KEEPCNT',
+        'CURLOPT_SERVER_RESPONSE_TIMEOUT',
+        'CURLOPT_PREREQFUNCTION',
+        'CURLOPT_DEBUGFUNCTION',
+    ];
+
+    /**
+     * Class consts used by FFI helpers but not present on Zend 8.2 curl.stub.php.
+     * CURLOPT_ERRORBUFFER is advertised anyway (#25814 compliance); CURLOPT_WRITEDATA /
+     * CURLM_UNKNOWN_OPTION stay internal-only (#24132 intentional gaps).
+     *
+     * @var list<string>
+     */
+    private const UNADVERTISED_CLASS_CONSTANTS = [
+        'CURLOPT_WRITEDATA',
+        'CURLM_UNKNOWN_OPTION',
+    ];
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
-        $constants = [
-            'CURLOPT_URL' => self::CURLOPT_URL,
-            'CURLOPT_RETURNTRANSFER' => self::CURLOPT_RETURNTRANSFER,
-            'CURLOPT_POST' => self::CURLOPT_POST,
-            'CURLOPT_HTTPHEADER' => self::CURLOPT_HTTPHEADER,
-            'CURLOPT_SHARE' => self::CURLOPT_SHARE,
-            'CURLOPT_NOBODY' => self::CURLOPT_NOBODY,
-            'CURLE_OK' => self::CURLE_OK,
-            'CURLM_CALL_MULTI_PERFORM' => self::CURLM_CALL_MULTI_PERFORM,
-            'CURLM_OK' => self::CURLM_OK,
-            'CURLM_BAD_HANDLE' => self::CURLM_BAD_HANDLE,
-            'CURLM_BAD_EASY_HANDLE' => self::CURLM_BAD_EASY_HANDLE,
-            'CURLM_OUT_OF_MEMORY' => self::CURLM_OUT_OF_MEMORY,
-            'CURLM_INTERNAL_ERROR' => self::CURLM_INTERNAL_ERROR,
-            'CURLM_ADDED_ALREADY' => self::CURLM_ADDED_ALREADY,
-            'CURLSHOPT_NONE' => self::CURLSHOPT_NONE,
-            'CURLSHOPT_SHARE' => self::CURLSHOPT_SHARE,
-            'CURLSHOPT_UNSHARE' => self::CURLSHOPT_UNSHARE,
-            'CURL_LOCK_DATA_COOKIE' => self::CURL_LOCK_DATA_COOKIE,
-            'CURL_LOCK_DATA_DNS' => self::CURL_LOCK_DATA_DNS,
-            'CURL_LOCK_DATA_SSL_SESSION' => self::CURL_LOCK_DATA_SSL_SESSION,
-            'CURL_LOCK_DATA_CONNECT' => self::CURL_LOCK_DATA_CONNECT,
-            'CURL_LOCK_DATA_PSL' => self::CURL_LOCK_DATA_PSL,
-        ];
-        foreach (self::VERSION_FEATURE_BITS as $name => $value) {
+        $constants = [];
+        $ref = new \ReflectionClass(self::class);
+        foreach ($ref->getReflectionConstants(\ReflectionClassConstant::IS_PUBLIC) as $c) {
+            $value = $c->getValue();
+            if (!\is_int($value)) {
+                continue;
+            }
+            $name = $c->getName();
+            if (\in_array($name, self::UNADVERTISED_CLASS_CONSTANTS, true)) {
+                continue;
+            }
+            if (\in_array($name, self::PHP84_OPTION_CONSTANT_NAMES, true)
+                && !CurlExtensionPolicy::advertisesPhp84OptionConstants()) {
+                continue;
+            }
             $constants[$name] = $value;
         }
-        if (CurlExtensionPolicy::advertisesExtension()) {
-            foreach (self::httpClientConstants() as $name => $value) {
-                $constants[$name] = $value;
-            }
-            // curl_version_info age selector (php-src curl.stub.php / curlver.h; #24099, #24463).
-            $constants['CURLVERSION_NOW'] = VmCurlCore::CURLVERSION_NOW;
-            $constants['CURLINFO_HTTP_CODE'] = self::CURLINFO_HTTP_CODE;
-            $constants['CURLINFO_EFFECTIVE_URL'] = self::CURLINFO_EFFECTIVE_URL;
-            $constants['CURLPAUSE_ALL'] = self::CURLPAUSE_ALL;
-            $constants['CURLPAUSE_CONT'] = self::CURLPAUSE_CONT;
-            $constants['CURLPAUSE_RECV'] = self::CURLPAUSE_RECV;
-            $constants['CURLPAUSE_RECV_CONT'] = self::CURLPAUSE_RECV_CONT;
-            $constants['CURLPAUSE_SEND'] = self::CURLPAUSE_SEND;
-            $constants['CURLPAUSE_SEND_CONT'] = self::CURLPAUSE_SEND_CONT;
-            $constants['CURLMSG_DONE'] = self::CURLMSG_DONE;
-            $constants['CURLMOPT_PIPELINING'] = self::CURLMOPT_PIPELINING;
-            $constants['CURLMOPT_MAXCONNECTS'] = self::CURLMOPT_MAXCONNECTS;
-            $constants['CURLMOPT_MAX_HOST_CONNECTIONS'] = self::CURLMOPT_MAX_HOST_CONNECTIONS;
-            $constants['CURLMOPT_MAX_PIPELINE_LENGTH'] = self::CURLMOPT_MAX_PIPELINE_LENGTH;
-            $constants['CURLMOPT_CONTENT_LENGTH_PENALTY_SIZE'] = self::CURLMOPT_CONTENT_LENGTH_PENALTY_SIZE;
-            $constants['CURLMOPT_CHUNK_LENGTH_PENALTY_SIZE'] = self::CURLMOPT_CHUNK_LENGTH_PENALTY_SIZE;
-            $constants['CURLMOPT_MAX_TOTAL_CONNECTIONS'] = self::CURLMOPT_MAX_TOTAL_CONNECTIONS;
-            $constants['CURLMOPT_MAX_CONCURRENT_STREAMS'] = self::CURLMOPT_MAX_CONCURRENT_STREAMS;
-        }
-
-        return $constants;
-    }
-
-    /**
-     * CURLOPT_* / CURLINFO_* used by common HTTP clients (Guzzle, Symfony HttpClient, …).
-     *
-     * PHP 8.4-only names are appended only when {@see CurlExtensionPolicy::advertisesPhp84OptionConstants()}
-     * (#22837 — withhold phantoms on the 8.2 reference profile).
-     *
-     * @return array<string, int>
-     */
-    private static function httpClientConstants(): array
-    {
-        $constants = [
-            'CURLOPT_TIMEOUT' => self::CURLOPT_TIMEOUT,
-            'CURLOPT_TIMEOUT_MS' => self::CURLOPT_TIMEOUT_MS,
-            'CURLOPT_CONNECTTIMEOUT' => self::CURLOPT_CONNECTTIMEOUT,
-            'CURLOPT_CONNECTTIMEOUT_MS' => self::CURLOPT_CONNECTTIMEOUT_MS,
-            'CURLOPT_FOLLOWLOCATION' => self::CURLOPT_FOLLOWLOCATION,
-            'CURLOPT_MAXREDIRS' => self::CURLOPT_MAXREDIRS,
-            'CURLOPT_POSTFIELDS' => self::CURLOPT_POSTFIELDS,
-            'CURLOPT_USERAGENT' => self::CURLOPT_USERAGENT,
-            'CURLOPT_SSL_VERIFYPEER' => self::CURLOPT_SSL_VERIFYPEER,
-            'CURLOPT_SSL_VERIFYHOST' => self::CURLOPT_SSL_VERIFYHOST,
-            'CURLOPT_CAINFO' => self::CURLOPT_CAINFO,
-            'CURLOPT_CAPATH' => self::CURLOPT_CAPATH,
-            'CURLOPT_COOKIE' => self::CURLOPT_COOKIE,
-            'CURLOPT_COOKIEFILE' => self::CURLOPT_COOKIEFILE,
-            'CURLOPT_COOKIEJAR' => self::CURLOPT_COOKIEJAR,
-            'CURLOPT_COOKIELIST' => self::CURLOPT_COOKIELIST,
-            'CURLOPT_COOKIESESSION' => self::CURLOPT_COOKIESESSION,
-            'CURLOPT_PROXY' => self::CURLOPT_PROXY,
-            'CURLOPT_PROXYPORT' => self::CURLOPT_PROXYPORT,
-            'CURLOPT_PROXYUSERPWD' => self::CURLOPT_PROXYUSERPWD,
-            'CURLOPT_PROXYTYPE' => self::CURLOPT_PROXYTYPE,
-            'CURLOPT_HTTPPROXYTUNNEL' => self::CURLOPT_HTTPPROXYTUNNEL,
-            'CURLOPT_PROXYAUTH' => self::CURLOPT_PROXYAUTH,
-            'CURLOPT_CUSTOMREQUEST' => self::CURLOPT_CUSTOMREQUEST,
-            'CURLOPT_HEADER' => self::CURLOPT_HEADER,
-            'CURLOPT_HTTPGET' => self::CURLOPT_HTTPGET,
-            'CURLOPT_PUT' => self::CURLOPT_PUT,
-            'CURLOPT_UPLOAD' => self::CURLOPT_UPLOAD,
-            'CURLOPT_FILE' => self::CURLOPT_FILE,
-            'CURLOPT_INFILE' => self::CURLOPT_INFILE,
-            'CURLOPT_ERRORBUFFER' => self::CURLOPT_ERRORBUFFER,
-            'CURLOPT_INFILESIZE' => self::CURLOPT_INFILESIZE,
-            'CURLOPT_REFERER' => self::CURLOPT_REFERER,
-            'CURLOPT_ENCODING' => self::CURLOPT_ENCODING,
-            'CURLOPT_ACCEPT_ENCODING' => self::CURLOPT_ACCEPT_ENCODING,
-            'CURLOPT_VERBOSE' => self::CURLOPT_VERBOSE,
-            'CURLOPT_STDERR' => self::CURLOPT_STDERR,
-            'CURLOPT_HTTPAUTH' => self::CURLOPT_HTTPAUTH,
-            'CURLOPT_USERPWD' => self::CURLOPT_USERPWD,
-            'CURLOPT_USERNAME' => self::CURLOPT_USERNAME,
-            'CURLOPT_PASSWORD' => self::CURLOPT_PASSWORD,
-            'CURLOPT_HTTP_VERSION' => self::CURLOPT_HTTP_VERSION,
-            'CURL_HTTP_VERSION_NONE' => self::CURL_HTTP_VERSION_NONE,
-            'CURL_HTTP_VERSION_1_0' => self::CURL_HTTP_VERSION_1_0,
-            'CURL_HTTP_VERSION_1_1' => self::CURL_HTTP_VERSION_1_1,
-            'CURL_HTTP_VERSION_2' => self::CURL_HTTP_VERSION_2,
-            'CURL_HTTP_VERSION_2_0' => self::CURL_HTTP_VERSION_2_0,
-            'CURL_HTTP_VERSION_2TLS' => self::CURL_HTTP_VERSION_2TLS,
-            'CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE' => self::CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE,
-            'CURLOPT_PROTOCOLS' => self::CURLOPT_PROTOCOLS,
-            'CURLOPT_REDIR_PROTOCOLS' => self::CURLOPT_REDIR_PROTOCOLS,
-            'CURLOPT_FRESH_CONNECT' => self::CURLOPT_FRESH_CONNECT,
-            'CURLOPT_FORBID_REUSE' => self::CURLOPT_FORBID_REUSE,
-            'CURLOPT_TCP_NODELAY' => self::CURLOPT_TCP_NODELAY,
-            'CURLOPT_IPRESOLVE' => self::CURLOPT_IPRESOLVE,
-            'CURLOPT_DNS_CACHE_TIMEOUT' => self::CURLOPT_DNS_CACHE_TIMEOUT,
-            'CURLOPT_BUFFERSIZE' => self::CURLOPT_BUFFERSIZE,
-            'CURLOPT_PRIVATE' => self::CURLOPT_PRIVATE,
-            'CURLOPT_NOPROGRESS' => self::CURLOPT_NOPROGRESS,
-            'CURLOPT_LOW_SPEED_LIMIT' => self::CURLOPT_LOW_SPEED_LIMIT,
-            'CURLOPT_LOW_SPEED_TIME' => self::CURLOPT_LOW_SPEED_TIME,
-            'CURLOPT_RESUME_FROM' => self::CURLOPT_RESUME_FROM,
-            'CURLOPT_FAILONERROR' => self::CURLOPT_FAILONERROR,
-            'CURLOPT_RANGE' => self::CURLOPT_RANGE,
-            'CURLOPT_PORT' => self::CURLOPT_PORT,
-            'CURLOPT_AUTOREFERER' => self::CURLOPT_AUTOREFERER,
-            'CURLOPT_SAFE_UPLOAD' => self::CURLOPT_SAFE_UPLOAD,
-            'CURLOPT_BINARYTRANSFER' => self::CURLOPT_BINARYTRANSFER,
-            'CURLOPT_SSLCERT' => self::CURLOPT_SSLCERT,
-            'CURLOPT_SSLCERTTYPE' => self::CURLOPT_SSLCERTTYPE,
-            'CURLOPT_SSLKEY' => self::CURLOPT_SSLKEY,
-            'CURLOPT_SSLKEYTYPE' => self::CURLOPT_SSLKEYTYPE,
-            'CURLOPT_KEYPASSWD' => self::CURLOPT_KEYPASSWD,
-            'CURLOPT_CERTINFO' => self::CURLOPT_CERTINFO,
-            'CURLOPT_INTERFACE' => self::CURLOPT_INTERFACE,
-            'CURLOPT_LOCALPORT' => self::CURLOPT_LOCALPORT,
-            'CURLOPT_UNIX_SOCKET_PATH' => self::CURLOPT_UNIX_SOCKET_PATH,
-            'CURLOPT_POSTREDIR' => self::CURLOPT_POSTREDIR,
-            'CURLOPT_UNRESTRICTED_AUTH' => self::CURLOPT_UNRESTRICTED_AUTH,
-            'CURLOPT_FILETIME' => self::CURLOPT_FILETIME,
-            'CURLOPT_MAXCONNECTS' => self::CURLOPT_MAXCONNECTS,
-            'CURLOPT_SSLVERSION' => self::CURLOPT_SSLVERSION,
-            'CURLOPT_SSL_CIPHER_LIST' => self::CURLOPT_SSL_CIPHER_LIST,
-            'CURLOPT_DNS_SERVERS' => self::CURLOPT_DNS_SERVERS,
-            'CURLOPT_DEFAULT_PROTOCOL' => self::CURLOPT_DEFAULT_PROTOCOL,
-            'CURLOPT_PATH_AS_IS' => self::CURLOPT_PATH_AS_IS,
-            'CURLOPT_PIPEWAIT' => self::CURLOPT_PIPEWAIT,
-            'CURLOPT_TCP_KEEPALIVE' => self::CURLOPT_TCP_KEEPALIVE,
-            'CURLOPT_TCP_KEEPIDLE' => self::CURLOPT_TCP_KEEPIDLE,
-            'CURLOPT_TCP_KEEPINTVL' => self::CURLOPT_TCP_KEEPINTVL,
-            'CURLOPT_UPKEEP_INTERVAL_MS' => self::CURLOPT_UPKEEP_INTERVAL_MS,
-            'CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS' => self::CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS,
-            'CURLOPT_EXPECT_100_TIMEOUT_MS' => self::CURLOPT_EXPECT_100_TIMEOUT_MS,
-            'CURLOPT_CONNECT_TO' => self::CURLOPT_CONNECT_TO,
-            'CURLOPT_TLS13_CIPHERS' => self::CURLOPT_TLS13_CIPHERS,
-            'CURLOPT_CONNECT_ONLY' => self::CURLOPT_CONNECT_ONLY,
-            'CURLOPT_WRITEFUNCTION' => self::CURLOPT_WRITEFUNCTION,
-            'CURLOPT_READFUNCTION' => self::CURLOPT_READFUNCTION,
-            'CURLOPT_PROGRESSFUNCTION' => self::CURLOPT_PROGRESSFUNCTION,
-            'CURLOPT_HEADERFUNCTION' => self::CURLOPT_HEADERFUNCTION,
-            // Zend 8.2 surface missing from earlier registration (#22837 / re-#21336).
-            'CURLOPT_MAXFILESIZE' => self::CURLOPT_MAXFILESIZE,
-            'CURLOPT_MAXFILESIZE_LARGE' => self::CURLOPT_MAXFILESIZE_LARGE,
-            'CURLOPT_HSTS' => self::CURLOPT_HSTS,
-            'CURLOPT_HSTS_CTRL' => self::CURLOPT_HSTS_CTRL,
-            'CURLOPT_ALTSVC' => self::CURLOPT_ALTSVC,
-            'CURLOPT_ALTSVC_CTRL' => self::CURLOPT_ALTSVC_CTRL,
-            'CURLOPT_AWS_SIGV4' => self::CURLOPT_AWS_SIGV4,
-            'CURLOPT_CAINFO_BLOB' => self::CURLOPT_CAINFO_BLOB,
-            'CURLOPT_HAPROXYPROTOCOL' => self::CURLOPT_HAPROXYPROTOCOL,
-            'CURLOPT_FTP_RESPONSE_TIMEOUT' => self::CURLOPT_FTP_RESPONSE_TIMEOUT,
-            'CURLINFO_RESPONSE_CODE' => self::CURLINFO_RESPONSE_CODE,
-            'CURLINFO_TOTAL_TIME' => self::CURLINFO_TOTAL_TIME,
-            'CURLINFO_CONTENT_TYPE' => self::CURLINFO_CONTENT_TYPE,
-            'CURLINFO_EFFECTIVE_METHOD' => self::CURLINFO_EFFECTIVE_METHOD,
-            'CURLINFO_SIZE_DOWNLOAD' => self::CURLINFO_SIZE_DOWNLOAD,
-            'CURLINFO_PRIMARY_IP' => self::CURLINFO_PRIMARY_IP,
-            'CURLINFO_PRIMARY_PORT' => self::CURLINFO_PRIMARY_PORT,
-            'CURLINFO_LOCAL_IP' => self::CURLINFO_LOCAL_IP,
-            'CURLINFO_LOCAL_PORT' => self::CURLINFO_LOCAL_PORT,
-            'CURLINFO_REDIRECT_COUNT' => self::CURLINFO_REDIRECT_COUNT,
-            'CURLINFO_REDIRECT_URL' => self::CURLINFO_REDIRECT_URL,
-            'CURLINFO_HEADER_SIZE' => self::CURLINFO_HEADER_SIZE,
-            'CURLINFO_REQUEST_SIZE' => self::CURLINFO_REQUEST_SIZE,
-            'CURLINFO_SSL_VERIFYRESULT' => self::CURLINFO_SSL_VERIFYRESULT,
-            'CURLINFO_NAMELOOKUP_TIME' => self::CURLINFO_NAMELOOKUP_TIME,
-            'CURLINFO_CONNECT_TIME' => self::CURLINFO_CONNECT_TIME,
-            'CURLINFO_STARTTRANSFER_TIME' => self::CURLINFO_STARTTRANSFER_TIME,
-            'CURLINFO_PRETRANSFER_TIME' => self::CURLINFO_PRETRANSFER_TIME,
-            'CURLINFO_SIZE_UPLOAD' => self::CURLINFO_SIZE_UPLOAD,
-            'CURLINFO_SPEED_DOWNLOAD' => self::CURLINFO_SPEED_DOWNLOAD,
-            'CURLINFO_SPEED_UPLOAD' => self::CURLINFO_SPEED_UPLOAD,
-            'CURLINFO_FILETIME' => self::CURLINFO_FILETIME,
-            'CURLINFO_CONTENT_LENGTH_DOWNLOAD' => self::CURLINFO_CONTENT_LENGTH_DOWNLOAD,
-            'CURLINFO_CONTENT_LENGTH_UPLOAD' => self::CURLINFO_CONTENT_LENGTH_UPLOAD,
-            'CURLINFO_HEADER_OUT' => self::CURLINFO_HEADER_OUT,
-            'CURLINFO_REDIRECT_TIME' => self::CURLINFO_REDIRECT_TIME,
-            'CURLINFO_REFERER' => self::CURLINFO_REFERER,
-            'CURLINFO_RETRY_AFTER' => self::CURLINFO_RETRY_AFTER,
-        ];
-        if (CurlExtensionPolicy::advertisesPhp84OptionConstants()) {
-            $constants['CURL_HTTP_VERSION_3'] = self::CURL_HTTP_VERSION_3;
-            $constants['CURL_HTTP_VERSION_3ONLY'] = self::CURL_HTTP_VERSION_3ONLY;
-            $constants['CURLINFO_POSTTRANSFER_TIME_T'] = self::CURLINFO_POSTTRANSFER_TIME_T;
-            // libcurl ≥ 7.84 CURLINFO_STRING+61/+62 — present on Zend 8.3+/8.4 builds (#23899).
-            $constants['CURLINFO_CAINFO'] = self::CURLINFO_CAINFO;
-            $constants['CURLINFO_CAPATH'] = self::CURLINFO_CAPATH;
-            $constants['CURLOPT_TCP_KEEPCNT'] = self::CURLOPT_TCP_KEEPCNT;
-            $constants['CURLOPT_SERVER_RESPONSE_TIMEOUT'] = self::CURLOPT_SERVER_RESPONSE_TIMEOUT;
-            $constants['CURLOPT_PREREQFUNCTION'] = self::CURLOPT_PREREQFUNCTION;
-            $constants['CURLOPT_DEBUGFUNCTION'] = self::CURLOPT_DEBUGFUNCTION;
-        }
+        // curl_version_info age selector (php-src curl.stub.php / curlver.h; #24099, #24463).
+        $constants['CURLVERSION_NOW'] = VmCurlCore::CURLVERSION_NOW;
 
         return $constants;
     }

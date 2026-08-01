@@ -245,6 +245,15 @@ PHP;
             self::assertArrayNotHasKey('CURLINFO_CAPATH', $ref);
             self::assertArrayHasKey('CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS', $ref);
             self::assertSame(271, $ref['CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS']);
+            // Zend 8.2 stub families previously missing (#24132).
+            self::assertSame(1, $ref['CURLAUTH_BASIC']);
+            self::assertSame(128, $ref['CURLAUTH_AWS_SIGV4']);
+            self::assertSame(8, $ref['CURLALTSVC_H1']);
+            self::assertSame(7, $ref['CURLE_COULDNT_CONNECT']);
+            self::assertArrayHasKey('CURLVERSION_NOW', $ref);
+            self::assertGreaterThanOrEqual(640, count($ref));
+            self::assertArrayNotHasKey('CURLM_UNKNOWN_OPTION', $ref);
+            self::assertArrayNotHasKey('CURLOPT_WRITEDATA', $ref);
         } finally {
             if (false === $prev || null === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
