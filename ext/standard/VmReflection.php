@@ -3066,22 +3066,28 @@ final class VmReflection
     {
         $const = new Variable();
         $const->int(ReflectionSupport::REFLECTION_ATTRIBUTE_IS_INSTANCEOF);
-        $entry->constants['is_instanceof'] = $const;
-        $entry->constNames['is_instanceof'] = 'IS_INSTANCEOF';
+        // Case-sensitive class-const keys (#25910) — php-src name is IS_INSTANCEOF.
+        $entry->constants['IS_INSTANCEOF'] = $const;
+        $entry->constNames['IS_INSTANCEOF'] = 'IS_INSTANCEOF';
     }
 
     /**
      * Register int class constants on a Reflection builtin (#22128, php_reflection.stub.php).
      *
-     * @param array<string, int> $constants lower_snake name => value
+     * Storage keys must match php-src / ClassConstFetch casing (IS_*), not lower_snake.
+     * After #25910, lowercase keys only resolved via host native fallback — which lacks
+     * ReflectionProperty::IS_FINAL on the 8.2 reference profile (#26222, re-#22341).
+     *
+     * @param array<string, int> $constants lower_snake name => value (canonicalized to UPPER)
      */
     private static function registerIntClassConstants(ClassEntry $entry, array $constants): void
     {
         foreach ($constants as $name => $value) {
             $const = new Variable();
             $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = strtoupper($name);
+            $canonical = strtoupper($name);
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
     }
 
