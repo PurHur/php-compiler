@@ -227,6 +227,8 @@ final class ImplementsHierarchyCompileCheck
                 if (null !== $builtin) {
                     throw new CompileFatal($enum['file'], $enum['line'], $builtin);
                 }
+                // Serializable is DECLARE-time (ImplementsHierarchyRuntimeCheck), like Throwable —
+                // Zend still runs preceding statements (#26538, zend_enum.c).
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',

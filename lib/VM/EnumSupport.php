@@ -57,6 +57,23 @@ final class EnumSupport
         );
     }
 
+    /**
+     * php-src Zend/zend_enum.c — enums may not implement Serializable (#26538).
+     *
+     * Checked at DECLARE time (like Throwable), not parseAndCompile — preceding
+     * statements still run. Ordinary classes keep the E_DEPRECATED path (#22000).
+     */
+    public static function serializableImplementationForbiddenMessage(
+        string $enumDisplay,
+        string $ifaceLc
+    ): ?string {
+        if ('serializable' !== strtolower(ltrim($ifaceLc, '\\'))) {
+            return null;
+        }
+
+        return sprintf('Enum %s cannot implement the Serializable interface', $enumDisplay);
+    }
+
     public static function ensureBuiltinCasesMethod(ClassEntry $entry): void
     {
         if (!$entry->isEnum) {

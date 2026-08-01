@@ -95,6 +95,8 @@ final class EnumVMTest extends BaseTest
                 'enum_implements_interface.phpt',
                 'enum_implements_interface_missing.phpt',
                 'enum_implements_interface_unit.phpt',
+                'enum_implements_serializable_forbidden.phpt',
+                'implements_throwable_ban_for_enums.phpt',
                 'enum_static_method.phpt',
                 'unit_enum_basic.phpt',
                 'unit_enum_case_name.phpt',

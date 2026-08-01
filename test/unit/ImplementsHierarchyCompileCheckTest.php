@@ -301,6 +301,57 @@ PHP;
         $runtime->run($block, false);
     }
 
+    /** @covers issue #26538 */
+    public function testEnumImplementsSerializableFailsAtRuntime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E implements Serializable {
+  case A;
+  public function serialize() { return ""; }
+  public function unserialize($d) {}
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_implements_serializable.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Fatal error: Enum E cannot implement the Serializable interface'
+        );
+        $runtime->run($block, false);
+    }
+
+    /** @covers issue #26538 */
+    public function testEnumImplementsSerializablePrintsPrecedingOutput(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo "before\n";
+enum E implements Serializable {
+  case A;
+  public function serialize() { return ""; }
+  public function unserialize($d) {}
+}
+echo "reach\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_serializable_before.php');
+        $this->assertNotNull($block);
+        ob_start();
+        try {
+            $runtime->run($block, false);
+            $this->fail('expected Serializable ban fatal');
+        } catch (\LogicException $e) {
+            $out = ob_get_clean();
+            $this->assertSame("before\n", $out);
+            $this->assertStringContainsString(
+                'Enum E cannot implement the Serializable interface',
+                $e->getMessage()
+            );
+        }
+    }
+
     /** @covers issue #25869 */
     public function testExtendsExceptionImplementsThrowableAllowed(): void
     {
