@@ -381,6 +381,70 @@ final class VmSsh2Native
         return $ok;
     }
 
+    /** LIBSSH2_SFTP_STAT — follow symlinks (PECL ssh2_sftp_stat; #26609). */
+    public const SFTP_STAT = 0;
+
+    /** LIBSSH2_SFTP_LSTAT — do not follow symlinks (PECL ssh2_sftp_lstat; #26609). */
+    public const SFTP_LSTAT = 1;
+
+    private const SFTP_ATTR_SIZE = 0x00000001;
+
+    private const SFTP_ATTR_UIDGID = 0x00000002;
+
+    private const SFTP_ATTR_PERMISSIONS = 0x00000004;
+
+    private const SFTP_ATTR_ACMODTIME = 0x00000008;
+
+    /**
+     * Stat remote path via libssh2 (PECL ssh2_sftp_stat / lstat; #26609).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     *
+     * @return array<int|string, int>|false PECL dual-key layout (index + name)
+     */
+    public static function sftpStat(\FFI\CData $sftp, string $path, int $statType)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $attrs = $ffi->new('LIBSSH2_SFTP_ATTRIBUTES');
+        $rc = $ffi->libssh2_sftp_stat_ex($sftp, $path, \strlen($path), $statType, \FFI::addr($attrs));
+        if (0 !== $rc) {
+            return false;
+        }
+        $out = [];
+        $flags = (int) $attrs->flags;
+        if ($flags & self::SFTP_ATTR_SIZE) {
+            $size = (int) $attrs->filesize;
+            $out[7] = $size;
+            $out['size'] = $size;
+        }
+        if ($flags & self::SFTP_ATTR_UIDGID) {
+            $uid = (int) $attrs->uid;
+            $gid = (int) $attrs->gid;
+            $out[4] = $uid;
+            $out['uid'] = $uid;
+            $out[5] = $gid;
+            $out['gid'] = $gid;
+        }
+        if ($flags & self::SFTP_ATTR_PERMISSIONS) {
+            $mode = (int) $attrs->permissions;
+            $out[2] = $mode;
+            $out['mode'] = $mode;
+        }
+        if ($flags & self::SFTP_ATTR_ACMODTIME) {
+            $atime = (int) $attrs->atime;
+            $mtime = (int) $attrs->mtime;
+            $out[8] = $atime;
+            $out['atime'] = $atime;
+            $out[9] = $mtime;
+            $out['mtime'] = $mtime;
+        }
+
+        return $out;
+    }
+
     /**
      * Open session channel, exec command, drain stdout (PECL ssh2_exec; #26576).
      *
@@ -499,6 +563,16 @@ LIBSSH2_SFTP_HANDLE *libssh2_sftp_open_ex(LIBSSH2_SFTP *sftp, const char *filena
 ssize_t libssh2_sftp_read(LIBSSH2_SFTP_HANDLE *handle, char *buffer, size_t buffer_maxlen);
 ssize_t libssh2_sftp_write(LIBSSH2_SFTP_HANDLE *handle, const char *buffer, size_t count);
 int libssh2_sftp_close_handle(LIBSSH2_SFTP_HANDLE *handle);
+typedef struct _LIBSSH2_SFTP_ATTRIBUTES {
+    unsigned long flags;
+    unsigned long long filesize;
+    unsigned long uid;
+    unsigned long gid;
+    unsigned long permissions;
+    unsigned long atime;
+    unsigned long mtime;
+} LIBSSH2_SFTP_ATTRIBUTES;
+int libssh2_sftp_stat_ex(LIBSSH2_SFTP *sftp, const char *path, unsigned int path_len, int stat_type, LIBSSH2_SFTP_ATTRIBUTES *attrs);
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
 LIBSSH2_CHANNEL *libssh2_channel_open_ex(LIBSSH2_SESSION *session, const char *channel_type, unsigned int channel_type_len, unsigned int window_size, unsigned int packet_size, const char *message, unsigned int message_len);
 int libssh2_channel_process_startup(LIBSSH2_CHANNEL *channel, const char *request, size_t request_len, const char *message, size_t message_len);

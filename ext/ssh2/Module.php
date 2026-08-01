@@ -58,6 +58,8 @@ class Module extends ModuleAbstract
             new ssh2_sftp(),
             new ssh2_scp_recv(),
             new ssh2_scp_send(),
+            new ssh2_sftp_stat(),
+            new ssh2_sftp_lstat(),
         ];
     }
 }
