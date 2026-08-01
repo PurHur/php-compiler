@@ -12,7 +12,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 
 /**
- * LLVM lowering helpers for ?-> nullsafe branch targets (issues #308, #3219, #10154, #10311).
+ * LLVM lowering helpers for ?-> nullsafe branch targets (issues #308, #3219, #10154, #10311, #26364).
  *
  * SSOT: {@see \PHPCompiler\VM\TypedPropertyCheck}, {@see \PHPCompiler\VM\NullsafeJitHelper}
  */
@@ -22,9 +22,12 @@ final class NullsafeHelper
 
     private const VALUE_BOX_HELPER = 'PHPCompiler\\VM\\NullsafeJitHelper::valueBoxShortCircuits';
 
+    private const VALUE_BOX_METHOD_HELPER = 'PHPCompiler\\VM\\NullsafeJitHelper::valueBoxMethodShortCircuits';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::VALUE_BOX_HELPER,
+        self::VALUE_BOX_METHOD_HELPER,
     ];
 
     public static function compileBranch(
@@ -42,14 +45,28 @@ final class NullsafeHelper
     }
 
     /**
-     * i1: receiver short-circuits ?-> (null, scalar/non-object, or uninitialized nullable slot).
+     * i1: receiver short-circuits ?->.
+     *
+     * Property: null, scalar/non-object, or uninitialized nullable slot (#18026).
+     * Method: null / uninitialized nullable only — scalars Error in the fetch arm (#26364).
      */
-    public static function isReceiverNull(JIT $jit, Variable $receiver): Value
-    {
+    public static function isReceiverNull(
+        JIT $jit,
+        Variable $receiver,
+        bool $forMethodCall = false
+    ): Value {
         $context = $jit->context;
         $builder = $context->builder;
         $i1 = $context->getTypeFromString('int1');
-        if (self::receiverAlwaysShortCircuits($receiver->type)) {
+        if ($forMethodCall) {
+            if (Variable::TYPE_NULL === $receiver->type) {
+                return $i1->constInt(1, false);
+            }
+            // Known non-null non-object: do not short-circuit; METHODCALL_INIT Errors (#26364).
+            if (self::receiverAlwaysShortCircuits($receiver->type)) {
+                return $i1->constInt(0, false);
+            }
+        } elseif (self::receiverAlwaysShortCircuits($receiver->type)) {
             return $i1->constInt(1, false);
         }
         if (Variable::TYPE_OBJECT === $receiver->type) {
@@ -74,7 +91,7 @@ final class NullsafeHelper
         );
         $nullableSlot = $i1->constInt(self::nullablePropertySlot($context, $receiver) ? 1 : 0, false);
 
-        return self::callValueBoxShortCircuits($context, $typeByte, $nullableSlot);
+        return self::callValueBoxShortCircuits($context, $typeByte, $nullableSlot, $forMethodCall);
     }
 
     private static function receiverAlwaysShortCircuits(int $jitType): bool
@@ -109,7 +126,26 @@ final class NullsafeHelper
 
     private static function ensureLinked(Context $context): void
     {
-        $abiName = '__nullsafe__valueBoxShortCircuits';
+        self::ensureValueBoxBridge(
+            $context,
+            '__nullsafe__valueBoxShortCircuits',
+            'nullsafe_value_box_bridge_entry',
+            self::VALUE_BOX_HELPER
+        );
+        self::ensureValueBoxBridge(
+            $context,
+            '__nullsafe__valueBoxMethodShortCircuits',
+            'nullsafe_value_box_method_bridge_entry',
+            self::VALUE_BOX_METHOD_HELPER
+        );
+    }
+
+    private static function ensureValueBoxBridge(
+        Context $context,
+        string $abiName,
+        string $bridgeEntry,
+        string $helperFqcn
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -122,20 +158,27 @@ final class NullsafeHelper
         JitVmHelperLink::ensureBridge(
             $context,
             $abiName,
-            'nullsafe_value_box_bridge_entry',
+            $bridgeEntry,
             [$i8, $i1],
             $i1,
-            self::VALUE_BOX_HELPER,
+            $helperFqcn,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#10311'
         );
     }
 
-    private static function callValueBoxShortCircuits(Context $context, Value $typeByte, Value $nullableSlot): Value
-    {
+    private static function callValueBoxShortCircuits(
+        Context $context,
+        Value $typeByte,
+        Value $nullableSlot,
+        bool $forMethodCall
+    ): Value {
         self::ensureLinked($context);
-        $fn = $context->lookupFunction('__nullsafe__valueBoxShortCircuits');
+        $abiName = $forMethodCall
+            ? '__nullsafe__valueBoxMethodShortCircuits'
+            : '__nullsafe__valueBoxShortCircuits';
+        $fn = $context->lookupFunction($abiName);
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
 

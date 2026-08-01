@@ -5860,7 +5860,10 @@ restart:
                 case OpCode::TYPE_NULLSAFE:
                     $receiver = $frame->scope[$op->arg2];
                     $frame = (
-                        VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($receiver)
+                        VM\TypedPropertyCheck::nullsafeShortCircuitReceiver(
+                            $receiver,
+                            $op->nullsafeMethodCall
+                        )
                             ? $op->block1
                             : $op->block2
                     )->getFrame($this->context, $frame);

@@ -342,6 +342,11 @@ class OpCode {
     /** ?-> fetch arm: uninitialized nullable typed slot → null not Error (#5220, #13747). */
     public bool $nullsafeUninitNullableToNull = false;
     /**
+     * TYPE_NULLSAFE for ?-> method call: short-circuit only on null (not scalar/array).
+     * Property ?-> still treats non-objects like Zend #18026 (#26364, zend_vm_def.h).
+     */
+    public bool $nullsafeMethodCall = false;
+    /**
      * Trait use adaptation entries for TYPE_TRAIT_USE_ADAPTATION (#3238).
      *
      * Each element: alias `{kind: alias, trait: ?string, method: string, newName: ?string}`

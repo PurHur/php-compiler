@@ -9889,7 +9889,11 @@ class JIT {
                     $nullsafeResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$nullsafeResult] = true;
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $isNull = JIT\NullsafeHelper::isReceiverNull($this, $receiver);
+                    $isNull = JIT\NullsafeHelper::isReceiverNull(
+                        $this,
+                        $receiver,
+                        $op->nullsafeMethodCall
+                    );
                     // Mirror ?? lowering: branchIf targets entry blocks; merge from branch tails (#3219).
                     $nullTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
                     $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);

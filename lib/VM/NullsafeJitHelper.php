@@ -14,7 +14,8 @@ final class NullsafeJitHelper
 {
     /**
      * Value-box slice of nullsafe short-circuit: PHP null, scalar/non-object, or uninitialized
-     * nullable typed slot (#5220, #18026, #18028).
+     * nullable typed slot (#5220, #18026, #18028). Property ?-> only — method uses
+     * {@see valueBoxMethodShortCircuits} (#26364).
      */
     public static function valueBoxShortCircuits(int $typeByte, bool $nullablePropertySlot): bool
     {
@@ -32,5 +33,19 @@ final class NullsafeJitHelper
             Variable::TYPE_STRING,
             Variable::TYPE_ARRAY,
         ], true);
+    }
+
+    /**
+     * Method ?-> value-box short-circuit: only null / uninitialized nullable (#26364).
+     *
+     * php-src: Zend/zend_vm_def.h — ZEND_INIT_METHOD_CALL nullsafe skips IS_NULL only.
+     */
+    public static function valueBoxMethodShortCircuits(int $typeByte, bool $nullablePropertySlot): bool
+    {
+        if (Variable::TYPE_NULL === $typeByte) {
+            return true;
+        }
+
+        return Variable::TYPE_UNDEFINED === $typeByte && $nullablePropertySlot;
     }
 }

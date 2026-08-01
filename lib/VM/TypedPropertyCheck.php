@@ -199,13 +199,20 @@ final class TypedPropertyCheck
     }
 
     /**
-     * ?-> receiver short-circuit: PHP null, scalar/non-object, or uninitialized nullable typed
+     * ?-> receiver short-circuit.
+     *
+     * Property path (#18026): PHP null, scalar/non-object, or uninitialized nullable typed
      * slot after a standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y direct read
      * throws via nullsafeFetchPropertyRead (#5361); ??/isset/empty use nullsafeUninitNullableToNull
-     * (#13747). Zend is silent on (1)?->p etc. (#18026).
+     * (#13747).
+     *
+     * Method path (#26364, zend_vm_def.h ZEND_INIT_METHOD_CALL): only null (and the same
+     * uninitialized-nullable cases). Non-null non-objects Error like plain `->`.
      */
-    public static function nullsafeShortCircuitReceiver(Variable $receiver): bool
-    {
+    public static function nullsafeShortCircuitReceiver(
+        Variable $receiver,
+        bool $forMethodCall = false
+    ): bool {
         $resolved = $receiver->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
             return true;
@@ -213,6 +220,10 @@ final class TypedPropertyCheck
 
         if (self::isUninitialized($receiver) && self::propertyAllowsNull($receiver)) {
             return true;
+        }
+
+        if ($forMethodCall) {
+            return false;
         }
 
         return \in_array($resolved->type, [

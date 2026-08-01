@@ -14,6 +14,7 @@ final class NullsafeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/NullsafeHelper.php');
         $this->assertStringContainsString('NullsafeJitHelper', $source);
         $this->assertStringContainsString('valueBoxShortCircuits', $source);
+        $this->assertStringContainsString('valueBoxMethodShortCircuits', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringNotContainsString('NullsafeRuntime', $source);
     }
@@ -47,6 +48,22 @@ final class NullsafeRuntimeShrinkTest extends TestCase
             \PHPCompiler\VM\Variable::TYPE_OBJECT,
             false
         ));
+        $this->assertTrue($helper::valueBoxMethodShortCircuits(
+            \PHPCompiler\VM\Variable::TYPE_NULL,
+            false
+        ));
+        $this->assertFalse($helper::valueBoxMethodShortCircuits(
+            \PHPCompiler\VM\Variable::TYPE_INTEGER,
+            false
+        ));
+        $this->assertFalse($helper::valueBoxMethodShortCircuits(
+            \PHPCompiler\VM\Variable::TYPE_STRING,
+            false
+        ));
+        $this->assertTrue($helper::valueBoxMethodShortCircuits(
+            \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+            true
+        ));
     }
 
     public function testNullsafeShortCircuitReceiverSkipsScalar(): void
@@ -56,6 +73,9 @@ final class NullsafeRuntimeShrinkTest extends TestCase
         $this->assertTrue(
             \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($int)
         );
+        $this->assertFalse(
+            \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($int, true)
+        );
     }
 
     public function testNullsafeShortCircuitReceiverKeepsObject(): void
@@ -64,6 +84,18 @@ final class NullsafeRuntimeShrinkTest extends TestCase
         $obj->object(new \PHPCompiler\VM\ObjectEntry(new \PHPCompiler\VM\ClassEntry('C')));
         $this->assertFalse(
             \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($obj)
+        );
+        $this->assertFalse(
+            \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($obj, true)
+        );
+    }
+
+    public function testNullsafeShortCircuitMethodReceiverOnlyNull(): void
+    {
+        $null = new \PHPCompiler\VM\Variable();
+        $null->null();
+        $this->assertTrue(
+            \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($null, true)
         );
     }
 }
