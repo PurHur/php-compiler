@@ -105,7 +105,8 @@ class ClassEntry {
     /** stdClass-style: create public properties on first read/write (#3117). */
     public bool $allowsDynamicProperties = false;
     /**
-     * ZEND_ACC_NO_DYNAMIC_PROPERTIES — undeclared writes throw Error (Closure/Fiber/Dom\\; #26371).
+     * ZEND_ACC_NO_DYNAMIC_PROPERTIES — undeclared writes throw Error (Closure/Fiber/Generator/WeakMap; #26371).
+     * Living Dom\* are not sealed (php-src 8.4/8.5 Deprecated+write; #26566).
      * Distinct from {@see $allowsDynamicProperties} (ZEND_ACC_ALLOW_DYNAMIC_PROPERTIES, no deprecation).
      */
     public bool $noDynamicProperties = false;
