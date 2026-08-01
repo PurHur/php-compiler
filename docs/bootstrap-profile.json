@@ -5929,6 +5929,7 @@
         "lib/ModuleAbstract.php",
         "lib/NestedTernaryRejector.php",
         "lib/NewDereferenceableSyntaxRejector.php",
+        "lib/NonCanonicalCastDeprecation.php",
         "lib/NullSafeLivenessDetector.php",
         "lib/OpCode.php",
         "lib/OpCodeNames.php",
@@ -6890,9 +6891,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6656,
+        "inventory_files": 6657,
         "excluded": 0,
-        "eligible": 6656,
+        "eligible": 6657,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

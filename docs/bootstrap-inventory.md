@@ -5863,6 +5863,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ModuleAbstract.php` | 0 | 1 |
 | `lib/NestedTernaryRejector.php` | 0 | 4 |
 | `lib/NewDereferenceableSyntaxRejector.php` | 0 | 3 |
+| `lib/NonCanonicalCastDeprecation.php` | 0 | 3 |
 | `lib/NullSafeLivenessDetector.php` | 0 | 1 |
 | `lib/OpCode.php` | 0 | 1 |
 | `lib/PHPTypes/CompilerTypeReconstructor.php` | 0 | 1 |
@@ -48803,6 +48804,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileFatal (line 29)
 - new CompileFatal (line 40)
 - 1 class method(s)
+
+### `lib/NonCanonicalCastDeprecation.php`
+
+**Warnings** (review for bootstrap subset):
+- new Block (line 103)
+- new Frame (line 104)
+- 4 class method(s)
 
 ### `lib/NullSafeLivenessDetector.php`
 

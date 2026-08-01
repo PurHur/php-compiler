@@ -525,6 +525,8 @@ class Runtime {
         SwitchCaseSemicolonDeprecation::emitForSource($code, $filename, $this->vmContext);
         // Original source — backtick shell-exec before CFG rewrites to shell_exec() (#26280).
         BacktickShellExecDeprecation::emitForSource($code, $filename, $this->vmContext);
+        // Original source — (integer)/(boolean)/(double)/(binary) before any rewrite (#26281).
+        NonCanonicalCastDeprecation::emitForSource($code, $filename, $this->vmContext);
         [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
