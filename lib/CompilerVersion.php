@@ -1102,6 +1102,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ Closures and first-class callables in constant expressions (#26240).
+     *
+     * RFCs: closures_in_const_expr / fcc_in_const_expr — Zend/zend_compile.c.
+     * Closures must be {@code static} and must not {@code use} outer variables; FCC is
+     * {@code func(...)} / {@code Class::method(...)} only. Withheld on PROFILE≤8.4.
+     */
+    public static function supportsClosuresInConstantExpressions(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`, `clone ($obj, with: [...])`).
      *
      * Zend landed clone-with in 8.5 (RFC); PROFILE=8.4 must reject like Zend 8.4 (#23877, re-#16676/#12987).

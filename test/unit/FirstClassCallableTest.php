@@ -342,7 +342,10 @@ PHP;
         $this->assertSame('true', ob_get_clean());
     }
 
-    /** Issue #9697: FCC in parameter defaults is not a constant expression (Zend/zend_compile.c). */
+    /**
+     * Issue #9697: FCC in parameter defaults is not a constant expression below PHP 8.5.
+     * On PROFILE=8.5+ FCC defaults are legal (#26240 / fcc_in_const_expr).
+     */
     public function testVmFunctionFirstClassCallableDefaultParameterCompileError(): void
     {
         $code = <<<'PHP'
@@ -372,6 +375,35 @@ PHP;
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('Constant expression contains invalid operations');
         $rt->parseAndCompile($code, 'test.php');
+    }
+
+    /** PROFILE=8.5: FCC parameter defaults evaluate when omitted (#26240). */
+    public function testVmFunctionFirstClassCallableDefaultParameterOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $code = <<<'PHP'
+<?php
+class C {
+    public function f(Closure $c = strlen(...)): int {
+        return $c('abc');
+    }
+}
+echo (new C())->f();
+PHP;
+            $rt = new Runtime();
+            $block = $rt->parseAndCompile($code, 'fcc_default_85.php');
+            ob_start();
+            $rt->run($block);
+            $this->assertSame('3', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     /** Issue #10472: inline parenthesized builtin FCC invoke `(strlen(...))($arg)`. */
