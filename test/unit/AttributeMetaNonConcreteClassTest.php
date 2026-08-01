@@ -111,6 +111,75 @@ PHP;
         );
     }
 
+    /** @covers issue #26329 — DelayedTargetValidation for Deprecated / Override / SensitiveParameter */
+    public function testDelayedTargetValidationDefersDeprecatedOverrideSensitive(): void
+    {
+        $this->setProfile('8.5');
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[\DelayedTargetValidation]
+#[\Deprecated('x')]
+class X {}
+echo "dep=ok\n";
+try {
+    (new ReflectionClass(X::class))->getAttributes(Deprecated::class)[0]->newInstance();
+} catch (Throwable $e) {
+    echo 'dep=', get_class($e), ':', $e->getMessage(), "\n";
+}
+class Holder {
+    #[\DelayedTargetValidation]
+    #[\Override]
+    public const NAME = 'c';
+}
+echo "ovr=ok\n";
+try {
+    (new ReflectionClassConstant(Holder::class, 'NAME'))->getAttributes(Override::class)[0]->newInstance();
+} catch (Throwable $e) {
+    echo 'ovr=', get_class($e), ':', $e->getMessage(), "\n";
+}
+#[\DelayedTargetValidation]
+#[\SensitiveParameter]
+class Z {}
+echo "sens=ok\n";
+try {
+    (new ReflectionClass(Z::class))->getAttributes(SensitiveParameter::class)[0]->newInstance();
+} catch (Throwable $e) {
+    echo 'sens=', get_class($e), ':', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attr_dtv_internal.php'));
+        $this->assertSame(
+            "dep=ok\n"
+            ."dep=Error:Cannot apply #[\\Deprecated] to class X\n"
+            ."ovr=ok\n"
+            ."ovr=Error:Attribute \"Override\" cannot target class constant (allowed targets: method, property)\n"
+            ."sens=ok\n"
+            ."sens=Error:Attribute \"SensitiveParameter\" cannot target class (allowed targets: parameter)\n",
+            ob_get_clean()
+        );
+    }
+
+    /** @covers issue #26329 — #[\Override] functional validation is not delayed */
+    public function testDelayedTargetValidationDoesNotSuppressOverrideFunctionalCheck(): void
+    {
+        $this->setProfile('8.5');
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('has #[\Override] attribute, but no matching parent method exists');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+class P {}
+class C extends P {
+    #[\DelayedTargetValidation]
+    #[\Override]
+    public function missing(): void {}
+}
+PHP
+            , 'attr_dtv_override_func.php');
+    }
+
     public function testConcreteClassStillAllowedOnProfile85(): void
     {
         $this->setProfile('8.5');
