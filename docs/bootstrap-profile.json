@@ -1783,6 +1783,12 @@
         "ext/random/RandomizerGetBytesFromStringAlgo.php",
         "ext/random/SecureInstance.php",
         "ext/random/Xoshiro256StarStarInstance.php",
+        "ext/rar/BuiltinClasses.php",
+        "ext/rar/Module.php",
+        "ext/rar/RarEngine.php",
+        "ext/rar/RarExtensionPolicy.php",
+        "ext/rar/VmRar.php",
+        "ext/rar/bootstrap_rarexception.php",
         "ext/redis/BuiltinClasses.php",
         "ext/redis/Module.php",
         "ext/redis/RedisClassMethod.php",
@@ -4812,6 +4818,7 @@
         "lib/Ast/TypedFunctionStaticRewriter.php",
         "lib/Ast/VoidCastDesugar.php",
         "lib/AsymmetricVisibilityRejector.php",
+        "lib/BacktickShellExecDeprecation.php",
         "lib/BareThrowSyntaxRejector.php",
         "lib/Block.php",
         "lib/BuiltinByRefParams.php",
@@ -6891,9 +6898,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6658,
+        "inventory_files": 6664,
         "excluded": 0,
-        "eligible": 6658,
+        "eligible": 6664,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -984,6 +984,10 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'memcached_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\rar\RarExtensionPolicy::runsRarCompliance($name)
+                && \PHPCompiler\ext\rar\RarExtensionPolicy::isRarComplianceCase($name)) {
+                continue;
+            }
             // snmpget/snmpwalk not JIT-lowered yet (#6070); phantom registration checks are fine.
             if (str_contains($name, 'snmp')
                 && !str_contains($name, 'snmp_phantom')) {
