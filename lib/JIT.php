@@ -8891,6 +8891,20 @@ class JIT {
                             break;
                         }
                         if ($classOp instanceof Operand\Literal) {
+                            // self/parent::class — resolve display name then constantStringFromString
+                            // (fromLiteral bake of trait name "T" fails LLVM verify in nested closures, #26459).
+                            $lcClass = strtolower((string) $classOp->value);
+                            if (\in_array($lcClass, ['self', 'parent'], true)) {
+                                $display = $this->resolveClassNameForPseudoConst($block, $classOp);
+                                if ('parent' === $lcClass) {
+                                    // resolveClassNameForPseudoConst already returns parent FQCN
+                                }
+                                $classNameVal = $this->context->builder->load(
+                                    $this->context->constantStringFromString($display)
+                                );
+                                $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
+                                break;
+                            }
                             $className = $this->resolveClassNameForPseudoConst($block, $classOp);
                             $lit = new Operand\Literal($className);
                             $lit->type = Type::string();
@@ -10364,8 +10378,8 @@ class JIT {
                     }
                     // Mirror VM TYPE_CLOSURE: definition-site class scope on the nested Func so
                     // self::class / __CLASS__→self::class lower during AOT (#26459, #25793).
-                    $this->propagateEnclosingClassOntoClosureFunc($block, $op->block1);
                     if (JIT\FiberHelper::blockContainsFiberSuspend($op->block1)) {
+                        $this->propagateEnclosingClassOntoClosureFunc($block, $op->block1);
                         $internalName = JIT\ClosureHelper::nextInternalName();
                         $resumeName = strtolower($internalName.'__fiber_resume');
                         JIT\FiberHelper::compileResumeFunction(
@@ -10383,7 +10397,7 @@ class JIT {
                         break;
                     }
                     $internalName = JIT\ClosureHelper::nextInternalName();
-                    $this->compileBlock($op->block1, $internalName);
+                    $this->compileClosureBodyBlock($block, $op->block1, $internalName);
                     $lcname = strtolower($internalName);
                     if (!isset($this->context->functionProxies[$lcname])) {
                         throw new \LogicException("Closure body failed to register JIT proxy: {$internalName}");
@@ -10415,12 +10429,31 @@ class JIT {
                         JIT\ClosureBindHelper::ensureClosureBindingProperties($this->context);
 
                         $scopeName = (string) $block->func->class->value;
-                        $scopeConst = $this->context->context->constString($scopeName, true);
+                        $scopeLc = strtolower(ltrim($scopeName, '\\'));
+                        // Trait method closures: bind ce to the composing class (#26459, #25793).
+                        if ($this->context->type->object->isTraitClass($scopeLc)) {
+                            $composing = $this->context->scope->traitComposingClassName;
+                            if ('' === $composing) {
+                                $composing = $this->context->scope->className;
+                            }
+                            if ('' !== $composing
+                                && !$this->context->type->object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                                if ($this->context->type->object->hasDeclaredClass($composing)) {
+                                    $scopeName = $this->context->type->object->classNameForId(
+                                        $this->context->type->object->lookup($composing)
+                                    );
+                                } else {
+                                    $scopeName = $composing;
+                                }
+                            }
+                        }
                         $boundScope = new Variable(
                             $this->context,
                             Variable::TYPE_STRING,
                             Variable::KIND_VALUE,
-                            $scopeConst
+                            $this->context->builder->load(
+                                $this->context->constantStringFromString($scopeName)
+                            )
                         );
                         $boundScope->compileTimeString = $scopeName;
 
@@ -17129,6 +17162,40 @@ class JIT {
         $closureBody->func->class = $enclosingClass;
     }
 
+    /**
+     * Compile a nested closure body while preserving trait composing / class scope (#26459).
+     *
+     * Nested {@see compileBlock} of closures can leave scope->classId pointing at a prior
+     * NestedJIT helper class; keep traitComposingClassName and prefer it for self::class.
+     */
+    private function compileClosureBodyBlock(Block $enclosing, Block $closureBody, string $internalName): void
+    {
+        $this->propagateEnclosingClassOntoClosureFunc($enclosing, $closureBody);
+        $savedComposing = $this->context->scope->traitComposingClassName;
+        $savedClassName = $this->context->scope->className;
+        $savedClassId = $this->context->scope->classId;
+        if ('' === $savedComposing) {
+            // Inherit composing from enclosing method compile (set in trait flatten / runQueue).
+            if ('' !== $savedClassName
+                && !$this->context->type->object->isTraitClass(strtolower(ltrim($savedClassName, '\\')))) {
+                if ($this->context->type->object->hasDeclaredClass($savedClassName)) {
+                    $this->context->scope->traitComposingClassName = $this->context->type->object->classNameForId(
+                        $this->context->type->object->lookup($savedClassName)
+                    );
+                } else {
+                    $this->context->scope->traitComposingClassName = $savedClassName;
+                }
+            }
+        }
+        try {
+            $this->compileBlock($closureBody, $internalName);
+        } finally {
+            $this->context->scope->traitComposingClassName = $savedComposing;
+            $this->context->scope->className = $savedClassName;
+            $this->context->scope->classId = $savedClassId;
+        }
+    }
+
     private function resolveJitStaticScopeClass(Block $block, Operand\Literal $classOp): string
     {
         $lc = strtolower($classOp->value);
@@ -17143,15 +17210,23 @@ class JIT {
                 if ('' !== $composing && !$this->context->type->object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
                     return $composing;
                 }
+                // Prefer scope->className before classId: NestedJIT leaves classId on the last
+                // helper class (e.g. DirHandleJitHelper) when compiling nested closures (#26459).
+                $scopeName = $this->context->scope->className;
+                if ('' !== $scopeName && !$this->context->type->object->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
+                    if ($this->context->type->object->hasDeclaredClass($scopeName)) {
+                        return $this->context->type->object->classNameForId(
+                            $this->context->type->object->lookup($scopeName)
+                        );
+                    }
+
+                    return $scopeName;
+                }
                 if ($this->context->scope->classId > 0) {
                     $fromId = $this->context->type->object->classNameForId($this->context->scope->classId);
                     if ('' !== $fromId && !$this->context->type->object->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
                         return $fromId;
                     }
-                }
-                $scopeName = $this->context->scope->className;
-                if ('' !== $scopeName && !$this->context->type->object->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
-                    return $scopeName;
                 }
             }
 
