@@ -4,23 +4,34 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for proc_open/close/status/terminate via ProcessOpenJitHelper PHP (#9408, #12958).
+ * JIT/AOT embed link for proc_open/close/status/terminate via ProcessOpenJitHelper PHP (#9408, #12958, #26269).
  *
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (ProcessSlotJitHelper →
+ * ProcessOpenJitHelper) in one NestedJIT scope (peer NetworkServices #26247 / Gettext #26226).
  * SSOT: {@see \PHPCompiler\ext\standard\ProcessOpenJitHelper}
- * php-src: ext/standard/proc_open.c
+ * php-src: ext/standard/proc_open.c — PHP_FUNCTION(proc_open) / proc_close / proc_get_status / proc_terminate
  */
 final class ProcessOpenEmbedBridge
 {
     private const HELPER_PATH = '/ext/standard/ProcessSlotJitHelper.php';
 
     private const OPEN_HELPER_PATH = '/ext/standard/ProcessOpenJitHelper.php';
+
+    /**
+     * Ordered NestedJIT sources — ProcessSlotJitHelper before ProcessOpenJitHelper (#26269).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::HELPER_PATH,
+        self::OPEN_HELPER_PATH,
+    ];
 
     private const PROC_OPEN = 'PHPCompiler\\ext\\standard\\ProcessOpenJitHelper::procOpenArgv';
 
@@ -40,7 +51,6 @@ final class ProcessOpenEmbedBridge
         self::PROC_GET_STATUS,
         self::PROC_TERMINATE,
     ];
-
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_is_process_resource',
@@ -206,48 +216,18 @@ final class ProcessOpenEmbedBridge
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ProcessOpenJitHelper compile (#9408)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26269');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            foreach ([self::HELPER_PATH, self::OPEN_HELPER_PATH] as $rel) {
-                $path = $root.$rel;
-                $base = \basename($path);
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $base);
-                if (null === $block) {
-                    throw new \LogicException($base.' parseAndCompile failed (#9408)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT process-open helpers (#9408)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#26269'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
