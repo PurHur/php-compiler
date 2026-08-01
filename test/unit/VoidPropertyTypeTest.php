@@ -48,8 +48,9 @@ class C {
     public function __construct(public void $p) {}
 }
 PHP;
+        // Zend rejects promoted void as a parameter type first (zend_compile.c), not as a property.
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Property C::$p cannot have type void');
+        $this->expectExceptionMessage('void cannot be used as a parameter type');
         $runtime->parseAndCompile($code, 'void_promoted_property.php');
     }
 
