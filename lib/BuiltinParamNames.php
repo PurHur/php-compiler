@@ -466,13 +466,58 @@ final class BuiltinParamNames
             case 'ftp_connect':
             case 'ftp_ssl_connect':
                 return ['hostname', 'port', 'timeout'];
-            // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says stream/local_file/… (#23656)
+            // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says stream/local_file/… (#23656, #24639)
             case 'ftp_login':
                 return ['ftp', 'username', 'password'];
+            case 'ftp_pwd':
+            case 'ftp_cdup':
+            case 'ftp_systype':
+            case 'ftp_nb_continue':
+            case 'ftp_close':
+            case 'ftp_quit':
+                return ['ftp'];
+            case 'ftp_chdir':
+            case 'ftp_mkdir':
+            case 'ftp_rmdir':
+            case 'ftp_nlist':
+            case 'ftp_mlsd':
+                return ['ftp', 'directory'];
+            case 'ftp_rawlist':
+                return ['ftp', 'directory', 'recursive'];
+            case 'ftp_exec':
+            case 'ftp_raw':
+            case 'ftp_site':
+                return ['ftp', 'command'];
+            case 'ftp_chmod':
+                return ['ftp', 'permissions', 'filename'];
+            case 'ftp_alloc':
+                return ['ftp', 'size', '&response='];
+            case 'ftp_pasv':
+                return ['ftp', 'enable'];
+            case 'ftp_size':
+            case 'ftp_mdtm':
+            case 'ftp_delete':
+                return ['ftp', 'filename'];
+            case 'ftp_rename':
+                return ['ftp', 'from', 'to'];
+            case 'ftp_get_option':
+                return ['ftp', 'option'];
+            case 'ftp_set_option':
+                return ['ftp', 'option', 'value'];
             case 'ftp_get':
+            case 'ftp_nb_get':
                 return ['ftp', 'local_filename', 'remote_filename', 'mode', 'offset'];
             case 'ftp_put':
+            case 'ftp_nb_put':
                 return ['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'];
+            case 'ftp_append':
+                return ['ftp', 'remote_filename', 'local_filename', 'mode'];
+            case 'ftp_fget':
+            case 'ftp_nb_fget':
+                return ['ftp', 'stream', 'remote_filename', 'mode', 'offset'];
+            case 'ftp_fput':
+            case 'ftp_nb_fput':
+                return ['ftp', 'remote_filename', 'stream', 'mode', 'offset'];
             case 'sort':
             case 'rsort':
                 // php-src ext/standard/basic_functions.stub.php — array, flags only (#23225).
