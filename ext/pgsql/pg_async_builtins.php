@@ -11,6 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
+require_once __DIR__.'/PgSendAsyncReturn.php';
+
 /**
  * pg_socket / pg_consume_input / pg_flush / pg_connect_poll (php-src ext/pgsql; #20636, #21896).
  * Loaded via Module::getFunctions() + spine require.
@@ -373,24 +375,8 @@ final class pg_set_error_context_visibility extends Internal
 
 /**
  * Shared true / 0 / false return for pg_send_* (#20681).
+ * Trait lives in {@see PgSendAsyncReturn.php} (own spine unit).
  */
-trait PgSendAsyncReturn
-{
-    private function assignSendReturn(\PHPCompiler\VM\Variable $returnVar, bool|int $out): void
-    {
-        if (true === $out) {
-            $returnVar->bool(true);
-
-            return;
-        }
-        if (false === $out) {
-            $returnVar->bool(false);
-
-            return;
-        }
-        $returnVar->int($out);
-    }
-}
 
 /**
  * pg_send_query (php-src ext/pgsql/pgsql.c; #20681).

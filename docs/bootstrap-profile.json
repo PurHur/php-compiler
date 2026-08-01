@@ -1640,6 +1640,7 @@
         "ext/pdo/pdo_drivers.php",
         "ext/pgsql/BuiltinClasses.php",
         "ext/pgsql/Module.php",
+        "ext/pgsql/PgSendAsyncReturn.php",
         "ext/pgsql/PgsqlConstants.php",
         "ext/pgsql/PgsqlExtensionPolicy.php",
         "ext/pgsql/PgsqlSerializeDeny.php",
@@ -6903,9 +6904,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6669,
+        "inventory_files": 6670,
         "excluded": 0,
-        "eligible": 6669,
+        "eligible": 6670,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

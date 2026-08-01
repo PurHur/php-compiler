@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6669 |
-| Phase A inventory files (M2 ratio SSOT) | 6669 |
+| PHP files on vm.php path | 6670 |
+| Phase A inventory files (M2 ratio SSOT) | 6670 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21489 |
+| Source constructs flagged (warnings) | 21490 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1630,6 +1630,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
 | `ext/pgsql/Module.php` | 0 | 123 |
+| `ext/pgsql/PgSendAsyncReturn.php` | 0 | 2 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/PgsqlSerializeDeny.php` | 0 | 3 |
@@ -1639,7 +1640,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 2 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
-| `ext/pgsql/pg_async_builtins.php` | 0 | 19 |
+| `ext/pgsql/pg_async_builtins.php` | 0 | 18 |
 | `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 3 |
@@ -19790,6 +19791,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_socket_poll (line 236)
 - 8 class method(s)
 
+### `ext/pgsql/PgSendAsyncReturn.php`
+
+**Warnings** (review for bootstrap subset):
+- trait PgSendAsyncReturn (line 14)
+- 1 class method(s)
+
 ### `ext/pgsql/PgsqlConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19878,25 +19885,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/pg_async_builtins.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new ArgumentCountError (line 62)
-- new ArgumentCountError (line 101)
-- new ArgumentCountError (line 130)
-- new ArgumentCountError (line 173)
-- new ArgumentCountError (line 224)
-- new ArgumentCountError (line 278)
-- new ArgumentCountError (line 330)
-- trait PgSendAsyncReturn (line 377)
-- new ArgumentCountError (line 411)
-- new ArgumentCountError (line 446)
-- new ArgumentCountError (line 482)
-- new ArgumentCountError (line 518)
-- new ArgumentCountError (line 552)
-- new ArgumentCountError (line 594)
-- new ArgumentCountError (line 626)
-- new ArgumentCountError (line 689)
-- new ArgumentCountError (line 746)
-- 35 class method(s)
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 64)
+- new ArgumentCountError (line 103)
+- new ArgumentCountError (line 132)
+- new ArgumentCountError (line 175)
+- new ArgumentCountError (line 226)
+- new ArgumentCountError (line 280)
+- new ArgumentCountError (line 332)
+- new ArgumentCountError (line 397)
+- new ArgumentCountError (line 432)
+- new ArgumentCountError (line 468)
+- new ArgumentCountError (line 504)
+- new ArgumentCountError (line 538)
+- new ArgumentCountError (line 580)
+- new ArgumentCountError (line 612)
+- new ArgumentCountError (line 675)
+- new ArgumentCountError (line 732)
+- 34 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
 

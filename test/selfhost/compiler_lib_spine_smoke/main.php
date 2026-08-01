@@ -1424,6 +1424,7 @@ require_once __DIR__.'/../../../ext/pgsql/pg_untrace.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlLob.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_lo_builtins.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_copy_meta_builtins.php';
+require_once __DIR__.'/../../../ext/pgsql/PgSendAsyncReturn.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_async_builtins.php';
 require_once __DIR__.'/../../../ext/pgsql/PgsqlConstants.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_dml_builtins.php';
