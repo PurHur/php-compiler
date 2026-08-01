@@ -821,6 +821,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ deprecates null as an array offset / array_key_exists() key (coerce to "").
+     *
+     * php-src: Zend/zend_execute.c / zend_vm_def.h; ext/standard/array.c (#26276).
+     * RFC: deprecations_php_8_5 — null array offset / array_key_exists.
+     * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
+     */
+    public static function supportsNullArrayOffsetDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ TENTATIVE_RETURN Core constant (Zend/zend_attributes.h, issue #18060).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or

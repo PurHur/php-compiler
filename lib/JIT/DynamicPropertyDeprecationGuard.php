@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\TypeCheck;
 
 /**
@@ -61,6 +62,40 @@ final class DynamicPropertyDeprecationGuard
         self::emitDeprecated(
             $context,
             TypeCheck::FALSE_TO_ARRAY_DEPRECATED_MESSAGE,
+            $file,
+            $line
+        );
+    }
+
+    /**
+     * Null array offset — Zend 8.5+ E_DEPRECATED then coerce to "" (zend_execute.c; #26276).
+     */
+    public static function emitNullArrayOffset(Context $context, string $file = '', int $line = 0): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsNullArrayOffsetDeprecation()) {
+            return;
+        }
+        StringTriggerError::ensureLinked($context);
+        self::emitDeprecated(
+            $context,
+            HashTable::NULL_ARRAY_OFFSET_DEPRECATED_MESSAGE,
+            $file,
+            $line
+        );
+    }
+
+    /**
+     * array_key_exists(null, …) — Zend 8.5+ E_DEPRECATED (ext/standard/array.c; #26276).
+     */
+    public static function emitNullArrayKeyExists(Context $context, string $file = '', int $line = 0): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsNullArrayOffsetDeprecation()) {
+            return;
+        }
+        StringTriggerError::ensureLinked($context);
+        self::emitDeprecated(
+            $context,
+            HashTable::NULL_ARRAY_KEY_EXISTS_DEPRECATED_MESSAGE,
             $file,
             $line
         );

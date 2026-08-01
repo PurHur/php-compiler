@@ -5155,7 +5155,7 @@ restart:
                         }
                         $table = $container->toArray();
                         try {
-                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3)) {
+                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3, false, $frame)) {
                                 $this->context->errors->undefinedArrayKey(
                                     $arg3,
                                     $this->context,
@@ -6719,7 +6719,7 @@ restart:
                         try {
                             $container->separateArrayForWrite();
                             $container = $containerSlot->resolveIndirect();
-                            $container->toArray()->offsetUnset($key);
+                            $container->toArray()->offsetUnset($key, $frame);
                         } catch (\TypeError $e) {
                             $catchFrame = $this->dispatchVmTypeError($e, $frame);
                             if (null !== $catchFrame) {
@@ -8848,7 +8848,7 @@ restart:
                                 break;
                             }
                             try {
-                                $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                                $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3], $frame));
                             } catch (\TypeError $e) {
                                 $catchFrame = $this->dispatchVmTypeError($e, $frame);
                                 if (null !== $catchFrame) {

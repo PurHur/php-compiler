@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\DynamicPropertyDeprecationGuard;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
 use PHPCompiler\JIT\JitLongArg;
@@ -43,6 +44,7 @@ final class ArrayKeyExistsRuntime
             : ArrayBuiltinHelper::loadHashTable($context, $array);
 
         if (JITVariable::TYPE_NULL === $key->type || ($key->isNullConstant ?? false)) {
+            DynamicPropertyDeprecationGuard::emitNullArrayKeyExists($context);
             if (JITVariable::TYPE_VALUE === $key->type) {
                 return self::hashtableKeyExistsValueBoxKey($context, $ht, $key);
             }
@@ -218,6 +220,7 @@ final class ArrayKeyExistsRuntime
             $afterNull
         );
         $context->builder->positionAtEnd($nullBlock);
+        DynamicPropertyDeprecationGuard::emitNullArrayKeyExists($context);
         $nullResult = self::hashtableKeyExistsStringKey(
             $context,
             $ht,

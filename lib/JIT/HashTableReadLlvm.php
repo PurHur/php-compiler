@@ -330,6 +330,30 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $nullKeyBlock = $fn->appendBasicBlock('ht_read_vk_null_key');
+        $afterNullKey = $fn->appendBasicBlock('ht_read_vk_after_null_key');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            ),
+            $nullKeyBlock,
+            $afterNullKey
+        );
+        $context->builder->positionAtEnd($nullKeyBlock);
+        DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
+        $emptyKey = $context->builder->load($context->constantStringFromString(''));
+        $nullKeyBox = null !== $superglobalName
+            ? self::readSuperglobalStringKeyToValueBox($context, $ht, $emptyKey)
+            : self::readStringKeyToValueBox($context, $ht, $emptyKey);
+        JitValueBox::copyFromPointer(
+            $context,
+            $destPtr,
+            JitValueBox::pointer($context, $nullKeyBox->value)
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterNullKey);
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -410,6 +434,7 @@ final class HashTableReadLlvm
     public static function offsetIsSetDim(Context $context, Value $ht, Variable $dim): Value
     {
         if (Variable::TYPE_NULL === $dim->type) {
+            DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
             $emptyKey = $context->builder->load($context->constantStringFromString(''));
 
             return $context->builder->call(
@@ -462,6 +487,15 @@ final class HashTableReadLlvm
         Variable $dim,
         ?string $superglobalName = null
     ): Variable {
+        if (Variable::TYPE_NULL === $dim->type) {
+            DynamicPropertyDeprecationGuard::emitNullArrayOffset($context);
+            $emptyKey = $context->builder->load($context->constantStringFromString(''));
+            if (null !== $superglobalName) {
+                return self::readSuperglobalStringKeyToValueBox($context, $ht, $emptyKey);
+            }
+
+            return self::readStringKeyToValueBox($context, $ht, $emptyKey);
+        }
         if (Variable::TYPE_STRING === $dim->type) {
             $key = $context->helper->loadValue($dim);
             if (null !== $superglobalName) {

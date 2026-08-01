@@ -38,12 +38,12 @@ final class VmEmptyDimension
             }
             $table = $container->toArray();
             try {
-                if (!$table->keyExists($dim)) {
+                if (!$table->keyExists($dim, false, $frame)) {
                     $dst->bool(true);
 
                     return null;
                 }
-                $stored = $table->findVariable($dim, false);
+                $stored = $table->findVariable($dim, false, $vm->context, $frame);
                 $dst->bool(!boolval::isTruthy($stored->resolveIndirect()));
             } catch (\TypeError $e) {
                 return $vm->propagateEmptyDimensionTypeError($e, $frame);

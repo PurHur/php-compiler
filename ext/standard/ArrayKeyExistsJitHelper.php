@@ -17,6 +17,10 @@ final class ArrayKeyExistsJitHelper
 {
     public static function keyExists(Variable $key, HashTable $table): bool
     {
-        return $table->keyExists($key);
+        if (Variable::TYPE_NULL === $key->type) {
+            HashTable::warnNullArrayKeyExistsIfNeeded();
+        }
+
+        return $table->keyExists($key, false);
     }
 }
