@@ -145,6 +145,8 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo return empty (#23260)
+            'unserialize' => 'mixed',
             // ext/json/json.stub.php — PHP 8.3+; InternalArgInfo omits function entirely (#26211)
             'json_validate' => 'bool',
             // ext/curl/curl.stub.php — InternalArgInfo return int; Zend bool (#26107)
@@ -424,6 +426,14 @@ final class BuiltinInternalArgInfo
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
+            // ext/standard/basic_functions.stub.php — mixed $value; string $data; array $options (#23260)
+            // InternalArgInfo still variable (untyped) / variable_representation+allowed_classes (bool|array).
+            'serialize' => 0 === $index ? 'mixed' : null,
+            'unserialize' => match ($index) {
+                0 => 'string',
+                1 => 'array',
+                default => null,
+            },
             // ext/json/json.stub.php — string $json, int $depth, int $flags (#26211, re-#23876)
             'json_validate' => match ($index) {
                 0 => 'string',
