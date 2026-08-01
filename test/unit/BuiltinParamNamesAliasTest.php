@@ -3523,6 +3523,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ehdl', 'xml_set_element_handler'));
     }
 
+    /** @covers issue #26589 */
+    public function testXmlSetHandlerStubNamedParamsResolve(): void
+    {
+        $funcs = [
+            'xml_set_character_data_handler',
+            'xml_set_default_handler',
+            'xml_set_end_namespace_decl_handler',
+            'xml_set_external_entity_ref_handler',
+            'xml_set_notation_decl_handler',
+            'xml_set_processing_instruction_handler',
+            'xml_set_start_namespace_decl_handler',
+            'xml_set_unparsed_entity_decl_handler',
+        ];
+        foreach ($funcs as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['parser', 'handler'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'parser', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'handler', $fn), $fn);
+            // Legacy InternalArgInfo name must not resolve (Zend rejects $hdl)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'hdl', $fn), $fn);
+        }
+    }
+
     /** @covers issue #23946 */
     public function testXmlSetObjectStubNamedParamsResolve(): void
     {
