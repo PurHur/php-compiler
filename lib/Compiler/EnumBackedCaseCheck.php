@@ -13,9 +13,10 @@ use PHPCfg\Script;
  * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
  * Unit (non-backed) enum cases must not declare a value (#26382, zend_compile.c).
  * Duplicate case names are rejected at compile (#5218, zend_compile.c).
+ * Enum backing type must be int or string (#26539, zend_compile.c).
  * Duplicate backing values are validated at first case use via {@see \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique()} (#5773, #8687, zend_enum.c).
  *
- * php-src: Zend/zend_enum.c — zend_register_enum_case; Zend/zend_compile.c — enum case registration
+ * php-src: Zend/zend_enum.c — zend_register_enum_case; Zend/zend_compile.c — enum case registration / zend_compile_enum
  */
 final class EnumBackedCaseCheck
 {
@@ -60,14 +61,16 @@ final class EnumBackedCaseCheck
     {
         $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
         $this->validateDuplicateCaseNames($enum, $enumDisplay);
+        $this->assertValidEnumBackingType($enum);
 
         if (null === $enum->backedType || !$enum->backedType instanceof Op\Type\Literal) {
             $this->validateUnitEnumCasesHaveNoValue($enum, $enumDisplay);
 
             return;
         }
-        $backedType = $enum->backedType->name;
+        $backedType = strtolower($enum->backedType->name);
         if ('int' !== $backedType && 'string' !== $backedType) {
+            // Unreachable: assertValidEnumBackingType rejects peers first (#26539).
             return;
         }
         foreach ($enum->stmts->children as $member) {
@@ -86,6 +89,78 @@ final class EnumBackedCaseCheck
                 );
             }
         }
+    }
+
+    /**
+     * Zend: "Enum backing type must be int or string, %s given" (#26539, zend_compile.c).
+     */
+    private function assertValidEnumBackingType(Op\Stmt\Enum_ $enum): void
+    {
+        if (null === $enum->backedType) {
+            return;
+        }
+        if ($enum->backedType instanceof Op\Type\Literal) {
+            $name = $enum->backedType->name;
+            $lc = strtolower($name);
+            if ('int' === $lc || 'string' === $lc) {
+                return;
+            }
+            throw new CompileFatal(
+                $enum->getFile(),
+                $enum->getLine(),
+                sprintf(
+                    'Enum backing type must be int or string, %s given',
+                    $this->zendBackingTypeGivenLabel($name)
+                )
+            );
+        }
+
+        // Union / nullable / other composite types are never legal backing types.
+        throw new CompileFatal(
+            $enum->getFile(),
+            $enum->getLine(),
+            sprintf(
+                'Enum backing type must be int or string, %s given',
+                $this->formatCompositeBackingTypeGiven($enum->backedType)
+            )
+        );
+    }
+
+    /**
+     * Zend type printer for the ", %s given" fragment (iterable → Traversable|array).
+     */
+    private function zendBackingTypeGivenLabel(string $name): string
+    {
+        if (0 === strcasecmp($name, 'iterable')) {
+            return 'Traversable|array';
+        }
+
+        return ltrim($name, '\\');
+    }
+
+    private function formatCompositeBackingTypeGiven(Op\Type $type): string
+    {
+        if ($type instanceof Op\Type\Nullable) {
+            $inner = $type->subtype ?? null;
+            if ($inner instanceof Op\Type\Literal) {
+                return '?' . $this->zendBackingTypeGivenLabel($inner->name);
+            }
+
+            return '?mixed';
+        }
+        if ($type instanceof Op\Type\Union_) {
+            $parts = [];
+            foreach ($type->types as $part) {
+                if ($part instanceof Op\Type\Literal) {
+                    $parts[] = $this->zendBackingTypeGivenLabel($part->name);
+                }
+            }
+            if ([] !== $parts) {
+                return implode('|', $parts);
+            }
+        }
+
+        return 'mixed';
     }
 
     /**
