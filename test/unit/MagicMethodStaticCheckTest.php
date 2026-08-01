@@ -175,4 +175,23 @@ PHP;
         $runtime->run($block);
         $this->assertSame("cs:m\nok\n", ob_get_clean());
     }
+
+    /** @covers issue #26437 — non-public __callStatic still dispatches (warning covered by compliance). */
+    public function testNonPublicCallStaticDispatches(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+error_reporting(E_ALL);
+class C {
+    private static function __callStatic($n, $a) { return "cs:$n"; }
+}
+echo C::foo(), "\n";
+PHP;
+        ob_start();
+        $block = $runtime->parseAndCompile($code, 'nonpublic_callstatic.php');
+        $this->assertNotNull($block);
+        $runtime->run($block);
+        $this->assertSame("cs:foo\n", ob_get_clean());
+    }
 }
