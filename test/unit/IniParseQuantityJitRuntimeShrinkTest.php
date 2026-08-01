@@ -6,7 +6,11 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** ini_parse_quantity JIT routes through IniParseQuantityJitHelper PHP, not strtoll LLVM (#9237). */
+/**
+ * ini_parse_quantity JIT routes through IniParseQuantityJitHelper PHP (#9237 / #26444).
+ *
+ * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #26441 / #25570).
+ */
 final class IniParseQuantityJitRuntimeShrinkTest extends TestCase
 {
     public function testIniParseQuantityJitHelperDelegatesToVmIniQuantity(): void
@@ -22,13 +26,20 @@ final class IniParseQuantityJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('structGep', $source);
     }
 
-    public function testIniParseQuantityRuntimeRoutesThroughIniParseQuantityJitHelper(): void
+    public function testIniParseQuantityRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IniParseQuantityRuntime.php');
         $this->assertStringContainsString('IniParseQuantityJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString("lookupFunction('strtoll')", $source);
         $this->assertStringNotContainsString('implementParseQuantity', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertLessThan(130, \substr_count($source, "\n") + 1);
     }
 
     public function testIniParseQuantityJitHelperSemanticsMatchVmIniQuantity(): void
