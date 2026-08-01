@@ -3070,6 +3070,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['flags'], BuiltinParamNames::forClassMethod('finfo::set_flags'));
     }
 
+    /** @covers issue #26181 */
+    public function testFinfoConstructStubNamedParamsResolve(): void
+    {
+        $ctor = BuiltinParamNames::forClassMethod('finfo::__construct');
+        self::assertSame(['flags=', 'magic_database='], $ctor);
+        self::assertSame(
+            ['flags=', 'magic_database='],
+            BuiltinParamNames::paramNamesForInternalFunction('finfo::__construct')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ctor, 'flags', 'finfo::__construct'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ctor, 'magic_database', 'finfo::__construct'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'options', 'finfo::__construct'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'magic_file', 'finfo::__construct'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('finfo', '__construct'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('finfo', '__construct'));
+        self::assertSame(
+            '?string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('finfo', '__construct', 1)
+        );
+    }
+
     /** @covers issue #23409 */
     public function testNumberFormatterCurrencyStubNamedParamsResolve(): void
     {

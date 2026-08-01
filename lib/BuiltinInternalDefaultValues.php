@@ -125,6 +125,11 @@ final class BuiltinInternalDefaultValues
         'finfo_buffer' => [
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/fileinfo/fileinfo.stub.php — int $flags = 0, ?string $magic_database = null (#26181)
+        'finfo::__construct' => [
+            0 => ['kind' => 'int', 'value' => 0],
+            1 => ['kind' => 'null'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — ?int $length = null (#23181, #25749)
         'substr' => [
             2 => ['kind' => 'null'],

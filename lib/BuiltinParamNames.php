@@ -247,6 +247,8 @@ final class BuiltinParamNames
             'finfo::buffer' => ['string', 'flags=', 'context='],
             'finfo::file' => ['filename', 'flags=', 'context='],
             'finfo::set_flags' => ['flags'],
+            // php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo still says options/magic_file (#26181)
+            'finfo::__construct' => ['flags=', 'magic_database='],
             // php-src Zend/zend_fibers.stub.php — InternalArgInfo empty (#24592)
             'fiber::__construct' => ['callback'],
             // php-src Zend/zend_weakrefs.stub.php — InternalArgInfo empty (#24592)
