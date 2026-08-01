@@ -80,6 +80,8 @@ final class JitFile
         $context->builder->branchIf($readFailed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        // php-src file() open failure — same E_WARNING shape as fopen/file_get_contents (#26695)
+        JitBuiltinWarning::emitStreamOpenFailed($context, $pathPhi, 'file');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);
 
