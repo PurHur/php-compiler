@@ -286,3 +286,129 @@ final class ssh2_fetch_stream extends Ssh2Function
         $frame->returnVar->object($object);
     }
 }
+
+/**
+ * ssh2_sftp(resource $session): resource|false
+ */
+final class ssh2_sftp extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_sftp', 1);
+        if (!VmSsh2Session::isAuthed($session)) {
+            @\trigger_error('ssh2_sftp(): Unable to startup SFTP channel', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_sftp(): Unable to startup SFTP channel', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $sftp = VmSsh2Native::sftpInit($native);
+        if (null === $sftp) {
+            @\trigger_error('ssh2_sftp(): Unable to startup SFTP channel', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ssh2_sftp() requires a VM context');
+        }
+        $wrapped = VmSsh2Sftp::wrap($ctx, $session, $sftp);
+        $frame->returnVar->object($wrapped->toObject());
+    }
+}
+
+/**
+ * ssh2_scp_recv(resource $session, string $remote_file, string $local_file): bool
+ */
+final class ssh2_scp_recv extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_scp_recv');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_scp_recv() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_scp_recv', 1);
+        $remote = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_scp_recv', 2, 'remote_file');
+        $local = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_scp_recv', 3, 'local_file');
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native || !VmSsh2Session::isAuthed($session)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::scpRecv($native, $remote, $local));
+    }
+}
+
+/**
+ * ssh2_scp_send(resource $session, string $local_file, string $remote_file, int $create_mode = 0644): bool
+ */
+final class ssh2_scp_send extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_scp_send');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_scp_send() expects between 3 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_scp_send', 1);
+        $local = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_scp_send', 2, 'local_file');
+        $remote = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_scp_send', 3, 'remote_file');
+        $mode = 0644;
+        if ($argc >= 4) {
+            $mode = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'ssh2_scp_send', 4, 'create_mode');
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native || !VmSsh2Session::isAuthed($session)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::scpSend($native, $local, $remote, $mode));
+    }
+}
