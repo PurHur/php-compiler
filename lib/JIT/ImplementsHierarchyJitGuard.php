@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Compiler\SourceLocation;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\ReadonlyRaise;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\ImplementsHierarchyRuntimeCheck;
 
 /**
@@ -46,16 +49,61 @@ final class ImplementsHierarchyJitGuard
                 ? $sourceLocation->startLine
                 : 0;
 
-            ReadonlyRaise::registerDeclarations($context);
-            ReadonlyRaise::ensureLinked($context);
-            ReadonlyRaise::emitRaise($context, sprintf(
+            $full = sprintf(
                 'Fatal error: %s in %s on line %d',
                 $message,
                 $file,
                 $line
-            ));
+            );
+
+            // Standalone AOT: fprintf+exit — pending ReadonlyRaise abort helpers segfault on
+            // this edge (#26538 / #25869; same pattern as ListUnpackHelper #25096).
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                self::emitStandaloneFatalExit($context, $full);
+
+                return;
+            }
+
+            ReadonlyRaise::registerDeclarations($context);
+            ReadonlyRaise::ensureLinked($context);
+            ReadonlyRaise::emitRaise($context, $full);
 
             return;
         }
+    }
+
+    private static function emitStandaloneFatalExit(Context $context, string $fullMessage): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'fprintf',
+            $context->context->functionType($i32, true, $i8p, $i8p)
+        );
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'exit',
+            $context->context->functionType($context->getTypeFromString('void'), false, $i32)
+        );
+        $stderr = StringTriggerErrorJit::stderrFilePtr($context);
+        // Zend prints "PHP Fatal error:  …" (two spaces after the colon).
+        $body = str_starts_with($fullMessage, 'Fatal error: ')
+            ? substr($fullMessage, strlen('Fatal error: '))
+            : $fullMessage;
+        $line = 'PHP Fatal error:  '.$body."\n";
+        $context->builder->call(
+            $context->lookupFunction('fprintf'),
+            $stderr,
+            $context->builder->pointerCast($context->constantFromString('%s'), $i8p),
+            $context->builder->pointerCast($context->constantFromString($line), $i8p)
+        );
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $i32->constInt(255, false)
+        );
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        $deadBb = BasicBlockHelper::append($context, 'implements_hierarchy_fatal_dead');
+        $context->builder->positionAtEnd($deadBb);
     }
 }

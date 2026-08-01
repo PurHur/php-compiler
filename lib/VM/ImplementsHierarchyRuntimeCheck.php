@@ -140,6 +140,16 @@ final class ImplementsHierarchyRuntimeCheck
                 $context
             );
         }
+        // php-src zend_enum.c — enum + Serializable is a hard ban (not the class E_DEPRECATED path).
+        if ($isEnum) {
+            $serializableBan = EnumSupport::serializableImplementationForbiddenMessage(
+                $subjectDisplay,
+                $targetLc
+            );
+            if (null !== $serializableBan) {
+                return $serializableBan;
+            }
+        }
 
         return ReservedBuiltinClass::compileTimeImplementsForbiddenMessage($subjectDisplay, $targetLc);
     }
