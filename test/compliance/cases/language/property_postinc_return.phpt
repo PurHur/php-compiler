@@ -1,5 +1,5 @@
 --TEST--
-Typed instance/static property ++/-- return value in expression (#10123, Zend/zend_execute.c)
+Typed instance/static property ++/-- return value in expression (#26491 / re-#10123, Zend/zend_execute.c)
 --FILE--
 <?php
 class C {
