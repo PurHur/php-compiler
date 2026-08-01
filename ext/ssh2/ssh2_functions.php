@@ -258,7 +258,15 @@ final class ssh2_exec extends Ssh2Function
         }
         $session = $this->requireSession($frame->calledArgs[0], 'ssh2_exec', 1);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_exec', 2, 'command');
+        // pty / env / width / height accepted for arity parity; ignored in v1.
         if (!VmSsh2Session::isAuthed($session)) {
+            @\trigger_error('ssh2_exec(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
             @\trigger_error('ssh2_exec(): Unable to request a channel from remote host', \E_USER_WARNING);
             $frame->returnVar->bool(false);
 
@@ -268,8 +276,22 @@ final class ssh2_exec extends Ssh2Function
         if (null === $ctx) {
             throw new \LogicException('ssh2_exec() requires a VM context');
         }
-        $wrapped = VmSsh2Stream::wrap($ctx, $session, $command);
-        $frame->returnVar->object($wrapped->toObject());
+        $out = VmSsh2Native::channelExecDrain($native, $command);
+        if (false === $out) {
+            @\trigger_error('ssh2_exec(): Unable to request a channel from remote host', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        // PECL returns a readable stream resource; drain into php://memory (#26576).
+        require_once \dirname(__DIR__).'/standard/VmPhpMemoryStream.php';
+        $handle = \PHPCompiler\ext\standard\VmPhpMemoryStream::openWithBuffer('php://memory', $out, 'rb');
+        if (false === $handle) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->streamHandle($handle, $ctx);
     }
 }
 
