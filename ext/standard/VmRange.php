@@ -16,7 +16,8 @@ use PHPCompiler\VM\Variable;
  */
 final class VmRange
 {
-    private const ZERO_STEP_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
+    /** php-src 8.2 uses this text for both zero step and step larger than the span. */
+    private const STEP_RANGE_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
 
     public static function build(Frame $frame, Variable $startVar, Variable $endVar, ?Variable $stepVar): HashTable
     {
@@ -216,7 +217,7 @@ final class VmRange
             if (Variable::TYPE_FLOAT === $stepVar->type) {
                 $step = VmMath::floatToZendLong($stepVar->toFloat());
                 if (0 === $step) {
-                    throw new \ValueError(self::ZERO_STEP_ERROR);
+                    throw new \ValueError(self::STEP_RANGE_ERROR);
                 }
 
                 return self::normalizeIntStepSign($start, $end, $step);
@@ -230,7 +231,7 @@ final class VmRange
                         $step = (int) $s;
                     }
                     if (0 === $step) {
-                        throw new \ValueError(self::ZERO_STEP_ERROR);
+                        throw new \ValueError(self::STEP_RANGE_ERROR);
                     }
 
                     return self::normalizeIntStepSign($start, $end, $step);
@@ -245,7 +246,7 @@ final class VmRange
         }
         $step = $stepVar->toInt();
         if (0 === $step) {
-            throw new \ValueError(self::ZERO_STEP_ERROR);
+            throw new \ValueError(self::STEP_RANGE_ERROR);
         }
 
         return self::normalizeIntStepSign($start, $end, $step);
@@ -292,7 +293,7 @@ final class VmRange
             );
         }
         if (0.0 === $step) {
-            throw new \ValueError(self::ZERO_STEP_ERROR);
+            throw new \ValueError(self::STEP_RANGE_ERROR);
         }
 
         return self::normalizeFloatStepSign($start, $end, $step);
@@ -343,7 +344,7 @@ final class VmRange
             $step = $stepVar->toInt();
         }
         if (0 === $step) {
-            throw new \ValueError(self::ZERO_STEP_ERROR);
+            throw new \ValueError(self::STEP_RANGE_ERROR);
         }
 
         return self::normalizeIntStepSign(ord($startChar), ord($endChar), $step);
@@ -353,15 +354,47 @@ final class VmRange
     public static function intRangeTable(int $start, int $end, int $step): HashTable
     {
         if (0 === $step) {
-            throw new \ValueError(self::ZERO_STEP_ERROR);
+            throw new \ValueError(self::STEP_RANGE_ERROR);
         }
         $step = self::normalizeIntStepSign($start, $end, $step);
 
         return self::buildIntRange($start, $end, $step);
     }
 
+    /**
+     * php-src PHP_FUNCTION(range) / boundary_error: when endpoints differ, |step| must be
+     * <= |end - start| (equality allowed). Equal endpoints always yield a singleton (#26657).
+     */
+    private static function rejectOversizedIntStep(int $start, int $end, int $step): void
+    {
+        if ($start === $end) {
+            return;
+        }
+        $span = $start > $end ? ($start - $end) : ($end - $start);
+        $stepAbs = $step < 0 ? -$step : $step;
+        if ($span < $stepAbs) {
+            throw new \ValueError(self::STEP_RANGE_ERROR);
+        }
+    }
+
+    private static function rejectOversizedFloatStep(float $start, float $end, float $step): void
+    {
+        if ($start === $end) {
+            return;
+        }
+        $stepAbs = abs($step);
+        if ($stepAbs <= 0.0) {
+            throw new \ValueError(self::STEP_RANGE_ERROR);
+        }
+        $span = $start > $end ? ($start - $end) : ($end - $start);
+        if ($span < $stepAbs) {
+            throw new \ValueError(self::STEP_RANGE_ERROR);
+        }
+    }
+
     private static function buildIntRange(int $start, int $end, int $step): HashTable
     {
+        self::rejectOversizedIntStep($start, $end, $step);
         $ht = new HashTable();
         $index = 0;
         if ($step > 0) {
@@ -385,6 +418,7 @@ final class VmRange
 
     private static function buildFloatRange(float $start, float $end, float $step): HashTable
     {
+        self::rejectOversizedFloatStep($start, $end, $step);
         $ht = new HashTable();
         $index = 0;
         // php-src ext/standard/array.c — index * step from start, size from round span (#15326).
@@ -426,10 +460,11 @@ final class VmRange
 
     private static function buildCharRange(string $startChar, string $endChar, int $step): HashTable
     {
-        $ht = new HashTable();
-        $index = 0;
         $start = ord($startChar);
         $end = ord($endChar);
+        self::rejectOversizedIntStep($start, $end, $step);
+        $ht = new HashTable();
+        $index = 0;
         if ($step > 0) {
             for ($i = $start; $i <= $end; $i += $step) {
                 $stored = new Variable();

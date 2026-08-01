@@ -40,6 +40,19 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertSame(4, $stepped->getNumElements());
         $this->assertSame(0, $stepped->findIndex(0)?->resolveIndirect()->toInt());
         $this->assertSame(6, $stepped->findIndex(3)?->resolveIndirect()->toInt());
+
+        // php-src: |step| > span → ValueError; |step| == span OK (#26657).
+        $equalSpan = RangeIntJitHelper::intRangeCopy(0, 2, 2);
+        $this->assertSame(2, $equalSpan->getNumElements());
+        try {
+            RangeIntJitHelper::intRangeCopy(0, 1, 2);
+            $this->fail('expected ValueError for oversized step');
+        } catch (\ValueError $e) {
+            $this->assertSame(
+                'range(): Argument #3 ($step) must not exceed the specified range',
+                $e->getMessage()
+            );
+        }
     }
 
     public function testDeadBuildIntegerRangeLlvmDeletedFromHashTableWrite(): void
