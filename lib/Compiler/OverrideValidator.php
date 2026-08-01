@@ -79,6 +79,16 @@ final class OverrideValidator
         return false;
     }
 
+    /** Display `$prop::get` for synthetic property-hook methods (#26328). */
+    private static function overrideMethodDisplayName(string $methodName): string
+    {
+        $reflection = \PHPCompiler\SourcePreprocessor\PropertyHooks::reflectionNameFromHookMethod(
+            strtolower($methodName)
+        );
+
+        return $reflection ?? $methodName;
+    }
+
     /**
      * @throws \CompileError
      */
@@ -224,7 +234,7 @@ final class OverrideValidator
             throw new \CompileError(sprintf(
                 '%s::%s() has #[\Override] attribute, but no matching parent method exists',
                 ltrim($ownerDisplay, '\\'),
-                $method->func->name
+                self::overrideMethodDisplayName($method->func->name)
             ));
         }
         $ownerLc = strtolower(ltrim($ownerDisplay, '\\'));
