@@ -131,16 +131,32 @@ final class DomNodeState
     /** Live {@see DOMNodeList}/{@see Dom\HTMLCollection} class-token query for getElementsByClassName (#20556, #20709). */
     public ?string $listQueryClassNames = null;
 
-    /** Persistent childNodes list object id for element/document nodes. */
+    /** Most recent childNodes list object id for element/document nodes. */
     public ?int $childNodesListId = null;
+
+    /**
+     * All childNodes {@see DOMNodeList} wrappers issued for this node (Zend distinct
+     * wrappers per property read; php-src ext/dom/node.c; #26330).
+     *
+     * @var list<int>
+     */
+    public array $liveChildNodesListIds = [];
 
     /**
      * Persistent Dom\HTMLCollection id for ParentNode::$children (element children only; #21033).
      */
     public ?int $childrenListId = null;
 
-    /** Persistent attributes map object id for element nodes (php-src ext/dom/namednodemap.c). */
+    /** Most recent attributes map object id for element nodes (php-src ext/dom/namednodemap.c). */
     public ?int $attributesListId = null;
+
+    /**
+     * All attributes {@see DOMNamedNodeMap} wrappers issued for this element (Zend distinct
+     * wrappers per property read; php-src ext/dom/php_dom.c; #26330).
+     *
+     * @var list<int>
+     */
+    public array $liveAttributesMapIds = [];
 
     /** Persistent DOMTokenList object id for element nodes (php-src ext/dom/token_list.c; #16876). */
     public ?int $classListId = null;

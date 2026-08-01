@@ -10554,6 +10554,129 @@ final class VmDom
         self::syncElementAttributes($ctx, $element);
     }
 
+    /**
+     * Property read for DOMElement::$attributes — fresh NamedNodeMap wrapper each time
+     * (php-src ext/dom/php_dom.c dom_element_attributes_read; #26330).
+     */
+    public static function issueElementAttributesMap(Context $ctx, ObjectEntry $element): Variable
+    {
+        if (!self::isElement($element) || !DomRegistry::has($element)) {
+            $var = new Variable();
+            $var->null();
+
+            return $var;
+        }
+        self::initElementPropertySlots($element);
+        $state = DomRegistry::state($element);
+        $attrIds = self::collectAttributeNodeIds($ctx, $element);
+        self::syncAttributeTreeLinks($ctx, $element, $attrIds);
+        self::refreshLiveAttributesMaps($element, $attrIds);
+
+        $mapVar = self::createNamedNodeMap($ctx, $attrIds, $element);
+        $map = $mapVar->toObject();
+        $state->liveAttributesMapIds[] = $map->id;
+        $state->attributesListId = $map->id;
+        self::rawPropertySlot($element, self::PROP_ATTRIBUTES)->copyFrom($mapVar);
+
+        $out = new Variable();
+        $out->copyFrom($mapVar);
+
+        return $out;
+    }
+
+    /**
+     * Property read for DOMNode::$childNodes — fresh NodeList wrapper each time
+     * (php-src ext/dom/node.c dom_node_child_nodes_read; #26330).
+     */
+    public static function issueChildNodesList(Context $ctx, ObjectEntry $node): Variable
+    {
+        if (!self::exposesChildNodes($node)) {
+            $var = new Variable();
+            $var->null();
+
+            return $var;
+        }
+        self::initNodePropertySlots($node);
+        $state = DomRegistry::state($node);
+        self::syncChildSiblingLinks($state->childIds);
+        self::refreshLiveChildNodesLists($node, $state->childIds);
+
+        $listVar = VmDomLiving::prefersLivingCollections($node)
+            ? self::createDomNodeList($ctx, $state->childIds)
+            : self::createNodeList($ctx, $state->childIds);
+        $list = $listVar->toObject();
+        $state->liveChildNodesListIds[] = $list->id;
+        $state->childNodesListId = $list->id;
+        self::rawPropertySlot($node, self::PROP_CHILD_NODES)->copyFrom($listVar);
+
+        $out = new Variable();
+        $out->copyFrom($listVar);
+
+        return $out;
+    }
+
+    /** @param list<int> $attrIds */
+    private static function refreshLiveAttributesMaps(ObjectEntry $element, array $attrIds): void
+    {
+        $state = DomRegistry::state($element);
+        $alive = [];
+        foreach ($state->liveAttributesMapIds as $mapId) {
+            $map = DomRegistry::entry($mapId);
+            if (null === $map || !self::isNamedNodeMap($map)) {
+                continue;
+            }
+            self::updateNamedNodeMapMembers($map, $attrIds);
+            $alive[] = $mapId;
+        }
+        $state->liveAttributesMapIds = $alive;
+        if (null !== $state->attributesListId
+            && !\in_array($state->attributesListId, $alive, true)
+        ) {
+            $canonical = DomRegistry::entry($state->attributesListId);
+            if (null !== $canonical && self::isNamedNodeMap($canonical)) {
+                self::updateNamedNodeMapMembers($canonical, $attrIds);
+                $state->liveAttributesMapIds[] = $state->attributesListId;
+            }
+        }
+    }
+
+    /** @param list<int> $childIds */
+    private static function refreshLiveChildNodesLists(ObjectEntry $node, array $childIds): void
+    {
+        $state = DomRegistry::state($node);
+        $alive = [];
+        foreach ($state->liveChildNodesListIds as $listId) {
+            $list = DomRegistry::entry($listId);
+            if (null === $list || !self::isNodeList($list)) {
+                continue;
+            }
+            self::updateNodeListMembers($list, $childIds);
+            $alive[] = $listId;
+        }
+        $state->liveChildNodesListIds = $alive;
+        if (null !== $state->childNodesListId
+            && !\in_array($state->childNodesListId, $alive, true)
+        ) {
+            $canonical = DomRegistry::entry($state->childNodesListId);
+            if (null !== $canonical && self::isNodeList($canonical)) {
+                self::updateNodeListMembers($canonical, $childIds);
+                $state->liveChildNodesListIds[] = $state->childNodesListId;
+            }
+        }
+    }
+
+    /** Slot access that does not re-enter managed property handlers (#26330). */
+    private static function rawPropertySlot(ObjectEntry $entry, string $name): Variable
+    {
+        $props = $entry->propertiesWithNames();
+        if (!isset($props[$name])) {
+            $entry->allocateProperty($name);
+            $props = $entry->propertiesWithNames();
+        }
+
+        return $props[$name];
+    }
+
     private static function syncElementAttributes(Context $ctx, ObjectEntry $element): void
     {
         if (!self::isElement($element)) {
@@ -10564,25 +10687,25 @@ final class VmDom
         $attrIds = self::collectAttributeNodeIds($ctx, $element);
         self::syncAttributeTreeLinks($ctx, $element, $attrIds);
 
-        $props = $element->propertiesWithNames();
-        if (!isset($props[self::PROP_ATTRIBUTES])) {
-            $element->allocateProperty(self::PROP_ATTRIBUTES);
-            $props = $element->propertiesWithNames();
-        }
-        $attrsVar = $props[self::PROP_ATTRIBUTES];
+        $attrsVar = self::rawPropertySlot($element, self::PROP_ATTRIBUTES);
+        self::refreshLiveAttributesMaps($element, $attrIds);
+
         if (null !== $state->attributesListId) {
             $map = DomRegistry::entry($state->attributesListId);
-            if (null !== $map) {
+            if (null !== $map && self::isNamedNodeMap($map)) {
                 self::updateNamedNodeMapMembers($map, $attrIds);
                 $attrsVar->object($map);
 
                 return;
             }
         }
-        if (null === $state->attributesListId && Variable::TYPE_OBJECT === $attrsVar->resolveIndirect()->type) {
+        if (Variable::TYPE_OBJECT === $attrsVar->resolveIndirect()->type) {
             $existing = $attrsVar->resolveIndirect()->toObject();
             if (self::isNamedNodeMap($existing)) {
                 $state->attributesListId = $existing->id;
+                if (!\in_array($existing->id, $state->liveAttributesMapIds, true)) {
+                    $state->liveAttributesMapIds[] = $existing->id;
+                }
                 self::updateNamedNodeMapMembers($existing, $attrIds);
                 $attrsVar->object($existing);
 
@@ -10592,6 +10715,7 @@ final class VmDom
         $mapVar = self::createNamedNodeMap($ctx, $attrIds, $element);
         $map = $mapVar->toObject();
         $state->attributesListId = $map->id;
+        $state->liveAttributesMapIds[] = $map->id;
         $attrsVar->copyFrom($mapVar);
     }
 
@@ -10792,7 +10916,8 @@ final class VmDom
             return;
         }
         self::initNodePropertySlots($node);
-        $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES)->resolveIndirect();
+        // Raw slot — childNodes is a managed property (#26330).
+        $childNodesVar = self::rawPropertySlot($node, self::PROP_CHILD_NODES)->resolveIndirect();
         if (Variable::TYPE_OBJECT === $childNodesVar->type && self::isNodeList($childNodesVar->toObject())) {
             self::ensureChildrenCollection($ctx, $node);
 
@@ -10881,6 +11006,12 @@ final class VmDom
             self::PROP_LAST_CHILD,
             self::PROP_CHILD_NODES,
         ] as $prop) {
+            // childNodes is managed (#26330) — copy the raw slot, do not issue a wrapper.
+            if (self::PROP_CHILD_NODES === $prop) {
+                self::rawPropertySlot($dest, $prop)->copyFrom(self::rawPropertySlot($source, $prop));
+
+                continue;
+            }
             $dest->getProperty($prop)->copyFrom($source->getProperty($prop));
         }
     }
@@ -10942,10 +11073,12 @@ final class VmDom
         self::syncParentNodeElementProperties($node, $state->childIds);
         self::syncParentNodeChildrenCollection($ctx, $node, $state->childIds);
 
-        $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES);
+        // Raw slot — childNodes is a managed property that issues fresh wrappers (#26330).
+        $childNodesVar = self::rawPropertySlot($node, self::PROP_CHILD_NODES);
+        self::refreshLiveChildNodesLists($node, $state->childIds);
         if (null !== $state->childNodesListId) {
             $list = DomRegistry::entry($state->childNodesListId);
-            if (null !== $list) {
+            if (null !== $list && self::isNodeList($list)) {
                 self::updateNodeListMembers($list, $state->childIds);
                 $childNodesVar->object($list);
                 self::syncChildSiblingLinks($state->childIds);
@@ -10956,10 +11089,13 @@ final class VmDom
                 return;
             }
         }
-        if (null === $state->childNodesListId && Variable::TYPE_OBJECT === $childNodesVar->resolveIndirect()->type) {
+        if (Variable::TYPE_OBJECT === $childNodesVar->resolveIndirect()->type) {
             $existing = $childNodesVar->resolveIndirect()->toObject();
             if (self::isNodeList($existing)) {
                 $state->childNodesListId = $existing->id;
+                if (!\in_array($existing->id, $state->liveChildNodesListIds, true)) {
+                    $state->liveChildNodesListIds[] = $existing->id;
+                }
                 self::updateNodeListMembers($existing, $state->childIds);
                 $childNodesVar->object($existing);
                 self::syncChildSiblingLinks($state->childIds);
@@ -10982,6 +11118,7 @@ final class VmDom
             : self::createNodeList($ctx, $state->childIds);
         $list = $listVar->toObject();
         $state->childNodesListId = $list->id;
+        $state->liveChildNodesListIds[] = $list->id;
         $childNodesVar->copyFrom($listVar);
 
         self::syncChildSiblingLinks($state->childIds);
@@ -11818,6 +11955,21 @@ final class VmDom
     {
         return DomRegistry::has($entry)
             && DomConstants::XML_ELEMENT_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    /**
+     * True when {@see DOMNode::$childNodes} is a live collection property (php-src node.c; #26330).
+     * Excludes list/map/token/xpath handles that also sit in DomRegistry.
+     */
+    public static function exposesChildNodes(ObjectEntry $entry): bool
+    {
+        if (!DomRegistry::has($entry)) {
+            return false;
+        }
+        $nodeType = DomRegistry::state($entry)->nodeType;
+
+        return $nodeType >= DomConstants::XML_ELEMENT_NODE
+            && $nodeType <= DomConstants::XML_NAMESPACE_DECL_NODE;
     }
 
     public static function isTextNode(ObjectEntry $entry): bool

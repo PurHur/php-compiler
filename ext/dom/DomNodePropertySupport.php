@@ -80,6 +80,7 @@ final class DomNodePropertySupport
             || (VmDom::isElement($object) && strtolower(VmDom::PROP_TAG_NAME) === $lc)
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
             || (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc)
+            || (VmDom::exposesChildNodes($object) && strtolower(VmDom::PROP_CHILD_NODES) === $lc)
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
             || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc
             || strtolower(VmDom::PROP_BASE_URI) === $lc
@@ -200,9 +201,17 @@ final class DomNodePropertySupport
             if (null === $ctx) {
                 $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
             }
-            VmDom::ensureElementAttributesMap($ctx, $object);
 
-            return VmDom::elementAttributesVariable($object);
+            // Zend creates a fresh NamedNodeMap wrapper per read (php-src; #26330).
+            return VmDom::issueElementAttributesMap($ctx, $object);
+        }
+        if (VmDom::exposesChildNodes($object) && strtolower(VmDom::PROP_CHILD_NODES) === $lc) {
+            if (null === $ctx) {
+                $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+            }
+
+            // Zend creates a fresh NodeList wrapper per read (php-src; #26330).
+            return VmDom::issueChildNodesList($ctx, $object);
         }
         if (strtolower(VmDom::PROP_NODE_VALUE) === $lc) {
             $value = VmDom::readNodeValue($object);
