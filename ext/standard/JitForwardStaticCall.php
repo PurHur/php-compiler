@@ -169,12 +169,16 @@ final class JitForwardStaticCall
         JITVariable $params,
         string $builtinName
     ): void {
+        // AOT/top-level array literals are often TYPE_VALUE boxes; accept the same
+        // shapes as ArrayBuiltinHelper::loadHashTable() (#26237 / #6853).
         if (
             !ArrayBuiltinHelper::isNativeArray($params->type)
             && JITVariable::TYPE_HASHTABLE !== $params->type
+            && JITVariable::TYPE_VALUE !== $params->type
+            && !JitValueBox::isValueOperand($params)
         ) {
             throw new \LogicException(
-                "{$builtinName}() argument #2 (\$parameters) must be of type array in this compiler build"
+                "{$builtinName}() argument #2 (\$args) must be of type array in this compiler build"
             );
         }
         $ht = ArrayBuiltinHelper::loadHashTable($context, $params);
