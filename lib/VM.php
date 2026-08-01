@@ -20618,6 +20618,12 @@ restart:
             return;
         }
         if (null === $value && $this->declaredReturnTypeRequiresValue($block)) {
+            if ($block->returnTypeMixed) {
+                TypeCheck::assertNoneReturned(
+                    $this->returnTypeCallableName($block->func),
+                    'mixed'
+                );
+            }
             TypeCheck::assertReturnValueProvided();
         }
         if ($block->returnTypeStatic) {
@@ -20692,6 +20698,9 @@ restart:
 
     private function declaredReturnTypeRequiresValue(Block $block): bool
     {
+        if ($block->returnTypeMixed) {
+            return true;
+        }
         if ($block->returnTypeStatic) {
             return true;
         }

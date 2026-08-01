@@ -150,6 +150,9 @@ class Block {
     /** Declared `: static` return — late-bound object type (issue #3412). */
     public bool $returnTypeStatic = false;
 
+    /** Explicit `: mixed` return — still requires a returned value (#26485). */
+    public bool $returnTypeMixed = false;
+
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
@@ -943,6 +946,7 @@ class Block {
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
             $this->returnTypeStatic = $parent->returnTypeStatic;
+            $this->returnTypeMixed = $parent->returnTypeMixed;
             $this->returnDeclaredType = $parent->returnDeclaredType;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
@@ -2456,12 +2460,14 @@ class Block {
             return false;
         }
         if ($returnType instanceof Op\Type\Mixed_) {
+            // php-cfg uses Mixed_ for *untyped* functions; explicit `: mixed` is Literal.
             return false;
         }
         if ($returnType instanceof Op\Type\Literal) {
             $name = strtolower($returnType->name);
 
-            return 'void' !== $name && 'never' !== $name && 'mixed' !== $name;
+            // Explicit `: mixed` still requires a return value (zend_verify_return_type / #26485).
+            return 'void' !== $name && 'never' !== $name;
         }
 
         return true;

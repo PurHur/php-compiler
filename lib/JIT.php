@@ -10225,6 +10225,24 @@ class JIT {
                                     ? "{$neverFunc}(): never-returning function must not implicitly return"
                                     : 'A never-returning function must not return'
                             );
+                        } elseif ($block->returnTypeMixed) {
+                            // Explicit `: mixed` still requires a return value (#26485).
+                            $mixedName = $this->jitReturnTypeCallableName($block->func);
+                            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\TypeErrorRaise::emitRaise(
+                                $this->context,
+                                null !== $mixedName && '' !== $mixedName
+                                    ? "{$mixedName}(): Return value must be of type mixed, none returned"
+                                    : 'Return value must be of type mixed, none returned'
+                            );
+                        } elseif ($this->jitDeclaredReturnTypeRequiresValue($block)) {
+                            JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\ErrorRaise::emitRaise(
+                                $this->context,
+                                'A function with return type must return a value'
+                            );
                         }
                         if ($this->isVoidLlvmFunction($func)) {
                             $this->context->builder->returnVoid();
@@ -11815,6 +11833,42 @@ class JIT {
     private function emitJitScalarReturnTypeCheck(Block $block, Variable &$return): bool
     {
         return JIT\ScalarReturnCheck::enforce($this->context, $block, $return);
+    }
+
+    /** Mirror VM declaredReturnTypeRequiresValue for RETURN_VOID epilogues (#26485). */
+    private function jitDeclaredReturnTypeRequiresValue(Block $block): bool
+    {
+        if ($block->returnTypeMixed || $block->returnTypeStatic) {
+            return true;
+        }
+        if (null !== $block->returnDnfConstraints) {
+            return true;
+        }
+        if (null !== $block->returnClassConstraint) {
+            $label = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+            if ($block->isGenerator && in_array($label, ['Generator', 'Iterator', 'Traversable'], true)) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return null !== $block->returnTypeConstraint;
+    }
+
+    private function jitReturnTypeCallableName(?\PHPCfg\Func $func): ?string
+    {
+        if (null === $func) {
+            return null;
+        }
+        if (null !== $func->class) {
+            $className = $func->class->value ?? null;
+            if (is_string($className) && '' !== $className) {
+                return $className.'::'.$func->name;
+            }
+        }
+
+        return $func->name;
     }
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
