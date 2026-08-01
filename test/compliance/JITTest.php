@@ -1539,8 +1539,9 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'eval_compile_error_catchable')) {
                 continue;
             }
-            // final plain property override/child_override _84: host PHP 8.2 parser rejects `final` on plain properties (#24687).
+            // final plain property override/child_override _84/_85: host PHP 8.2 parser rejects `final` on plain properties (#24687, #26306).
             if (str_contains($name, 'final_plain_property_override_84')
+                || str_contains($name, 'final_plain_property_override_85')
                 || str_contains($name, 'final_plain_property_child_override_84')
                 || str_contains($name, 'final_plain_property_override_after_ternary_84')) {
                 continue;
