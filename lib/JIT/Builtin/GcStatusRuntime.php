@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\CompilerVersion;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for gc_status() via GcStatusJitHelper PHP (#9150).
+ * JIT/AOT link for gc_status() via GcStatusJitHelper PHP (#9150, #26472).
  *
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmGcStatus}
- * php-src: ext/standard/php_gc.c — PHP_FUNCTION(gc_status)
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(gc_status)
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer IniParseQuantity #26444).
  */
 final class GcStatusRuntime
 {
@@ -203,56 +205,18 @@ final class GcStatusRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GcStatusJitHelper compile (#9150)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26472');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcStatusJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GcStatusJitHelper.php parseAndCompile failed (#9150)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9150)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26472'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
