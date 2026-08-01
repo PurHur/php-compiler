@@ -59,9 +59,13 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'abstract_enum_declarations',
             'construct' => 'Abstract enum `abstract enum E { case A; }`',
-            'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
-            'issue' => 3737,
-            'notes' => ['Source rewriter + php-cfg flags; `new E()` fatals; case fetch works on VM'],
+            // Empty opcodes: Zend rejects — probe fails → no/no/no (#26519, inverts #3737).
+            'opcodes' => [],
+            'issue' => 26519,
+            'notes' => [
+                'Zend has no `abstract enum` production (zend_language_parser.y); reject like `final enum` (#26519)',
+                'Prior #3737 rewriter stripped the modifier — removed for php-src-strict parity',
+            ],
             'probe' => 'abstract enum E { case A; } echo E::A->name;',
         ],
         [
