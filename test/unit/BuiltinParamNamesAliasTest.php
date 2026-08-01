@@ -1065,6 +1065,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $ctx->type);
     }
 
+    /** @covers issue #26320 — InternalArgInfo still says path */
+    public function testOpendirDirectoryNamedParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('opendir');
+        self::assertSame(['directory', 'context='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'directory', 'opendir'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'opendir'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'path', 'opendir'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('opendir'));
+        self::assertSame(
+            ['directory', 'context='],
+            BuiltinParamNames::paramNamesForInternalFunction('opendir')
+        );
+    }
+
     /** @covers issue #23346 */
     public function testChmodPermissionsNamedParam(): void
     {
