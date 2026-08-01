@@ -41,7 +41,6 @@ final class ReturnPendingRuntime
         JitHelperAbiBridge::implement(
             $context,
             self::HELPER_PATH,
-            'ReturnPendingJitHelper.php',
             '#9663',
             self::COMPILED_HELPERS,
             [
