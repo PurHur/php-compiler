@@ -15,22 +15,18 @@ final class PropertyDefaultClassPseudoConstVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        yield 'property_default_class_pseudo_const.phpt' => self::parsePHPT(
-            __DIR__.'/cases/language/property_default_class_pseudo_const.phpt',
-            'property_default_class_pseudo_const.phpt'
-        );
-        yield 'property_default_static_class_reject.phpt' => self::parsePHPT(
-            __DIR__.'/cases/language/property_default_static_class_reject.phpt',
-            'property_default_static_class_reject.phpt'
-        );
-        yield 'property_default_const_expr.phpt' => self::parsePHPT(
-            __DIR__.'/cases/language/property_default_const_expr.phpt',
-            'property_default_const_expr.phpt'
-        );
-        yield 'property_default_array_class_const.phpt' => self::parsePHPT(
-            __DIR__.'/cases/language/property_default_array_class_const.phpt',
-            'property_default_array_class_const.phpt'
-        );
+        foreach ([
+            'property_default_class_pseudo_const.phpt',
+            'property_default_class_pseudo_const_ns.phpt',
+            'property_default_static_class_reject.phpt',
+            'property_default_const_expr.phpt',
+            'property_default_array_class_const.phpt',
+        ] as $file) {
+            yield $file => self::parsePHPT(
+                __DIR__.'/cases/language/'.$file,
+                $file
+            );
+        }
     }
 
     public function setUp(): void

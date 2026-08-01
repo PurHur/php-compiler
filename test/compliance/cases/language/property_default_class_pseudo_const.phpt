@@ -14,19 +14,6 @@ class A extends B {
 $a = new A;
 echo $a->x, "|", $a->y, "|", $a->z, "\n";
 echo A::$sx, "|", A::$sy, "|", A::$sz, "\n";
-
-namespace Foo {
-    class B {}
-    class A extends B {
-        public $x = self::class;
-        public $y = parent::class;
-        public $z = B::class;
-        public $w = \Foo\B::class;
-    }
-    $a = new A;
-    echo $a->x, "|", $a->y, "|", $a->z, "|", $a->w, "\n";
-}
 --EXPECT--
 A|B|B
 A|B|B
-Foo\A|Foo\B|Foo\B|Foo\B

@@ -8155,7 +8155,15 @@ class Compiler {
                                 } else {
                                     $staticClassMsg = $this->propertyDefaultStaticClassRejectMessage($child);
                                     if (null !== $staticClassMsg) {
-                                        $this->throwCompileError($staticClassMsg);
+                                        $sourceFile = $child->getFile();
+                                        if ('' === $sourceFile) {
+                                            $sourceFile = 'unknown';
+                                        }
+                                        throw new CompileFatal(
+                                            $sourceFile,
+                                            max(1, $child->getLine()),
+                                            $staticClassMsg
+                                        );
                                     }
                                     $propName = '?';
                                     if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
@@ -10877,7 +10885,11 @@ class Compiler {
             if (null !== $this->compilingClassLc) {
                 $parent = $this->compilingClassParentDisplayName();
                 if (null === $parent || '' === $parent) {
-                    $this->throwCompileError(EnumParentCompileCheck::MESSAGE);
+                    throw new CompileFatal(
+                        'unknown',
+                        1,
+                        EnumParentCompileCheck::MESSAGE
+                    );
                 }
 
                 return $parent;
