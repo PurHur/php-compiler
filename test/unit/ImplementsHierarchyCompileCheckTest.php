@@ -49,6 +49,37 @@ PHP;
         $runtime->parseAndCompile($code, 'extends_interface.php');
     }
 
+    /** @covers issue #26537 */
+    public function testClassExtendsTraitFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {}
+class C extends T {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C cannot extend trait T');
+        $runtime->parseAndCompile($code, 'extends_trait.php');
+    }
+
+    /** @covers issue #26537 */
+    public function testTraitUseCompositionStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public function hi() { echo "hi\n"; } }
+class C { use T; }
+(new C)->hi();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'use_trait.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
+
     public function testInterfaceExtendsClassFailsAtCompileTime(): void
     {
         $runtime = new Runtime();

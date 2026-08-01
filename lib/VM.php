@@ -18882,6 +18882,12 @@ restart:
             return;
         }
         $parent = $this->context->classes[$entry->parentLc];
+        // php-src zend_inheritance.c — parent must not be ZEND_ACC_TRAIT (#26537).
+        if ($parent->isTrait) {
+            throw new \CompileError(
+                "Class {$entry->name} cannot extend trait {$parent->name}"
+            );
+        }
         // php-src zend_inheritance.c — cannot extend ZEND_ACC_FINAL (#21669, #3406).
         // Enums are implicitly final (zend_enum.c ZEND_ACC_FINAL; #26531).
         if ($parent->isFinal || $parent->isEnum) {
