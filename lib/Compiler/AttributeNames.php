@@ -71,11 +71,11 @@ final class AttributeNames
     }
 
     /**
-     * Zend compile-time target guard (zend_attributes.c, issue #6864, #9821, #9822, #25138).
+     * Zend compile-time target guard (zend_attributes.c / zend_attributes.stub.php; #6864, #25138, #26253).
      *
-     * `#[\Override]` targets methods (and class constants in this compiler) from PHP 8.3+.
-     * Property targeting requires PHP 8.5+ ({@see CompilerVersion::supportsOverridePropertyTarget})
-     * — php-src PHP-8.4 stub is TARGET_METHOD only; PHP-8.5 adds TARGET_PROPERTY.
+     * `#[\Override]` targets methods from PHP 8.3+. Property targeting requires PHP 8.5+
+     * ({@see CompilerVersion::supportsOverridePropertyTarget}). Class constants are not a valid
+     * target on any shipping PHP (RFC override_constants is proposed for 8.6 only).
      *
      * @param list<string> $names
      */
@@ -89,11 +89,11 @@ final class AttributeNames
             return;
         }
 
-        $allowed = ['method', 'class constant'];
-        $allowedMsg = 'method, class constant';
+        $allowed = ['method'];
+        $allowedMsg = 'method';
         if (CompilerVersion::supportsOverridePropertyTarget()) {
             $allowed[] = 'property';
-            $allowedMsg = 'method, class constant, property';
+            $allowedMsg = 'method, property';
         }
 
         if (\in_array($target, $allowed, true)) {

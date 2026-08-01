@@ -89,9 +89,9 @@ final class BuiltinAttributes
 
     private static function registerOverride(Context $ctx): void
     {
-        // php-src Zend/zend_attributes.stub.php — TARGET_METHOD; +TARGET_PROPERTY on 8.5+ (#25138).
-        // TARGET_CLASS_CONSTANT kept for #9821 compile coverage (not in php-src Override flags).
-        $targets = AttributeSupport::TARGET_METHOD | AttributeSupport::TARGET_CLASS_CONSTANT;
+        // php-src Zend/zend_attributes.stub.php — TARGET_METHOD; +TARGET_PROPERTY on 8.5+ (#25138, #26253).
+        // Never TARGET_CLASS_CONSTANT until php-src ships override_constants (proposed 8.6).
+        $targets = AttributeSupport::TARGET_METHOD;
         if (CompilerVersion::supportsOverridePropertyTarget()) {
             $targets |= AttributeSupport::TARGET_PROPERTY;
         }

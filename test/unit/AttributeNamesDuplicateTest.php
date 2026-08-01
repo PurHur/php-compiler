@@ -122,7 +122,7 @@ final class AttributeNamesDuplicateTest extends TestCase
             $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target class (allowed targets: method, class constant)'
+                'Attribute "Override" cannot target class (allowed targets: method)'
             );
             AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'class');
         } finally {
@@ -143,7 +143,7 @@ final class AttributeNamesDuplicateTest extends TestCase
             $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target parameter (allowed targets: method, class constant)'
+                'Attribute "Override" cannot target parameter (allowed targets: method)'
             );
             AttributeNames::assertOverrideMethodTargetOnly(['\\Override'], 'parameter');
         } finally {
@@ -163,9 +163,49 @@ final class AttributeNamesDuplicateTest extends TestCase
             $this->assertFalse(CompilerVersion::supportsOverridePropertyTarget());
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target property (allowed targets: method, class constant)'
+                'Attribute "Override" cannot target property (allowed targets: method)'
             );
             AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'property');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testRejectsOverrideOnClassConstant(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Override" cannot target class constant (allowed targets: method)'
+            );
+            AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'class constant');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testRejectsOverrideOnClassConstantAt85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverridePropertyTarget());
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Override" cannot target class constant (allowed targets: method, property)'
+            );
+            AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'class constant');
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
