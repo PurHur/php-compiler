@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Builtin\StringGetParentClass;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -31,6 +33,24 @@ final class JitGetParentClass
         }
 
         return self::routeThroughPhpHelper($context, $whatArg);
+    }
+
+    /**
+     * Zero-arg get_parent_class() — defining-scope parent or false (#26369).
+     *
+     * php-src: Zend/zend_builtin_functions.c — zend_get_executed_scope() then ce->parent.
+     */
+    public static function invokeNoArg(Context $context): Value
+    {
+        if (CompilerVersion::supportsGetClassParentClassParameterlessDeprecation()) {
+            VmEngineBuiltinDeprecation::emitJitCallingWithoutArguments($context, 'get_parent_class');
+        }
+        $block = $context->jitEnclosingBlock;
+        if (!$block instanceof Block || null === $block->func || null === $block->func->class) {
+            return self::returnFalse($context);
+        }
+
+        return self::invokeForClassName($context, $block->func->class->value);
     }
 
     private static function routeThroughPhpHelper(Context $context, JITVariable $whatArg): Value

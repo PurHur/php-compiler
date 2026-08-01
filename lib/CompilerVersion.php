@@ -1112,6 +1112,31 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ E_DEPRECATED for get_class()/get_parent_class() without arguments (#26369).
+     *
+     * php-src: Zend/zend_builtin_functions.c — "Calling get_class() without arguments is deprecated"
+     * (same for get_parent_class). Withheld on 8.4.0-dev reference profile (matches Zend 8.2 silence).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsGetClassParentClassParameterlessDeprecation(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.2+ get_defined_functions() optional $exclude_disabled (ext/standard/basic_functions.c, #4942).
      *
      * Unlike {@see supportsGetDeclaredExcludeDeprecated()} (PHP 8.4-only), Zend exposes this on the

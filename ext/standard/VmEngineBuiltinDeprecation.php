@@ -22,6 +22,12 @@ final class VmEngineBuiltinDeprecation
         return 'Constant '.$constant.' is deprecated';
     }
 
+    /** php-src zend_builtin_functions.c — get_class / get_parent_class zero-arg (#26369). */
+    public static function callingWithoutArgumentsMessage(string $function): string
+    {
+        return 'Calling '.$function.'() without arguments is deprecated';
+    }
+
     public static function emitFunction(?Frame $frame, string $function): void
     {
         self::emit($frame, self::functionMessage($function));
@@ -30,6 +36,11 @@ final class VmEngineBuiltinDeprecation
     public static function emitConstant(?Frame $frame, string $constant): void
     {
         self::emit($frame, self::constantMessage($constant));
+    }
+
+    public static function emitCallingWithoutArguments(?Frame $frame, string $function): void
+    {
+        self::emit($frame, self::callingWithoutArgumentsMessage($function));
     }
 
     public static function emitJitFunction(Context $context, string $function): void
@@ -46,6 +57,14 @@ final class VmEngineBuiltinDeprecation
             return;
         }
         JitBuiltinWarning::emitDeprecated($context, self::constantMessage($constant));
+    }
+
+    public static function emitJitCallingWithoutArguments(Context $context, string $function): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JitBuiltinWarning::emitDeprecated($context, self::callingWithoutArgumentsMessage($function));
     }
 
     private static function emit(?Frame $frame, string $message): void
