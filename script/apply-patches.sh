@@ -108,6 +108,9 @@ patch_already_applied() {
     php-types-fromdecl-junk-fragments.patch)
       grep -q 'Malformed phpdoc fragments in vendor trees' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-fromdecl-string-literals.patch)
+      grep -q 'Psalm/PHPStan string literal types' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-fromdecl-trailing-comma.patch)
       grep -q 'Docblock union splits may leave a lone' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
         && ! php_types_type_fromdecl_trailing_comma_corrupt "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
@@ -4091,6 +4094,48 @@ PY
   echo "Applied php-types-fromdecl-junk-fragments.patch (overlay)"
 }
 
+apply_php_types_fromdecl_string_literals_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-fromdecl-string-literals.patch"; then
+    echo "Skip php-types-fromdecl-string-literals.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if "Psalm/PHPStan string literal types" in text:
+    raise SystemExit(0)
+
+anchor = (
+    "        // Malformed phpdoc fragments in vendor trees (north-star5 prelink; #2743, #2745).\n"
+    "        if ('' === $trimmedDecl || '*' === $trimmedDecl || '*/' === $trimmedDecl\n"
+    "            || str_starts_with($trimmedDecl, '*/')) {\n"
+    "            return self::mixed();\n"
+    "        }\n"
+)
+if anchor not in text:
+    sys.stderr.write("php-types-fromdecl-string-literals: junk-fragments anchor not found\n")
+    raise SystemExit(1)
+
+insert = (
+    anchor
+    + "        // Psalm/PHPStan string literal types: 'parent' / \"foo\" (#26686).\n"
+    + "        // Spine docblocks use @return null|'parent'|'self'|'static' (#26630 / #26655).\n"
+    + "        if (\n"
+    + "            (strlen($trimmedDecl) >= 2 && \"'\" === $trimmedDecl[0] && str_ends_with($trimmedDecl, \"'\"))\n"
+    + "            || (strlen($trimmedDecl) >= 2 && '\"' === $trimmedDecl[0] && str_ends_with($trimmedDecl, '\"'))\n"
+    + "        ) {\n"
+    + "            return new self(self::TYPE_STRING);\n"
+    + "        }\n"
+)
+path.write_text(text.replace(anchor, insert, 1))
+PY
+  echo "Applied php-types-fromdecl-string-literals.patch (overlay)"
+}
+
 apply_php_cfg_in_operator_overlay() {
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/In_.php"
@@ -6574,6 +6619,10 @@ PY
     apply_php_types_fromdecl_junk_fragments_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-fromdecl-string-literals.patch" ]]; then
+    apply_php_types_fromdecl_string_literals_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-magic-script-const.patch" ]]; then
     apply_php_types_magic_script_const_overlay
     return $?
@@ -6935,6 +6984,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-callable-return-strip.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
+  apply_patch "$PATCH_DIR/php-types-fromdecl-string-literals.patch"
   apply_patch "$PATCH_DIR/php-types-remove-type-empty-union.patch"
   apply_patch "$PATCH_DIR/php-types-anonymous-class-type.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"

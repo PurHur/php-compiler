@@ -1,0 +1,21 @@
+diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+index 1111111..2222222 100644
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -376,6 +376,14 @@ class Type
+             || str_starts_with($trimmedDecl, '*/')) {
+             return self::mixed();
+         }
++        // Psalm/PHPStan string literal types: 'parent' / "foo" (#26686).
++        // Spine docblocks use @return null|'parent'|'self'|'static' (#26630 / #26655).
++        if (
++            (strlen($trimmedDecl) >= 2 && "'" === $trimmedDecl[0] && str_ends_with($trimmedDecl, "'"))
++            || (strlen($trimmedDecl) >= 2 && '"' === $trimmedDecl[0] && str_ends_with($trimmedDecl, '"'))
++        ) {
++            return new self(self::TYPE_STRING);
++        }
+         // list<T|null> union splits may pass a trailing "null>" fragment (#2276).
+         if (str_ends_with($trimmedDecl, '>') && !str_contains($trimmedDecl, '<')) {
+             $trimmedDecl = rtrim(substr($trimmedDecl, 0, -1));
+             $decl = $trimmedDecl;
+         }
