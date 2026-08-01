@@ -11033,6 +11033,9 @@ class Compiler {
      * (Zend zend_compile.c class name resolution; #26629, #3803).
      *
      * {@code static::class} returns null — late-static binding needs the runtime opcode (#19614).
+     * Trait {@code self::class} / {@code parent::class} also return null — Zend retargets them to
+     * the composing class at use-time (#26659, #19629, Zend/zend_traits.c); folding the trait
+     * name would bake the wrong string into method bodies (regression from #26629).
      */
     protected function resolveCompileTimeClassPseudoConstFqcn(string $className, Block $block): ?string
     {
@@ -11041,11 +11044,19 @@ class Compiler {
             return null;
         }
         if ('self' === $lc) {
+            $declLc = $this->declaringClassLcForTypeHint($block);
+            if (null !== $declLc && $this->classCompileRegistry->isTrait($declLc)) {
+                return null;
+            }
             $display = $this->declaringClassDisplayNameForTypeHint($block);
 
             return null !== $display && '' !== $display ? $display : null;
         }
         if ('parent' === $lc) {
+            $declLc = $this->declaringClassLcForTypeHint($block);
+            if (null !== $declLc && $this->classCompileRegistry->isTrait($declLc)) {
+                return null;
+            }
             if (null !== $this->compilingClassLc) {
                 $parent = $this->compilingClassParentDisplayName();
                 if (null === $parent || '' === $parent) {
