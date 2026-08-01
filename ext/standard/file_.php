@@ -55,6 +55,8 @@ final class file_ extends Internal
 
         $lines = VmFs::file($path, $flags);
         if (false === $lines) {
+            // php-src ext/standard/file.c — open failure → E_WARNING + false (#26695)
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'file', $path);
             $frame->returnVar->bool(false);
 
             return;
