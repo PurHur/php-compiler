@@ -20138,7 +20138,9 @@ restart:
         return $this->isClassBodyDefaultInitOpcode($type)
             || OpCode::TYPE_NEW === $type
             || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $type
-            || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $type;
+            || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $type
+            || OpCode::TYPE_CLOSURE === $type
+            || OpCode::TYPE_FROM_CALLABLE === $type;
     }
 
     private function isClassBodyDefaultInitOpcode(int $type): bool
@@ -20286,6 +20288,64 @@ restart:
                 if (self::SUCCESS !== $result) {
                     throw new \LogicException('Class constant constructor failed');
                 }
+                break;
+            case OpCode::TYPE_FROM_CALLABLE:
+                // Closures / FCC in class const exprs (#26240, fcc_in_const_expr).
+                if (isset($frame->scope[$op->arg2])) {
+                    $callable = $frame->scope[$op->arg2]->resolveIndirect();
+                } elseif (isset($frame->block->constants[$op->arg2])) {
+                    $callable = $frame->block->constants[$op->arg2];
+                } else {
+                    throw new \LogicException('TYPE_FROM_CALLABLE missing callable slot');
+                }
+                $entry = VM\ClosureSupport::fromCallable(
+                    $this->context,
+                    $frame,
+                    $callable,
+                    $op->fromCallableParentScope
+                );
+                $frame->scope[$op->arg1]->object($entry);
+                break;
+            case OpCode::TYPE_CLOSURE:
+                // Static Closures in class const exprs (#26240, closures_in_const_expr).
+                if (null === $op->block1) {
+                    $frame->scope[$op->arg1]->null();
+                    break;
+                }
+                $funcName = null !== $op->block1->func
+                    ? $op->block1->func->name
+                    : '{closure}';
+                $closureFunc = new Func\PHP($funcName, $op->block1);
+                $closureFunc->sourceLocation = $op->sourceLocation;
+                if ([] !== $op->parameterMetadata) {
+                    $closureFunc->parameterMetadata = $op->parameterMetadata;
+                }
+                if ([] !== $op->attributeNames) {
+                    $closureFunc->attributeNames = $op->attributeNames;
+                }
+                if ([] !== $op->attributeEntries) {
+                    $closureFunc->attributeEntries = $op->attributeEntries;
+                }
+                $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
+                $state = new ClosureState($closureFunc, $captures);
+                $state->applyDefinitionSite($op->sourceLocation, $op->block1);
+                if (
+                    null !== $frame->block->func
+                    && null !== $frame->block->func->class
+                    && null !== $frame->block->func->class->value
+                    && '' !== $frame->block->func->class->value
+                ) {
+                    $declaring = $frame->block->func->class->value;
+                    if (null !== $op->block1->func) {
+                        $op->block1->func->class = $frame->block->func->class;
+                    }
+                    $state->boundScopeClass = $declaring;
+                    $called = $this->inferCalledClass($frame);
+                    if (null !== $called && '' !== $called) {
+                        $state->boundCalledScopeClass = $called;
+                    }
+                }
+                $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                 break;
             default:
                 throw new \LogicException(

@@ -6,6 +6,7 @@ namespace PHPCompiler\Compiler;
 
 use PHPCfg\Block;
 use PHPCfg\ErrorSuppressBlock;
+use PHPCfg\Func;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\ArrowFunction;
 use PHPCfg\Op\Expr\Assign;
@@ -24,7 +25,7 @@ use PHPCfg\Script;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905, #24947, #25839).
+ * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905, #24947, #25839, #26240).
  *
  * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
  * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
@@ -38,6 +39,10 @@ use PHPCompiler\CompilerVersion;
  * rejected. On ≤8.4 every *user* cast remains invalid (#24905). php-cfg's synthetic
  * {@see Cast\Bool_} on the long arm of {@code &&}/{@code ||} is not a ZEND_AST_CAST — allow it
  * so class-const logical expressions match Zend (#25839 / re-#17229).
+ *
+ * PHP 8.5+ allows {@code static} Closures / arrow functions (no {@code use}) and first-class
+ * callables ({@see CompilerVersion::supportsClosuresInConstantExpressions}); ordinary
+ * {@see FuncCall}/{@see MethodCall}/{@see StaticCall} remain invalid.
  */
 final class ThrowInClassConstCompileCheck
 {
@@ -96,11 +101,15 @@ final class ThrowInClassConstCompileCheck
         }
         foreach ($ops as $op) {
             if ($op instanceof Throw_
-                || $op instanceof Closure
-                || $op instanceof ArrowFunction
                 || $op instanceof FuncCall
                 || $op instanceof MethodCall
                 || $op instanceof StaticCall
+            ) {
+                throw new \CompileError(self::MESSAGE);
+            }
+            if (
+                ($op instanceof Closure || $op instanceof ArrowFunction)
+                && !self::isAllowedConstExprClosure($op)
             ) {
                 throw new \CompileError(self::MESSAGE);
             }
@@ -264,5 +273,26 @@ final class ThrowInClassConstCompileCheck
             || $op instanceof Cast\String_
             || $op instanceof Cast\Bool_
             || $op instanceof Cast\Array_;
+    }
+
+    /**
+     * PHP 8.5+ static Closures / arrow functions without {@code use()} (#26240).
+     *
+     * @see CompilerVersion::supportsClosuresInConstantExpressions()
+     */
+    private static function isAllowedConstExprClosure(Closure|ArrowFunction $op): bool
+    {
+        if (!CompilerVersion::supportsClosuresInConstantExpressions()) {
+            return false;
+        }
+        $func = $op->getFunc();
+        if (0 === ($func->flags & Func::FLAG_STATIC)) {
+            return false;
+        }
+        if ($op instanceof Closure && [] !== $op->useVars) {
+            return false;
+        }
+
+        return true;
     }
 }

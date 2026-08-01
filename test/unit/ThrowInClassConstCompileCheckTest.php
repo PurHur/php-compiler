@@ -88,6 +88,74 @@ const C = function () { return 1; };
 PHP);
     }
 
+    /** Non-static Closure stays invalid even on PROFILE=8.5 (#26240). */
+    public function testNonStaticClosureInGlobalConstCompileErrorsOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+const C = function () { return 1; };
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Static Closure / arrow / FCC allowed in const exprs on PROFILE=8.5 (#26240). */
+    public function testStaticClosureAndFccInConstAllowedOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+const C = static fn(int $x): int => $x + 1;
+const D = strlen(...);
+const E = static function (int $x): int { return $x + 1; };
+class K {
+    public const F = static fn(string $s): int => strlen($s);
+}
+echo (C)(2), ',', (D)('ab'), ',', (E)(2), ',', (K::F)('xy');
+PHP, 'const_closure_fcc_85.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame('3,2,3,2', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testStaticClosureUseInConstCompileErrorsOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+$a = 1;
+const C = static function () use ($a) { return $a; };
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testStaticCallInClassConstCompileErrors(): void
     {
         $this->expectCompileError(<<<'PHP'

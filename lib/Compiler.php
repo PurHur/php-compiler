@@ -8831,7 +8831,8 @@ class Compiler {
     /**
      * Parameter defaults evaluated when the argument is omitted: `new Class()` (#6652).
      * Unresolved ConstFetch / ClassConstFetch defaults defer like Zend (zend_compile_default_value, #24138).
-     * First-class callables are not constant expressions (Zend/zend_compile.c, #9697).
+     * First-class callables are not constant expressions below PHP 8.5 (Zend/zend_compile.c, #9697);
+     * on 8.5+ they are legal const-exprs and lower as runtime defaults (#26240).
      */
     protected function paramDefaultUsesRuntimeInit(Op\Expr\Param $param): bool
     {
@@ -8839,7 +8840,11 @@ class Compiler {
             return true;
         }
         if (null !== $this->paramDefaultFirstClassCallableExpr($param)) {
-            $this->throwCompileLogic(ThrowInClassConstCompileCheck::MESSAGE);
+            if (!CompilerVersion::supportsClosuresInConstantExpressions()) {
+                $this->throwCompileLogic(ThrowInClassConstCompileCheck::MESSAGE);
+            }
+
+            return true;
         }
         // tryFoldParamDefaultSlot already failed — keep the AST and resolve at call time (#24138).
         if (null !== $this->paramDefaultConstFetchExpr($param)) {
@@ -44404,6 +44409,14 @@ class Compiler {
         $insertAt = $n;
         while ($insertAt > 0 && OpCode::TYPE_CONST_FETCH === $block->opCodes[$insertAt - 1]->type) {
             --$insertAt;
+        }
+        // (CONST)(...) — ConstFetch writes the dynamic callee slot; keep it before INIT (#26240).
+        if (null !== $init->arg1) {
+            for ($i = $insertAt; $i < $n; ++$i) {
+                if ($block->opCodes[$i]->arg1 === $init->arg1) {
+                    return false;
+                }
+            }
         }
         array_splice($block->opCodes, $insertAt, 0, [$init]);
         $block->nOpCodes = \count($block->opCodes);
