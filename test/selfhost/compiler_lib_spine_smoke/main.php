@@ -6274,6 +6274,7 @@ require_once __DIR__.'/../../../lib/VM/PropertyIsInitializedHandler.php';
 require_once __DIR__.'/../../../lib/VM/PropertyIsInitializedJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/PropertyMangle.php';
 require_once __DIR__.'/../../../lib/VM/PropertyNameSupport.php';
+require_once __DIR__.'/../../../lib/VM/RedundantIterableUnionCheck.php';
 require_once __DIR__.'/../../../lib/VM/RedundantTrueFalseUnionCheck.php';
 require_once __DIR__.'/../../../lib/VM/Refcount.php';
 require_once __DIR__.'/../../../lib/VM/ReferencableCheck.php';

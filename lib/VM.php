@@ -6881,6 +6881,11 @@ restart:
                         $frame,
                         $op->sourceLocation
                     );
+                    VM\RedundantIterableUnionCheck::assertFunctionBlock(
+                        $op->block1,
+                        $frame,
+                        $op->sourceLocation
+                    );
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
                     if (isset($this->context->functions[$lcname])) {
@@ -19339,6 +19344,7 @@ restart:
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     VM\RedundantTrueFalseUnionCheck::assertPropertyOp($frame, $op);
+                    VM\RedundantIterableUnionCheck::assertPropertyOp($frame, $op);
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
@@ -19443,6 +19449,7 @@ restart:
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     VM\RedundantTrueFalseUnionCheck::assertPropertyOp($frame, $op);
+                    VM\RedundantIterableUnionCheck::assertPropertyOp($frame, $op);
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
@@ -19582,6 +19589,11 @@ restart:
                     }
                     if (null !== $op->block1) {
                         VM\RedundantTrueFalseUnionCheck::assertFunctionBlock(
+                            $op->block1,
+                            $frame,
+                            $op->sourceLocation
+                        );
+                        VM\RedundantIterableUnionCheck::assertFunctionBlock(
                             $op->block1,
                             $frame,
                             $op->sourceLocation
