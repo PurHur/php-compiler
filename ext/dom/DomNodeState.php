@@ -272,4 +272,12 @@ final class DomNodeState
      * @var array<string, string>
      */
     public array $nodeClassMap = [];
+
+    /**
+     * DocumentFragment object id holding HTML `<template>` contents
+     * (php-src php_dom_ensure_templated_content / private_data.c; #26034).
+     *
+     * Not listed in {@see $childIds} — child traversal on the template element stays empty.
+     */
+    public ?int $templateContentId = null;
 }

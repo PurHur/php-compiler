@@ -2123,20 +2123,21 @@ final class VmDom
      *
      * HTML documents use the HTML serializer (same empty/void rules as saveHTML);
      * XML documents keep XML empty-element form (`<i/>`).
+     * HTML `<template>` serializes its templated contents fragment (#26034).
      */
     public static function getInnerHTML(ObjectEntry $element): string
     {
         if (!self::isElement($element)) {
             throw new \DOMException('Not an element node');
         }
-        $state = DomRegistry::state($element);
-        if ([] === $state->childIds) {
+        $childIds = self::elementSerializationChildIds($element);
+        if ([] === $childIds) {
             return '';
         }
         // HTML doc → no XML self-close; XML doc → `<tag/>` (#22773 / php-src inner_html_mixin.c).
         $emptySelfClosing = !self::elementOwnerIsHtmlDocument($element);
         $parts = [];
-        foreach ($state->childIds as $childId) {
+        foreach ($childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
                 $parts[] = self::serializeHtmlNode($child, $emptySelfClosing);
@@ -2181,6 +2182,8 @@ final class VmDom
     /**
      * Dom\Element::$innerHTML setter — replace children with parsed fragment
      * (php-src ext/dom/inner_outer_html_mixin.c; #20532).
+     *
+     * HTML `<template>` writes into the templated contents DocumentFragment (#26034).
      */
     public static function setInnerHTML(Context $ctx, ObjectEntry $element, string $html): void
     {
@@ -2192,6 +2195,14 @@ final class VmDom
             throw new \DOMException('Hierarchy request error');
         }
         $fragment = self::parseHtmlIntoFragment($ctx, $html, $ownerDocument);
+        if (self::isHtmlTemplateElement($element)) {
+            $content = self::ensureTemplateContentFragment($ctx, $element);
+            self::removeAllLiveStandardChildren($ctx, $content);
+            self::appendLiveStandardChild($ctx, $content, $fragment);
+            self::syncSubtree($ctx, $content);
+
+            return;
+        }
         self::removeAllLiveStandardChildren($ctx, $element);
         self::appendLiveStandardChild($ctx, $element, $fragment);
         self::syncSubtree($ctx, $element);
@@ -8417,6 +8428,11 @@ final class VmDom
             $state->attributeIsId['id'] = true;
         }
         self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
+        // HTML `<template>` keeps parsed descendants in a DocumentFragment, not childIds
+        // (php-src html5_parser.c / php_dom_add_templated_content; #26034).
+        if (self::isHtmlTemplateElement($entry)) {
+            self::adoptChildrenIntoTemplateContent($ctx, $entry);
+        }
 
         return $entry;
     }
@@ -9029,7 +9045,8 @@ final class VmDom
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state, $htmlEscapeMode);
-        if ([] === $state->childIds) {
+        $childIds = self::elementSerializationChildIds($entry);
+        if ([] === $childIds) {
             if ($emptySelfClosing) {
                 // XMLDocument / XML context (#18618, #22773): empty-element form <tag/>.
                 return '<'.$name.$attrPart.'/>';
@@ -9039,7 +9056,7 @@ final class VmDom
             return self::formatHtmlEmptyElementDump($name, $attrPart);
         }
         $parts = [];
-        foreach ($state->childIds as $childId) {
+        foreach ($childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
                 $parts[] = self::serializeHtmlNode($child, $emptySelfClosing, $htmlEscapeMode);
@@ -9383,7 +9400,7 @@ final class VmDom
      */
     private static function elementHasInlineFormatContent(ObjectEntry $entry): bool
     {
-        foreach (DomRegistry::state($entry)->childIds as $childId) {
+        foreach (self::elementSerializationChildIds($entry) as $childId) {
             $child = DomRegistry::entry($childId);
             if (null === $child) {
                 continue;
@@ -9406,7 +9423,8 @@ final class VmDom
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeElementAttributes($entry, $redeclarableNsRoot);
-        if ([] === $state->childIds) {
+        $childIds = self::elementSerializationChildIds($entry);
+        if ([] === $childIds) {
             $tag = $noEmptyTag
                 ? '<'.$name.$attrPart.'></'.$name.'>'
                 : '<'.$name.$attrPart.'/>';
@@ -9416,7 +9434,7 @@ final class VmDom
         // Text/cdata/entity-ref children suppress pretty-print (libxml; #21489).
         if (!$format || self::elementHasInlineFormatContent($entry)) {
             $parts = [];
-            foreach ($state->childIds as $childId) {
+            foreach ($childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
                     $parts[] = self::serializeNode($child, 0, false, $noEmptyTag);
@@ -9429,7 +9447,7 @@ final class VmDom
 
         $indent = str_repeat('  ', $depth);
         $lines = [$indent.'<'.$name.$attrPart.'>'];
-        foreach ($state->childIds as $childId) {
+        foreach ($childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
                 $lines[] = self::serializeNode($child, $depth + 1, true, $noEmptyTag);
@@ -13028,6 +13046,97 @@ final class VmDom
         }
 
         return VmDomLiving::CLASS_HTML_DOCUMENT === strtolower($ownerDocument->class->name);
+    }
+
+    /**
+     * HTML `<template>` in the XHTML namespace (php-src html5_parser.c; #26034).
+     *
+     * HTML_NO_DEFAULT_NS parses leave namespaceUri null — those templates keep ordinary children.
+     */
+    public static function isHtmlTemplateElement(ObjectEntry $element): bool
+    {
+        if (!self::isElement($element)) {
+            return false;
+        }
+        $state = DomRegistry::state($element);
+        $name = strtolower($state->localName ?? $state->nodeName);
+        $colon = strrpos($name, ':');
+        if (false !== $colon) {
+            $name = substr($name, $colon + 1);
+        }
+        if ('template' !== $name) {
+            return false;
+        }
+
+        return VmDomLiving::HTML_NS === ($state->namespaceUri ?? null);
+    }
+
+    /**
+     * Child ids to serialize for an element — template contents fragment when applicable (#26034).
+     *
+     * @return list<int>
+     */
+    private static function elementSerializationChildIds(ObjectEntry $entry): array
+    {
+        $state = DomRegistry::state($entry);
+        if (!self::isHtmlTemplateElement($entry)) {
+            return $state->childIds;
+        }
+        $contentId = $state->templateContentId;
+        if (null === $contentId) {
+            return [];
+        }
+        $content = DomRegistry::entry($contentId);
+        if (null === $content) {
+            return [];
+        }
+
+        return DomRegistry::state($content)->childIds;
+    }
+
+    /**
+     * Ensure the DocumentFragment that holds HTML template contents (php-src private_data.c; #26034).
+     */
+    private static function ensureTemplateContentFragment(Context $ctx, ObjectEntry $template): ObjectEntry
+    {
+        $state = DomRegistry::state($template);
+        if (null !== $state->templateContentId) {
+            $existing = DomRegistry::entry($state->templateContentId);
+            if (null !== $existing) {
+                return $existing;
+            }
+        }
+        $ownerDocument = self::ownerDocumentEntry($template);
+        $fragment = self::createDocumentFragment($ctx, $ownerDocument)->toObject();
+        // php-src: fragment->parent = template_node (not listed in template children).
+        DomRegistry::state($fragment)->parentId = $template->id;
+        $state->templateContentId = $fragment->id;
+
+        return $fragment;
+    }
+
+    /**
+     * Move a template element's ordinary children into its contents fragment after HTML parse (#26034).
+     */
+    private static function adoptChildrenIntoTemplateContent(Context $ctx, ObjectEntry $template): void
+    {
+        $state = DomRegistry::state($template);
+        $content = self::ensureTemplateContentFragment($ctx, $template);
+        if ([] === $state->childIds) {
+            return;
+        }
+        $contentState = DomRegistry::state($content);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            self::linkChildToParent($child, $content);
+            $contentState->childIds[] = $childId;
+        }
+        $state->childIds = [];
+        self::syncSubtree($ctx, $template);
+        self::syncSubtree($ctx, $content);
     }
 
     private static function resolveClassByName(Context $ctx, string $name): ?ClassEntry
