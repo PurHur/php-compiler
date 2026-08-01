@@ -702,17 +702,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'preg_split'));
     }
 
-    /** @covers issue #10028 */
+    /** @covers issue #10028 #26465 */
     public function testIniGetSetNamedParameters(): void
     {
         $get = BuiltinParamNames::forFunction('ini_get');
         self::assertSame(['option'], $get);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($get, 'option', 'ini_get'));
 
-        $set = BuiltinParamNames::forFunction('ini_set');
-        self::assertSame(['option', 'value'], $set);
-        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($set, 'option', 'ini_set'));
-        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($set, 'value', 'ini_set'));
+        foreach (['ini_set', 'ini_alter'] as $fn) {
+            $set = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['option', 'value'], $set, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($set, 'option', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($set, 'value', $fn), $fn);
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+        }
     }
 
     /** @covers issue #10126 / #23404 — Zend stub uses env_vars not env */
