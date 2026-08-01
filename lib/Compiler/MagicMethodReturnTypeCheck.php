@@ -15,7 +15,7 @@ use PHPCompiler\MethodVisibility;
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
  * (#4988 return types; #25023 zero-parameter magic methods; #25025/#25029 __toString;
- * #26432 __set/__unset void return)
+ * #26432 __set/__unset void return; #26463 __isset bool return)
  */
 final class MagicMethodReturnTypeCheck
 {
@@ -131,6 +131,15 @@ final class MagicMethodReturnTypeCheck
                         $this->fatal(
                             $member,
                             "{$classDisplay}::__unset(): Return type must be void when declared"
+                        );
+                    }
+                    break;
+                case '__isset':
+                    // php-src zend_check_magic_method_implementation — bool/true/false/never (#26463)
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isExactBoolOrNeverType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "{$classDisplay}::__isset(): Return type must be bool when declared"
                         );
                     }
                     break;
@@ -257,6 +266,32 @@ final class MagicMethodReturnTypeCheck
             && null === $sig->classLc
             && null === $sig->unionMembers
             && null === $sig->intersectionMembers;
+    }
+
+    /**
+     * Exact `bool`, standalone `true`/`false`, or `never` (Zend ZEND_TYPE_CONTAINS_CODE).
+     *
+     * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation (__isset)
+     */
+    private function isExactBoolOrNeverType(Op\Type $type): bool
+    {
+        $sig = TypeSig::fromCfgType($type);
+        if (null === $sig) {
+            return false;
+        }
+        if ($sig->never) {
+            return true;
+        }
+        if ($sig->nullable || null !== $sig->unionMembers || null !== $sig->intersectionMembers) {
+            return false;
+        }
+        if ('bool' === $sig->builtinScalar && null === $sig->classLc) {
+            return true;
+        }
+        // PHP 8.2+ true/false standalone types land as class-like names in php-cfg TypeSig.
+        return null === $sig->builtinScalar
+            && null !== $sig->classLc
+            && ('true' === $sig->classLc || 'false' === $sig->classLc);
     }
 
     private function fatal(Op\Stmt\ClassMethod $method, string $message): void
