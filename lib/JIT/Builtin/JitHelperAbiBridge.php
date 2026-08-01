@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Shared LLVM ABI trampolines into compiled php-in-PHP JIT helpers (#9679).
+ * Shared LLVM ABI trampolines into compiled php-in-PHP JIT helpers (#9679, #26347).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcCollectCycles #26333).
  */
 final class JitHelperAbiBridge
 {
@@ -24,7 +25,6 @@ final class JitHelperAbiBridge
     public static function implement(
         Context $context,
         string $helperPath,
-        string $helperFileName,
         string $issueTag,
         array $compiledHelpers,
         array $bridges,
@@ -38,7 +38,7 @@ final class JitHelperAbiBridge
             return;
         }
 
-        self::ensureJitHelperCompiled($context, $helperPath, $helperFileName, $issueTag, $compiledHelpers);
+        self::ensureJitHelperCompiled($context, $helperPath, $issueTag, $compiledHelpers);
         foreach ($bridges as $bridge) {
             match ($bridge['kind']) {
                 'void' => self::implementVoidBridge($context, $bridge['abi'], $bridge['helper'], $issueTag),
@@ -286,13 +286,7 @@ final class JitHelperAbiBridge
 
     private static function helperFunction(Context $context, string $logical, string $issueTag): LlvmFunction
     {
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after JIT helper compile ('.$issueTag.')');
-        }
-
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, $issueTag);
     }
 
     /**
@@ -301,37 +295,10 @@ final class JitHelperAbiBridge
     private static function ensureJitHelperCompiled(
         Context $context,
         string $helperPath,
-        string $helperFileName,
         string $issueTag,
         array $compiledHelpers,
     ): void {
-        $missing = false;
-        foreach ($compiledHelpers as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).$helperPath;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $helperFileName, $issueTag, $compiledHelpers): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $helperFileName);
-            if (null === $block) {
-                throw new \LogicException($helperFileName.' parseAndCompile failed ('.$issueTag.')');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach ($compiledHelpers as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT ('.$issueTag.')');
-            }
-        }
+        JitVmHelperLink::ensureCompiled($context, $helperPath, $compiledHelpers, $issueTag);
     }
 
     /**
