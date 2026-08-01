@@ -484,6 +484,9 @@ final class PropertyHookDispatchLlvm
         $callerLc = '' !== $context->scope->className
             ? strtolower(ltrim($context->scope->className, '\\'))
             : null;
+        $callerDisplay = '' !== $context->scope->className
+            ? ltrim($context->scope->className, '\\')
+            : null;
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
@@ -499,7 +502,8 @@ final class PropertyHookDispatchLlvm
                 MethodVisibility::mask($effectiveRead),
                 $staticProperty
                     ? $objectType->staticPropertyAsymmetricExplicitRead($classId, $propertyName)
-                    : $objectType->propertyAsymmetricExplicitRead($classId, $propertyName)
+                    : $objectType->propertyAsymmetricExplicitRead($classId, $propertyName),
+                $callerDisplay
             );
         } catch (\LogicException $e) {
             $message = $e->getMessage();

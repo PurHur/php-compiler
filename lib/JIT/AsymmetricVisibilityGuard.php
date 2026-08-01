@@ -91,6 +91,7 @@ final class AsymmetricVisibilityGuard
         }
 
         $callerLc = self::callerClassLc($context, $enclosingBlock);
+        $callerDisplay = self::callerClassDisplay($context, $enclosingBlock);
         try {
             if ('unset' === $verb) {
                 PropertyVisibility::assertUnsettable(
@@ -101,7 +102,8 @@ final class AsymmetricVisibilityGuard
                     $propName,
                     static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
                     MethodVisibility::mask($effectiveRead),
-                    $objectType->propertyAsymmetricExplicitRead($classId, $propName)
+                    $objectType->propertyAsymmetricExplicitRead($classId, $propName),
+                    $callerDisplay
                 );
             } else {
                 PropertyVisibility::assertWritable(
@@ -112,7 +114,8 @@ final class AsymmetricVisibilityGuard
                     $propName,
                     static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
                     MethodVisibility::mask($effectiveRead),
-                    $objectType->propertyAsymmetricExplicitRead($classId, $propName)
+                    $objectType->propertyAsymmetricExplicitRead($classId, $propName),
+                    $callerDisplay
                 );
             }
         } catch (\LogicException $e) {
@@ -175,7 +178,8 @@ final class AsymmetricVisibilityGuard
                 $propName,
                 static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
                 MethodVisibility::mask($effectiveRead),
-                $meta['asymmetricExplicitRead'] ?? false
+                $meta['asymmetricExplicitRead'] ?? false,
+                self::callerClassDisplay($context, $enclosingBlock)
             );
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());
@@ -193,6 +197,19 @@ final class AsymmetricVisibilityGuard
         }
         if ('' !== $context->scope->className) {
             return strtolower(ltrim($context->scope->className, '\\'));
+        }
+
+        return null;
+    }
+
+    /** Original casing for zend_asymmetric_visibility_property_modification_error (#26298). */
+    private static function callerClassDisplay(Context $context, ?Block $enclosingBlock): ?string
+    {
+        if (null !== $enclosingBlock?->func?->class) {
+            return ltrim($enclosingBlock->func->class->value, '\\');
+        }
+        if ('' !== $context->scope->className) {
+            return ltrim($context->scope->className, '\\');
         }
 
         return null;
