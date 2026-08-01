@@ -350,8 +350,8 @@ class Child extends Base {
 PHP;
         $this->expectException(\CompileError::class);
         $allowed = CompilerVersion::supportsOverridePropertyTarget()
-            ? 'method, class constant, property'
-            : 'method, class constant';
+            ? 'method, property'
+            : 'method';
         $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: '.$allowed.')');
         $runtime->parseAndCompile($code, 'override_on_class.php');
     }
@@ -367,8 +367,8 @@ trait T {}
 PHP;
         $this->expectException(\CompileError::class);
         $allowed = CompilerVersion::supportsOverridePropertyTarget()
-            ? 'method, class constant, property'
-            : 'method, class constant';
+            ? 'method, property'
+            : 'method';
         $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: '.$allowed.')');
         $runtime->parseAndCompile($code, 'override_on_trait.php');
     }
@@ -448,45 +448,93 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
-    public function testOverrideOnInterfaceClassConstantCompiles(): void
+    /** #26253: #[\Override] on class constants is never a php-src target. */
+    public function testOverrideOnInterfaceClassConstantRejected(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 interface I { public const X = 1; }
 class C implements I { #[\Override] public const X = 2; }
 echo C::X, "\n";
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'override_const_iface.php'));
-        $this->assertSame("2\n", ob_get_clean());
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Override" cannot target class constant (allowed targets: method)'
+            );
+            $runtime->parseAndCompile($code, 'override_const_iface.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
-    public function testOverrideOnExtendsClassConstantCompiles(): void
+    /** #26253 */
+    public function testOverrideOnExtendsClassConstantRejected(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 class Base { public const X = 1; }
 class Child extends Base { #[\Override] public const X = 2; }
 echo Child::X, "\n";
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'override_const_extends.php'));
-        $this->assertSame("2\n", ob_get_clean());
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Override" cannot target class constant (allowed targets: method)'
+            );
+            $runtime->parseAndCompile($code, 'override_const_extends.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
+    /** #26253 — orphan constant also fails as illegal target, not missing parent. */
     public function testInvalidOverrideOnClassConstantFailsAtCompileTime(): void
     {
-        $this->requireOverrideValidation();
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 class C { #[\Override] public const X = 1; }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('C::X has #[\Override] attribute, but no matching parent constant exists');
-        $runtime->parseAndCompile($code, 'override_const_invalid.php');
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Override" cannot target class constant (allowed targets: method)'
+            );
+            $runtime->parseAndCompile($code, 'override_const_invalid.php');
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
+    }
+
+    /** #26253: Reflection Attribute flags match Zend (TARGET_METHOD only under 8.4). */
+    public function testOverrideAttributeFlagsExcludeClassConstantUnder84(): void
+    {
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesOverrideAttributeClass());
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$r = new ReflectionClass(Override::class);
+$a = $r->getAttributes(Attribute::class)[0]->newInstance();
+echo $a->flags, "\n";
+echo (($a->flags & Attribute::TARGET_CLASS_CONSTANT) !== 0) ? "const=1\n" : "const=0\n";
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'override_flags_84.php'));
+            $this->assertSame("4\nconst=0\n", ob_get_clean());
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
     public function testOverrideOnExtendsPropertyCompiles(): void
@@ -525,7 +573,7 @@ echo "OK\n";
 PHP;
             $this->expectException(\CompileError::class);
             $this->expectExceptionMessage(
-                'Attribute "Override" cannot target property (allowed targets: method, class constant)'
+                'Attribute "Override" cannot target property (allowed targets: method)'
             );
             $runtime->parseAndCompile($code, 'override_prop_84.php');
         } finally {

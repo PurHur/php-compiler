@@ -25,4 +25,4 @@ echo "unreachable\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Attribute "Override" cannot target property (allowed targets: method, class constant)
+parseAndCompile failure: target=%s: Attribute "Override" cannot target property (allowed targets: method)

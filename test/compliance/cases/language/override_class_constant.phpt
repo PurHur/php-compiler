@@ -1,5 +1,13 @@
 --TEST--
-Language: #[\Override] on class constants — interface/extends override compiles (#9821)
+Language: #[\Override] on class constants is rejected — not a php-src target (#26253)
+--SKIPIF--
+<?php
+if (!PHPCompiler\CompilerVersion::supportsOverrideAttribute()) {
+    echo "skip — Override validation disabled on reference profile\n";
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);
@@ -13,17 +21,9 @@ class C implements I {
     public const X = 2;
 }
 
-class Base {
-    public const Y = 10;
-}
-
-class Child extends Base {
-    #[\Override]
-    public const Y = 20;
-}
-
-echo C::X, "\n", Child::Y, "\n";
+echo C::X, "\n";
 ?>
---EXPECT--
-2
-20
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: Attribute "Override" cannot target class constant (allowed targets: method)

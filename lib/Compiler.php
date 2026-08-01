@@ -7974,6 +7974,7 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertReturnTypeWillChangeMethodTargetOnly($constOp->attributeNames, 'class constant');
+        AttributeNames::assertOverrideMethodTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertDeprecatedTargetAllowed($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && null !== $constName) {
