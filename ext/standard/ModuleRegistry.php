@@ -150,6 +150,8 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\memcached\MemcachedExtensionPolicy::advertisesExtension();
         $withholdRarSurface = 'rar' === $primary
             && !\PHPCompiler\ext\rar\RarExtensionPolicy::advertisesExtension();
+        $withholdImapSurface = 'imap' === $primary
+            && !\PHPCompiler\ext\imap\ImapExtensionPolicy::advertisesExtension();
         $withholdMongodbSurface = 'mongodb' === $primary
             && !\PHPCompiler\ext\mongodb\MongodbExtensionPolicy::advertisesExtension();
         $withholdSnmpSurface = 'snmp' === $primary
@@ -189,7 +191,7 @@ final class ModuleRegistry
         $withholdMysqliSurface = 'mysqli' === $primary
             && !\PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMemcachedSurface && !$withholdRarSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface && !$withholdGmpSurface && !$withholdApcuSurface && !$withholdUuidSurface && !$withholdPspellSurface && !$withholdEnchantSurface && !$withholdZmqSurface && !$withholdZstdSurface && !$withholdLzfSurface && !$withholdLz4Surface && !$withholdDsSurface && !$withholdGnupgSurface && !$withholdMailparseSurface && !$withholdDbaSurface && !$withholdOdbcSurface && !$withholdMysqliSurface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMemcachedSurface && !$withholdRarSurface && !$withholdImapSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface && !$withholdGmpSurface && !$withholdApcuSurface && !$withholdUuidSurface && !$withholdPspellSurface && !$withholdEnchantSurface && !$withholdZmqSurface && !$withholdZstdSurface && !$withholdLzfSurface && !$withholdLz4Surface && !$withholdDsSurface && !$withholdGnupgSurface && !$withholdMailparseSurface && !$withholdDbaSurface && !$withholdOdbcSurface && !$withholdMysqliSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         } elseif ($registerSqlite3ExtensionLoaded) {
             self::register($module->getExtensionName(), $moduleVersion);
@@ -217,7 +219,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMemcachedSurface || $withholdRarSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface || $withholdGmpSurface || $withholdApcuSurface || $withholdUuidSurface || $withholdPspellSurface || $withholdEnchantSurface || $withholdZmqSurface || $withholdZstdSurface || $withholdLzfSurface || $withholdLz4Surface || $withholdDsSurface || $withholdGnupgSurface || $withholdMailparseSurface || $withholdDbaSurface || $withholdOdbcSurface || $withholdMysqliSurface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMemcachedSurface || $withholdRarSurface || $withholdImapSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface || $withholdGmpSurface || $withholdApcuSurface || $withholdUuidSurface || $withholdPspellSurface || $withholdEnchantSurface || $withholdZmqSurface || $withholdZstdSurface || $withholdLzfSurface || $withholdLz4Surface || $withholdDsSurface || $withholdGnupgSurface || $withholdMailparseSurface || $withholdDbaSurface || $withholdOdbcSurface || $withholdMysqliSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;

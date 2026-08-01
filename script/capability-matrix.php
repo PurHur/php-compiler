@@ -43,6 +43,7 @@ function collectCapabilities(string $root): array
         'curl' => new PHPCompiler\ext\curl\Module(),
         'zip' => new PHPCompiler\ext\zip\Module(),
         'rar' => new PHPCompiler\ext\rar\Module(),
+        'imap' => new PHPCompiler\ext\imap\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'enchant' => new PHPCompiler\ext\enchant\Module(),
