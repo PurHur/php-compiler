@@ -194,4 +194,26 @@ PHP;
         $runtime->run($block);
         $this->assertSame("cs:foo\n", ob_get_clean());
     }
+
+    /** @covers issue #26439 — non-public instance magics still dispatch (warning covered by compliance). */
+    public function testNonPublicInstanceMagicDispatches(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+error_reporting(E_ALL);
+class C {
+    private function __get($n) { return "got:$n"; }
+    private function __call($n, $a) { return "call:$n"; }
+}
+$o = new C;
+echo $o->x, "\n";
+echo $o->foo(), "\n";
+PHP;
+        ob_start();
+        $block = $runtime->parseAndCompile($code, 'nonpublic_instance_magic.php');
+        $this->assertNotNull($block);
+        $runtime->run($block);
+        $this->assertSame("got:x\ncall:foo\n", ob_get_clean());
+    }
 }
