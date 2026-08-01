@@ -261,6 +261,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('realpath'));
     }
 
+    /** php-src file.stub.php — InternalArgInfo omits |false / ?int $length (#25750). */
+    public function testStreamGetContentsReflectionTypes(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_get_contents'));
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('stream_get_contents', 1));
+    }
+
     /** php-src zlib.stub.php — InternalArgInfo omits |false (#25511). */
     public function testGzencodeGzdecodeReflectionReturnUnions(): void
     {
