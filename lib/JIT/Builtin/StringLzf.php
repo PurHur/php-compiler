@@ -4,18 +4,28 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link hook for lzf_* — compiles LzfJitHelper into the module (#8805).
+ * JIT/AOT link hook for lzf_* — compiles LzfJitHelper into the module (#8805, #26649).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringZstd #26596 / MbStrwidth #26617).
  */
 final class StringLzf
 {
+    private const HELPER_PATH = '/ext/lzf/LzfJitHelper.php';
+
     private const COMPRESS_HELPER = 'PHPCompiler\\ext\\lzf\\LzfJitHelper::compress';
 
     private const DECOMPRESS_HELPER = 'PHPCompiler\\ext\\lzf\\LzfJitHelper::decompress';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::COMPRESS_HELPER,
+        self::DECOMPRESS_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -40,41 +50,17 @@ final class StringLzf
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after compile (#8805)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26649');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $needed = [\strtolower(self::COMPRESS_HELPER), \strtolower(self::DECOMPRESS_HELPER)];
-        $missing = false;
-        foreach ($needed as $lc) {
-            if (!isset($context->functions[$lc])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).'/ext/lzf/LzfJitHelper.php';
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'LzfJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('LzfJitHelper.php parseAndCompile failed (#8805)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach ($needed as $lc) {
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#8805)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26649'
+        );
     }
 }
