@@ -115,7 +115,14 @@ final class OverrideValidator
                     continue;
                 }
                 // php-src 8.4: Override is TARGET_METHOD only; property targeting is 8.5+ (#25138).
-                AttributeNames::assertOverrideMethodTargetOnly($attributeNames, 'property');
+                // With DelayedTargetValidation, Compiler already deferred the target error onto
+                // OpCode attributeEntries (#26329) — skip the duplicate CompileError here.
+                if (!AttributeNames::shouldDelayInternalTargetValidation($attributeNames)) {
+                    AttributeNames::assertOverrideMethodTargetOnly($attributeNames, 'property');
+                } elseif (!CompilerVersion::supportsOverridePropertyTarget()) {
+                    // Wrong target delayed — do not run functional #[\Override] checks (RFC).
+                    continue;
+                }
                 self::validateOverrideProperty($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
 
                 continue;
@@ -128,7 +135,11 @@ final class OverrideValidator
             }
             $attributeNames = AttributeNames::fromOp($child);
             // php-src: Override never targets class constants (#26253; RFC override_constants not shipping).
-            AttributeNames::assertOverrideMethodTargetOnly($attributeNames, 'class constant');
+            // DelayedTargetValidation: target error already stored on OpCode entries in compile (#26329).
+            if (!AttributeNames::shouldDelayInternalTargetValidation($attributeNames)) {
+                AttributeNames::assertOverrideMethodTargetOnly($attributeNames, 'class constant');
+            }
+            // Class constants are never a valid Override target — no functional check.
         }
     }
 
