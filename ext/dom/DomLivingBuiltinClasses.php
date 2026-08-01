@@ -126,6 +126,8 @@ final class DomLivingBuiltinClasses
             $node->properties[] = new ClassProperty(VmDom::PROP_IS_CONNECTED, null, new Variable(Variable::TYPE_BOOLEAN));
         }
         self::copyMethods($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
+        // DOCUMENT_POSITION_* live on Dom\Node as well as DOMNode (php_dom.stub.php; #26060).
+        self::copyClassConstants($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
         // php-src php_dom.stub.php — private final function __construct() (#26059).
         // Subclasses inherit this via parentLc; copyMethods skips __construct so legacy
         // public DOMElement/DOMText ctors are not re-advertised on Dom\* leaves.
@@ -590,6 +592,26 @@ final class DomLivingBuiltinClasses
                     $declared = substr($declared, strrpos($declared, '::') + 2);
                 }
                 $to->methodNames[$lc] = $declared;
+            }
+        }
+    }
+
+    /** Copy class constants (case-sensitive keys) onto living Dom\* types (#26060). */
+    private static function copyClassConstants(?ClassEntry $from, ClassEntry $to): void
+    {
+        if (null === $from) {
+            return;
+        }
+        foreach ($from->constants as $key => $value) {
+            if (isset($to->constants[$key])) {
+                continue;
+            }
+            $to->constants[$key] = $value;
+            if (isset($from->constNames[$key])) {
+                $to->constNames[$key] = $from->constNames[$key];
+            }
+            if (isset($from->constVisibility[$key])) {
+                $to->constVisibility[$key] = $from->constVisibility[$key];
             }
         }
     }

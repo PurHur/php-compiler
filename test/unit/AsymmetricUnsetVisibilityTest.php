@@ -60,4 +60,42 @@ final class AsymmetricUnsetVisibilityTest extends TestCase
         );
         $this->addToAssertionCount(1);
     }
+
+    public function testPrivateSetDeniesChildScopeUnsetWithScopePrefix(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Cannot unset private(set) property U::$name from scope Child'
+        );
+        PropertyVisibility::assertUnsettable(
+            CfgFunc::FLAG_PRIVATE,
+            'child',
+            'u',
+            'U',
+            'name',
+            static fn (): bool => false,
+            CfgFunc::FLAG_PUBLIC,
+            true,
+            'Child'
+        );
+    }
+
+    public function testProtectedSetDeniesUnrelatedScopeWithScopePrefix(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage(
+            'Cannot unset protected(set) property Parent::$tag from scope Other'
+        );
+        PropertyVisibility::assertUnsettable(
+            CfgFunc::FLAG_PROTECTED,
+            'other',
+            'parent',
+            'Parent',
+            'tag',
+            static fn (): bool => false,
+            CfgFunc::FLAG_PUBLIC,
+            true,
+            'Other'
+        );
+    }
 }

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
@@ -31,6 +32,9 @@ use PHPLLVM\Value;
  * implode() with glue and array of scalar values (subset of PHP; JIT/AOT via JitImplode).
  *
  * $separator soft-null DEP+coerce on PROFILE=8.4 (#21210, reverts #19894; php-src string.c).
+ * PROFILE≥8.4 frameless implode(2) rejects array-first + explicit null (#26277); join keeps
+ * zif_implode array-first (php-src string_arginfo.h — frameless only on implode).
+ * PROFILE≥8.4 string+null pieces TypeError names arg #2 ($array) (#26278; php-src string.c).
  */
 final class implode extends Internal
 {
@@ -56,11 +60,18 @@ final class implode extends Internal
             );
         } else {
             // php-src PHP_FUNCTION(implode): Z_PARAM_ARRAY_HT_OR_STR + Z_PARAM_ARRAY_HT_OR_NULL;
-            // when pieces == NULL, string/coerced first arg TypeErrors as Argument #1 ($array) (#19566).
+            // pieces == NULL + string first: PROFILE≥8.4 dual-arg TypeError (#26278); else #19566.
             $first = $frame->calledArgs[0]->resolveIndirect();
             $second = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_ARRAY === $first->type) {
                 if (Variable::TYPE_NULL === $second->type) {
+                    // Zend 8.4+ frameless implode(2) requires string $separator (#26277).
+                    if (self::rejectsArrayFirstExplicitNullPieces($this->getName())) {
+                        throw new \TypeError(sprintf(
+                            '%s(): Argument #1 ($separator) must be of type string, array given',
+                            $this->getName()
+                        ));
+                    }
                     $glue = '';
                     $ht = $first->toArray();
                 } else {
@@ -71,12 +82,9 @@ final class implode extends Internal
             } elseif (Variable::TYPE_NULL === $second->type) {
                 self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
-                // Soft-null separator then Arg #1 ($array) string given (#19566 / #21210).
+                // Soft-null separator then null-pieces TypeError (#26278 / #19566 / #21210).
                 self::coerceSeparatorSoftNull($frame->calledArgs[0], $this->getName());
-                throw new \TypeError(sprintf(
-                    '%s(): Argument #1 ($array) must be of type array, string given',
-                    $this->getName()
-                ));
+                throw new \TypeError(self::nullPiecesStringFirstTypeErrorMessage($this->getName()));
             } else {
                 self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
@@ -118,8 +126,14 @@ final class implode extends Internal
             $haystack = $this->loadHaystack($context, $args[0], false);
         } else {
             // php-src pieces == NULL (#19566): array-first empty glue, or Arg #1 ($array) string given.
+            // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
             if (self::jitArgIsDefinitelyNull($args[1])) {
                 if (self::jitArgIsDefinitelyArray($args[0])) {
+                    if (self::rejectsArrayFirstExplicitNullPieces($this->getName())) {
+                        self::emitSeparatorArrayTypeErrorAndAbort($context, $this->getName());
+
+                        return $context->getTypeFromString('__string__*')->constNull();
+                    }
                     $i64 = $context->getTypeFromString('int64');
                     $glue = $context->builder->call(
                         $context->lookupFunction('__string__alloc'),
@@ -130,7 +144,7 @@ final class implode extends Internal
                     return JitImplode::implode($context, $glue, $haystack);
                 }
                 if (JITVariable::TYPE_VALUE === $args[0]->type) {
-                    // Boxed first + null pieces: array → empty glue; else Arg #1 ($array).
+                    // Boxed first + null pieces: array → empty glue (or #26277 TypeError); else Arg #1 ($array).
                     return $this->jitTwoArgNullPiecesBoxedFirst($context, $args[0], $this->getName());
                 }
                 self::rejectNullSeparatorJit($context, $args[0], $this->getName());
@@ -278,6 +292,40 @@ final class implode extends Internal
     }
 
     /**
+     * Zend 8.4+ registers frameless implode(2) requiring string $separator; join keeps zif_implode
+     * array-first when pieces is explicit null (#26277; php-src string.c / string_arginfo.h).
+     */
+    private static function rejectsArrayFirstExplicitNullPieces(string $function): bool
+    {
+        if ('implode' !== $function) {
+            return false;
+        }
+
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * php-src string.c PHP_FUNCTION(implode): pieces == NULL && arg1_array == NULL.
+     *
+     * PROFILE≥8.4 (#26278 / php-src PR #12683): dual-arg message naming $separator + $array.
+     * Older profiles keep the legacy Arg #1 ($array), string given message (#19566).
+     */
+    private static function nullPiecesStringFirstTypeErrorMessage(string $function): string
+    {
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            return sprintf(
+                '%s(): If argument #1 ($separator) is of type string, argument #2 ($array) must be of type array, null given',
+                $function
+            );
+        }
+
+        return sprintf(
+            '%s(): Argument #1 ($array) must be of type array, string given',
+            $function
+        );
+    }
+
+    /**
      * php-src Z_PARAM_ARRAY_HT_OR_STR + Z_PARAM_ARRAY_HT_OR_NULL — array-first two-arg form (#16401).
      *
      * When argument #1 is an array, invalid glue is reported on argument #2 ($array).
@@ -341,6 +389,12 @@ final class implode extends Internal
         self::lowerSeparatorSoftNull($context, $firstArg, $function);
         self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
         $context->builder->positionAtEnd($arrayBlock);
+        // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
+        if (self::rejectsArrayFirstExplicitNullPieces($function)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         $i64 = $context->getTypeFromString('int64');
         $glue = $context->builder->call(
             $context->lookupFunction('__string__alloc'),
@@ -400,6 +454,12 @@ final class implode extends Internal
         JitArrayElem::requireArrayParam($context, $secondArg, $function, 2, 'array', '?array');
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($nullBlock);
+        // PROFILE≥8.4 frameless implode(2): array + null → $separator TypeError (#26277).
+        if (self::rejectsArrayFirstExplicitNullPieces($function)) {
+            self::emitSeparatorArrayTypeErrorAndAbort($context, $function);
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         $i64 = $context->getTypeFromString('int64');
         $glue = $context->builder->call(
             $context->lookupFunction('__string__alloc'),
@@ -411,7 +471,7 @@ final class implode extends Internal
     }
 
     /**
-     * Modern form: null pieces → Arg #1 ($array), string given (#19566).
+     * Modern form: null pieces → PROFILE≥8.4 dual-arg TypeError (#26278) else #19566.
      */
     private static function jitRejectNullPiecesModernForm(
         Context $context,
@@ -547,16 +607,14 @@ final class implode extends Internal
         ));
     }
 
-    /** php-src pieces==NULL + string first — Argument #1 ($array), string given (#19566). */
+    /** php-src pieces==NULL + string first — #26278 (≥8.4) / #19566 (legacy). */
     private static function emitPiecesNullStringFirstTypeErrorAndAbort(Context $context, string $function): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, sprintf(
-            '%s(): Argument #1 ($array) must be of type array, string given',
-            $function
-        ));
-        $context->builder->call($context->lookupFunction('abort'));
+        // ExceptionBridge — catchable in try/catch; uncaught still aborts on AOT (#19894, #19276).
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            self::nullPiecesStringFirstTypeErrorMessage($function)
+        );
     }
 
     /** AOT standalone: libc abort like JitArrayElem::emitErrorAndAbort (#4160). */

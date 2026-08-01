@@ -260,8 +260,9 @@ final class AttributeNames
      * Zend compile-time target guard for #[\Deprecated] (zend_attributes.c, #23701).
      *
      * PHP 8.4: function | method | class constant only.
-     * PHP 8.5+: also class (traits further gated by {@see assertDeprecatedAllowedOnClassLike})
-     * and constant — matches Attribute::TARGET_* on the builtin.
+     * PHP 8.5+: Attribute::TARGET_CLASS (class-likes: class/interface/trait/enum) and
+     * TARGET_CONSTANT are advertised — {@see assertDeprecatedAllowedOnClassLike} then
+     * restricts TARGET_CLASS applications to traits only (rfc:deprecated_traits, #26307).
      *
      * @param list<string> $names
      */
@@ -294,7 +295,10 @@ final class AttributeNames
 
     /**
      * Zend 8.5+ validate_deprecated: #[\Deprecated] on class-likes is traits-only
-     * (zend_attributes.c, rfc:deprecated_traits, #22989). Interfaces/classes/enums fatal.
+     * (zend_attributes.c, rfc:deprecated_traits, #22989 / #26307).
+     *
+     * TARGET_CLASS on the builtin is required so traits pass the Attribute target mask;
+     * this validator then fatals for class / interface / enum (same message shape as php-src).
      *
      * @param list<string> $names
      */

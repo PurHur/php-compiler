@@ -13,8 +13,18 @@ final class MemcachedExtensionPolicyTest extends TestCase
 {
     public function testWithheldOnReferenceProfile(): void
     {
-        self::assertFalse(CompilerVersion::supportsMemcached());
-        self::assertFalse(MemcachedExtensionPolicy::advertisesExtension());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            self::assertFalse(CompilerVersion::supportsMemcached());
+            self::assertFalse(MemcachedExtensionPolicy::advertisesExtension());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testAdvertisedOnForwardProfile(): void

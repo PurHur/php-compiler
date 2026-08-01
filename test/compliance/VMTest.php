@@ -1364,11 +1364,8 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
-            if (!CompilerVersion::supportsGlobalDeprecatedConstAttributes()
-                && str_contains($name, 'global_deprecated_const')
-                && !str_contains($name, 'reference_profile')) {
-                continue;
-            }
+            // global_deprecated_const.phpt sets PROFILE=8.5 via --ENV-- (#26308); always include
+            // so SKIPIF/--ENV-- can enable TARGET_CONSTANT — do not gate on the provider profile.
             if (CompilerVersion::supportsGlobalDeprecatedConstAttributes()
                 && str_contains($name, 'global_deprecated_const_reference_profile')) {
                 continue;

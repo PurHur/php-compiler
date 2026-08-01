@@ -280,7 +280,7 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        $key = $this->formatArrayKey(HashTable::normalizeIndexKey($index));
+        $key = $this->formatArrayKey(HashTable::normalizeIndexKey($index, 'Illegal offset type', false));
         $message = "Undefined array key {$key}";
         $this->emitWarning($message, $context, $frame, $file);
     }

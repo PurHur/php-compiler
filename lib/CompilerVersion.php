@@ -288,14 +288,16 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ #[\Deprecated] on file/namespace constants (Zend/zend_compile.c, issue #16819).
+     * PHP 8.5+ #[\Deprecated] on file/namespace constants (Attribute::TARGET_CONSTANT).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
-     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * php-src Zend/zend_attributes.stub.php: Deprecated gains TARGET_CONSTANT only in 8.5;
+     * Zend 8.4 parse-errors `#[\Deprecated] const` (`syntax error, unexpected token "const"`).
+     * Withheld on ≤8.4 (reference + PROFILE=8.4). Enable via stable 8.5.0+ or
+     * `PHP_COMPILER_PROFILE=8.5` (#16819, #26308).
      */
     public static function supportsGlobalDeprecatedConstAttributes(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
@@ -818,6 +820,18 @@ final class CompilerVersion
     public static function supportsImplicitNullableParameterDeprecation(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ deprecates null as an array offset / array_key_exists() key (coerce to "").
+     *
+     * php-src: Zend/zend_execute.c / zend_vm_def.h; ext/standard/array.c (#26276).
+     * RFC: deprecations_php_8_5 — null array offset / array_key_exists.
+     * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
+     */
+    public static function supportsNullArrayOffsetDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
@@ -1504,6 +1518,39 @@ final class CompilerVersion
     public static function supportsDollarBraceStringDeprecation(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.2.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ deprecates `case <expr>;` / `default;` in switch (prefer `:`).
+     *
+     * php-src: Zend/zend_compile.c ZEND_ALT_CASE_SYNTAX (#26279).
+     * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsSwitchCaseSemicolonDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ deprecates the backtick operator as an alias for shell_exec().
+     *
+     * php-src: Zend/zend_compile.c zend_compile_shell_exec (#26280).
+     * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsBacktickShellExecDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ deprecates non-canonical cast spellings (integer)/(boolean)/(double)/(binary).
+     *
+     * php-src: Zend/zend_language_scanner.l (#26281).
+     * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsNonCanonicalCastDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**

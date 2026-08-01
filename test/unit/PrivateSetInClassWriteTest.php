@@ -68,7 +68,7 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame(
-            "child:Cannot modify private(set) property U::\$n from child\n",
+            "child:Cannot modify private(set) property U::\$n from scope Child\n",
             ob_get_clean()
         );
     }

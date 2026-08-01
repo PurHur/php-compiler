@@ -63,22 +63,36 @@ final class VmStreamWrapperMetadata
         return false;
     }
 
-    /** STREAM_META_TOUCH value — optional mtime/atime list (php-src php_touch wrapper path). */
+    /**
+     * STREAM_META_TOUCH value — optional mtime/atime list (php-src php_touch + userspace.c).
+     *
+     * php-src filestat.c: when only mtime is set, both utimbuf fields get that mtime
+     * (`newtime->modtime = newtime->actime = filetime`). userspace.c then always
+     * exposes [modtime, actime] when the pointer is non-NULL — so two-arg touch
+     * yields [mtime, mtime], not a single-element list (#26288).
+     */
     public static function touchValue(?int $mtime, ?int $atime): Variable
     {
         $ht = new HashTable();
-        $index = 0;
-        if (null !== $mtime) {
-            $v = new Variable();
-            $v->int($mtime);
-            $ht->add((string) $index, $v);
-            ++$index;
+        // Both omitted → NULL utimbuf → empty array (zero-arg / null,null touch).
+        if (null === $mtime && null === $atime) {
+            $arr = new Variable();
+            $arr->array($ht);
+
+            return $arr;
         }
-        if (null !== $atime) {
-            $v = new Variable();
-            $v->int($atime);
-            $ht->add((string) $index, $v);
+        // mtime set, atime omitted → duplicate mtime as actime (two-arg touch).
+        if (null !== $mtime && null === $atime) {
+            $atime = $mtime;
         }
+        // mtime null + atime set is a ValueError in php-src before metadata dispatch;
+        // callers must not reach here in that shape.
+        $mod = new Variable();
+        $mod->int((int) $mtime);
+        $ht->add('0', $mod);
+        $acc = new Variable();
+        $acc->int((int) $atime);
+        $ht->add('1', $acc);
         $arr = new Variable();
         $arr->array($ht);
 

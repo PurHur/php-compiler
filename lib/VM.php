@@ -5155,7 +5155,7 @@ restart:
                         }
                         $table = $container->toArray();
                         try {
-                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3)) {
+                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3, false, $frame)) {
                                 $this->context->errors->undefinedArrayKey(
                                     $arg3,
                                     $this->context,
@@ -6719,7 +6719,7 @@ restart:
                         try {
                             $container->separateArrayForWrite();
                             $container = $containerSlot->resolveIndirect();
-                            $container->toArray()->offsetUnset($key);
+                            $container->toArray()->offsetUnset($key, $frame);
                         } catch (\TypeError $e) {
                             $catchFrame = $this->dispatchVmTypeError($e, $frame);
                             if (null !== $catchFrame) {
@@ -8848,7 +8848,7 @@ restart:
                                 break;
                             }
                             try {
-                                $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                                $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3], $frame));
                             } catch (\TypeError $e) {
                                 $catchFrame = $this->dispatchVmTypeError($e, $frame);
                                 if (null !== $catchFrame) {
@@ -14274,16 +14274,18 @@ restart:
             : strtolower($object->class->name);
         $declaringDisplay = $this->context->classes[$declaringLc]->name
             ?? $object->class->name;
+        $callerLc = $this->callerClassLc($frame);
         try {
             PropertyVisibility::assertUnsettable(
                 $setVis,
-                $this->callerClassLc($frame),
+                $callerLc,
                 $declaringLc,
                 $declaringDisplay,
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
-                $meta->asymmetricExplicitRead
+                $meta->asymmetricExplicitRead,
+                $this->callerScopeDisplay($frame, $callerLc)
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -15354,16 +15356,18 @@ restart:
         if ($setVis === $readVis) {
             return null;
         }
+        $callerLc = $this->callerClassLc($frame);
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
-                $this->callerClassLc($frame),
+                $callerLc,
                 $meta['declaringClassLc'],
                 $meta['declaringClassDisplay'],
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
-                $meta['asymmetricExplicitRead'] ?? false
+                $meta['asymmetricExplicitRead'] ?? false,
+                $this->callerScopeDisplay($frame, $callerLc)
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -15743,16 +15747,18 @@ restart:
             : strtolower($owner->class->name);
         $declaringDisplay = $this->context->classes[$declaringLc]->name
             ?? $owner->class->name;
+        $callerLc = $this->callerClassLc($frame);
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
-                $this->callerClassLc($frame),
+                $callerLc,
                 $declaringLc,
                 $declaringDisplay,
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
-                $meta->asymmetricExplicitRead
+                $meta->asymmetricExplicitRead,
+                $this->callerScopeDisplay($frame, $callerLc)
             );
         } catch (\LogicException $e) {
             return $e->getMessage();

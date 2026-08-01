@@ -8,10 +8,10 @@ use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Rewrite attributes on file/namespace constants for nikic/php-parser 4.x (#16819, #23882).
+ * Rewrite attributes on file/namespace constants for nikic/php-parser 4.x (#16819, #23882, #26308).
  *
- * - PHP 8.4+: #[\Deprecated] only (Zend/zend_compile.c).
- * - PHP 8.5+: any attribute (RFC attributes_on_constants / TARGET_CONSTANT).
+ * - PHP 8.5+: any attribute including #[\Deprecated] (RFC attributes_on_constants /
+ *   Attribute::TARGET_CONSTANT). Zend 8.4 parse-errors attributed file-scope constants.
  *
  * php-parser 4.x rejects `#[Attr] const X` — strip to a comment marker and recover in PHPCfg.
  */

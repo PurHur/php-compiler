@@ -1,9 +1,11 @@
 --TEST--
-Language: #[\Deprecated] on global constants emits E_USER_DEPRECATED on fetch (#16819, Zend/zend_compile.c)
+Language: #[\Deprecated] on global constants emits E_USER_DEPRECATED on fetch (#16819, #26308, Zend/zend_attributes.stub.php)
+--ENV--
+PHP_COMPILER_PROFILE=8.5
 --SKIPIF--
 <?php
 if (!PHPCompiler\CompilerVersion::supportsGlobalDeprecatedConstAttributes()) {
-    die('skip global deprecated constants require PHP_COMPILER_PROFILE=8.4');
+    die('skip global deprecated constants require PHP_COMPILER_PROFILE=8.5');
 }
 ?>
 --FILE--
