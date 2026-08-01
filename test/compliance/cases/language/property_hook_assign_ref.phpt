@@ -1,5 +1,5 @@
 --TEST--
-By-reference assign to hooked properties requires &get (#22475, #6426, zend_object_handlers.c)
+By-reference assign to hooked properties requires &get (#22475, #6426, #26368, zend_object_handlers.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -81,6 +81,18 @@ $a = new A();
 $ref = &$a->prop;
 $ref = 42;
 echo $a->prop, "\n";
+
+// #26368 — typed &get-only: assign-ref must alias private backing (zend_property_hooks.c)
+class C26368 {
+    private int $b = 1;
+    public int $x {
+        &get => $this->b;
+    }
+}
+$c = new C26368;
+$r = &$c->x;
+$r = 5;
+echo $c->x, "\n";
 --EXPECT--
 Error: Indirect modification of H::$x is not allowed
 Error: Indirect modification of H::$x is not allowed
@@ -88,3 +100,4 @@ Error: Cannot assign by reference to overloaded object
 Error: Indirect modification of G::$x is not allowed
 9
 42
+5
