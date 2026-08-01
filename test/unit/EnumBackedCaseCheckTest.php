@@ -229,6 +229,60 @@ PHP,
         );
     }
 
+    /** @covers issue #26557 */
+    public function testUnitEnumCaseThenConstSameNameFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redefine class constant E::Foo');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case Foo;
+    const Foo = 1;
+}
+echo "ok\n";
+PHP,
+            'enum_case_then_const.php'
+        );
+    }
+
+    /** @covers issue #26557 */
+    public function testUnitEnumConstThenCaseSameNameFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redefine class constant E::Foo');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    const Foo = 1;
+    case Foo;
+}
+echo "ok\n";
+PHP,
+            'enum_const_then_case.php'
+        );
+    }
+
+    /** @covers issue #26557 */
+    public function testBackedEnumCaseThenConstSameNameFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redefine class constant E::Foo');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E: int {
+    case Foo = 1;
+    const Foo = 2;
+}
+echo "ok\n";
+PHP,
+            'enum_backed_case_then_const.php'
+        );
+    }
+
     /** @covers issue #25929 */
     public function testUnitEnumCaseDifferingNamesCompile(): void
     {

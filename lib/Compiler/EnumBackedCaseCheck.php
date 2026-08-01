@@ -13,6 +13,7 @@ use PHPCfg\Script;
  * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
  * Unit (non-backed) enum cases must not declare a value (#26382, zend_compile.c).
  * Duplicate case names are rejected at compile (#5218, zend_compile.c).
+ * Enum case names share the class-constant table with user `const` (#26557, zend_compile.c).
  * Enum backing type must be int or string (#26539, zend_compile.c).
  * Duplicate backing values are validated at first case use via {@see \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique()} (#5773, #8687, zend_enum.c).
  *
@@ -188,7 +189,8 @@ final class EnumBackedCaseCheck
     }
 
     /**
-     * Zend rejects duplicate enum case names at compile time (#5218, zend_compile.c).
+     * Zend rejects duplicate enum case names and case↔const collisions at compile time
+     * (#5218, #26557, zend_compile.c). Cases occupy the same name table as user `const`.
      */
     private function validateDuplicateCaseNames(Op\Stmt\Enum_ $enum, string $enumDisplay): void
     {
@@ -198,19 +200,19 @@ final class EnumBackedCaseCheck
             if (!$member instanceof Op\Terminal\Const_) {
                 continue;
             }
-            if (!$this->memberIsEnumCase($member, $enum)) {
-                continue;
-            }
-            // Enum case names are case-sensitive (Zend/zend_compile.c / zend_enum.c, #25929).
-            $caseName = $this->operandDisplayName($member->name, 'case');
-            if (isset($seen[$caseName])) {
+            // Enum case / class constant names are case-sensitive (Zend/zend_compile.c / zend_enum.c, #25929).
+            $name = $this->operandDisplayName(
+                $member->name,
+                $this->memberIsEnumCase($member, $enum) ? 'case' : 'const'
+            );
+            if (isset($seen[$name])) {
                 throw new CompileFatal(
                     $member->getFile(),
                     $member->getLine(),
-                    sprintf('Cannot redefine class constant %s::%s', $enumDisplay, $caseName)
+                    sprintf('Cannot redefine class constant %s::%s', $enumDisplay, $name)
                 );
             }
-            $seen[$caseName] = true;
+            $seen[$name] = true;
         }
     }
 
