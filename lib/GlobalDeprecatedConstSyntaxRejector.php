@@ -8,7 +8,9 @@ use PHPCompiler\Ast\GlobalDeprecatedConstRewriter;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 8.4+ #[\Deprecated] on file/namespace constants on the Zend 8.2 reference profile (#16819).
+ * Reject attributed file/namespace constants when TARGET_CONSTANT is unavailable (#16819, #26308).
+ *
+ * Matches Zend ≤8.4 parse error (`syntax error, unexpected token "const"`). Allowed on PROFILE≥8.5.
  */
 final class GlobalDeprecatedConstSyntaxRejector
 {

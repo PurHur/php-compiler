@@ -47,7 +47,7 @@ PHP;
         self::assertSame($src, GlobalDeprecatedConstRewriter::rewrite($src));
     }
 
-    public function testRewritesDeprecatedGlobalConstOnForwardProfile(): void
+    public function testLeavesDeprecatedGlobalConstOn84ProfileForParserReject(): void
     {
         putenv('PHP_COMPILER_PROFILE=8.4');
         $src = <<<'PHP'
@@ -55,8 +55,22 @@ PHP;
 #[\Deprecated(since: '8.4')]
 const FOO = 42;
 PHP;
+        // Zend 8.4 parse-errors attributed file-scope constants (#26308).
+        self::assertSame($src, GlobalDeprecatedConstRewriter::rewrite($src));
+        self::assertFalse(CompilerVersion::supportsGlobalDeprecatedConstAttributes());
+    }
+
+    public function testRewritesDeprecatedGlobalConstOn85Profile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        $src = <<<'PHP'
+<?php
+#[\Deprecated(since: '8.4')]
+const FOO = 42;
+PHP;
         $out = GlobalDeprecatedConstRewriter::rewrite($src);
-        self::assertStringContainsString('phpc-global-deprecated-const:since=8.4', $out);
+        // 8.5 uses general ATTRS marker (TARGET_CONSTANT / #23882).
+        self::assertStringContainsString('phpc-global-const-attrs:', $out);
         self::assertStringNotContainsString('#[', $out);
         self::assertStringContainsString('const FOO = 42', $out);
     }
@@ -80,6 +94,19 @@ PHP;
         $src = <<<'PHP'
 <?php
 #[\Deprecated(since: '8.4')]
+const FOO = 42;
+PHP;
+        $error = GlobalDeprecatedConstRewriter::referenceProfileSyntaxError($src);
+        self::assertNotNull($error);
+        self::assertSame('syntax error, unexpected token "const"', $error['message']);
+    }
+
+    public function testProfile84SyntaxErrorMatchesZend(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $src = <<<'PHP'
+<?php
+#[\Deprecated("old")]
 const FOO = 42;
 PHP;
         $error = GlobalDeprecatedConstRewriter::referenceProfileSyntaxError($src);

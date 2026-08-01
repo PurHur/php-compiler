@@ -1,14 +1,14 @@
 --TEST--
-ReflectionConstant global isDeprecated / type / modifiers (#21255, ext/reflection/php_reflection.c)
+ReflectionConstant global isDeprecated / type / modifiers (#21255, #26308, ext/reflection/php_reflection.c)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --SKIPIF--
 <?php
 if (!PHPCompiler\CompilerVersion::advertisesReflectionConstantClass()) {
     die('skip ReflectionConstant requires forward profile');
 }
 if (!PHPCompiler\CompilerVersion::supportsGlobalDeprecatedConstAttributes()) {
-    die('skip global deprecated constants require PHP_COMPILER_PROFILE=8.4');
+    die('skip global deprecated constants require PHP_COMPILER_PROFILE=8.5');
 }
 ?>
 --FILE--
