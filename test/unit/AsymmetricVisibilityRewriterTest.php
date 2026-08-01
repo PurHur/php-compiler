@@ -390,6 +390,15 @@ trait T {
     public static (protected(set)) string $name = 't';
 }
 PHP;
+        if (CompilerVersion::supportsStaticAsymmetricVisibility()) {
+            $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+            self::assertStringContainsString(
+                '/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public static string $name',
+                preg_replace('/\s+/', ' ', $rewritten)
+            );
+
+            return;
+        }
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
         AsymmetricVisibilityRewriter::rewrite($source);
@@ -404,9 +413,38 @@ class C {
     public (private(set)) static int $x = 1;
 }
 PHP;
+        // PHP 8.5+ accepts static aviz (#26239); ≤8.4 still compile-fatal (#7013).
+        if (CompilerVersion::supportsStaticAsymmetricVisibility()) {
+            $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+            self::assertStringContainsString(
+                '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public static int $x',
+                preg_replace('/\s+/', ' ', $rewritten)
+            );
+
+            return;
+        }
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
         AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    /** @covers issue #26239 — unparenthesized public private(set) static on PHP 8.5 */
+    public function testStaticUnparenthesizedPublicPrivateSetRewritesOn85(): void
+    {
+        if (!CompilerVersion::supportsStaticAsymmetricVisibility()) {
+            $this->markTestSkipped('static asymmetric visibility requires PHP 8.5 forward profile (#26239)');
+        }
+        $source = <<<'PHP'
+<?php
+class C {
+    public private(set) static string $x = 'a';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public static string $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testStaticPrivateSetWithoutExplicitReadRewrites(): void
