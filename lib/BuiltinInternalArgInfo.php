@@ -112,6 +112,8 @@ final class BuiltinInternalArgInfo
             'hash_hkdf' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
+            // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
+            'mb_ucfirst', 'mb_lcfirst' => 'string',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
@@ -522,6 +524,12 @@ final class BuiltinInternalArgInfo
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => match ($index) {
                 0 => 'string',
                 1, 2 => '?string',
+                default => null,
+            },
+            // ext/mbstring/mbstring.stub.php — string, ?string encoding=null (#26282)
+            'mb_ucfirst', 'mb_lcfirst' => match ($index) {
+                0 => 'string',
+                1 => '?string',
                 default => null,
             },
             // ext/spl/spl.stub.php — Traversable|array (InternalArgInfo says traversable) (#25066)
