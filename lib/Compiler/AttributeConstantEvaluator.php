@@ -16,7 +16,7 @@ use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\VM\Variable;
 
 /**
- * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725, #26030).
+ * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725, #26030, #26627).
  *
  * php-src: zend_compile_attribute / zend_ast_evaluate constant expression rules (subset).
  */
@@ -106,7 +106,7 @@ final class AttributeConstantEvaluator
             return self::evalArray($expr);
         }
         if ($expr instanceof Expr\ClassConstFetch) {
-            return self::evalClassConstFetch($expr); // int|CompileTimeEnumCase
+            return self::evalClassConstFetch($expr); // int|string|CompileTimeEnumCase
         }
         if ($expr instanceof BinaryOp\BitwiseOr) {
             return self::evalIntBinary($expr, '|');
@@ -228,7 +228,7 @@ final class AttributeConstantEvaluator
         return dirname(self::evalMagicFile());
     }
 
-    private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int|CompileTimeEnumCase
+    private static function evalClassConstFetch(Expr\ClassConstFetch $expr): int|string|CompileTimeEnumCase
     {
         if (!$expr->class instanceof Node\Name) {
             throw new \LogicException(
@@ -254,13 +254,20 @@ final class AttributeConstantEvaluator
             return $value;
         }
 
-        // php-src: backed/unit enum case fetches are valid attribute const exprs (#9988, zend_compile.c).
+        // php-src: Foo::class / self::class / parent::class are valid attribute const exprs
+        // (zend_compile.c). PHP-CFG already resolves self/parent to concrete names before
+        // AttributeMetadata runs; static::class remains and is a compile-time fatal (#26627).
         if ('class' === strtolower($constName)) {
-            throw new \LogicException(
-                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
-            );
+            if ('static' === strtolower($className)) {
+                throw new \LogicException(
+                    'static::class cannot be used for compile-time class name resolution'
+                );
+            }
+
+            return $className;
         }
 
+        // php-src: backed/unit enum case fetches are valid attribute const exprs (#9988, zend_compile.c).
         return new CompileTimeEnumCase($className, $constName);
     }
 
