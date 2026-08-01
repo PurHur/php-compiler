@@ -94,7 +94,7 @@ final class IntersectionTypeMemberCompileCheck
     /**
      * First duplicate intersection member display name (second occurrence spelling), or null.
      *
-     * Does not claim DNF arm redundancy {@code (A&B)|(A&B)} — that is a separate check.
+     * Does not claim DNF arm redundancy {@code (A&B)|(A&B)} — see {@see RedundantDnfArmCompileCheck} (#26606).
      */
     public static function findDuplicateMemberName(?Op\Type $type): ?string
     {

@@ -45,6 +45,7 @@
             <file>./test/compliance/ObjectClassUnionRedundantVMTest.php</file>
             <file>./test/compliance/DnfSubsetArmRedundantVMTest.php</file>
             <file>./test/compliance/NullsafeByRefRhsVMTest.php</file>
+            <file>./test/compliance/RedundantDnfArmVMTest.php</file>
             <file>./test/compliance/PropertyDefaultClassPseudoConstVMTest.php</file>
             <file>./test/compliance/GeneratorJITTest.php</file>
             <file>./test/compliance/VisibilityTest.php</file>
