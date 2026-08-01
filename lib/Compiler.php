@@ -187,6 +187,9 @@ class Compiler {
     /** Parent lc while compiling a class body — registerClass() runs after body (#13533). */
     private ?string $compilingClassParentLc = null;
 
+    /** Parent display name while compiling a class body (#26252). */
+    private ?string $compilingClassParentName = null;
+
     /** Display class name while compiling a class body (#4286). */
     private ?string $compilingClassDisplayName = null;
 
@@ -6633,6 +6636,7 @@ class Compiler {
             $this->throwCompileError('Class name must be a compile-time class reference');
         }
         $parentLc = null;
+        $parentName = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentName = $this->staticNameFromOperand($class->extends);
             if (null === $parentName) {
@@ -6685,13 +6689,18 @@ class Compiler {
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
         $this->currentClassStaticPropertyCompile = $classLc;
         $prevCompilingParentLc = $this->compilingClassParentLc;
+        $prevCompilingParentName = $this->compilingClassParentName;
         $this->compilingClassParentLc = $parentLc;
+        $this->compilingClassParentName = null !== $parentLc
+            ? ($parentName ?? $parentLc)
+            : null;
         $return->block1 = $this->compileClassBody(
             $class->stmts,
             $type,
             $className
         );
         $this->compilingClassParentLc = $prevCompilingParentLc;
+        $this->compilingClassParentName = $prevCompilingParentName;
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
         $this->mergeTraitStaticPropertiesIntoClass($class->stmts, $classLc);
         $this->mergeTraitCompileTimeClassConstsIntoClass($class->stmts, $classLc);
@@ -7033,6 +7042,25 @@ class Compiler {
         }
 
         return $this->staticNameFromOperand($class);
+    }
+
+    /**
+     * True when the enclosing function is a static method (no `$this`, #26252).
+     *
+     * `parent::staticMethod(...)` FCC must use the Class::method string path, not
+     * `[$this, method]` — Zend/zend_compile.c ZEND_AST_CALLABLE_CONVERT.
+     */
+    protected function blockIsStaticMethodContext(Block $block): bool
+    {
+        $func = $block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+        if (null === ($func->class ?? null) || null === $func->class->value || '' === $func->class->value) {
+            return false;
+        }
+
+        return 0 !== (($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
     }
 
     /** True when StaticCall source class is the `parent` keyword (#6735, zend_compile.c). */
@@ -41576,10 +41604,13 @@ class Compiler {
     {
         $result = $this->compileOperand($expr->result, $block, false);
         // `parent::instanceMethod(...)` — bound closure with parent scope, not static (#17655, zend_compile.c).
+        // Static methods / static context: fall through to `"parent::m"` / fqcn string FCC (#26252).
+        // Binding `$this` from a static method yields a null receiver and fromCallable fails.
         if (
             Op\Expr\FirstClassCallable::KIND_STATIC === $expr->kind
             && null !== $expr->class
             && $this->staticCallUsesParentScope($expr->class)
+            && !$this->blockIsStaticMethodContext($block)
         ) {
             return $this->compileBoundMethodFirstClassCallable(
                 $expr,
@@ -41683,8 +41714,49 @@ class Compiler {
         if (!$class instanceof Operand\Literal || !$method instanceof Operand\Literal) {
             $this->throwCompileLogic('First-class static callable requires literal class and method names');
         }
+        $className = $this->resolveFirstClassStaticClassName((string) $class->value, $block);
 
-        return $this->compileStringLiteralSlot($class->value.'::'.$method->value, $block);
+        return $this->compileStringLiteralSlot($className.'::'.$method->value, $block);
+    }
+
+    /**
+     * Resolve `parent` / `self` in FCC Class::method strings for AOT/JIT (#26252).
+     *
+     * VM {@see ClosureSupport::resolveClassScopeName} rewrites at runtime; native emit must
+     * bake a real class name or lookup fails with `undefined static method parent::m()`.
+     */
+    private function resolveFirstClassStaticClassName(string $className, Block $block): string
+    {
+        $lc = strtolower($className);
+        if ('parent' === $lc) {
+            if (null !== $this->compilingClassParentLc && '' !== $this->compilingClassParentLc) {
+                return $this->compilingClassParentDisplayName() ?? $this->compilingClassParentLc;
+            }
+            $this->throwCompileError('Cannot use "parent" when current class scope has no parent');
+        }
+        if ('self' === $lc) {
+            if (null !== $block->func && null !== $block->func->class && '' !== (string) $block->func->class->value) {
+                return (string) $block->func->class->value;
+            }
+            if (null !== $this->compilingClassLc && '' !== $this->compilingClassLc) {
+                return $this->compilingClassLc;
+            }
+        }
+
+        return $className;
+    }
+
+    /** Display name for the class currently being compiled's extends clause (#26252). */
+    private function compilingClassParentDisplayName(): ?string
+    {
+        if (null !== $this->compilingClassParentName && '' !== $this->compilingClassParentName) {
+            return $this->compilingClassParentName;
+        }
+        if (null === $this->compilingClassParentLc || '' === $this->compilingClassParentLc) {
+            return null;
+        }
+
+        return $this->compilingClassParentLc;
     }
 
     private function compileStringLiteralSlot(string $value, Block $block): int

@@ -115,6 +115,75 @@ PHP;
         $this->assertSame('parent', ob_get_clean());
     }
 
+    /** Issue #26252: parent::staticMethod(...) from static context (re-#17655). */
+    public function testVmParentStaticMethodFirstClassCallableFromStatic(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A { public static function m(): string { return "A"; } }
+class B extends A {
+  public static function t(): string {
+    $f = parent::m(...);
+    return $f();
+  }
+}
+echo B::t();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('A', ob_get_clean());
+    }
+
+    /** Issue #26252: parent::staticMethod(...) from instance context still works. */
+    public function testVmParentStaticMethodFirstClassCallableFromInstance(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A { public static function m(): string { return "A"; } }
+class B extends A {
+  public function t(): string {
+    $f = parent::m(...);
+    return $f();
+  }
+}
+echo (new B())->t();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('A', ob_get_clean());
+    }
+
+    /** Issue #26252: parent::instanceMethod(...) from static context Errors like Zend. */
+    public function testVmParentInstanceMethodFirstClassCallableFromStaticErrors(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A { public function i(): string { return "Ai"; } }
+class B extends A {
+  public static function t(): void {
+    parent::i(...);
+  }
+}
+try {
+  B::t();
+} catch (Error $e) {
+  echo $e->getMessage(), "\n";
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "Non-static method A::i() cannot be called statically\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
     public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
     {

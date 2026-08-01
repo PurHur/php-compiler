@@ -364,7 +364,7 @@ class OpCode {
     public bool $isEnumCaseDeclare = false;
     /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
     public bool $staticCallParentScope = false;
-    /** TYPE_FROM_CALLABLE: `parent::instanceMethod(...)` bound closure (#17655, zend_compile.c). */
+    /** TYPE_FROM_CALLABLE: `parent::instanceMethod(...)` bound closure (#17655, #26252, zend_compile.c). */
     public bool $fromCallableParentScope = false;
     /**
      * TYPE_FUNCCALL_INIT: callee was a variable/expression, not a literal name (#23591).
