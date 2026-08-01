@@ -4507,6 +4507,7 @@ require_once __DIR__.'/../../../lib/Ast/TypedFunctionStaticRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/VoidCastDesugar.php';
 require_once __DIR__.'/../../../lib/AsymmetricVisibilityRejector.php';
 require_once __DIR__.'/../../../lib/BareThrowSyntaxRejector.php';
+require_once __DIR__.'/../../../lib/BacktickShellExecDeprecation.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
 require_once __DIR__.'/../../../lib/BuiltinFunctionClassConstant.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';

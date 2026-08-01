@@ -1530,6 +1530,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ deprecates the backtick operator as an alias for shell_exec().
+     *
+     * php-src: Zend/zend_compile.c zend_compile_shell_exec (#26280).
+     * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsBacktickShellExecDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ null coalesce (??) inside double-quoted `{$...}` interpolation (#14063, #14113, #15893).
      *
      * Default 8.4.0-dev reference profile rejects ?? in encapsed braces like Zend 8.2; forward profile
