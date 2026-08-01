@@ -3749,6 +3749,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('gzwrite'));
     }
 
+    /** @covers issue #25588 */
+    public function testZlibEncodeLevelOptionalDefault(): void
+    {
+        $names = BuiltinParamNames::forFunction('zlib_encode');
+        self::assertSame(['data', 'encoding', 'level='], $names);
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('zlib_encode'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('zlib_encode'));
+        $info = ['name' => 'level', 'type' => 'int', 'isOptional' => true];
+        $level = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($level, 'zlib_encode', 2, $info));
+        self::assertSame(-1, $level->toInt());
+    }
+
     /** @covers issue #24392 */
     public function testGzLineNamedParamsResolve(): void
     {
