@@ -411,8 +411,9 @@ class Runtime {
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
-        [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
-        $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
+        // #26519: reject `abstract enum` (Zend has no T_ABSTRACT T_ENUM); do not strip (#3737).
+        $code = AbstractEnumSourceRewriter::reject($code, $filename);
+        $this->abstractEnumMarker->clear();
         BareThrowSyntaxRejector::reject($code, $filename);
 
         return SourceBareThrowRewriter::rewrite($code);

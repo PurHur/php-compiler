@@ -15,7 +15,8 @@ use PHPCompiler\VM\ClassAbstract;
  * php-src: Zend/zend_compile.c — enum abstract method validation;
  * Zend/zend_enum.c — enum method table / abstract enforcement.
  *
- * PHP 8.4: `abstract enum` may declare abstract methods; concrete enums `implements` them.
+ * Note: `abstract enum` itself is not Zend syntax (#26519); this check covers abstract methods
+ * on ordinary enums (traits / interfaces) and leftover abstract-enum CFG if any.
  */
 final class EnumAbstractMethodCompileCheck
 {
