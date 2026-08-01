@@ -518,6 +518,10 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'null'],
             1 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/session/session.stub.php — ?string $id = null (InternalArgInfo string → no infer) (#26460)
+        'session_id' => [
+            0 => ['kind' => 'null'],
+        ],
         // php-src ext/date/php_date.stub.php — string $datetime = "now", ?DateTimeZone $timezone = null (#25392)
         // Functions absent from InternalArgInfo entirely.
         'date_create' => [

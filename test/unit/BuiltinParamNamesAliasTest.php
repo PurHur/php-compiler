@@ -3167,9 +3167,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ue, 'error_level', 'user_error'));
 
         $sid = BuiltinParamNames::forFunction('session_id');
-        self::assertSame(['id'], $sid);
+        self::assertSame(['id='], $sid);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sid, 'id', 'session_id'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sid, 'newid', 'session_id'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('session_id'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('session_id', 0));
+        self::assertSame('?string', BuiltinInternalArgInfo::paramInfoForFunction('session_id', 0)['type']);
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_id'));
+        $infoId = ['name' => 'id', 'type' => '?string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('session_id', 0, $infoId, false));
+        $idDefault = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($idDefault, 'session_id', 0, $infoId));
+        self::assertSame(Variable::TYPE_NULL, $idDefault->type);
     }
 
     /** @covers issue #24456 */

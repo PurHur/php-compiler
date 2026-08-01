@@ -140,6 +140,8 @@ final class BuiltinInternalArgInfo
             'mb_ucfirst', 'mb_lcfirst' => 'string',
             // ext/mbstring/mbstring.stub.php — InternalArgInfo return string (missing array| / |false) (#26466)
             'mb_convert_encoding' => 'array|string|false',
+            // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
+            'session_id' => 'string|false',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
             'json_decode' => 'mixed',
             'json_encode' => 'string|false',
@@ -417,6 +419,8 @@ final class BuiltinInternalArgInfo
                 0, 1 => 'string',
                 default => null,
             },
+            // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
+            'session_id' => 0 === $index ? '?string' : null,
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
             'json_decode' => 1 === $index ? '?bool' : null,
             'json_encode' => 0 === $index ? 'mixed' : null,
