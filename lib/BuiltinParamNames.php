@@ -1470,10 +1470,11 @@ final class BuiltinParamNames
                 return ['string', 'encoding'];
             case 'mb_str_split':
                 return ['string', 'length', 'encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — optionals + types (#26283)
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':
-                return ['string', 'characters', 'encoding'];
+                return ['string', 'characters=', 'encoding='];
             // php-src ext/mbstring/mbstring.stub.php — Reflection was empty (#23805)
             case 'mb_str_pad':
                 return ['string', 'length', 'pad_string=', 'pad_type=', 'encoding='];
