@@ -1006,6 +1006,10 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\eio\EioExtensionPolicy::isEioComplianceCase($name)) {
                 continue;
             }
+            if (!\PHPCompiler\ext\ssh2\Ssh2ExtensionPolicy::runsSsh2Compliance($name)
+                && \PHPCompiler\ext\ssh2\Ssh2ExtensionPolicy::isSsh2ComplianceCase($name)) {
+                continue;
+            }
             // snmpget/snmpwalk not JIT-lowered yet (#6070); phantom registration checks are fine.
             if (str_contains($name, 'snmp')
                 && !str_contains($name, 'snmp_phantom')) {

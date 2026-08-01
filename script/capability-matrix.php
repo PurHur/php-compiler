@@ -45,6 +45,7 @@ function collectCapabilities(string $root): array
         'rar' => new PHPCompiler\ext\rar\Module(),
         'imap' => new PHPCompiler\ext\imap\Module(),
         'eio' => new PHPCompiler\ext\eio\Module(),
+        'ssh2' => new PHPCompiler\ext\ssh2\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'enchant' => new PHPCompiler\ext\enchant\Module(),

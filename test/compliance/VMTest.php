@@ -841,6 +841,10 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\eio\EioExtensionPolicy::isEioComplianceCase($name)) {
                 continue;
             }
+            if (!\PHPCompiler\ext\ssh2\Ssh2ExtensionPolicy::runsSsh2Compliance($name)
+                && \PHPCompiler\ext\ssh2\Ssh2ExtensionPolicy::isSsh2ComplianceCase($name)) {
+                continue;
+            }
             // snmp_* PROFILE=8.4 via --ENV--; always include those cases.
             // Other snmp_* need forward profile.
             if (!CompilerVersion::supportsSnmp()
