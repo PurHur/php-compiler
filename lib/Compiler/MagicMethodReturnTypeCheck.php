@@ -15,7 +15,8 @@ use PHPCompiler\MethodVisibility;
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
  * (#4988 return types; #25023 zero-parameter magic methods; #25025/#25029 __toString;
- * #26432 __set/__unset void return; #26463 __isset bool return)
+ * #26432 __set/__unset void return; #26463 __isset bool return;
+ * #26484 __set_state object return)
  */
 final class MagicMethodReturnTypeCheck
 {
@@ -140,6 +141,15 @@ final class MagicMethodReturnTypeCheck
                         $this->fatal(
                             $member,
                             "{$classDisplay}::__isset(): Return type must be bool when declared"
+                        );
+                    }
+                    break;
+                case '__set_state':
+                    // php-src zend_check_magic_method_implementation — object/class/self/static/parent/never (#26484)
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isExactObjectOrNeverType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "{$classDisplay}::__set_state(): Return type must be object when declared"
                         );
                     }
                     break;
@@ -292,6 +302,35 @@ final class MagicMethodReturnTypeCheck
         return null === $sig->builtinScalar
             && null !== $sig->classLc
             && ('true' === $sig->classLc || 'false' === $sig->classLc);
+    }
+
+    /**
+     * Exact object-ish return: `object`, named class, `self`/`static`/`parent`, or `never`.
+     *
+     * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation (__set_state)
+     */
+    private function isExactObjectOrNeverType(Op\Type $type): bool
+    {
+        $sig = TypeSig::fromCfgType($type);
+        if (null === $sig) {
+            return false;
+        }
+        if ($sig->never) {
+            return true;
+        }
+        if ($sig->nullable || $sig->void
+            || null !== $sig->unionMembers
+            || null !== $sig->intersectionMembers) {
+            return false;
+        }
+        if ($sig->self || $sig->static) {
+            return true;
+        }
+        if ('object' === $sig->builtinScalar && null === $sig->classLc) {
+            return true;
+        }
+        // Named class (including parent) — not a non-object builtin scalar.
+        return null === $sig->builtinScalar && null !== $sig->classLc;
     }
 
     private function fatal(Op\Stmt\ClassMethod $method, string $message): void

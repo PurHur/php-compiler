@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issues #4988 #26432 #26463 */
+/** @covers issues #4988 #26432 #26463 #26484 */
 final class MagicMethodReturnTypeCheckTest extends TestCase
 {
     /**
@@ -167,6 +167,55 @@ class T6 { public static function __toString(): string { return 'x'; } }
 PHP,
             'Method T6::__toString() cannot be static',
         ];
+        yield '__set_state int' => [
+            <<<'PHP'
+<?php
+class Ss1 { public static function __set_state(array $a): int { return 1; } }
+PHP,
+            'Ss1::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state string' => [
+            <<<'PHP'
+<?php
+class Ss2 { public static function __set_state(array $a): string { return 'x'; } }
+PHP,
+            'Ss2::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state array' => [
+            <<<'PHP'
+<?php
+class Ss3 { public static function __set_state(array $a): array { return []; } }
+PHP,
+            'Ss3::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state mixed' => [
+            <<<'PHP'
+<?php
+class Ss4 { public static function __set_state(array $a): mixed { return new self; } }
+PHP,
+            'Ss4::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state void' => [
+            <<<'PHP'
+<?php
+class Ss5 { public static function __set_state(array $a): void {} }
+PHP,
+            'Ss5::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state nullable object' => [
+            <<<'PHP'
+<?php
+class Ss6 { public static function __set_state(array $a): ?object { return null; } }
+PHP,
+            'Ss6::__set_state(): Return type must be object when declared',
+        ];
+        yield '__set_state union' => [
+            <<<'PHP'
+<?php
+class Ss7 { public static function __set_state(array $a): object|array { return new self; } }
+PHP,
+            'Ss7::__set_state(): Return type must be object when declared',
+        ];
     }
 
     public function testValidMagicMethodReturnTypesCompile(): void
@@ -187,6 +236,7 @@ class Good {
     public function __debugInfo(): ?array { return null; }
     public function __destruct() {}
     public function __toString(): string { return 'Good'; }
+    public static function __set_state(array $a): object { return new self; }
 }
 echo (string) new Good(), "\n";
 PHP;
@@ -195,6 +245,39 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame("Good\n", ob_get_clean());
+    }
+
+    public function testSetStateObjectishReturnTypesCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {}
+class Good extends Base {
+    public static function __set_state(array $a): Good { return new self; }
+}
+class SelfRt {
+    public static function __set_state(array $a): self { return new self; }
+}
+class StaticRt {
+    public static function __set_state(array $a): static { return new self; }
+}
+class ParentRt extends Base {
+    public static function __set_state(array $a): parent { return new self; }
+}
+class NeverRt {
+    public static function __set_state(array $a): never { throw new Exception('no'); }
+}
+class Untyped {
+    public static function __set_state(array $a) { return new self; }
+}
+echo Good::class, SelfRt::class, StaticRt::class, ParentRt::class, NeverRt::class, Untyped::class, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'valid_set_state.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("GoodSelfRtStaticRtParentRtNeverRtUntyped\n", ob_get_clean());
     }
 
     public function testNeverMagicMethodReturnTypesCompile(): void
