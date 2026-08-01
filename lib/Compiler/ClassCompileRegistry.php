@@ -112,6 +112,24 @@ final class ClassCompileRegistry
         return isset($this->registeredInterfaces[self::lc($lcName)]);
     }
 
+    /**
+     * True when $classLc declares or inherits $methodLc (own, trait, or parent chain).
+     * Used for `(new C)()` → `__invoke` detection across CFG blocks (#26426, #10176).
+     */
+    public function hasMethod(string $classLc, string $methodLc): bool
+    {
+        $lc = self::lc($classLc);
+        $methodLc = strtolower($methodLc);
+        if ('' === $lc || '' === $methodLc) {
+            return false;
+        }
+        if (isset($this->methods[$lc][$methodLc])) {
+            return true;
+        }
+
+        return null !== $this->findMethodInClassChain($lc, $methodLc, $lc);
+    }
+
     public function parentDisplayName(?string $classLc): ?string
     {
         if (null === $classLc || '' === $classLc) {
