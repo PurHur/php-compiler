@@ -96,4 +96,21 @@ PHP;
         $this->expectExceptionMessage('Declaration of B4::f($x) must be compatible with A4::f(&$x)');
         $runtime->run($block);
     }
+
+    /** @covers issue #26530 — by-ref return drop on eval inherit */
+    public function testEvalRejectsByRefReturnDrop(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A5 { function &f(): int { $x = 1; return $x; } }
+eval('class B5 extends A5 { function f(): int { return 1; } }');
+echo "byref_ret_accepted\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'issue_26530_eval_byref_ret.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B5::f(): int must be compatible with & A5::f(): int');
+        $runtime->run($block);
+    }
 }
