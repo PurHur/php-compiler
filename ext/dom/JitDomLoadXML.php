@@ -57,9 +57,13 @@ final class JitDomLoadXML
         }
 
         $xmlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null !== $xmlLit) {
+            $xmlLit = ltrim(VmDom::stripLeadingUtf8Bom($xmlLit));
+        }
         if (
             null !== $xmlLit
-            && '' !== trim($xmlLit)
+            && '' !== $xmlLit
+            && '<' === $xmlLit[0]
             && !JitDomLoadXMLUserScript::xmlContainsInterElementBlankText($xmlLit)
         ) {
             JitDomLoadXMLUserScript::rememberCompileTimeXml($xmlLit);

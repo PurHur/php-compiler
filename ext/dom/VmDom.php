@@ -4202,6 +4202,9 @@ final class VmDom
         self::ensureDocument($document);
         self::rejectEmptyLoadSource($xml, 'DOMDocument::loadXML()');
 
+        // libxml xmlReadMemory skips a leading UTF-8 BOM (php-src ext/dom/document.c; #26565).
+        $xml = self::stripLeadingUtf8Bom($xml);
+
         // ltrim for parse structure; keep leading byte count for getLineNo (#20795).
         // Preserve trailing newlines so premature-end EOF line/column match libxml (#24319).
         $leadingLen = \strlen($xml) - \strlen(ltrim($xml));
@@ -4418,6 +4421,16 @@ final class VmDom
         if ('' === $source) {
             throw new \ValueError($method.': Argument #1 ($source) must not be empty');
         }
+    }
+
+    /**
+     * libxml xmlReadMemory skips a leading UTF-8 BOM before parsing (#26565).
+     *
+     * Only the absolute prefix is stripped — whitespace before a BOM still fails like Zend.
+     */
+    public static function stripLeadingUtf8Bom(string $xml): string
+    {
+        return str_starts_with($xml, "\xEF\xBB\xBF") ? substr($xml, 3) : $xml;
     }
 
     /** php-src ext/dom/document.c — empty $filename rejected since PHP 8.0 (#18734). */
