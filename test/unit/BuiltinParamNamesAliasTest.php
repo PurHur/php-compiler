@@ -1885,6 +1885,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'gmtoffset', 'timezone_name_from_abbr'));
     }
 
+    /** @covers issue #26358 */
+    public function testTimezoneNameFromAbbrReturnAndDefaults(): void
+    {
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('timezone_name_from_abbr'));
+        $infoUtc = ['name' => 'utcOffset', 'type' => 'int', 'isOptional' => true];
+        $infoIsDst = ['name' => 'isDST', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('timezone_name_from_abbr', 1, $infoUtc, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('timezone_name_from_abbr', 2, $infoIsDst, false));
+        $utc = new Variable();
+        $isDst = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($utc, 'timezone_name_from_abbr', 1, $infoUtc));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($isDst, 'timezone_name_from_abbr', 2, $infoIsDst));
+        self::assertSame(Variable::TYPE_INTEGER, $utc->type);
+        self::assertSame(-1, $utc->toInt());
+        self::assertSame(Variable::TYPE_INTEGER, $isDst->type);
+        self::assertSame(-1, $isDst->toInt());
+    }
+
     /** @covers issue #24360 */
     public function testTimezoneProceduralZendStubNamedParams(): void
     {
