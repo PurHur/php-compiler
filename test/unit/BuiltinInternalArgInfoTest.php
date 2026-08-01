@@ -263,6 +263,36 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('XMLParser', $parseParser['type']);
     }
 
+    /** php-src ext/xml/xml.stub.php — xml_set_*_handler; InternalArgInfo hdl:string / return int (#26589). */
+    public function testXmlSetHandlerReflectionStubTypes(): void
+    {
+        $singleHandler = [
+            'xml_set_character_data_handler',
+            'xml_set_default_handler',
+            'xml_set_end_namespace_decl_handler',
+            'xml_set_external_entity_ref_handler',
+            'xml_set_notation_decl_handler',
+            'xml_set_processing_instruction_handler',
+            'xml_set_start_namespace_decl_handler',
+            'xml_set_unparsed_entity_decl_handler',
+        ];
+        foreach ($singleHandler as $fn) {
+            $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 1), $fn);
+            $parser = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($parser, $fn);
+            $this->assertSame('XMLParser', $parser['type'], $fn);
+            $handler = BuiltinInternalArgInfo::paramInfoForFunction($fn, 1);
+            $this->assertNotNull($handler, $fn);
+            $this->assertSame('', $handler['type'], $fn);
+        }
+        $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_set_element_handler'));
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride('xml_set_element_handler', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('xml_set_element_handler', 1));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('xml_set_element_handler', 2));
+    }
+
     /** php-src string.stub.php — cost params stub-only; InternalArgInfo has string1/string2 only (#25538). */
     public function testLevenshteinCostParamTypesAreInt(): void
     {

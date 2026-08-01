@@ -183,6 +183,16 @@ final class BuiltinInternalArgInfo
             // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / true (#26319)
             'xml_parser_create' => 'XMLParser',
             'xml_set_object' => 'true',
+            // ext/xml/xml.stub.php — InternalArgInfo return int; Zend true (#26589)
+            'xml_set_character_data_handler',
+            'xml_set_default_handler',
+            'xml_set_element_handler',
+            'xml_set_end_namespace_decl_handler',
+            'xml_set_external_entity_ref_handler',
+            'xml_set_notation_decl_handler',
+            'xml_set_processing_instruction_handler',
+            'xml_set_start_namespace_decl_handler',
+            'xml_set_unparsed_entity_decl_handler' => 'true',
             // ext/standard/array.stub.php — InternalArgInfo return empty (#25441)
             'array_sum', 'array_product' => 'int|float',
             // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
@@ -629,6 +639,24 @@ final class BuiltinInternalArgInfo
             'xml_set_object' => 0 === $index ? 'XMLParser' : null,
             'xml_parser_create' => 0 === $index ? '?string' : null,
             'xml_parse' => 0 === $index ? 'XMLParser' : null,
+            // ext/xml/xml.stub.php — XMLParser + untyped handler; InternalArgInfo hdl:string (#26589)
+            'xml_set_character_data_handler',
+            'xml_set_default_handler',
+            'xml_set_end_namespace_decl_handler',
+            'xml_set_external_entity_ref_handler',
+            'xml_set_notation_decl_handler',
+            'xml_set_processing_instruction_handler',
+            'xml_set_start_namespace_decl_handler',
+            'xml_set_unparsed_entity_decl_handler' => match ($index) {
+                0 => 'XMLParser',
+                1 => '',
+                default => null,
+            },
+            'xml_set_element_handler' => match ($index) {
+                0 => 'XMLParser',
+                1, 2 => '',
+                default => null,
+            },
             default => null,
         };
     }
