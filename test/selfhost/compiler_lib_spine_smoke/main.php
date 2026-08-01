@@ -4615,6 +4615,7 @@ require_once __DIR__.'/../../../lib/Compiler/InterfaceImplementationCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodBodyCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodArityCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/MagicMethodParamTypeCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodReturnTypeCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodStaticCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/NewCtorParens.php';
