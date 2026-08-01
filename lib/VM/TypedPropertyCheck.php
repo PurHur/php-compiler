@@ -199,40 +199,28 @@ final class TypedPropertyCheck
     }
 
     /**
-     * ?-> receiver short-circuit.
+     * ?-> receiver short-circuit — only null (and uninitialized nullable typed slots).
      *
-     * Property path (#18026): PHP null, scalar/non-object, or uninitialized nullable typed
-     * slot after a standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y direct read
-     * throws via nullsafeFetchPropertyRead (#5361); ??/isset/empty use nullsafeUninitNullableToNull
-     * (#13747).
+     * Property (#26365, zend_vm_def.h): non-null non-objects fall through to the fetch arm and
+     * warn like plain `->`. IS-mode (??/isset/empty) stays silent via nullsafeUninitNullableToNull
+     * (#18026 coalesce / FETCH_OBJ_IS). Chained $x?->y direct read uses nullsafeFetchPropertyRead
+     * (#5361); uninit nullable under ?? uses nullsafeUninitNullableToNull (#13747, #5220).
      *
-     * Method path (#26364, zend_vm_def.h ZEND_INIT_METHOD_CALL): only null (and the same
-     * uninitialized-nullable cases). Non-null non-objects Error like plain `->`.
+     * Method (#26364, ZEND_INIT_METHOD_CALL): same null-only short-circuit; scalars Error.
+     *
+     * `$forMethodCall` is retained for call-site clarity; both paths share null-only rules.
      */
     public static function nullsafeShortCircuitReceiver(
         Variable $receiver,
         bool $forMethodCall = false
     ): bool {
+        unset($forMethodCall);
         $resolved = $receiver->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
             return true;
         }
 
-        if (self::isUninitialized($receiver) && self::propertyAllowsNull($receiver)) {
-            return true;
-        }
-
-        if ($forMethodCall) {
-            return false;
-        }
-
-        return \in_array($resolved->type, [
-            Variable::TYPE_BOOLEAN,
-            Variable::TYPE_INTEGER,
-            Variable::TYPE_FLOAT,
-            Variable::TYPE_STRING,
-            Variable::TYPE_ARRAY,
-        ], true);
+        return self::isUninitialized($receiver) && self::propertyAllowsNull($receiver);
     }
 
     private static function classPropertyAllowsNull(ObjectEntry $owner, string $name): bool

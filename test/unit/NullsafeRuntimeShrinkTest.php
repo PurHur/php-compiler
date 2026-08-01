@@ -36,11 +36,12 @@ final class NullsafeRuntimeShrinkTest extends TestCase
             \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
             false
         ));
-        $this->assertTrue($helper::valueBoxShortCircuits(
+        // Property ?-> no longer short-circuits scalars (#26365) — same as method (#26364).
+        $this->assertFalse($helper::valueBoxShortCircuits(
             \PHPCompiler\VM\Variable::TYPE_INTEGER,
             false
         ));
-        $this->assertTrue($helper::valueBoxShortCircuits(
+        $this->assertFalse($helper::valueBoxShortCircuits(
             \PHPCompiler\VM\Variable::TYPE_STRING,
             false
         ));
@@ -66,11 +67,11 @@ final class NullsafeRuntimeShrinkTest extends TestCase
         ));
     }
 
-    public function testNullsafeShortCircuitReceiverSkipsScalar(): void
+    public function testNullsafeShortCircuitReceiverDoesNotShortCircuitScalar(): void
     {
         $int = new \PHPCompiler\VM\Variable();
         $int->int(1);
-        $this->assertTrue(
+        $this->assertFalse(
             \PHPCompiler\VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($int)
         );
         $this->assertFalse(
