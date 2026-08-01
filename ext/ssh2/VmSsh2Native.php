@@ -99,6 +99,34 @@ final class VmSsh2Native
     }
 
     /**
+     * Public-key auth from files (PECL ssh2_auth_pubkey_file; #26577).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function authPubkeyFromFile(
+        \FFI\CData $session,
+        string $username,
+        string $pubkeyFile,
+        string $privkeyFile,
+        ?string $passphrase
+    ): bool {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $rc = $ffi->libssh2_userauth_publickey_fromfile_ex(
+            $session,
+            $username,
+            \strlen($username),
+            $pubkeyFile,
+            $privkeyFile,
+            $passphrase
+        );
+
+        return 0 === $rc;
+    }
+
+    /**
      * Host-key fingerprint after handshake (PECL ssh2_fingerprint / libssh2_hostkey_hash; #26575).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -458,6 +486,9 @@ int libssh2_session_handshake(LIBSSH2_SESSION *session, int sock);
 void libssh2_session_set_blocking(LIBSSH2_SESSION *session, int blocking);
 int libssh2_userauth_password_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *password, unsigned int password_len, void *passwd_change_cb);
 void *libssh2_hostkey_hash(LIBSSH2_SESSION *session, int hash_type);
+int libssh2_userauth_publickey_fromfile_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *publickey, const char *privatekey, const char *passphrase);
+int libssh2_session_last_error(LIBSSH2_SESSION *session, char **errmsg, int *errmsg_len, int want_buf);
+char *libssh2_userauth_list(LIBSSH2_SESSION *session, const char *username, unsigned int username_len);
 int libssh2_session_disconnect_ex(LIBSSH2_SESSION *session, int reason, const char *description, const char *lang);
 int libssh2_session_free(LIBSSH2_SESSION *session);
 typedef struct _LIBSSH2_SFTP LIBSSH2_SFTP;

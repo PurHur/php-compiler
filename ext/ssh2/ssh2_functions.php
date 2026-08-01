@@ -195,6 +195,68 @@ final class ssh2_auth_password extends Ssh2Function
     }
 }
 
+final class ssh2_auth_pubkey_file extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_auth_pubkey_file');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 4 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_auth_pubkey_file() expects between 4 and 5 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_auth_pubkey_file', 1);
+        $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_auth_pubkey_file', 2, 'username');
+        $pubkey = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_auth_pubkey_file', 3, 'pubkeyfile');
+        $privkey = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'ssh2_auth_pubkey_file', 4, 'privkeyfile');
+        $passphrase = null;
+        if ($argc >= 5) {
+            $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'ssh2_auth_pubkey_file', 5, 'passphrase');
+        }
+        if ('' === $user) {
+            throw new \ValueError('ssh2_auth_pubkey_file(): Argument #2 ($username) must not be empty');
+        }
+        $pubkey = self::expandHomePath($pubkey);
+        $privkey = self::expandHomePath($privkey);
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_auth_pubkey_file(): Authentication failed for '.$user.' using public key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!VmSsh2Native::authPubkeyFromFile($native, $user, $pubkey, $privkey, $passphrase)) {
+            @\trigger_error('ssh2_auth_pubkey_file(): Authentication failed for '.$user.' using public key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        VmSsh2Session::markAuthed($session);
+        $frame->returnVar->bool(true);
+    }
+
+    private static function expandHomePath(string $path): string
+    {
+        if (\strlen($path) >= 2 && '~' === $path[0] && '/' === $path[1]) {
+            $home = getenv('HOME');
+            if (\is_string($home) && '' !== $home) {
+                return $home.\substr($path, 1);
+            }
+        }
+
+        return $path;
+    }
+}
+
 final class ssh2_fingerprint extends Ssh2Function
 {
     public function __construct()
