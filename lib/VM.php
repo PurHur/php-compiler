@@ -14274,16 +14274,18 @@ restart:
             : strtolower($object->class->name);
         $declaringDisplay = $this->context->classes[$declaringLc]->name
             ?? $object->class->name;
+        $callerLc = $this->callerClassLc($frame);
         try {
             PropertyVisibility::assertUnsettable(
                 $setVis,
-                $this->callerClassLc($frame),
+                $callerLc,
                 $declaringLc,
                 $declaringDisplay,
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
-                $meta->asymmetricExplicitRead
+                $meta->asymmetricExplicitRead,
+                $this->callerScopeDisplay($frame, $callerLc)
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -15354,16 +15356,18 @@ restart:
         if ($setVis === $readVis) {
             return null;
         }
+        $callerLc = $this->callerClassLc($frame);
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
-                $this->callerClassLc($frame),
+                $callerLc,
                 $meta['declaringClassLc'],
                 $meta['declaringClassDisplay'],
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
-                $meta['asymmetricExplicitRead'] ?? false
+                $meta['asymmetricExplicitRead'] ?? false,
+                $this->callerScopeDisplay($frame, $callerLc)
             );
         } catch (\LogicException $e) {
             return $e->getMessage();
@@ -15743,16 +15747,18 @@ restart:
             : strtolower($owner->class->name);
         $declaringDisplay = $this->context->classes[$declaringLc]->name
             ?? $owner->class->name;
+        $callerLc = $this->callerClassLc($frame);
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
-                $this->callerClassLc($frame),
+                $callerLc,
                 $declaringLc,
                 $declaringDisplay,
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),
-                $meta->asymmetricExplicitRead
+                $meta->asymmetricExplicitRead,
+                $this->callerScopeDisplay($frame, $callerLc)
             );
         } catch (\LogicException $e) {
             return $e->getMessage();

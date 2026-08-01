@@ -101,7 +101,8 @@ final class PropertyVisibility
         string $propertyName,
         callable $isSubclass,
         int $readVisibilityFlags = 0,
-        bool $explicitReadModifier = false
+        bool $explicitReadModifier = false,
+        ?string $callerClassDisplay = null
     ): void {
         self::assertSetVisibility(
             'modify',
@@ -112,7 +113,8 @@ final class PropertyVisibility
             $propertyName,
             $isSubclass,
             $readVisibilityFlags,
-            $explicitReadModifier
+            $explicitReadModifier,
+            $callerClassDisplay
         );
     }
 
@@ -129,7 +131,8 @@ final class PropertyVisibility
         string $propertyName,
         callable $isSubclass,
         int $readVisibilityFlags = 0,
-        bool $explicitReadModifier = false
+        bool $explicitReadModifier = false,
+        ?string $callerClassDisplay = null
     ): void {
         self::assertSetVisibility(
             'unset',
@@ -140,12 +143,16 @@ final class PropertyVisibility
             $propertyName,
             $isSubclass,
             $readVisibilityFlags,
-            $explicitReadModifier
+            $explicitReadModifier,
+            $callerClassDisplay
         );
     }
 
     /**
      * Shared set-visibility gate for assign (`modify`) and unset (`unset`).
+     *
+     * php-src zend_execute.c zend_asymmetric_visibility_property_modification_error —
+     * class scopes use `from scope {Name}` with original casing (#26298).
      *
      * @throws \LogicException when the operation is not allowed
      */
@@ -158,7 +165,8 @@ final class PropertyVisibility
         string $propertyName,
         callable $isSubclass,
         int $readVisibilityFlags = 0,
-        bool $explicitReadModifier = false
+        bool $explicitReadModifier = false,
+        ?string $callerClassDisplay = null
     ): void {
         if (MethodVisibility::isPublic($setVisibilityFlags)) {
             return;
@@ -174,6 +182,7 @@ final class PropertyVisibility
                 $explicitReadModifier
             );
         }
+        $scopeLabel = 'scope '.($callerClassDisplay ?? $callerClassLc);
         if (($setVisibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
                 self::denySetVisibility(
@@ -181,7 +190,7 @@ final class PropertyVisibility
                     $setVisibilityFlags,
                     $declaringClassDisplay,
                     $propertyName,
-                    $callerClassLc,
+                    $scopeLabel,
                     $readVisibilityFlags,
                     $explicitReadModifier
                 );
@@ -198,7 +207,7 @@ final class PropertyVisibility
                 $setVisibilityFlags,
                 $declaringClassDisplay,
                 $propertyName,
-                $callerClassLc,
+                $scopeLabel,
                 $readVisibilityFlags,
                 $explicitReadModifier
             );

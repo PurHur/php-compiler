@@ -47,4 +47,4 @@ try {
 1
 x:Cannot modify private(set) property T::$x from global scope
 y:Cannot modify protected(set) property T::$y from global scope
-child:Cannot modify private(set) property U::$n from child
+child:Cannot modify private(set) property U::$n from scope Child
