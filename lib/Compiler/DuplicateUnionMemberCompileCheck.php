@@ -14,8 +14,8 @@ use PHPCfg\Operand;
  * {@code Foo|Bar|Foo}) are compile fatals: {@code Duplicate type X is redundant}.
  *
  * Case-insensitive match; message uses the second occurrence's spelling (leading
- * {@code \} stripped). Exact DNF arm equality / subset redundancy and semantic
- * overlaps ({@code iterable|array}, {@code object|Class}) are separate checks.
+ * {@code \} stripped). Exact DNF arm equality (#26606) / subset redundancy (#26607)
+ * and semantic overlaps ({@code iterable|array}, {@code object|Class}) are separate checks.
  *
  * php-src: Zend/zend_compile.c — zend_compile_type duplicate type-arm rejection.
  *
