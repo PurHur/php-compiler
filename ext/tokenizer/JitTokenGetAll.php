@@ -27,8 +27,13 @@ final class JitTokenGetAll
         $flagsLit = self::compileTimeFlags($context, $args, $argc);
         // Non-empty compile-time source — materialize. Empty "" uses runtime empty HT
         // (nested TokenGetAllJitHelper returns garbage for "" on AOT; #21503).
+        // TOKEN_PARSE ParseError must throw at runtime, not abort JIT/AOT compile (#26671).
         if (null !== $sourceLit && '' !== $sourceLit && null !== $flagsLit) {
-            return self::materializeCompileTime($context, $sourceLit, $flagsLit);
+            try {
+                return self::materializeCompileTime($context, $sourceLit, $flagsLit);
+            } catch (\ParseError $e) {
+                // Fall through to runtime helper so the compiled unit throws ParseError.
+            }
         }
         if ('' === $sourceLit && null !== $flagsLit) {
             return self::materializeEmptyTokens($context);

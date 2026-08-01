@@ -8,6 +8,9 @@ namespace PHPCompiler\ext\tokenizer;
  * Native PHP source lexer for token_get_all() (php-src Zend/zend_language_scanner.l; #4561).
  *
  * Returns Zend-compatible tuples: single-char strings or [token_id, text, line].
+ *
+ * With TOKEN_PARSE, tracks brace/bracket/paren nesting like Zend's nest_location_stack and
+ * throws ParseError on mismatch / unclosed openers (ext/tokenizer/tokenizer.c; #26671).
  */
 final class LanguageScanner
 {
@@ -22,6 +25,13 @@ final class LanguageScanner
 
     /** @var list<int|string|array{0: int, 1: string, 2: int}> */
     private array $tokens = [];
+
+    /**
+     * Zend nest_location_stack entries when TOKEN_PARSE is set.
+     *
+     * @var list<array{0: string, 1: int}>
+     */
+    private array $nestStack = [];
 
     /** @var array<string, int> */
     private static ?array $keywords = null;
@@ -73,6 +83,8 @@ final class LanguageScanner
 
             if ('#' === $ch && $this->matchAt('#[')) {
                 $this->pushToken($this->id('T_ATTRIBUTE'), '#[');
+                // php-src: T_ATTRIBUTE "#["" enters '[' nesting under TOKEN_PARSE (#26671).
+                $this->enterNesting('[');
                 $this->pos += 2;
                 continue;
             }
@@ -145,6 +157,8 @@ final class LanguageScanner
             $this->pushToken($this->id('T_BAD_CHARACTER'), $ch);
             ++$this->pos;
         }
+
+        $this->checkNestingAtEnd();
     }
 
     private function scanInlineOrOpenTag(): bool
@@ -500,6 +514,8 @@ final class LanguageScanner
         ++$this->pos;
         if ($this->pos < $this->len && '{' === $this->source[$this->pos]) {
             $this->pushToken($this->id('T_DOLLAR_OPEN_CURLY_BRACES'), '${', $startLine);
+            // php-src: "${" enters '{' nesting under TOKEN_PARSE (#26671).
+            $this->enterNesting('{');
             $this->pos += 1;
 
             return;
@@ -742,11 +758,77 @@ final class LanguageScanner
     private function pushChar(string $ch): void
     {
         $this->tokens[] = $ch;
+        if ('{' === $ch || '[' === $ch || '(' === $ch) {
+            $this->enterNesting($ch);
+
+            return;
+        }
+        if ('}' === $ch || ']' === $ch || ')' === $ch) {
+            $this->exitNesting($ch);
+        }
     }
 
     private function pushToken(int $id, string $text, ?int $line = null): void
     {
         $this->tokens[] = [$id, $text, $line ?? $this->line];
+    }
+
+    /**
+     * php-src Zend/zend_language_scanner.l — enter_nesting() under PARSER_MODE / TOKEN_PARSE (#26671).
+     */
+    private function enterNesting(string $opening): void
+    {
+        if (0 === ($this->flags & self::TOKEN_PARSE)) {
+            return;
+        }
+        $this->nestStack[] = [$opening, $this->line];
+    }
+
+    /**
+     * php-src Zend/zend_language_scanner.l — exit_nesting() (#26671).
+     */
+    private function exitNesting(string $closing): void
+    {
+        if (0 === ($this->flags & self::TOKEN_PARSE)) {
+            return;
+        }
+        if ([] === $this->nestStack) {
+            throw new \ParseError("Unmatched '".$closing."'");
+        }
+        [$opening, $lineno] = $this->nestStack[\count($this->nestStack) - 1];
+        $expect = '{' === $opening ? '}' : ('[' === $opening ? ']' : ')');
+        if ($expect !== $closing) {
+            throw new \ParseError($this->formatBadNesting($opening, $lineno, $closing));
+        }
+        \array_pop($this->nestStack);
+    }
+
+    /**
+     * php-src Zend/zend_language_scanner.l — check_nesting_at_end() (#26671).
+     */
+    private function checkNestingAtEnd(): void
+    {
+        if (0 === ($this->flags & self::TOKEN_PARSE) || [] === $this->nestStack) {
+            return;
+        }
+        [$opening, $lineno] = $this->nestStack[\count($this->nestStack) - 1];
+        throw new \ParseError($this->formatBadNesting($opening, $lineno, ''));
+    }
+
+    /**
+     * php-src Zend/zend_language_scanner.l — report_bad_nesting() (#26671).
+     */
+    private function formatBadNesting(string $opening, int $openingLineno, string $closing): string
+    {
+        $msg = "Unclosed '".$opening."'";
+        if ($openingLineno !== $this->line) {
+            $msg .= ' on line '.$openingLineno;
+        }
+        if ('' !== $closing) {
+            $msg .= " does not match '".$closing."'";
+        }
+
+        return $msg;
     }
 
     private function id(string $name): int
