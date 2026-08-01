@@ -55,6 +55,57 @@ PHP,
         $this->assertNotNull($block);
     }
 
+    /** @covers issue #26382 */
+    public function testUnitEnumCaseWithValueFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Case A of non-backed enum E must not have a value');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case A = 1;
+}
+echo "should not run\n";
+PHP,
+            'enum_unit_with_value.php'
+        );
+    }
+
+    /** @covers issue #26382 */
+    public function testUnitEnumCaseWithStringValueFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Case A of non-backed enum E must not have a value');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case A = 'A';
+}
+echo "should not run\n";
+PHP,
+            'enum_unit_with_string_value.php'
+        );
+    }
+
+    /** @covers issue #26382 */
+    public function testUnitEnumWithBareConstStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case A;
+    const X = 1;
+}
+echo E::X;
+PHP,
+            'enum_unit_bare_const.php'
+        );
+        $this->assertNotNull($block);
+    }
+
     public function testBackedEnumCaseWithValueCompiles(): void
     {
         $runtime = new Runtime();
