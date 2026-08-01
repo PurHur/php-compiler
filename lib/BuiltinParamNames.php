@@ -1274,6 +1274,10 @@ final class BuiltinParamNames
                 return ['separator', 'array='];
             case 'nl2br':
                 return ['string', 'use_xhtml'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str (#23693)
+            case 'hebrev':
+            case 'hebrevc': // pre-8.0 profiles only (#20354); same Zend stub names when advertised
+                return ['string', 'max_chars_per_line='];
             case 'str_contains':
             case 'str_starts_with':
             case 'str_ends_with':

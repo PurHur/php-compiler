@@ -2012,6 +2012,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mult', 'str_repeat'));
     }
 
+    /** @covers issue #23693 */
+    public function testHebrevZendStubNamedParams(): void
+    {
+        foreach (['hebrev', 'hebrevc'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'max_chars_per_line='], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'max_chars_per_line', $fn));
+            // Legacy InternalArgInfo name must not resolve (Zend rejects $str)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn));
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn));
+        }
+    }
+
     /** @covers issue #23215 */
     public function testStrtrZendStubNamedParams(): void
     {
