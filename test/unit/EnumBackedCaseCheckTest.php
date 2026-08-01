@@ -266,4 +266,32 @@ PHP,
             ['name' => 'B', 'backing' => 2],
         ]));
     }
+
+    /**
+     * @dataProvider illegalEnumBackingTypes
+     * @covers issue #26539
+     */
+    public function testIllegalEnumBackingTypeFailsAtCompileTime(string $type, string $given): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage("Enum backing type must be int or string, {$given} given");
+        $runtime->parseAndCompile(
+            "<?php\nenum E: {$type} { case A; }\necho \"ok\\n\";\n",
+            'enum_illegal_backing.php'
+        );
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function illegalEnumBackingTypes(): iterable
+    {
+        yield 'object' => ['object', 'object'];
+        yield 'bool' => ['bool', 'bool'];
+        yield 'float' => ['float', 'float'];
+        yield 'array' => ['array', 'array'];
+        yield 'iterable' => ['iterable', 'Traversable|array'];
+        yield 'mixed' => ['mixed', 'mixed'];
+        yield 'callable' => ['callable', 'callable'];
+        yield 'stdClass' => ['stdClass', 'stdClass'];
+    }
 }
