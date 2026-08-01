@@ -97,6 +97,13 @@ final class BuiltinInternalArgInfo
             'stream_get_line' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo return int (missing |false) (#26322)
             'ftell' => 'int|false',
+            // ext/standard/dir.stub.php — InternalArgInfo return string (missing |false) (#26320)
+            'readdir' => 'string|false',
+            // ext/standard/file.stub.php — InternalArgInfo return string (missing |false) (#26320)
+            'tempnam' => 'string|false',
+            // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26320)
+            'gethostbynamel' => 'array|false',
+            'sys_getloadavg' => 'array|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
             'fscanf' => 'array|int|false|null',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false; ini_alter absent (#26465, #26187)

@@ -662,6 +662,9 @@ final class BuiltinParamNames
             // php-src ext/standard/dir.stub.php — directory (InternalArgInfo dir) (#23448)
             case 'scandir':
                 return ['directory', 'sorting_order=', 'context='];
+            // php-src ext/standard/dir.stub.php — directory (InternalArgInfo path) (#26320)
+            case 'opendir':
+                return ['directory', 'context='];
             case 'chdir':
                 return ['directory'];
             // php-src ext/standard/basic_functions.stub.php — ?int $mask = null (#24971)
