@@ -813,6 +813,30 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ E_WARNING when ++/-- on bool or -- on null has no effect (zend_operators.c, #26378).
+     *
+     * RFC saner-inc-dec-operators. Withheld on 8.4.0-dev reference profile (matches Zend 8.2 silence).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsIncDecNoEffectWarning(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ deprecates implicit nullable typed params (`int $x = null`) at compile time.
      *
      * php-src: Zend/zend_compile.c (zend_compile_params), RFC deprecate-implicitly-nullable-types.

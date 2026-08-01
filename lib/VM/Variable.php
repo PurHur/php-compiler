@@ -2776,11 +2776,16 @@ restart:
      *
      * @see Zend/zend_operators.c increment_function() / decrement_function()
      */
-    public function incDecOp(int $opCode, Variable $left, Variable $right): void
-    {
+    public function incDecOp(
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->incDecOp($opCode, $left, $right);
+            $result->incDecOp($opCode, $left, $right, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -2793,9 +2798,9 @@ restart:
         if (self::TYPE_BOOLEAN === $left->type) {
             $this->copyFrom($left);
             if (OpCode::TYPE_PLUS === $opCode) {
-                $this->applyIncrement();
+                $this->applyIncrement($vm, $frame);
             } else {
-                $this->applyDecrement();
+                $this->applyDecrement($vm, $frame);
             }
 
             return;
@@ -2914,14 +2919,53 @@ restart:
     }
 
     /**
-     * Zend increment_function() on a single value (issue #3552).
+     * Zend E_WARNING text for no-op ++/-- on bool/null (zend_operators.c, #26378).
      */
-    public function applyIncrement(): void
+    public static function incDecNoEffectWarningMessage(string $verb, string $typeName): string
+    {
+        return sprintf(
+            '%s on type %s has no effect, this will change in the next major version of PHP',
+            $verb,
+            $typeName
+        );
+    }
+
+    /**
+     * Emit PHP 8.3+ no-effect ++/-- warning when profile-gated and a live ErrorReporter exists.
+     */
+    private static function warnIncDecNoEffect(
+        string $verb,
+        string $typeName,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
+        if (!\PHPCompiler\CompilerVersion::supportsIncDecNoEffectWarning()) {
+            return;
+        }
+        $context = $vm?->context ?? $frame?->vmContext;
+        if (null === $context) {
+            return;
+        }
+        $context->errors->triggerError(
+            self::incDecNoEffectWarningMessage($verb, $typeName),
+            ErrorReporter::E_WARNING,
+            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $context,
+            $frame
+        );
+    }
+
+    /**
+     * Zend increment_function() on a single value (issue #3552).
+     *
+     * Optional $vm/$frame emit PHP 8.3+ "has no effect" E_WARNING for bool (#26378).
+     */
+    public function applyIncrement(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): void
     {
         if ($this->type === self::TYPE_INDIRECT) {
             $copy = new self();
             $copy->copyFrom($this->indirect);
-            $copy->applyIncrement();
+            $copy->applyIncrement($vm, $frame);
             $this->indirect->copyFrom($copy);
 
             return;
@@ -2929,10 +2973,13 @@ restart:
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
                 // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
+                // PHP 8.3+: E_WARNING — will change in next major (RFC saner-inc-dec-operators, #26378).
+                self::warnIncDecNoEffect('Increment', 'bool', $vm, $frame);
+
                 return;
             case self::TYPE_UNDEFINED:
             case self::TYPE_NULL:
-                // Zend increment_function(): IS_NULL → int 0 then ++ (issue #7435).
+                // Zend increment_function(): IS_NULL → int 0 then ++ (issue #7435). No 8.3 warning.
                 $this->int(1);
 
                 return;
@@ -2977,13 +3024,15 @@ restart:
 
     /**
      * Zend decrement_function() on a single value (issue #3552).
+     *
+     * Optional $vm/$frame emit PHP 8.3+ "has no effect" E_WARNING for bool and null (#26378).
      */
-    public function applyDecrement(): void
+    public function applyDecrement(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): void
     {
         if ($this->type === self::TYPE_INDIRECT) {
             $copy = new self();
             $copy->copyFrom($this->indirect);
-            $copy->applyDecrement();
+            $copy->applyDecrement($vm, $frame);
             $this->indirect->copyFrom($copy);
 
             return;
@@ -2991,10 +3040,16 @@ restart:
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
                 // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
+                // PHP 8.3+: E_WARNING — will change in next major (RFC saner-inc-dec-operators, #26378).
+                self::warnIncDecNoEffect('Decrement', 'bool', $vm, $frame);
+
                 return;
             case self::TYPE_UNDEFINED:
             case self::TYPE_NULL:
                 // Zend decrement_function(): IS_NULL is a no-op on PHP 8.x (issue #7435).
+                // PHP 8.3+: E_WARNING for null -- (null ++ still coerces to 1 without this warning).
+                self::warnIncDecNoEffect('Decrement', 'null', $vm, $frame);
+
                 return;
             case self::TYPE_INTEGER:
                 if ($this->isVmResource()) {
