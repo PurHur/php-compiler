@@ -7830,6 +7830,9 @@ restart:
                     }
                     $classEntry = new ClassEntry($name);
                     $classEntry->isEnum = true;
+                    // Enums never grow dynamic properties (zend_enum.c / #26588).
+                    $classEntry->noDynamicProperties = true;
+                    $classEntry->allowsDynamicProperties = false;
                     \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($classEntry);
                     if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
                         $classEntry->backedType = $frame->block->constants[$op->arg2]->toString();
@@ -8136,13 +8139,10 @@ restart:
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
                         $enumEntry = $var->toEnumCase()->enumClass;
                         $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
-                        $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
-                            $enumEntry,
-                            $name,
-                            false
-                        );
-                        if ($forWrite && null !== $readonlyMsg) {
-                            $catchFrame = $this->dispatchVmError($readonlyMsg, $frame);
+                        if ($forWrite) {
+                            // Readonly name/value, else Cannot create dynamic property (#26588).
+                            $writeMsg = EnumCaseSupport::propertyWriteViolationMessage($enumEntry, $name);
+                            $catchFrame = $this->dispatchVmError($writeMsg, $frame);
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
@@ -8253,13 +8253,13 @@ restart:
                     }
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
                         $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
-                        $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
-                            $propertyObject->class,
-                            $name,
-                            false
-                        );
-                        if ($forWrite && null !== $readonlyMsg) {
-                            $catchFrame = $this->dispatchVmError($readonlyMsg, $frame);
+                        if ($forWrite) {
+                            // Readonly name/value, else Cannot create dynamic property (#26588).
+                            $writeMsg = EnumCaseSupport::propertyWriteViolationMessage(
+                                $propertyObject->class,
+                                $name
+                            );
+                            $catchFrame = $this->dispatchVmError($writeMsg, $frame);
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;

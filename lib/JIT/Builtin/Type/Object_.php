@@ -1751,8 +1751,12 @@ class Object_ extends Type {
     public function declareEnum(Operand $name): int
     {
         $this->enums[strtolower($name->value)] = true;
+        $classId = $this->declareClass($name);
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES — Error on undeclared write (#26588, zend_enum.c).
+        $this->setClassNoDynamicProperties($classId, true);
+        $this->setClassAllowsDynamicProperties($classId, false);
 
-        return $this->declareClass($name);
+        return $classId;
     }
 
     public function setEnumBackedType(int $classId, ?string $backedType): void
@@ -1868,6 +1872,9 @@ class Object_ extends Type {
     public function finishEnumClass(int $classId): void
     {
         if ($this->isEnumClassId($classId)) {
+            // Re-assert seal in case declareClass paths cleared flags (#26588).
+            $this->setClassNoDynamicProperties($classId, true);
+            $this->setClassAllowsDynamicProperties($classId, false);
             EnumCasesHelper::registerCasesMethod($this->context, $this, $classId);
             $this->defineMethodVisibility(
                 $classId,
@@ -3632,6 +3639,8 @@ class Object_ extends Type {
         }
         if ('connectionstatus' === $lcname) {
             $this->enums[$lcname] = true;
+            $this->setClassNoDynamicProperties($id, true);
+            $this->setClassAllowsDynamicProperties($id, false);
             $this->setEnumBackedType($id, 'int');
             foreach ([
                 'Normal' => \PHPCompiler\ext\standard\VmConnection::NORMAL,
@@ -3645,6 +3654,8 @@ class Object_ extends Type {
         }
         if ('roundingmode' === $lcname) {
             $this->enums[$lcname] = true;
+            $this->setClassNoDynamicProperties($id, true);
+            $this->setClassAllowsDynamicProperties($id, false);
             $this->setEnumBackedType($id, 'int');
             foreach ([
                 'HalfAwayFromZero',
@@ -3663,6 +3674,8 @@ class Object_ extends Type {
         }
         if ('arraypadtype' === $lcname && \PHPCompiler\CompilerVersion::supportsArrayPadTypeEnum()) {
             $this->enums[$lcname] = true;
+            $this->setClassNoDynamicProperties($id, true);
+            $this->setClassAllowsDynamicProperties($id, false);
             foreach (['Positive', 'Negative'] as $caseName) {
                 $backing = new VMVariable();
                 $backing->null();
@@ -3671,6 +3684,8 @@ class Object_ extends Type {
         }
         if ('parseurl' === $lcname) {
             $this->enums[$lcname] = true;
+            $this->setClassNoDynamicProperties($id, true);
+            $this->setClassAllowsDynamicProperties($id, false);
             $this->setEnumBackedType($id, 'int');
             foreach ([
                 'Scheme' => \PHPCompiler\ext\standard\VmParseUrl::PHP_URL_SCHEME,

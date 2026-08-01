@@ -11601,6 +11601,31 @@ class JIT {
                         if (
                             $forWrite
                             && !$this->context->type->object->hasProperty($classId, $name->value)
+                            && $this->context->type->object->rejectsDynamicProperties($classId)
+                            && !JIT\MagicMethodDispatch::hasInstanceMethod(
+                                $this->context->type->object,
+                                $classId,
+                                '__set'
+                            )
+                        ) {
+                            // Enums / Closure / Fiber / … — catchable Error (#26588, #26371).
+                            $message = sprintf(
+                                'Cannot create dynamic property %s::$%s',
+                                $declaringClass,
+                                $name->value
+                            );
+                            if ([] !== $this->context->tryCatch->handlerStack) {
+                                JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                            } else {
+                                \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                $this->context->builder->call($this->context->lookupFunction('abort'));
+                                $this->context->builder->clearInsertionPosition();
+                            }
+                            break;
+                        }
+                        if (
+                            $forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
                         ) {
                             $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
                                 ? $op->sourceLocation->startLine
