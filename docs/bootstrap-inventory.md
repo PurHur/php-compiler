@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6657 |
-| Phase A inventory files (M2 ratio SSOT) | 6657 |
+| PHP files on vm.php path | 6658 |
+| Phase A inventory files (M2 ratio SSOT) | 6658 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21471 |
+| Source constructs flagged (warnings) | 21474 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -42772,7 +42772,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 285 class method(s)
+- 286 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -48914,11 +48914,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassPreprocessor (line 388)
 - new StaticClassPreprocessor (line 391)
 - new SourcePreprocessor\PropertyHooks (line 394)
-- new State (line 542)
-- new ReflectionProperty (line 569)
-- new ReflectionProperty (line 572)
-- new LintCompiler (line 984)
-- new Variable (line 1114)
+- new State (line 544)
+- new ReflectionProperty (line 571)
+- new ReflectionProperty (line 574)
+- new LintCompiler (line 986)
+- new Variable (line 1116)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
