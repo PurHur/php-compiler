@@ -837,6 +837,10 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\imap\ImapExtensionPolicy::isImapComplianceCase($name)) {
                 continue;
             }
+            if (!\PHPCompiler\ext\eio\EioExtensionPolicy::runsEioCompliance($name)
+                && \PHPCompiler\ext\eio\EioExtensionPolicy::isEioComplianceCase($name)) {
+                continue;
+            }
             // snmp_* PROFILE=8.4 via --ENV--; always include those cases.
             // Other snmp_* need forward profile.
             if (!CompilerVersion::supportsSnmp()

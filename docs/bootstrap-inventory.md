@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6694 |
-| Phase A inventory files (M2 ratio SSOT) | 6694 |
+| PHP files on vm.php path | 6701 |
+| Phase A inventory files (M2 ratio SSOT) | 6701 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21566 |
+| Source constructs flagged (warnings) | 21600 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -515,6 +515,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ds/DsExtensionPolicy.php` | 0 | 1 |
 | `ext/ds/Module.php` | 0 | 1 |
 | `ext/ds/VmDsStorage.php` | 0 | 15 |
+| `ext/eio/BuiltinClasses.php` | 0 | 1 |
+| `ext/eio/EioConstants.php` | 0 | 1 |
+| `ext/eio/EioExtensionPolicy.php` | 0 | 1 |
+| `ext/eio/Module.php` | 0 | 10 |
+| `ext/eio/VmEioCore.php` | 0 | 8 |
+| `ext/eio/VmEioRequest.php` | 0 | 2 |
+| `ext/eio/eio_functions.php` | 0 | 11 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
 | `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
 | `ext/enchant/EnchantSerializeDeny.php` | 0 | 3 |
@@ -10358,6 +10365,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 192)
 - 14 class method(s)
 
+### `ext/eio/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/eio/EioConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/eio/EioExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `ext/eio/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 34)
+- new eio_init (line 49)
+- new eio_nop (line 50)
+- new eio_open (line 51)
+- new eio_close (line 52)
+- new eio_read (line 53)
+- new eio_write (line 54)
+- new eio_poll (line 55)
+- new eio_nreqs (line 56)
+- 3 class method(s)
+
+### `ext/eio/VmEioCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 72)
+- new Variable (line 192)
+- new ObjectEntry (line 210)
+- new Variable (line 216)
+- new Variable (line 218)
+- new Variable (line 232)
+- 7 class method(s)
+- 1 closure(s)
+
+### `ext/eio/VmEioRequest.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 22)
+- 1 class method(s)
+
+### `ext/eio/eio_functions.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 29)
+- new Variable (line 48)
+- new ArgumentCountError (line 65)
+- new ArgumentCountError (line 84)
+- new ArgumentCountError (line 103)
+- new ArgumentCountError (line 127)
+- new ArgumentCountError (line 154)
+- new ArgumentCountError (line 188)
+- new ArgumentCountError (line 216)
+- new ArgumentCountError (line 251)
+- 11 class method(s)
+
 ### `ext/enchant/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13243,7 +13312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/imap_errors.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 24)
 - 2 class method(s)
 
 ### `ext/imap/imap_fetchbody.php`
@@ -13255,7 +13324,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/imap_headerinfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/imap/imap_last_error.php`
@@ -13273,7 +13342,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/imap_open.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/imap/imap_search.php`
@@ -43041,7 +43110,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 289 class method(s)
+- 290 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
