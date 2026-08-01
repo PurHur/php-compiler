@@ -184,6 +184,62 @@ PHP;
         );
     }
 
+    /** Issue #26630: self::/static:: instanceMethod(...) bound FCC (re-#17655). */
+    public function testVmSelfAndStaticInstanceMethodFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+class P {
+  function f(){ return "P"; }
+  function viaSelf(){ $c = self::f(...); return $c(); }
+  function viaStatic(){ $c = static::f(...); return $c(); }
+}
+class C extends P {
+  function f(){ return "C"; }
+  function viaSelf(){ $c = self::f(...); return $c(); }
+  function viaParent(){ $c = parent::f(...); return $c(); }
+  function viaStatic(){ $c = static::f(...); return $c(); }
+}
+$o = new C;
+echo "self=".$o->viaSelf()."\n";
+echo "parent=".$o->viaParent()."\n";
+echo "static=".$o->viaStatic()."\n";
+echo "Pself=".(new ReflectionMethod(P::class, "viaSelf"))->invoke($o)."\n";
+echo "Pstatic=".(new ReflectionMethod(P::class, "viaStatic"))->invoke($o)."\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "self=C\nparent=P\nstatic=C\nPself=P\nPstatic=C\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #26630: named Class::instanceMethod(...) outside object still Errors. */
+    public function testVmNamedClassInstanceMethodFccOutsideObjectErrors(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C { function f(){ return "C"; } }
+try {
+  C::f(...);
+  echo "no-error\n";
+} catch (Error $e) {
+  echo $e->getMessage(), "\n";
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "Non-static method C::f() cannot be called statically\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
     public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
     {

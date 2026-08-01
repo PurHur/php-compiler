@@ -7336,22 +7336,39 @@ class Compiler {
     /** True when StaticCall source class is the `parent` keyword (#6735, zend_compile.c). */
     protected function staticCallUsesParentScope(Operand $class): bool
     {
+        return 'parent' === $this->firstClassCallableScopeKeyword($class);
+    }
+
+    /**
+     * FCC / static-call scope keyword: `parent` / `self` / `static`, else null (#17655, #26630).
+     *
+     * @return null|'parent'|'self'|'static'
+     */
+    protected function firstClassCallableScopeKeyword(Operand $class): ?string
+    {
         $name = $this->literalScopeClassName($class);
-        if (null !== $name && 'parent' === strtolower($name)) {
-            return true;
+        if (null !== $name) {
+            $lc = strtolower($name);
+            if ('parent' === $lc || 'self' === $lc || 'static' === $lc) {
+                return $lc;
+            }
         }
         $current = $class;
         while (null !== $current) {
             if ($current instanceof Operand\Variable && $current->name instanceof Operand\Literal) {
-                if ('parent' === strtolower((string) $current->name->value)) {
-                    return true;
+                $lc = strtolower((string) $current->name->value);
+                if ('parent' === $lc || 'self' === $lc || 'static' === $lc) {
+                    return $lc;
                 }
             }
             if (property_exists($current, 'original') && null !== $current->original) {
                 if ($current->original instanceof \PhpParser\Node\Name) {
                     $parts = $current->original->getParts();
-                    if (1 === \count($parts) && 'parent' === strtolower($parts[0])) {
-                        return true;
+                    if (1 === \count($parts)) {
+                        $lc = strtolower($parts[0]);
+                        if ('parent' === $lc || 'self' === $lc || 'static' === $lc) {
+                            return $lc;
+                        }
                     }
                 }
                 if ($current->original instanceof Operand) {
@@ -7363,7 +7380,7 @@ class Compiler {
             break;
         }
 
-        return false;
+        return null;
     }
 
     /**
@@ -42542,22 +42559,25 @@ class Compiler {
     protected function compileFirstClassCallable(Op\Expr\FirstClassCallable $expr, Block $block): array
     {
         $result = $this->compileOperand($expr->result, $block, false);
-        // `parent::instanceMethod(...)` — bound closure with parent scope, not static (#17655, zend_compile.c).
-        // Static methods / static context: fall through to `"parent::m"` / fqcn string FCC (#26252).
+        // `parent::` / `self::` / `static::` instanceMethod(...) — bound `$this` closures (#17655, #26630).
+        // Static methods / static context: fall through to `"Class::m"` string FCC (#26252).
         // Binding `$this` from a static method yields a null receiver and fromCallable fails.
         if (
             Op\Expr\FirstClassCallable::KIND_STATIC === $expr->kind
             && null !== $expr->class
-            && $this->staticCallUsesParentScope($expr->class)
             && !$this->blockIsStaticMethodContext($block)
         ) {
-            return $this->compileBoundMethodFirstClassCallable(
-                $expr,
-                $block,
-                $result,
-                new Operand\Variable(new Operand\Literal('this')),
-                true
-            );
+            $scope = $this->firstClassCallableScopeKeyword($expr->class);
+            if (null !== $scope) {
+                return $this->compileBoundMethodFirstClassCallable(
+                    $expr,
+                    $block,
+                    $result,
+                    new Operand\Variable(new Operand\Literal('this')),
+                    // `static::` is late-bound (virtual); `self`/`parent` pin the resolve class.
+                    'static' === $scope ? null : $scope
+                );
+            }
         }
         // Numeric kinds: avoid php-cfg class const fetch during self-host bundle JIT (#1056).
         if (3 === $expr->kind) {
@@ -42566,7 +42586,7 @@ class Compiler {
                 $block,
                 $result,
                 $expr->var,
-                false
+                null
             );
         }
 
@@ -42600,7 +42620,10 @@ class Compiler {
     }
 
     /**
-     * Lower `$obj->m(...)` / `parent::m(...)` to `[receiver, method]` + TYPE_FROM_CALLABLE (#3566, #17655).
+     * Lower `$obj->m(...)` / `parent|self|static::m(...)` to `[receiver, method]` + TYPE_FROM_CALLABLE
+     * (#3566, #17655, #26630).
+     *
+     * @param null|'parent'|'self' $scope  null = virtual (`$obj->` / `static::`); pin for self/parent
      *
      * @return OpCode[]
      */
@@ -42609,7 +42632,7 @@ class Compiler {
         Block $block,
         int $result,
         Operand $receiver,
-        bool $parentScope
+        ?string $scope = null
     ): array {
         $callableSlot = $this->compileOperand($expr->result, $block, false);
         $receiverSlot = $this->compileOperand($receiver, $block, true);
@@ -42619,7 +42642,7 @@ class Compiler {
             $result,
             $callableSlot
         );
-        $fromCallable->fromCallableParentScope = $parentScope;
+        $fromCallable->fromCallableScope = $scope;
         $this->assignSourceMetadata($fromCallable, $expr);
 
         return [

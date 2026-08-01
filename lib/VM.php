@@ -6750,7 +6750,7 @@ restart:
                             $this->context,
                             $frame,
                             $callable,
-                            $op->fromCallableParentScope
+                            $op->fromCallableScope
                         );
                         $frame->scope[$op->arg1]->object($entry);
                     } catch (\Error $e) {
@@ -20485,7 +20485,7 @@ restart:
                     $this->context,
                     $frame,
                     $callable,
-                    $op->fromCallableParentScope
+                    $op->fromCallableScope
                 );
                 $frame->scope[$op->arg1]->object($entry);
                 break;

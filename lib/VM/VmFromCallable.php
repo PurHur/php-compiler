@@ -40,8 +40,11 @@ final class VmFromCallable
             $receiverOp = VmBoundMethodCallable::resolveBoundMethodReceiverOperand($block, $callableSlot);
             if (null !== $receiverOp) {
                 $classHint = VmBoundMethodCallable::resolveBoundMethodReceiverClassName($block, $callableSlot);
-                if ($op->fromCallableParentScope) {
+                $scope = $op->fromCallableScope;
+                if ('parent' === $scope) {
                     $classHint = self::resolveParentScopeClassName($context, $block);
+                } elseif ('self' === $scope) {
+                    $classHint = self::resolveSelfScopeClassName($context, $block);
                 }
 
                 return self::fromBoundMethodCallable(
@@ -50,7 +53,7 @@ final class VmFromCallable
                     $receiverOp,
                     $methodLc,
                     $classHint,
-                    $op->fromCallableParentScope
+                    null !== $scope
                 );
             }
         }
