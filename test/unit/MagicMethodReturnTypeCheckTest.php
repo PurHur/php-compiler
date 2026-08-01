@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issues #4988 #26432 */
+/** @covers issues #4988 #26432 #26463 */
 final class MagicMethodReturnTypeCheckTest extends TestCase
 {
     /**
@@ -75,6 +75,27 @@ PHP,
 class Cu { public function __unset(string $n): int { return 1; } }
 PHP,
             'Cu::__unset(): Return type must be void when declared',
+        ];
+        yield '__isset int' => [
+            <<<'PHP'
+<?php
+class Ci { public function __isset(string $n): int { return 1; } }
+PHP,
+            'Ci::__isset(): Return type must be bool when declared',
+        ];
+        yield '__isset string' => [
+            <<<'PHP'
+<?php
+class Cis { public function __isset(string $n): string { return 'x'; } }
+PHP,
+            'Cis::__isset(): Return type must be bool when declared',
+        ];
+        yield '__isset nullable bool' => [
+            <<<'PHP'
+<?php
+class Cin { public function __isset(string $n): ?bool { return true; } }
+PHP,
+            'Cin::__isset(): Return type must be bool when declared',
         ];
         yield '__construct return type' => [
             <<<'PHP'
@@ -162,6 +183,7 @@ class Good {
     public function __clone(): void {}
     public function __set(string $n, mixed $v): void {}
     public function __unset(string $n): void {}
+    public function __isset(string $n): bool { return false; }
     public function __debugInfo(): ?array { return null; }
     public function __destruct() {}
     public function __toString(): string { return 'Good'; }
@@ -186,6 +208,7 @@ class Good {
     public function __clone(): never { throw new Exception('no clone'); }
     public function __set(string $n, mixed $v): never { throw new Exception('no set'); }
     public function __unset(string $n): never { throw new Exception('no unset'); }
+    public function __isset(string $n): never { throw new Exception('no isset'); }
 }
 echo Good::class, "\n";
 PHP;
@@ -194,6 +217,22 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame("Good\n", ob_get_clean());
+    }
+
+    public function testIssetTrueFalseReturnTypesCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class T { public function __isset(string $n): true { return true; } }
+class F { public function __isset(string $n): false { return false; } }
+echo T::class, F::class, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'valid_magic_isset_true_false.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("TF\n", ob_get_clean());
     }
 
     /**
