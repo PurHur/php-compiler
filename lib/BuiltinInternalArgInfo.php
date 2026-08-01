@@ -99,6 +99,9 @@ final class BuiltinInternalArgInfo
             'ftell' => 'int|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#26058)
             'fscanf' => 'array|int|false|null',
+            // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
+            'password_get_info' => 'array',
+            'password_needs_rehash' => 'bool',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26185)
             'filesize', 'filemtime' => 'int|false',
             'glob', 'scandir' => 'array|false',
@@ -333,6 +336,14 @@ final class BuiltinInternalArgInfo
             'mktime', 'gmmktime' => ($index >= 1 && $index <= 5) ? '?int' : null,
             // ext/standard/basic_functions.stub.php — mixed &...$vars (InternalArgInfo string) (#26058)
             'fscanf' => 2 === $index ? 'mixed' : null,
+            // ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
+            'password_get_info' => 0 === $index ? 'string' : null,
+            'password_needs_rehash' => match ($index) {
+                0 => 'string',
+                1 => 'string|int|null',
+                2 => 'array',
+                default => null,
+            },
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)

@@ -2609,6 +2609,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($verify, 'hash', 'password_verify'));
     }
 
+    /** @covers issue #23292 */
+    public function testPasswordGetInfoNeedsRehashZendStubNamedParams(): void
+    {
+        $info = BuiltinParamNames::forFunction('password_get_info');
+        self::assertSame(['hash'], $info);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($info, 'hash', 'password_get_info'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('password_get_info'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('password_get_info'));
+
+        $rehash = BuiltinParamNames::forFunction('password_needs_rehash');
+        self::assertSame(['hash', 'algo', 'options='], $rehash);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($rehash, 'hash', 'password_needs_rehash'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($rehash, 'algo', 'password_needs_rehash'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($rehash, 'options', 'password_needs_rehash'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('password_needs_rehash'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('password_needs_rehash'));
+    }
+
     /** @covers issue #23240 */
     public function testChrZendStubNamedParams(): void
     {

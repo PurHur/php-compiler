@@ -1640,6 +1640,11 @@ final class BuiltinParamNames
                 return ['password', 'algo', 'options'];
             case 'password_verify':
                 return ['password', 'hash'];
+            // php-src ext/standard/password.stub.php — absent from InternalArgInfo (#23292)
+            case 'password_get_info':
+                return ['hash'];
+            case 'password_needs_rehash':
+                return ['hash', 'algo', 'options='];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says ascii (#23240)
             case 'chr':
                 return ['codepoint'];
