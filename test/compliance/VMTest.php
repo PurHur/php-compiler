@@ -833,6 +833,10 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\rar\RarExtensionPolicy::isRarComplianceCase($name)) {
                 continue;
             }
+            if (!\PHPCompiler\ext\imap\ImapExtensionPolicy::runsImapCompliance($name)
+                && \PHPCompiler\ext\imap\ImapExtensionPolicy::isImapComplianceCase($name)) {
+                continue;
+            }
             // snmp_* PROFILE=8.4 via --ENV--; always include those cases.
             // Other snmp_* need forward profile.
             if (!CompilerVersion::supportsSnmp()

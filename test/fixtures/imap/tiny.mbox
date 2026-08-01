@@ -1,0 +1,17 @@
+From sender@example.com Sat Aug 01 00:00:00 2026
+From: sender@example.com
+To: you@example.com
+Subject: Hello imap
+Date: Sat, 1 Aug 2026 00:00:00 +0000
+Message-ID: <1@php-compiler.local>
+
+hello imap body
+
+From other@example.com Sat Aug 01 01:00:00 2026
+From: other@example.com
+To: you@example.com
+Subject: Second message
+Date: Sat, 1 Aug 2026 01:00:00 +0000
+Message-ID: <2@php-compiler.local>
+
+second body

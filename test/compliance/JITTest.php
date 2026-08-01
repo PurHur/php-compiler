@@ -988,6 +988,10 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\rar\RarExtensionPolicy::isRarComplianceCase($name)) {
                 continue;
             }
+            if (!\PHPCompiler\ext\imap\ImapExtensionPolicy::runsImapCompliance($name)
+                && \PHPCompiler\ext\imap\ImapExtensionPolicy::isImapComplianceCase($name)) {
+                continue;
+            }
             // snmpget/snmpwalk not JIT-lowered yet (#6070); phantom registration checks are fine.
             if (str_contains($name, 'snmp')
                 && !str_contains($name, 'snmp_phantom')) {
