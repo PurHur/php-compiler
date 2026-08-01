@@ -285,9 +285,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
     public function testFilterVarArrayAndFilterInputReflectionStubs(): void
     {
         $this->assertSame('array|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('filter_var_array'));
+        $this->assertSame('array|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('filter_input_array'));
         $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('filter_input'));
         $this->assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('filter_var_array', 1));
         $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('filter_var_array', 2));
+        $this->assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('filter_input_array', 1));
+        $this->assertSame('bool', BuiltinInternalArgInfo::stubParamTypeOverride('filter_input_array', 2));
         $this->assertSame('array|int', BuiltinInternalArgInfo::stubParamTypeOverride('filter_input', 3));
         $options = BuiltinInternalArgInfo::paramInfoForFunction('filter_var_array', 1);
         $this->assertNotNull($options);

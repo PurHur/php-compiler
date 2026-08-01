@@ -120,6 +120,7 @@ final class BuiltinInternalArgInfo
             'filter_var' => 'mixed',
             'filter_input' => 'mixed',
             'filter_var_array' => 'array|false|null',
+            'filter_input_array' => 'array|false|null',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo return array (missing |false) (#25498)
             'class_implements', 'class_parents', 'class_uses' => 'array|false',
             // Zend/zend_builtin_functions.stub.php — sizeof alias absent from InternalArgInfo (#25966)
@@ -386,6 +387,12 @@ final class BuiltinInternalArgInfo
             },
             // ext/filter/filter.stub.php — array|int $options / bool $add_empty (#26184)
             'filter_var_array' => match ($index) {
+                1 => 'array|int',
+                2 => 'bool',
+                default => null,
+            },
+            // ext/filter/filter.stub.php — array|int $options / bool $add_empty (#26201)
+            'filter_input_array' => match ($index) {
                 1 => 'array|int',
                 2 => 'bool',
                 default => null,

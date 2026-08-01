@@ -1185,6 +1185,9 @@ final class BuiltinParamNames
             // php-src ext/filter/filter.stub.php — filter=FILTER_DEFAULT, options=0 (#23383, #26184)
             case 'filter_input':
                 return ['type', 'var_name', 'filter=', 'options='];
+            // php-src ext/filter/filter.stub.php — options=FILTER_DEFAULT, add_empty=true (#26201)
+            case 'filter_input_array':
+                return ['type', 'options=', 'add_empty='];
             case 'explode':
                 return ['separator', 'string', 'limit'];
             // php-src ext/standard/string.stub.php — array|string $separator, ?array $array = null (#24811)
