@@ -17531,6 +17531,8 @@ restart:
      * Bind a static call to __callStatic when present (Zend get_static_method_fallback).
      *
      * Used for both missing methods (#3273) and inaccessible private/protected statics (#25670).
+     * Non-public `__callStatic` still dispatches — Zend warns at declaration then invokes
+     * the trampoline without a normal visibility check (#26437).
      *
      * @return bool true when the frame was bound to __callStatic
      */
@@ -17541,18 +17543,9 @@ restart:
             return false;
         }
         $frame->magicCallMethodName = $methodName;
-        $vis = $magicClass->methodVisibility['__callstatic'] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        $callerClassLc = null;
-        if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            $callerClassLc = strtolower($frame->block->func->class->value);
-        }
-        MethodVisibility::assertCallable(
-            $vis,
-            $callerClassLc,
-            strtolower($magicClass->name),
-            $magicClass->name,
-            '__callStatic'
-        );
+        // Do not MethodVisibility::assertCallable — magic trampoline ignores declaration
+        // visibility (zend_std_get_static_method / #26437). Direct C::__callStatic(...) still
+        // goes through the normal static path first; inaccessible → this fallback.
         $frame->call = $magicClass->methods['__callstatic'];
         $frame->callArgs = [];
         $frame->callArgEntries = [];
