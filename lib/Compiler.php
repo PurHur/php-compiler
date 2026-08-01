@@ -720,6 +720,8 @@ class Compiler {
         }
         $this->rejectPseudoClassTypeHintOutsideClassScope($returnType, $block, $func);
         $this->assertIntersectionTypeMembers($returnType);
+        // void before never — Zend prefers "Void can only…" when both appear in a union (#26517).
+        $this->assertFunctionSignatureVoidType($returnType);
         $this->assertFunctionSignatureNeverType($returnType);
         $this->assertMixedTypeRules($returnType);
         $block->returnDeclaredType = $returnType;
@@ -7528,6 +7530,22 @@ class Compiler {
     }
 
     /**
+     * Zend zend_compile_type — void is only valid as a standalone return type (#26517).
+     * Unions / nullable void → "Void can only be used as a standalone type" (capital V).
+     * Intersection members are rejected earlier by {@see assertIntersectionTypeMembers}.
+     */
+    protected function assertFunctionSignatureVoidType(?Op\Type $type): void
+    {
+        if (!$this->cfgTypeContainsVoid($type)) {
+            return;
+        }
+        if ($this->cfgTypeIsStandaloneVoid($type)) {
+            return;
+        }
+        $this->throwCompileError('Void can only be used as a standalone type');
+    }
+
+    /**
      * Zend zend_handle_never_type — never is only valid as a standalone signature type (#14334).
      */
     protected function assertFunctionSignatureNeverType(?Op\Type $type): void
@@ -7843,8 +7861,13 @@ class Compiler {
     {
         $this->rejectPseudoClassTypeHintOutsideClassScope($declared, $block, $func);
         $this->assertIntersectionTypeMembers($declared);
+        // void before never — Zend prefers "Void can only…" for void|never params (#26517).
+        $this->assertFunctionSignatureVoidType($declared);
         $this->assertFunctionSignatureNeverType($declared);
         $this->assertMixedTypeRules($declared);
+        if ($this->cfgTypeIsStandaloneVoid($declared)) {
+            $this->throwCompileError('void cannot be used as a parameter type');
+        }
         if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
         }
