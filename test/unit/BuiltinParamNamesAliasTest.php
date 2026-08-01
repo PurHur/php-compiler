@@ -1161,6 +1161,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTimeImmutable', 'setMicrosecond'));
     }
 
+    /** @covers issue #26097 */
+    public function testDateTimeCreateFromTimestampNamedParameters(): void
+    {
+        foreach (['DateTime::createFromTimestamp', 'DateTimeImmutable::createFromTimestamp'] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame(['timestamp'], $names, $qual);
+            self::assertSame(
+                0,
+                BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp', $qual),
+                $qual
+            );
+        }
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('DateTime', 'createFromTimestamp'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('DateTimeImmutable', 'createFromTimestamp'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTime', 'createFromTimestamp'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTimeImmutable', 'createFromTimestamp'));
+    }
+
     /** @covers issue #23707 */
     public function testDateIntervalConstructStubNamedParamsResolve(): void
     {
