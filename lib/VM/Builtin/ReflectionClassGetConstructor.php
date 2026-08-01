@@ -23,13 +23,21 @@ final class ReflectionClassGetConstructor extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        if (!isset($entry->methods['__construct'])) {
+        // php-src ce->constructor walks inheritance including parent-private (__construct; #26059).
+        $declaring = null;
+        foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+            if (isset($class->methods['__construct'])) {
+                $declaring = $class;
+                break;
+            }
+        }
+        if (null === $declaring) {
             $frame->returnVar->null();
 
             return;
         }
         $out = new Variable(Variable::TYPE_OBJECT);
-        $out->object(ReflectionSupport::newReflectionMethodObject($ctx, $entry, '__construct'));
+        $out->object(ReflectionSupport::newReflectionMethodObject($ctx, $declaring, '__construct'));
         $frame->returnVar->copyFrom($out);
     }
 }

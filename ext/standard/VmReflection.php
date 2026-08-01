@@ -3635,6 +3635,15 @@ final class VmReflection
                 return true;
             }
         }
+        // php-src ReflectionClass::hasMethod finds parent-private __construct via ce->constructor
+        // even though getMethods() omits it (#26059 / #7191).
+        if (('__construct' === $methodLc || '__destruct' === $methodLc) && 0 === $filter) {
+            foreach (self::classHierarchyChain($entry, $ctx) as $class) {
+                if (isset($class->methods[$methodLc])) {
+                    return true;
+                }
+            }
+        }
         if ($entry->isEnum && self::methodExistsOnClass($entry, $method)) {
             return true;
         }

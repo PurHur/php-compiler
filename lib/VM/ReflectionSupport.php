@@ -1294,7 +1294,7 @@ final class ReflectionSupport
     }
 
     /** php-src zim_ReflectionClass_isInstantiable — abstract/interface/trait/enum/static/private ctor (#6302). */
-    public static function reflectionClassIsInstantiable(ClassEntry $entry): bool
+    public static function reflectionClassIsInstantiable(ClassEntry $entry, ?Context $ctx = null): bool
     {
         if ($entry->isInterface || $entry->isTrait || $entry->isEnum || $entry->isAbstract || $entry->isStatic) {
             return false;
@@ -1303,6 +1303,19 @@ final class ReflectionSupport
             return false;
         }
         $ctorLc = '__construct';
+        // Walk parents: Dom\HTMLDocument inherits Dom\Node's private final __construct (#26059).
+        if (null !== $ctx) {
+            foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+                if (!isset($class->methods[$ctorLc])) {
+                    continue;
+                }
+                $flags = $class->methodVisibility[$ctorLc] ?? 0;
+
+                return 0 === ($flags & \PHPCfg\Func::FLAG_PRIVATE);
+            }
+
+            return true;
+        }
         if (!isset($entry->methods[$ctorLc])) {
             return true;
         }
@@ -1567,7 +1580,9 @@ final class ReflectionSupport
                 continue;
             }
             $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+            // Parent-private hidden on child (#7191), except ctor/dtor Reflection lookup (#26059).
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry
+                && '__construct' !== $methodLc && '__destruct' !== $methodLc) {
                 continue;
             }
 
@@ -3836,8 +3851,10 @@ final class ReflectionSupport
                 continue;
             }
             $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-            // php-src: parent-private methods are not visible on the child (#7191).
-            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+            // php-src: parent-private methods are not visible on the child (#7191),
+            // except __construct / __destruct (ce->constructor / ReflectionClass::getMethod; #26059).
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry
+                && '__construct' !== $methodLc && '__destruct' !== $methodLc) {
                 continue;
             }
             $declaring = $class;
