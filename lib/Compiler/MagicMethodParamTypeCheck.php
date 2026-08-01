@@ -12,7 +12,7 @@ use PHPCfg\Script;
  * Compile-time magic method parameter type rules (PHP 8.0+).
  *
  * php-src: Zend/zend_API.c — zend_check_magic_method_arg_type /
- * zend_check_magic_method_implementation (#26500; arity in #25024)
+ * zend_check_magic_method_implementation (#26500, #26501; arity in #25024)
  *
  * When a parameter type is declared, its type mask must include the required
  * MAY_BE_STRING / MAY_BE_ARRAY bit (unions that contain the type, `mixed`, and
@@ -32,6 +32,9 @@ final class MagicMethodParamTypeCheck
         '__unset' => [0 => 'string'],
         '__call' => [0 => 'string', 1 => 'array'],
         '__callstatic' => [0 => 'string', 1 => 'array'],
+        // php-src zend_check_magic_method_implementation — param #1 array (#26501)
+        '__unserialize' => [0 => 'array'],
+        '__set_state' => [0 => 'array'],
     ];
 
     public static function validate(Script $script): void

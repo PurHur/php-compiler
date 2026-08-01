@@ -9,6 +9,8 @@ class Good {
     public function __unset(string $n): void {}
     public function __call(string $n, array $a) { return "c:$n"; }
     public static function __callStatic(string $n, array $a) { return "s:$n"; }
+    public function __unserialize(array $d): void {}
+    public static function __set_state(array $a): object { return new self; }
 }
 $g = new Good();
 echo $g->x, "\n";

@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #26500 */
+/** @covers issues #26500, #26501 */
 final class MagicMethodParamTypeCheckTest extends TestCase
 {
     /**
@@ -88,6 +88,28 @@ class C { function __get(array $n) { return 1; } }
 PHP,
             'N\\C::__get(): Parameter #1 ($n) must be of type string when declared',
         ];
+        yield '__unserialize string' => [
+            <<<'PHP'
+<?php
+class C { function __unserialize(string $data): void {} }
+PHP,
+            'C::__unserialize(): Parameter #1 ($data) must be of type array when declared',
+        ];
+        yield '__set_state int' => [
+            <<<'PHP'
+<?php
+class C { static function __set_state(int $a): object { return new C; } }
+PHP,
+            'C::__set_state(): Parameter #1 ($a) must be of type array when declared',
+        ];
+        yield 'namespaced __unserialize' => [
+            <<<'PHP'
+<?php
+namespace N;
+class C { function __unserialize(string $data): void {} }
+PHP,
+            'N\\C::__unserialize(): Parameter #1 ($data) must be of type array when declared',
+        ];
     }
 
     /**
@@ -113,6 +135,8 @@ class G {
     public function __unset($n) {}
     public function __call($n, $a) { return $n; }
     public static function __callStatic($n, $a) { return $n; }
+    public function __unserialize($d): void {}
+    public static function __set_state($a) { return new self; }
 }
 PHP,
         ];
@@ -126,6 +150,8 @@ class G {
     public function __unset(string $n): void {}
     public function __call(string $n, array $a) { return $n; }
     public static function __callStatic(string $n, array $a) { return $n; }
+    public function __unserialize(array $d): void {}
+    public static function __set_state(array $a): object { return new self; }
 }
 PHP,
         ];
@@ -139,6 +165,12 @@ class G {
     public function __unset(string|null $n): void {}
     public function __call(string $n, iterable $a) { return $n; }
     public static function __callStatic(string $n, array|string $a) { return $n; }
+    public function __unserialize(array|string $d): void {}
+    public static function __set_state(iterable $a): object { return new self; }
+}
+class H {
+    public function __unserialize(mixed $d): void {}
+    public static function __set_state(?array $a): object { return new self; }
 }
 PHP,
         ];
