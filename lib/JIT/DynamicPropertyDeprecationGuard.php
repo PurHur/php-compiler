@@ -33,8 +33,23 @@ final class DynamicPropertyDeprecationGuard
         if ($objectType->isReadonlyClass($classId)) {
             return;
         }
-        // Internal / extension classes: Error, not E_DEPRECATED (zend_object_handlers.c; #26055).
-        if ($objectType->isExternalOnlyClass($classId)) {
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES: Error, not E_DEPRECATED (zend_object_handlers.c; #26055, #26371).
+        if ($objectType->rejectsDynamicProperties($classId)) {
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                $context,
+                sprintf('Cannot create dynamic property %s::$%s', $className, $propertyName)
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
+        // AOT: external-class dynamic property bags are not wired yet — keep Error (avoid
+        // segfault on DateTime/etc undeclared writes). JIT + VM match Zend deprecate+write (#26371).
+        if (
+            $objectType->isExternalOnlyClass($classId)
+            && 0 !== ($context->runtime->mode & \PHPCompiler\Runtime::MODE_AOT)
+        ) {
             \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
                 $context,
                 sprintf('Cannot create dynamic property %s::$%s', $className, $propertyName)

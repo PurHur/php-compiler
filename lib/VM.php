@@ -3592,8 +3592,8 @@ class VM {
         if ($this->instanceMethodReturnsByRef($object, '__get')) {
             return $this->invokeMagicGet($object, $name);
         }
-        // Defense in depth — primary gate is enforceInternalDynamicPropertyCreate (#26055).
-        if (!$object->class->allowsDynamicProperties && $object->class->isInternal) {
+        // Defense in depth — primary gate is enforceInternalDynamicPropertyCreate (#26055, #26371).
+        if ($object->class->noDynamicProperties) {
             $thrown = VM\BuiltinExceptionSupport::materializeError(
                 $this->context,
                 sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
@@ -14851,14 +14851,14 @@ restart:
     }
 
     /**
-     * Internal classes without ZEND_ACC_ALLOW_DYNAMIC_PROPERTIES → catchable Error
-     * (zend_object_handlers.c; Dom\ / DOM* / DateTime; #26055).
+     * ZEND_ACC_NO_DYNAMIC_PROPERTIES → catchable Error (zend_object_handlers.c; #26055, #26371).
+     * Other internals (DateTime, ArrayObject, legacy DOM*) still allow with E_DEPRECATED.
      *
      * @return ?Frame catch frame when handled; null when allowed or after uncaught raise
      */
     private function enforceInternalDynamicPropertyCreate(ObjectEntry $object, string $name, Frame $frame): ?Frame
     {
-        if ($object->class->allowsDynamicProperties || !$object->class->isInternal) {
+        if (!$object->class->noDynamicProperties) {
             return null;
         }
         if ($object->hasProperty($name)) {

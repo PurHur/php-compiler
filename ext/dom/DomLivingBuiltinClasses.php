@@ -510,6 +510,29 @@ final class DomLivingBuiltinClasses
             $xmlDocument->methodNames['savexmlfile'] = 'saveXmlFile';
         }
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
+
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES on living Dom\* objects (php_dom.c; #26055, #26371).
+        // Skip interfaces/enums and Dom\DOMException (alias of legacy DOMException).
+        self::sealDomLivingDynamicProperties($ctx);
+    }
+
+    /**
+     * Mark concrete Dom\* class entries as rejecting dynamic properties (#26371).
+     */
+    private static function sealDomLivingDynamicProperties(Context $ctx): void
+    {
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!str_starts_with($lc, 'dom\\')) {
+                continue;
+            }
+            if ($entry->isInterface || $entry->isEnum) {
+                continue;
+            }
+            if (VmDomLiving::CLASS_DOM_EXCEPTION === $lc) {
+                continue;
+            }
+            $entry->noDynamicProperties = true;
+        }
     }
 
     /**

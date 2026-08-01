@@ -273,6 +273,8 @@ final class GeneratorState
     {
         $entry = new ClassEntry('Generator');
         $entry->isFinal = true;
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES (zend_generators.c; #26371).
+        $entry->noDynamicProperties = true;
         $entry->interfaces = ['iterator'];
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->methods['getreturn'] = new GeneratorGetReturn();

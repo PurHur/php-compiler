@@ -104,6 +104,11 @@ class ClassEntry {
     public array $sealedPermits = [];
     /** stdClass-style: create public properties on first read/write (#3117). */
     public bool $allowsDynamicProperties = false;
+    /**
+     * ZEND_ACC_NO_DYNAMIC_PROPERTIES — undeclared writes throw Error (Closure/Fiber/Dom\\; #26371).
+     * Distinct from {@see $allowsDynamicProperties} (ZEND_ACC_ALLOW_DYNAMIC_PROPERTIES, no deprecation).
+     */
+    public bool $noDynamicProperties = false;
     /** Zend CE_INTERNAL: VM builtin / extension class, not user-declared (#5011). */
     public bool $isInternal = false;
     /** @var list<string> PHP 8 attribute names on this class (#1936). */
