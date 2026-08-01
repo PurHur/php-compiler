@@ -166,7 +166,7 @@ final class VmEval
             // Reference-profile syntax rejectors throw CompileFatal; Zend eval surfaces ParseError (#22796).
             if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
                 $line = $e->sourceLine > 1 ? $e->sourceLine - 1 : max(1, $e->sourceLine);
-                self::failEvalParse($ctx, $e->getMessage(), $line);
+                self::failEvalParse($ctx, $e->getMessage(), $line, $code);
             }
             throw $e;
         } catch (\CompileError $e) {
@@ -178,14 +178,14 @@ final class VmEval
             if (self::isCatchableCompileErrorMessage($message)) {
                 throw new \CompileError($message);
             }
-            self::failEvalParse($ctx, $e->getMessage(), self::lineFromThrowable($e));
+            self::failEvalParse($ctx, $e->getMessage(), self::lineFromThrowable($e), $code);
         }
 
         if (null === $block) {
             $detail = $runtime->formatParseAndCompileNullDetail(null)
                 ?? Runtime::getLastParseFailure()
                 ?? 'Parse error';
-            self::failEvalParse($ctx, $detail, 1);
+            self::failEvalParse($ctx, $detail, 1, $code);
         }
 
         return $vm->executeEvalBlock($block, $scopeFrame);
@@ -240,18 +240,36 @@ final class VmEval
      *
      * @return never
      */
-    private static function failEvalParse(Context $ctx, string $detail, int $evalLine): void
-    {
-        self::recordParseError($ctx, $detail, $evalLine);
-        throw new \ParseError(self::normalizeParseMessage($detail), $evalLine);
+    private static function failEvalParse(
+        Context $ctx,
+        string $detail,
+        int $evalLine,
+        ?string $code = null
+    ): void {
+        $message = self::normalizeParseMessage($detail, $code);
+        self::recordParseError($ctx, $message, $evalLine);
+        throw new \ParseError($message, $evalLine);
     }
 
-    private static function normalizeParseMessage(string $detail): string
+    /**
+     * Map php-parser diagnostics toward Zend scanner/parser wording (#26691).
+     *
+     * php-src: Zend/zend_language_scanner.l — check_nesting_at_end() / report_bad_nesting().
+     */
+    private static function normalizeParseMessage(string $detail, ?string $code = null): string
     {
+        if (null !== $code) {
+            $open = self::innermostUnclosedNestChar($code);
+            if (null !== $open) {
+                return "Unclosed '".$open."'";
+            }
+        }
+
         $message = trim($detail);
         if (str_starts_with(strtolower($message), 'parse error:')) {
             $message = trim(substr($message, strlen('Parse error:')));
         }
+        $message = self::stripParserLineSuffix($message);
         if (str_starts_with(strtolower($message), 'syntax error,')) {
             return $message;
         }
@@ -262,6 +280,75 @@ final class VmEval
         return $message;
     }
 
+    /**
+     * Innermost unclosed nest opener at EOF (Zend check_nesting_at_end; #26691).
+     *
+     * @return '{'|'['|'('|null
+     */
+    public static function innermostUnclosedNestChar(string $code): ?string
+    {
+        $stack = [];
+        $len = strlen($code);
+        $i = 0;
+        while ($i < $len) {
+            $ch = $code[$i];
+            if ('/' === $ch && $i + 1 < $len) {
+                $next = $code[$i + 1];
+                if ('/' === $next) {
+                    $nl = strpos($code, "\n", $i + 2);
+                    $i = false === $nl ? $len : $nl + 1;
+                    continue;
+                }
+                if ('*' === $next) {
+                    $end = strpos($code, '*/', $i + 2);
+                    $i = false === $end ? $len : $end + 2;
+                    continue;
+                }
+            }
+            if ('#' === $ch) {
+                $nl = strpos($code, "\n", $i + 1);
+                $i = false === $nl ? $len : $nl + 1;
+                continue;
+            }
+            if ("'" === $ch || '"' === $ch) {
+                $quote = $ch;
+                ++$i;
+                while ($i < $len) {
+                    if ('\\' === $code[$i]) {
+                        $i += 2;
+                        continue;
+                    }
+                    if ($quote === $code[$i]) {
+                        ++$i;
+                        break;
+                    }
+                    ++$i;
+                }
+                continue;
+            }
+            if ('{' === $ch || '[' === $ch || '(' === $ch) {
+                $stack[] = $ch;
+                ++$i;
+                continue;
+            }
+            if ('}' === $ch || ']' === $ch || ')' === $ch) {
+                $want = '}' === $ch ? '{' : (']' === $ch ? '[' : '(');
+                if ([] !== $stack && $want === $stack[\count($stack) - 1]) {
+                    array_pop($stack);
+                }
+                ++$i;
+                continue;
+            }
+            ++$i;
+        }
+
+        if ([] === $stack) {
+            return null;
+        }
+
+        return $stack[\count($stack) - 1];
+    }
+
     private static function recordParseError(Context $ctx, string $message, int $line): void
     {
         $ctx->errors->recordLastError(ErrorReporter::E_PARSE, $message, self::EVAL_FILENAME, $line);
@@ -270,12 +357,18 @@ final class VmEval
     /**
      * Zend parses eval strings as inline PHP; our PHPCfg pipeline expects a script TU (#3358).
      * Trailing expressions without a semicolon are wrapped in return (zend_eval_string parity).
+     *
+     * Skip the return prefix when nest delimiters are still open — otherwise php-parser reports
+     * misleading "unexpected T_CLASS" instead of Zend's Unclosed '{' (#26691).
      */
     public static function wrapEvalCode(string $code): string
     {
         $trimmed = rtrim($code);
         if ('' === $trimmed) {
             return "<?php\n";
+        }
+        if (null !== self::innermostUnclosedNestChar($trimmed)) {
+            return "<?php\n".$code;
         }
         if (!str_ends_with($trimmed, ';') && !str_ends_with($trimmed, '}')) {
             return "<?php\nreturn ".$trimmed.';';
