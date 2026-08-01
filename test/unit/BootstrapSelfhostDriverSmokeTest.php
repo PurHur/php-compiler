@@ -76,6 +76,7 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     {
         $apply = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
         $this->assertStringContainsString('php-types-fromdecl-junk-fragments.patch', $apply);
+        $this->assertStringContainsString('php-types-fromdecl-string-literals.patch', $apply);
     }
 
     /** Issue #3004: argv bin/compile.php must not return null from parseAndCompile stub when sidecars miss. */
