@@ -992,6 +992,10 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\imap\ImapExtensionPolicy::isImapComplianceCase($name)) {
                 continue;
             }
+            if (!\PHPCompiler\ext\eio\EioExtensionPolicy::runsEioCompliance($name)
+                && \PHPCompiler\ext\eio\EioExtensionPolicy::isEioComplianceCase($name)) {
+                continue;
+            }
             // snmpget/snmpwalk not JIT-lowered yet (#6070); phantom registration checks are fine.
             if (str_contains($name, 'snmp')
                 && !str_contains($name, 'snmp_phantom')) {

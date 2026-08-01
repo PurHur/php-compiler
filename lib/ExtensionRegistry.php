@@ -88,6 +88,7 @@ final class ExtensionRegistry
             new \PHPCompiler\ext\bz2\Module(),
             new \PHPCompiler\ext\rar\Module(),
             new \PHPCompiler\ext\imap\Module(),
+            new \PHPCompiler\ext\eio\Module(),
             new \PHPCompiler\ext\brotli\Module(),
             new \PHPCompiler\ext\sodium\Module(),
             new \PHPCompiler\ext\sqlite3\Module(),

@@ -3408,6 +3408,18 @@ final class CompilerVersion
     }
 
     /**
+     * ext/eio via pure PHP {@see \PHPCompiler\ext\eio\VmEioCore} — withheld on reference profile (#6442).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host pecl-eio / libeio absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * or explicit {@code PHP_COMPILER_ENABLE_EIO=1}.
+     */
+    public static function supportsEio(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/mongodb via pure PHP {@see \PHPCompiler\ext\mongodb\VmMongodb} — withheld on reference profile (#6575).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
