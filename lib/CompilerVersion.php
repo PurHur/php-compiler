@@ -288,14 +288,16 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ #[\Deprecated] on file/namespace constants (Zend/zend_compile.c, issue #16819).
+     * PHP 8.5+ #[\Deprecated] on file/namespace constants (Attribute::TARGET_CONSTANT).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
-     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * php-src Zend/zend_attributes.stub.php: Deprecated gains TARGET_CONSTANT only in 8.5;
+     * Zend 8.4 parse-errors `#[\Deprecated] const` (`syntax error, unexpected token "const"`).
+     * Withheld on ≤8.4 (reference + PROFILE=8.4). Enable via stable 8.5.0+ or
+     * `PHP_COMPILER_PROFILE=8.5` (#16819, #26308).
      */
     public static function supportsGlobalDeprecatedConstAttributes(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
