@@ -569,10 +569,9 @@ final class VmFloatDtoa
         return [$digits, $decpt];
     }
 
-    /** php-src main/snprintf.c php_conv_fp format 'F'. */
+    /** php-src main/snprintf.c php_conv_fp format 'F' (no NDIGIT/addz inventing digits; #26207). */
     private static function convFpF(string $p, int $decimalPoint, int $precision): string
     {
-        $ndig = self::NDIGIT;
         $out = '';
         $pos = 0;
         $pLen = \strlen($p);
@@ -581,27 +580,18 @@ final class VmFloatDtoa
             $out = '0';
             if ($precision > 0) {
                 $out .= '.';
-                $dp = $decimalPoint;
-                while ($dp++ < 0) {
+                while ($decimalPoint++ < 0) {
                     $out .= '0';
                 }
             }
         } else {
-            $addz = $decimalPoint >= $ndig ? $decimalPoint - $ndig + 1 : 0;
-            $decimalPoint -= $addz;
-            while ($decimalPoint-- > 0) {
+            // php-src: do { *s++ = *p ? *p++ : '0'; } while (--decimal_point > 0);
+            do {
                 $out .= $pos < $pLen ? $p[$pos++] : '0';
-            }
-            while ($addz-- > 0) {
-                $out .= '0';
-            }
+            } while (--$decimalPoint > 0);
             if ($precision > 0) {
                 $out .= '.';
             }
-        }
-
-        if ($precision > 0 && $decimalPoint <= 0 && !\str_contains($out, '.')) {
-            $out .= '.';
         }
 
         while ($pos < $pLen) {

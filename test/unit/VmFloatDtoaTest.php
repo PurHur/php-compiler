@@ -46,6 +46,15 @@ final class VmFloatDtoaTest extends TestCase
         $this->assertSame('83.33333333333332860', VmFloatDtoa::formatSprintfF(5 * 200.0 / 12, 17));
     }
 
+    /** php-src main/snprintf.c php_conv_fp — large %f must not invent digits (#26207). */
+    public function testSprintfFixedLargeFloatPrecisionMatchesZend(): void
+    {
+        $this->assertSame('100000000000000000000.000000', VmFloatDtoa::formatSprintfF(1e20, 6));
+        $this->assertSame('100000000000000000000', VmFloatDtoa::formatSprintfF(1e20, 0));
+        $this->assertSame('100000000000000000000.00', VmFloatDtoa::formatSprintfF(1e20, 2));
+        $this->assertSame('1.500000', VmFloatDtoa::formatSprintfF(1.5, 6));
+    }
+
     /** php-src zend_gcvt / formatted_print.c %g significant digits (#24016). */
     public function testSprintfGeneralSignificantDigitsMatchZend(): void
     {
