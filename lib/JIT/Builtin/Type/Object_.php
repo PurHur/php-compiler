@@ -200,6 +200,9 @@ class Object_ extends Type {
     /** @var array<int, true> class ids with #[\AllowDynamicProperties] or stdClass (#3467, #4570) */
     private array $allowsDynamicPropertiesClassIds = [];
 
+    /** @var array<int, true> ZEND_ACC_NO_DYNAMIC_PROPERTIES class ids (#26055, #26371) */
+    private array $noDynamicPropertiesClassIds = [];
+
     /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
     private array $readonlyPropertyNames = [];
 
@@ -1194,6 +1197,21 @@ class Object_ extends Type {
     public function allowsDynamicProperties(int $classId): bool
     {
         return isset($this->allowsDynamicPropertiesClassIds[$classId]);
+    }
+
+    public function setClassNoDynamicProperties(int $classId, bool $rejects): void
+    {
+        if ($rejects) {
+            $this->noDynamicPropertiesClassIds[$classId] = true;
+        } else {
+            unset($this->noDynamicPropertiesClassIds[$classId]);
+        }
+    }
+
+    /** ZEND_ACC_NO_DYNAMIC_PROPERTIES — Error on undeclared write (#26371). */
+    public function rejectsDynamicProperties(int $classId): bool
+    {
+        return isset($this->noDynamicPropertiesClassIds[$classId]);
     }
 
     public function inheritReadonlyFromParent(int $childId, string $parentLc): void
@@ -3202,6 +3220,22 @@ class Object_ extends Type {
     }
 
     /**
+     * Engine classes with ZEND_ACC_NO_DYNAMIC_PROPERTIES (Closure/Fiber/Dom\\; #26371).
+     */
+    private static function externalClassRejectsDynamicProperties(string $lcname): bool
+    {
+        if (\in_array($lcname, ['closure', 'fiber', 'generator', 'weakmap'], true)) {
+            return true;
+        }
+        // Living Dom\* nodes — not legacy DOM*, not Dom\DOMException alias.
+        if (str_starts_with($lcname, 'dom\\') && 'dom\\domexception' !== $lcname) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Internal zend classes whose instance storage must not leak via get_object_vars() from global scope (#10719).
      *
      * @return list<int>
@@ -3230,6 +3264,9 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $lcname;
         if ('stdclass' === $lcname) {
             $this->allowsDynamicPropertiesClassIds[$id] = true;
+        }
+        if (self::externalClassRejectsDynamicProperties($lcname)) {
+            $this->noDynamicPropertiesClassIds[$id] = true;
         }
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);

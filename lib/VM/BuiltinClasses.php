@@ -622,6 +622,8 @@ final class BuiltinClasses
     private static function registerWeakMap(Context $ctx): void
     {
         $entry = new ClassEntry('WeakMap');
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES (zend_weakrefs.c; #26371).
+        $entry->noDynamicProperties = true;
         // Zend/zend_weakrefs.c — ArrayAccess + Countable + IteratorAggregate (#22267).
         $entry->interfaces = ['arrayaccess', 'countable', 'iteratoraggregate'];
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
@@ -2168,6 +2170,8 @@ final class BuiltinClasses
     private static function registerFiber(Context $ctx): void
     {
         $entry = new ClassEntry('Fiber');
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES (zend_fibers.c; #26371).
+        $entry->noDynamicProperties = true;
         $pub = CfgFunc::FLAG_PUBLIC;
         // Zend zend_fibers.c: suspend/getCurrent are statically invokable inside fiber callbacks (#5485).
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;

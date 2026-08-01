@@ -396,6 +396,8 @@ final class ClosureState
     {
         $entry = new ClassEntry('Closure');
         $entry->isFinal = true;
+        // ZEND_ACC_NO_DYNAMIC_PROPERTIES (zend_closures.c; #26371).
+        $entry->noDynamicProperties = true;
         $pubStatic = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
         $entry->methods['fromcallable'] = new Builtin\ClosureFromCallable();
         $entry->methodVisibility['fromcallable'] = $pubStatic;
