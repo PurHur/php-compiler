@@ -1925,6 +1925,25 @@ PHP;
         self::assertStringEndsWith('3', trim($out));
     }
 
+    /** Issue #26703 — var_export(Fiber::getCurrent() !== null, true) must compile (StaticCall producer). */
+    public function testVarExportFiberGetCurrentNotIdenticalNullReturnTrue(): void
+    {
+        $code = <<<'PHP'
+<?php
+$f = new Fiber(function () {
+    echo var_export(Fiber::getCurrent() !== null, true), "\n";
+    echo print_r(Fiber::getCurrent() !== null, true), "\n";
+});
+$f->start();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_fiber_get_current_cmp.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("true\n1\n", ob_get_clean());
+    }
+
     /** Issue #17250 — var_export($x !== false, true) wires NotIdentical producer, not hoisted false ConstFetch. */
     public function testVarExportNotIdenticalFalseReturnTrueUsesComparisonProducerSlot(): void
     {
