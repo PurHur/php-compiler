@@ -1107,6 +1107,78 @@ final class VmSsh2Native
     }
 
     /**
+     * Bind a remote forward listener (PECL ssh2_forward_listen; #26715).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return \FFI\CData|null LIBSSH2_LISTENER*
+     */
+    public static function channelForwardListen(
+        \FFI\CData $session,
+        int $port,
+        ?string $host,
+        int $maxConnections
+    ) {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $ffi->libssh2_session_set_blocking($session, 1);
+        try {
+            $listener = $ffi->libssh2_channel_forward_listen_ex(
+                $session,
+                $host,
+                $port,
+                null,
+                $maxConnections
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $listener;
+    }
+
+    /**
+     * Accept a connection on a remote forward listener (PECL ssh2_forward_accept; #26715).
+     *
+     * @param \FFI\CData $listener LIBSSH2_LISTENER*
+     *
+     * @return \FFI\CData|null LIBSSH2_CHANNEL*
+     */
+    public static function channelForwardAccept(\FFI\CData $listener)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        try {
+            $channel = $ffi->libssh2_channel_forward_accept($listener);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $channel;
+    }
+
+    /**
+     * Cancel a remote forward listener (PECL listener dtor; #26715).
+     *
+     * @param \FFI\CData $listener LIBSSH2_LISTENER*
+     */
+    public static function channelForwardCancel(\FFI\CData $listener): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            $ffi->libssh2_channel_forward_cancel($listener);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
      * @return \FFI|null
      */
     private static function ffi()

@@ -19,6 +19,7 @@ require_once __DIR__.'/VmSsh2Native.php';
 require_once __DIR__.'/VmSsh2Session.php';
 require_once __DIR__.'/VmSsh2Stream.php';
 require_once __DIR__.'/VmSsh2Sftp.php';
+require_once __DIR__.'/VmSsh2Listener.php';
 
 /** Shared JIT stub for ssh2_* v1 (#6385). */
 abstract class Ssh2Function extends Internal
@@ -85,6 +86,35 @@ abstract class Ssh2Function extends Internal
         }
 
         return VmSsh2Sftp::requireLive($object, $fn);
+    }
+
+    protected function requireListener(Variable $var, string $fn, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($listener) must be of type SSH2\\Listener, %s given',
+                $fn,
+                $argNum,
+                match ($var->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_INTEGER => 'int',
+                    default => 'mixed',
+                }
+            ));
+        }
+        $object = $var->toObject();
+        if (VmSsh2Listener::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($listener) must be of type SSH2\\Listener, %s given',
+                $fn,
+                $argNum,
+                $object->class->name
+            ));
+        }
+
+        return VmSsh2Listener::requireLive($object, $fn);
     }
 }
 
@@ -788,6 +818,118 @@ final class ssh2_tunnel extends Ssh2Function
             return;
         }
         $wrapped = VmSsh2Stream::wrap($ctx, $session, 'tunnel:'.$host.':'.$port, $channel);
+        $frame->returnVar->object($wrapped->toObject());
+    }
+}
+
+/**
+ * ssh2_forward_listen(resource $session, int $port[, string $host[, int $max_connections = 16]]): resource|false
+ *
+ * Remote port forward listener (PECL ssh2_forward_listen; #26715).
+ */
+final class ssh2_forward_listen extends Ssh2Function
+{
+    private const DEFAULT_MAX_QUEUED = 16;
+
+    public function __construct()
+    {
+        parent::__construct('ssh2_forward_listen');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_forward_listen() expects between 2 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_forward_listen', 1);
+        $port = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ssh2_forward_listen', 2, 'port');
+        $host = null;
+        if ($argc >= 3 && Variable::TYPE_NULL !== $frame->calledArgs[2]->resolveIndirect()->type) {
+            $host = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_forward_listen', 3, 'host');
+        }
+        $maxConnections = self::DEFAULT_MAX_QUEUED;
+        if ($argc >= 4) {
+            $maxConnections = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'ssh2_forward_listen', 4, 'max_connections');
+        }
+        if (!VmSsh2Session::isAuthed($session)) {
+            @\trigger_error('ssh2_forward_listen(): Failure listening on remote port', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_forward_listen(): Failure listening on remote port', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ssh2_forward_listen() requires a VM context');
+        }
+        $listener = VmSsh2Native::channelForwardListen($native, $port, $host, $maxConnections);
+        if (null === $listener) {
+            @\trigger_error('ssh2_forward_listen(): Failure listening on remote port', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $wrapped = VmSsh2Listener::wrap($ctx, $session, $port, $host, $listener);
+        $frame->returnVar->object($wrapped->toObject());
+    }
+}
+
+/**
+ * ssh2_forward_accept(resource $listener): resource|false
+ *
+ * Accept a channel on a remote forward listener (PECL ssh2_forward_accept; #26715).
+ */
+final class ssh2_forward_accept extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_forward_accept');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_forward_accept() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $listener = $this->requireListener($frame->calledArgs[0], 'ssh2_forward_accept', 1);
+        $native = VmSsh2Listener::nativeListener($listener);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $channel = VmSsh2Native::channelForwardAccept($native);
+        if (null === $channel) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ssh2_forward_accept() requires a VM context');
+        }
+        $session = VmSsh2Listener::session($listener);
+        $wrapped = VmSsh2Stream::wrap($ctx, $session, 'forward-accept', $channel);
         $frame->returnVar->object($wrapped->toObject());
     }
 }
