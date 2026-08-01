@@ -537,7 +537,8 @@ final class ClosureSupport
                 );
             }
 
-            throw new \Error('Call to undefined function '.$lc.'()');
+            // Zend preserves source spelling in FCC Error messages (#26690, zend_execute_API.c).
+            throw new \Error('Call to undefined function '.$name.'()');
         }
 
         return ClosureState::fromWrappedFunc($ctx->functions[$lc]);

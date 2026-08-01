@@ -10594,7 +10594,10 @@ class JIT {
                                     }
                                     throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
                                 }
-                                throw new \LogicException("Call to undefined function {$lcname}()");
+                                // Preserve source spelling like Zend (#26690, zend_execute_API.c).
+                                throw new \LogicException(
+                                    'Call to undefined function '.$nameVar->compileTimeString.'()'
+                                );
                             }
                             $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                         }

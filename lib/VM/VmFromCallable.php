@@ -90,7 +90,8 @@ final class VmFromCallable
         // exit/die remain registered for 8.4 paren-call lowering but are not FCC-visible on 8.2 (#22796).
         if (!$context->functionIsRegistered($lc)
             || !\PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($lc)) {
-            throw new \Error("Call to undefined function {$lc}()");
+            // Zend preserves source spelling in FCC Error messages (#26690, zend_execute_API.c).
+            throw new \Error("Call to undefined function {$name}()");
         }
 
         return self::wrapCallableProxy($context, $context->resolveFunctionProxy($lc), $lc);
