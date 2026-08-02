@@ -3493,6 +3493,23 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('splmaxheap' === $lcname || 'splminheap' === $lcname || 'splheap' === $lcname) {
+            // Thin AOT: `__spl_heap` packed storage + Iterator extract-on-next (#26784).
+            // Zend subclass rematerializes Countable-first (#25822).
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, ['Countable', 'Iterator']);
+            $this->defineProperty($id, \PHPCompiler\VM\SplHeapJitHelper::PROP_HEAP, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplHeapJitHelper::PROP_ITER_POS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplHeapJitHelper::PROP_KIND, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'insert', 'extract', 'top', 'count', 'isempty',
+                'rewind', 'valid', 'current', 'key', 'next',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('sensitiveparametervalue' === $lcname) {
             // Trace redaction marker — store wrapped arg for getValue() (#3351, #4621, #22487).
             // Private like Zend zend_exceptions.stub.php — json_encode must not leak (#23042).
