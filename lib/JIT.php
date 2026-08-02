@@ -4622,6 +4622,8 @@ class JIT {
         }
         $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         $this->ensureM3EmitTuRuntimeParseSpineDeps();
+        // Void Optimizer/AssignOp::optimize before host-lowering compileEmitSmoke (#11809, #26756).
+        $this->ensureM3EmitTuInventoryArgvVmOptimizerStub();
         $emitHelperStubMethods = [];
         if ($this->shouldStubInventoryEmitParseCompileSpine()) {
             $emitHelperStubMethods = ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
@@ -5024,35 +5026,44 @@ class JIT {
     /** Inventory argv: AssignOp::optimize is link-only on compileEmitSmoke spine (#11809). */
     private function ensureM3EmitTuInventoryArgvVmOptimizerStub(): void
     {
-        if (!$this->shouldUseM3InventoryEmitDriver() || !$this->shouldUseM3CompileDriverRealLowering()) {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
-        $logical = 'PHPCompiler\\VM\\Optimizer::optimize';
-        $lc = strtolower($logical);
-        if (isset($this->context->functions[$lc])) {
+        // M5 argv / gen-0 seed real-lowers compileEmitSmoke even when inventory-emit
+        // classification flickers; still need void optimize() stubs (#26756).
+        if (!$this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseM5DriverHostCompile()) {
             return;
         }
         $objectPtr = $this->context->getTypeFromString('__object__*');
         $voidTy = $this->context->getTypeFromString('void');
-        $func = $this->context->module->addFunction(
-            $this->llvmInternalName($logical),
-            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
-        );
-        $bb = $func->appendBasicBlock('entry');
-        $saved = $this->context->builder;
-        $this->context->builder = $this->context->context->builderCreate();
-        $this->context->builder->positionAtEnd($bb);
-        $this->context->builder->returnVoid();
-        $this->context->builder->clearInsertionPosition();
-        $this->context->builder = $saved;
-        $this->context->functions[$lc] = $func;
-        $this->context->functionReturnType[$lc] = 'void';
-        $this->context->functionProxies[$lc] = new JIT\Call\Native(
-            $func,
-            $logical,
-            [$objectPtr, $objectPtr],
-            []
-        );
+        foreach ([
+            'PHPCompiler\\VM\\Optimizer::optimize',
+            'PHPCompiler\\VM\\Optimizer\\AssignOp::optimize',
+        ] as $logical) {
+            $lc = strtolower($logical);
+            if (isset($this->context->functions[$lc])) {
+                continue;
+            }
+            $func = $this->context->module->addFunction(
+                $this->llvmInternalName($logical),
+                $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
+            );
+            $bb = $func->appendBasicBlock('entry');
+            $saved = $this->context->builder;
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
+            $this->context->builder->returnVoid();
+            $this->context->builder->clearInsertionPosition();
+            $this->context->builder = $saved;
+            $this->context->functions[$lc] = $func;
+            $this->context->functionReturnType[$lc] = 'void';
+            $this->context->functionProxies[$lc] = new JIT\Call\Native(
+                $func,
+                $logical,
+                [$objectPtr, $objectPtr],
+                []
+            );
+        }
     }
 
     /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
@@ -18491,6 +18502,28 @@ class JIT {
                 $this->context->scope->args = [$receiverVar];
 
                 return;
+            }
+            // Runtime::compileEmitSmoke calls $assignOpResolver->optimize(); typed property can
+            // collapse to object during M5 argv host-lower — bind the void Optimizer stub (#26756).
+            if (
+                'optimize' === $methodLc
+                && (
+                    $this->shouldUseM5DriverHostCompile()
+                    || $this->shouldUseM3InventoryEmitDriver()
+                )
+            ) {
+                $this->ensureM3EmitTuInventoryArgvVmOptimizerStub();
+                foreach ([
+                    'phpcompiler\\vm\\optimizer\\assignop::optimize',
+                    'phpcompiler\\vm\\optimizer::optimize',
+                ] as $optProxy) {
+                    if (isset($this->context->functionProxies[$optProxy])) {
+                        $this->context->scope->toCall = $this->context->functionProxies[$optProxy];
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
+                }
             }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
