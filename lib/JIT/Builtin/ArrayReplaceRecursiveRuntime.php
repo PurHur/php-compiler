@@ -17,7 +17,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayReplace #23807 / MemoryRuntime #24058).
  * Standalone AOT compiles {@see ArrayReplaceRecursiveJitHelper} via nested JIT bridges (#14424); embed uses same PHP path.
- * SSOT: {@see \PHPCompiler\VM\HashTable::replaceRecursiveCopy()}
+ * NestedJIT: {@see \PHPCompiler\JIT\Call\HashTableReplaceRecursiveCopy} (#26977).
+ * VM SSOT: {@see \PHPCompiler\VM\HashTable::replaceRecursiveCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_recursive)
  */
 final class ArrayReplaceRecursiveRuntime

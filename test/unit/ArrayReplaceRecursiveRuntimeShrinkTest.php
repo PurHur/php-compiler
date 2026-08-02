@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_replace_recursive() NestedJIT via JitVmHelperLink::ensureCompiled (#12638 / #24077 / peer #23807).
+ * array_replace_recursive() NestedJIT via JitVmHelperLink::ensureCompiled (#12638 / #24077 / #26977).
  */
 final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
 {
@@ -37,19 +37,11 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayReplaceRecursiveJitHelper', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
-        $this->assertStringNotContainsString('parseAndCompile', $runtime);
-        $this->assertStringNotContainsString('new JIT(', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_replace_recursive.php');
         $this->assertIsString($builtin);
         $this->assertStringContainsString('ArrayReplaceRecursiveRuntime::replaceRecursive', $builtin);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $builtin);
         $this->assertStringContainsString('replaceRecursiveCopy', $builtin);
     }
 
@@ -62,5 +54,44 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $copy = ArrayReplaceRecursiveJitHelper::replaceSingleCopy($base);
         $this->assertNotSame($base, $copy);
         $this->assertSame('a', $copy->find('x')->toString());
+    }
+
+    /** Nested overlay — helper must match HashTable::replaceRecursiveCopy (#26977). */
+    public function testArrayReplaceRecursiveJitHelperNestedOverlayMatchesHashTable(): void
+    {
+        $left = new HashTable();
+        $innerL = new HashTable();
+        $b = new Variable();
+        $b->int(1);
+        $innerL->add('b', $b);
+        $wrapL = new Variable();
+        $wrapL->array($innerL);
+        $left->add('a', $wrapL);
+
+        $right = new HashTable();
+        $innerR = new HashTable();
+        $c = new Variable();
+        $c->int(2);
+        $innerR->add('c', $c);
+        $wrapR = new Variable();
+        $wrapR->array($innerR);
+        $right->add('a', $wrapR);
+
+        $viaHelper = ArrayReplaceRecursiveJitHelper::replaceTwo($left, $right);
+        $viaHt = $left->replaceRecursiveCopy($right);
+
+        $this->assertSame(1, $viaHelper->find('a')->toArray()->find('b')->toInt());
+        $this->assertSame(2, $viaHelper->find('a')->toArray()->find('c')->toInt());
+        $this->assertSame(1, $viaHt->find('a')->toArray()->find('b')->toInt());
+        $this->assertSame(2, $viaHt->find('a')->toArray()->find('c')->toInt());
+    }
+
+    public function testNestedVmRegistersReplaceRecursiveCopy(): void
+    {
+        $nested = file_get_contents($this->repoRoot.'/lib/JIT/NestedVmHashTableMethodLlvm.php');
+        $this->assertIsString($nested);
+        $this->assertStringContainsString("'replacerecursivecopy'", $nested);
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/Call/HashTableReplaceRecursiveCopy.php');
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
     }
 }

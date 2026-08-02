@@ -7,9 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * array_replace_recursive() for compiled JIT/AOT modules (#12638, php-in-PHP).
+ * array_replace_recursive() for compiled JIT/AOT modules (#12638, #26977, php-in-PHP).
  *
- * SSOT: {@see HashTable::replaceRecursiveCopy()}
+ * NestedJIT lowers {@see HashTable::replaceRecursiveCopy()} via
+ * {@see \PHPCompiler\JIT\Call\HashTableReplaceRecursiveCopy} / {@see \PHPCompiler\JIT\HashTableReplaceRecursiveLlvm}.
+ * VM SSOT: {@see HashTable::replaceRecursiveCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_recursive)
  */
 final class ArrayReplaceRecursiveJitHelper
