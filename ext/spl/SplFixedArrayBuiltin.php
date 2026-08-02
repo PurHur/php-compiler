@@ -68,6 +68,8 @@ final class SplFixedArrayBuiltin
         $entry->methods['fromarray'] = new SplFixedArrayFromArray();
         $entry->methodVisibility['fromarray'] = $pubStatic;
         $entry->methodNames['fromarray'] = 'fromArray';
+        // php-src spl_fixedarray.stub.php — fromArray(): SplFixedArray (#26793).
+        $entry->methodReturnDeclaredTypes['fromarray'] = 'SplFixedArray';
         $entry->methods['toarray'] = new SplFixedArrayToArray();
         $entry->methodVisibility['toarray'] = $pub;
         $entry->methodNames['toarray'] = 'toArray';

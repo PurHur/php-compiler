@@ -132,12 +132,82 @@ final class array_count extends Internal
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
             return ArrayCountRuntime::numElements($context, $args[0]);
         }
+        // Boxed values may hold Countable objects (SplFixedArray::fromArray result; #26793).
         if (JITVariable::TYPE_VALUE === $args[0]->type || JitValueBox::isValueOperand($args[0])) {
+            $countable = $this->tryCompileCountableCount($context, $args[0]);
+            if (null !== $countable) {
+                return $countable;
+            }
+
             return ArrayCountRuntime::numElements($context, $args[0]);
+        }
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            $countable = $this->tryCompileCountableCount($context, $args[0]);
+            if (null !== $countable) {
+                return $countable;
+            }
         }
         $this->emitCountTypeError($context, $args[0]);
 
         return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    /**
+     * count($obj) for Countable — runtime class_id dispatch (KIND_VARIABLE locals; #26793).
+     */
+    private function tryCompileCountableCount(Context $context, JITVariable $arg): ?Value
+    {
+        $candidates = [];
+        foreach ($context->type->object->allClassNamesById() as $classId => $className) {
+            $classLc = strtolower(ltrim((string) $className, '\\'));
+            if (!\in_array(
+                'countable',
+                $context->type->object->allInterfacesForClassLc($classLc),
+                true
+            )) {
+                continue;
+            }
+            $proxyName = $classLc.'::count';
+            if (!$context->functionIsRegistered($proxyName)) {
+                continue;
+            }
+            $candidates[(int) $classId] = $context->resolveFunctionProxy($proxyName);
+        }
+        // Ensure SplFixedArray is a candidate even if interface seeding lagged (#26793).
+        if (
+            $context->type->object->hasDeclaredClass('SplFixedArray')
+            && $context->functionIsRegistered('splfixedarray::count')
+        ) {
+            $sfaId = $context->type->object->lookup('SplFixedArray');
+            $candidates[$sfaId] = $context->resolveFunctionProxy('splfixedarray::count');
+        }
+        if ([] === $candidates) {
+            return null;
+        }
+        // Single candidate: call directly (avoids RuntimeIndirect class_id mismatch on
+        // KIND_VARIABLE object slots that still hold the right instance).
+        if (1 === \count($candidates)) {
+            $proxy = reset($candidates);
+            assert($proxy instanceof \PHPCompiler\JIT\Call);
+            $box = $proxy->call($context, $arg);
+            $ptr = JitValueBox::normalizeValuePtr($context, $box);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                $ptr
+            );
+        }
+        $box = (new \PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall(
+            $arg,
+            'count',
+            $candidates
+        ))->call($context, $arg);
+        $ptr = JitValueBox::normalizeValuePtr($context, $box);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $ptr
+        );
     }
 
     private function emitCountTypeError(Context $context, JITVariable $arg): void
