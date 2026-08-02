@@ -7145,7 +7145,7 @@ class InternalArgInfo
         'SplFixedArray::__construct' => ['SplFixedArray', 'size' => 'int'],
         'SplFixedArray::count' => ['int'],
         'SplFixedArray::current' => [''],
-        'SplFixedArray::fromArray' => ['object', 'data' => 'array', 'save_indexes=' => 'bool'],
+        'SplFixedArray::fromArray' => ['SplFixedArray', 'array' => 'array', 'preserveKeys=' => 'bool'],
         'SplFixedArray::getSize' => ['int'],
         'SplFixedArray::key' => ['int'],
         'SplFixedArray::next' => [''],

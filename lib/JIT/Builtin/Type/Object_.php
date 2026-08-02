@@ -3618,6 +3618,31 @@ class Object_ extends Type {
                 $this->setClassParentName($displayName, 'SplDoublyLinkedList');
             }
         }
+        if ('splfixedarray' === $lcname) {
+            // Thin AOT: `__spl_ht` packed storage for fromArray/count/ArrayAccess (#26793).
+            // php-src ext/spl/spl_fixedarray.stub.php — IteratorAggregate + ArrayAccess + Countable + JsonSerializable.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('JsonSerializable');
+            $this->setClassInterfaces($displayName, [
+                'IteratorAggregate',
+                'Traversable',
+                'ArrayAccess',
+                'Countable',
+                'JsonSerializable',
+            ]);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFixedArrayJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
+            foreach ([
+                '__construct', 'count', 'getsize', 'setsize', 'toarray', 'getiterator',
+                'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
+                'jsonserialize',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+            $this->defineMethodVisibility($id, 'fromarray', $pubStatic);
+        }
         if ('sensitiveparametervalue' === $lcname) {
             // Trace redaction marker — store wrapped arg for getValue() (#3351, #4621, #22487).
             // Private like Zend zend_exceptions.stub.php — json_encode must not leak (#23042).

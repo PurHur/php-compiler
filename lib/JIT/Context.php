@@ -1042,6 +1042,15 @@ class Context {
                 $this->functionProxies[$dllLc.'::'.$dllMethod] = new Call\SplDllistMethod($dllMethod, $dllClass);
             }
         }
+        // SplFixedArray — `__spl_ht` + fromArray / count / ArrayAccess (#26793).
+        // Seed the class so count()/ArrayAccess candidates see Countable before first use.
+        $this->type->object->lookup('SplFixedArray');
+        foreach ([
+            '__construct', 'fromArray', 'count', 'getSize',
+            'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset',
+        ] as $sfaMethod) {
+            $this->functionProxies['splfixedarray::'.strtolower($sfaMethod)] = new Call\SplFixedArrayMethod($sfaMethod);
+        }
 
         $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
         $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();
