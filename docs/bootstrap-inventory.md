@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6819 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22039 |
+| Source constructs flagged (warnings) | 22038 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5384,7 +5384,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringCountChars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringDeployPath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirRuntime.php` | 0 | 2 |
@@ -33668,20 +33668,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 126)
 - new Variable (line 128)
 - new Variable (line 291)
-- new HashTable (line 335)
-- new Variable (line 336)
+- new HashTable (line 351)
 - new Variable (line 352)
-- new Variable (line 485)
-- new HashTable (line 505)
-- new Variable (line 514)
-- new HashTable (line 531)
-- new Variable (line 533)
-- new HashTable (line 543)
-- new Variable (line 545)
+- new Variable (line 368)
+- new Variable (line 505)
+- new HashTable (line 525)
+- new Variable (line 534)
+- new HashTable (line 551)
+- new Variable (line 553)
+- new HashTable (line 563)
 - new Variable (line 565)
-- new HashTable (line 570)
-- new Variable (line 572)
-- 26 class method(s)
+- new Variable (line 585)
+- new HashTable (line 590)
+- new Variable (line 592)
+- 27 class method(s)
 
 ### `ext/standard/VmStreamContextOptions.php`
 
@@ -46267,7 +46267,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringDeployPath.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 82)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/StringDir.php`
@@ -55101,29 +55100,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 1353)
 - new Variable (line 1507)
 - new EnumCaseEntry (line 1509)
-- new self (line 2065)
-- new self (line 2237)
-- new self (line 2245)
-- new self (line 2253)
-- new self (line 2255)
-- new self (line 2512)
-- new ArithmeticError (line 2629)
-- new self (line 2649)
-- new self (line 2757)
-- new Error (line 2764)
-- new DivisionByZeroError (line 2869)
+- new self (line 2072)
+- new self (line 2244)
+- new self (line 2252)
+- new self (line 2260)
+- new self (line 2262)
+- new self (line 2519)
+- new ArithmeticError (line 2636)
+- new self (line 2656)
+- new self (line 2764)
+- new Error (line 2771)
 - new DivisionByZeroError (line 2876)
-- new self (line 2936)
-- new Error (line 2968)
-- new self (line 2989)
-- new self (line 3003)
-- new Error (line 3036)
-- new self (line 3057)
-- new self (line 3065)
-- new Error (line 3255)
-- new Error (line 3261)
-- new Error (line 3286)
-- new Error (line 3294)
+- new DivisionByZeroError (line 2883)
+- new self (line 2943)
+- new Error (line 2975)
+- new self (line 2996)
+- new self (line 3010)
+- new Error (line 3043)
+- new self (line 3064)
+- new self (line 3072)
+- new Error (line 3262)
+- new Error (line 3268)
+- new Error (line 3293)
+- new Error (line 3301)
 - 132 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
