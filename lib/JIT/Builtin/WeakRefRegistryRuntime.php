@@ -123,8 +123,47 @@ final class WeakRefRegistryRuntime
         $entry = $fn->appendBasicBlock('wr_reset_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $context->builder->call(self::helperFunction($context, self::RESET));
+        self::ensureRefGlobals($context);
+        $context->builder->store(
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->module->getNamedGlobal(self::G_REF_COUNT)
+        );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+    }
+
+    private const MAX_REFS_LLVM = 4096;
+
+    private const G_REF_COUNT = 'phpc_wr_ref_count';
+
+    private const G_REF_TARGETS = 'phpc_wr_ref_targets';
+
+    private const G_REF_SLOTS = 'phpc_wr_ref_slots';
+
+    private const G_LAST_SLOT = 'phpc_wr_last_slot';
+
+    private static function ensureRefGlobals(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        if (null === $context->module->getNamedGlobal(self::G_REF_COUNT)) {
+            $g = $context->module->addGlobal($i32, self::G_REF_COUNT);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_LAST_SLOT)) {
+            $g = $context->module->addGlobal($i8p, self::G_LAST_SLOT);
+            $g->setInitializer($i8p->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_REF_TARGETS)) {
+            $arrTy = $i8p->arrayType(self::MAX_REFS_LLVM);
+            $g = $context->module->addGlobal($arrTy, self::G_REF_TARGETS);
+            $g->setInitializer($arrTy->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_REF_SLOTS)) {
+            $arrTy = $i8p->arrayType(self::MAX_REFS_LLVM);
+            $g = $context->module->addGlobal($arrTy, self::G_REF_SLOTS);
+            $g->setInitializer($arrTy->constNull());
+        }
     }
 
     private static function implementRegisterRefBridge(Context $context): void
@@ -137,18 +176,64 @@ final class WeakRefRegistryRuntime
             return;
         }
 
+        self::ensureRefGlobals($context);
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('wr_reg_ref_bridge_entry');
+        $entry = $fn->appendBasicBlock('wr_reg_ref_entry');
+        $done = $fn->appendBasicBlock('wr_reg_ref_done');
+        $checkSlot = $fn->appendBasicBlock('wr_reg_ref_check_slot');
+        $checkCap = $fn->appendBasicBlock('wr_reg_ref_check_cap');
+        $store = $fn->appendBasicBlock('wr_reg_ref_store');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(
-            self::helperFunction($context, self::REGISTER_REF),
-            $context->builder->pointerCast($fn->getParam(0), $i64),
-            $context->builder->pointerCast($fn->getParam(1), $i64)
+
+        $target = $fn->getParam(0);
+        $slot = $fn->getParam(1);
+        $null = $i8p->constNull();
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $target, $null),
+            $done,
+            $checkSlot
         );
+        $context->builder->positionAtEnd($checkSlot);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $slot, $null),
+            $done,
+            $checkCap
+        );
+        $context->builder->positionAtEnd($checkCap);
+        $countPtr = $context->module->getNamedGlobal(self::G_REF_COUNT);
+        $count = $context->builder->load($countPtr);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_SGE,
+                $count,
+                $i32->constInt(self::MAX_REFS_LLVM, false)
+            ),
+            $done,
+            $store
+        );
+        $context->builder->positionAtEnd($store);
+        $targets = $context->module->getNamedGlobal(self::G_REF_TARGETS);
+        $slots = $context->module->getNamedGlobal(self::G_REF_SLOTS);
+        $zero = $context->context->int32Type()->constInt(0, false);
+        $context->builder->store(
+            $target,
+            $context->builder->gep($targets, $zero, $count)
+        );
+        $context->builder->store(
+            $slot,
+            $context->builder->gep($slots, $zero, $count)
+        );
+        $context->builder->store($slot, $context->module->getNamedGlobal(self::G_LAST_SLOT));
+        $context->builder->store(
+            $context->builder->add($count, $i32->constInt(1, false)),
+            $countPtr
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -373,17 +458,92 @@ final class WeakRefRegistryRuntime
             return;
         }
 
+        self::ensureRefGlobals($context);
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($voidTy, false, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('wr_clear_bridge_entry');
+
+        $entry = $fn->appendBasicBlock('wr_clear_entry');
+        $nullLast = $fn->appendBasicBlock('wr_clear_null_last');
+        $loopHead = $fn->appendBasicBlock('wr_clear_loop');
+        $body = $fn->appendBasicBlock('wr_clear_body');
+        $match = $fn->appendBasicBlock('wr_clear_match');
+        $next = $fn->appendBasicBlock('wr_clear_next');
+        $done = $fn->appendBasicBlock('wr_clear_done');
+
+        $null = $i8p->constNull();
+        $zero32 = $i32->constInt(0, false);
+        $one32 = $i32->constInt(1, false);
+
+        $nullSlot = static function (Value $slot) use ($context, $null): void {
+            // Slot arg is the object's void** property pointer — null the indirection
+            // so __object__load_value_slot takes the null path (#26795).
+            $voidpp = $context->getTypeFromString('void**');
+            $voidp = $context->getTypeFromString('void*');
+            $context->builder->store(
+                $voidp->constNull(),
+                $context->builder->pointerCast($slot, $voidpp)
+            );
+        };
+
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(
-            self::helperFunction($context, self::CLEAR_OBJECT),
-            $context->builder->pointerCast($fn->getParam(0), $i64)
+        $target = $fn->getParam(0);
+        $lastSlot = $context->builder->load($context->module->getNamedGlobal(self::G_LAST_SLOT));
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $lastSlot, $null),
+            $loopHead,
+            $nullLast
         );
+
+        $context->builder->positionAtEnd($nullLast);
+        $nullSlot($lastSlot);
+        $context->builder->store($null, $context->module->getNamedGlobal(self::G_LAST_SLOT));
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->phi($i32);
+        $idx->addIncoming($zero32, $entry);
+        $idx->addIncoming($zero32, $nullLast);
+        $count = $context->builder->load($context->module->getNamedGlobal(self::G_REF_COUNT));
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $idx, $count),
+            $body,
+            $done
+        );
+
+        $context->builder->positionAtEnd($body);
+        $zero = $context->context->int32Type()->constInt(0, false);
+        $targets = $context->module->getNamedGlobal(self::G_REF_TARGETS);
+        $slots = $context->module->getNamedGlobal(self::G_REF_SLOTS);
+        $t = $context->builder->load($context->builder->gep($targets, $zero, $idx));
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $t, $target),
+            $match,
+            $next
+        );
+
+        $context->builder->positionAtEnd($match);
+        $slot = $context->builder->load($context->builder->gep($slots, $zero, $idx));
+        $doNull = $fn->appendBasicBlock('wr_clear_do_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $slot, $null),
+            $doNull,
+            $next
+        );
+        $context->builder->positionAtEnd($doNull);
+        $nullSlot($slot);
+        $context->builder->store($null, $context->builder->gep($targets, $zero, $idx));
+        $context->builder->store($null, $context->builder->gep($slots, $zero, $idx));
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($next);
+        $nextIdx = $context->builder->add($idx, $one32);
+        $idx->addIncoming($nextIdx, $next);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }

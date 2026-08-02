@@ -453,6 +453,16 @@ class Refcount extends Builtin {
                     $destroyBlock = $parentFn->appendBasicBlock('delref_destroy');
                     $this->context->builder->branchIf($deferDestroy, $deferBlock, $destroyBlock);
                     $this->context->builder->positionAtEnd($deferBlock);
+                    // {main} defers free until shutdown (#4013), but WeakReference::get must
+                    // observe null as soon as the referent refcount hits 0 (#26795).
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('phpc_weakref_clear_object_typed'),
+                        $this->context->builder->pointerCast(
+                            $refVirtual,
+                            $this->context->getTypeFromString('int8*')
+                        ),
+                        $typeinfo
+                    );
                     $this->context->builder->returnVoid();
                     $this->context->builder->positionAtEnd($destroyBlock);
                     $this->context->builder->call(

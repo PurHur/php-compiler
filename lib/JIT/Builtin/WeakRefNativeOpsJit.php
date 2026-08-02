@@ -26,9 +26,15 @@ final class WeakRefNativeOpsJit
             self::i64FromVar($context, $slotPtr),
             $valuePtr
         );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $slotAsValue
+        // Weak referent slots are non-refcounted (zend_weakrefs.c / VM clearWeakTarget).
+        // Do not __value__writeNull — that valueDelrefs and would double-free (#26795).
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(
+                \PHPCompiler\JIT\Variable::TYPE_NULL,
+                false
+            ),
+            $context->builder->structGep($slotAsValue, $valueMap['type'])
         );
     }
 

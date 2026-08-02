@@ -122,10 +122,12 @@ class Refcount extends Builtin {
                         if (($typeinfo & $objMask) != 0) {
                             phpc_destruct_try_invoke((int8*) $refVirtual);
                         }
+                        // Clear WeakReference slots when refcount hits 0 even if {main}
+                        // defers free until shutdown (#4013 / #26795).
+                        phpc_weakref_clear_object_typed((__object__*) $refVirtual, $typeinfo);
                         if (!$allow) {
                             return;
                         }
-                        phpc_weakref_clear_object_typed((__object__*) $refVirtual, $typeinfo);
                         phpc_gc_unregister((__object__*) $refVirtual);
                         free $refVirtual;
                     }
