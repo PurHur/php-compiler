@@ -5,38 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_utf8_strlen / __compiler_utf8_valid via Utf8JitHelper PHP (#9246, #9273, #25836).
+ * JIT/AOT link for __compiler_utf8_strlen / __compiler_utf8_valid (#9246, #9273, #27051).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer PosixTimes #25600 / MathModf #22519).
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Thin AOT cannot use NestedJIT Utf8JitHelper→VmString: that path treats {@see __string__*}
+ * args as boxed {@see __value__*} and returns 0 (#27051). ABI bodies are LLVM walks on
+ * {@see __string__*} ({@see StringUtf8StrlenJit} / {@see StringUtf8ValidJit}); PHP SSOT remains
+ * {@see \PHPCompiler\ext\standard\VmString} / {@see \PHPCompiler\ext\standard\Utf8JitHelper}.
  * php-src: ext/standard/utf8.c, ext/mbstring/mbstring.c
  */
 final class StringUtf8Runtime
 {
-    private const HELPER_PATH = '/ext/standard/Utf8JitHelper.php';
-
-    private const STRLEN_HELPER = 'PHPCompiler\\ext\\standard\\Utf8JitHelper::utf8CharLength';
-
-    private const VALID_HELPER = 'PHPCompiler\\ext\\standard\\Utf8JitHelper::isValidUtf8';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::STRLEN_HELPER,
-        self::VALID_HELPER,
-    ];
-
-    /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        '__compiler_utf8_strlen',
-        '__compiler_utf8_valid',
-    ];
-
     public static function ensureLinked(Context $context): void
     {
         $resume = null;
@@ -79,87 +60,7 @@ final class StringUtf8Runtime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_utf8_strlen');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementBridge($context, '__compiler_utf8_strlen', self::STRLEN_HELPER, 0);
-        self::implementBridge($context, '__compiler_utf8_valid', self::VALID_HELPER, 1);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementBridge(
-        Context $context,
-        string $abiName,
-        string $helperLogical,
-        int $nullReturn
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($i64, false, $strPtr)
-            );
-
-        $entry = $fn->appendBasicBlock('utf8_bridge_entry');
-        $nullBb = $fn->appendBasicBlock('utf8_bridge_null');
-        $workBb = $fn->appendBasicBlock('utf8_bridge_work');
-        $context->builder->positionAtEnd($entry);
-
-        $input = $fn->getParam(0);
-        $nullStr = $strPtr->constNull();
-        $nullRet = $i64->constInt($nullReturn, false);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $input, $nullStr);
-        $context->builder->branchIf($isNull, $nullBb, $workBb);
-
-        $context->builder->positionAtEnd($nullBb);
-        $context->builder->returnValue($nullRet);
-
-        $context->builder->positionAtEnd($workBb);
-        $result = $context->builder->call(self::helperFunction($context, $helperLogical), $input);
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#25836');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#25836'
-        );
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (self::ABI_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after StringUtf8Runtime bridge (#9273)');
-            }
-            $context->registerFunction($name, $fn);
-        }
+        StringUtf8StrlenJit::implement($context);
+        StringUtf8ValidJit::implement($context);
     }
 }

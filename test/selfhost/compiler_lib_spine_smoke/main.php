@@ -5308,6 +5308,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrldecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrlencode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Latin1.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8StrlenJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8ValidJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Runtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarDump.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExport.php';

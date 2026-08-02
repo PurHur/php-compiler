@@ -94,6 +94,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/SleepJitHelper.php',
         'ext/ctype/CtypeJitHelper.php',
         'lib/JIT/Builtin/CtypeRuntime.php',
+        'lib/JIT/Builtin/StringUtf8StrlenJit.php',
+        'lib/JIT/Builtin/StringUtf8ValidJit.php',
         'lib/JIT/Builtin/StringUtf8Runtime.php',
         'lib/JIT/Builtin/StringHrtimeRuntime.php',
         'lib/JIT/Builtin/StringGetrusageRuntime.php',
