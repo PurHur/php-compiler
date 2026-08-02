@@ -1064,12 +1064,13 @@ class Module extends ModuleAbstract
         try {
             $context->lookupFunction('phpc_basetozval_result');
         } catch (\Throwable $e) {
-            $charPtr = $context->getTypeFromString('char*');
+            // `__string__*` ABI — NestedJIT-safe (peer #26884); was char*/i8* + strlen init.
+            $strPtr = $context->getTypeFromString('__string__*');
             $i64 = $context->getTypeFromString('int64');
             $i64Ptr = $context->getTypeFromString('int64*');
             $doublePtr = $context->getTypeFromString('double*');
             $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $charPtr, $i64, $i64Ptr, $doublePtr);
+            $ft = $context->context->functionType($i32, false, $strPtr, $i64, $i64Ptr, $doublePtr);
             $fn = $context->module->addFunction('phpc_basetozval_result', $ft);
             $context->registerFunction('phpc_basetozval_result', $fn);
         }

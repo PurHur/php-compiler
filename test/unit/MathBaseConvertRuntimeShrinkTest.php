@@ -28,12 +28,31 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathBaseConvertRuntime.php');
         $this->assertStringContainsString('MathBaseConvertJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive()', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('emitBaseToZvalCore', $source);
         $this->assertStringNotContainsString('emitDigitValue', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
-        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(380, \substr_count($source, "\n") + 1);
+    }
+
+    /** NestedJIT must not call VmMath — thin AOT stubs that to null (#26884). */
+    public function testMathBaseConvertJitHelperIsNestedJitSafeInline(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/MathBaseConvertJitHelper.php');
+        $this->assertStringContainsString('radixDigitChar', $source);
+        $this->assertStringContainsString('parseRec', $source);
+        $this->assertStringContainsString('substr(', $source);
+        $this->assertDoesNotMatchRegularExpression('/VmMath::\w+\s*\(/', $source);
+        $this->assertStringNotContainsString('ctype_space', $source);
+        $this->assertStringNotContainsString('ctype_digit', $source);
+        $this->assertStringNotContainsString('sprintf(', $source);
+        $this->assertStringNotContainsString('\\ord(', $source);
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathBaseConvertRuntime.php');
+        $this->assertStringNotContainsString('stringFromCstr', $runtime);
     }
 
     public function testMathBaseConvertJitHelperMatchesVmMath(): void

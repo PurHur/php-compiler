@@ -61,10 +61,7 @@ final class hexdec extends Internal
 
         return MathBaseConvert::baseToZvalCall(
             $context,
-            $this->stringDataPtr(
-                $context,
-                self::jitStringArg($context, $args[0])
-            ),
+            self::jitStringArg($context, $args[0]),
             16
         );
     }

@@ -75,7 +75,6 @@ final class base_convert_ extends Internal
             );
         }
         MathBaseConvert::ensureLinked($context);
-        $ptr = $this->stringDataPtr($context, $num);
         $fromBase = $context->callerStrictTypes
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'base_convert', 2, 'from_base')
             : JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'base_convert', 2, 'from_base');
@@ -84,6 +83,6 @@ final class base_convert_ extends Internal
             : JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'base_convert', 3, 'to_base');
         $fn = $context->lookupFunction('phpc_base_convert');
 
-        return $context->builder->call($fn, $ptr, $fromBase, $toBase);
+        return $context->builder->call($fn, $num, $fromBase, $toBase);
     }
 }
