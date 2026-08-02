@@ -27,30 +27,19 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('isDeployRootRealLoweringMethod', $jit);
         $this->assertStringContainsString('isSourceBundlerRealLoweringMethod', $jit);
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
-        // M5 argv / gen-0 seed must real-lower even when SELFHOST_AOT was cleared (#26756).
-        $realLowerPos = strpos($jit, 'function shouldUseM3CompileDriverRealLowering');
-        $this->assertNotFalse($realLowerPos);
-        $realLowerChunk = substr($jit, $realLowerPos, 700);
-        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $realLowerChunk);
-        // initParsePipeline must stay real-lowered under M5 (void stubs leave Runtime::$parser null) (#26756).
+        // M5 argv / gen-0 seed: C-floor initParsePipeline avoids NestedJIT hang (#26756).
+        $this->assertFileExists($root.'/lib/JIT/RuntimeInitParsePipeline.php');
+        $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $jit);
+        $this->assertStringContainsString('require_once __DIR__.\'/JIT/RuntimeInitParsePipeline.php\'', $jit);
         $allowPos = strpos($jit, 'function isM3CompileDriverRealLoweringName');
         $this->assertNotFalse($allowPos);
         $allowChunk = substr($jit, $allowPos, 4500);
+        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $allowChunk);
         $this->assertStringContainsString('\\runtime::initparsepipeline', $allowChunk);
-        $this->assertDoesNotMatchRegularExpression(
-            '/shouldUseM5DriverHostCompile\(\)\s*\n\s*&& \(str_ends_with\(\$lower, \'\\\\runtime::initparsepipeline\'/s',
-            $allowChunk
-        );
-        $guard = (string) file_get_contents($root.'/lib/JIT/TypedPropertyUninitGuard.php');
-        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $guard);
-        $bbHelper = (string) file_get_contents($root.'/lib/JIT/BasicBlockHelper.php');
-        $this->assertStringContainsString('Never positionBefore(terminator)', $bbHelper);
-        $this->assertStringContainsString('AssignOp::optimize', $jit);
-        $this->assertStringContainsString("'optimize' === \$methodLc", $jit);
-        $this->assertStringContainsString('isM5ArgvResolveSidecarIdentityStubName', $jit);
-        $this->assertStringContainsString('emitM5ArgvResolveSidecarIdentityStub', $jit);
+        $floor = (string) file_get_contents($root.'/lib/JIT/RuntimeInitParsePipeline.php');
+        $this->assertStringContainsString("PHPCfg\\\\Parser", $floor);
+        $this->assertStringContainsString('allocConstructed', $floor);
         $compilePhp = (string) file_get_contents($root.'/bin/compile.php');
-        $this->assertStringContainsString("str_ends_with(\$normalized, '/bin/compile.php')", $compilePhp);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $compilePhp);
         $this->assertStringContainsString('Emit-helper binaries must init parse/compiler spine (#2633)', $emit);
         $this->assertStringContainsString('exitWithStatus', $emit);

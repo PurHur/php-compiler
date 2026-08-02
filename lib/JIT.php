@@ -15,6 +15,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
+require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
 require_once __DIR__.'/JIT/VmDriverExecuteNative.php';
@@ -135,12 +136,7 @@ class JIT {
             && (null !== $this->m3EmitTuMainBlock || null !== $this->m3CompileDriverMainBlock)
         ) {
             $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
-            // Stub-only inventory argv may pre-declare null parse/compileEmitSmoke.
-            // Real-lower / M5 argv seed must not — null LLVM entry blocks poison later
-            // Runtime.php lowering (#26756 / re-#23468).
-            if ($this->shouldEnsureInventoryArgvParseHelperStubs()
-                && !$this->shouldRealLowerInventoryArgvParseSpine()
-            ) {
+            if ($this->shouldEnsureInventoryArgvParseHelperStubs()) {
                 $this->ensureM3EmitTuRuntimeParseSpineDeps();
                 $inventoryArgvStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
                 if (null !== $inventoryArgvStubBlock) {
@@ -174,9 +170,7 @@ class JIT {
                 );
             }
             $parseLc = 'phpcompiler\\runtime::parse';
-            if (!isset($this->context->functions[$parseLc])
-                && !$this->shouldRealLowerInventoryArgvParseSpine()
-            ) {
+            if (!isset($this->context->functions[$parseLc])) {
                 $this->emitM3EmitTuRuntimeParseStubNative(
                     $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
                     'PHPCompiler\\Runtime::parse',
@@ -1416,12 +1410,6 @@ class JIT {
      */
     private function shouldRealLowerInventoryArgvParseSpine(): bool
     {
-        // M5 argv / gen-0 seed: force real parse spine even when M4 bin/compile.php
-        // inventory-emit-for-block is false (#26756 / re-#23468).
-        if ($this->shouldUseM5DriverHostCompile() && $this->shouldUseM3CompileDriverRealLowering()) {
-            return true;
-        }
-
         return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM3CompileDriverRealLowering();
     }
 
@@ -1595,17 +1583,12 @@ class JIT {
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
     private function shouldUseM3CompileDriverRealLowering(): bool
     {
-        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
-        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+        if (!$this->shouldUseSelfHostJitStubs()) {
             return false;
         }
-        // M5 argv / gen-0 seed: keep compile-driver allowlist even if user-script AOT
-        // briefly cleared SELFHOST_AOT (#26756 / re-#23468).
-        if ($this->shouldUseM5DriverHostCompile()) {
-            return true;
-        }
+        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
 
-        return $this->shouldUseSelfHostJitStubs();
+        return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
@@ -1733,11 +1716,10 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
             return true;
         }
-        // M5 argv diagnostics stay on void/null stubs; initParsePipeline must remain real-lowered
-        // so Runtime::$parser is initialized (void init* stubs make functional smoke impossible) (#26756).
+        // M5 argv: C-floor initParsePipeline (compileRuntimeInitParsePipelineM3Native) —
+        // NestedJIT of the PHP CFG hung Zend rebuilds for hours (#26756).
         if ($this->shouldUseM5DriverHostCompile()
-            && (str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')
-                || str_ends_with($lower, '\\runtime::peeklastparsefailure'))
+            && str_ends_with($lower, '\\runtime::initparsepipeline')
         ) {
             return false;
         }
@@ -1883,15 +1865,6 @@ class JIT {
         }
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
-        }
-        // M5 argv / gen-0 seed: ResolveSidecarJitHelper NestedJIT explodes (no phpc_str_replace
-        // under NestedJitCompileScope; helper unit failed.json) — identity path stubs (#26756).
-        if (
-            $this->shouldUseM5DriverHostCompile()
-            && null !== $logicalName
-            && $this->isM5ArgvResolveSidecarIdentityStubName(strtolower($logicalName))
-        ) {
-            return $this->emitM5ArgvResolveSidecarIdentityStub($internalName, $logicalName, $block);
         }
         // M5 bootstrap sidecar: CLI entry scripts under `PHP_COMPILER_SELFHOST_AOT=1` only need a
         // linkable bundle; stub {main} to avoid LLVM 9 crashing while lowering argv driver chains
@@ -2657,7 +2630,6 @@ class JIT {
             ];
             if (in_array($methodLc, $inventoryEmitSpine, true)) {
                 // Real argv parse spine needs ctor/init; standalone stays stubbed (#15597).
-                // Do not void-stub initParsePipeline under M5 — seed would lack $parser (#26756).
                 if ($this->shouldRealLowerInventoryArgvParseSpine() && 'standalone' !== $methodLc) {
                     return false;
                 }
@@ -2787,6 +2759,41 @@ class JIT {
         $lcname = strtolower($logicalName);
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
+        }
+        // M5 argv / gen-0 seed: C-floor like initCompiler — NestedJIT of Runtime.php
+        // initParsePipeline hung Zend rebuilds for hours (#26756 / re-#23468).
+        if ($this->shouldUseM5DriverHostCompile()) {
+            $objectPtr = $this->context->getTypeFromString('__object__*');
+            $func = $this->context->module->addFunction(
+                $this->llvmInternalName($internalName),
+                $this->context->context->functionType(
+                    $this->context->getTypeFromString('void'),
+                    false,
+                    $objectPtr
+                )
+            );
+            $bb = $func->appendBasicBlock('entry');
+            $saved = $this->context->builder;
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
+            JIT\RuntimeInitParsePipeline::emit(
+                $this->context,
+                $this->context->type->object,
+                $func->getParam(0)
+            );
+            $this->context->builder->returnVoid();
+            $this->context->builder->clearInsertionPosition();
+            $this->context->builder = $saved;
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = 'void';
+            $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+                $func,
+                $logicalName,
+                [$objectPtr],
+                $this->collectParamDefaults($block)
+            );
+
+            return $func;
         }
         if ($this->shouldUseM3EmitTuNativeBridge()
             || $this->shouldUseM3CompileDriverRealLowering()
@@ -2935,61 +2942,6 @@ class JIT {
             $logicalName,
             [$objectPtr],
             $this->collectParamDefaults($block)
-        );
-
-        return $func;
-    }
-
-    /**
-     * ResolveSidecarJitHelper path remap — identity is enough for gen-0 argv functional smoke
-     * (never-seen scripts use live paths). Avoids NestedJIT IR blow-up (#26756 / #23970).
-     */
-    private function isM5ArgvResolveSidecarIdentityStubName(string $lower): bool
-    {
-        return str_contains($lower, '\\resolvesidecarjithelper::');
-    }
-
-    private function emitM5ArgvResolveSidecarIdentityStub(
-        string $internalName,
-        string $logicalName,
-        Block $block
-    ): PHPLLVM\Value {
-        $lcname = strtolower($logicalName);
-        if (isset($this->context->functions[$lcname])) {
-            return $this->context->functions[$lcname];
-        }
-        $args = $this->normalizeSelfHostNativeCallArgTypes(
-            $this->collectStubFunctionArgTypes($block),
-            $logicalName
-        );
-        $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__value__';
-        $returnType = $this->context->getTypeFromString($callbackType);
-        $func = $this->context->module->addFunction(
-            $this->llvmInternalName($internalName),
-            $this->context->context->functionType($returnType, false, ...$args)
-        );
-        $bb = $func->appendBasicBlock('m5_argv_resolve_sidecar_identity');
-        $saved = $this->context->builder;
-        $savedActive = $this->context->activeFunction;
-        $this->context->builder = $this->context->context->builderCreate();
-        $this->context->builder->positionAtEnd($bb);
-        $this->context->functions[$lcname] = $func;
-        $this->context->activeFunction = $lcname;
-        $defaultArgs = $this->collectParamDefaults($block);
-        if ($func->countParams() > 0) {
-            $this->context->builder->returnValue($func->getParam(0));
-        } else {
-            $this->emitSelfHostStubReturn($callbackType, $func);
-        }
-        $this->context->builder->clearInsertionPosition();
-        $this->context->builder = $saved;
-        $this->context->activeFunction = $savedActive;
-        $this->context->functionReturnType[$lcname] = $callbackType;
-        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
-            $func,
-            $logicalName,
-            $args,
-            $defaultArgs
         );
 
         return $func;
@@ -4628,10 +4580,6 @@ class JIT {
             if (isset($this->context->functions[$spineLcKey]) || null === $stubBlock) {
                 continue;
             }
-            // Do not install null stubs that poison later Runtime.php lowering (#26756).
-            if ('parse' === $spineLc && $this->shouldRealLowerInventoryArgvParseSpine()) {
-                continue;
-            }
             if ('parse' === $spineLc) {
                 $this->emitM3EmitTuRuntimeParseStubNative(
                     $this->llvmInternalName($spineLogical),
@@ -4682,28 +4630,17 @@ class JIT {
         }
         $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         $this->ensureM3EmitTuRuntimeParseSpineDeps();
-        // Void Optimizer/AssignOp::optimize before host-lowering compileEmitSmoke (#11809, #26756).
-        $this->ensureM3EmitTuInventoryArgvVmOptimizerStub();
         $emitHelperStubMethods = [];
         if ($this->shouldStubInventoryEmitParseCompileSpine()) {
             $emitHelperStubMethods = ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
         } elseif ($this->shouldRealLowerInventoryArgvParseSpine()) {
-            // Inventory argv: real-lower parse; preprocess helpers stay CFG stubs (#11809).
-            // Keep compileEmitSmoke stubbed — full CFG hits object::optimize() under NestedJIT (#26756).
-            // M5 argv: also skip PHP CFG for init*/diagnostics (native RuntimeEmitTuInit / void stubs);
-            // host-lowering initParsePipeline hung the Zend rebuild for hours (#26756).
-            $emitHelperStubMethods = [
-                'preparesourceforparser',
-                'preprocesssourceforparse',
-                'rewritesourcebeforeparser',
-                'compileemitsmoke',
-            ];
+            // Inventory argv: real-lower parse only; preprocess helpers stay CFG stubs (#11809).
+            $emitHelperStubMethods = ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
             if ($this->shouldUseM5DriverHostCompile()) {
-                // Diagnostics only — keep initParsePipeline / initCompiler / loadCoreModules real (#26756).
-                $emitHelperStubMethods = array_merge($emitHelperStubMethods, [
-                    'noteparsecompilenullforscript',
-                    'peeklastparsefailure',
-                ]);
+                // C-floor initParsePipeline via compileRuntimeInitParsePipelineM3Native (#26756).
+                $emitHelperStubMethods[] = 'initparsepipeline';
+                $emitHelperStubMethods[] = 'noteparsecompilenullforscript';
+                $emitHelperStubMethods[] = 'peeklastparsefailure';
             }
         }
         $inventoryEmitHelper = $this->shouldStubM3InventoryEmitJitSpineMethods();
@@ -4727,9 +4664,7 @@ class JIT {
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
-        // M5 argv seed host-lowers Runtime::parse first; emitting the sidecar standalone
-        // stub here runQueues mid-parse and fatals on a null LLVM insert block (#26756).
-        if ($sidecar && null !== $this->m3EmitTuMainBlock && !$this->shouldUseM5DriverHostCompile()) {
+        if ($sidecar && null !== $this->m3EmitTuMainBlock) {
             $this->emitM3EmitTuRuntimeStandaloneStubNative(
                 $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
                 'PHPCompiler\\Runtime::standalone',
@@ -4738,13 +4673,6 @@ class JIT {
         }
         if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
             $this->runQueue();
-        }
-        if ($sidecar && null !== $this->m3EmitTuMainBlock && $this->shouldUseM5DriverHostCompile()) {
-            $this->emitM3EmitTuRuntimeStandaloneStubNative(
-                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
-                'PHPCompiler\\Runtime::standalone',
-                $this->m3EmitTuMainBlock
-            );
         }
     }
 
@@ -5098,44 +5026,35 @@ class JIT {
     /** Inventory argv: AssignOp::optimize is link-only on compileEmitSmoke spine (#11809). */
     private function ensureM3EmitTuInventoryArgvVmOptimizerStub(): void
     {
-        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+        if (!$this->shouldUseM3InventoryEmitDriver() || !$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
-        // M5 argv / gen-0 seed real-lowers compileEmitSmoke even when inventory-emit
-        // classification flickers; still need void optimize() stubs (#26756).
-        if (!$this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseM5DriverHostCompile()) {
+        $logical = 'PHPCompiler\\VM\\Optimizer::optimize';
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
             return;
         }
         $objectPtr = $this->context->getTypeFromString('__object__*');
         $voidTy = $this->context->getTypeFromString('void');
-        foreach ([
-            'PHPCompiler\\VM\\Optimizer::optimize',
-            'PHPCompiler\\VM\\Optimizer\\AssignOp::optimize',
-        ] as $logical) {
-            $lc = strtolower($logical);
-            if (isset($this->context->functions[$lc])) {
-                continue;
-            }
-            $func = $this->context->module->addFunction(
-                $this->llvmInternalName($logical),
-                $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
-            );
-            $bb = $func->appendBasicBlock('entry');
-            $saved = $this->context->builder;
-            $this->context->builder = $this->context->context->builderCreate();
-            $this->context->builder->positionAtEnd($bb);
-            $this->context->builder->returnVoid();
-            $this->context->builder->clearInsertionPosition();
-            $this->context->builder = $saved;
-            $this->context->functions[$lc] = $func;
-            $this->context->functionReturnType[$lc] = 'void';
-            $this->context->functionProxies[$lc] = new JIT\Call\Native(
-                $func,
-                $logical,
-                [$objectPtr, $objectPtr],
-                []
-            );
-        }
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($logical),
+            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lc] = $func;
+        $this->context->functionReturnType[$lc] = 'void';
+        $this->context->functionProxies[$lc] = new JIT\Call\Native(
+            $func,
+            $logical,
+            [$objectPtr, $objectPtr],
+            []
+        );
     }
 
     /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
@@ -6310,13 +6229,6 @@ class JIT {
         ) {
             return $this->emitM3EmitTuRuntimeBlockPtrStubNative($internalName, $logicalName, $block);
         }
-        // M5 argv diagnostics — void/null stubs (not PHP CFG) (#26756).
-        if (str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')) {
-            return $this->emitM3EmitTuRuntimeTwoObjectVoidStub($internalName, $logicalName, $block);
-        }
-        if (str_ends_with($lower, '\\runtime::peeklastparsefailure')) {
-            return $this->emitM3EmitTuCompilerNullStringGetterStub($internalName, $logicalName, $block);
-        }
 
         throw new \LogicException('Unhandled M3 emit TU Runtime spine: '.$logicalName);
     }
@@ -6722,10 +6634,10 @@ class JIT {
         }
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
-        // Inventory emit OR M5 argv seed real-lower: host-parse lib/Runtime.php (#2967, #26756).
-        // M4 bin/compile.php + M5_DRIVER_HOST can have shouldRealLower true while
-        // shouldUseM3InventoryEmitDriver() is false — still need the Runtime.php path.
-        if ($this->shouldUseM3InventoryEmitDriver() || $this->shouldRealLowerInventoryArgvParseSpine()) {
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        if ($this->shouldUseM3InventoryEmitDriver()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
             if (in_array($methodLc, [
@@ -6737,59 +6649,12 @@ class JIT {
                 'peeklastparsefailure',
                 'noteparsecompilenullforscript',
             ], true)) {
-                // M5 argv seed: keep diagnostics on void/null stubs — host CFG is unnecessary
-                // and noteParseCompileNullForScript had no spine-stub handler (#26756).
-                if ($this->shouldUseM5DriverHostCompile()
-                    && in_array($methodLc, [
-                        'noteparsecompilenullforscript',
-                        'peeklastparsefailure',
-                        'compileemitsmoke',
-                        'preprocesssourceforparse',
-                        'rewritesourcebeforeparser',
-                    ], true)
-                ) {
-                    $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
-                    if (null === $stubBlock) {
-                        return;
-                    }
-                    if ('noteparsecompilenullforscript' === $methodLc) {
-                        $this->emitM3EmitTuRuntimeTwoObjectVoidStub(
-                            $this->llvmInternalName($logical),
-                            $logical,
-                            $stubBlock
-                        );
-                    } elseif ('peeklastparsefailure' === $methodLc) {
-                        $this->emitM3EmitTuCompilerNullStringGetterStub(
-                            $this->llvmInternalName($logical),
-                            $logical,
-                            $stubBlock
-                        );
-                    } elseif ('compileemitsmoke' === $methodLc) {
-                        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
-                            $this->llvmInternalName($logical),
-                            $logical,
-                            $stubBlock
-                        );
-                    } else {
-                        // Identity preprocess/rewrite CFG stubs (#11809 / #26756).
-                        $this->compileSkippedCompilerSplitCfgStub(
-                            $this->llvmInternalName($logical),
-                            $stubBlock,
-                            $logical
-                        );
-                    }
-
-                    return;
-                }
                 if ($this->shouldRealLowerInventoryArgvParseSpine()) {
-                    // Drop map entry so Runtime.php lowering can run; early null stubs must not win (#26756).
                     unset(
                         $this->context->functions[$lc],
                         $this->context->functionReturnType[$lc],
                         $this->context->functionProxies[$lc]
                     );
-                } elseif (isset($this->context->functions[$lc])) {
-                    return;
                 }
                 $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
                 if (!isset($this->context->functions[$lc])) {
@@ -6797,9 +6662,6 @@ class JIT {
                 }
             }
 
-            return;
-        }
-        if (isset($this->context->functions[$lc])) {
             return;
         }
         foreach ($this->context->runtime->modules as $module) {
@@ -6870,11 +6732,7 @@ class JIT {
             }
             $compiled = $this->context->runtime->compileFunc($logical, $cfgFunc);
             if ($compiled instanceof CoreFunc\PHP) {
-                // Isolate builder/block maps — host-lowering Runtime.php mid argv compile
-                // otherwise leaves parentless instructions at module verify (#26756).
-                JIT\NestedJitCompileScope::run($this->context, function () use ($compiled, $logical): void {
-                    $this->compileBlock($compiled->block, $logical);
-                });
+                $this->compileBlock($compiled->block, $logical);
             }
 
             return;
@@ -6906,9 +6764,7 @@ class JIT {
                 }
                 $compiled = $this->context->runtime->compileFunc($logical, $bodyChild->func);
                 if ($compiled instanceof CoreFunc\PHP) {
-                    JIT\NestedJitCompileScope::run($this->context, function () use ($compiled, $logical): void {
-                        $this->compileBlock($compiled->block, $logical);
-                    });
+                    $this->compileBlock($compiled->block, $logical);
                 }
                 $this->context->scope->classId = $savedClassId;
                 $this->context->scope->className = $savedClassName;
@@ -18631,28 +18487,6 @@ class JIT {
                 $this->context->scope->args = [$receiverVar];
 
                 return;
-            }
-            // Runtime::compileEmitSmoke calls $assignOpResolver->optimize(); typed property can
-            // collapse to object during M5 argv host-lower — bind the void Optimizer stub (#26756).
-            if (
-                'optimize' === $methodLc
-                && (
-                    $this->shouldUseM5DriverHostCompile()
-                    || $this->shouldUseM3InventoryEmitDriver()
-                )
-            ) {
-                $this->ensureM3EmitTuInventoryArgvVmOptimizerStub();
-                foreach ([
-                    'phpcompiler\\vm\\optimizer\\assignop::optimize',
-                    'phpcompiler\\vm\\optimizer::optimize',
-                ] as $optProxy) {
-                    if (isset($this->context->functionProxies[$optProxy])) {
-                        $this->context->scope->toCall = $this->context->functionProxies[$optProxy];
-                        $this->context->scope->args = [$receiverVar];
-
-                        return;
-                    }
-                }
             }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
