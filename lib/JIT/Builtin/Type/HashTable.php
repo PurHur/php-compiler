@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin\Type;
 
+use PHPCompiler\JIT\JitStringCompare;
+
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Builtin\Type;
@@ -740,12 +742,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_set_update');
         $next = $fn->appendBasicBlock('strkey_set_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -850,12 +847,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_ht_update');
         $next = $fn->appendBasicBlock('strkey_ht_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -961,12 +953,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_obj_update');
         $next = $fn->appendBasicBlock('strkey_obj_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -1072,12 +1059,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_long_update');
         $next = $fn->appendBasicBlock('strkey_long_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -1183,12 +1165,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_double_update');
         $next = $fn->appendBasicBlock('strkey_double_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -1295,12 +1272,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_bool_update');
         $next = $fn->appendBasicBlock('strkey_bool_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -1400,12 +1372,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $update = $fn->appendBasicBlock('strkey_null_update');
         $next = $fn->appendBasicBlock('strkey_null_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
@@ -1958,12 +1925,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $next = $fn->appendBasicBlock('strkey_lookup_next');
         $this->context->builder->branchIf($isMatch, $found, $next);
 
@@ -2153,13 +2115,10 @@ class HashTable extends Type
             $this->context->lookupFunction('__value__readString'),
             $valNext
         );
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($strCur),
-            $this->stringDataPtr($strNext)
-        );
+        $cmp = JitStringCompare::strcmp($this->context, $strCur, $strNext);
+        $i64 = $this->context->getTypeFromString('int64');
         $this->context->builder->store(
-            $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false)),
+            $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false)),
             $needsSwapSlot
         );
         $this->context->builder->branch($cmpDone);
@@ -2773,13 +2732,10 @@ class HashTable extends Type
             $this->context->lookupFunction('__value__readString'),
             $valNext
         );
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($strCur),
-            $this->stringDataPtr($strNext)
-        );
+        $cmp = JitStringCompare::strcmp($this->context, $strCur, $strNext);
+        $i64 = $this->context->getTypeFromString('int64');
         $this->context->builder->store(
-            $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i32->constInt(0, false)),
+            $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false)),
             $needsSwapSlot
         );
         $this->context->builder->branch($cmpDone);
@@ -2920,14 +2876,11 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($cmpStr);
         $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
         $strNext = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valNext);
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($strCur),
-            $this->stringDataPtr($strNext)
-        );
+        $cmp = JitStringCompare::strcmp($this->context, $strCur, $strNext);
+        $i64 = $this->context->getTypeFromString('int64');
         $strOutOfOrder = $reverse
-            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i32->constInt(0, false))
-            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
+            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false))
+            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false));
         $this->context->builder->store($strOutOfOrder, $needsSwapSlot);
         $this->context->builder->branch($cmpDone);
 
@@ -3079,12 +3032,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($loopBody);
         $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
-        $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcmp'),
-            $this->stringDataPtr($key),
-            $this->stringDataPtr($nodeKey)
-        );
-        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $isMatch = JitStringCompare::identical($this->context, $key, $nodeKey);
         $remove = $fn->appendBasicBlock('strkey_unset_remove');
         $next = $fn->appendBasicBlock('strkey_unset_next');
         $this->context->builder->branchIf($isMatch, $remove, $next);

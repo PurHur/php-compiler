@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\StringGetObjectVars;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -14,9 +15,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT helper for get_object_vars() via GetObjectVarsJitHelper PHP (#1370, #16629).
+ * JIT/AOT helper for get_object_vars() / get_mangled_object_vars() (#1370, #16629, #26797).
  *
- * Compile-time enum-case operands keep registry fast path; runtime operands route through PHP.
+ * Embed/MCJIT: runtime operands route through {@see GetObjectVarsJitHelper} PHP SSOT.
+ * Standalone AOT: native class-id LLVM ({@see JitGetObjectVarsNative}) — NestedJIT helpers
+ * cannot see user-class property metadata (#579 / empty helper unit).
+ *
+ * Compile-time enum-case operands keep registry fast path on both load types.
  * php-src: ext/standard/var.c — PHP_FUNCTION(get_object_vars)
  */
 final class JitGetObjectVars
@@ -40,6 +45,10 @@ final class JitGetObjectVars
             self::appendEnumCaseObjectVars($context, $object, $objPtr, (int) $compileTimeEnum['classId'], $ht);
 
             return self::boxedHashtable($context, $ht);
+        }
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return JitGetObjectVarsNative::invoke($context, $objectArg, $mangledKeys);
         }
 
         if (JITVariable::TYPE_OBJECT !== $objectArg->type && JITVariable::TYPE_VALUE !== $objectArg->type) {

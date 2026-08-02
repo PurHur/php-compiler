@@ -17,6 +17,10 @@ use PHPLLVM\Builder;
  * `__hashtable__*` ABI (#21109), so return operands are native hashtables / i64 pointers —
  * not `__object__*`. Treating them as ordinary class returns TypeErrors
  * `HashTable, int returned` (#20652, #21888 / SuperglobalRefreshJitHelper).
+ *
+ * {@see \PHPCompiler\VM\Variable} is the same shape: NestedJIT lowers `: Variable` to
+ * `__value__*` (#16565 / #20785). Object-style ClassReturnCheck then TypeErrors
+ * `Variable, int returned` on value-box returns (GetObjectVarsJitHelper — #26797).
  */
 final class ClassReturnCheck
 {
@@ -40,6 +44,11 @@ final class ClassReturnCheck
             || self::isVmHashTableClass($block->returnClassConstraint)
         ) {
             return self::enforceVmHashTableReturn($context, $return, $callableName, $expected);
+        }
+        if (self::isVmVariableClass($expected)
+            || self::isVmVariableClass($block->returnClassConstraint)
+        ) {
+            return self::enforceVmVariableReturn($context, $return, $callableName, $expected);
         }
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -70,6 +79,16 @@ final class ClassReturnCheck
             || 'hashtable' === $lc;
     }
 
+    /** NestedJIT / param ABI name for {@see \PHPCompiler\VM\Variable} (#16565 / #26797). */
+    public static function isVmVariableClass(string $name): bool
+    {
+        $lc = strtolower(ltrim($name, '\\'));
+
+        return 'phpcompiler\\vm\\variable' === $lc
+            || str_ends_with($lc, '\\vm\\variable')
+            || 'variable' === $lc;
+    }
+
     /**
      * Accept native hashtable ABI returns for `: HashTable` (#21888, #20652).
      *
@@ -88,6 +107,46 @@ final class ClassReturnCheck
             || Variable::TYPE_NATIVE_LONG === $return->type
             || Variable::TYPE_OBJECT === $return->type
             || Variable::TYPE_VALUE === $return->type
+            || 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)
+        ) {
+            return true;
+        }
+        if (Variable::TYPE_NULL === $return->type) {
+            self::raiseReturnTypeError($context, $callableName, $expected, 'null');
+
+            return false;
+        }
+        $scalarGiven = self::scalarGivenLabel($return);
+        if (null !== $scalarGiven) {
+            self::raiseReturnTypeError($context, $callableName, $expected, $scalarGiven);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Accept NestedJIT `__value__*` ABI returns for `: Variable` (#26797 / peer #21888).
+     *
+     * @return bool false when a TypeError path was emitted
+     */
+    private static function enforceVmVariableReturn(
+        Context $context,
+        Variable $return,
+        ?string $callableName,
+        string $expected
+    ): bool {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        // Boxed slot / native long pointer / object wrap / hashtable payload
+        if (Variable::TYPE_VALUE === $return->type
+            || Variable::TYPE_NATIVE_LONG === $return->type
+            || Variable::TYPE_OBJECT === $return->type
+            || Variable::TYPE_HASHTABLE === $return->type
+            || Variable::TYPE_STRING === $return->type
+            || Variable::TYPE_NATIVE_BOOL === $return->type
+            || Variable::TYPE_NATIVE_DOUBLE === $return->type
             || 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)
         ) {
             return true;

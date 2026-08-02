@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6751 |
-| Phase A inventory files (M2 ratio SSOT) | 6751 |
+| PHP files on vm.php path | 6752 |
+| Phase A inventory files (M2 ratio SSOT) | 6752 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21821 |
+| Source constructs flagged (warnings) | 21823 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2617,6 +2617,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGetMetaTags.php` | 0 | 1 |
 | `ext/standard/JitGetObjectId.php` | 0 | 1 |
 | `ext/standard/JitGetObjectVars.php` | 0 | 1 |
+| `ext/standard/JitGetObjectVarsNative.php` | 0 | 2 |
 | `ext/standard/JitGetParentClass.php` | 0 | 1 |
 | `ext/standard/JitGetResourceId.php` | 0 | 1 |
 | `ext/standard/JitGetResourceType.php` | 0 | 1 |
@@ -27459,6 +27460,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `ext/standard/JitGetObjectVarsNative.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 348)
+- 22 class method(s)
+
 ### `ext/standard/JitGetParentClass.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48187,8 +48194,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ClassReturnCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 141)
-- 12 class method(s)
+- new Variable (line 200)
+- 14 class method(s)
 
 ### `lib/JIT/CliArgvGlobalInit.php`
 

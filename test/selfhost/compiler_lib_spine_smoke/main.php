@@ -2409,6 +2409,7 @@ require_once __DIR__.'/../../../ext/standard/JitGetIncludedFiles.php';
 require_once __DIR__.'/../../../ext/standard/JitGetMetaTags.php';
 require_once __DIR__.'/../../../ext/standard/JitGetObjectId.php';
 require_once __DIR__.'/../../../ext/standard/JitGetObjectVars.php';
+require_once __DIR__.'/../../../ext/standard/JitGetObjectVarsNative.php';
 require_once __DIR__.'/../../../ext/standard/JitGetParentClass.php';
 require_once __DIR__.'/../../../ext/standard/JitGetResourceId.php';
 require_once __DIR__.'/../../../ext/standard/JitGetResourceType.php';
