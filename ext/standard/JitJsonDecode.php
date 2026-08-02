@@ -31,11 +31,8 @@ final class JitJsonDecode
     {
         $slot = JitValueBox::alloc($context);
         if (\is_bool($scalar)) {
-            JitValueBox::writeLong(
-                $context,
-                $slot,
-                $context->getTypeFromString('int64')->constInt($scalar ? 1 : 0, false)
-            );
+            // php-src json_decode scalars are IS_TRUE/IS_FALSE — writeBool, not writeLong (#26887).
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool($scalar));
         } elseif (\is_int($scalar)) {
             JitValueBox::writeLong(
                 $context,
