@@ -3273,13 +3273,15 @@ class Object_ extends Type {
         $this->externalOnlyClassIds[$id] = true;
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
-        $this->classIdToName[$id] = $displayName;
         $this->classes[$lcname] = $id;
-        // propertyFetch / copyProperties use classNameForId; declareClass sets this, externals must too (#1514, #1056).
-        $this->classIdToName[$id] = $lcname;
+        // Prefer Zend display spelling for builtins looked up as lowercase (#26885).
         if ('stdclass' === $lcname) {
+            $displayName = 'stdClass';
             $this->allowsDynamicPropertiesClassIds[$id] = true;
         }
+        // classIdToName must keep display spelling (stdClass, not stdclass) for
+        // get_class()/get_debug_type()/::class (#23641, #26885). Lookup keys stay in $classes.
+        $this->classIdToName[$id] = $displayName;
         if (self::externalClassRejectsDynamicProperties($lcname)) {
             $this->noDynamicPropertiesClassIds[$id] = true;
         }

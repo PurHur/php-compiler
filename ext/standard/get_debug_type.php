@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -127,16 +128,27 @@ final class get_debug_type extends Internal
         }
     }
 
+    /**
+     * Boxed TYPE_VALUE path — must GEP/read via {@see JitValueBox::valuePtrFromVariable}
+     * (loadValue returns a struct, not `__value__*`; thin AOT compile segfaulted, #26885).
+     * Shape mirrors {@see JitGettype::boxed}; HT/object probes are BB-guarded so
+     * select operands do not null-deref (#26885 runtime).
+     */
     private static function jitGetDebugTypeBoxed(Context $context, JITVariable $arg): Value
     {
-        $loaded = $context->helper->loadValue($arg);
+        $valuePtr = JitValueBox::normalizeValuePtr(
+            $context,
+            JitValueBox::valuePtrFromVariable($context, $arg)
+        );
         $valMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
-            $context->builder->structGep($loaded, $valMap['type'])
+            $context->builder->structGep($valuePtr, $valMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
-        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        // Mask IS_REFCOUNTED — AOT stores JIT tags (TYPE_*|0x80) (#26854 / #26885).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE & 0x7f, false);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $kind, $enumCaseTy);
         $enumBb = BasicBlockHelper::append($context, 'get_debug_type_enum_case');
         $scalarBb = BasicBlockHelper::append($context, 'get_debug_type_scalar');
         $doneBb = BasicBlockHelper::append($context, 'get_debug_type_boxed_done');
@@ -146,12 +158,13 @@ final class get_debug_type extends Internal
         $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
         if (null !== $enumMap && isset($enumMap['class_id'])) {
             $classId = $context->builder->load(
-                $context->builder->structGep($loaded, $enumMap['class_id'])
+                $context->builder->structGep($valuePtr, $enumMap['class_id'])
             );
             $enumName = ReflectionBuiltinHelper::classNameStringFromClassId($context, $classId);
         } else {
             $enumName = $context->builder->load($context->constantStringFromString('unknown'));
         }
+        $enumEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($scalarBb);
@@ -163,35 +176,69 @@ final class get_debug_type extends Internal
             JITVariable::TYPE_NATIVE_BOOL => 'bool',
             JITVariable::TYPE_STRING => 'string',
         ] as $jitType => $name) {
-            $expected = $i8->constInt($jitType, false);
-            $isType = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
+            $expected = $i8->constInt($jitType & 0x7f, false);
+            $isType = $context->builder->icmp(Builder::INT_EQ, $kind, $expected);
             $candidate = $context->builder->load($context->constantStringFromString($name));
             $result = $context->builder->select($isType, $candidate, $result);
         }
+
         $isHt = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(JITVariable::TYPE_HASHTABLE, false)
         );
+        $htProbeBb = BasicBlockHelper::append($context, 'get_debug_type_ht_probe');
+        $afterHtBb = BasicBlockHelper::append($context, 'get_debug_type_after_ht');
+        $context->builder->branchIf($isHt, $htProbeBb, $afterHtBb);
+
+        $context->builder->positionAtEnd($htProbeBb);
         $htLabel = $context->builder->select(
             JitStreamContextRepresentation::isRepresentation(
                 $context,
                 $context->builder->call(
                     $context->lookupFunction('__value__readHashtable'),
-                    $loaded
+                    $valuePtr
                 )
             ),
             $context->builder->load($context->constantStringFromString('resource (stream-context)')),
             $context->builder->load($context->constantStringFromString('array'))
         );
-        $result = $context->builder->select($isHt, $htLabel, $result);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($afterHtBb);
+
+        $context->builder->positionAtEnd($afterHtBb);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $afterHtPhi = $context->builder->phi($strPtr, 'get_debug_type_ht_phi');
+        $afterHtPhi->addIncoming($result, $scalarBb);
+        $afterHtPhi->addIncoming($htLabel, $htEnd);
+        $result = $afterHtPhi;
+
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $objProbeBb = BasicBlockHelper::append($context, 'get_debug_type_obj_probe');
+        $afterObjBb = BasicBlockHelper::append($context, 'get_debug_type_after_obj');
+        $context->builder->branchIf($isObject, $objProbeBb, $afterObjBb);
+
+        $context->builder->positionAtEnd($objProbeBb);
+        $objectLabel = ReflectionBuiltinHelper::getDebugTypeClassName($context, $arg);
+        $objEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($afterObjBb);
+
+        $context->builder->positionAtEnd($afterObjBb);
+        $afterObjPhi = $context->builder->phi($strPtr, 'get_debug_type_obj_phi');
+        $afterObjPhi->addIncoming($result, $afterHtBb);
+        $afterObjPhi->addIncoming($objectLabel, $objEnd);
+        $result = $afterObjPhi;
+        $scalarEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-        $strPtr = $context->getTypeFromString('__string__*');
         $phi = $context->builder->phi($strPtr);
-        $phi->addIncoming($enumName, $enumBb);
-        $phi->addIncoming($result, $scalarBb);
+        $phi->addIncoming($enumName, $enumEnd);
+        $phi->addIncoming($result, $scalarEnd);
 
         return $phi;
     }
