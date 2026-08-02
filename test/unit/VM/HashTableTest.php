@@ -218,6 +218,36 @@ class HashTableTest extends TestCase
     }
 
     /**
+     * By-ref FE_FETCH must promote the bucket to a shared ref cell so residual aliases
+     * survive HashTable::duplicate() (append / COW) — Zend FE_FETCH_RW (#26738).
+     */
+    public function testForeachByRefSurvivesDuplicateCow(): void
+    {
+        $ht = new HashTable();
+        foreach ([10, 20] as $i => $n) {
+            $v = new Variable();
+            $v->int($n);
+            $ht->addIndex($i, $v);
+        }
+        $ht->iterReset();
+        $this->assertTrue($ht->iterValid());
+        $this->assertTrue($ht->iterValid());
+        $payload = $ht->iterCurrentValue(true);
+        $loop = new Variable();
+        $loop->indirect($payload);
+
+        $copy = $ht->duplicate();
+        $write = new Variable();
+        $write->int(99);
+        $loop->copyFrom($write);
+
+        $this->assertSame(99, $ht->findIndex(1)->resolveIndirect()->toInt());
+        $this->assertSame(99, $copy->findIndex(1)->resolveIndirect()->toInt());
+        $this->assertTrue($ht->findIndex(1)->isIndirect());
+        $this->assertTrue($copy->findIndex(1)->isIndirect());
+    }
+
+    /**
      * Foreach cursor (Z_FE_POS) must not skip the next element when unset deletes the
      * current bucket — nInternalPointer update must not feed ITER_VALID's ++ (#21985).
      */
