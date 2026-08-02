@@ -98,23 +98,18 @@ final class JitVarExport
 
     private static function echoBoolJit(Context $context, Value $boolVal): void
     {
-        $charPtr = $context->getTypeFromString('char*');
-        $printf = $context->lookupFunction('printf');
+        // Use write-backed echo (not libc printf): under thin AOT, printf is fully buffered
+        // when stdout is not a TTY, so `var_export(true); echo "\n";` printed `\n` then
+        // flushed `true` at exit (#26929 Done-when / peer ValueEchoHelper).
         $trueBlock = BasicBlockHelper::append($context, 'var_export_bool_true');
         $falseBlock = BasicBlockHelper::append($context, 'var_export_bool_false');
         $doneBlock = BasicBlockHelper::append($context, 'var_export_bool_done');
         $context->builder->branchIf($boolVal, $trueBlock, $falseBlock);
         $context->builder->positionAtEnd($trueBlock);
-        $context->builder->call(
-            $printf,
-            $context->builder->pointerCast($context->constantFromString('true'), $charPtr)
-        );
+        ValueEchoHelper::echoLiteral($context, 'true');
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($falseBlock);
-        $context->builder->call(
-            $printf,
-            $context->builder->pointerCast($context->constantFromString('false'), $charPtr)
-        );
+        ValueEchoHelper::echoLiteral($context, 'false');
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
     }
