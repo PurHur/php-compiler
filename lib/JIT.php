@@ -1733,14 +1733,10 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
             return true;
         }
-        // M5 argv / gen-0 seed: void/native RuntimeEmitTuInit stubs — PHP CFG host-lower of
-        // initParsePipeline hung the Zend rebuild for hours despite the emit-spine skip list
-        // (NestedJIT still consulted this allowlist via shouldUseM3EmitTuRuntimeMethodStub) (#26756).
+        // M5 argv diagnostics stay on void/null stubs; initParsePipeline must remain real-lowered
+        // so Runtime::$parser is initialized (void init* stubs make functional smoke impossible) (#26756).
         if ($this->shouldUseM5DriverHostCompile()
-            && (str_ends_with($lower, '\\runtime::initparsepipeline')
-                || str_ends_with($lower, '\\runtime::initcompiler')
-                || str_ends_with($lower, '\\runtime::loadcoremodules')
-                || str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')
+            && (str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')
                 || str_ends_with($lower, '\\runtime::peeklastparsefailure'))
         ) {
             return false;
@@ -2660,13 +2656,8 @@ class JIT {
                 'standalone',
             ];
             if (in_array($methodLc, $inventoryEmitSpine, true)) {
-                // M5 argv seed: keep init* on void/native stubs (NestedJIT hung on initParsePipeline) (#26756).
-                if ($this->shouldUseM5DriverHostCompile()
-                    && in_array($methodLc, ['initparsepipeline', 'initcompiler', 'loadcoremodules'], true)
-                ) {
-                    return true;
-                }
                 // Real argv parse spine needs ctor/init; standalone stays stubbed (#15597).
+                // Do not void-stub initParsePipeline under M5 — seed would lack $parser (#26756).
                 if ($this->shouldRealLowerInventoryArgvParseSpine() && 'standalone' !== $methodLc) {
                     return false;
                 }
@@ -4708,10 +4699,8 @@ class JIT {
                 'compileemitsmoke',
             ];
             if ($this->shouldUseM5DriverHostCompile()) {
+                // Diagnostics only — keep initParsePipeline / initCompiler / loadCoreModules real (#26756).
                 $emitHelperStubMethods = array_merge($emitHelperStubMethods, [
-                    'initparsepipeline',
-                    'initcompiler',
-                    'loadcoremodules',
                     'noteparsecompilenullforscript',
                     'peeklastparsefailure',
                 ]);

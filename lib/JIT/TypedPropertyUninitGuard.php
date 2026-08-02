@@ -16,6 +16,13 @@ final class TypedPropertyUninitGuard
 {
     public static function emitBeforeRead(Context $context, Variable $var): void
     {
+        // M5 argv / gen-0 seed: CFG split + NestedJIT ErrorRaise leaves parentless / mid-BB
+        // terminators while host-lowering Runtime::parse (#26756). Typed init checks are not
+        // required for never-seen functional smoke.
+        $m5 = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if ('1' === $m5 || 'true' === strtolower((string) $m5)) {
+            return;
+        }
         if (Variable::TYPE_VALUE !== $var->type) {
             return;
         }

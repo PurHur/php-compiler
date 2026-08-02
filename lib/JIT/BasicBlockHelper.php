@@ -161,15 +161,12 @@ final class BasicBlockHelper
             $context->builder->positionAtEnd($entry);
         }
         $slot = $context->builder->alloca($type);
-        if (null !== $restore) {
-            $terminator = $restore->getTerminator();
-            if (null !== $terminator) {
-                // Do not position after a terminator: it creates invalid IR ("terminator in the middle").
-                $context->builder->positionBefore($terminator);
-            } else {
-                $context->builder->positionAtEnd($restore);
-            }
+        if (null !== $restore && null === $restore->getTerminator()) {
+            $context->builder->positionAtEnd($restore);
         } else {
+            // Never positionBefore(terminator): further emits become "terminator in the middle"
+            // (Runtime::parse host-lower under M5 argv — #26756). Cleared insert forces callers
+            // through ensureOpenInsertBlock instead of splicing before an existing branch.
             $context->builder->clearInsertionPosition();
         }
 

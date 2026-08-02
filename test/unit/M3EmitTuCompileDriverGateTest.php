@@ -32,16 +32,19 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertNotFalse($realLowerPos);
         $realLowerChunk = substr($jit, $realLowerPos, 700);
         $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $realLowerChunk);
-        // NestedJIT allowlist must also refuse initParsePipeline under M5 (emit-spine skip alone hung) (#26756).
+        // initParsePipeline must stay real-lowered under M5 (void stubs leave Runtime::$parser null) (#26756).
         $allowPos = strpos($jit, 'function isM3CompileDriverRealLoweringName');
         $this->assertNotFalse($allowPos);
         $allowChunk = substr($jit, $allowPos, 4500);
-        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $allowChunk);
         $this->assertStringContainsString('\\runtime::initparsepipeline', $allowChunk);
-        $this->assertMatchesRegularExpression(
-            '/shouldUseM5DriverHostCompile\(\).*initparsepipeline.*return false;/s',
+        $this->assertDoesNotMatchRegularExpression(
+            '/shouldUseM5DriverHostCompile\(\)\s*\n\s*&& \(str_ends_with\(\$lower, \'\\\\runtime::initparsepipeline\'/s',
             $allowChunk
         );
+        $guard = (string) file_get_contents($root.'/lib/JIT/TypedPropertyUninitGuard.php');
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $guard);
+        $bbHelper = (string) file_get_contents($root.'/lib/JIT/BasicBlockHelper.php');
+        $this->assertStringContainsString('Never positionBefore(terminator)', $bbHelper);
         $this->assertStringContainsString('AssignOp::optimize', $jit);
         $this->assertStringContainsString("'optimize' === \$methodLc", $jit);
         $this->assertStringContainsString('isM5ArgvResolveSidecarIdentityStubName', $jit);
