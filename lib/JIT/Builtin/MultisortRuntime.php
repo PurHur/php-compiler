@@ -7,28 +7,22 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_multisort() coupled packed paths via MultisortJitHelper PHP (#15667).
+ * JIT/AOT link for array_multisort() coupled packed paths via LLVM `__multisort__packed` (#26908).
  *
- * SSOT: {@see \PHPCompiler\ext\standard\array_multisort}
+ * NestedJIT {@see \PHPCompiler\ext\standard\MultisortJitHelper} aborts under thin standalone
+ * AOT (same NestedJIT HashTable/Traversable hole as SortJitHelper — see #24010). Emit the
+ * coupled bubble sort in {@see Type\HashTable::implementMultisortPacked()} instead.
+ *
+ * SSOT (VM): {@see \PHPCompiler\ext\standard\array_multisort}
  * php-src: ext/standard/array.c — php_array_multisort
  */
 final class MultisortRuntime
 {
     private const ABI_MULTISORT_PACKED = '__multisort__packed';
-
-    private const HELPER_PATH = '/ext/standard/MultisortJitHelper.php';
-
-    private const MULTISORT_PACKED_HELPER = 'PHPCompiler\\ext\\standard\\MultisortJitHelper::multisortPacked';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::MULTISORT_PACKED_HELPER,
-    ];
 
     /**
      * @param list<JITVariable> $arrays
@@ -65,49 +59,17 @@ final class MultisortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        // Body emitted by Type\HashTable::implementMultisortPacked() at context init (#26908).
+        $fn = $context->module->getNamedFunction(self::ABI_MULTISORT_PACKED);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException(self::ABI_MULTISORT_PACKED.' missing after HashTable type init (#26908)');
+        }
+        $context->registerFunction(self::ABI_MULTISORT_PACKED, $fn);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
-    }
-
-    public static function implement(Context $context): void
-    {
-        if (self::bridgesComplete($context)) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i1 = $context->getTypeFromString('int1');
-        $void = $context->getTypeFromString('void');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_MULTISORT_PACKED,
-            'multisort_packed_bridge_entry',
-            [$htPtr, $i1],
-            $void,
-            self::MULTISORT_PACKED_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#15667'
-        );
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        self::ensureLinked($context);
     }
 
     private static function argToHashtable(Context $context, JITVariable $arg): Value
@@ -130,24 +92,5 @@ final class MultisortRuntime
         }
 
         return HashTableHelper::packVariables($context, $vars);
-    }
-
-    private static function bridgesComplete(Context $context): bool
-    {
-        $probe = $context->module->getNamedFunction(self::ABI_MULTISORT_PACKED);
-        if (null === $probe || 0 === $probe->countBasicBlocks()) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        $fn = $context->module->getNamedFunction(self::ABI_MULTISORT_PACKED);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_MULTISORT_PACKED.' missing after MultisortRuntime bridge (#15667)');
-        }
-        $context->registerFunction(self::ABI_MULTISORT_PACKED, $fn);
     }
 }

@@ -123,6 +123,8 @@ class HashTable extends Type
         // Packed-list sort()/rsort() — NestedJIT SortJitHelper stubs were no-ops (#24010).
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
+        // Coupled array_multisort() — NestedJIT MultisortJitHelper aborts under thin AOT (#26908).
+        $this->registerFn('__multisort__packed', 'void', ['__hashtable__*', 'int1']);
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
@@ -190,6 +192,7 @@ class HashTable extends Type
         $this->implementSortStringKeyValuesReverse();
         $this->implementSortPacked(false);
         $this->implementSortPacked(true);
+        $this->implementMultisortPacked();
     }
 
     private function ensureLibcStrtol(): void
@@ -2913,6 +2916,176 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($passExit);
         $this->context->builder->branch($passHead);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    /**
+     * Coupled bubble-sort for array_multisort() packed hashtable list (#26908).
+     *
+     * {@see \PHPCompiler\ext\standard\MultisortJitHelper} NestedJIT aborts under thin
+     * standalone AOT (HashTable method dispatch / Traversable foreach). Mirror
+     * {@see implementSortPacked} and swap every companion when the primary is out of order.
+     *
+     * @param Value $sources packed list of `__hashtable__*` values (primary first)
+     * @param Value $descending int1
+     */
+    private function implementMultisortPacked(): void
+    {
+        $fn = $this->context->lookupFunction('__multisort__packed');
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $sources = $fn->getParam(0);
+        $descending = $fn->getParam(1);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i1 = $this->context->getTypeFromString('int1');
+        $i8 = $this->context->getTypeFromString('int8');
+        $i64 = $this->context->getTypeFromString('int64');
+        $valueType = $this->context->getTypeFromString('__value__');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $tag = 'msort';
+
+        $tableCount = $this->context->builder->load(
+            $this->context->builder->structGep($sources, $htMap['nextFreeElement'])
+        );
+        $done = $fn->appendBasicBlock($tag.'_done');
+        $loadPrimary = $fn->appendBasicBlock($tag.'_load_primary');
+        $tooFewTables = $this->context->builder->icmp(
+            Builder::INT_ULT,
+            $tableCount,
+            $sizeT->constInt(2, false)
+        );
+        $this->context->builder->branchIf($tooFewTables, $done, $loadPrimary);
+
+        $this->context->builder->positionAtEnd($loadPrimary);
+        $primaryVal = $this->listEntryAt($sources, $htMap, $zero);
+        $primary = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readHashtable'),
+            $primaryVal
+        );
+        $length = $this->context->builder->load(
+            $this->context->builder->structGep($primary, $htMap['nextFreeElement'])
+        );
+        $work = $fn->appendBasicBlock($tag.'_work');
+        $tooShort = $this->context->builder->icmp(
+            Builder::INT_ULT,
+            $length,
+            $sizeT->constInt(2, false)
+        );
+        $this->context->builder->branchIf($tooShort, $done, $work);
+
+        $this->context->builder->positionAtEnd($work);
+        $firstVal = $this->listEntryAt($primary, $htMap, $zero);
+        $firstType = $this->context->builder->load(
+            $this->context->builder->structGep($firstVal, $valueMap['type'])
+        );
+        $isString = $this->context->builder->icmp(Builder::INT_EQ, $firstType, $stringTag);
+        $isDesc = $this->context->builder->icmp(
+            Builder::INT_NE,
+            $descending,
+            $i1->constInt(0, false)
+        );
+
+        $outerSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_outer');
+        $this->context->builder->store($zero, $outerSlot);
+        $outerHead = $fn->appendBasicBlock($tag.'_outer_head');
+        $outerBody = $fn->appendBasicBlock($tag.'_outer_body');
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerHead);
+        $outer = $this->context->builder->load($outerSlot);
+        $outerLimit = $this->context->builder->sub($length, $one);
+        $outerDone = $this->context->builder->icmp(Builder::INT_UGE, $outer, $outerLimit);
+        $this->context->builder->branchIf($outerDone, $done, $outerBody);
+
+        $this->context->builder->positionAtEnd($outerBody);
+        $innerSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_inner');
+        $this->context->builder->store($zero, $innerSlot);
+        $innerLimit = $this->context->builder->sub($outerLimit, $outer);
+        $innerHead = $fn->appendBasicBlock($tag.'_inner_head');
+        $innerBody = $fn->appendBasicBlock($tag.'_inner_body');
+        $outerAdvance = $fn->appendBasicBlock($tag.'_outer_adv');
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerHead);
+        $inner = $this->context->builder->load($innerSlot);
+        $innerDone = $this->context->builder->icmp(Builder::INT_UGE, $inner, $innerLimit);
+        $this->context->builder->branchIf($innerDone, $outerAdvance, $innerBody);
+
+        $this->context->builder->positionAtEnd($innerBody);
+        $innerNext = $this->context->builder->addNoSignedWrap($inner, $one);
+        $valCur = $this->listEntryAt($primary, $htMap, $inner);
+        $valNext = $this->listEntryAt($primary, $htMap, $innerNext);
+        $cmpStr = $fn->appendBasicBlock($tag.'_cmp_str');
+        $cmpLong = $fn->appendBasicBlock($tag.'_cmp_long');
+        $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
+        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
+        $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
+
+        $this->context->builder->positionAtEnd($cmpStr);
+        $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
+        $strNext = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valNext);
+        $cmp = JitStringCompare::strcmp($this->context, $strCur, $strNext);
+        $strGt = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i64->constInt(0, false));
+        $strLt = $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i64->constInt(0, false));
+        $strOutOfOrder = $this->context->builder->select($isDesc, $strLt, $strGt);
+        $this->context->builder->store($strOutOfOrder, $needsSwapSlot);
+        $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($cmpLong);
+        $longCur = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valCur);
+        $longNext = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valNext);
+        $longGt = $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext);
+        $longLt = $this->context->builder->icmp(Builder::INT_SLT, $longCur, $longNext);
+        $longOutOfOrder = $this->context->builder->select($isDesc, $longLt, $longGt);
+        $this->context->builder->store($longOutOfOrder, $needsSwapSlot);
+        $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($cmpDone);
+        $needsSwap = $this->context->builder->load($needsSwapSlot);
+        $swapAll = $fn->appendBasicBlock($tag.'_swap_all');
+        $innerAdvance = $fn->appendBasicBlock($tag.'_inner_adv');
+        $this->context->builder->branchIf($needsSwap, $swapAll, $innerAdvance);
+
+        $this->context->builder->positionAtEnd($swapAll);
+        $tSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_t');
+        $this->context->builder->store($zero, $tSlot);
+        $swapHead = $fn->appendBasicBlock($tag.'_swap_head');
+        $swapBody = $fn->appendBasicBlock($tag.'_swap_body');
+        $this->context->builder->branch($swapHead);
+
+        $this->context->builder->positionAtEnd($swapHead);
+        $t = $this->context->builder->load($tSlot);
+        $swapDone = $this->context->builder->icmp(Builder::INT_UGE, $t, $tableCount);
+        $this->context->builder->branchIf($swapDone, $innerAdvance, $swapBody);
+
+        $this->context->builder->positionAtEnd($swapBody);
+        $tableVal = $this->listEntryAt($sources, $htMap, $t);
+        $table = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readHashtable'),
+            $tableVal
+        );
+        $a = $this->listEntryAt($table, $htMap, $inner);
+        $b = $this->listEntryAt($table, $htMap, $innerNext);
+        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
+        $this->context->builder->store($this->context->builder->load($a), $tmp);
+        $this->context->builder->store($this->context->builder->load($b), $a);
+        $this->context->builder->store($this->context->builder->load($tmp), $b);
+        $this->context->builder->store($this->context->builder->addNoSignedWrap($t, $one), $tSlot);
+        $this->context->builder->branch($swapHead);
+
+        $this->context->builder->positionAtEnd($innerAdvance);
+        $this->context->builder->store($this->context->builder->addNoSignedWrap($inner, $one), $innerSlot);
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($outerAdvance);
+        $this->context->builder->store($this->context->builder->addNoSignedWrap($outer, $one), $outerSlot);
+        $this->context->builder->branch($outerHead);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
