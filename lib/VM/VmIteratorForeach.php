@@ -64,7 +64,10 @@ final class VmIteratorForeach
         return 'arrayiterator' === $ut
             || 'recursivearrayiterator' === $ut
             || 'recursiveiteratoriterator' === $ut
-            || 'arrayobject' === $ut;
+            || 'arrayobject' === $ut
+            || 'limititerator' === $ut
+            || 'appenditerator' === $ut
+            || 'regexiterator' === $ut;
     }
 
     /**

@@ -240,6 +240,9 @@ final class Variable {
 
     public ?\PHPLLVM\Value $fiberStatePtr = null;
 
+    /** Compile-time class for `new Foo` results — survives VALUE-box assign (#26825). */
+    public ?string $classUserType = null;
+
     /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
     public bool $isJitGenerator = false;
 

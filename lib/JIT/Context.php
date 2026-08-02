@@ -82,6 +82,9 @@ class Context {
     /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
     public ?Operand $jitJsonEncodeValueOperand = null;
 
+    /** Operand for iterator_to_array() iterator arg — CFG userType for HT-backed SPL (#26825). */
+    public ?Operand $jitIteratorToArrayIteratorOperand = null;
+
     /** Operand for compile-time xmlrpc_encode() array/scalar literals (#19048). */
     public ?Operand $jitXmlrpcEncodeValueOperand = null;
 
@@ -1024,6 +1027,14 @@ class Context {
         }
         // RecursiveIteratorIterator — flatten inner HT to LEAVES_ONLY `__spl_ht` (#26775).
         $this->functionProxies['recursiveiteratoriterator::__construct'] = new Call\RecursiveIteratorIteratorConstruct();
+        // LimitIterator / AppendIterator / RegexIterator — snapshot into `__spl_ht` (#26825).
+        $this->type->object->lookup('LimitIterator');
+        $this->type->object->lookup('AppendIterator');
+        $this->type->object->lookup('RegexIterator');
+        $this->functionProxies['limititerator::__construct'] = new Call\LimitIteratorConstruct();
+        $this->functionProxies['appenditerator::__construct'] = new Call\AppendIteratorMethod('__construct');
+        $this->functionProxies['appenditerator::append'] = new Call\AppendIteratorMethod('append');
+        $this->functionProxies['regexiterator::__construct'] = new Call\RegexIteratorConstruct();
         // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
         foreach ([
             'splmaxheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MAX,

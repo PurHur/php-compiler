@@ -3566,6 +3566,52 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if (
+            'limititerator' === $lcname
+            || 'appenditerator' === $lcname
+            || 'regexiterator' === $lcname
+        ) {
+            // Thin AOT: snapshot / filter into `__spl_ht` at construct (#26825).
+            // php-src ext/spl/spl_iterators.stub.php — OuterIterator + Iterator.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('OuterIterator');
+            $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'OuterIterator',
+                'Traversable',
+                'Iterator',
+            ]);
+            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            if ('regexiterator' === $lcname) {
+                $this->seedExternalClassConstants($id, [
+                    'USE_KEY' => 1,
+                    'INVERT_MATCH' => 2,
+                    'MATCH' => 0,
+                    'GET_MATCH' => 1,
+                    'ALL_MATCHES' => 2,
+                    'SPLIT' => 3,
+                    'REPLACE' => 4,
+                ]);
+            }
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $methods = [
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'getinneriterator',
+            ];
+            if ('limititerator' === $lcname) {
+                $methods[] = 'seek';
+                $methods[] = 'getposition';
+            } elseif ('appenditerator' === $lcname) {
+                $methods[] = 'append';
+                $methods[] = 'getiteratorindex';
+                $methods[] = 'getarrayiterator';
+            } else {
+                $methods[] = 'accept';
+            }
+            foreach ($methods as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('recursiveiteratoriterator' === $lcname) {
             // Thin AOT: LEAVES_ONLY flatten into `__spl_ht` at construct (#26775).
             // php-src ext/spl/spl_iterators.c — OuterIterator + Iterator.
