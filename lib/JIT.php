@@ -6755,7 +6755,6 @@ class JIT {
                         'noteparsecompilenullforscript',
                         'peeklastparsefailure',
                         'compileemitsmoke',
-                        'preparesourceforparser',
                         'preprocesssourceforparse',
                         'rewritesourcebeforeparser',
                     ], true)
@@ -6783,7 +6782,7 @@ class JIT {
                             $stubBlock
                         );
                     } else {
-                        // Identity preprocess/prepare CFG stubs (#11809 / #26756).
+                        // Identity preprocess/rewrite CFG stubs (#11809 / #26756).
                         $this->compileSkippedCompilerSplitCfgStub(
                             $this->llvmInternalName($logical),
                             $stubBlock,
