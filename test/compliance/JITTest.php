@@ -1044,13 +1044,16 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\zip\ZipExtensionPolicy::isZipComplianceCase($name)) {
                 continue;
             }
+            // uri_*_profile85 / uri_phantom_profile84 set PROFILE via --ENV--; always include (#26254).
             if (!CompilerVersion::supportsUri()
                 && str_contains($name, 'uri_rfc3986')
-                && !str_contains($name, 'uri_phantom')) {
+                && !str_contains($name, 'uri_phantom')
+                && !str_contains($name, 'uri_exists_profile85')) {
                 continue;
             }
             if (CompilerVersion::supportsUri()
-                && str_contains($name, 'uri_phantom')) {
+                && str_contains($name, 'uri_phantom')
+                && !str_contains($name, 'uri_phantom_profile84')) {
                 continue;
             }
             if (!CompilerVersion::supportsBcmath()
