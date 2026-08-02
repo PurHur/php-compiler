@@ -427,12 +427,23 @@ final class HashTable {
 
     /**
      * Read bucket value; by-value path unrefs IS_INDIRECT slots in place (ZEND_FE_FETCH_R / #5419).
+     *
+     * By-ref (ZEND_FE_FETCH_RW): promote the bucket to a shared IS_REFERENCE cell so the
+     * residual loop variable keeps write-through across HashTable COW (append / separate)
+     * — same shape as ASSIGN_REF into a dim (#22027, #26738).
      */
     private function valueAtBucketIndex(int $index, bool $byRef): Variable
     {
         $bucket = $this->buckets->read($index);
         if ($byRef) {
-            return $bucket->value;
+            $cell = $bucket->value;
+            if (Variable::TYPE_INDIRECT !== $cell->type) {
+                $ref = new Variable();
+                $ref->copyFrom($cell);
+                $cell->indirect($ref);
+            }
+
+            return $cell->resolveIndirect();
         }
         // Zend ZEND_FE_FETCH_R: by-value foreach copies referenced slots in place (#5419).
         if ($bucket->value->isIndirect()) {
