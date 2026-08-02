@@ -236,6 +236,68 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function after(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        VmDom::afterLiveStandardNodes($ctx, $node, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function before(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        VmDom::beforeLiveStandardNodes($ctx, $node, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function replaceWith(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        VmDom::replaceWithLiveStandardNodes($ctx, $node, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * ChildNode::remove vs DOMTokenList::remove (#26752).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function dispatchRemove(VmContext $ctx, ObjectEntry $receiver, array $extra): Variable
+    {
+        return match (strtolower($receiver->class->name)) {
+            'domtokenlist', 'dom\\tokenlist' => self::tokenListRemove($ctx, $receiver, $extra),
+            default => self::childNodeRemove($ctx, $receiver, $extra),
+        };
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function childNodeRemove(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        unset($extra);
+        VmDom::removeLiveStandard($ctx, $node);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function replaceChildren(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
     {
         VmDom::replaceChildrenLiveStandardNodes($ctx, $parent, $extra);

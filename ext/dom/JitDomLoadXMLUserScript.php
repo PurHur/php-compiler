@@ -163,6 +163,8 @@ final class JitDomLoadXMLUserScript
             $elemJit,
             JITVariable::TYPE_OBJECT
         );
+        // So getElementsByTagName()->item(0) returns the linked firstChild (#26752).
+        DomUserScriptPinnedRootLlvm::pin($context, $element);
         self::pinUserScriptLoadSideEffects($context);
     }
 
