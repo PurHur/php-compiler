@@ -9,7 +9,8 @@ namespace PHPCompiler\ext\filter;
  *
  * php-src: ext/filter/logical_filters.c — php_filter_validate_email
  *
- * Keep this unit free of VmFilter / Frame so FilterEmailJitHelper emit stays lean.
+ * Keep this unit free of VmFilter / Frame / `\preg_match` so NestedJIT stays lean
+ * and thin AOT does not emit `__compiler_preg_match` (#27068).
  */
 final class FilterEmailValidate
 {
@@ -21,38 +22,49 @@ final class FilterEmailValidate
      */
     public static function isValid(string $s, int $flags = 0): bool
     {
+        return 1 === self::isValidInt($s, $flags);
+    }
+
+    /**
+     * NestedJIT-safe 0/1 result for thin AOT dynamic bridges (#27068).
+     * Bool / `?string` NestedJIT returns are corrupt under thin AOT (#26853); int matches FilterInt.
+     */
+    public static function isValidInt(string $s, int $flags = 0): int
+    {
         $len = \strlen($s);
         if (0 === $len || $len > 320) {
-            return false;
+            return 0;
         }
         $at = \strpos($s, '@');
         if (false === $at || $at !== \strrpos($s, '@')) {
-            return false;
+            return 0;
         }
         if (0 === $at || $at === $len - 1) {
-            return false;
+            return 0;
         }
         $local = \substr($s, 0, $at);
         $domain = \substr($s, $at + 1);
         if ('' === $local || '' === $domain || !\str_contains($domain, '.')) {
-            return false;
+            return 0;
         }
         $unicode = 0 !== ($flags & self::FLAG_EMAIL_UNICODE);
         if (!self::isLocalPart($local, $unicode) || !self::isDomainPart($domain)) {
-            return false;
+            return 0;
         }
 
-        return true;
+        return 1;
     }
 
     private static function isLocalPart(string $local, bool $unicode): bool
     {
-        if ($unicode) {
-            return (bool) \preg_match('/^[\p{L}\p{N}.!#$%&\'*+\/=?^_`{|}~-]+$/u', $local);
-        }
-
         $len = \strlen($local);
         for ($i = 0; $i < $len; ++$i) {
+            $o = \ord($local[$i]);
+            if ($unicode && $o >= 0x80) {
+                // Approx php-src `\p{L}\p{N}` without `\preg_match` — NestedJIT of
+                // that call emits `__compiler_preg_match` with no AOT provider (#27068).
+                continue;
+            }
             if (!self::isLocalChar($local[$i])) {
                 return false;
             }

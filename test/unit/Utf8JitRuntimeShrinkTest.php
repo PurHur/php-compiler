@@ -6,7 +6,9 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** UTF-8 JIT helpers route through Utf8JitHelper PHP via StringUtf8Runtime, not per-byte LLVM (#9246, #9273, #25836). */
+/**
+ * UTF-8 ABI: LLVM {@see __string__*} walks via StringUtf8*Jit; PHP SSOT stays VmString (#27051).
+ */
 final class Utf8JitRuntimeShrinkTest extends TestCase
 {
     public function testUtf8JitHelperDelegatesToVmString(): void
@@ -16,37 +18,38 @@ final class Utf8JitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmString::isValidUtf8', $source);
     }
 
-    public function testStringUtf8RuntimeUsesJitVmHelperLinkNotHandRolledNestedJit(): void
+    public function testStringUtf8RuntimeDelegatesToLlvmStringAbiBodies(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUtf8Runtime.php');
-        $this->assertStringContainsString('Utf8JitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('StringUtf8StrlenJit::implement', $source);
+        $this->assertStringContainsString('StringUtf8ValidJit::implement', $source);
+        $this->assertStringContainsString('#27051', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString('utf8_strlen_step_ascii', $source);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringUtf8StrlenJit.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringUtf8ValidJit.php');
-        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('Utf8JitHelper::utf8CharLength', $source);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringUtf8StrlenJit.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringUtf8ValidJit.php');
+        $this->assertLessThan(80, \substr_count($source, "\n") + 1);
     }
 
-    public function testThinWrapperFilesDeleted(): void
+    public function testLlvmBodiesOperateOnStringPointerNotValueBox(): void
     {
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringUtf8Strlen.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringUtf8Valid.php');
+        $strlen = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUtf8StrlenJit.php');
+        $valid = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUtf8ValidJit.php');
+        foreach ([$strlen, $valid] as $source) {
+            $this->assertStringContainsString('__string__strlen', $source);
+            $this->assertStringContainsString('structFieldMap[\'__string__\']', $source);
+            $this->assertStringNotContainsString('__value__writeString', $source);
+            $this->assertStringNotContainsString('JitVmHelperLink', $source);
+        }
     }
 
     public function testMbstringJitRoutesThroughStringUtf8Runtime(): void
     {
         $strlen = (string) \file_get_contents(__DIR__.'/../../ext/mbstring/JitMbStrlen.php');
         $this->assertStringContainsString('StringUtf8Runtime', $strlen);
-        $this->assertStringNotContainsString('StringUtf8Strlen', $strlen);
 
         $check = (string) \file_get_contents(__DIR__.'/../../ext/mbstring/JitMbCheckEncoding.php');
         $this->assertStringContainsString('StringUtf8Runtime::validFromPtr', $check);
-        $this->assertStringNotContainsString('StringUtf8Valid', $check);
     }
 }

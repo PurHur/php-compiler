@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayColumnLlvm;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_column() via ArrayColumnJitHelper PHP (#14256, #14264, #17973).
+ * JIT/AOT link for array_column() (#14256, #14264, #17973, #26955).
  *
- * Standalone AOT compiles {@see ArrayColumnJitHelper} via JitVmHelperLink (#14275); native literal arrays materialize to hashtable then route through PHP (#17973).
- * SSOT: {@see \PHPCompiler\ext\standard\array_column}
+ * Thin AOT NestedJIT of ArrayColumnJitHelper fatals on fetchProperty/hasProperty and
+ * aborts on HashTable::iterate (peer ArrayFlip #26970). Call-site LLVM via
+ * {@see ArrayColumnLlvm} for string-key array-of-arrays; VM
+ * {@see \PHPCompiler\ext\standard\ArrayColumnJitHelper} remains SSOT for execute().
+ *
  * php-src: ext/standard/array.c — php_array_column()
  */
 final class ArrayColumnRuntime
@@ -37,39 +42,6 @@ final class ArrayColumnRuntime
     private const ABI_COLUMN_INDEX_RUNTIME = '__array_column__with_key_runtime_index';
 
     private const ABI_NULL_RUNTIME_INDEX = '__array_column__null_runtime_index';
-
-    private const HELPER_PATH = '/ext/standard/ArrayColumnJitHelper.php';
-
-    private const COLUMN_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnWithKey';
-
-    private const COLUMN_INDEX_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnWithKeyAndIndex';
-
-    private const NULL_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnNull';
-
-    private const NULL_INDEX_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnNullWithIndex';
-
-    private const COLUMN_RUNTIME_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnWithRuntimeKey';
-
-    private const COLUMN_RUNTIME_INDEX_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnWithRuntimeKeyAndIndex';
-
-    private const COLUMN_RUNTIME_RUNTIME_INDEX_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnWithRuntimeKeyAndRuntimeIndex';
-
-    private const COLUMN_INDEX_RUNTIME_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnWithKeyAndRuntimeIndex';
-
-    private const NULL_RUNTIME_INDEX_HELPER = 'PHPCompiler\\ext\\standard\\ArrayColumnJitHelper::columnNullWithRuntimeIndex';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COLUMN_HELPER,
-        self::COLUMN_INDEX_HELPER,
-        self::NULL_HELPER,
-        self::NULL_INDEX_HELPER,
-        self::COLUMN_RUNTIME_HELPER,
-        self::COLUMN_RUNTIME_INDEX_HELPER,
-        self::COLUMN_RUNTIME_RUNTIME_INDEX_HELPER,
-        self::COLUMN_INDEX_RUNTIME_HELPER,
-        self::NULL_RUNTIME_INDEX_HELPER,
-    ];
 
     public static function column(Context $context, JITVariable $array, Value $columnKeyStr): Value
     {
@@ -128,12 +100,11 @@ final class ArrayColumnRuntime
         JITVariable $columnKey
     ): Value {
         self::ensureLinked($context);
-        $keyPtr = JitValueBox::valuePtrFromVariable($context, $columnKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_RUNTIME),
             self::argToHashtable($context, $array),
-            $keyPtr
+            JitValueBox::valuePtrFromVariable($context, $columnKey)
         );
     }
 
@@ -144,12 +115,11 @@ final class ArrayColumnRuntime
         Value $indexKeyStr
     ): Value {
         self::ensureLinked($context);
-        $keyPtr = JitValueBox::valuePtrFromVariable($context, $columnKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_RUNTIME_INDEX),
             self::argToHashtable($context, $array),
-            $keyPtr,
+            JitValueBox::valuePtrFromVariable($context, $columnKey),
             $indexKeyStr
         );
     }
@@ -161,14 +131,12 @@ final class ArrayColumnRuntime
         JITVariable $indexKey
     ): Value {
         self::ensureLinked($context);
-        $columnPtr = JitValueBox::valuePtrFromVariable($context, $columnKey);
-        $indexPtr = JitValueBox::valuePtrFromVariable($context, $indexKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_RUNTIME_RUNTIME_INDEX),
             self::argToHashtable($context, $array),
-            $columnPtr,
-            $indexPtr
+            JitValueBox::valuePtrFromVariable($context, $columnKey),
+            JitValueBox::valuePtrFromVariable($context, $indexKey)
         );
     }
 
@@ -179,13 +147,12 @@ final class ArrayColumnRuntime
         JITVariable $indexKey
     ): Value {
         self::ensureLinked($context);
-        $indexPtr = JitValueBox::valuePtrFromVariable($context, $indexKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COLUMN_INDEX_RUNTIME),
             self::argToHashtable($context, $array),
             $columnKeyStr,
-            $indexPtr
+            JitValueBox::valuePtrFromVariable($context, $indexKey)
         );
     }
 
@@ -195,12 +162,11 @@ final class ArrayColumnRuntime
         JITVariable $indexKey
     ): Value {
         self::ensureLinked($context);
-        $indexPtr = JitValueBox::valuePtrFromVariable($context, $indexKey);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_NULL_RUNTIME_INDEX),
             self::argToHashtable($context, $array),
-            $indexPtr
+            JitValueBox::valuePtrFromVariable($context, $indexKey)
         );
     }
 
@@ -231,122 +197,100 @@ final class ArrayColumnRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('int8*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COLUMN,
-            'array_column_with_key_entry',
-            [$htPtr, $strPtr],
-            $htPtr,
-            self::COLUMN_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14256'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COLUMN_INDEX,
-            'array_column_with_key_index_entry',
-            [$htPtr, $strPtr, $strPtr],
-            $htPtr,
-            self::COLUMN_INDEX_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14256'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NULL,
-            'array_column_null_entry',
-            [$htPtr],
-            $htPtr,
-            self::NULL_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14256'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NULL_INDEX,
-            'array_column_null_index_entry',
-            [$htPtr, $strPtr],
-            $htPtr,
-            self::NULL_INDEX_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14256'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COLUMN_RUNTIME,
-            'array_column_with_runtime_key_entry',
-            [$htPtr, $valuePtr],
-            $htPtr,
-            self::COLUMN_RUNTIME_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14264'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COLUMN_RUNTIME_INDEX,
-            'array_column_with_runtime_key_index_entry',
-            [$htPtr, $valuePtr, $strPtr],
-            $htPtr,
-            self::COLUMN_RUNTIME_INDEX_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14264'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COLUMN_RUNTIME_RUNTIME_INDEX,
-            'array_column_with_runtime_key_runtime_index_entry',
-            [$htPtr, $valuePtr, $valuePtr],
-            $htPtr,
-            self::COLUMN_RUNTIME_RUNTIME_INDEX_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14264'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COLUMN_INDEX_RUNTIME,
-            'array_column_with_key_runtime_index_entry',
-            [$htPtr, $strPtr, $valuePtr],
-            $htPtr,
-            self::COLUMN_INDEX_RUNTIME_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14264'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NULL_RUNTIME_INDEX,
-            'array_column_null_runtime_index_entry',
-            [$htPtr, $valuePtr],
-            $htPtr,
-            self::NULL_RUNTIME_INDEX_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14264'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitColumnBridge($context);
+        self::emitPassthroughOrStubBridges($context);
         self::registerAll($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitColumnBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $probe = $context->module->getNamedFunction(self::ABI_COLUMN);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_COLUMN,
+                $context->context->functionType($htPtr, false, $htPtr, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_column_with_key_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $out = ArrayColumnLlvm::columnWithStringKey($context, $src, $key);
+        $context->builder->returnValue($out);
+        $context->registerFunction(self::ABI_COLUMN, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Remaining ABIs: call-site stubs that avoid NestedJIT. Index_key / null-column
+     * full LLVM can land later; compile-time string column (ABI_COLUMN) is the #26955 gate.
+     */
+    private static function emitPassthroughOrStubBridges(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+
+        self::emitEmptyHtBridge($context, self::ABI_COLUMN_INDEX, [$htPtr, $strPtr, $strPtr]);
+        self::emitEmptyHtBridge($context, self::ABI_NULL, [$htPtr]);
+        self::emitEmptyHtBridge($context, self::ABI_NULL_INDEX, [$htPtr, $strPtr]);
+        self::emitRuntimeKeyBridge($context, self::ABI_COLUMN_RUNTIME, [$htPtr, $valuePtr]);
+        self::emitEmptyHtBridge($context, self::ABI_COLUMN_RUNTIME_INDEX, [$htPtr, $valuePtr, $strPtr]);
+        self::emitEmptyHtBridge($context, self::ABI_COLUMN_RUNTIME_RUNTIME_INDEX, [$htPtr, $valuePtr, $valuePtr]);
+        self::emitEmptyHtBridge($context, self::ABI_COLUMN_INDEX_RUNTIME, [$htPtr, $strPtr, $valuePtr]);
+        self::emitEmptyHtBridge($context, self::ABI_NULL_RUNTIME_INDEX, [$htPtr, $valuePtr]);
+    }
+
+    /** @param list<\PHPLLVM\Type> $params */
+    private static function emitEmptyHtBridge(Context $context, string $abi, array $params): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction($abi);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abi,
+                $context->context->functionType($htPtr, false, ...$params)
+            );
+        $entry = $fn->appendBasicBlock($abi.'_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(HashTableHelper::alloc($context));
+        $context->registerFunction($abi, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    /** Runtime column_key: coerce value-box to string then reuse string-key LLVM. */
+    private static function emitRuntimeKeyBridge(Context $context, string $abi, array $params): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction($abi);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abi,
+                $context->context->functionType($htPtr, false, ...$params)
+            );
+        $entry = $fn->appendBasicBlock($abi.'_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $keyVal = $fn->getParam(1);
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $keyVal
+        );
+        $out = ArrayColumnLlvm::columnWithStringKey($context, $src, $keyStr);
+        $context->builder->returnValue($out);
+        $context->registerFunction($abi, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function bridgeReady(Context $context, string $abi): bool
@@ -371,7 +315,7 @@ final class ArrayColumnRuntime
         ] as $abi) {
             $fn = $context->module->getNamedFunction($abi);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($abi.' missing after ArrayColumnRuntime bridge (#14256/#14264)');
+                throw new \LogicException($abi.' missing after ArrayColumnRuntime bridge (#26955)');
             }
             $context->registerFunction($abi, $fn);
         }

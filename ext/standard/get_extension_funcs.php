@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /**
  * get_extension_funcs() — list functions registered by an extension (#3433, ext/standard/basic_functions.c).
  *
- * Z_PARAM_STR $extension_name — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ * Z_PARAM_STR $extension — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ * Stub name is $extension (php-src basic_functions.stub.php); InternalArgInfo still says extension_name (#23569).
  */
 final class get_extension_funcs extends Internal
 {
@@ -36,7 +37,7 @@ final class get_extension_funcs extends Internal
             0,
             'get_extension_funcs',
             0,
-            'extension_name'
+            'extension'
         );
         $funcs = VmInfo::get_extension_funcs($name);
         if (false === $funcs) {
