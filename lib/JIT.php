@@ -135,7 +135,12 @@ class JIT {
             && (null !== $this->m3EmitTuMainBlock || null !== $this->m3CompileDriverMainBlock)
         ) {
             $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
-            if ($this->shouldEnsureInventoryArgvParseHelperStubs()) {
+            // Stub-only inventory argv may pre-declare null parse/compileEmitSmoke.
+            // Real-lower / M5 argv seed must not — null LLVM entry blocks poison later
+            // Runtime.php lowering (#26756 / re-#23468).
+            if ($this->shouldEnsureInventoryArgvParseHelperStubs()
+                && !$this->shouldRealLowerInventoryArgvParseSpine()
+            ) {
                 $this->ensureM3EmitTuRuntimeParseSpineDeps();
                 $inventoryArgvStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
                 if (null !== $inventoryArgvStubBlock) {
@@ -169,7 +174,9 @@ class JIT {
                 );
             }
             $parseLc = 'phpcompiler\\runtime::parse';
-            if (!isset($this->context->functions[$parseLc])) {
+            if (!isset($this->context->functions[$parseLc])
+                && !$this->shouldRealLowerInventoryArgvParseSpine()
+            ) {
                 $this->emitM3EmitTuRuntimeParseStubNative(
                     $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
                     'PHPCompiler\\Runtime::parse',
@@ -177,7 +184,12 @@ class JIT {
                 );
             }
             $runtimeEmitLc = 'phpcompiler\\runtime::compileemitsmoke';
-            if (!isset($this->context->functions[$runtimeEmitLc])) {
+            if (!isset($this->context->functions[$runtimeEmitLc])
+                && !(
+                    $this->shouldRealLowerInventoryArgvParseSpine()
+                    && $this->shouldUseM5DriverHostCompile()
+                )
+            ) {
                 $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
                     $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
                     'PHPCompiler\\Runtime::compileEmitSmoke',
@@ -1409,6 +1421,12 @@ class JIT {
      */
     private function shouldRealLowerInventoryArgvParseSpine(): bool
     {
+        // M5 argv / gen-0 seed: force real parse spine even when M4 bin/compile.php
+        // inventory-emit-for-block is false (#26756 / re-#23468).
+        if ($this->shouldUseM5DriverHostCompile() && $this->shouldUseM3CompileDriverRealLowering()) {
+            return true;
+        }
+
         return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM3CompileDriverRealLowering();
     }
 
@@ -1687,7 +1705,8 @@ class JIT {
         }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             if ($this->shouldRealLowerInventoryArgvParseSpine()) {
-                return false;
+                // Gen-0 argv seed (M5_DRIVER_HOST): real-lower compileEmitSmoke (#26756).
+                return $this->shouldUseM5DriverHostCompile();
             }
 
             return true;
@@ -4537,6 +4556,17 @@ class JIT {
             if (isset($this->context->functions[$spineLcKey]) || null === $stubBlock) {
                 continue;
             }
+            // Do not install null stubs that poison later Runtime.php lowering (#26756).
+            if ('parse' === $spineLc && $this->shouldRealLowerInventoryArgvParseSpine()) {
+                continue;
+            }
+            if (
+                'compileemitsmoke' === $spineLc
+                && $this->shouldRealLowerInventoryArgvParseSpine()
+                && $this->shouldUseM5DriverHostCompile()
+            ) {
+                continue;
+            }
             if ('parse' === $spineLc) {
                 $this->emitM3EmitTuRuntimeParseStubNative(
                     $this->llvmInternalName($spineLogical),
@@ -4591,8 +4621,11 @@ class JIT {
         if ($this->shouldStubInventoryEmitParseCompileSpine()) {
             $emitHelperStubMethods = ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
         } elseif ($this->shouldRealLowerInventoryArgvParseSpine()) {
-            // Inventory argv: real-lower parse only; preprocess helpers stay CFG stubs (#11809).
-            $emitHelperStubMethods = ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
+            // Inventory argv: real-lower parse; preprocess helpers stay CFG stubs (#11809).
+            // M5 argv / gen-0 seed also needs compileEmitSmoke for never-seen inputs (#26756).
+            $emitHelperStubMethods = $this->shouldUseM5DriverHostCompile()
+                ? ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser']
+                : ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
         }
         $inventoryEmitHelper = $this->shouldStubM3InventoryEmitJitSpineMethods();
         foreach ([
@@ -6585,9 +6618,6 @@ class JIT {
         }
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
-        if (isset($this->context->functions[$lc])) {
-            return;
-        }
         if ($this->shouldUseM3InventoryEmitDriver()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
@@ -6601,11 +6631,14 @@ class JIT {
                 'noteparsecompilenullforscript',
             ], true)) {
                 if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                    // Drop map entry so Runtime.php lowering can run; early null stubs must not win (#26756).
                     unset(
                         $this->context->functions[$lc],
                         $this->context->functionReturnType[$lc],
                         $this->context->functionProxies[$lc]
                     );
+                } elseif (isset($this->context->functions[$lc])) {
+                    return;
                 }
                 $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
                 if (!isset($this->context->functions[$lc])) {
@@ -6613,6 +6646,9 @@ class JIT {
                 }
             }
 
+            return;
+        }
+        if (isset($this->context->functions[$lc])) {
             return;
         }
         foreach ($this->context->runtime->modules as $module) {

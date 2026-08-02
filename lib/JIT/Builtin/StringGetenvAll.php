@@ -37,17 +37,13 @@ final class StringGetenvAll
 
     public static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        // Peer StringGetenv (#26756): empty Type.php declarations are not completed bodies.
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }
 
         $probe = $context->module->getNamedFunction('__compiler_getenv_all');
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -71,11 +67,6 @@ final class StringGetenvAll
         $abiName = '__compiler_getenv_all';
         $probe = $context->module->getNamedFunction($abiName);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
             return;

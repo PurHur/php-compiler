@@ -49,7 +49,16 @@ ulimit -v unlimited 2>/dev/null || ulimit -v 0 2>/dev/null || true
 export PHP_COMPILER_MEMORY_LIMIT="${MEM}"
 export PHP_COMPILER_LLVM_MEMORY_LIMIT="${MEM}"
 export PHP_COMPILER_INCLUDE_SCOPE_REMAP="${PHP_COMPILER_INCLUDE_SCOPE_REMAP:-0}"
-export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
+# NestedJIT helpers (ResolveSidecarJitHelper / StrposJitHelper) call str_replace while
+# StringStrReplace::ensureLinked no-ops under NestedJitCompileScope unless the
+# helper-runtime cache can supply phpc_str_replace (#23970, #26756). Force on even when
+# the exclusive spine launcher exported HELPER_RUNTIME_O=0 for cold NestedJIT avoidance
+# (#22642). Opt out only with BOOTSTRAP_GEN0_ARGV_HELPER_RUNTIME_O=0.
+if [[ "${BOOTSTRAP_GEN0_ARGV_HELPER_RUNTIME_O:-1}" == "1" ]]; then
+  export PHP_COMPILER_HELPER_RUNTIME_O=1
+else
+  export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
+fi
 export PHPCFG_SIMPLIFIER_USECHAIN="${PHPCFG_SIMPLIFIER_USECHAIN:-1}"
 unset PHPCFG_SIMPLIFIER_LEGACY
 

@@ -2600,6 +2600,8 @@ require_once __DIR__.'/../../../ext/standard/JitRandomIntArg.php';
 require_once __DIR__.'/../../../ext/standard/JitReaddir.php';
 require_once __DIR__.'/../../../ext/standard/JitReadfile.php';
 require_once __DIR__.'/../../../ext/standard/JitReadfileLibc.php';
+require_once __DIR__.'/../../../ext/standard/JitFileGetContentsLibc.php';
+require_once __DIR__.'/../../../ext/standard/phpc_file_get_contents_kernel.php';
 require_once __DIR__.'/../../../ext/standard/JitReadgzfile.php';
 require_once __DIR__.'/../../../ext/standard/JitReadline.php';
 require_once __DIR__.'/../../../ext/standard/JitReadlink.php';

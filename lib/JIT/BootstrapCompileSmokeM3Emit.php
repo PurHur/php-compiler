@@ -446,6 +446,14 @@ final class BootstrapCompileSmokeM3Emit
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             return true;
         }
+        // Full M5 argv / gen-0 seed drivers must bake RuntimeEmitTuInit + real parseAndCompile
+        // even though PHP_COMPILER_M3_COMPILE_DRIVER=1 (that flag alone selects stub spine for
+        // helloworld inventory argv — #12036). Without this, functional smoke dies at
+        // parseAndCompile null after source read succeeds (#26756 / re-#23468).
+        $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if ('1' === $m5Host || 'true' === strtolower((string) $m5Host)) {
+            return true;
+        }
         $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver)) {
             // Zend helloworld bin/compile.php inventory argv: thin ctor, stub spine (#12036).

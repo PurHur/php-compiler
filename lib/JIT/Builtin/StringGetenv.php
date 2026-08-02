@@ -73,17 +73,15 @@ final class StringGetenv
 
     public static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        // NestedJIT must not recurse into GetenvLookupJitHelper; helper-runtime .o is OK (#23970).
+        // Do not treat Type.php's empty declaration (countBasicBlocks>0, no terminator) as a
+        // completed body — that left U __compiler_getenv at argv-driver link (#26756).
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }
 
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction(self::ABI_NAME, $probe);
-
-            return;
-        }
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
@@ -181,11 +179,6 @@ final class StringGetenv
     {
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction(self::ABI_NAME, $probe);
-
-            return;
-        }
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
