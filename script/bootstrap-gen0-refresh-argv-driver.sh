@@ -49,7 +49,16 @@ ulimit -v unlimited 2>/dev/null || ulimit -v 0 2>/dev/null || true
 export PHP_COMPILER_MEMORY_LIMIT="${MEM}"
 export PHP_COMPILER_LLVM_MEMORY_LIMIT="${MEM}"
 export PHP_COMPILER_INCLUDE_SCOPE_REMAP="${PHP_COMPILER_INCLUDE_SCOPE_REMAP:-0}"
-export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
+# NestedJIT helpers (ResolveSidecarJitHelper / StrposJitHelper) call str_replace while
+# StringStrReplace::ensureLinked no-ops under NestedJitCompileScope unless the
+# helper-runtime cache can supply phpc_str_replace (#23970, #26756). Force on even when
+# the exclusive spine launcher exported HELPER_RUNTIME_O=0 for cold NestedJIT avoidance
+# (#22642). Opt out only with BOOTSTRAP_GEN0_ARGV_HELPER_RUNTIME_O=0.
+if [[ "${BOOTSTRAP_GEN0_ARGV_HELPER_RUNTIME_O:-1}" == "1" ]]; then
+  export PHP_COMPILER_HELPER_RUNTIME_O=1
+else
+  export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
+fi
 export PHPCFG_SIMPLIFIER_USECHAIN="${PHPCFG_SIMPLIFIER_USECHAIN:-1}"
 unset PHPCFG_SIMPLIFIER_LEGACY
 
@@ -109,12 +118,14 @@ chmod +x "${ROOT}/build/.m3_bin_compile_aot_blob"
 
 bootstrap_lowering_source_write_build_stamp
 echo "==> record gen-0 build receipt for argv driver artifacts"
+# Argv-only refresh: functional smoke on build/bin-compile-aot is the evidence (#26756).
+export BOOTSTRAP_GEN0_ARGV_ONLY_RECEIPT=1
 php -r '
 require $argv[1]."/script/bootstrap-gen0-manifest-lib.php";
 $r = bootstrap_gen0_write_build_receipt($argv[1]);
 fwrite(STDOUT, "bootstrap-gen0-refresh-argv-driver: receipt fingerprint="
     .substr((string) $r["lowering_source_fingerprint"], 0, 16)."… artifacts="
-    .count($r["artifacts"])."\n");
+    .count($r["artifacts"])." evidence=".(string) ($r["link_evidence"]["source"] ?? "?")."\n");
 ' "${ROOT}"
 
 php "${ROOT}/script/bootstrap-gen0-manifest-refresh.php"

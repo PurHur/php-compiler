@@ -23,6 +23,12 @@ final class StringGetenvRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__compiler_getenv');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
+        // Type.php declares __compiler_getenv before ensureStandaloneBodies; an empty
+        // entry block must not satisfy "body present" (#26756 / argv-driver link).
+        $this->assertTrue(
+            JitVmHelperLink::hasNamedBridgeEntry($fn, 'getenv_bridge_entry'),
+            '__compiler_getenv must have getenv_bridge_entry with a terminator'
+        );
 
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }

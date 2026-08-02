@@ -404,6 +404,14 @@ final class SelfHostBuiltinPolicy
             return false;
         }
 
+        // Internal libc kernels (phpc_*_kernel) are registered on Module::getFunctions()
+        // so looksLikeStdlibBuiltin would stub them under SELFHOST_AOT — that turns
+        // FileGetContentsJitHelper / ReadfileJitHelper into null no-ops (#26756).
+        $key = self::normalizeName($name);
+        if (str_starts_with($key, 'phpc_')) {
+            return false;
+        }
+
         return self::isAutoStubBatchMember($name) || self::looksLikeStdlibBuiltin($name);
     }
 

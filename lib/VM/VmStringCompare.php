@@ -247,6 +247,10 @@ final class VmStringCompare
 
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
+        // NestedJIT / entryAlloca can leave insert cleared mid-Runtime::parse; without an
+        // open BB, branchIf to jit_strcmp_* is parentless and sealFunction writes unreachable
+        // onto the prior block (#26756).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcmp_identical_entry');
         $map = $context->structFieldMap['__string__'];
         $leftLen = $context->builder->load(
             $context->builder->structGep($leftStr, $map['length'])
@@ -386,6 +390,9 @@ final class VmStringCompare
         if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
+        // Resume open BB before readString/identical — cleared/sealed insert leaves parentless
+        // @__value__readString and orphan jit_strcmp_* blocks under M5 argv (#26756).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcmp_value_to_string');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $boxedStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),

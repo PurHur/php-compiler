@@ -406,6 +406,22 @@ final class M3EmitTuTrivialEchoAot
     /** Runtime::standalone native for emit-helper SPINE — copy matched sidecar to outfile. */
     public static function emitStandaloneWriteCachedAot(Context $context, Value $block, Value $outFile): void
     {
+        // M5 gen-0 never-seen echo: C-floor sentinel → cc-built ELF (#26756).
+        if (M5TrivialEchoNative::isRegistered($context)) {
+            [$handled, $merge] = M5TrivialEchoNative::emitStandaloneSentinelCheck(
+                $context,
+                $block,
+                $outFile,
+                'cached'
+            );
+            $cont = BasicBlockHelper::append($context, 'm5_te_cached_cont');
+            $done = BasicBlockHelper::append($context, 'm5_te_cached_done');
+            $context->builder->positionAtEnd($merge);
+            $context->builder->branchIf($handled, $done, $cont);
+            $context->builder->positionAtEnd($done);
+            $context->builder->returnVoid();
+            $context->builder->positionAtEnd($cont);
+        }
         if (!self::isRegistered($context)) {
             $context->builder->returnVoid();
 

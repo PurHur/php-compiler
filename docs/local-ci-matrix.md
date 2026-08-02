@@ -505,7 +505,7 @@ make bootstrap-gen0-driver-functional-smoke
 # or: ./script/bootstrap-gen0-driver-functional-smoke.sh
 ```
 
-`BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE=1` adds the same check to `release-readiness` (default **off** until an honest argv-driver refresh lands — then flip default-on in `script/ci-defaults.env`). Rebuild the seed with:
+`BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE=1` adds the same check to `release-readiness` (default **on** after #26756 argv-driver refresh). Rebuild the seed with:
 
 ```bash
 # multi-hour exclusive spine + optional argv driver (#22642 protect name):

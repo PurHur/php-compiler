@@ -91,6 +91,12 @@ class Runtime {
     private ?string $jitCompileCacheKey = null;
     public array $modules = [];
     public int $mode;
+    /**
+     * M5 argv / gen-0 seed: C-floor initParsePipeline sets this so parse() skips
+     * prepareSourceForParser list-unpack (SEGV in __string__separate after identity
+     * stub setStringAt round-trip — #26756 / re-#23468).
+     */
+    public bool $m5ArgvIdentityParsePrepare = false;
     private SealedClassAnnotator $sealedClassAnnotator;
     private StaticClassAnnotator $staticClassAnnotator;
     public ?string $debugFile = null;

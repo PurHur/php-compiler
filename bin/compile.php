@@ -118,6 +118,17 @@ function phpc_compile_is_user_script_aot(string $normalized): bool
     if (str_contains($normalized, 'compiler_unit_probe')) {
         return false;
     }
+    // Zend rebuild of the production argv driver is self-host seed work, not user-script AOT.
+    // Treating bin/compile.php as a user script forces SELFHOST_AOT=0 and installs null
+    // Runtime::parse / compileEmitSmoke stubs — functional smoke then fails (#26756 / re-#23468).
+    if (str_ends_with($normalized, '/bin/compile.php') || 'bin/compile.php' === $normalized) {
+        return false;
+    }
+    // M5 argv / gen-0 seed rebuild must keep self-host compile-driver real-lowering (#26756).
+    $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+    if ('1' === $m5Host || 'true' === strtolower((string) $m5Host)) {
+        return false;
+    }
 
     return true;
 }
@@ -478,9 +489,14 @@ function run(string $filename, string $code, array $options): void
             $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
             // Real CGI refresh helpers (multipart $_FILES) must not use self-host stubs (#15624).
-            putenv('PHP_COMPILER_SELFHOST_AOT=0');
-            $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
-            $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            // Never clear SELFHOST_AOT under M5 argv / gen-0 seed rebuild (#26756).
+            $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+            $keepSelfHostForM5 = '1' === $m5DriverHost || 'true' === strtolower((string) $m5DriverHost);
+            if (!$keepSelfHostForM5) {
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            }
             // Stale MCJIT cache can resurrect pre-#13031 superglobal refresh bodies (#15624).
             putenv('PHP_COMPILER_CACHE=0');
             $_ENV['PHP_COMPILER_CACHE'] = '0';
