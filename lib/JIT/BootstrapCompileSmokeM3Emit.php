@@ -556,6 +556,56 @@ final class BootstrapCompileSmokeM3Emit
         Value $filename
     ): Value {
         $objPtr = $context->getTypeFromString('__object__*');
+        // M5 argv / gen-0: trivial echo shape via NestedJIT M5TrivialEchoScript (#26756).
+        $trivialFn = M5TrivialEchoScript::lookup($context);
+        if (null !== $trivialFn) {
+            $tag = 'te'.(string) ++self::$seq;
+            $okBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_ok_'.$tag);
+            $missBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_miss_'.$tag);
+            $doneBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_done_'.$tag);
+            $block = $context->builder->call($trivialFn, $code, $filename);
+            $isNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
+            $context->builder->branchIf($isNull, $missBb, $okBb);
+
+            $context->builder->positionAtEnd($okBb);
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($missBb);
+            $fallback = self::emitRuntimeParseAndCompileDefaultFallback(
+                $context,
+                $runtimeThis,
+                $code,
+                $filename
+            );
+            $missTail = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($doneBb);
+            $phi = $context->builder->phi($objPtr);
+            $phi->addIncoming($block, $okBb);
+            $phi->addIncoming($fallback, $missTail);
+
+            return $phi;
+        }
+
+        return self::emitRuntimeParseAndCompileDefaultFallback(
+            $context,
+            $runtimeThis,
+            $code,
+            $filename
+        );
+    }
+
+    /**
+     * parse → compileEmitSmoke / compile fallback when trivial-echo path misses (#26756).
+     */
+    private static function emitRuntimeParseAndCompileDefaultFallback(
+        Context $context,
+        Value $runtimeThis,
+        Value $code,
+        Value $filename
+    ): Value {
+        $objPtr = $context->getTypeFromString('__object__*');
         $parseLc = strtolower('PHPCompiler\\Runtime::parse');
         if (!isset($context->functions[$parseLc])) {
             return $objPtr->constNull();

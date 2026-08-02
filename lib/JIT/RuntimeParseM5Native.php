@@ -15,10 +15,10 @@ use PHPLLVM\Value;
  * - C-floor initParsePipeline only allocates a shallow Parser shell; PHPCfg\Parser::parse
  *   is not in the argv driver today (nm shows no Parser symbols).
  *
- * This floor keeps `__string__*` formals and returns null without touching prepare or
- * shallow parser slots — honest "parseAndCompile returned null" instead of exit 139.
- * Next: NestedJIT / force-include PHPCfg\Parser::parse into the M5 argv module, then
- * call it here (and run preprocessor/detector lightly for hello-world).
+ * Prefer real Parser::parse when NestedJIT-registered ({@see RuntimeParseM5PhpCfgParser}).
+ * Functional-smoke `echo "TOKEN"` is handled by {@see M5TrivialEchoScript::parseAndCompile}
+ * when NestedJIT-registered (opt-in PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT) via
+ * {@see BootstrapCompileSmokeM3Emit::emitRuntimeParseAndCompileDefault}.
  */
 final class RuntimeParseM5Native
 {

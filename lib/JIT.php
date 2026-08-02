@@ -18,6 +18,7 @@ require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
 require_once __DIR__.'/JIT/RuntimeParseM5Native.php';
 require_once __DIR__.'/JIT/RuntimeParseM5PhpCfgParser.php';
+require_once __DIR__.'/JIT/M5TrivialEchoScript.php';
 require_once __DIR__.'/JIT/RuntimePrepareSpineIdentity.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
@@ -4851,6 +4852,13 @@ class JIT {
                     return $this->context->runtime->parse($code, $path);
                 }
             );
+            // Opt-in NestedJIT of M5TrivialEchoScript::parseAndCompile — default off; NestedJIT
+            // of the helper hangs at runtime in the argv driver (#26756). Host helper +
+            // emitRuntimeParseAndCompileDefault wiring stay ready for a pure C-floor next.
+            $m5TrivialNested = getenv('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT');
+            if ('1' === $m5TrivialNested || 'true' === strtolower((string) $m5TrivialNested)) {
+                $this->ensureM5TrivialEchoScriptParseAndCompileLowered();
+            }
             $parseLogical = 'PHPCompiler\\Runtime::parse';
             $parseLc = strtolower($parseLogical);
             if (!isset($this->context->functions[$parseLc])) {
@@ -6986,6 +6994,67 @@ class JIT {
 
             return;
         }
+    }
+
+    /** NestedJIT M5TrivialEchoScript::parseAndCompile for gen-0 functional-smoke (#26756). */
+    private function ensureM5TrivialEchoScriptParseAndCompileLowered(): void
+    {
+        if (!$this->shouldUseM5DriverHostCompile()) {
+            return;
+        }
+        $logical = JIT\M5TrivialEchoScript::logicalName();
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        $path = __DIR__.'/JIT/M5TrivialEchoScript.php';
+        if (!is_file($path)) {
+            return;
+        }
+        try {
+            $script = $this->context->runtime->parse((string) file_get_contents($path), $path);
+        } catch (\Throwable $e) {
+            return;
+        }
+        $savedClassId = $this->context->scope->classId;
+        $savedClassName = $this->context->scope->className;
+        $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\JIT\\M5TrivialEchoScript');
+        $this->context->scope->className = 'phpcompiler\\jit\\m5trivialechoscript';
+        foreach ($script->main->cfg->children as $child) {
+            if (!$child instanceof Op\Stmt\Class_) {
+                continue;
+            }
+            $className = $this->cfgOperandClassName($child->name);
+            $classLc = null === $className
+                ? null
+                : strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+            if (null === $classLc || 'phpcompiler\\jit\\m5trivialechoscript' !== $classLc) {
+                continue;
+            }
+            foreach ($child->stmts->children as $bodyChild) {
+                if (!$bodyChild instanceof Op\Stmt\ClassMethod) {
+                    continue;
+                }
+                if (strtolower($bodyChild->func->name) !== 'parseandcompile') {
+                    continue;
+                }
+                if (null === $bodyChild->func->cfg) {
+                    break;
+                }
+                $compiled = $this->context->runtime->compileFunc($logical, $bodyChild->func);
+                if ($compiled instanceof CoreFunc\PHP) {
+                    JIT\NestedJitCompileScope::run($this->context, function () use ($compiled, $logical): void {
+                        $this->compileBlock($compiled->block, $logical);
+                    });
+                }
+                $this->context->scope->classId = $savedClassId;
+                $this->context->scope->className = $savedClassName;
+
+                return;
+            }
+        }
+        $this->context->scope->classId = $savedClassId;
+        $this->context->scope->className = $savedClassName;
     }
 
     /** Lower Runtime::parse / compileEmitSmoke from lib/Runtime.php for inventory argv driver (#2967). */

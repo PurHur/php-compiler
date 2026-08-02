@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+use PHPUnit\Framework\TestCase;
+
+/** M5 trivial-echo Script/Block builder for gen-0 functional smoke (#26756). */
+final class M5TrivialEchoScriptTest extends TestCase
+{
+    public function testTryBuildMatchesFunctionalSmokeShape(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $code = "<?php\necho \"GEN0_FUNCTIONAL_OK tok\\n\";\n";
+        $script = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild($code, 'never-seen.php');
+        $this->assertNotNull($script);
+        $this->assertSame('{main}', $script->main->name);
+        $this->assertCount(2, $script->main->cfg->children);
+        $this->assertInstanceOf(\PHPCfg\Op\Terminal\Echo_::class, $script->main->cfg->children[0]);
+        $this->assertInstanceOf(\PHPCfg\Op\Terminal\Return_::class, $script->main->cfg->children[1]);
+        $echo = $script->main->cfg->children[0];
+        $this->assertInstanceOf(\PHPCfg\Operand\Literal::class, $echo->expr);
+        $this->assertSame("GEN0_FUNCTIONAL_OK tok\n", $echo->expr->value);
+    }
+
+    public function testParseAndCompileMatchesCompileEmitSmoke(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $code = "<?php\necho \"hi\\n\";\n";
+        $block = \PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile($code, 't.php');
+        $this->assertInstanceOf(\PHPCompiler\Block::class, $block);
+        $this->assertSame(2, $block->nOpCodes);
+        $this->assertSame(\PHPCompiler\OpCode::TYPE_ECHO, $block->opCodes[0]->type);
+        $this->assertSame(\PHPCompiler\OpCode::TYPE_RETURN_VOID, $block->opCodes[1]->type);
+        $this->assertSame("hi\n", $block->constants[0]->toString());
+
+        $script = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild($code, 't.php');
+        $runtime = new \PHPCompiler\Runtime();
+        $ref = $runtime->compileEmitSmoke($script);
+        $this->assertSame($ref->nOpCodes, $block->nOpCodes);
+        $this->assertSame($ref->constants[0]->toString(), $block->constants[0]->toString());
+    }
+
+    public function testTryBuildRejectsNonEcho(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo 1;', 't.php'));
+        $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile('<?php $a=1;', 't.php'));
+    }
+
+    public function testWiringPrefersTrivialEchoInParseAndCompileDefault(): void
+    {
+        $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('M5TrivialEchoScript::lookup', $smoke);
+        $this->assertStringContainsString('emitRuntimeParseAndCompileDefaultFallback', $smoke);
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('M5TrivialEchoScript.php', $jit);
+        $this->assertStringContainsString('ensureM5TrivialEchoScriptParseAndCompileLowered', $jit);
+        $this->assertStringContainsString('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT', $jit);
+    }
+}
