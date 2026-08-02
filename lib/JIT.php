@@ -6881,7 +6881,11 @@ class JIT {
             }
             $compiled = $this->context->runtime->compileFunc($logical, $cfgFunc);
             if ($compiled instanceof CoreFunc\PHP) {
-                $this->compileBlock($compiled->block, $logical);
+                // Isolate builder/block maps — host-lowering Runtime.php mid argv compile
+                // otherwise leaves parentless instructions at module verify (#26756).
+                JIT\NestedJitCompileScope::run($this->context, function () use ($compiled, $logical): void {
+                    $this->compileBlock($compiled->block, $logical);
+                });
             }
 
             return;
@@ -6913,7 +6917,9 @@ class JIT {
                 }
                 $compiled = $this->context->runtime->compileFunc($logical, $bodyChild->func);
                 if ($compiled instanceof CoreFunc\PHP) {
-                    $this->compileBlock($compiled->block, $logical);
+                    JIT\NestedJitCompileScope::run($this->context, function () use ($compiled, $logical): void {
+                        $this->compileBlock($compiled->block, $logical);
+                    });
                 }
                 $this->context->scope->classId = $savedClassId;
                 $this->context->scope->className = $savedClassName;
