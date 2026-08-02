@@ -21,6 +21,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GlobalIntrospectionNameRuntime #22070).
  * Replaces {@see MathBaseConvertJit} LLVM (~950 LOC). SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit (peer #26869).
+ * NestedJIT of other helpers may only declare ABIs (#27012); bodies emit outside NestedJIT.
  * php-src: ext/standard/math.c
  */
 final class MathBaseConvertRuntime
@@ -60,7 +61,11 @@ final class MathBaseConvertRuntime
     public static function implement(Context $context): void
     {
         // NestedJIT of MathBaseConvertJitHelper must not emit outer ABI bridges (#26884).
+        // Other NestedJIT units (WeakRef→hexdec) may still emit calls — declare+register
+        // the ABIs so lookup does not throw; bodies are filled outside NestedJIT (#27012).
         if (NestedJitCompileScope::isActive()) {
+            self::declareRuntimeAbisForNestedJit($context);
+
             return;
         }
 
@@ -82,6 +87,18 @@ final class MathBaseConvertRuntime
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** Declare phpc_base_convert / phpc_basetozval_result without bridge bodies (#27012). */
+    private static function declareRuntimeAbisForNestedJit(Context $context): void
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $context->registerFunction($name, self::declareFunction($context, $name));
+            }
         }
     }
 

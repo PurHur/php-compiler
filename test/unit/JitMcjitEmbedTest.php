@@ -95,6 +95,32 @@ PHP;
         $this->assertStringContainsString('enum U', $out);
     }
 
+    /** @covers issue #27012 */
+    public function testInjectsBootstrapForInterfaceOnlyScript(): void
+    {
+        $in = <<<'PHP'
+<?php
+interface I {}
+var_export(interface_exists('I'));
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString('interface I', $out);
+    }
+
+    /** @covers issue #27012 */
+    public function testDoesNotDoubleBootstrapWhenInterfacePlusPaddedClass(): void
+    {
+        $in = <<<'PHP'
+<?php
+interface I {}
+class C {}
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringNotContainsString('__phpc_mcjit_embed_bootstrap', $out);
+    }
+
     /** @covers issue #25929 — docblock "class constant" must not pad a following enum */
     public function testDoesNotPadEnumWhenDocblockMentionsClassConstant(): void
     {
