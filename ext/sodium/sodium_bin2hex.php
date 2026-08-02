@@ -7,13 +7,20 @@ namespace PHPCompiler\ext\sodium;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringBin2hex;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_bin2hex() — binary to hex (php-src ext/sodium/libsodium.c; #3438, #21517/#24772). */
+/**
+ * sodium_bin2hex() — binary to hex (php-src ext/sodium/libsodium.c; #3438, #21517/#24772, #26871).
+ *
+ * JIT/AOT: reuse {@see StringBin2hex} / `__compiler_bin2hex` (output matches Zend sodium_bin2hex;
+ * NestedJIT-safe via Bin2hexJitHelper — no new C).
+ */
 final class sodium_bin2hex extends Internal
 {
     public function __construct()
@@ -35,6 +42,31 @@ final class sodium_bin2hex extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() JIT is not supported in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, $this->getName(), 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
+        StringBin2hex::ensureLinked($context);
+
+        $string = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'string'
+            )
+            : JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                $this->getName(),
+                0,
+                'string'
+            );
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_bin2hex'),
+            $string
+        );
     }
 }
