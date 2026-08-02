@@ -173,9 +173,10 @@ final class BackedEnumFromJit
 
     private static function returnEnumCaseValue(Context $context, ObjectBuiltin $object, int $classId, string $caseKey): Value
     {
+        // Heap box: from()/tryFrom are separate native functions; a stack alloca would be
+        // use-after-return once the caller continues (#26855 / re-#24208).
+        $ptr = self::allocReturnValueSlot($context);
         $caseVar = $object->jitEnumCaseFromBacking($classId, $caseKey);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
         $objPtr = Variable::KIND_VALUE === $caseVar->kind
             ? $caseVar->value
             : $context->builder->load($caseVar->value);
@@ -190,14 +191,30 @@ final class BackedEnumFromJit
 
     private static function returnNullValue(Context $context): Value
     {
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
+        $ptr = self::allocReturnValueSlot($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             $ptr
         );
 
         return $ptr;
+    }
+
+    /** Heap {@see __value__*} for synthesized enum::from / ::tryFrom return (#26855). */
+    private static function allocReturnValueSlot(Context $context): Value
+    {
+        $valueType = $context->getTypeFromString('__value__');
+        $heapVal = $context->memory->malloc($valueType);
+        $map = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($heapVal, $map['type'])
+        );
+
+        return $context->builder->pointerCast(
+            $heapVal,
+            $context->getTypeFromString('__value__*')
+        );
     }
 
     /**
