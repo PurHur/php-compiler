@@ -804,6 +804,7 @@ class Context {
             'phpc_hypot_kernel',
             'phpc_fmod_kernel',
             'phpc_ceil_kernel',
+            'phpc_floor_kernel',
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',

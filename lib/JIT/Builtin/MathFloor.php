@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitFloorKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for floor() via FloorJitHelper PHP (#15128).
+ * JIT/AOT link for floor() via FloorJitHelper PHP (#15128, #27004).
  *
- * Replaces libc `floor` LLVM lookup in ext/standard/floor.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see FloorJitHelper} via {@see JitVmHelperLink}
+ * (Hypot/Sqrt #20664 / Ceil #27003 shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering FloorJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(floor)
  */
 final class MathFloor
@@ -28,6 +31,8 @@ final class MathFloor
         self::FLOOR_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'floor_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathFloor
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitFloorKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathFloor
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_FLOOR);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_FLOOR, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_FLOOR,
-            'floor_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::FLOOR_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15128'
+            '#27004'
         );
     }
 }
