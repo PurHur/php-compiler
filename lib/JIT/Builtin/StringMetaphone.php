@@ -22,6 +22,17 @@ final class StringMetaphone
 
     private const HELPER_PATH = '/ext/standard/MetaphoneJitHelper.php';
 
+    /**
+     * NestedJIT VmMetaphone with the helper — solo MetaphoneJitHelper stubs
+     * VmMetaphone::encode (fingerprint deps are not NestedJIT'd) (#26794).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/VmMetaphone.php',
+        '/ext/standard/MetaphoneJitHelper.php',
+    ];
+
     private const METAPHONE_HELPER = 'PHPCompiler\\ext\\standard\\MetaphoneJitHelper::metaphoneArgv';
 
     /** @var list<string> */
@@ -56,6 +67,13 @@ final class StringMetaphone
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
+        // Bundle NestedJITs VmMetaphone before the ABI bridge (#26794).
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#21342'
+        );
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI,

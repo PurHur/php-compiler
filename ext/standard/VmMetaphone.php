@@ -12,22 +12,22 @@ final class VmMetaphone
     private const SH = 'X';
     private const TH = '0';
 
-    /** @var list<int> */
-    private const CODES = [
-        1, 16, 4, 16, 9, 2, 4, 16, 9, 2, 0, 2, 2, 2, 1, 4, 0, 2, 4, 4, 1, 0, 0, 0, 8, 0,
-    ];
-
     private static function upperAt(string $word, int $len, int $index): string
     {
         if ($index < 0 || $index >= $len) {
             return '';
         }
-        $ord = \ord($word[$index]);
+        // NestedJIT/AOT: `$word[$index]` offsets stay null / abort (#26794).
+        $ch = \substr($word, $index, 1);
+        if ('' === $ch) {
+            return '';
+        }
+        $ord = \ord($ch);
         if ($ord >= 97 && $ord <= 122) {
             return \chr($ord - 32);
         }
 
-        return $word[$index];
+        return $ch;
     }
 
     private static function isAlpha(string $c): bool
@@ -55,9 +55,37 @@ final class VmMetaphone
         if (!self::isAlpha($c)) {
             return 0;
         }
-        $o = \ord(self::toUpper($c));
-
-        return self::CODES[$o - 65];
+        // NestedJIT/AOT: avoid class-const list indexing (#26794).
+        // php-src ext/standard/string.c metaphone code table (A…Z).
+        switch (\ord(self::toUpper($c))) {
+            case 65: return 1;   // A
+            case 66: return 16;  // B
+            case 67: return 4;   // C
+            case 68: return 16;  // D
+            case 69: return 9;   // E
+            case 70: return 2;   // F
+            case 71: return 4;   // G
+            case 72: return 16;  // H
+            case 73: return 9;   // I
+            case 74: return 2;   // J
+            case 75: return 0;   // K
+            case 76: return 2;   // L
+            case 77: return 2;   // M
+            case 78: return 2;   // N
+            case 79: return 1;   // O
+            case 80: return 4;   // P
+            case 81: return 0;   // Q
+            case 82: return 2;   // R
+            case 83: return 4;   // S
+            case 84: return 4;   // T
+            case 85: return 1;   // U
+            case 86: return 0;   // V
+            case 87: return 0;   // W
+            case 88: return 0;   // X
+            case 89: return 8;   // Y
+            case 90: return 0;   // Z
+            default: return 0;
+        }
     }
 
     private static function isVowel(string $c): bool
@@ -85,12 +113,10 @@ final class VmMetaphone
         return !self::isAlpha($c);
     }
 
-    private static function phonize(string &$out, string $c, int $maxPhonemes): void
+    /** NestedJIT/AOT-safe phoneme concat (no by-ref string mutation) (#26794). */
+    private static function appendPhoneme(string $out, string $c): string
     {
-        if (0 !== $maxPhonemes && \strlen($out) >= $maxPhonemes) {
-            return;
-        }
-        $out .= $c;
+        return $out.$c;
     }
 
     public static function encode(string $word, int $maxPhonemes = 0): string
@@ -117,10 +143,10 @@ final class VmMetaphone
         switch ($curr) {
             case 'A':
                 if ('E' === $next) {
-                    self::phonize($out, 'E', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'E');
                     $wIdx += 2;
                 } else {
-                    self::phonize($out, 'A', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'A');
                     ++$wIdx;
                 }
                 break;
@@ -128,33 +154,33 @@ final class VmMetaphone
             case 'K':
             case 'P':
                 if ('N' === $next) {
-                    self::phonize($out, 'N', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'N');
                     $wIdx += 2;
                 }
                 break;
             case 'W':
                 if ('R' === $next) {
-                    self::phonize($out, $next, $maxPhonemes);
+                    $out = self::appendPhoneme($out, $next);
                     $wIdx += 2;
                 } elseif ('H' === $next || self::isVowel($next)) {
-                    self::phonize($out, 'W', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'W');
                     $wIdx += 2;
                 }
                 break;
             case 'X':
-                self::phonize($out, 'S', $maxPhonemes);
+                $out = self::appendPhoneme($out, 'S');
                 ++$wIdx;
                 break;
             case 'E':
             case 'I':
             case 'O':
             case 'U':
-                self::phonize($out, $curr, $maxPhonemes);
+                $out = self::appendPhoneme($out, $curr);
                 ++$wIdx;
                 break;
         }
 
-        while ('' !== self::upperAt($word, $len, $wIdx) && (0 === $maxPhonemes || \strlen($out) < $maxPhonemes)) {
+        while ('' !== self::upperAt($word, $len, $wIdx)) {
             $skip = 0;
             $curr = self::upperAt($word, $len, $wIdx);
             $next = self::upperAt($word, $len, $wIdx + 1);
@@ -173,33 +199,33 @@ final class VmMetaphone
             switch ($curr) {
                 case 'B':
                     if ('M' !== $prev) {
-                        self::phonize($out, 'B', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'B');
                     }
                     break;
                 case 'C':
                     if (self::makeSoft($next)) {
                         if ('A' === $afterNext && 'I' === $next) {
-                            self::phonize($out, self::SH, $maxPhonemes);
+                            $out = self::appendPhoneme($out, self::SH);
                         } elseif ('S' !== $prev) {
-                            self::phonize($out, 'S', $maxPhonemes);
+                            $out = self::appendPhoneme($out, 'S');
                         }
                     } elseif ('H' === $next) {
                         if (!$traditional && ('R' === $afterNext || 'S' === $prev)) {
-                            self::phonize($out, 'K', $maxPhonemes);
+                            $out = self::appendPhoneme($out, 'K');
                         } else {
-                            self::phonize($out, self::SH, $maxPhonemes);
+                            $out = self::appendPhoneme($out, self::SH);
                         }
                         $skip = 1;
                     } else {
-                        self::phonize($out, 'K', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'K');
                     }
                     break;
                 case 'D':
                     if ('G' === $next && self::makeSoft($afterNext)) {
-                        self::phonize($out, 'J', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'J');
                         $skip = 1;
                     } else {
-                        self::phonize($out, 'T', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'T');
                     }
                     break;
                 case 'G':
@@ -207,45 +233,45 @@ final class VmMetaphone
                         $lookBack3 = self::upperAt($word, $len, $wIdx - 3);
                         $lookBack4 = self::upperAt($word, $len, $wIdx - 4);
                         if (!self::noGhToF($lookBack3) && 'H' !== $lookBack4) {
-                            self::phonize($out, 'F', $maxPhonemes);
+                            $out = self::appendPhoneme($out, 'F');
                             $skip = 1;
                         }
                     } elseif ('N' === $next) {
                         $lookAhead3 = self::upperAt($word, $len, $wIdx + 3);
                         if (!self::isBreak($afterNext) && ('E' !== $afterNext || 'D' !== $lookAhead3)) {
-                            self::phonize($out, 'K', $maxPhonemes);
+                            $out = self::appendPhoneme($out, 'K');
                         }
                     } elseif (self::makeSoft($next) && 'G' !== $prev) {
-                        self::phonize($out, 'J', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'J');
                     } else {
-                        self::phonize($out, 'K', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'K');
                     }
                     break;
                 case 'H':
                     if (self::isVowel($next) && !self::affectH($prev)) {
-                        self::phonize($out, 'H', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'H');
                     }
                     break;
                 case 'K':
                     if ('C' !== $prev) {
-                        self::phonize($out, 'K', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'K');
                     }
                     break;
                 case 'P':
                     if ('H' === $next) {
-                        self::phonize($out, 'F', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'F');
                     } else {
-                        self::phonize($out, 'P', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'P');
                     }
                     break;
                 case 'Q':
-                    self::phonize($out, 'K', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'K');
                     break;
                 case 'S':
                     if ('I' === $next && ('O' === $afterNext || 'A' === $afterNext)) {
-                        self::phonize($out, self::SH, $maxPhonemes);
+                        $out = self::appendPhoneme($out, self::SH);
                     } elseif ('H' === $next) {
-                        self::phonize($out, self::SH, $maxPhonemes);
+                        $out = self::appendPhoneme($out, self::SH);
                         $skip = 1;
                     } elseif (
                         !$traditional
@@ -253,41 +279,41 @@ final class VmMetaphone
                         && 'H' === self::upperAt($word, $len, $wIdx + 2)
                         && 'W' === self::upperAt($word, $len, $wIdx + 3)
                     ) {
-                        self::phonize($out, self::SH, $maxPhonemes);
+                        $out = self::appendPhoneme($out, self::SH);
                         $skip = 2;
                     } else {
-                        self::phonize($out, 'S', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'S');
                     }
                     break;
                 case 'T':
                     if ('I' === $next && ('O' === $afterNext || 'A' === $afterNext)) {
-                        self::phonize($out, self::SH, $maxPhonemes);
+                        $out = self::appendPhoneme($out, self::SH);
                     } elseif ('H' === $next) {
-                        self::phonize($out, self::TH, $maxPhonemes);
+                        $out = self::appendPhoneme($out, self::TH);
                         $skip = 1;
                     } elseif (!('C' === $next && 'H' === $afterNext)) {
-                        self::phonize($out, 'T', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'T');
                     }
                     break;
                 case 'V':
-                    self::phonize($out, 'F', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'F');
                     break;
                 case 'W':
                     if (self::isVowel($next)) {
-                        self::phonize($out, 'W', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'W');
                     }
                     break;
                 case 'X':
-                    self::phonize($out, 'K', $maxPhonemes);
-                    self::phonize($out, 'S', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'K');
+                    $out = self::appendPhoneme($out, 'S');
                     break;
                 case 'Y':
                     if (self::isVowel($next)) {
-                        self::phonize($out, 'Y', $maxPhonemes);
+                        $out = self::appendPhoneme($out, 'Y');
                     }
                     break;
                 case 'Z':
-                    self::phonize($out, 'S', $maxPhonemes);
+                    $out = self::appendPhoneme($out, 'S');
                     break;
                 case 'F':
                 case 'J':
@@ -295,13 +321,19 @@ final class VmMetaphone
                 case 'M':
                 case 'N':
                 case 'R':
-                    self::phonize($out, $curr, $maxPhonemes);
+                    $out = self::appendPhoneme($out, $curr);
                     break;
             }
 
             $wIdx += 1 + $skip;
         }
 
+        if ($maxPhonemes > 0) {
+            // NestedJIT/AOT: avoid strlen($out) mid-loop; truncate once (#26794).
+            return \substr($out, 0, $maxPhonemes);
+        }
+
         return $out;
     }
 }
+
