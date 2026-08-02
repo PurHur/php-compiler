@@ -884,6 +884,11 @@ class Context {
         if (DomInstanceMethodJit::isDomInstanceMethodProxy($lc)) {
             DomInstanceMethodJit::ensureProxy($this, $lc);
         }
+        if (SimpleXmlInstanceMethodJit::isSimpleXmlInstanceMethodProxy($lc)
+            && UserScriptAotEnv::isActive()
+        ) {
+            SimpleXmlInstanceMethodJit::ensureProxy($this, $lc);
+        }
         if ($this->functionProxyIsCallable($lc)) {
             return true;
         }

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6777 |
-| Phase A inventory files (M2 ratio SSOT) | 6777 |
+| PHP files on vm.php path | 6786 |
+| Phase A inventory files (M2 ratio SSOT) | 6786 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21901 |
+| Source constructs flagged (warnings) | 21918 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1854,7 +1854,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlAddChild.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAsXml.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 2 |
-| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 3 |
+| `ext/simplexml/JitSimpleXmlCount.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlGet.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlLoadString.php` | 0 | 2 |
+| `ext/simplexml/JitSimpleXmlOffsetGet.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlToString.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 5 |
 | `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
 | `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 2 |
@@ -4928,7 +4933,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 137 |
+| `lib/JIT.php` | 0 | 138 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
@@ -5757,6 +5762,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/SimpleXMLElementAddChild.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAsXml.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementCount.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementGet.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementOffsetGet.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementToString.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementXpath.php` | 0 | 1 |
 | `lib/JIT/Call/SplDllistMethod.php` | 0 | 2 |
 | `lib/JIT/Call/SplHeapMethod.php` | 0 | 2 |
@@ -5932,7 +5941,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SensitiveParamHelper.php` | 0 | 1 |
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 5 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 9 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
@@ -22001,11 +22010,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 26)
 - 1 class method(s)
 
+### `ext/simplexml/JitSimpleXmlCount.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlLoadString.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlOffsetGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 55)
-- 8 class method(s)
+- new SimpleXMLElement (line 109)
+- new JITVariable (line 236)
+- new JITVariable (line 451)
+- 18 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -30964,7 +31001,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StrRot13JitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/StrWordCountJitHelper.php`
 
@@ -43717,106 +43754,107 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Variable (line 7354)
 - new Variable (line 7579)
 - new Variable (line 7612)
-- new Variable (line 8039)
-- new Variable (line 8064)
-- new Variable (line 8101)
-- new Variable (line 8226)
-- new Error (line 8354)
-- new Variable (line 8391)
-- new Variable (line 8399)
-- new Operand\Literal (line 8595)
-- new Variable (line 8740)
-- new Variable (line 8833)
-- new Operand\Literal (line 8939)
-- new Operand\Literal (line 9019)
-- new Variable (line 9488)
-- new Variable (line 9568)
-- new Variable (line 9645)
-- new VM\Variable (line 9726)
-- new OpCode (line 9827)
-- new Variable (line 10436)
-- new Variable (line 10518)
-- new JIT\Call\ClosureWithBinding (line 10549)
-- new JIT\Call\RuntimeVariableFunction (line 10627)
-- new Variable (line 10829)
-- new Variable (line 10843)
-- new VM\Variable (line 11111)
-- new VM (line 11117)
-- new VM\Variable (line 11130)
-- new Variable (line 11363)
-- new Type (line 11370)
-- new Variable (line 11391)
-- new Type (line 11399)
-- new Variable (line 11427)
-- new Type (line 11437)
-- new Variable (line 11682)
-- new Variable (line 11703)
-- new Variable (line 13050)
-- new Variable (line 13071)
-- new Variable (line 13100)
-- new Variable (line 13121)
-- new CompileError (line 13910)
-- new CompileError (line 14039)
-- new Variable (line 14096)
-- new Variable (line 14130)
-- new Variable (line 14591)
-- new Variable (line 14611)
-- new Variable (line 14632)
-- new Variable (line 14722)
-- new Variable (line 14763)
-- new Variable (line 14873)
-- new Variable (line 14897)
-- new Variable (line 14907)
-- new Variable (line 15092)
-- new Variable (line 15110)
-- new Variable (line 15168)
-- new Variable (line 15195)
-- new Variable (line 15221)
-- new Variable (line 15560)
-- new Variable (line 15934)
-- new Variable (line 15964)
-- new Variable (line 15983)
-- new Variable (line 16013)
-- new Variable (line 16050)
-- new Variable (line 16098)
-- new Variable (line 16141)
-- new VM\Variable (line 16576)
-- new Variable (line 16610)
+- new Variable (line 8063)
+- new Variable (line 8088)
+- new Variable (line 8125)
+- new Variable (line 8250)
+- new Error (line 8378)
+- new Variable (line 8415)
+- new Variable (line 8423)
+- new Operand\Literal (line 8619)
+- new Variable (line 8764)
+- new Variable (line 8857)
+- new Operand\Literal (line 8963)
+- new Operand\Literal (line 9043)
+- new Variable (line 9512)
+- new Variable (line 9592)
+- new Variable (line 9669)
+- new VM\Variable (line 9750)
+- new OpCode (line 9851)
+- new Variable (line 10460)
+- new Variable (line 10542)
+- new JIT\Call\ClosureWithBinding (line 10573)
+- new JIT\Call\RuntimeVariableFunction (line 10651)
+- new Variable (line 10853)
+- new Variable (line 10867)
+- new VM\Variable (line 11135)
+- new VM (line 11141)
+- new VM\Variable (line 11154)
+- new Variable (line 11387)
+- new Type (line 11394)
+- new Variable (line 11415)
+- new Type (line 11423)
+- new Variable (line 11451)
+- new Type (line 11461)
+- new Variable (line 11706)
+- new Variable (line 11727)
+- new Operand\Literal (line 11819)
+- new Variable (line 13102)
+- new Variable (line 13123)
+- new Variable (line 13152)
+- new Variable (line 13173)
+- new CompileError (line 13962)
+- new CompileError (line 14091)
+- new Variable (line 14148)
+- new Variable (line 14182)
+- new Variable (line 14643)
+- new Variable (line 14663)
+- new Variable (line 14684)
+- new Variable (line 14774)
+- new Variable (line 14815)
+- new Variable (line 14925)
+- new Variable (line 14949)
+- new Variable (line 14959)
+- new Variable (line 15144)
+- new Variable (line 15162)
+- new Variable (line 15220)
+- new Variable (line 15247)
+- new Variable (line 15273)
+- new Variable (line 15612)
+- new Variable (line 15986)
+- new Variable (line 16016)
+- new Variable (line 16035)
+- new Variable (line 16065)
+- new Variable (line 16102)
+- new Variable (line 16150)
+- new Variable (line 16193)
+- new VM\Variable (line 16628)
 - new Variable (line 16662)
-- new Variable (line 16680)
-- new Variable (line 16699)
-- new Variable (line 16706)
-- new OpCode (line 16728)
-- new Variable (line 16729)
-- new Variable (line 16989)
-- new Variable (line 17045)
-- new Variable (line 17083)
-- new OpCode (line 17097)
-- new Variable (line 17098)
-- new Variable (line 17157)
-- new OpCode (line 17178)
-- new Variable (line 17179)
-- new Variable (line 17278)
-- new Variable (line 17300)
-- new Variable (line 17368)
-- new Operand\Literal (line 17377)
-- new Variable (line 17392)
-- new Variable (line 17702)
-- new VM\PropertyIsInitializedHandler (line 17799)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 17839)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18161)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18309)
-- new JIT\Call\VmCoerceVariableToString (line 18436)
-- new JIT\Call\IncludePathResolverResolve (line 18733)
-- new Operand\Literal (line 18820)
-- new Operand\Literal (line 18823)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 18866)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 19013)
-- new VM (line 20112)
-- new VM\Variable (line 20121)
-- new Variable (line 20142)
-- new Variable (line 20188)
-- new Variable (line 20735)
+- new Variable (line 16714)
+- new Variable (line 16732)
+- new Variable (line 16751)
+- new Variable (line 16758)
+- new OpCode (line 16780)
+- new Variable (line 16781)
+- new Variable (line 17041)
+- new Variable (line 17097)
+- new Variable (line 17135)
+- new OpCode (line 17149)
+- new Variable (line 17150)
+- new Variable (line 17209)
+- new OpCode (line 17230)
+- new Variable (line 17231)
+- new Variable (line 17330)
+- new Variable (line 17352)
+- new Variable (line 17420)
+- new Operand\Literal (line 17429)
+- new Variable (line 17444)
+- new Variable (line 17754)
+- new VM\PropertyIsInitializedHandler (line 17851)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 17891)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18213)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18361)
+- new JIT\Call\VmCoerceVariableToString (line 18488)
+- new JIT\Call\IncludePathResolverResolve (line 18785)
+- new Operand\Literal (line 18872)
+- new Operand\Literal (line 18875)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 18918)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 19065)
+- new VM (line 20164)
+- new VM\Variable (line 20173)
+- new Variable (line 20194)
+- new Variable (line 20240)
+- new Variable (line 20787)
 - 407 class method(s)
 - 7 closure(s)
 
@@ -46699,7 +46737,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrRot13.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringStrWordCount.php`
 
@@ -48171,6 +48209,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementCount.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/SimpleXMLElementGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/SimpleXMLElementOffsetGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/SimpleXMLElementToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SimpleXMLElementXpath.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48440,98 +48498,98 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 615)
 - new Scope (line 635)
 - new Call\ExternalMethod (line 690)
-- new Builtin\IsNullFn (line 1001)
-- new Builtin\IsNullFn (line 1002)
-- new Call\SplObjectStorageMethod (line 1003)
-- new Call\SplObjectStorageMethod (line 1004)
-- new Call\SplObjectStorageMethod (line 1005)
-- new Call\SplObjectStorageMethod (line 1006)
-- new Call\SplObjectStorageMethod (line 1007)
+- new Builtin\IsNullFn (line 1006)
+- new Builtin\IsNullFn (line 1007)
 - new Call\SplObjectStorageMethod (line 1008)
-- new Call\ArrayIteratorConstruct (line 1010)
-- new Call\ArrayIteratorConstruct (line 1011)
-- new Call\RecursiveIteratorIteratorConstruct (line 1015)
-- new Call\SplHeapMethod (line 1023)
-- new Call\SplDllistMethod (line 1037)
-- new Call\WeakReferenceCreate (line 1041)
-- new Call\WeakReferenceGet (line 1042)
-- new Call\WeakMapMethod (line 1043)
-- new Call\WeakMapMethod (line 1044)
-- new Call\WeakMapMethod (line 1045)
-- new Call\WeakMapMethod (line 1046)
-- new Call\WeakMapMethod (line 1047)
-- new Call\BcMathNumberConstruct (line 1050)
-- new Call\BcMathNumberToString (line 1051)
-- new Call\BcMathNumberMethod (line 1054)
-- new Call\ReflectionClassConstruct (line 1058)
-- new Call\ReflectionObjectConstruct (line 1059)
-- new Call\ReflectionClassGetName (line 1060)
-- new Call\ReflectionClassGetShortName (line 1061)
-- new Call\ReflectionClassGetAttributes (line 1062)
-- new Call\ReflectionClassGetMethod (line 1063)
-- new Call\ReflectionClassGetReflectionConstant (line 1064)
-- new Call\ReflectionClassIsFinal (line 1065)
-- new Call\ReflectionClassIsIterateable (line 1066)
-- new Call\ReflectionClassIsIterateable (line 1067)
-- new Call\ReflectionClassNewLazyProxy (line 1069)
-- new Call\ReflectionClassNewLazyGhost (line 1070)
-- new Call\ReflectionClassCreateLazyGhost (line 1071)
-- new Call\ReflectionClassCreateLazyProxy (line 1072)
-- new Call\ReflectionPropertyConstruct (line 1074)
-- new Call\ReflectionPropertyGetAttributes (line 1075)
-- new Call\ReflectionPropertyIsFinal (line 1076)
-- new Call\ReflectionConstantConstruct (line 1078)
-- new Call\ReflectionConstantGetAttributes (line 1079)
-- new Call\ReflectionClassConstantGetAttributes (line 1081)
-- new Call\ReflectionMethodGetAttributes (line 1082)
-- new Call\ReflectionFunctionConstruct (line 1083)
-- new Call\ReflectionFunctionGetName (line 1084)
-- new Call\ReflectionFunctionIsVariadic (line 1085)
-- new Call\ReflectionParameterIsSensitiveParameter (line 1087)
-- new Call\ReflectionFunctionGetNamedArguments (line 1090)
-- new Call\ReflectionMethodGetNamedArguments (line 1091)
-- new Call\ReflectionAttributeGetName (line 1093)
-- new Call\ReflectionAttributeGetTarget (line 1094)
-- new Call\ReflectionAttributeNewInstance (line 1095)
-- new Call\ReflectionEnumConstruct (line 1096)
-- new Call\ReflectionEnumGetName (line 1097)
-- new Call\ReflectionEnumHasCase (line 1098)
-- new Call\ReflectionEnumGetCase (line 1099)
-- new Call\ReflectionEnumIsBacked (line 1100)
-- new Call\ReflectionEnumUnitCaseGetName (line 1101)
-- new Call\ReflectionEnumUnitCaseGetName (line 1102)
-- new Call\ExceptionGetMessage (line 1103)
-- new Call\ExceptionGetCode (line 1104)
-- new Call\ExceptionToString (line 1105)
-- new Call\ExceptionGetTraceAsString (line 1106)
-- new Call\ExceptionConstruct (line 1109)
-- new Call\DateTimeConstruct (line 1130)
-- new Call\DateTimeImmutableConstruct (line 1131)
-- new Call\DateTimeZoneConstruct (line 1132)
-- new Call\DateIntervalConstruct (line 1133)
-- new Call\DatePeriodConstruct (line 1134)
-- new Call\DatePeriodCreateFromISO8601String (line 1136)
-- new Call\DatePeriodIteratorMethod (line 1138)
-- new Call\DateTimeFormat (line 1141)
-- new Call\DateTimeFormat (line 1142)
-- new Call\DateTimeCreateFromFormat (line 1144)
-- new Call\DateTimeCreateFromFormat (line 1145)
-- new Call\DateIntervalCreateFromDateString (line 1147)
-- new Call\DateTimeSetTimezone (line 1149)
-- new Call\DateTimeSetTimezone (line 1155)
-- new Result (line 1524)
-- new Result (line 1546)
-- new Variable (line 2219)
-- new Variable (line 2356)
-- new Variable (line 2610)
-- new Variable (line 2668)
-- new VMVariable (line 2830)
-- new VMVariable (line 2846)
-- new VMVariable (line 2852)
-- new VMVariable (line 2858)
-- new VMVariable (line 2869)
-- new Variable (line 2899)
-- new Variable (line 2942)
+- new Call\SplObjectStorageMethod (line 1009)
+- new Call\SplObjectStorageMethod (line 1010)
+- new Call\SplObjectStorageMethod (line 1011)
+- new Call\SplObjectStorageMethod (line 1012)
+- new Call\SplObjectStorageMethod (line 1013)
+- new Call\ArrayIteratorConstruct (line 1015)
+- new Call\ArrayIteratorConstruct (line 1016)
+- new Call\RecursiveIteratorIteratorConstruct (line 1020)
+- new Call\SplHeapMethod (line 1028)
+- new Call\SplDllistMethod (line 1042)
+- new Call\WeakReferenceCreate (line 1046)
+- new Call\WeakReferenceGet (line 1047)
+- new Call\WeakMapMethod (line 1048)
+- new Call\WeakMapMethod (line 1049)
+- new Call\WeakMapMethod (line 1050)
+- new Call\WeakMapMethod (line 1051)
+- new Call\WeakMapMethod (line 1052)
+- new Call\BcMathNumberConstruct (line 1055)
+- new Call\BcMathNumberToString (line 1056)
+- new Call\BcMathNumberMethod (line 1059)
+- new Call\ReflectionClassConstruct (line 1063)
+- new Call\ReflectionObjectConstruct (line 1064)
+- new Call\ReflectionClassGetName (line 1065)
+- new Call\ReflectionClassGetShortName (line 1066)
+- new Call\ReflectionClassGetAttributes (line 1067)
+- new Call\ReflectionClassGetMethod (line 1068)
+- new Call\ReflectionClassGetReflectionConstant (line 1069)
+- new Call\ReflectionClassIsFinal (line 1070)
+- new Call\ReflectionClassIsIterateable (line 1071)
+- new Call\ReflectionClassIsIterateable (line 1072)
+- new Call\ReflectionClassNewLazyProxy (line 1074)
+- new Call\ReflectionClassNewLazyGhost (line 1075)
+- new Call\ReflectionClassCreateLazyGhost (line 1076)
+- new Call\ReflectionClassCreateLazyProxy (line 1077)
+- new Call\ReflectionPropertyConstruct (line 1079)
+- new Call\ReflectionPropertyGetAttributes (line 1080)
+- new Call\ReflectionPropertyIsFinal (line 1081)
+- new Call\ReflectionConstantConstruct (line 1083)
+- new Call\ReflectionConstantGetAttributes (line 1084)
+- new Call\ReflectionClassConstantGetAttributes (line 1086)
+- new Call\ReflectionMethodGetAttributes (line 1087)
+- new Call\ReflectionFunctionConstruct (line 1088)
+- new Call\ReflectionFunctionGetName (line 1089)
+- new Call\ReflectionFunctionIsVariadic (line 1090)
+- new Call\ReflectionParameterIsSensitiveParameter (line 1092)
+- new Call\ReflectionFunctionGetNamedArguments (line 1095)
+- new Call\ReflectionMethodGetNamedArguments (line 1096)
+- new Call\ReflectionAttributeGetName (line 1098)
+- new Call\ReflectionAttributeGetTarget (line 1099)
+- new Call\ReflectionAttributeNewInstance (line 1100)
+- new Call\ReflectionEnumConstruct (line 1101)
+- new Call\ReflectionEnumGetName (line 1102)
+- new Call\ReflectionEnumHasCase (line 1103)
+- new Call\ReflectionEnumGetCase (line 1104)
+- new Call\ReflectionEnumIsBacked (line 1105)
+- new Call\ReflectionEnumUnitCaseGetName (line 1106)
+- new Call\ReflectionEnumUnitCaseGetName (line 1107)
+- new Call\ExceptionGetMessage (line 1108)
+- new Call\ExceptionGetCode (line 1109)
+- new Call\ExceptionToString (line 1110)
+- new Call\ExceptionGetTraceAsString (line 1111)
+- new Call\ExceptionConstruct (line 1114)
+- new Call\DateTimeConstruct (line 1135)
+- new Call\DateTimeImmutableConstruct (line 1136)
+- new Call\DateTimeZoneConstruct (line 1137)
+- new Call\DateIntervalConstruct (line 1138)
+- new Call\DatePeriodConstruct (line 1139)
+- new Call\DatePeriodCreateFromISO8601String (line 1141)
+- new Call\DatePeriodIteratorMethod (line 1143)
+- new Call\DateTimeFormat (line 1146)
+- new Call\DateTimeFormat (line 1147)
+- new Call\DateTimeCreateFromFormat (line 1149)
+- new Call\DateTimeCreateFromFormat (line 1150)
+- new Call\DateIntervalCreateFromDateString (line 1152)
+- new Call\DateTimeSetTimezone (line 1154)
+- new Call\DateTimeSetTimezone (line 1160)
+- new Result (line 1529)
+- new Result (line 1551)
+- new Variable (line 2224)
+- new Variable (line 2361)
+- new Variable (line 2615)
+- new Variable (line 2673)
+- new VMVariable (line 2835)
+- new VMVariable (line 2851)
+- new VMVariable (line 2857)
+- new VMVariable (line 2863)
+- new VMVariable (line 2874)
+- new Variable (line 2904)
+- new Variable (line 2947)
 - 106 class method(s)
 - 32 closure(s)
 
@@ -49015,16 +49073,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitNativeString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 94)
 - new Variable (line 106)
-- new Variable (line 132)
+- new Variable (line 122)
 - new Variable (line 148)
-- new Variable (line 193)
-- new Variable (line 221)
-- new Variable (line 229)
-- new Variable (line 243)
-- new Variable (line 251)
-- new Variable (line 274)
+- new Variable (line 164)
+- new Variable (line 209)
+- new Variable (line 237)
+- new Variable (line 245)
+- new Variable (line 259)
+- new Variable (line 267)
+- new Variable (line 290)
 - 4 class method(s)
 
 ### `lib/JIT/JitNestedHelperCoerce.php`
@@ -49170,18 +49228,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/MagicMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 156)
-- new Variable (line 190)
-- new Variable (line 196)
-- new Operand\Literal (line 424)
-- new Operand\Literal (line 430)
-- new Operand\Literal (line 439)
-- new Operand\Literal (line 445)
-- new Variable (line 460)
-- new Error (line 473)
-- new Error (line 479)
-- new Variable (line 517)
-- new Operand\Literal (line 527)
+- new Variable (line 160)
+- new Variable (line 194)
+- new Variable (line 200)
+- new Operand\Literal (line 428)
+- new Operand\Literal (line 434)
+- new Operand\Literal (line 443)
+- new Operand\Literal (line 449)
+- new Variable (line 464)
+- new Error (line 477)
+- new Error (line 483)
+- new Variable (line 521)
+- new Operand\Literal (line 531)
 - 17 class method(s)
 - 1 closure(s)
 
@@ -49465,11 +49523,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 32)
-- new Call\SimpleXMLElementAddChild (line 37)
-- new Call\SimpleXMLElementAsXml (line 43)
-- new Call\SimpleXMLElementXpath (line 48)
-- 1 class method(s)
+- new Call\SimpleXMLElementConstruct (line 43)
+- new Call\SimpleXMLElementAddChild (line 48)
+- new Call\SimpleXMLElementAsXml (line 54)
+- new Call\SimpleXMLElementXpath (line 59)
+- new Call\SimpleXMLElementGet (line 64)
+- new Call\SimpleXMLElementOffsetGet (line 69)
+- new Call\SimpleXMLElementCount (line 74)
+- new Call\SimpleXMLElementToString (line 79)
+- 2 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`
 

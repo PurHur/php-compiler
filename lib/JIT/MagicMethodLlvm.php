@@ -50,6 +50,10 @@ final class MagicMethodLlvm
         $methodLc = strtolower($methodLc);
         $visited = [];
         $current = strtolower(ltrim($classLc, '\\'));
+        // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338, #26863).
+        if ('simplemxml_element' === $current) {
+            $current = 'simplexmlelement';
+        }
         while (!isset($visited[$current])) {
             $visited[$current] = true;
             $proxy = $current.'::'.$methodLc;
