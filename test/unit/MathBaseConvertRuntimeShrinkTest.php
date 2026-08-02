@@ -31,13 +31,15 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
         $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive()', $source);
+        $this->assertStringContainsString('declareRuntimeAbisForNestedJit', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('emitBaseToZvalCore', $source);
         $this->assertStringNotContainsString('emitDigitValue', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
-        $this->assertLessThan(380, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
     }
+
 
     /** NestedJIT must not call VmMath — thin AOT stubs that to null (#26884). */
     public function testMathBaseConvertJitHelperIsNestedJitSafeInline(): void

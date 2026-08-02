@@ -11,6 +11,7 @@ namespace PHPCompiler;
  * execute until a property slot exists (#4954); pad at JIT prepare time only (bin/jit.php).
  * Const-only / method-only bodies without properties hit the same MCJIT gap (#6964).
  * Constructor-promoted-only user classes need the same pad as trait-merged classes (#5091).
+ * Interface-only scripts need the embed bootstrap class (no property pad path, #27012).
  */
 final class JitMcjitEmbed
 {
@@ -53,6 +54,15 @@ final class JitMcjitEmbed
         }
         // Enum-only scripts still need a padded user class for MCJIT module init (#4964, #6487).
         if (preg_match('/\benum\b/i', $code) && !str_contains($code, '__phpc_mcjit_embed_bootstrap')) {
+            return self::prependMcjitBootstrap($code);
+        }
+        // Interface-only scripts take the full MCJIT path (requiresVmLowering=false) but never
+        // receive a class property pad — without bootstrap, MCJIT segfaults (#27012 / #4964).
+        if (
+            preg_match('/\binterface\b/i', $code)
+            && !preg_match('/\bclass\s+/i', $code)
+            && !str_contains($code, '__phpc_mcjit_embed_bootstrap')
+        ) {
             return self::prependMcjitBootstrap($code);
         }
 
