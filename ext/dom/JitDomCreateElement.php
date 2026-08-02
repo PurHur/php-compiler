@@ -182,7 +182,7 @@ final class JitDomCreateElement
     ): void {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_ELEMENT);
-        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue'] as $prop) {
+        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue', VmDom::PROP_USER_SCRIPT_INNER_XML] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
             }
@@ -200,6 +200,17 @@ final class JitDomCreateElement
                 JITVariable::TYPE_STRING
             );
         }
+        $emptyInner = $context->builder->load($context->constantStringFromString(''));
+        $ownedInner = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $emptyInner
+        );
+        $innerVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $ownedInner);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_USER_SCRIPT_INNER_XML),
+            $innerVar,
+            JITVariable::TYPE_STRING
+        );
     }
 
     private static function materializeElementFromRuntimeName(Context $context, JITVariable $nameArg): Value
@@ -240,6 +251,8 @@ final class JitDomCreateElement
             // initTextContentSlot / saveXML / getElementById helpers (#25475).
             VmDom::PROP_TEXT_CONTENT => JITVariable::TYPE_STRING,
             'nodeValue' => JITVariable::TYPE_STRING,
+            // ParentNode append/prepend → saveXML child markup (#26765).
+            VmDom::PROP_USER_SCRIPT_INNER_XML => JITVariable::TYPE_STRING,
             // DomNodeLiveMutationRuntime::syncElementNavSlots (appendChild path).
             VmDom::PROP_FIRST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
             VmDom::PROP_LAST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,

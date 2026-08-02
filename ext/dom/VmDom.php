@@ -212,6 +212,12 @@ final class VmDom
     /** JIT/AOT: DomRegistry object id for scalar helper bridges (#17954, #16075). */
     public const PROP_REGISTRY_ID = '__phpcDomRegistryId';
 
+    /**
+     * User-script AOT: serialized child markup for saveXML($node) after ParentNode
+     * append/prepend (#26765). Distinct from textContent (descendant text only).
+     */
+    public const PROP_USER_SCRIPT_INNER_XML = '__phpcUserScriptInnerXml';
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {

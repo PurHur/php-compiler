@@ -115,6 +115,11 @@ final class Variable {
      */
     public ?array $compileTimeBcmathNumber = null;
 
+    /**
+     * DOMElement tagName when created via createElement('lit') in user-script AOT (#26765).
+     */
+    public ?string $compileTimeDomTagName = null;
+
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 

@@ -251,6 +251,8 @@ final class DomNodeLiveMutationRuntime
                 );
             }
             self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
+            // saveXML($node) must emit element children, not only textContent (#26765).
+            self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs);
 
             return self::nullValuePtr($context);
         }
@@ -503,6 +505,63 @@ final class DomNodeLiveMutationRuntime
         $propVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $owned);
         $objectType->propertyStore(
             $objectType->propertySlotFor($receiverObj, 'DOMElement', 'textContent'),
+            $propVar,
+            Variable::TYPE_STRING
+        );
+    }
+
+    /**
+     * Write ParentNode append/prepend args into __phpcUserScriptInnerXml for AOT saveXML (#26765).
+     *
+     * Compile-time only: string literals + createElement() result Variables carrying
+     * {@see Variable::$compileTimeDomTagName}. Stores this call's markup (replace), not a
+     * process-global accum — IR lowering may invoke sync more than once per call site.
+     *
+     * @param list<Variable> $extraArgs document order (caller passes original append args)
+     */
+    private static function syncUserScriptInnerXmlFromArgs(
+        Context $context,
+        Variable $receiver,
+        array $extraArgs
+    ): void {
+        if ([] === $extraArgs) {
+            return;
+        }
+        $pieces = [];
+        foreach ($extraArgs as $arg) {
+            if (Variable::TYPE_STRING === $arg->type) {
+                $lit = $arg->compileTimeString ?? null;
+                if (null === $lit) {
+                    return;
+                }
+                $pieces[] = $lit;
+                continue;
+            }
+            if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
+                return;
+            }
+            $tag = $arg->compileTimeDomTagName ?? null;
+            if (null === $tag || '' === $tag) {
+                return;
+            }
+            $pieces[] = '<'.$tag.'/>';
+        }
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
+            $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, Variable::TYPE_STRING);
+        }
+        $receiverObj = self::receiverObject($context, $receiver);
+        $textStr = $context->builder->load(
+            $context->constantStringFromString(implode('', $pieces))
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $textStr
+        );
+        $propVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_USER_SCRIPT_INNER_XML),
             $propVar,
             Variable::TYPE_STRING
         );

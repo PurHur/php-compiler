@@ -103,7 +103,7 @@ final class JitDomLoadXMLUserScript
         // dynamic-property deprecation (hasProperty does not walk DOMNode; #23251).
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
-        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue'] as $prop) {
+        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue', VmDom::PROP_USER_SCRIPT_INNER_XML] as $prop) {
             if (!$objectType->hasProperty($elementClassId, $prop)) {
                 $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
             }
