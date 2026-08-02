@@ -25837,7 +25837,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/Base64JitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/Bin2hexJitHelper.php`
 
@@ -30662,7 +30662,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/QuotPrintJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/QuotemetaJitHelper.php`
 
@@ -31339,7 +31339,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UniqidJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/UnitEnumExistsJitHelper.php`
 
@@ -42535,8 +42535,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2146)
-- new ArgumentCountError (line 2157)
+- new ArgumentCountError (line 2152)
+- new ArgumentCountError (line 2163)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -46409,7 +46409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHrtimeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
 
@@ -46626,7 +46626,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringQuotPrint.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringQuotemeta.php`
 
@@ -46944,7 +46944,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUniqid.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringUnitEnumExists.php`
 
@@ -47089,10 +47089,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type.php`
 
 **Warnings** (review for bootstrap subset):
-- new Type\Value (line 25)
-- new Type\HashTable (line 26)
-- new Type\Object_ (line 27)
-- new Type\String_ (line 28)
+- new Type\Value (line 26)
+- new Type\HashTable (line 27)
+- new Type\Object_ (line 28)
+- new Type\String_ (line 29)
 - 3 class method(s)
 
 ### `lib/JIT/Builtin/Type/HashTable.php`
@@ -47961,9 +47961,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 729)
-- new Variable (line 737)
-- new Variable (line 746)
+- new Variable (line 740)
+- new Variable (line 748)
+- new Variable (line 757)
 - 12 class method(s)
 
 ### `lib/JIT/Call/NestedClosureInvoke.php`
