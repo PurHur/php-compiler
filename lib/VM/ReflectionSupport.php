@@ -596,7 +596,7 @@ final class ReflectionSupport
     }
 
     /**
-     * @param list<Variable> $invokeArgs
+     * @param array<int, Variable> $invokeArgs possibly sparse — omitted optionals use RECV defaults (#26768)
      */
     public static function invokeAttributeConstructor(
         VmEngine $vm,
@@ -610,14 +610,25 @@ final class ReflectionSupport
             // caller after a void __construct return (TYPE_RETURN_VOID → nextframe), so
             // ReflectionAttribute::newInstance() from inside a user function returned early
             // with null (#22029; same pattern as #4284 / #12069).
-            $vm->invokePhpFunctionIsolated($ctor, $thisVar, ...$invokeArgs);
+            // ARG_RECV shifts instance method indices by +1 for $this (see VM TYPE_ARG_RECV).
+            // Keep sparse keys so omitted attribute AST args hit parameter defaults (#26768;
+            // php-src ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)).
+            $calledArgs = [0 => $thisVar];
+            foreach ($invokeArgs as $idx => $value) {
+                $calledArgs[1 + (int) $idx] = $value;
+            }
+            $vm->invokePhpFunctionIsolatedWithCalledArgs($ctor, $calledArgs);
 
             return;
         }
         if ($ctor instanceof Func\Internal) {
             $frame = $ctor->getFrame($ctx);
             $frame->vmContext = $ctx;
-            $frame->calledArgs = array_merge([$thisVar], $invokeArgs);
+            $calledArgs = [0 => $thisVar];
+            foreach ($invokeArgs as $idx => $value) {
+                $calledArgs[1 + (int) $idx] = $value;
+            }
+            $frame->calledArgs = $calledArgs;
             $ctor->execute($frame);
 
             return;
@@ -649,9 +660,13 @@ final class ReflectionSupport
     /**
      * Map stored attribute ctor args to invokePhpFunction arguments in parameter order (#3216).
      *
+     * Only arguments present in the attribute AST are included. Omitted optional parameters
+     * are left unset so TYPE_ARG_RECV applies defaults (php-src ReflectionAttribute::newInstance,
+     * #26768) — do not pad with null (that TypeErrors typed defaults like `int $flags = 0`).
+     *
      * @param list<array{name: ?string, value: mixed}> $argSpecs
      *
-     * @return list<Variable>
+     * @return array<int, Variable> possibly sparse (named optionals / trailing defaults)
      */
     public static function constructorInvokeVariables(
         Func $ctor,
@@ -669,16 +684,15 @@ final class ReflectionSupport
         }
         $vars = [];
         $pi = 0;
+        $paramIndex = 0;
         foreach (self::constructorParamNames($ctor) as $paramName) {
             if (isset($named[$paramName])) {
-                $vars[] = self::attributeValueToVariable($named[$paramName], $ctx);
+                $vars[$paramIndex] = self::attributeValueToVariable($named[$paramName], $ctx);
             } elseif (array_key_exists($pi, $positional)) {
-                $vars[] = self::attributeValueToVariable($positional[$pi++], $ctx);
-            } else {
-                $null = new Variable();
-                $null->null();
-                $vars[] = $null;
+                $vars[$paramIndex] = self::attributeValueToVariable($positional[$pi++], $ctx);
             }
+            // else: omit — RECV / internal ctor applies the parameter default (#26768)
+            ++$paramIndex;
         }
 
         return $vars;
