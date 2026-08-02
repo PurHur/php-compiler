@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringHttpBuildQuery;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -142,6 +143,8 @@ final class http_build_query extends Internal
         }
 
         TypeErrorRaise::ensureLinked($context);
+        // Peer preg_quote (#26827): thin AOT needs call-site ensureLinked (#26869).
+        StringHttpBuildQuery::ensureLinked($context);
         $data = JitHttpBuildQuery::normalizeDataArg($context, $args[0]);
         $prefix = $this->optionalStringArg($context, $args, 1, '');
         [$separator, $encoding] = $this->resolveSeparatorAndEncodingJit($context, $args);

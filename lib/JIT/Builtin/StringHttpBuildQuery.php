@@ -4,24 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443, #24887).
+ * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443, #24887, #26869).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrtr #21844 / SocketAtmark #24831).
- * Thin LLVM bridge forwards the ABI. php-src: ext/standard/http.c — http_build_query
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrtr #21844).
+ * Thin LLVM bridge forwards the ABI; call-site {@see ensureLinked} for thin standalone AOT (#26869).
+ * php-src: ext/standard/http.c — http_build_query
  */
 final class StringHttpBuildQuery
 {
     private const HELPER_PATH = '/ext/standard/HttpBuildQueryJitHelper.php';
 
     private const BUILD_HELPER = 'PHPCompiler\\ext\\standard\\HttpBuildQueryJitHelper::build';
+
+    private const BRIDGE_ENTRY = 'http_build_query_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -45,17 +50,29 @@ final class StringHttpBuildQuery
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_http_build_query');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || (null !== $probe && $probe->countBasicBlocks() > 0)
+        ) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#26869).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementBuildBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBuildBridge(Context $context): void
@@ -76,7 +93,7 @@ final class StringHttpBuildQuery
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('http_build_query_bridge_entry');
+        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $resultRaw = JitNestedHelperCoerce::callHelper(
             $context,
@@ -92,7 +109,7 @@ final class StringHttpBuildQuery
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#24887');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26869');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -108,7 +125,7 @@ final class StringHttpBuildQuery
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#24887'
+            '#26869'
         );
     }
 
@@ -117,7 +134,7 @@ final class StringHttpBuildQuery
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringHttpBuildQuery bridge (#9443)');
+                throw new \LogicException($name.' missing after StringHttpBuildQuery bridge (#9443/#26869)');
             }
             $context->registerFunction($name, $fn);
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringHttpBuildQuery;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -43,6 +44,8 @@ final class JitHttpBuildQuery
         Value $separator,
         Value $encoding
     ): Value {
+        // Thin standalone AOT defers String_.implement — link the ABI body at the call site (#26869).
+        StringHttpBuildQuery::ensureLinked($context);
         $ht = self::loadData($context, $data);
 
         return $context->builder->call(

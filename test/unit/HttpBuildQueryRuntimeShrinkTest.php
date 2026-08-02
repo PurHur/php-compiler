@@ -30,6 +30,8 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('HttpBuildQueryJitHelper::build', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -37,10 +39,16 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
-    public function testHttpBuildQueryJitHelperDelegatesToVmHttpBuildQuery(): void
+    public function testHttpBuildQueryJitHelperIsNestedJitSafeInline(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HttpBuildQueryJitHelper.php');
-        $this->assertStringContainsString('VmHttpBuildQuery::buildFromHashTable', $source);
+        $this->assertStringContainsString('percentEncode', $source);
+        $this->assertStringContainsString('iterateKeyed', $source);
+        $this->assertStringContainsString('exportKeyValuePairs', $source);
+        $this->assertStringNotContainsString('VmHttpBuildQuery::buildFromHashTable', $source);
+        $this->assertStringNotContainsString('as [$', $source);
+        $this->assertStringNotContainsString('rawurlencode(', $source);
+        $this->assertStringNotContainsString('urlencode(', $source);
     }
 
     public function testHttpBuildQueryJitHelperMatchesVmHttpBuildQuery(): void
@@ -60,5 +68,13 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
         $expected = VmHttpBuildQuery::build(['a' => 1, 'b' => ['c' => 2]]);
         $actual = HttpBuildQueryJitHelper::build($ht, '', '&', VmHttpBuildQuery::ENCODING_RFC1738);
         $this->assertSame($expected, $actual);
+    }
+
+    public function testJitHttpBuildQueryEnsuresLinkedAtCallSite(): void
+    {
+        $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitHttpBuildQuery.php');
+        $this->assertStringContainsString('StringHttpBuildQuery::ensureLinked', $jit);
+        $call = (string) file_get_contents(__DIR__.'/../../ext/standard/http_build_query.php');
+        $this->assertStringContainsString('StringHttpBuildQuery::ensureLinked', $call);
     }
 }
