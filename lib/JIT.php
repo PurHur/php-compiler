@@ -2230,7 +2230,7 @@ class JIT {
             $returnType = $this->context->getTypeFromString($callbackType);
             $this->context->functionReturnType[strtolower($logicalName ?? $internalName)] = $callbackType;
 
-            if ($this->instanceMethodUsesThis($block)) {
+            if ($this->instanceMethodUsesThis($block) || $this->closureBodyUsesThis($block)) {
                 $rawTypes[] = Type::object();
                 $args[] = $this->context->getTypeFromString('__object__*');
             }
@@ -2316,7 +2316,7 @@ class JIT {
                 $variadicArgIndex = null;
                 if (null !== $block->variadicParamIndex) {
                     $variadicArgIndex = $block->variadicParamIndex;
-                    if ($this->instanceMethodUsesThis($block)) {
+                    if ($this->llvmThisParamOffset($block) > 0) {
                         ++$variadicArgIndex;
                     }
                 }
@@ -7345,7 +7345,7 @@ class JIT {
             $this->emitJitDestructAllowDelref($block);
         }
         $thisParamOffset = 0;
-        if ($this->instanceMethodUsesThis($block)) {
+        if ($this->instanceMethodUsesThis($block) || $this->closureBodyUsesThis($block)) {
             $thisParamOffset = 1;
             if ([] !== $args) {
                 $this->context->implicitThisArgument = $args[0];
@@ -7396,7 +7396,7 @@ class JIT {
                 ?? SourcePreprocessor\PropertyHooks::propertyNameFromGetHookMethod($methodLc);
         }
         if ([] !== $args) {
-            if (0 === $thisParamOffset && $this->instanceMethodUsesThis($block)) {
+            if (0 === $thisParamOffset && $this->llvmThisParamOffset($block) > 0) {
                 $thisParamOffset = 1;
             }
             foreach ($block->orig->hoistedOperands as $hoisted) {
@@ -10478,6 +10478,7 @@ class JIT {
                         );
                         $callProxy = JIT\ClosureHelper::wrapCallWithCaptures($callProxy, $captures);
                     }
+                    JIT\ClosureBindHelper::ensureClosureBindingProperties($this->context);
                     $closureObj = JIT\ClosureHelper::allocateClosureObject(
                         $this->context,
                         $callProxy,
@@ -11429,6 +11430,8 @@ class JIT {
                                 Variable::KIND_VALUE,
                                 $this->context->type->object->allocate($classId)
                             );
+                            // Compile-time class for Closure::call / bindTo scope (#26872).
+                            $obj->compileTimeString = $resolvedName;
                             $resultOp = $block->getOperand($op->arg1);
                             $this->assignOperand($resultOp, $obj, true);
                             $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
@@ -17584,6 +17587,32 @@ class JIT {
         return false;
     }
 
+    /**
+     * Free closures that read $this need an implicit __object__* param so Closure::call /
+     * bindTo can prepend temporary $this (JIT.pre blockUsesThis; #26872).
+     */
+    private function closureBodyUsesThis(Block $block): bool
+    {
+        if (null === $block->func) {
+            return false;
+        }
+        if (0 === (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)) {
+            return false;
+        }
+        if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+            return false;
+        }
+
+        return $this->blockUsesThis($block);
+    }
+
+    /** 1 when LLVM param 0 is $this (instance method or this-using closure) (#26872). */
+    private function llvmThisParamOffset(Block $block): int
+    {
+        return ($this->instanceMethodUsesThis($block) || $this->closureBodyUsesThis($block)) ? 1 : 0;
+    }
+
+
     private function instanceMethodUsesThis(Block $block): bool
     {
         if (null === $block->func) {
@@ -19457,6 +19486,7 @@ class JIT {
         // DOM JIT Call\Dom* helpers are always instance methods (#25182).
         if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
             || $toCall instanceof JIT\Call\ClosureBindTo
+            || $toCall instanceof JIT\Call\ClosureCall
             || str_starts_with($toCall::class, 'PHPCompiler\\JIT\\Call\\Dom')
         ) {
             return 1;
@@ -19573,7 +19603,7 @@ class JIT {
     private function paramTypeConstraintsForNativeCall(Block $block): array
     {
         $constraints = [];
-        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        $offset = $this->llvmThisParamOffset($block);
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
@@ -19615,7 +19645,7 @@ class JIT {
     private function paramImplicitNullableForNativeCall(Block $block): array
     {
         $implicit = [];
-        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        $offset = $this->llvmThisParamOffset($block);
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
@@ -19636,7 +19666,7 @@ class JIT {
     private function paramIntersectionConstraintsForNativeCall(Block $block): array
     {
         $constraints = [];
-        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        $offset = $this->llvmThisParamOffset($block);
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
@@ -19666,7 +19696,7 @@ class JIT {
     private function paramClassConstraintsForNativeCall(Block $block): array
     {
         $constraints = [];
-        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        $offset = $this->llvmThisParamOffset($block);
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
@@ -19688,7 +19718,7 @@ class JIT {
     private function paramDnfConstraintsForNativeCall(Block $block): array
     {
         $constraints = [];
-        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        $offset = $this->llvmThisParamOffset($block);
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
@@ -19720,7 +19750,7 @@ class JIT {
     private function paramByRefForNativeCall(Block $block): array
     {
         $refs = [];
-        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        $offset = $this->llvmThisParamOffset($block);
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
