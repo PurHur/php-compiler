@@ -50,6 +50,8 @@ final class StringJsonDecode
 
     private const LAST_ERROR_MSG_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::lastErrorMsg';
 
+    private const SET_LAST_ERROR_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::setLastError';
+
     private const DECODE_BRIDGE_ENTRY = 'json_decode_bridge_entry';
 
     private const VALIDATE_BRIDGE_ENTRY = 'json_validate_bridge_entry';
@@ -57,6 +59,8 @@ final class StringJsonDecode
     private const LAST_ERROR_BRIDGE_ENTRY = 'json_last_error_bridge_entry';
 
     private const LAST_ERROR_MSG_BRIDGE_ENTRY = 'json_last_error_msg_bridge_entry';
+
+    private const SET_LAST_ERROR_BRIDGE_ENTRY = 'json_set_last_error_bridge_entry';
 
     /** @var list<string> */
     private const DECODE_COMPILED_HELPERS = [
@@ -73,6 +77,7 @@ final class StringJsonDecode
         self::VALIDATE_HELPER,
         self::LAST_ERROR_HELPER,
         self::LAST_ERROR_MSG_HELPER,
+        self::SET_LAST_ERROR_HELPER,
     ];
 
     /** @var list<string> */
@@ -81,6 +86,7 @@ final class StringJsonDecode
         '__compiler_json_validate',
         '__compiler_json_last_error',
         '__compiler_json_last_error_msg',
+        '__compiler_json_set_last_error',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -118,10 +124,12 @@ final class StringJsonDecode
         $validateProbe = $context->module->getNamedFunction('__compiler_json_validate');
         $lastErrProbe = $context->module->getNamedFunction('__compiler_json_last_error');
         $lastMsgProbe = $context->module->getNamedFunction('__compiler_json_last_error_msg');
+        $setErrProbe = $context->module->getNamedFunction('__compiler_json_set_last_error');
         if (JitVmHelperLink::hasNamedBridgeEntry($decodeProbe, self::DECODE_BRIDGE_ENTRY)
             && JitVmHelperLink::hasNamedBridgeEntry($validateProbe, self::VALIDATE_BRIDGE_ENTRY)
             && JitVmHelperLink::hasNamedBridgeEntry($lastErrProbe, self::LAST_ERROR_BRIDGE_ENTRY)
-            && JitVmHelperLink::hasNamedBridgeEntry($lastMsgProbe, self::LAST_ERROR_MSG_BRIDGE_ENTRY)) {
+            && JitVmHelperLink::hasNamedBridgeEntry($lastMsgProbe, self::LAST_ERROR_MSG_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($setErrProbe, self::SET_LAST_ERROR_BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
 
@@ -130,7 +138,8 @@ final class StringJsonDecode
         if (null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0
             && null !== $validateProbe && $validateProbe->countBasicBlocks() > 0
             && null !== $lastErrProbe && $lastErrProbe->countBasicBlocks() > 0
-            && null !== $lastMsgProbe && $lastMsgProbe->countBasicBlocks() > 0) {
+            && null !== $lastMsgProbe && $lastMsgProbe->countBasicBlocks() > 0
+            && null !== $setErrProbe && $setErrProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
 
@@ -172,6 +181,17 @@ final class StringJsonDecode
             self::VALIDATE_HELPER_PATH,
             self::VALIDATE_COMPILED_HELPERS,
             '#20829'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_json_set_last_error',
+            self::SET_LAST_ERROR_BRIDGE_ENTRY,
+            [$i64],
+            $i64,
+            self::SET_LAST_ERROR_HELPER,
+            self::VALIDATE_HELPER_PATH,
+            self::VALIDATE_COMPILED_HELPERS,
+            '#26792'
         );
         self::registerLinkedRuntime($context);
         BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
