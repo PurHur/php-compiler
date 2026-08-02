@@ -16306,6 +16306,7 @@ class JIT {
             || $toCall instanceof JIT\Call\DateIntervalConstruct
             || $toCall instanceof JIT\Call\DatePeriodConstruct
             || $toCall instanceof JIT\Call\ArrayIteratorConstruct
+            || $toCall instanceof JIT\Call\RecursiveIteratorIteratorConstruct
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
         ) {

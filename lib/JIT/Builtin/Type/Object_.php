@@ -3468,27 +3468,74 @@ class Object_ extends Type {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
-        if ('arrayiterator' === $lcname) {
-            // Thin user-script AOT foreach via __spl_ht packed walk (#26783).
+        if ('arrayiterator' === $lcname || 'recursivearrayiterator' === $lcname) {
+            // Thin user-script AOT foreach via __spl_ht packed walk (#26783, #26775).
             // php-src ext/spl/spl_array.stub.php — SeekableIterator + ArrayAccess + Serializable + Countable.
             $this->ensureZendBuiltinInterfaces();
-            $this->setClassInterfaces($displayName, [
+            $ifaces = [
                 'SeekableIterator',
                 'ArrayAccess',
                 'Serializable',
                 'Countable',
-            ]);
+            ];
+            if ('recursivearrayiterator' === $lcname) {
+                // Zend rematerializes Countable-first + RecursiveIterator (#25796).
+                $this->markInterfaceClass('RecursiveIterator');
+                $this->setInterfaceExtends('RecursiveIterator', ['Iterator', 'Traversable']);
+                $ifaces = [
+                    'Countable',
+                    'Serializable',
+                    'ArrayAccess',
+                    'Iterator',
+                    'Traversable',
+                    'SeekableIterator',
+                    'RecursiveIterator',
+                ];
+            }
+            $this->setClassInterfaces($displayName, $ifaces);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
-            $this->seedExternalClassConstants($id, [
+            $constants = [
                 'STD_PROP_LIST' => 1,
                 'ARRAY_AS_PROPS' => 2,
-            ]);
+            ];
+            if ('recursivearrayiterator' === $lcname) {
+                $constants['CHILD_ARRAYS_ONLY'] = 4;
+            }
+            $this->seedExternalClassConstants($id, $constants);
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
                 '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
                 'count', 'append', 'getarraycopy', 'getflags', 'setflags',
                 'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
+                'haschildren', 'getchildren',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
+        if ('recursiveiteratoriterator' === $lcname) {
+            // Thin AOT: LEAVES_ONLY flatten into `__spl_ht` at construct (#26775).
+            // php-src ext/spl/spl_iterators.c — OuterIterator + Iterator.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('OuterIterator');
+            $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'OuterIterator',
+                'Traversable',
+                'Iterator',
+            ]);
+            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            $this->seedExternalClassConstants($id, [
+                'LEAVES_ONLY' => 0,
+                'SELF_FIRST' => 1,
+                'CHILD_FIRST' => 2,
+                'CATCH_GET_CHILD' => 16,
+            ]);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next',
+                'getinneriterator', 'getdepth', 'setmaxdepth', 'getmaxdepth',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }

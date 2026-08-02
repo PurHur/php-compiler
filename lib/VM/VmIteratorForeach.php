@@ -53,11 +53,17 @@ final class VmIteratorForeach
             && 'splobjectstorage' === strtolower($containerUserType);
     }
 
-    /** ArrayIterator stores the iterated array in `__spl_ht` (packed/string keys) (#26783). */
+    /** ArrayIterator / RAI / RII store iteration data in `__spl_ht` (#26783, #26775). */
     private static function usesArrayIteratorHt(?string $containerUserType): bool
     {
-        return null !== $containerUserType
-            && 'arrayiterator' === strtolower($containerUserType);
+        if (null === $containerUserType) {
+            return false;
+        }
+        $ut = strtolower($containerUserType);
+
+        return 'arrayiterator' === $ut
+            || 'recursivearrayiterator' === $ut
+            || 'recursiveiteratoriterator' === $ut;
     }
 
     private static function usesWeakMapHashtable(?string $containerUserType): bool
