@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitCoshKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for cosh() via CoshJitHelper PHP (#15156).
+ * JIT/AOT link for cosh() via CoshJitHelper PHP (#15156, #27005).
  *
- * Replaces libc `cosh` LLVM lookup in ext/standard/cosh.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see CoshJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering CoshJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(cosh)
  */
 final class MathCosh
@@ -28,6 +31,8 @@ final class MathCosh
         self::COSH_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'cosh_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathCosh
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitCoshKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathCosh
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_COSH);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_COSH, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_COSH,
-            'cosh_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::COSH_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15156'
+            '#27005'
         );
     }
 }
