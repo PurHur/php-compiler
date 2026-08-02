@@ -498,7 +498,7 @@ final class VmDom
         $ctx->classes[self::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
 
         if (CompilerVersion::supportsDomTokenList()) {
-            // IteratorAggregate + Countable (php-src Dom\TokenList / token_list.c; #20884).
+            // IteratorAggregate + Countable (php-src Dom\TokenList / php_dom.stub.php; #20884, #26721).
             $tokenList = new ClassEntry('DOMTokenList');
             $tokenList->isInternal = true;
             $tokenList->interfaces[] = 'countable';
@@ -529,20 +529,8 @@ final class VmDom
             $tokenList->methods['getiterator'] = new TokenListGetIterator();
             $tokenList->methodVisibility['getiterator'] = $pub;
             $tokenList->methodNames['getiterator'] = 'getIterator';
-            // Iterable helpers (issue #20884 done-when; complements getIterator).
-            $tokenList->methods['entries'] = new TokenListEntries();
-            $tokenList->methodVisibility['entries'] = $pub;
-            $tokenList->methods['keys'] = new TokenListKeys();
-            $tokenList->methodVisibility['keys'] = $pub;
-            $tokenList->methods['values'] = new TokenListValues();
-            $tokenList->methodVisibility['values'] = $pub;
-            $tokenList->methods['foreach'] = new TokenListForEach();
-            $tokenList->methodVisibility['foreach'] = $pub;
-            $tokenList->methodNames['foreach'] = 'forEach';
-            // php-src token_list.c — __toString returns the same string as $value (#24545).
-            $tokenList->methods['__tostring'] = new TokenListToString();
-            $tokenList->methodVisibility['__tostring'] = $pub;
-            $tokenList->methodNames['__tostring'] = '__toString';
+            // php-src php_dom.stub.php Dom\TokenList — getIterator only; no entries/keys/values/forEach
+            // and no __toString ((string) throws Error on Zend 8.4/8.5; #26721, re-#24545).
             $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
         }
 
