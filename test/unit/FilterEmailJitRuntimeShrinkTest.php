@@ -19,11 +19,19 @@ final class FilterEmailJitRuntimeShrinkTest extends TestCase
     public function testStringFilterEmailRoutesThroughFilterEmailJitHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilterEmail.php');
-        $this->assertStringContainsString('FilterEmailJitHelper', $source);
-        $this->assertStringContainsString('FilterEmailValidate', $source);
+        // #27068 — ABI bridges isValidInt (NestedJIT int 0/1; const path folds in JitFilter).
+        $this->assertStringContainsString('FilterEmailValidate::isValidInt', $source);
         $this->assertStringNotContainsString('llvmIsLocalChar', $source);
         $this->assertStringNotContainsString('filter_email_find_at_head', $source);
-        $this->assertLessThan(160, \substr_count($source, "\n"), 'StringFilterEmail must be a thin bridge');
+        $this->assertLessThan(180, \substr_count($source, "\n"), 'StringFilterEmail must be a thin bridge');
+    }
+
+    public function testJitFilterFoldsConstEmailViaFilterEmailValidate(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/JitFilter.php');
+        $this->assertStringContainsString('FilterEmailValidate::isValid', $source);
+        $this->assertStringContainsString('compileTimeString', $source);
+        $this->assertStringContainsString('#27068', $source);
     }
 
     public function testJitFilterRoutesThroughStringFilterEmail(): void

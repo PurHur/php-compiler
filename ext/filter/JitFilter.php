@@ -412,7 +412,6 @@ final class JitFilter
 
     public static function validateEmail(Context $context, JITVariable $value): Value
     {
-        StringFilterEmail::ensureLinked($context);
         if (JITVariable::TYPE_VALUE === $value->type) {
             return self::boxValueValidateEmail($context, $value);
         }
@@ -428,6 +427,30 @@ final class JitFilter
             return $ptr;
         }
 
+        // Compile-time string — fold via FilterEmailValidate SSOT (NestedJIT helper
+        // returns / string indexing are corrupt under thin AOT; #27068 / peer #26853).
+        $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
+        if (null !== $lit) {
+            if (!FilterEmailValidate::isValid($lit)) {
+                JitValueBox::writeBool($context, $slot, $falseVal);
+
+                return $ptr;
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load($context->constantStringFromString($lit))
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $owned
+            );
+
+            return $ptr;
+        }
+
+        // Dynamic string — keep ABI linked for capability; NestedJIT validate is best-effort.
+        StringFilterEmail::ensureLinked($context);
         $str = $context->helper->loadValue($value);
         $validated = $context->builder->call(
             $context->lookupFunction('__compiler_filter_validate_email'),
