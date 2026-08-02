@@ -127,6 +127,40 @@ final class VmSsh2Native
     }
 
     /**
+     * Public-key auth from in-memory key blobs (PECL ssh2_auth_pubkey; #26716).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function authPubkeyFromMemory(
+        \FFI\CData $session,
+        string $username,
+        string $pubkey,
+        string $privkey,
+        ?string $passphrase
+    ): bool {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $rc = $ffi->libssh2_userauth_publickey_frommemory(
+                $session,
+                $username,
+                \strlen($username),
+                $pubkey,
+                \strlen($pubkey),
+                $privkey,
+                \strlen($privkey),
+                $passphrase
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return 0 === $rc;
+    }
+
+    /**
      * Hostbased public-key auth from files (PECL ssh2_auth_hostbased_file; #26714).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -1201,6 +1235,7 @@ void libssh2_session_set_blocking(LIBSSH2_SESSION *session, int blocking);
 int libssh2_userauth_password_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *password, unsigned int password_len, void *passwd_change_cb);
 void *libssh2_hostkey_hash(LIBSSH2_SESSION *session, int hash_type);
 int libssh2_userauth_publickey_fromfile_ex(LIBSSH2_SESSION *session, const char *username, unsigned int username_len, const char *publickey, const char *privatekey, const char *passphrase);
+int libssh2_userauth_publickey_frommemory(LIBSSH2_SESSION *session, const char *username, size_t username_len, const char *publickeyfiledata, size_t publickeyfiledata_len, const char *privatekeyfiledata, size_t privatekeyfiledata_len, const char *passphrase);
 int libssh2_session_last_error(LIBSSH2_SESSION *session, char **errmsg, int *errmsg_len, int want_buf);
 char *libssh2_userauth_list(LIBSSH2_SESSION *session, const char *username, unsigned int username_len);
 int libssh2_userauth_authenticated(LIBSSH2_SESSION *session);
