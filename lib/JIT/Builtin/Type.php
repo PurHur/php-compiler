@@ -1323,6 +1323,11 @@ class Type extends Builtin {
             $fntypeJsonLastErrorMsg
         );
         $this->context->registerFunction('__compiler_json_last_error_msg', $fnJsonLastErrorMsg);
+        $fnJsonSetLastError = $this->context->module->addFunction(
+            '__compiler_json_set_last_error',
+            $this->context->context->functionType($i64, false, $i64)
+        );
+        $this->context->registerFunction('__compiler_json_set_last_error', $fnJsonSetLastError);
         $fnJsonValidate = $this->context->module->addFunction(
             '__compiler_json_validate',
             $this->context->context->functionType($i64, false, $strPtr, $i64)

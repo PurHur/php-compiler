@@ -27,9 +27,10 @@ final class VmJsonFormat
             $encoded = self::encodeValue($exported, $flags, 0, $maxDepth);
             if ($preserveLastError) {
                 VmJson::setLastError($previous);
-            } else {
-                VmJson::setLastError(0);
             }
+            // PARTIAL substitutions (e.g. INF/NAN → 0) set JSON_ERROR_INF_OR_NAN while still
+            // returning a string — keep that sticky (php-src ext/json/php_json_encoder.c, #26792).
+            // Clean encodes already cleared lastError at entry above.
 
             return $encoded;
         } catch (VmJsonExportException $e) {

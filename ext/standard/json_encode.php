@@ -82,12 +82,25 @@ final class json_encode extends Internal
         if (null !== $literal && null !== $knownFlags) {
             // PHP-in-PHP fold — same encoder as VM/runtime (#21723); avoid host ext/json skew.
             $encoded = VmJsonFormat::encodeExported($literal, $knownFlags);
+            $sticky = VmJson::lastError();
             if (false === $encoded) {
                 if (VmJsonFlags::throwsOnError($knownFlags)) {
                     // encodeExported throws on THROW; false is soft-failure only.
                     throw new \LogicException('json_encode() THROW path returned false');
                 }
-                throw new \LogicException('json_encode() failed');
+                // Soft-fail + sticky last_error at runtime (#26792).
+                JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+                $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                \PHPCompiler\JIT\JitValueBox::writeBool(
+                    $context,
+                    $slot,
+                    $context->constantFromBool(false)
+                );
+
+                return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+            }
+            if (0 !== $sticky) {
+                JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
             }
 
             return $context->builder->load($context->constantStringFromString($encoded));
