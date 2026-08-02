@@ -2677,7 +2677,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHttpLastResponseHeaders.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitHypotKernel.php` | 0 | 1 |
-| `ext/standard/JitIdate.php` | 0 | 1 |
+| `ext/standard/JitIdate.php` | 0 | 2 |
 | `ext/standard/JitImageTypeArg.php` | 0 | 1 |
 | `ext/standard/JitImageTypeToMimeType.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 2 |
@@ -5402,7 +5402,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGetClassVars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetObjectVars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetParentClass.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringGetdate.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringGetdate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGethostname.php` | 0 | 1 |
@@ -26398,7 +26398,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/GetdateJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/GetenvJitHelper.php`
 
@@ -26566,7 +26566,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IdateJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/Ieee754.php`
 
@@ -27605,7 +27605,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/JitGetenvKernel.php`
 
@@ -27831,7 +27831,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitImageTypeArg.php`
 
@@ -27929,15 +27930,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIteratorToArray.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 115)
-- new Variable (line 157)
-- new Variable (line 227)
-- new Variable (line 283)
-- new Variable (line 298)
-- new Variable (line 313)
-- new Variable (line 386)
-- new Variable (line 388)
-- new Variable (line 402)
+- new Variable (line 116)
+- new Variable (line 158)
+- new Variable (line 205)
+- new Variable (line 249)
+- new Variable (line 264)
+- new Variable (line 279)
+- new Variable (line 352)
+- new Variable (line 354)
+- new Variable (line 368)
 - 13 class method(s)
 
 ### `ext/standard/JitIteratorWalk.php`
@@ -31853,7 +31854,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDatePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/VmDateSunFunc.php`
 
@@ -36618,7 +36619,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/iterator_to_array.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/json_decode.php`
 
@@ -44728,7 +44729,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcStatusRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/GcToggleRuntime.php`
 
@@ -46319,8 +46320,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
-- 1 closure(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringGetenv.php`
 
@@ -46441,7 +46441,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringIdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringImageTypeToExtension.php`
 
@@ -54158,7 +54158,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 285)
 - new Variable (line 297)
 - new Variable (line 304)
-- new Variable (line 460)
+- new Variable (line 474)
 - 22 class method(s)
 
 ### `lib/VM/GeneratorJitHelper.php`
