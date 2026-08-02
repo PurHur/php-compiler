@@ -14580,6 +14580,7 @@ class JIT {
                 $var->compileTimeConstantName = $value->compileTimeConstantName;
                 $var->compileTimeEnumCase = $value->compileTimeEnumCase;
                 $var->compileTimeFloat = $value->compileTimeFloat;
+                $var->compileTimeLong = $value->compileTimeLong;
                 $this->syncCompileTimeString($var, $value, false);
                 // First-bind must keep Closure invoke metadata; dropping it forces
                 // RuntimeIndirectClosureCall over every {closure}_* in the module and

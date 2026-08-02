@@ -870,6 +870,17 @@ final class JitXmlWriterUserScript
         if (null !== $arg->compileTimeLong) {
             return 0 !== (int) $arg->compileTimeLong;
         }
+        // CONST_FETCH true/false sets compileTimeConstantName even when the LLVM load
+        // is Instruction-backed (#26774).
+        if (null !== $arg->compileTimeConstantName) {
+            $cn = strtolower($arg->compileTimeConstantName);
+            if ('true' === $cn) {
+                return true;
+            }
+            if ('false' === $cn) {
+                return false;
+            }
+        }
         if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
             return true;
         }
