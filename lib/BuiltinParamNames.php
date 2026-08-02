@@ -998,6 +998,12 @@ final class BuiltinParamNames
             // php-src ext/bcmath/bcmath.stub.php — PHP 8.4; not in php-types InternalArgInfo (#24578)
             case 'bcdivmod':
                 return ['num1', 'num2', 'scale='];
+            case 'bcpow':
+                // php-src — num/exponent/scale; InternalArgInfo still says x/y (#26145).
+                return ['num', 'exponent', 'scale'];
+            case 'bcsqrt':
+                // php-src — num/scale; InternalArgInfo still says operand (#26145).
+                return ['num', 'scale'];
             case 'bcpowmod':
                 // php-src — num/exponent/modulus/scale; RoundingMode is bcround-only (#26143).
                 return ['num', 'exponent', 'modulus', 'scale'];
