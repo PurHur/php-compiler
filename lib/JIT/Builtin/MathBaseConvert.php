@@ -19,9 +19,9 @@ final class MathBaseConvert
         MathBaseConvertRuntime::ensureLinked($context);
     }
 
-    public static function baseToZvalCall(Context $context, Value $strDataPtr, int $base): Value
+    public static function baseToZvalCall(Context $context, Value $strPtr, int $base): Value
     {
-        return MathBaseConvertRuntime::baseToZvalCall($context, $strDataPtr, $base);
+        return MathBaseConvertRuntime::baseToZvalCall($context, $strPtr, $base);
     }
 
     public static function implement(Context $context): void

@@ -29443,7 +29443,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/MathBaseConvertJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/MemoryJitHelper.php`
 
@@ -45036,7 +45036,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathBaseConvertRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/MathCeil.php`
 

@@ -16,10 +16,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_base_convert / phpc_basetozval_result via MathBaseConvertJitHelper PHP (#9584).
+ * JIT/AOT link for phpc_base_convert / phpc_basetozval_result via MathBaseConvertJitHelper PHP (#9584, #26884).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GlobalIntrospectionNameRuntime #22070).
  * Replaces {@see MathBaseConvertJit} LLVM (~950 LOC). SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit (peer #26869).
  * php-src: ext/standard/math.c
  */
 final class MathBaseConvertRuntime
@@ -58,6 +59,11 @@ final class MathBaseConvertRuntime
 
     public static function implement(Context $context): void
     {
+        // NestedJIT of MathBaseConvertJitHelper must not emit outer ABI bridges (#26884).
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('phpc_base_convert');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -65,11 +71,18 @@ final class MathBaseConvertRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit
+        // (hexdec/bindec thin AOT: "Current basic block has no parent function", #26884 / peer #26869).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_base_convert', self::implementBaseConvertBridge(...));
         self::implementIfMissing($context, 'phpc_basetozval_result', self::implementBaseToZvalResultBridge(...));
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
@@ -98,7 +111,6 @@ final class MathBaseConvertRuntime
             // fall through
         }
 
-        $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $i64Ptr = $context->getTypeFromString('int64*');
         $doublePtr = $context->getTypeFromString('double*');
@@ -108,11 +120,11 @@ final class MathBaseConvertRuntime
         return match ($name) {
             'phpc_base_convert' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($strPtr, false, $i8p, $i64, $i64)
+                $context->context->functionType($strPtr, false, $strPtr, $i64, $i64)
             ),
             'phpc_basetozval_result' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($i32, false, $i8p, $i64, $i64Ptr, $doublePtr)
+                $context->context->functionType($i32, false, $strPtr, $i64, $i64Ptr, $doublePtr)
             ),
             default => throw new \LogicException('Unknown base_convert JIT helper: '.$name),
         };
@@ -129,11 +141,11 @@ final class MathBaseConvertRuntime
         $fromI64 = $context->builder->sext($from, $i64);
         $toI64 = $context->builder->sext($to, $i64);
 
-        // NestedJIT helpers take `__string__*`; bridge ABI is NUL-terminated i8* (#26511).
-        $str = self::stringFromCstr($context, $fn->getParam(0));
+        // Pass `__string__*` straight through — i8*/__string__init round-trip made NestedJIT
+        // string offsets ints so ord() TypeError'd under thin AOT (#26884).
         $result = $context->builder->call(
             self::helperFunction($context, self::BASE_CONVERT),
-            $str,
+            $fn->getParam(0),
             $fromI64,
             $toI64
         );
@@ -153,10 +165,9 @@ final class MathBaseConvertRuntime
         $baseI64 = $context->builder->sext($base, $i64);
 
         // NestedJIT maps PHP `int` returns to i64; phpc_basetozval_result is i32 (#26511).
-        $str = self::stringFromCstr($context, $fn->getParam(0));
         $tagWide = $context->builder->call(
             self::helperFunction($context, self::PARSE_BASE_TO_ZVAL),
-            $str,
+            $fn->getParam(0),
             $baseI64
         );
         $tag = $context->builder->trunc($tagWide, $i32);
@@ -243,7 +254,7 @@ final class MathBaseConvertRuntime
         $context->builder->positionAtEnd($cont);
     }
 
-    public static function baseToZvalCall(Context $context, $strDataPtr, int $base)
+    public static function baseToZvalCall(Context $context, Value $strPtr, int $base): Value
     {
         self::ensureLinked($context);
         $i32 = $context->getTypeFromString('int32');
@@ -253,7 +264,7 @@ final class MathBaseConvertRuntime
         $doubleOut = BasicBlockHelper::entryAlloca($context, $double);
         $isDouble = $context->builder->call(
             $context->lookupFunction('phpc_basetozval_result'),
-            $strDataPtr,
+            $strPtr,
             $i64->constInt($base, false),
             $longOut,
             $doubleOut
@@ -302,28 +313,6 @@ final class MathBaseConvertRuntime
         }
 
         return $fn;
-    }
-
-    /** Bridge i8* C strings into NestedJIT `__string__*` (peer StringNaturalCompare; no entryAlloca). */
-    private static function stringFromCstr(Context $context, Value $cstr): Value
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
-        $null = $i8p->constNull();
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $cstr, $null);
-        $ptr = $context->builder->select($isNull, $empty, $cstr);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $ptr);
-        $lenI64 = $len->typeOf() === $i64
-            ? $len
-            : $context->builder->zExt($len, $i64);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $ptr
-        );
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
