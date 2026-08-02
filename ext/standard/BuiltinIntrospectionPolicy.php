@@ -46,6 +46,16 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return CompilerVersion::advertisesPhp84ArraySearchFunctions();
         }
+        // PHP 8.4-only pcntl surface — absent on Zend 8.2 stubs (#26742).
+        if (\in_array($lc, [
+            'pcntl_getcpu',
+            'pcntl_getcpuaffinity',
+            'pcntl_setcpuaffinity',
+            'pcntl_setns',
+            'pcntl_waitid',
+        ], true)) {
+            return CompilerVersion::advertisesPhp84PcntlApis();
+        }
         if (\in_array($lc, ['array_first', 'array_last'], true)) {
             return CompilerVersion::advertisesPhp85ArrayFirstLast();
         }

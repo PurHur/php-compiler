@@ -1,5 +1,7 @@
 --TEST--
-stdlib pcntl_setns (#21257, ext/pcntl/pcntl.c)
+stdlib pcntl_setns on PROFILE=8.4 (#21257, #26742, ext/pcntl/pcntl.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);

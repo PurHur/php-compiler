@@ -1,5 +1,7 @@
 --TEST--
-pcntl_getcpuaffinity/setcpuaffinity/getcpu (#20510)
+pcntl_getcpuaffinity/setcpuaffinity/getcpu on PROFILE=8.4 (#20510, #26742)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php if (!function_exists('pcntl_getcpuaffinity')) die('skip no pcntl affinity'); ?>
 --FILE--
