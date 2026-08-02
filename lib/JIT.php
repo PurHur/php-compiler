@@ -8066,13 +8066,18 @@ class JIT {
                             $dim
                         );
                         if (null !== $sxeListDim) {
+                            // Keep the same Variable so SplObjectStorage tree lookup survives
+                            // assignOperandValue (lastTree fallback would pick the wrong node).
                             if ($forceBranchMerge) {
                                 $this->assignOperand($resultOp, $sxeListDim, true);
+                                $resultDim = $this->context->getVariableFromOp($resultOp);
+                                if (null !== $sxeListDim->compileTimeString) {
+                                    $resultDim->compileTimeString = $sxeListDim->compileTimeString;
+                                }
                             } else {
-                                $this->assignOperand($resultOp, $sxeListDim);
+                                $this->context->setVariableOp($resultOp, $sxeListDim);
+                                $resultDim = $sxeListDim;
                             }
-                            $sxeListDim->magicGetOverloadedClass = 'SimpleXMLElement';
-                            $resultDim = $this->context->getVariableFromOp($resultOp);
                             $resultDim->magicGetOverloadedClass = 'SimpleXMLElement';
                             break;
                         }
@@ -8198,6 +8203,22 @@ class JIT {
                         break;
                     }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
+                        // SimpleXMLElement::xpath() node-set: fold `$n[$i]` to compile-time SXE (#26911).
+                        if (!$forWrite) {
+                            $xpathDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                                $this->context,
+                                $value,
+                                $dim
+                            );
+                            if (null !== $xpathDim) {
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($resultOp, $xpathDim, true);
+                                } else {
+                                    $this->assignOperand($resultOp, $xpathDim);
+                                }
+                                break;
+                            }
+                        }
                         $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
@@ -8209,6 +8230,21 @@ class JIT {
                         break;
                     }
                     if (Variable::TYPE_VALUE === $value->type) {
+                        if (!$forWrite) {
+                            $xpathDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                                $this->context,
+                                $value,
+                                $dim
+                            );
+                            if (null !== $xpathDim) {
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($resultOp, $xpathDim, true);
+                                } else {
+                                    $this->assignOperand($resultOp, $xpathDim);
+                                }
+                                break;
+                            }
+                        }
                         if (null !== $containerOp->type
                             && \PHPTypes\Type::TYPE_OBJECT === $containerOp->type->type
                             && null !== $op->arg3
