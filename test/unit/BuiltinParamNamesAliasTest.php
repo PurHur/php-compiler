@@ -1549,6 +1549,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #26145 — bcpow/bcsqrt Zend stub names (InternalArgInfo still x/y/operand) */
+    public function testBcpowBcsqrtZendStubNamedParameters(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $pow = BuiltinParamNames::forFunction('bcpow');
+            self::assertSame(['num', 'exponent', 'scale'], $pow);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($pow, 'num', 'bcpow'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pow, 'exponent', 'bcpow'));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($pow, 'scale', 'bcpow'));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($pow, 'x', 'bcpow'));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($pow, 'y', 'bcpow'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('bcpow'));
+
+            $sqrt = BuiltinParamNames::forFunction('bcsqrt');
+            self::assertSame(['num', 'scale'], $sqrt);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sqrt, 'num', 'bcsqrt'));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($sqrt, 'scale', 'bcsqrt'));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sqrt, 'operand', 'bcsqrt'));
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('bcsqrt'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #24578 — bcdivmod PHP 8.4 stub names; not in php-types InternalArgInfo */
     public function testBcdivmodReflectionNamedParameters(): void
     {
