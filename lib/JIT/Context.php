@@ -1023,6 +1023,20 @@ class Context {
                 $this->functionProxies[$heapLc.'::'.$heapMethod] = new Call\SplHeapMethod($heapMethod, $heapKind);
             }
         }
+        // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790).
+        foreach ([
+            'spldoublylinkedlist' => 'SplDoublyLinkedList',
+            'splqueue' => 'SplQueue',
+            'splstack' => 'SplStack',
+        ] as $dllLc => $dllClass) {
+            $dllMethods = ['__construct', 'push', 'pop', 'shift'];
+            if ('splqueue' === $dllLc) {
+                $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);
+            }
+            foreach ($dllMethods as $dllMethod) {
+                $this->functionProxies[$dllLc.'::'.$dllMethod] = new Call\SplDllistMethod($dllMethod, $dllClass);
+            }
+        }
 
         $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
         $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();
