@@ -27852,7 +27852,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 19 class method(s)
 
 ### `ext/standard/JitIni.php`
 
@@ -31427,7 +31427,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VersionCompareJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/VfscanfJitHelper.php`
 
@@ -46995,7 +46995,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringVersionCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringVersionCompareJit.php`
 

@@ -158,6 +158,11 @@ final class JitInfo
             }
         }
 
+        $folded = self::tryFoldVersionCompare($context, $ver1, $ver2, $operator);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         StringVersionCompare::ensureLinked($context);
         // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21556, reverts #20254 TypeError).
         $ver1Str = JitStringBuiltinArg::lowerTrimFamilyString(
@@ -188,6 +193,48 @@ final class JitInfo
         }
 
         return self::versionCompareWithOperator($context, $raw, $operator);
+    }
+
+    /**
+     * Fold version_compare when version strings (and optional operator) are compile-time
+     * literals — uses VmInfo (full canonicalize) so NestedJIT thin-AOT need not (#26866).
+     */
+    private static function tryFoldVersionCompare(
+        Context $context,
+        JITVariable $ver1,
+        JITVariable $ver2,
+        ?JITVariable $operator
+    ): ?Value {
+        $v1 = $ver1->compileTimeString ?? JitStringArg::compileTimeLiteral($ver1);
+        $v2 = $ver2->compileTimeString ?? JitStringArg::compileTimeLiteral($ver2);
+        if (null === $v1 || null === $v2) {
+            return null;
+        }
+        $opLit = null;
+        if (null !== $operator) {
+            if (JITVariable::TYPE_NULL === $operator->type || ($operator->isNullConstant ?? false)) {
+                $opLit = null;
+            } else {
+                $opLit = $operator->compileTimeString ?? JitStringArg::compileTimeLiteral($operator);
+                if (null === $opLit) {
+                    return null;
+                }
+            }
+        }
+        $result = VmInfo::version_compare($v1, $v2, $opLit);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (\is_bool($result)) {
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool($result));
+        } else {
+            JitValueBox::writeLong(
+                $context,
+                $slot,
+                $context->getTypeFromString('int64')->constInt($result, true)
+            );
+        }
+
+        return $ptr;
     }
 
     private static function emitVersionCompareOperatorValueError(Context $context): Value
@@ -331,28 +378,28 @@ final class JitInfo
         $notLt = $context->builder->icmp(Builder::INT_NE, $compare, $negOne);
         $notEq = $context->builder->icmp(Builder::INT_NE, $compare, $zero);
 
-        $false = $i64->constInt(0, false);
-        $result = $false;
+        // php-src returns bool for the 3-arg form — writeBool (not writeLong) (#26866).
+        $result = $context->constantFromBool(false);
         $matched = $context->constantFromBool(false);
         foreach ([
-            ['<', $context->builder->zExt($isLt, $i64)],
-            ['lt', $context->builder->zExt($isLt, $i64)],
-            ['<=', $context->builder->zExt($notGt, $i64)],
-            ['le', $context->builder->zExt($notGt, $i64)],
-            ['>', $context->builder->zExt($isGt, $i64)],
-            ['gt', $context->builder->zExt($isGt, $i64)],
-            ['>=', $context->builder->zExt($notLt, $i64)],
-            ['ge', $context->builder->zExt($notLt, $i64)],
-            ['==', $context->builder->zExt($isEq, $i64)],
-            ['=', $context->builder->zExt($isEq, $i64)],
-            ['eq', $context->builder->zExt($isEq, $i64)],
-            ['!=', $context->builder->zExt($notEq, $i64)],
-            ['<>', $context->builder->zExt($notEq, $i64)],
-            ['ne', $context->builder->zExt($notEq, $i64)],
-        ] as [$literal, $longVal]) {
+            ['<', $isLt],
+            ['lt', $isLt],
+            ['<=', $notGt],
+            ['le', $notGt],
+            ['>', $isGt],
+            ['gt', $isGt],
+            ['>=', $notLt],
+            ['ge', $notLt],
+            ['==', $isEq],
+            ['=', $isEq],
+            ['eq', $isEq],
+            ['!=', $notEq],
+            ['<>', $notEq],
+            ['ne', $notEq],
+        ] as [$literal, $boolVal]) {
             $matches = self::jitStringEqualsLiteral($context, $operator, $literal);
             $matched = $context->builder->or($matched, $matches);
-            $result = $context->builder->select($matches, $longVal, $result);
+            $result = $context->builder->select($matches, $boolVal, $result);
         }
 
         $validOk = BasicBlockHelper::append($context, 'version_compare_op_ok');
@@ -364,7 +411,7 @@ final class JitInfo
         TypeErrorRaise::emitValueError($context, VmInfo::VERSION_COMPARE_OPERATOR_ERROR);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($validOk);
-        JitValueBox::writeLong($context, $slot, $result);
+        JitValueBox::writeBool($context, $slot, $result);
 
         return $ptr;
     }
