@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ChdirJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** chdir() JIT: always ChdirJitHelper via JitVmHelperLink — no thin libc fork (#21147). */
+/** chdir() JIT: libc JitChdirKernel directly (#21147, #26928). */
 final class ChdirRuntimeShrinkTest extends TestCase
 {
     public function testJitChdirUsesPhpBridgeNotLibc(): void
@@ -18,13 +18,12 @@ final class ChdirRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('LibcExtern', $source);
     }
 
-    public function testStringChdirAlwaysUsesHelperBridge(): void
+    public function testStringChdirUsesLibcKernelNotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringChdir.php');
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringContainsString('ChdirJitHelper', $source);
         $this->assertStringContainsString('JitChdirKernel::invoke', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString("lookupFunction('chdir')", $source);
