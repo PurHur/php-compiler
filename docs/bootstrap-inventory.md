@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6779 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21907 |
+| Source constructs flagged (warnings) | 21909 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2517,7 +2517,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateOffsetGet.php` | 0 | 2 |
 | `ext/standard/JitDateParse.php` | 0 | 1 |
 | `ext/standard/JitDateParseMaterializer.php` | 0 | 1 |
-| `ext/standard/JitDatePeriodConstruct.php` | 0 | 6 |
+| `ext/standard/JitDatePeriodConstruct.php` | 0 | 8 |
 | `ext/standard/JitDatePeriodCreateFromISO8601String.php` | 0 | 8 |
 | `ext/standard/JitDateSunFunc.php` | 0 | 1 |
 | `ext/standard/JitDateSunInfo.php` | 0 | 1 |
@@ -26962,12 +26962,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDatePeriodConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new JITVariable (line 89)
-- new JITVariable (line 109)
-- new JITVariable (line 122)
-- new JITVariable (line 137)
-- 6 class method(s)
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 70)
+- new Exception (line 79)
+- new JITVariable (line 155)
+- new JITVariable (line 175)
+- new JITVariable (line 188)
+- new JITVariable (line 203)
+- 12 class method(s)
 
 ### `ext/standard/JitDatePeriodCreateFromISO8601String.php`
 

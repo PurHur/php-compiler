@@ -12,7 +12,7 @@ use PHPCompiler\VM\DatePeriodSupport;
 use PHPLLVM\Value;
 
 /**
- * DatePeriod::__construct() — JIT/AOT end-date form (#26772).
+ * DatePeriod::__construct() — JIT/AOT end-date + int-$recurrences forms (#26772, #26852).
  *
  * php-src: ext/date/php_date.c — date_period_construct
  */
@@ -39,12 +39,9 @@ final class DatePeriodConstruct implements Call
         if (!self::isObjectish($args[1]) || !self::isObjectish($args[2])) {
             throw new \TypeError(DatePeriodSupport::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
         }
-        // Recurrence-count form: 3rd user arg is int — not thin-AOT lowered yet.
+        // Recurrence-count form: 3rd user arg is int (#26852).
         if (!self::isObjectish($args[3])) {
-            throw new \LogicException(
-                'DatePeriod::__construct(... int $recurrences) is not lowered for thin AOT in this build (#26772); '
-                .'use end-date form'
-            );
+            return JitDatePeriodConstruct::invokeFromRecurrenceCount($context, ...$args);
         }
 
         return JitDatePeriodConstruct::invokeFromEndDate($context, ...$args);
