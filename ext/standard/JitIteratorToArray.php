@@ -10,11 +10,8 @@ use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
-use PHPCompiler\VM\GeneratorState;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -35,12 +32,16 @@ final class JitIteratorToArray
         $doneBlock = BasicBlockHelper::append($context, 'ita_preserve_keys_done');
         $context->builder->branchIf($preserveKeys, $preserveBlock, $reindexBlock);
 
+        // Each arm must inttoptr/load __generator_state__ in its own block. A cached
+        // Value from the sibling arm fails Module->verify (dominate-uses, #26802).
         $context->builder->positionAtEnd($preserveBlock);
+        $iterator->generatorStatePtr = null;
         $preserveResult = self::invoke($context, $iterator, true);
         $preserveEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($reindexBlock);
+        $iterator->generatorStatePtr = null;
         $reindexResult = self::invoke($context, $iterator, false);
         $reindexEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -196,33 +197,10 @@ final class JitIteratorToArray
         Variable $gen,
         bool $preserveKeys
     ): Value {
+        // Drain via the same IterReset/Valid/Value path as foreach — the hand-rolled
+        // ensureStarted + has_current loop segfaulted under AOT (#26802).
         GeneratorHelper::loadStateFromGeneratorObject($context, $gen);
-        GeneratorHelper::compileAssertGeneratorIterableForRewind($context, $gen);
-        // Method-style rewind: open to first yield if needed, require AT_FIRST_YIELD (#23713).
-        GeneratorHelper::ensureStarted($context, $gen);
-        $state = $gen->generatorStatePtr;
-        $map = $context->structFieldMap['__generator_state__'];
-        $i1 = $context->getTypeFromString('int1');
-        $atFirst = $context->builder->load($context->builder->structGep($state, $map['at_first_yield']));
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $rewindOk = $fn->appendBasicBlock('ita_gen_rewind_ok');
-        $rewindFail = $fn->appendBasicBlock('ita_gen_rewind_fail');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_NE, $atFirst, $i1->constInt(0, false)),
-            $rewindOk,
-            $rewindFail
-        );
-        $context->builder->positionAtEnd($rewindFail);
-        TryCatchHelper::emitCatchableClassError(
-            $context,
-            'Exception',
-            GeneratorState::REWIND_ALREADY_RUN_ERROR
-        );
-        $context->builder->positionAtEnd($rewindOk);
-        $context->builder->store(
-            $i1->constInt(0, false),
-            $context->builder->structGep($state, $map['foreach_needs_advance'])
-        );
+        GeneratorHelper::compileIterReset($context, $gen);
 
         $out = new Variable(
             $context,
@@ -233,22 +211,15 @@ final class JitIteratorToArray
         if (!$preserveKeys) {
             $out->nextFreeElement = 0;
         }
-        $resumeFn = GeneratorHelper::resolveResumeFunction($context, $gen);
+        $fn = $context->builder->getInsertBlock()->getParent();
         $head = $fn->appendBasicBlock('ita_gen_head');
         $body = $fn->appendBasicBlock('ita_gen_body');
-        $advance = $fn->appendBasicBlock('ita_gen_advance');
         $done = $fn->appendBasicBlock('ita_gen_done');
         $context->builder->branch($head);
 
-        // Collect current yield before advancing (rewind left us on the opening yield).
         $context->builder->positionAtEnd($head);
-        $hasCurrent = $context->builder->load($context->builder->structGep($state, $map['has_current']));
-        $doneFlag = $context->builder->load($context->builder->structGep($state, $map['done']));
-        $alive = $context->builder->and(
-            $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false)),
-            $context->builder->icmp(Builder::INT_EQ, $doneFlag, $i1->constInt(0, false))
-        );
-        $context->builder->branchIf($alive, $body, $done);
+        $valid = GeneratorHelper::compileIterValid($context, $gen);
+        $context->builder->branchIf($valid, $body, $done);
 
         $context->builder->positionAtEnd($body);
         $value = GeneratorHelper::compileIterValue($context, $gen);
@@ -258,11 +229,6 @@ final class JitIteratorToArray
         } else {
             HashTableHelper::addElement($context, $out, $value, null);
         }
-        $context->builder->branch($advance);
-
-        $context->builder->positionAtEnd($advance);
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['at_first_yield']));
-        $context->builder->call($resumeFn, $state);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);

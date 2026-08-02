@@ -376,11 +376,14 @@ final class GeneratorIteratorJitHelper
         if (null !== $genVar->generatorStatePtr) {
             return $genVar->generatorStatePtr;
         }
-        $genVar = self::normalizeGeneratorObjectVariable($context, $genVar);
+        // Normalize for the property load only — do not rebind $genVar. Caching the
+        // state pointer on a discarded TYPE_OBJECT copy left callers with a null
+        // $gen->generatorStatePtr (AOT iterator_to_array / dominate-uses, #26802).
+        $objVar = self::normalizeGeneratorObjectVariable($context, $genVar);
         JitGeneratorHelper::ensureTypes($context);
         // Mirror FiberHelperLlvm::loadStateFromFiberObject — propertyFetch returns a
         // KIND_VARIABLE slot (i64*); inttoptr needs the loaded i64 bits (#26819).
-        $objVal = $context->helper->loadValue($genVar);
+        $objVal = $context->helper->loadValue($objVar);
         $stateVar = $context->type->object->propertyFetch(
             $objVal,
             'Generator',
@@ -434,11 +437,22 @@ final class GeneratorIteratorJitHelper
 
             return true;
         }
+        // Arrays / non-objects are never Generators (#26802).
+        if (
+            Variable::TYPE_OBJECT !== $genVar->type
+            && Variable::TYPE_VALUE !== $genVar->type
+        ) {
+            return false;
+        }
         try {
             self::normalizeGeneratorObjectVariable($context, $genVar);
             self::loadStateFromGeneratorObject($context, $genVar);
             self::resolveResumeLc($context, $genVar);
         } catch (\LogicException) {
+            // Drop a half-hydrated inttoptr from a non-Generator object (#26802).
+            $genVar->generatorStatePtr = null;
+            $genVar->generatorResumeName = null;
+
             return false;
         }
         $genVar->isJitGenerator = true;
