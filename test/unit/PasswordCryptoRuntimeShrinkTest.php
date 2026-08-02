@@ -46,12 +46,16 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
     public function testPasswordJitHelperDelegatesToVmPassword(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PasswordJitHelper.php');
+        // Host/VM path still uses VmPassword; NestedJIT uses thin kernels (#26773).
         $this->assertStringContainsString('VmPassword::hash', $source);
         $this->assertStringContainsString('VmPassword::verify', $source);
         $this->assertStringContainsString('VmPassword::crypt', $source);
         $this->assertStringContainsString('VmPassword::getInfo', $source);
         $this->assertStringContainsString('VmPassword::needsRehash', $source);
         $this->assertStringContainsString('VmPassword::algos', $source);
+        $this->assertStringContainsString('phpc_argon2_hash', $source);
+        $this->assertStringContainsString('phpc_libcrypt_kernel', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
     }
 
     public function testPasswordJitHelperHashMatchesVmPassword(): void

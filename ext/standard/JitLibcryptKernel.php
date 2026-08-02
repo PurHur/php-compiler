@@ -101,6 +101,70 @@ final class JitLibcryptKernel
         return $phi;
     }
 
+    /**
+     * crypt(3) + strcmp against expected hash — NestedJIT-safe bcrypt verify (#26773).
+     *
+     * @return Value i64 — 1 on match, 0 otherwise
+     */
+    public static function verifyMatch(Context $context, Value $passwordStr, Value $hashStr): Value
+    {
+        LibcExtern::register($context);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8 = $context->getTypeFromString('int8');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $tag = 'libcrypt_v_'.bin2hex(\random_bytes(3));
+
+        $failBlock = BasicBlockHelper::append($context, $tag.'_fail');
+        $okBlock = BasicBlockHelper::append($context, $tag.'_ok');
+        $cmpBlock = BasicBlockHelper::append($context, $tag.'_cmp');
+        $mergeBlock = BasicBlockHelper::append($context, $tag.'_merge');
+
+        $keyCstr = self::stringDataPtr($context, $passwordStr);
+        $hashCstr = self::stringDataPtr($context, $hashStr);
+        $resultCstr = $context->builder->call(
+            self::libcryptDecl($context),
+            $keyCstr,
+            $hashCstr
+        );
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $resultCstr, $i8p->constNull());
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $firstChar = $context->builder->load($resultCstr);
+        $isStar = $context->builder->icmp(
+            Builder::INT_EQ,
+            $firstChar,
+            $i8->constInt(\ord('*'), false)
+        );
+        $context->builder->branchIf($isStar, $failBlock, $cmpBlock);
+
+        $context->builder->positionAtEnd($cmpBlock);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $resultCstr,
+            $hashCstr
+        );
+        $cmpI32 = $cmp->typeOf() === $i32 ? $cmp : $context->builder->trunc($cmp, $i32);
+        $eq = $context->builder->icmp(Builder::INT_EQ, $cmpI32, $i32->constInt(0, false));
+        $matched = $context->builder->select($eq, $one, $zero);
+        $cmpEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $failEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($matched, $cmpEnd);
+        $phi->addIncoming($zero, $failEnd);
+
+        return $phi;
+    }
+
     private static function stringDataPtr(Context $context, Value $strPtr): Value
     {
         $map = $context->structFieldMap['__string__'];
