@@ -7,14 +7,15 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\GetClassJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ReflectionBuiltinHelper get_class LLVM routes through GetClassRuntime ABI (#10222 / #26854). */
+/** ReflectionBuiltinHelper get_class LLVM routes through GetClassRuntime inline walk (#10222 / #26854). */
 final class ReflectionBuiltinHelperRuntimeShrinkTest extends TestCase
 {
-    public function testReflectionBuiltinHelperUsesGetClassRuntimeBridge(): void
+    public function testReflectionBuiltinHelperUsesGetClassRuntimeInlineWalk(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ReflectionBuiltinHelper.php');
-        $this->assertStringContainsString('GetClassRuntime::ensureLinked', $source);
-        $this->assertStringContainsString('__phpc_class_name_from_id', $source);
+        $this->assertStringContainsString('GetClassRuntime::emitClassNameFromId', $source);
+        $this->assertStringContainsString('GetClassRuntime::emitDebugTypeClassNameFromId', $source);
+        $this->assertStringNotContainsString('__phpc_class_name_from_id', $source);
     }
 
     public function testGetClassRuntimeUsesMainModuleSelectWalk(): void

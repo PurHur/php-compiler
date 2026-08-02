@@ -9,8 +9,7 @@ try {
     $r->x = 4;
     echo "NO_THROW\n";
 } catch (Throwable $e) {
-    // Prefer instanceof: thin AOT get_class(Error) still soft-fails on some paths (#26854).
-    echo $e instanceof Error ? "Error" : get_class($e), "\n";
+    echo get_class($e), "\n";
 }
 --EXPECT--
 3
