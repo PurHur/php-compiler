@@ -77,7 +77,8 @@ final class JitVmHelperLink
         Context $context,
         array $relativeHelperPaths,
         array $compiledHelpers,
-        string $compileLabel
+        string $compileLabel,
+        bool $skipHelperRuntimeCache = false
     ): void {
         if ([] === $relativeHelperPaths) {
             throw new \InvalidArgumentException('ensureCompiledBundle requires at least one path ('.$compileLabel.')');
@@ -90,7 +91,10 @@ final class JitVmHelperLink
         // Split compilation (#15889): the cached helper TU provides these
         // symbols as available_externally imports + helpers.o at link time,
         // skipping the nested PHP lowering below entirely.
-        if (\PHPCompiler\AOT\HelperRuntimeCache::tryProvide($context, $compiledHelpers)) {
+        // Thin AOT preg must not consume the cached full PregJitHelper (VmPregNative)
+        // — that path returns wrong 0 under thin standalone (#26888 / #24115).
+        if (!$skipHelperRuntimeCache
+            && \PHPCompiler\AOT\HelperRuntimeCache::tryProvide($context, $compiledHelpers)) {
             if (!self::compiledHelpersMissing($context, $compiledHelpers)) {
                 return;
             }

@@ -32,6 +32,12 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('StringFormat::ensureLinked', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertMatchesRegularExpression(
+            '/ensureCompiledBundle\(\s*\$context,\s*\$bundle,\s*self::COMPILED_HELPERS,\s*\'#24943\',\s*\$thin\s*\)/',
+            $source
+        );
+        $link = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitVmHelperLink.php');
+        $this->assertStringContainsString('skipHelperRuntimeCache', $link);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
