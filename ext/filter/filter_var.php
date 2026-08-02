@@ -108,6 +108,12 @@ final class filter_var extends Internal
         if (1 === $argc) {
             return JitFilter::boxFilterDefault($context, $value);
         }
+        // Compile-time filter id — emit only that validator (avoids mega-CFG pulling
+        // FilterEmailValidate → __compiler_preg_match without a bridge, #26853 / peer #20988).
+        $constFilter = self::tryConstFilterId($context, $filterArg);
+        if (null !== $constFilter) {
+            return self::dispatchConstFilter($context, $value, $constFilter, $optionsArg);
+        }
         $filterVal = JitFilter::loadFilterId($context, $filterArg);
         $nullOnFailure = JitFilter::loadNullOnFailureFlag($context, $optionsArg);
         $i64 = $context->getTypeFromString('int64');
@@ -313,6 +319,108 @@ final class filter_var extends Internal
                 break;
             default:
                 throw new \LogicException('filter_var() returned unexpected type');
+        }
+    }
+
+    /** Compile-time FILTER_* id from a native long constant or named constant load (#26853). */
+    private static function tryConstFilterId(Context $context, JITVariable $filterArg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG !== $filterArg->type
+            || JITVariable::KIND_VALUE !== $filterArg->kind
+            || null === $filterArg->value) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (null !== $lib->LLVMIsAConstantInt($filterArg->value->value)) {
+            return (int) $lib->LLVMConstIntGetZExtValue($filterArg->value->value);
+        }
+        // FILTER_* constants lower as loads from registered globals (json_encode peer #21723).
+        if (null === $lib->LLVMIsALoadInst($filterArg->value->value)) {
+            return null;
+        }
+        $ptr = $filterArg->value->getOperand(0);
+        $name = $lib->LLVMGetValueName($ptr->value)?->toString() ?? '';
+        if ('' === $name || !isset($context->constants[$name])) {
+            return null;
+        }
+        if ($context->constants[$name][0] !== $filterArg->type) {
+            return null;
+        }
+        $phpVar = $context->runtime->vmContext->constantFetch($name);
+        if (null === $phpVar || \PHPCompiler\VM\Variable::TYPE_INTEGER !== $phpVar->type) {
+            return null;
+        }
+
+        return $phpVar->toInt();
+    }
+
+    /**
+     * Single-filter AOT/JIT path — no mega-CFG (#26853).
+     */
+    private static function dispatchConstFilter(
+        Context $context,
+        JITVariable $value,
+        int $filterId,
+        ?JITVariable $optionsArg
+    ): Value {
+        $nullOnFailure = JitFilter::loadNullOnFailureFlag($context, $optionsArg);
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
+        $applyNull = null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type;
+
+        switch ($filterId) {
+            case VmFilter::FILTER_DEFAULT:
+            case VmFilter::FILTER_UNSAFE_RAW:
+                return JitFilter::boxFilterDefault($context, $value);
+            case VmFilter::FILTER_VALIDATE_INT:
+                $result = JitFilter::validateInt($context, $value, $flags);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            case VmFilter::FILTER_VALIDATE_BOOLEAN:
+                return JitFilter::validateBoolean($context, $value, $nullOnFailure);
+            case VmFilter::FILTER_VALIDATE_FLOAT:
+                $result = JitFilter::validateFloat($context, $value);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            case VmFilter::FILTER_VALIDATE_DOMAIN:
+                $result = JitFilter::validateDomain($context, $value, $flags);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            case VmFilter::FILTER_VALIDATE_EMAIL:
+                $result = JitFilter::validateEmail($context, $value);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            case VmFilter::FILTER_VALIDATE_URL:
+                $result = JitFilter::validateUrl($context, $value);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            case VmFilter::FILTER_VALIDATE_IP:
+                $result = JitFilter::validateIp($context, $value, $flags);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            case VmFilter::FILTER_VALIDATE_MAC:
+                $result = JitFilter::validateMac($context, $value);
+
+                return $applyNull
+                    ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
+                    : $result;
+            default:
+                if (VmFilter::isSanitizeFilter($filterId)) {
+                    return JitFilter::sanitize($context, $value, $context->getTypeFromString('int64')->constInt($filterId, false), $flags);
+                }
+
+                return JitFilter::boxedFalse($context);
         }
     }
 }

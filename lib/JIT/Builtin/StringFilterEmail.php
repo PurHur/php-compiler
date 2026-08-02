@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -87,11 +88,12 @@ final class StringFilterEmail
 
         $entry = $fn->appendBasicBlock('filter_email_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::VALIDATE_HELPER),
-            $fn->getParam(0)
+        // NestedJIT ?string may be __value__*; ABI is __string__* (#26853).
+        $helper = self::helperFunction($context, self::VALIDATE_HELPER);
+        $raw = JitNestedHelperCoerce::callHelper($context, $helper, [$fn->getParam(0)]);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
         );
-        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 

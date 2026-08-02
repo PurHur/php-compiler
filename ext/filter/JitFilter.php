@@ -268,6 +268,19 @@ final class JitFilter
             return self::booleanFailureBox($context, $nullOnFailure);
         }
 
+        // Compile-time string — fold via VmFilter SSOT (NestedJIT helper returns are
+        // corrupt under thin AOT; #26853).
+        $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
+        if (null !== $lit) {
+            $parsed = VmFilter::parseBooleanString($lit);
+            if (null === $parsed) {
+                return self::booleanFailureBox($context, $nullOnFailure);
+            }
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool($parsed));
+
+            return $ptr;
+        }
+
         return self::stringToBooleanBox($context, $context->helper->loadValue($value), $nullOnFailure);
     }
 
@@ -1091,25 +1104,24 @@ final class JitFilter
 
     private static function stringToBooleanBox(Context $context, Value $strPtr, ?Value $nullOnFailure = null): Value
     {
+        // Keep helper linked for capability/shrink gates (#23612); parse inline —
+        // NestedJIT/cache ABI returns are corrupt under thin AOT (#26853).
         StringFilterBoolean::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
         $trueVal = $context->constantFromBool(true);
-        $i32 = $context->getTypeFromString('int32');
-        $tokenResult = $context->builder->call(
-            $context->lookupFunction('__compiler_filter_parse_boolean_string'),
-            $strPtr
-        );
+        $tokenResult = self::parseBooleanStringToken($context, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
         $isUnknown = $context->builder->icmp(
             Builder::INT_EQ,
             $tokenResult,
-            $i32->constInt(-1, true)
+            $i64->constInt(-1, true)
         );
         $isTrue = $context->builder->icmp(
             Builder::INT_NE,
             $tokenResult,
-            $i32->constInt(0, false)
+            $i64->constInt(0, false)
         );
 
         $id = (string) (++self::$blockSerial);
@@ -1139,6 +1151,163 @@ final class JitFilter
         $phi->addIncoming($knownResult, $knownTail);
 
         return $phi;
+    }
+
+    /**
+     * Inline php_filter_boolean token parse — returns i64 -1/0/1 (#26853).
+     * Mirrors {@see VmFilter::parseBooleanString()} (trim + case-insensitive tokens).
+     */
+    private static function parseBooleanStringToken(Context $context, Value $strPtr): Value
+    {
+        \PHPCompiler\JIT\LibcExtern::register($context);
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $rawLen = $context->builder->load($context->builder->structGep($strPtr, $map['length']));
+        $rawChars = $context->builder->structGep($strPtr, $map['value']);
+        $id = (string) (++self::$blockSerial);
+
+        $startSlot = $context->builder->alloca($i64, 1, 'fvb_s_'.$id);
+        $endSlot = $context->builder->alloca($i64, 1, 'fvb_e_'.$id);
+        $context->builder->store($i64->constInt(0, false), $startSlot);
+        $context->builder->store($rawLen, $endSlot);
+
+        // while (start < end && isspace(s[start])) start++;
+        $lHead = BasicBlockHelper::append($context, 'fvb_tl_'.$id);
+        $lCheck = BasicBlockHelper::append($context, 'fvb_tlc_'.$id);
+        $lInc = BasicBlockHelper::append($context, 'fvb_tli_'.$id);
+        $lDone = BasicBlockHelper::append($context, 'fvb_tld_'.$id);
+        $context->builder->branch($lHead);
+        $context->builder->positionAtEnd($lHead);
+        $s = $context->builder->load($startSlot);
+        $e = $context->builder->load($endSlot);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_ULT, $s, $e),
+            $lCheck,
+            $lDone
+        );
+        $context->builder->positionAtEnd($lCheck);
+        $ch = $context->builder->zext(
+            $context->builder->load($context->builder->gep($rawChars, $s)),
+            $i32
+        );
+        $context->builder->branchIf(self::isAsciiSpace($context, $ch), $lInc, $lDone);
+        $context->builder->positionAtEnd($lInc);
+        $context->builder->store($context->builder->add($s, $i64->constInt(1, false)), $startSlot);
+        $context->builder->branch($lHead);
+        $context->builder->positionAtEnd($lDone);
+
+        // while (end > start && isspace(s[end-1])) end--;
+        $rHead = BasicBlockHelper::append($context, 'fvb_tr_'.$id);
+        $rCheck = BasicBlockHelper::append($context, 'fvb_trc_'.$id);
+        $rDec = BasicBlockHelper::append($context, 'fvb_trd_'.$id);
+        $rDone = BasicBlockHelper::append($context, 'fvb_trdone_'.$id);
+        $context->builder->branch($rHead);
+        $context->builder->positionAtEnd($rHead);
+        $s = $context->builder->load($startSlot);
+        $e = $context->builder->load($endSlot);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_UGT, $e, $s),
+            $rCheck,
+            $rDone
+        );
+        $context->builder->positionAtEnd($rCheck);
+        $last = $context->builder->sub($e, $i64->constInt(1, false));
+        $ch = $context->builder->zext(
+            $context->builder->load($context->builder->gep($rawChars, $last)),
+            $i32
+        );
+        $context->builder->branchIf(self::isAsciiSpace($context, $ch), $rDec, $rDone);
+        $context->builder->positionAtEnd($rDec);
+        $context->builder->store($last, $endSlot);
+        $context->builder->branch($rHead);
+        $context->builder->positionAtEnd($rDone);
+
+        $start = $context->builder->load($startSlot);
+        $end = $context->builder->load($endSlot);
+        $tlen = $context->builder->sub($end, $start);
+        $tok = $context->builder->gep($rawChars, $start);
+
+        $neg1 = $i64->constInt(-1, true);
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+
+        $match = static function (string $lit) use ($context, $tok, $tlen, $i64, $i32): Value {
+            $n = \strlen($lit);
+            $lenOk = $context->builder->icmp(Builder::INT_EQ, $tlen, $i64->constInt($n, false));
+            $litPtr = $context->builder->load($context->constantStringFromString($lit));
+            $litChars = $context->builder->structGep(
+                $litPtr,
+                $context->structFieldMap['__string__']['value']
+            );
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strncasecmp'),
+                $tok,
+                $litChars,
+                $i64->constInt($n, false)
+            );
+            $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+
+            return $context->builder->and($lenOk, $eq);
+        };
+
+        $resultSlot = $context->builder->alloca($i64, 1, 'fvb_tok_'.$id);
+        $context->builder->store($neg1, $resultSlot);
+
+        $doneTok = BasicBlockHelper::append($context, 'fvb_tok_done_'.$id);
+        $emptyBlock = BasicBlockHelper::append($context, 'fvb_em_'.$id);
+        $afterEmpty = BasicBlockHelper::append($context, 'fvb_ae_'.$id);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $tlen, $zero);
+        $context->builder->branchIf($empty, $emptyBlock, $afterEmpty);
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->store($zero, $resultSlot);
+        $context->builder->branch($doneTok);
+        $context->builder->positionAtEnd($afterEmpty);
+
+        $try = static function (string $lit, Value $val, string $label) use (
+            $context,
+            $match,
+            $resultSlot,
+            $doneTok,
+            $id
+        ): void {
+            $yes = BasicBlockHelper::append($context, 'fvb_m_'.$label.'_'.$id);
+            $no = BasicBlockHelper::append($context, 'fvb_n_'.$label.'_'.$id);
+            $context->builder->branchIf($match($lit), $yes, $no);
+            $context->builder->positionAtEnd($yes);
+            $context->builder->store($val, $resultSlot);
+            $context->builder->branch($doneTok);
+            $context->builder->positionAtEnd($no);
+        };
+
+        $try('1', $one, '1');
+        $try('0', $zero, '0');
+        $try('on', $one, 'on');
+        $try('no', $zero, 'no');
+        $try('yes', $one, 'yes');
+        $try('off', $zero, 'off');
+        $try('true', $one, 'true');
+        $try('false', $zero, 'false');
+        $context->builder->branch($doneTok);
+        $context->builder->positionAtEnd($doneTok);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function isAsciiSpace(Context $context, Value $ch32): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $eq = static function (int $c) use ($context, $ch32, $i32): Value {
+            return $context->builder->icmp(Builder::INT_EQ, $ch32, $i32->constInt($c, false));
+        };
+
+        return $context->builder->or(
+            $context->builder->or($eq(0x20), $eq(0x09)),
+            $context->builder->or(
+                $context->builder->or($eq(0x0a), $eq(0x0d)),
+                $context->builder->or($eq(0x0b), $eq(0x0c))
+            )
+        );
     }
 
     private static function stringToFloatBox(Context $context, Value $strPtr): Value

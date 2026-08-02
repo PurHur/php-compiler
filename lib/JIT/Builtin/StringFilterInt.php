@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -78,12 +79,15 @@ final class StringFilterInt
 
         $entry = $fn->appendBasicBlock('filter_int_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::VALIDATE_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1)
+        $helper = self::helperFunction($context, self::VALIDATE_HELPER);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            $helper,
+            [$fn->getParam(0), $fn->getParam(1)]
         );
-        $context->builder->returnValue($result);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
         $context->registerFunction($abiName, $fn);
     }
 

@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -77,13 +78,16 @@ final class StringFilterSanitize
 
         $entry = $fn->appendBasicBlock('filter_sanitize_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::SANITIZE_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2)
+        // NestedJIT string may be __value__*; ABI is __string__* (#26853).
+        $helper = self::helperFunction($context, self::SANITIZE_HELPER);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            $helper,
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
         );
-        $context->builder->returnValue($result);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
         $context->registerFunction($abiName, $fn);
     }
 
