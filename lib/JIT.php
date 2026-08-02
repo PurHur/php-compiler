@@ -1600,12 +1600,17 @@ class JIT {
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
     private function shouldUseM3CompileDriverRealLowering(): bool
     {
-        if (!$this->shouldUseSelfHostJitStubs()) {
+        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return false;
         }
-        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        // M5 argv / gen-0 seed: keep compile-driver allowlist even if user-script AOT
+        // briefly cleared SELFHOST_AOT (#26756 / re-#23468).
+        if ($this->shouldUseM5DriverHostCompile()) {
+            return true;
+        }
 
-        return '1' === $flag || 'true' === strtolower((string) $flag);
+        return $this->shouldUseSelfHostJitStubs();
     }
 
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
