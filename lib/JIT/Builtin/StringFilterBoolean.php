@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -71,19 +72,24 @@ final class StringFilterBoolean
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $i32 = $context->getTypeFromString('int32');
-        $ft = $context->context->functionType($i32, false, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($i64, false, $strPtr);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('filter_bool_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::PARSE_HELPER),
-            $fn->getParam(0)
-        );
-        $context->builder->returnValue($result);
+        // Helper ABI is bare i64 (-1/0/1). Do not extractLong — that corrupts
+        // correct i64 returns under thin AOT (#26853; peer INT hex garbage).
+        // Pass `__string__*` straight through (#26866 / #26884).
+        $helper = self::helperFunction($context, self::PARSE_HELPER);
+        $raw = $context->builder->call($helper, $fn->getParam(0));
+        $ret = $raw;
+        if ($raw->typeOf() !== $i64) {
+            $ret = JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i64);
+        }
+        $context->builder->returnValue($ret);
         $context->registerFunction($abiName, $fn);
     }
 
