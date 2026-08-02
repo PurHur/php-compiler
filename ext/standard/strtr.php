@@ -33,7 +33,7 @@ final class strtr extends Internal
                 $replacePairs[VmString::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs')] =
                     VmString::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs');
             }
-            $result = VmString::strtrArray($string, $replacePairs);
+            $result = VmString::strtrArray($string, $replacePairs, $frame);
             BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->string($result));
 
             return;

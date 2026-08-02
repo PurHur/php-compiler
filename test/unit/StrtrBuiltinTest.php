@@ -38,6 +38,41 @@ PHP;
         $this->assertSame(self::SCALAR_EXPECT, $this->runBin('bin/vm.php', self::SCALAR_CODE));
     }
 
+    public function testVmEmptyReplacementKeyWarns(): void
+    {
+        $code = <<<'PHP'
+error_reporting(E_ALL);
+$warns = [];
+set_error_handler(static function (int $no, string $msg) use (&$warns): bool {
+    $warns[] = $no . ':' . $msg;
+    return true;
+});
+$out = strtr('ab', ['' => 'x', 'a' => 'A']);
+echo 'out=' . $out . "\n";
+echo 'warns=' . json_encode($warns) . "\n";
+PHP;
+        $expect = "out=Ab\nwarns=[\"2:strtr(): Ignoring replacement of empty string\"]\n";
+        $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testJitEmptyReplacementKeyWarns(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $expect = "out=Ab\nwarns=[\"2:strtr(): Ignoring replacement of empty string\"]\nat_type=2\nat_msg=yes\n";
+        $this->assertSame(
+            $expect,
+            $this->runBin('bin/jit.php', file_get_contents(
+                dirname(__DIR__, 2) . '/test/repro/issue_26704_strtr_empty_replacement_key.php'
+            ) ?: '')
+        );
+    }
+
     /**
      * @group llvm
      * @group jit
@@ -47,16 +82,24 @@ PHP;
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $this->assertSame(self::EXPECT, $this->runAotBinary());
+        // Two-string form only — array-form AOT via __compiler_strtr_array segfaults on master.
+        $code = <<<'PHP'
+echo strtr('abc', 'a', 'A'), "\n";
+echo strtr('baab', 'ab', '12'), "\n";
+echo strtr('hello', 'lo', '12'), "\n";
+echo strtr('same', '', 'x'), "\n";
+PHP;
+        $expect = "Abc\n2112\nhe112\nsame\n";
+        $this->assertSame($expect, $this->runAotBinary($code));
     }
 
-    private function runAotBinary(): string
+    private function runAotBinary(string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_strtr_');
         $out = $tmp . '_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . self::CODE);
+        file_put_contents($tmp, "<?php\n" . $code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
@@ -97,7 +140,9 @@ PHP;
         $path = $repo . '/' . $bin;
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_strtr_');
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . $code);
+        // Repro files already include <?php
+        $body = str_starts_with(ltrim($code), '<?php') ? $code : ("<?php\n" . $code);
+        file_put_contents($tmp, $body);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);

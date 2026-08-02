@@ -85,6 +85,10 @@ final class JitStrtr
             if (!\is_string($key) || !\is_string($value)) {
                 return null;
             }
+            // Empty from-key must run at runtime so E_WARNING reaches handlers (#26704).
+            if ('' === $key) {
+                return null;
+            }
             $pairs[$key] = $value;
         }
 
