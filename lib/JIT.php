@@ -8055,6 +8055,33 @@ class JIT {
                             break;
                         }
                     }
+                    // User-script AOT: `$nodes[$i]` from SimpleXMLElement::xpath() (#26911).
+                    if (
+                        !$forWrite
+                        && JIT\UserScriptAotEnv::isActive()
+                    ) {
+                        $sxeListDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                            $this->context,
+                            $value,
+                            $dim
+                        );
+                        if (null !== $sxeListDim) {
+                            // Keep the same Variable so SplObjectStorage tree lookup survives
+                            // assignOperandValue (lastTree fallback would pick the wrong node).
+                            if ($forceBranchMerge) {
+                                $this->assignOperand($resultOp, $sxeListDim, true);
+                                $resultDim = $this->context->getVariableFromOp($resultOp);
+                                if (null !== $sxeListDim->compileTimeString) {
+                                    $resultDim->compileTimeString = $sxeListDim->compileTimeString;
+                                }
+                            } else {
+                                $this->context->setVariableOp($resultOp, $sxeListDim);
+                                $resultDim = $sxeListDim;
+                            }
+                            $resultDim->magicGetOverloadedClass = 'SimpleXMLElement';
+                            break;
+                        }
+                    }
                     if ($fetchIs) {
                         // FETCH_DIM_IS for nested isset()/empty() chains (#21991).
                         $bracketLabel = Variable::cannotUseBracketLabel($value->type);
@@ -8176,6 +8203,22 @@ class JIT {
                         break;
                     }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
+                        // SimpleXMLElement::xpath() node-set: fold `$n[$i]` to compile-time SXE (#26911).
+                        if (!$forWrite) {
+                            $xpathDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                                $this->context,
+                                $value,
+                                $dim
+                            );
+                            if (null !== $xpathDim) {
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($resultOp, $xpathDim, true);
+                                } else {
+                                    $this->assignOperand($resultOp, $xpathDim);
+                                }
+                                break;
+                            }
+                        }
                         $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
@@ -8187,6 +8230,21 @@ class JIT {
                         break;
                     }
                     if (Variable::TYPE_VALUE === $value->type) {
+                        if (!$forWrite) {
+                            $xpathDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldXpathListDim(
+                                $this->context,
+                                $value,
+                                $dim
+                            );
+                            if (null !== $xpathDim) {
+                                if ($forceBranchMerge) {
+                                    $this->assignOperand($resultOp, $xpathDim, true);
+                                } else {
+                                    $this->assignOperand($resultOp, $xpathDim);
+                                }
+                                break;
+                            }
+                        }
                         if (null !== $containerOp->type
                             && \PHPTypes\Type::TYPE_OBJECT === $containerOp->type->type
                             && null !== $op->arg3
@@ -11136,6 +11194,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateSimpleXmlXpathCompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $nameOp = $block->getOperand($op->arg1);
@@ -12997,6 +13059,30 @@ class JIT {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $this->context->namedVariableBindings[$resolved]->compileTimeBcmathNumber = $ct;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /** Attach SimpleXMLElement::xpath() node-set token so `$n[$i]` can fold (#26911). */
+    private function propagateSimpleXmlXpathCompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!($toCall instanceof JIT\Call\SimpleXMLElementXpath)) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingXpathAssign($var);
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])
+                && $this->context->namedVariableBindings[$resolved] !== $var
+                && null !== $var->compileTimeString
+            ) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
@@ -17939,6 +18025,12 @@ class JIT {
                 ? $externalReceiverClass
                 : ('' !== $scopeClassName ? $scopeClassName : 'object'));
         $declaringClassLc = strtolower(ltrim($className, '\\'));
+        // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338, #26863, #26911).
+        // userType wins over resolveInstanceMethodReceiverClass(), so remap here too.
+        if ('simplemxml_element' === $declaringClassLc) {
+            $className = 'SimpleXMLElement';
+            $declaringClassLc = 'simplexmlelement';
+        }
         if (
             '' !== $declaringClassLc
             && !JIT\NestedJitCompileScope::isActive()
@@ -18661,6 +18753,11 @@ class JIT {
         $methodLc = strtolower($methodLc);
         $visited = [];
         $current = strtolower(ltrim($classLc, '\\'));
+        // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338, #26911).
+        if ('simplemxml_element' === $current) {
+            $current = 'simplexmlelement';
+            $classLc = 'simplexmlelement';
+        }
         while (!isset($visited[$current])) {
             $visited[$current] = true;
             $proxy = $current.'::'.$methodLc;
