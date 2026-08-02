@@ -1016,6 +1016,12 @@ class Context {
         $this->functionProxies['recursivearrayiterator::__construct'] = new Call\ArrayIteratorConstruct(
             'RecursiveArrayIterator'
         );
+        // ArrayObject — same `__spl_ht` construct + count/ArrayAccess/getArrayCopy (#26823).
+        $this->type->object->lookup('ArrayObject');
+        $this->functionProxies['arrayobject::__construct'] = new Call\ArrayIteratorConstruct('ArrayObject');
+        foreach (['count', 'getArrayCopy', 'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset'] as $aoMethod) {
+            $this->functionProxies['arrayobject::'.strtolower($aoMethod)] = new Call\ArrayObjectMethod($aoMethod);
+        }
         // RecursiveIteratorIterator — flatten inner HT to LEAVES_ONLY `__spl_ht` (#26775).
         $this->functionProxies['recursiveiteratoriterator::__construct'] = new Call\RecursiveIteratorIteratorConstruct();
         // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
