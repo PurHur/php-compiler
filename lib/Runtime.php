@@ -531,20 +531,15 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
-        // M5 argv seed: identity prepare stubs + list-unpack SEGV (#26756) — keep $code as-is.
-        if ($this->m5ArgvIdentityParsePrepare) {
-            $bareRethrowLines = [];
-        } else {
-            // Original source — T_DOLLAR_OPEN_CURLY_BRACES before any desugar (#22001).
-            DollarBraceStringDeprecation::emitForSource($code, $filename, $this->vmContext);
-            // Original source — switch `case;` / `default;` before comma-case rewrite (#26279).
-            SwitchCaseSemicolonDeprecation::emitForSource($code, $filename, $this->vmContext);
-            // Original source — backtick shell-exec before CFG rewrites to shell_exec() (#26280).
-            BacktickShellExecDeprecation::emitForSource($code, $filename, $this->vmContext);
-            // Original source — (integer)/(boolean)/(double)/(binary) before any rewrite (#26281).
-            NonCanonicalCastDeprecation::emitForSource($code, $filename, $this->vmContext);
-            [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
-        }
+        // Original source — T_DOLLAR_OPEN_CURLY_BRACES before any desugar (#22001).
+        DollarBraceStringDeprecation::emitForSource($code, $filename, $this->vmContext);
+        // Original source — switch `case;` / `default;` before comma-case rewrite (#26279).
+        SwitchCaseSemicolonDeprecation::emitForSource($code, $filename, $this->vmContext);
+        // Original source — backtick shell-exec before CFG rewrites to shell_exec() (#26280).
+        BacktickShellExecDeprecation::emitForSource($code, $filename, $this->vmContext);
+        // Original source — (integer)/(boolean)/(double)/(binary) before any rewrite (#26281).
+        NonCanonicalCastDeprecation::emitForSource($code, $filename, $this->vmContext);
+        [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
         }

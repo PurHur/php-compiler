@@ -42,20 +42,16 @@ final class RuntimeInitParsePipelineTest extends TestCase
         );
     }
 
-    public function testRuntimeParseSkipsPrepareWhenM5FlagSet(): void
+    public function testPrepareIdentityAvoidsStringSeparate(): void
     {
-        $path = dirname(__DIR__, 2).'/lib/Runtime.php';
+        $path = dirname(__DIR__, 2).'/lib/JIT/RuntimePrepareSpineIdentity.php';
         $source = (string) file_get_contents($path);
-        $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $source);
-        $parsePos = strpos($source, 'function parse(string $code, string $filename)');
-        $this->assertNotFalse($parsePos);
-        $chunk = substr($source, $parsePos, 1200);
-        $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $chunk);
-        $flagPos = strpos($chunk, 'm5ArgvIdentityParsePrepare');
-        $preparePos = strpos($chunk, 'prepareSourceForParser');
-        $this->assertNotFalse($flagPos);
-        $this->assertNotFalse($preparePos);
-        $this->assertLessThan($preparePos, $flagPos, 'M5 flag gate must precede prepareSourceForParser');
+        $this->assertStringNotContainsString(
+            "lookupFunction('__string__separate')",
+            $source,
+            'Prepare identity must not separate — NestedJIT string ABI SEGV (#26756)'
+        );
+        $this->assertStringContainsString('__hashtable__setStringAt', $source);
     }
 
     public function testPrepareSpineIdentityWiredBeforeVoidStubs(): void
