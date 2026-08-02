@@ -2834,8 +2834,10 @@ class Context {
                 case VMVariable::TYPE_INTEGER:
                     $type = $this->getTypeFromString('int64');
                     $global = $this->module->addGlobal($type, $name);
-                    $global->setInitializer($type->constInt($phpVar->toInt(), false));
-                    $this->constants[$name] = [Variable::TYPE_NATIVE_LONG, $global];
+                    $intVal = $phpVar->toInt();
+                    $global->setInitializer($type->constInt($intVal, false));
+                    // [type, global, compileTimeLong] — foldable after Instruction load (#26774).
+                    $this->constants[$name] = [Variable::TYPE_NATIVE_LONG, $global, $intVal];
                     break;
                 case VMVariable::TYPE_FLOAT:
                     $type = $this->getTypeFromString('double');
@@ -2846,8 +2848,9 @@ class Context {
                 case VMVariable::TYPE_BOOLEAN:
                     $type = $this->getTypeFromString('int1');
                     $global = $this->module->addGlobal($type, $name);
-                    $global->setInitializer($type->constInt($phpVar->toBool() ? 1 : 0, false));
-                    $this->constants[$name] = [Variable::TYPE_NATIVE_BOOL, $global];
+                    $boolAsLong = $phpVar->toBool() ? 1 : 0;
+                    $global->setInitializer($type->constInt($boolAsLong, false));
+                    $this->constants[$name] = [Variable::TYPE_NATIVE_BOOL, $global, $boolAsLong];
                     break;
                 case VMVariable::TYPE_STRING:
                     $compileTimeStr = $phpVar->toString();
@@ -2869,7 +2872,20 @@ class Context {
             $this->builder->load($this->constants[$name][1])
         );
         $var->compileTimeConstantName = $name;
-        if (Variable::TYPE_STRING === $this->constants[$name][0] && isset($this->constants[$name][2])) {
+        // true/false (and int) CONST_FETCH loads are Instruction-backed; keep a foldable
+        // scalar so user-script AOT (XMLWriter::outputMemory(true), flush(false), …) can
+        // treat them as compile-time flags (#26774, peer #23427 ARG_SEND rematerialize).
+        if ((Variable::TYPE_NATIVE_BOOL === $this->constants[$name][0]
+                || Variable::TYPE_NATIVE_LONG === $this->constants[$name][0])
+            && isset($this->constants[$name][2])
+            && \is_int($this->constants[$name][2])
+        ) {
+            $var->compileTimeLong = $this->constants[$name][2];
+        }
+        if (Variable::TYPE_STRING === $this->constants[$name][0]
+            && isset($this->constants[$name][2])
+            && \is_string($this->constants[$name][2])
+        ) {
             $var->compileTimeString = $this->constants[$name][2];
         }
 
