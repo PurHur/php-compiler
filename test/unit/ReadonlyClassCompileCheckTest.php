@@ -24,6 +24,28 @@ PHP;
         $runtime->parseAndCompile($code, 'non_readonly_child.php');
     }
 
+    /** @covers issue #26739 */
+    public function testNonReadonlyExtendsReadonlyInsideTryFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class A {
+    public function __construct(public int $x) {}
+}
+try {
+    class B extends A {}
+    echo "extended\n";
+} catch (Throwable $e) {
+    echo get_class($e), ":", $e->getMessage(), "\n";
+}
+echo "after\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Non-readonly class B cannot extend readonly class A');
+        $runtime->parseAndCompile($code, 'readonly_extend_in_try.php');
+    }
+
     public function testReadonlyChildOfNonReadonlyParentFailsAtCompileTime(): void
     {
         $runtime = new Runtime();

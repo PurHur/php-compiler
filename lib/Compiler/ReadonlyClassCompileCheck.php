@@ -8,6 +8,8 @@ use PHPCfg\Op;
 use PHPCfg\Op\Expr\Param;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCfg\Traverser;
+use PHPCfg\Visitor\DeclarationFinder;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\MethodVisibility;
@@ -16,6 +18,7 @@ use PHPCompiler\VM\ClassReadonly;
 /**
  * Compile-time checks for readonly class inheritance, property defaults (#3551, #3149),
  * and readonly property override compatibility (#7359, #7367).
+ * Declarations nested under try/catch/finally are included (#26739).
  *
  * php-src: Zend/zend_compile.c — zend_compile_class_decl, zend_compile_property_info();
  * Zend/zend_inheritance.c — inheritance_check_properties(), readonly parent/child checks;
@@ -62,10 +65,14 @@ final class ReadonlyClassCompileCheck
 
     private function collect(Script $script): void
     {
-        foreach ($script->main->cfg->children as $child) {
-            if ($child instanceof Op\Stmt\Class_) {
-                $this->collectClass($child);
-            }
+        // php-cfg nests declarations after try/catch merge blocks — not only main->cfg children
+        // (#26739 / FinalClassExtensionCheck #9722). Zend compile-fatals the unit; try cannot catch it.
+        $finder = new DeclarationFinder();
+        $traverser = new Traverser();
+        $traverser->addVisitor($finder);
+        $traverser->traverse($script);
+        foreach ($finder->getClasses() as $class) {
+            $this->collectClass($class);
         }
     }
 
