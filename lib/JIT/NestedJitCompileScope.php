@@ -57,6 +57,10 @@ final class NestedJitCompileScope
         // Nested helper compile sets scope->className (e.g. CaseCompareJitHelper); leaking it
         // makes later user-script $obj->method() resolve against the helper class (#22680 AOT).
         $savedClassName = $context->scope->className;
+        // Nested helper method entry also overwrites jitEnclosingBlock; leaking it makes
+        // asymmetric set Errors report the helper class instead of global scope (#26873).
+        $savedJitEnclosingBlock = $context->jitEnclosingBlock;
+        $savedJitPropertyHookRawProperty = $context->jitPropertyHookRawProperty;
         // Mid-call NestedJIT (e.g. CallUnpackRuntime → ListUnpackJitHelper) mutates toCall/args.
         // FUNCCALL_EXEC re-reads scope->toCall after resolveJitOutgoingCall; without restore the
         // packed spread hashtable is invoked as valueBoxIsArray(int) (#23971 e08_spread).
@@ -90,6 +94,8 @@ final class NestedJitCompileScope
             $context->scope->variables = $savedVariables;
             $context->namedVariableBindings = $savedNamedBindings;
             $context->scope->className = $savedClassName;
+            $context->jitEnclosingBlock = $savedJitEnclosingBlock;
+            $context->jitPropertyHookRawProperty = $savedJitPropertyHookRawProperty;
             $context->scope->toCall = $savedToCall;
             $context->scope->args = $savedArgs;
             $context->scope->argOperands = $savedArgOperands;
