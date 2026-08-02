@@ -28,10 +28,12 @@ final class WordwrapRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitWordwrap', $builtin);
     }
 
-    public function testWordwrapJitHelperDelegatesToVmString(): void
+    public function testWordwrapJitHelperIsSelfContainedAndMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/WordwrapJitHelper.php');
-        $this->assertStringContainsString('VmString::wordwrap', $source);
+        $this->assertDoesNotMatchRegularExpression('/\bVmString::/', $source);
+        $this->assertStringContainsString('Self-contained', $source);
+        $this->assertStringContainsString('wordwrapArgv', $source);
 
         $this->assertSame(
             "hello\nworld",
@@ -40,6 +42,14 @@ final class WordwrapRuntimeShrinkTest extends TestCase
         $this->assertSame(
             "hello\nworld",
             VmString::wordwrap('hello world', 5, "\n", false)
+        );
+        $this->assertSame(
+            "hello|\nworld",
+            WordwrapJitHelper::wordwrapArgv('hello world', 5, "|\n", 0)
+        );
+        $this->assertSame(
+            'super|calif|ragil|istic',
+            WordwrapJitHelper::wordwrapArgv('supercalifragilistic', 5, '|', 1)
         );
     }
 
