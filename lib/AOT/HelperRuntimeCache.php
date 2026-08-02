@@ -87,6 +87,16 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariabletwo' => true,
         // #26772 — helper-runtime unit.o stubs format → null; NestedJIT self-contained helper.
         'phpcompiler\\ext\\standard\\datetimeformatjithelper::formatstateargv' => true,
+        // #26989 — PendingHeadersJitHelper unit.o calls __compiler_preg_match without a provider
+        // in the helper TU; NestedJIT into the user module so PregMatchRuntime can link.
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::reset' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::enableheaderqueue' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::isflushed' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::addheader' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::removeheader' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::listheaderstable' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::flushresponseheaders' => true,
+        'phpcompiler\\ext\\standard\\pendingheadersjithelper::addsetcookie' => true,
     ];
 
     private static bool $loggedHit = false;

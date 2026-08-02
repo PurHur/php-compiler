@@ -284,6 +284,9 @@ if (null !== $unitPath) {
         '/ext/standard/PrintRJitHelper.php' => true,
         // #26772 — unit.o stubs format → null; NestedJIT self-contained helper into user AOT.
         '/ext/standard/DateTimeFormatJitHelper.php' => true,
+        // #26989 — unit.o calls __compiler_preg_match without a provider in the helper TU;
+        // NestedJIT into the user module so PregMatchRuntime can link (cold-build hello-world).
+        '/ext/standard/PendingHeadersJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => $unitFingerprint,
