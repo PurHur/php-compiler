@@ -35,6 +35,9 @@ final class WeakReferenceCreate implements Call
         $targetObj = WeakRefSetup::loadObjectFromArg($context, $args[0]);
         $weakRefObj = $context->type->object->allocate($classId);
         WeakRefSetup::bindWeakTarget($context, $weakRefObj, $targetObj);
+        // AOT call/assign retains one extra strong ref on the referent; drop it so the
+        // WeakReference slot stays non-owning like VM weakObject (#26795 / zend_weakrefs.c).
+        $context->refcount->delref($targetObj);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(

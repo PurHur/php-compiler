@@ -9149,9 +9149,22 @@ class JIT {
                                 }
                                 if (
                                     Variable::KIND_VARIABLE === $bound->kind
-                                    && Variable::TYPE_VALUE === $bound->type
+                                    && (
+                                        Variable::TYPE_VALUE === $bound->type
+                                        || Variable::TYPE_OBJECT === $bound->type
+                                    )
                                 ) {
-                                    $this->jitWriteNullForUnset($bound->value);
+                                    if (Variable::TYPE_VALUE === $bound->type) {
+                                        $this->jitWriteNullForUnset($bound->value);
+                                    } else {
+                                        // Native __object__* locals: delref then null the slot (#26795 / #4096 AOT unset).
+                                        $obj = $this->context->builder->load($bound->value);
+                                        $this->context->refcount->delref($obj);
+                                        $this->context->builder->store(
+                                            $this->context->getTypeFromString('__object__*')->constNull(),
+                                            $bound->value
+                                        );
+                                    }
                                     break;
                                 }
                             }
