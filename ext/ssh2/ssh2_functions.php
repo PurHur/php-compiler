@@ -20,6 +20,7 @@ require_once __DIR__.'/VmSsh2Session.php';
 require_once __DIR__.'/VmSsh2Stream.php';
 require_once __DIR__.'/VmSsh2Sftp.php';
 require_once __DIR__.'/VmSsh2Listener.php';
+require_once __DIR__.'/VmSsh2Publickey.php';
 
 /** Shared JIT stub for ssh2_* v1 (#6385). */
 abstract class Ssh2Function extends Internal
@@ -115,6 +116,35 @@ abstract class Ssh2Function extends Internal
         }
 
         return VmSsh2Listener::requireLive($object, $fn);
+    }
+
+    protected function requirePublickey(Variable $var, string $fn, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($pkey) must be of type SSH2\\Publickey, %s given',
+                $fn,
+                $argNum,
+                match ($var->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_INTEGER => 'int',
+                    default => 'mixed',
+                }
+            ));
+        }
+        $object = $var->toObject();
+        if (VmSsh2Publickey::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($pkey) must be of type SSH2\\Publickey, %s given',
+                $fn,
+                $argNum,
+                $object->class->name
+            ));
+        }
+
+        return VmSsh2Publickey::requireLive($object, $fn);
     }
 }
 
@@ -1493,5 +1523,226 @@ final class ssh2_sftp_readlink extends Ssh2Function
             return;
         }
         $frame->returnVar->string($resolved);
+    }
+}
+
+/**
+ * ssh2_publickey_init(resource $session): resource|false
+ *
+ * Publickey subsystem init (PECL ssh2_publickey_init; #26717).
+ */
+final class ssh2_publickey_init extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_publickey_init');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_publickey_init() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_publickey_init', 1);
+        if (!VmSsh2Session::isAuthed($session)) {
+            @\trigger_error('ssh2_publickey_init(): Connection not authenticated', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_publickey_init(): Unable to initialize publickey subsystem', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $pkey = VmSsh2Native::publickeyInit($native);
+        if (null === $pkey) {
+            @\trigger_error('ssh2_publickey_init(): Unable to initialize publickey subsystem', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ssh2_publickey_init() requires a VM context');
+        }
+        $wrapped = VmSsh2Publickey::wrap($ctx, $session, $pkey);
+        $frame->returnVar->object($wrapped->toObject());
+    }
+}
+
+/**
+ * ssh2_publickey_add(resource $pkey, string $algoname, string $blob[, bool $overwrite = false [, array $attributes = null]]): bool
+ */
+final class ssh2_publickey_add extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_publickey_add');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_publickey_add() expects between 3 and 5 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pkeyObj = $this->requirePublickey($frame->calledArgs[0], 'ssh2_publickey_add', 1);
+        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_publickey_add', 2, 'algoname');
+        $blob = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_publickey_add', 3, 'blob');
+        $overwrite = false;
+        if ($argc >= 4) {
+            $overwrite = (bool) $frame->calledArgs[3]->resolveIndirect()->toBool();
+        }
+        if ($argc >= 5) {
+            $attrsVar = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $attrsVar->type && Variable::TYPE_ARRAY !== $attrsVar->type) {
+                throw new \TypeError(\sprintf(
+                    'ssh2_publickey_add(): Argument #5 ($attributes) must be of type ?array, %s given',
+                    match ($attrsVar->type) {
+                        Variable::TYPE_STRING => 'string',
+                        Variable::TYPE_INTEGER => 'int',
+                        Variable::TYPE_BOOLEAN => 'bool',
+                        default => 'mixed',
+                    }
+                ));
+            }
+            // Attribute map is accepted for PECL arity parity; libssh2 add uses empty attrs (#26717).
+        }
+        $native = VmSsh2Publickey::nativePublickey($pkeyObj);
+        if (null === $native) {
+            @\trigger_error('ssh2_publickey_add(): Unable to add '.$algo.' key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!VmSsh2Native::publickeyAdd($native, $algo, $blob, $overwrite)) {
+            @\trigger_error('ssh2_publickey_add(): Unable to add '.$algo.' key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(true);
+    }
+}
+
+/**
+ * ssh2_publickey_remove(resource $pkey, string $algoname, string $blob): bool
+ */
+final class ssh2_publickey_remove extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_publickey_remove');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_publickey_remove() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pkeyObj = $this->requirePublickey($frame->calledArgs[0], 'ssh2_publickey_remove', 1);
+        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_publickey_remove', 2, 'algoname');
+        $blob = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_publickey_remove', 3, 'blob');
+        $native = VmSsh2Publickey::nativePublickey($pkeyObj);
+        if (null === $native) {
+            @\trigger_error('ssh2_publickey_remove(): Unable to remove '.$algo.' key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!VmSsh2Native::publickeyRemove($native, $algo, $blob)) {
+            @\trigger_error('ssh2_publickey_remove(): Unable to remove '.$algo.' key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(true);
+    }
+}
+
+/**
+ * ssh2_publickey_list(resource $pkey): array|false
+ */
+final class ssh2_publickey_list extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_publickey_list');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_publickey_list() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pkeyObj = $this->requirePublickey($frame->calledArgs[0], 'ssh2_publickey_list', 1);
+        $native = VmSsh2Publickey::nativePublickey($pkeyObj);
+        if (null === $native) {
+            @\trigger_error('ssh2_publickey_list(): Unable to list keys on remote server', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $keys = VmSsh2Native::publickeyList($native);
+        if (false === $keys) {
+            @\trigger_error('ssh2_publickey_list(): Unable to list keys on remote server', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        $idx = 0;
+        foreach ($keys as $key) {
+            $row = new \PHPCompiler\VM\HashTable();
+            $nameVar = new Variable();
+            $nameVar->string($key['name']);
+            $row->add('name', $nameVar);
+            $blobVar = new Variable();
+            $blobVar->string($key['blob']);
+            $row->add('blob', $blobVar);
+            $attrsHt = new \PHPCompiler\VM\HashTable();
+            foreach ($key['attrs'] as $attrName => $attrVal) {
+                $attrVar = new Variable();
+                $attrVar->string($attrVal);
+                $attrsHt->add((string) $attrName, $attrVar);
+            }
+            $attrsVar = new Variable();
+            $attrsVar->array($attrsHt);
+            $row->add('attrs', $attrsVar);
+            $rowVar = new Variable();
+            $rowVar->array($row);
+            $ht->addIndex($idx++, $rowVar);
+        }
+        $frame->returnVar->array($ht);
     }
 }

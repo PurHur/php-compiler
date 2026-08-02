@@ -39,6 +39,8 @@ class Module extends ModuleAbstract
         VmSsh2Sftp::registerClass($runtime->vmContext);
         require_once __DIR__.'/VmSsh2Listener.php';
         VmSsh2Listener::registerClass($runtime->vmContext);
+        require_once __DIR__.'/VmSsh2Publickey.php';
+        VmSsh2Publickey::registerClass($runtime->vmContext);
     }
 
     public function getFunctions(): array
@@ -79,6 +81,10 @@ class Module extends ModuleAbstract
             new ssh2_sftp_realpath(),
             new ssh2_sftp_symlink(),
             new ssh2_sftp_readlink(),
+            new ssh2_publickey_init(),
+            new ssh2_publickey_add(),
+            new ssh2_publickey_remove(),
+            new ssh2_publickey_list(),
         ];
     }
 }
