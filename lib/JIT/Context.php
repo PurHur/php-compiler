@@ -1179,6 +1179,13 @@ class Context {
             $this->functionProxies['datetime::createfromtimestamp'] = new Call\DateTimeCreateFromTimestamp(false);
             $this->functionProxies['datetimeimmutable::createfromtimestamp'] = new Call\DateTimeCreateFromTimestamp(true);
         }
+        // PHP 8.4+ get/setMicrosecond — avoid ExternalMethod silent NULL on thin AOT (#26938).
+        if (CompilerVersion::supportsDateTimeMicrosecond()) {
+            $this->functionProxies['datetime::getmicrosecond'] = new Call\DateTimeGetMicrosecond(false);
+            $this->functionProxies['datetimeimmutable::getmicrosecond'] = new Call\DateTimeGetMicrosecond(true);
+            $this->functionProxies['datetime::setmicrosecond'] = new Call\DateTimeSetMicrosecond(false);
+            $this->functionProxies['datetimeimmutable::setmicrosecond'] = new Call\DateTimeSetMicrosecond(true);
+        }
         // php-src stub $datetime — InternalArgInfo still says time (#24589).
         $this->functionProxies['dateinterval::createfromdatestring'] = new Call\DateIntervalCreateFromDateString();
         // Mutable setTimezone — thin user-script AOT property write (#22824).
