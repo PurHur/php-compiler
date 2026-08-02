@@ -31,12 +31,17 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $jit);
         $fnPos = strpos($jit, 'function compileRuntimeInitParsePipelineM3Native');
         $this->assertNotFalse($fnPos);
-        $chunk = substr($jit, $fnPos, 2500);
+        $chunk = substr($jit, $fnPos, 3500);
+        $m5Pos = strpos($chunk, 'shouldUseM5DriverHostCompile()');
         $floorPos = strpos($chunk, 'RuntimeInitParsePipeline::emit');
-        $nestedPos = strpos($chunk, 'compileM3EmitTuRuntimeMethodFromRuntimePhpFile');
+        $stubPos = strpos($chunk, "shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')");
+        $this->assertNotFalse($m5Pos);
         $this->assertNotFalse($floorPos);
-        $this->assertNotFalse($nestedPos);
-        $this->assertLessThan($nestedPos, $floorPos, 'M5 C-floor must run before NestedJIT Runtime.php path');
+        $this->assertLessThan($floorPos, $m5Pos, 'M5 gate must wrap C-floor emit');
+        // M5 C-floor must be consulted before void-stub short-circuit (#26756).
+        if (false !== $stubPos) {
+            $this->assertLessThan($stubPos, $floorPos, 'M5 C-floor must run before void-stub gate');
+        }
         $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $chunk);
     }
 }

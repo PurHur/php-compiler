@@ -390,6 +390,9 @@ final class VmStringCompare
         if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
+        // Resume open BB before readString/identical — cleared/sealed insert leaves parentless
+        // @__value__readString and orphan jit_strcmp_* blocks under M5 argv (#26756).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcmp_value_to_string');
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $boxedStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),

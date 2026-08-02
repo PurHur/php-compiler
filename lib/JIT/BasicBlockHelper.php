@@ -92,8 +92,9 @@ final class BasicBlockHelper
      * Continue emission in an open block; if the insert block is already sealed, use a fresh one.
      *
      * Never append instructions after an existing terminator (invalid IR).
-     * When insert is cleared mid-function (NestedJIT / const-string builder swap), prefer the
-     * function's last open BB over an orphaned label with no preds (Runtime::parse M5 — #26756).
+     * When insert is cleared or parked on a sealed BB (NestedJIT / const-string builder swap),
+     * prefer the function's last open BB over an orphaned label with no preds — otherwise
+     * sealFunction writes `unreachable` onto the dangling store block (Runtime::parse M5 — #26756).
      */
     public static function ensureOpenInsertBlock(Context $context, string $label): void
     {
@@ -113,6 +114,15 @@ final class BasicBlockHelper
         }
         if (null === $insert->getTerminator()) {
             return;
+        }
+        $fn = $insert->getParent();
+        if ($fn instanceof Function_) {
+            $open = self::lastOpenBasicBlock($fn);
+            if (null !== $open) {
+                $context->builder->positionAtEnd($open);
+
+                return;
+            }
         }
         $next = self::append($context, $label);
         $context->builder->positionAtEnd($next);

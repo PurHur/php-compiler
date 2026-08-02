@@ -2660,6 +2660,9 @@ class JIT {
             if (in_array($methodLc, $inventoryEmitSpine, true)) {
                 // Real argv parse spine needs ctor/init; standalone stays stubbed (#15597).
                 // Do not void-stub initParsePipeline under M5 — seed would lack $parser (#26756).
+                if ($this->shouldUseM5DriverHostCompile() && 'initparsepipeline' === $methodLc) {
+                    return false;
+                }
                 if ($this->shouldRealLowerInventoryArgvParseSpine() && 'standalone' !== $methodLc) {
                     return false;
                 }
@@ -2783,16 +2786,13 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
-        }
         $lcname = strtolower($logicalName);
-        if (isset($this->context->functions[$lcname])) {
-            return $this->context->functions[$lcname];
-        }
-        // M5 argv / gen-0 seed: C-floor like initCompiler — NestedJIT of Runtime.php
-        // initParsePipeline hung Zend rebuilds for hours (#26756 / re-#23468).
+        // M5 argv / gen-0 seed: C-floor BEFORE void-stub checks — inventory emit otherwise
+        // registers a 1-byte `ret` and leaves $parser null (#26756 / re-#23468).
         if ($this->shouldUseM5DriverHostCompile()) {
+            if (isset($this->context->functions[$lcname])) {
+                return $this->context->functions[$lcname];
+            }
             $objectPtr = $this->context->getTypeFromString('__object__*');
             $func = $this->context->module->addFunction(
                 $this->llvmInternalName($internalName),
@@ -2824,6 +2824,12 @@ class JIT {
             );
 
             return $func;
+        }
+        if ($this->shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
         }
         if ($this->shouldUseM3EmitTuNativeBridge()
             || $this->shouldUseM3CompileDriverRealLowering()
@@ -4501,6 +4507,10 @@ class JIT {
         $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
         if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
             foreach (['initparsepipeline', 'initcompiler', 'loadcoremodules'] as $methodLc) {
+                // M5 argv uses C-floor initParsePipeline — do not pre-register void ret (#26756).
+                if ('initparsepipeline' === $methodLc && $this->shouldUseM5DriverHostCompile()) {
+                    continue;
+                }
                 $logical = 'PHPCompiler\\Runtime::'.$methodLc;
                 $this->emitM3EmitTuRuntimeInitVoidStub(
                     $this->llvmInternalName($logical),

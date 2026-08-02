@@ -117,5 +117,36 @@ final class NestedJitCompileScopeRestoreTest extends TestCase
             $chunk,
             'identical() must ensureOpenInsertBlock before branchIf (#26756)'
         );
+        $vts = \strpos($source, 'function identicalValueToString');
+        $this->assertNotFalse($vts);
+        $vtsChunk = \substr($source, $vts, 900);
+        $this->assertStringContainsString(
+            'jit_strcmp_value_to_string',
+            $vtsChunk,
+            'identicalValueToString must ensureOpenInsertBlock before readString (#26756)'
+        );
+    }
+
+    public function testEnsureOpenInsertBlockPrefersLastOpenOnSealedInsert(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $source = (string) \file_get_contents($root.'/lib/JIT/BasicBlockHelper.php');
+        $pos = \strpos($source, 'function ensureOpenInsertBlock');
+        $this->assertNotFalse($pos);
+        $chunk = \substr($source, $pos, 1200);
+        $this->assertStringContainsString(
+            'lastOpenBasicBlock',
+            $chunk,
+            'ensureOpenInsertBlock must resume last open BB when insert is cleared/sealed (#26756)'
+        );
+        // Sealed-insert path must also consult lastOpenBasicBlock (not only null-insert).
+        $sealedPos = \strpos($chunk, 'getTerminator()');
+        $this->assertNotFalse($sealedPos);
+        $afterSealed = \substr($chunk, $sealedPos);
+        $this->assertStringContainsString(
+            'lastOpenBasicBlock',
+            $afterSealed,
+            'Sealed insert must prefer last open BB over orphan append (#26756)'
+        );
     }
 }

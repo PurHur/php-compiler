@@ -591,6 +591,9 @@ final class Variable {
                     $loaded
                 );
                 $context->builder->store($owned, $slot);
+                // Keep insert on the open store BB — callers loadValue/compare immediately and
+                // NestedJIT may have cleared insert mid-fromLiteral (#26756).
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'string_literal_after_store_cont');
                 $var = new Variable(
                     $context,
                     self::TYPE_STRING,
