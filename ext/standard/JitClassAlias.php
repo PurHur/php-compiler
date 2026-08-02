@@ -31,13 +31,25 @@ final class JitClassAlias
             $autoload = 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($autoloadArg->value->value);
         }
 
+        $object = $context->type->object;
+        $originalLc = strtolower(ltrim($original, '\\'));
+        $aliasLc = strtolower(ltrim($alias, '\\'));
         $vmContext = $context->runtime->vmContext;
-        if (null === $vmContext) {
-            $ok = $context->type->object->registerClassAlias($original, $alias);
+        // AOT/standalone compile keeps user classes in this module's Object_ registry,
+        // not the host vmContext. Prefer Object_ when the original is already declared
+        // there so class_alias + class_exists literal folding agree (#27010).
+        $inCompileUnit = null !== $object->classIdForLowerName($originalLc);
+        if ($inCompileUnit || null === $vmContext) {
+            $ok = $object->registerClassAlias($original, $alias);
+            if ($ok && null !== $vmContext && isset($vmContext->classes[$originalLc])
+                && !isset($vmContext->classes[$aliasLc])
+                && !isset($vmContext->classAliases[$aliasLc])) {
+                $vmContext->registerClassAlias($original, $alias, false);
+            }
         } else {
             $ok = $vmContext->registerClassAlias($original, $alias, $autoload);
             if ($ok) {
-                $context->type->object->registerClassAlias($original, $alias);
+                $object->registerClassAlias($original, $alias);
             }
         }
 
