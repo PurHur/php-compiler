@@ -284,13 +284,12 @@ class Module extends ModuleAbstract
                 new intlcal_set_minimal_days_in_first_week(),
                 new intlcal_get_keyword_values_for_locale(),
                 new intlcal_is_equivalent_to(),
-                // IntlGregorianCalendar procedurals (php-src php_intl.stub.php @alias; #20906)
+                // IntlGregorianCalendar procedurals (php-src php_intl.stub.php; #20906)
+                // createFromDate* are OO-only in php-src — no intlgregcal_create_from_date* (#26745)
                 new intlgregcal_create_instance(),
                 new intlgregcal_is_leap_year(),
                 new intlgregcal_get_gregorian_change(),
                 new intlgregcal_set_gregorian_change(),
-                new intlgregcal_create_from_date(),
-                new intlgregcal_create_from_date_time(),
                 // IntlTimeZone procedural aliases (php-src timezone.stub.php @alias; #20859)
                 new intltz_get_gmt(),
                 new intltz_create_time_zone(),
@@ -304,6 +303,7 @@ class Module extends ModuleAbstract
                 new intltz_get_canonical_id(),
                 new intltz_get_region(),
                 // IntlTimeZone procedurals after OOP (#20925; get_iana_id also #20926)
+                // intltz_get_utc never existed in php-src — withhold (#26745)
                 new intltz_count_equivalent_ids(),
                 new intltz_get_equivalent_id(),
                 new intltz_get_windows_id(),
@@ -311,7 +311,6 @@ class Module extends ModuleAbstract
                 new intltz_create_enumeration(),
                 new intltz_create_time_zone_id_enumeration(),
                 new intltz_get_unknown(),
-                new intltz_get_utc(),
                 new intltz_get_tz_data_version(),
                 new intltz_use_daylight_time(),
                 new intltz_has_same_rules(),

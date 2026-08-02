@@ -4120,4 +4120,55 @@ final class CompilerVersionGateTest extends TestCase
             }
         }
     }
+
+    /** @covers issue #26745 — createFromDate* withheld on unset PROFILE (Zend 8.2) */
+    public function testSupportsIntlGregorianCreateFromDateFalseOnDefault84DevProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsIntlGregorianCreateFromDate());
+    }
+
+    public function testSupportsIntlGregorianCreateFromDateFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsIntlGregorianCreateFromDate());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsIntlGregorianCreateFromDateTrueOnForwardProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsIntlGregorianCreateFromDate());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsIntlGregorianCreateFromDateTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsIntlGregorianCreateFromDate());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

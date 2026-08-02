@@ -226,6 +226,29 @@ final class IntlExtensionPolicy
     }
 
     /**
+     * IntlGregorianCalendar::createFromDate / createFromDateTime — PHP 8.3+ (#20906, #26745).
+     *
+     * php-src calendar.stub.php (PHP-8.3+) has OO methods only — no
+     * intlgregcal_create_from_date* procedural aliases in php_intl.stub.php.
+     */
+    public static function advertisesIntlGregorianCreateFromDate(): bool
+    {
+        return self::advertisesIntlCalendar()
+            && CompilerVersion::supportsIntlGregorianCreateFromDate();
+    }
+
+    /**
+     * IntlTimeZone::getUTC / intltz_get_utc — never in php-src (#20852 / #26745).
+     *
+     * timezone.stub.php exposes getGMT/getUnknown only; withhold so function_exists /
+     * method_exists match Zend on every profile.
+     */
+    public static function advertisesIntlTimeZoneGetUtc(): bool
+    {
+        return false;
+    }
+
+    /**
      * NumberFormatter — require loaded ext/intl (php-src ext/intl/formatter; #19670).
      *
      * Implementation stays in-tree (#5154) but must not phantom-advertise when intl is off.
