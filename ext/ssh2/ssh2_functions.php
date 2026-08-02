@@ -554,6 +554,54 @@ final class ssh2_auth_pubkey_file extends Ssh2Function
     }
 }
 
+final class ssh2_auth_pubkey extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_auth_pubkey');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 4 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_auth_pubkey() expects between 4 and 5 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_auth_pubkey', 1);
+        $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_auth_pubkey', 2, 'username');
+        $pubkey = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ssh2_auth_pubkey', 3, 'pubkey');
+        $privkey = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'ssh2_auth_pubkey', 4, 'privkey');
+        $passphrase = null;
+        if ($argc >= 5) {
+            $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'ssh2_auth_pubkey', 5, 'passphrase');
+        }
+        if ('' === $user) {
+            throw new \ValueError('ssh2_auth_pubkey(): Argument #2 ($username) must not be empty');
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            @\trigger_error('ssh2_auth_pubkey(): Authentication failed for '.$user.' using public key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (!VmSsh2Native::authPubkeyFromMemory($native, $user, $pubkey, $privkey, $passphrase)) {
+            @\trigger_error('ssh2_auth_pubkey(): Authentication failed for '.$user.' using public key', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        VmSsh2Session::markAuthed($session);
+        $frame->returnVar->bool(true);
+    }
+}
+
 final class ssh2_fingerprint extends Ssh2Function
 {
     public function __construct()

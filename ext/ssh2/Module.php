@@ -58,6 +58,7 @@ class Module extends ModuleAbstract
             new ssh2_auth_hostbased_file(),
             new ssh2_methods_negotiated(),
             new ssh2_auth_pubkey_file(),
+            new ssh2_auth_pubkey(),
             new ssh2_fingerprint(),
             new ssh2_exec(),
             new ssh2_fetch_stream(),
