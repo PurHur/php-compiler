@@ -24,22 +24,36 @@ final class VmStreamOpenFailure
         if (null === $frame->vmContext) {
             return;
         }
-        if (null === $detail || '' === $detail) {
-            $detail = self::resolveOpenFailureDetail($path);
-        }
-        VmStreamErrorStore::recordOpenFailed($path, $detail);
-        $message = \sprintf(
-            '%s(%s): Failed to open stream: %s',
-            $function,
-            $path,
-            $detail
-        );
+        $message = self::failedToOpenMessage($function, $path, $detail);
         $frame->vmContext->errors->triggerError(
             $message,
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
             $frame
+        );
+    }
+
+    /**
+     * php-src streams.c-shaped message; records stream error store when 8.6 API is active.
+     *
+     * @param string|null $detail strerror / wrapper reason; null → HTTP last transport err or ENOENT
+     */
+    public static function failedToOpenMessage(
+        string $function,
+        string $path,
+        ?string $detail = null
+    ): string {
+        if (null === $detail || '' === $detail) {
+            $detail = self::resolveOpenFailureDetail($path);
+        }
+        VmStreamErrorStore::recordOpenFailed($path, $detail);
+
+        return \sprintf(
+            '%s(%s): Failed to open stream: %s',
+            $function,
+            $path,
+            $detail
         );
     }
 
