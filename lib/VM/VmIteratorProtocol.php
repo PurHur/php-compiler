@@ -55,8 +55,9 @@ final class VmIteratorProtocol
     ): bool {
         if (null !== $containerUserType) {
             $ut = strtolower($containerUserType);
-            // HT-backed SPL — foreach walks __spl_ht, not Iterator method proxies (#26783).
-            if ('splobjectstorage' === $ut || 'arrayiterator' === $ut) {
+            // HT-backed SPL — foreach walks __spl_ht, not Iterator method proxies (#26783, #26775).
+            if ('splobjectstorage' === $ut || 'arrayiterator' === $ut
+                || 'recursivearrayiterator' === $ut || 'recursiveiteratoriterator' === $ut) {
                 return false;
             }
         }

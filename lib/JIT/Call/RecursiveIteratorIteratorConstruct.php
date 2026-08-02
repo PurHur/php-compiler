@@ -4,49 +4,54 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\Builtin\RecursiveLeavesFlattenRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * ArrayIterator / RecursiveArrayIterator::__construct — thin AOT (#26783, #26775).
+ * RecursiveIteratorIterator::__construct(Traversable $iterator, …) — thin AOT (#26775).
  *
- * Stores a packed hashtable copy in `__spl_ht` so foreach can walk a real table
- * (php-src ext/spl/spl_array.c — spl_array_object_new_ex / set_array).
+ * Flattens the inner RecursiveArrayIterator `__spl_ht` into LEAVES_ONLY order so foreach
+ * can walk a packed table (php-src ext/spl/spl_iterators.c).
  */
-final class ArrayIteratorConstruct implements Call
+final class RecursiveIteratorIteratorConstruct implements Call
 {
-    public function __construct(
-        private readonly string $className = 'ArrayIterator',
-    ) {
-    }
-
     public function call(Context $context, Variable ...$args): Value
     {
         if ([] === $args) {
-            throw new \LogicException($this->className.'::__construct() called without $this');
+            throw new \LogicException('RecursiveIteratorIterator::__construct() called without $this');
         }
         if (!isset($args[1])) {
-            return self::voidResult($context);
+            throw new \ArgumentCountError(
+                'RecursiveIteratorIterator::__construct() expects at least 1 argument, 0 given'
+            );
         }
 
+        RecursiveLeavesFlattenRuntime::ensureLinked($context);
         $receiver = self::objectReceiver($context, $args[0]);
-        $objPtr = $context->helper->loadValue($receiver);
-        $objectType = $context->type->object;
-        $slot = $objectType->propertySlotFor($objPtr, $this->className, '__spl_ht');
-        // Fresh packed HT (native array → new table; HT arg → copy via spread into alloc).
-        $src = HashTableHelper::coerceToPackedHashtable($context, $args[1]);
-        $copy = new Variable(
+        $inner = self::objectReceiver($context, $args[1]);
+        $srcHtVar = $context->type->object->splBackingHashtable($inner);
+        $srcHt = $context->helper->loadValue($srcHtVar);
+        $flatHt = $context->builder->call(
+            $context->lookupFunction(RecursiveLeavesFlattenRuntime::ABI),
+            $srcHt
+        );
+        $flatVar = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
-            HashTableHelper::alloc($context)
+            $flatHt
         );
-        HashTableHelper::spreadInto($context, $copy, $src);
-        $objectType->propertyStore($slot, $copy, Variable::TYPE_HASHTABLE);
+        $objPtr = $context->helper->loadValue($receiver);
+        $slot = $context->type->object->propertySlotFor(
+            $objPtr,
+            'RecursiveIteratorIterator',
+            '__spl_ht'
+        );
+        $context->type->object->propertyStore($slot, $flatVar, Variable::TYPE_HASHTABLE);
 
         return self::voidResult($context);
     }
@@ -66,7 +71,7 @@ final class ArrayIteratorConstruct implements Call
         }
 
         throw new \LogicException(
-            'ArrayIterator family __construct() receiver must be an object, got '
+            'RecursiveIteratorIterator::__construct() expects an object, got '
             .Variable::getStringType($receiver->type)
         );
     }

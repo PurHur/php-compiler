@@ -998,8 +998,13 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetexists'] = new Call\SplObjectStorageMethod('offsetexists');
         $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
-        // ArrayIterator::__construct — copy array into `__spl_ht` for thin AOT foreach (#26783).
-        $this->functionProxies['arrayiterator::__construct'] = new Call\ArrayIteratorConstruct();
+        // ArrayIterator / RecursiveArrayIterator — `__spl_ht` for thin AOT foreach (#26783, #26775).
+        $this->functionProxies['arrayiterator::__construct'] = new Call\ArrayIteratorConstruct('ArrayIterator');
+        $this->functionProxies['recursivearrayiterator::__construct'] = new Call\ArrayIteratorConstruct(
+            'RecursiveArrayIterator'
+        );
+        // RecursiveIteratorIterator — flatten inner HT to LEAVES_ONLY `__spl_ht` (#26775).
+        $this->functionProxies['recursiveiteratoriterator::__construct'] = new Call\RecursiveIteratorIteratorConstruct();
         // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
         foreach ([
             'splmaxheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MAX,
