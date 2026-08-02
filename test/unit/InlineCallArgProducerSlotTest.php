@@ -1944,6 +1944,56 @@ PHP;
         self::assertSame("true\n1\n", ob_get_clean());
     }
 
+    /** Issue #26702 — var_export(!$object, true) wires BooleanNot result, not the object New_ slot. */
+    public function testVarExportUnaryNotObjectReturnTrueUsesBooleanNotSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$o = new stdClass();
+echo var_export(!$o, true), "\n";
+$b = !$o;
+echo var_export($b, true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_unary_not_object.php');
+
+        $booleanNotSlot = null;
+        $newExecSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_BOOLEAN_NOT === $op->type && null === $booleanNotSlot) {
+                $booleanNotSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $newExecSlot) {
+                $newExecSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($booleanNotSlot);
+        self::assertNotNull($newExecSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame(
+            $booleanNotSlot,
+            $varExportSends[0],
+            'arg0 must be BooleanNot result, not New_/object; sends='.json_encode($varExportSends)
+        );
+        self::assertNotSame($newExecSlot, $varExportSends[0]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("false\nfalse\n", ob_get_clean());
+    }
+
     /** Issue #17250 — var_export($x !== false, true) wires NotIdentical producer, not hoisted false ConstFetch. */
     public function testVarExportNotIdenticalFalseReturnTrueUsesComparisonProducerSlot(): void
     {

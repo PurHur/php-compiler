@@ -18238,6 +18238,8 @@ class Compiler {
     private function inlineCallArgProducerUsesExprResultSlot(?Op\Expr $matched): bool
     {
         return $matched instanceof Op\Expr\Cast
+            || $matched instanceof Op\Expr\BooleanNot
+            || $matched instanceof Op\Expr\BitwiseNot
             || $matched instanceof Op\Expr\Array_
             || $matched instanceof Op\Expr\BinaryOp\Plus
             || $matched instanceof Op\Expr\BinaryOp\Concat
@@ -25123,6 +25125,10 @@ class Compiler {
             if ($producer instanceof Op\Expr\Cast) {
                 return $producer;
             }
+            // var_export(!$o, true) / var_dump(~$x) — unary not feeds arg #0 (#26702, #10537).
+            if ($producer instanceof Op\Expr\BooleanNot || $producer instanceof Op\Expr\BitwiseNot) {
+                return $producer;
+            }
             // E::A->name / E::A?->name / M::X?->id() — property/method fetch result is the call arg (#9684, #10286).
             if ($producer instanceof Op\Expr\PropertyFetch
                 || $producer instanceof Op\Expr\NullsafePropertyFetch
@@ -25528,6 +25534,8 @@ class Compiler {
             || $expr instanceof Op\Expr\StaticPropertyFetch
             || $expr instanceof Op\Expr\ArrayDimFetch
             || $expr instanceof Op\Expr\Cast
+            || $expr instanceof Op\Expr\BooleanNot
+            || $expr instanceof Op\Expr\BitwiseNot
             || $expr instanceof Op\Expr\UnaryMinus
             || $expr instanceof Op\Expr\UnaryPlus
             || $expr instanceof Op\Expr\PostInc
@@ -35148,16 +35156,30 @@ class Compiler {
             && 0 === $argIndex
             && $this->callArgIsDeadInlineTemporary($callArg)
         ) {
-            // define('ARR', …); var_export(ARR) — ConstFetch prelude, not define() bool return (#17872).
-            $constSlot = $block->slotForOperand($stmtBefore->result);
-            if (null === $constSlot) {
-                foreach ($this->compileExpr($stmtBefore, $block) as $op) {
-                    $emitOps[] = $op;
+            // var_export($expr, true|false) — hoisted return flag is not arg #0 (#26702, #17895).
+            $skipReturnFlagConst = false;
+            if (
+                $stmtBefore instanceof Op\Expr\ConstFetch
+                && \is_array($cfgCallOp->args ?? null)
+                && \count($cfgCallOp->args) >= 2
+            ) {
+                $flagName = strtolower($this->staticNameFromOperand($stmtBefore->name) ?? '');
+                if (\in_array($flagName, ['true', 'false'], true)) {
+                    $skipReturnFlagConst = true;
                 }
-                $constSlot = $block->slotForOperand($stmtBefore->result);
             }
+            if (!$skipReturnFlagConst) {
+                // define('ARR', …); var_export(ARR) — ConstFetch prelude, not define() bool return (#17872).
+                $constSlot = $block->slotForOperand($stmtBefore->result);
+                if (null === $constSlot) {
+                    foreach ($this->compileExpr($stmtBefore, $block) as $op) {
+                        $emitOps[] = $op;
+                    }
+                    $constSlot = $block->slotForOperand($stmtBefore->result);
+                }
 
-            return null !== $constSlot ? (int) $constSlot : null;
+                return null !== $constSlot ? (int) $constSlot : null;
+            }
         }
         $candidate = null;
         for ($i = $callIndex - 1; $i >= 0; --$i) {
@@ -35208,10 +35230,9 @@ class Compiler {
                 $candidate = $child;
                 break;
             }
-            // var_export($text->data) — PropertyFetch prelude must not fall through to stale MethodCall (#17540).
+            // var_export($text->data) / var_export(!$o, true) — expression prelude after skipped true/false (#17540, #26702).
             if (
-                $i === $callIndex - 1
-                && $this->callArgIsDeadInlineTemporary($callArg)
+                $this->callArgIsDeadInlineTemporary($callArg)
                 && $this->isImmediateVarExportExpressionPrelude($child)
             ) {
                 $candidate = $child;
@@ -43611,6 +43632,8 @@ class Compiler {
                 OpCode::TYPE_CAST_UNSET,
                 OpCode::TYPE_CAST_VOID,
             ],
+            $prelude instanceof Op\Expr\BooleanNot => [OpCode::TYPE_BOOLEAN_NOT],
+            $prelude instanceof Op\Expr\BitwiseNot => [OpCode::TYPE_BITWISE_NOT],
             $prelude instanceof Op\Expr\UnaryMinus => [OpCode::TYPE_UNARY_MINUS],
             $prelude instanceof Op\Expr\UnaryPlus => [OpCode::TYPE_UNARY_PLUS],
             // Typed property ++/-- inline call-arg (#26491 / re-#10123, zend_execute.c).
