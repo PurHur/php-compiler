@@ -22,6 +22,38 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('#26756', $source);
     }
 
+    public function testM5DriverHostDefinesRuntimeParseSpineProps(): void
+    {
+        $path = dirname(__DIR__, 2).'/lib/JIT/Builtin/Type/Object_.php';
+        $this->assertFileExists($path);
+        $source = (string) file_get_contents($path);
+        $runtimePos = strpos($source, "'phpcompiler\\runtime' === \$lcname");
+        $this->assertNotFalse($runtimePos);
+        $chunk = substr($source, $runtimePos, 2200);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $chunk);
+        $this->assertStringContainsString("'parser'", $chunk);
+        $this->assertStringContainsString("'confusableBuiltinTypeHintCheck'", $chunk);
+        // M5 host must not take the SELFHOST_AOT mode-only shortcut (#26756 SEGV).
+        $this->assertMatchesRegularExpression(
+            '/M5_DRIVER_HOST.*!\\$m5Host|!\\$m5Host.*SELFHOST_AOT|&&\\s*!\\$m5Host/s',
+            $chunk
+        );
+    }
+
+    public function testPrepareSpineIdentityWiredBeforeVoidStubs(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $this->assertFileExists($root.'/lib/JIT/RuntimePrepareSpineIdentity.php');
+        $jit = (string) file_get_contents($root.'/lib/JIT.php');
+        $this->assertStringContainsString('RuntimePrepareSpineIdentity.php', $jit);
+        $this->assertStringContainsString('ensureM5ArgvPrepareSpineIdentityStubs', $jit);
+        $identityPos = strpos($jit, 'ensureM5ArgvPrepareSpineIdentityStubs()');
+        $voidStubPos = strpos($jit, "foreach (['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser']");
+        $this->assertNotFalse($identityPos);
+        $this->assertNotFalse($voidStubPos);
+        $this->assertLessThan($voidStubPos, $identityPos, 'Identity stubs must register before void stub loop');
+    }
+
     public function testJitWiresM5FloorBeforeNestedJit(): void
     {
         $jitPath = dirname(__DIR__, 2).'/lib/JIT.php';

@@ -3354,8 +3354,13 @@ class Object_ extends Type {
         }
         if ('phpcompiler\runtime' === $lcname) {
             $selfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
-            if ('1' === $selfHostAot || 'true' === strtolower((string) $selfHostAot)) {
-                // Full Runtime property init segfaults LLVM 9 when lowering `new Runtime()` (#2600).
+            $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+            $m5Host = '1' === $m5DriverHost || 'true' === strtolower((string) $m5DriverHost);
+            // SELFHOST_AOT normally keeps only `mode` — full Runtime property init segfaults
+            // LLVM 9 when NestedJIT-lowering `new Runtime()` (#2600). M5 argv / gen-0 seed uses
+            // C-floor initParsePipeline/initCompiler/initVmContext instead (#26756), so the
+            // parse-spine slots must exist or propertyStore writes nowhere and parse SEGV on null.
+            if (('1' === $selfHostAot || 'true' === strtolower((string) $selfHostAot)) && !$m5Host) {
                 $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
             } else {
                 foreach (
@@ -3371,6 +3376,11 @@ class Object_ extends Type {
                         'jitContext',
                         'jit',
                         'typeReconstructor',
+                        // C-floor RuntimeInitParsePipeline also stores these annotators (#26756).
+                        'confusableBuiltinTypeHintCheck',
+                        'abstractEnumMarker',
+                        'sealedClassAnnotator',
+                        'staticClassAnnotator',
                     ] as $prop
                 ) {
                     $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
@@ -4135,6 +4145,10 @@ class Object_ extends Type {
                 'jitcontext',
                 'jit',
                 'typereconstructor',
+                'confusablebuiltintypehintcheck',
+                'abstractenummarker',
+                'sealedclassannotator',
+                'staticclassannotator',
             ], true)) {
                 return Variable::TYPE_OBJECT;
             }

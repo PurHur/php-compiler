@@ -16,6 +16,7 @@ require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
+require_once __DIR__.'/JIT/RuntimePrepareSpineIdentity.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
 require_once __DIR__.'/JIT/VmDriverExecuteNative.php';
@@ -162,6 +163,11 @@ class JIT {
         }
         $emitHelperStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if (null !== $emitHelperStubBlock && ($this->shouldStubInventoryEmitHelperBundledBodies() || $this->shouldRealLowerInventoryArgvParseSpine())) {
+            // Identity stubs with real signatures BEFORE parse host-lower — void stubs from
+            // {main}'s Block make prepare look void and leave $code null (#26756 / #11809).
+            if ($this->shouldRealLowerInventoryArgvParseSpine() || $this->shouldUseM5DriverHostCompile()) {
+                $this->ensureM5ArgvPrepareSpineIdentityStubs();
+            }
             foreach (['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser'] as $methodLc) {
                 $logical = 'PHPCompiler\\Runtime::'.$methodLc;
                 $lc = strtolower($logical);
@@ -1487,6 +1493,23 @@ class JIT {
         $flag = getenv('PHP_COMPILER_M5_DRIVER_HOST');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    /** Identity prepare/preprocess/rewrite stubs before parse host-lower (#26756 / #11809). */
+    private function ensureM5ArgvPrepareSpineIdentityStubs(): void
+    {
+        JIT\RuntimePrepareSpineIdentity::ensure(
+            $this->context,
+            fn (string $logical): string => $this->llvmInternalName($logical),
+            function (string $logical, $func, array $args, array $defaults): void {
+                $this->context->functionProxies[strtolower($logical)] = new JIT\Call\Native(
+                    $func,
+                    $logical,
+                    $args,
+                    $defaults
+                );
+            }
+        );
     }
 
     /**
@@ -4747,6 +4770,7 @@ class JIT {
             ];
             if ($this->shouldUseM5DriverHostCompile()) {
                 // C-floor initParsePipeline via compileRuntimeInitParsePipelineM3Native (#26756).
+                // prepare/preprocess/rewrite stay as identity stubs (RuntimePrepareSpineIdentity).
                 $emitHelperStubMethods = array_merge($emitHelperStubMethods, [
                     'initparsepipeline',
                     'noteparsecompilenullforscript',
@@ -5120,6 +5144,8 @@ class JIT {
         if (!$this->shouldStubInventoryArgvPreprocessSpineMethods()) {
             return;
         }
+        // Prefer identity stubs with real signatures over void stubs from {main} (#26756).
+        $this->ensureM5ArgvPrepareSpineIdentityStubs();
         $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if (null === $stubBlock) {
             return;
