@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\PasswordJitHelper;
 use PHPCompiler\ext\standard\VmPassword;
+use PHPCompiler\ext\standard\VmPasswordNative;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -63,6 +64,13 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
 
         $info = PasswordJitHelper::getInfoHashtable($hash);
         $this->assertSame('bcrypt', $info->find('algoName')->resolveIndirect()->toString());
+
+        if (VmPasswordNative::argon2Available()) {
+            $argon = PasswordJitHelper::hashArgv('secret', VmPassword::PASSWORD_ARGON2ID, 0);
+            $this->assertIsString($argon);
+            $this->assertStringStartsWith('$argon2id$', $argon);
+            $this->assertSame(1, PasswordJitHelper::verifyArgv('secret', $argon));
+        }
     }
 
     public function testVmPasswordNativeHasNoHostArgon2Delegation(): void

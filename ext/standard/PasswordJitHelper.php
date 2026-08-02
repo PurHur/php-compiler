@@ -14,19 +14,22 @@ use PHPCompiler\VM\HashTable;
  */
 final class PasswordJitHelper
 {
-    /** @return string|null null when hash fails (JIT ABI uses null __string__*) */
-    public static function hashArgv(string $password, int $algo, int $cost): ?string
+    /**
+     * @return string empty string when hash fails (NestedJIT/?string returns were nullled under AOT — #26773)
+     *
+     * Do not gate on {@see VmPassword::PASSWORD_BCRYPT} with `!==` here: NestedJIT/AOT
+     * class-const identity against the i64 algo param rejected bcrypt algo=1 (#26773).
+     * Delegate all algos (bcrypt + argon2*) to {@see VmPassword::hash}.
+     */
+    public static function hashArgv(string $password, int $algo, int $cost): string
     {
-        if (VmPassword::PASSWORD_BCRYPT !== $algo) {
-            return null;
-        }
         $options = [];
         if ($cost > 0) {
             $options['cost'] = $cost;
         }
         $result = VmPassword::hash($password, $algo, $options);
 
-        return false === $result ? null : $result;
+        return false === $result ? '' : $result;
     }
 
     public static function verifyArgv(string $password, string $hash): int

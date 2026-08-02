@@ -81,15 +81,23 @@ final class JitPassword
     {
         $id = (string) (++self::$blockSerial);
         $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
         $isNull = $context->builder->icmp(Builder::INT_EQ, $digest, $strPtr->constNull());
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
         $failBlock = BasicBlockHelper::append($context, 'password_hash_fail_'.$id);
+        $checkEmpty = BasicBlockHelper::append($context, 'password_hash_check_empty_'.$id);
         $okBlock = BasicBlockHelper::append($context, 'password_hash_ok_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'password_hash_done_'.$id);
-        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+        // hashArgv returns "" on failure (avoids NestedJIT ?string null) — treat empty as false (#26773).
+        $context->builder->branchIf($isNull, $failBlock, $checkEmpty);
+
+        $context->builder->positionAtEnd($checkEmpty);
+        $len = $context->builder->call($context->lookupFunction('__string__strlen'), $digest);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));

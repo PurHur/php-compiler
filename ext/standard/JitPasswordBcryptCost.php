@@ -7,11 +7,17 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** Shared JIT lowering for password_*() bcrypt `cost` option (#4741, #3279). */
+/**
+ * Shared JIT lowering for password_*() bcrypt `cost` option (#4741, #3279, #26773).
+ *
+ * PHI predecessors must be the actual terminator blocks after nested lowering (#24388 /
+ * #26773) — otherwise AOT Module->verify fails with dominate-uses / predecessor mismatch.
+ */
 final class JitPasswordBcryptCost
 {
     /**
@@ -31,9 +37,10 @@ final class JitPasswordBcryptCost
         if (JITVariable::TYPE_HASHTABLE === $options->type) {
             $ht = $context->helper->loadValue($options);
         } elseif (JITVariable::TYPE_VALUE === $options->type) {
+            // __value__readHashtable takes __value__*, not a loaded __value__ struct (#26773).
             $ht = $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
-                $context->helper->loadValue($options)
+                JitValueBox::pointer($context, $options->value)
             );
         } else {
             throw new \LogicException(
@@ -58,16 +65,19 @@ final class JitPasswordBcryptCost
         $context->builder->branchIf($hasCost, $hasBlock, $missBlock);
 
         $context->builder->positionAtEnd($missBlock);
+        $missEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($hasBlock);
         $costLong = self::lowerNumericOptionLong($context, $valPtr);
+        // lowerNumericOptionLong ends in its own done block — that is the real predecessor (#26773).
+        $hasEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64);
-        $phi->addIncoming($defaultCost, $missBlock);
-        $phi->addIncoming($costLong, $hasBlock);
+        $phi->addIncoming($defaultCost, $missEnd);
+        $phi->addIncoming($costLong, $hasEnd);
 
         return $phi;
     }
@@ -119,13 +129,14 @@ final class JitPasswordBcryptCost
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($defaultBlock);
+        $defaultEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($i64);
         $phi->addIncoming($longVal, $longEnd);
         $phi->addIncoming($stringLong, $stringEnd);
-        $phi->addIncoming($i64->constInt(0, false), $defaultBlock);
+        $phi->addIncoming($i64->constInt(0, false), $defaultEnd);
 
         return $phi;
     }
