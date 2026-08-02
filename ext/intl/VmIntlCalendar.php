@@ -322,12 +322,15 @@ final class VmIntlCalendar
         $greg->methodVisibility['__construct'] = $pub;
         $greg->methodNames['__construct'] = '__construct';
         $gregMethods = [
-            'createfromdate' => [new IntlGregorianCalendarCreateFromDate(), 'createFromDate', $pubStatic],
-            'createfromdatetime' => [new IntlGregorianCalendarCreateFromDateTime(), 'createFromDateTime', $pubStatic],
             'isleapyear' => [new IntlGregorianCalendarIsLeapYear(), 'isLeapYear', $pub],
             'getgregorianchange' => [new IntlGregorianCalendarGetGregorianChange(), 'getGregorianChange', $pub],
             'setgregorianchange' => [new IntlGregorianCalendarSetGregorianChange(), 'setGregorianChange', $pub],
         ];
+        // php-src PHP-8.3+ OO only — withhold on reference / PROFILE=8.2 (#20906, #26745)
+        if (CompilerVersion::supportsIntlGregorianCreateFromDate()) {
+            $gregMethods['createfromdate'] = [new IntlGregorianCalendarCreateFromDate(), 'createFromDate', $pubStatic];
+            $gregMethods['createfromdatetime'] = [new IntlGregorianCalendarCreateFromDateTime(), 'createFromDateTime', $pubStatic];
+        }
         foreach ($gregMethods as $lc => [$handler, $name, $vis]) {
             $greg->methods[$lc] = $handler;
             $greg->methodVisibility[$lc] = $vis;

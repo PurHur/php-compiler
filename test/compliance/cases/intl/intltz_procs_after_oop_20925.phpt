@@ -16,7 +16,8 @@ $names = [
     'intltz_create_enumeration',
     'intltz_create_time_zone_id_enumeration',
     'intltz_get_unknown',
-    'intltz_get_utc',
+    'intltz_get_utc', // never in php-src (#26745)
+    'intltz_get_gmt',
     'intltz_get_tz_data_version',
     'intltz_use_daylight_time',
     'intltz_has_same_rules',
@@ -40,8 +41,8 @@ echo 'equiv0=', intltz_get_equivalent_id('Europe/Paris', 0), "\n";
 echo 'windows=', intltz_get_windows_id('Europe/Paris'), "\n";
 echo 'windows_round=', intltz_get_id_for_windows_id('Romance Standard Time'), "\n";
 
-$utc = intltz_get_utc();
-echo 'utc=', intltz_get_id($utc), "\n";
+$gmt = intltz_get_gmt();
+echo 'gmt=', intltz_get_id($gmt), "\n";
 $unknown = intltz_get_unknown();
 echo 'unknown=', intltz_get_id($unknown), "\n";
 echo 'tzdata_len=', strlen(intltz_get_tz_data_version()) > 0 ? 'gt0' : '0', "\n";
@@ -56,8 +57,8 @@ echo 'idenum_iter=', (int) ($idEnum instanceof IntlIterator), "\n";
 
 $same = intltz_has_same_rules($paris, intltz_create_time_zone('Europe/Paris'));
 echo 'same_rules=', $same ? 'yes' : 'no', "\n";
-echo 'err=', intltz_get_error_code($utc), "\n";
-echo 'errmsg=', intltz_get_error_message($utc), "\n";
+echo 'err=', intltz_get_error_code($gmt), "\n";
+echo 'errmsg=', intltz_get_error_message($gmt), "\n";
 
 $raw = 0;
 $dstOff = 0;
@@ -74,7 +75,8 @@ intltz_get_id_for_windows_id=yes
 intltz_create_enumeration=yes
 intltz_create_time_zone_id_enumeration=yes
 intltz_get_unknown=yes
-intltz_get_utc=yes
+intltz_get_utc=no
+intltz_get_gmt=yes
 intltz_get_tz_data_version=yes
 intltz_use_daylight_time=yes
 intltz_has_same_rules=yes
@@ -88,7 +90,7 @@ oop_equiv_count=1
 equiv0=Europe/Paris
 windows=Romance Standard Time
 windows_round=Europe/Paris
-utc=UTC
+gmt=GMT
 unknown=Etc/Unknown
 tzdata_len=gt0
 enum_iter=1

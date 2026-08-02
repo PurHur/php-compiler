@@ -2562,6 +2562,44 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ IntlGregorianCalendar::createFromDate() / createFromDateTime()
+     * (ext/intl/calendar/calendar.stub.php; #20906, #26745).
+     *
+     * Withheld on 8.4.0-dev reference profile and PROFILE=8.2 (matches Zend 8.2
+     * method_exists gate). Enable via stable 8.4.0+ or explicit
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     *
+     * php-src has OO methods only — no intlgregcal_create_from_date* procedural aliases.
+     */
+    public static function supportsIntlGregorianCreateFromDate(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /** IntlGregorianCalendar::createFromDate* — stable or forward 8.3+ (#26745). */
+    public static function advertisesIntlGregorianCreateFromDate(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsIntlGregorianCreateFromDate();
+    }
+
+    /**
      * PHP 8.4+ IntlDateFormatter::PATTERN (UDAT_PATTERN = -2; ext/intl/dateformat.stub.php, #22623).
      *
      * Withheld on 8.4.0-dev reference profile and PROFILE=8.2 (matches Zend 8.2 ReflectionClass

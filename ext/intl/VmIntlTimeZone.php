@@ -100,7 +100,6 @@ final class VmIntlTimeZone
             'getregion' => [new IntlTimeZoneGetRegion(), 'getRegion', $pubStatic],
             'getgmt' => [new IntlTimeZoneGetGMT(), 'getGMT', $pubStatic],
             'getunknown' => [new IntlTimeZoneGetUnknown(), 'getUnknown', $pubStatic],
-            'getutc' => [new IntlTimeZoneGetUTC(), 'getUTC', $pubStatic],
             'createenumeration' => [new IntlTimeZoneCreateEnumeration(), 'createEnumeration', $pubStatic],
             'createtimezoneidenumeration' => [new IntlTimeZoneCreateTimeZoneIDEnumeration(), 'createTimeZoneIDEnumeration', $pubStatic],
             'getidforwindowsid' => [new IntlTimeZoneGetIDForWindowsID(), 'getIDForWindowsID', $pubStatic],
@@ -119,6 +118,10 @@ final class VmIntlTimeZone
             'todatetimezone' => [new IntlTimeZoneToDateTimeZone(), 'toDateTimeZone', $pub],
             'hassamerules' => [new IntlTimeZoneHasSameRules(), 'hasSameRules', $pub],
         ];
+        // php-src has getGMT/getUnknown only — getUTC never existed (#26745)
+        if (IntlExtensionPolicy::advertisesIntlTimeZoneGetUtc()) {
+            $methods['getutc'] = [new IntlTimeZoneGetUTC(), 'getUTC', $pubStatic];
+        }
         // php-src timezone.stub.php — getIanaID only when U_ICU_VERSION_MAJOR_NUM >= 74 (#20926).
         if (IntlExtensionPolicy::advertisesIanaTimeZoneId()) {
             $methods['getianaid'] = [new IntlTimeZoneGetIanaID(), 'getIanaID', $pubStatic];
