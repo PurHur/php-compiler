@@ -5246,7 +5246,7 @@ old_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond)
         $this->block = $loopEnd;
     }
 
-    protected function parseStmt_Enum(Stmt\\Enum_ $node)"""
+    protected function parseStmt_Echo(Stmt\\Echo_ $node)"""
 new_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond));
         // Zend emits ZEND_TICKS after the do-while statement (on loop exit) (#25621).
         $jumpIf = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
@@ -5260,7 +5260,7 @@ new_d = """        $cond = $this->readVariable($this->parseExprNode($node->cond)
         $this->block = $loopEnd;
     }
 
-    protected function parseStmt_Enum(Stmt\\Enum_ $node)"""
+    protected function parseStmt_Echo(Stmt\\Echo_ $node)"""
 old_d = old_d.replace("\\\\", "\\")
 new_d = new_d.replace("\\\\", "\\")
 if old_d not in text:

@@ -17,22 +17,19 @@ final class HashTableReplaceRecursiveLlvm
 {
     private static int $copyListEntrySeq = 0;
 
-    /** __value__.type may be JIT TYPE_HASHTABLE (135) or VM TYPE_ARRAY (6) depending on producer. */
+    /**
+     * Mask IS_REFCOUNTED — do not treat VM TYPE_ARRAY (6) as HT (collides with TYPE_VALUE&0x7f) (#26977).
+     */
     private static function isHashtableTypeByte(Context $context, \PHPLLVM\Value $typeByte): \PHPLLVM\Value
     {
         $i8 = $context->getTypeFromString('int8');
-        $isJit = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
-        );
-        $isVm = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
-        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
 
-        return $context->builder->or($isJit, $isVm);
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
     }
 
 
@@ -66,23 +63,8 @@ final class HashTableReplaceRecursiveLlvm
         Value $dest,
         Value $destIndex
     ): void {
-        self::copyPackedValueEntry(
-            $context,
-            self::listEntryAt($context, $src, $srcIndex),
-            $dest,
-            $destIndex
-        );
-    }
-    /**
-     * Store a __value__ list entry into a packed hashtable via HashTableWriteLlvm (#26977).
-     */
-    private static function copyPackedValueEntry(
-        Context $context,
-        Value $srcEntry,
-        Value $dest,
-        Value $destIndex
-    ): void {
-        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $srcEntry);
+        // Typed copy — raw entry KIND_VARIABLE misreads nested HT as int(0) (#26977 / #24232).
+        $elem = HashTableReadLlvm::readIndexedToValueBox($context, $src, $srcIndex);
         HashTableWriteLlvm::setAtIndex($context, $dest, $destIndex, $elem);
     }
 
@@ -95,13 +77,16 @@ final class HashTableReplaceRecursiveLlvm
 
         return $context->builder->inBoundsGep($values, $index);
     }
+
     private static function storeValueEntryAtStringKey(
         Context $context,
         Value $dest,
         Value $keyStr,
         Value $valEntry
     ): void {
-        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valEntry);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $slot, $valEntry);
+        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         HashTableWriteLlvm::setAtStringKey($context, $dest, $keyStr, $elem);
     }
 

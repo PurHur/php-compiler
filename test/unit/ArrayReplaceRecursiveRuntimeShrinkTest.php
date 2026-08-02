@@ -93,5 +93,9 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("'replacerecursivecopy'", $nested);
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Call/HashTableReplaceRecursiveCopy.php');
         $this->assertFileExists($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
+        $llvm = file_get_contents($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
+        $this->assertIsString($llvm);
+        $this->assertStringContainsString('HashTableReadLlvm::readIndexedToValueBox', $llvm);
+        $this->assertStringContainsString('JitValueBox::copyFromPointer', $llvm);
     }
 }
