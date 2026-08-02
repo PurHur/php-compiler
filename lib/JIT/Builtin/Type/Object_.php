@@ -3585,6 +3585,39 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if (
+            'spldoublylinkedlist' === $lcname
+            || 'splqueue' === $lcname
+            || 'splstack' === $lcname
+        ) {
+            // Thin AOT: `__spl_ht` packed deque for push/pop/shift/enqueue/dequeue (#26790).
+            // Zend rematerializes Serializable-first subclass interfaces (#25797).
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, [
+                'Serializable',
+                'ArrayAccess',
+                'Countable',
+                'Traversable',
+                'Iterator',
+            ]);
+            $this->defineProperty($id, \PHPCompiler\VM\SplDllistJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $methods = [
+                '__construct', 'push', 'pop', 'shift', 'unshift',
+                'top', 'bottom', 'count', 'isempty',
+                'rewind', 'valid', 'current', 'key', 'next',
+            ];
+            if ('splqueue' === $lcname) {
+                $methods = array_merge($methods, ['enqueue', 'dequeue']);
+            }
+            foreach ($methods as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+            if ('spldoublylinkedlist' !== $lcname) {
+                $this->setClassParentName($displayName, 'SplDoublyLinkedList');
+            }
+        }
         if ('sensitiveparametervalue' === $lcname) {
             // Trace redaction marker — store wrapped arg for getValue() (#3351, #4621, #22487).
             // Private like Zend zend_exceptions.stub.php — json_encode must not leak (#23042).

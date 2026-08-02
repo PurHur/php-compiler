@@ -16438,6 +16438,8 @@ class JIT {
             || $toCall instanceof JIT\Call\RecursiveIteratorIteratorConstruct
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\SplDllistMethod
+                && '__construct' === strtolower($toCall->methodName()))
         ) {
             return true;
         }
