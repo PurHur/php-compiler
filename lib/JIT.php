@@ -14045,6 +14045,7 @@ class JIT {
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
         $this->syncCompileTimeBcmathNumber($globalVar, $value, false);
         $this->syncCompileTimeDomTagName($globalVar, $value, false);
+        $this->syncCompileTimeDatePeriod($globalVar, $value, false);
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
         $this->markScopeVariableAssignedIfTracked($resultOp, $globalVar);
 
@@ -14628,6 +14629,7 @@ class JIT {
             $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
             $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
             $this->syncCompileTimeDomTagName($globalTarget, $value, false);
+            $this->syncCompileTimeDatePeriod($globalTarget, $value, false);
             $this->context->setVariableOp($resultOp, $globalTarget);
             $globalName = JIT\OperandName::resolve($resultOp);
             if (null !== $globalName && '' !== $globalName) {
@@ -14859,6 +14861,7 @@ class JIT {
             $this->invalidateScriptGlobalCompileTimeMetadata($result);
             $this->syncCompileTimeBcmathNumber($result, $value, false);
             $this->syncCompileTimeDomTagName($result, $value, false);
+            $this->syncCompileTimeDatePeriod($result, $value, false);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName(
@@ -14985,6 +14988,7 @@ class JIT {
                 $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
                 $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
                 $this->syncCompileTimeDomTagName($globalTarget, $value, false);
+                $this->syncCompileTimeDatePeriod($globalTarget, $value, false);
                 $this->context->setVariableOp($resultOp, $globalTarget);
                 $globalName = JIT\OperandName::resolve($resultOp);
                 if (null !== $globalName && '' !== $globalName) {
@@ -15123,6 +15127,7 @@ class JIT {
                     $this->syncCompileTimeFloat($result, $value, $force);
                     $this->syncCompileTimeBcmathNumber($result, $value, $force);
                     $this->syncCompileTimeDomTagName($result, $value, $force);
+                    $this->syncCompileTimeDatePeriod($result, $value, $force);
 
                     return;
                 }
@@ -15143,6 +15148,7 @@ class JIT {
             $this->syncCompileTimeFloat($result, $value, $force);
             $this->syncCompileTimeBcmathNumber($result, $value, $force);
             $this->syncCompileTimeDomTagName($result, $value, $force);
+            $this->syncCompileTimeDatePeriod($result, $value, $force);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
@@ -15232,6 +15238,7 @@ class JIT {
                     $this->syncCompileTimeFloat($result, $value, $force);
                     $this->syncCompileTimeBcmathNumber($result, $value, $force);
                     $this->syncCompileTimeDomTagName($result, $value, $force);
+                    $this->syncCompileTimeDatePeriod($result, $value, $force);
     
                     return;
                 case Variable::TYPE_NATIVE_BOOL:
@@ -15322,6 +15329,7 @@ class JIT {
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
                     $this->syncCompileTimeBcmathNumber($result, $value, $force);
                     $this->syncCompileTimeDomTagName($result, $value, $force);
+                    $this->syncCompileTimeDatePeriod($result, $value, $force);
 
                     return;
                 case Variable::TYPE_VALUE:
@@ -15689,6 +15697,7 @@ class JIT {
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->syncCompileTimeBcmathNumber($result, $value, $force);
             $this->syncCompileTimeDomTagName($result, $value, $force);
+            $this->syncCompileTimeDatePeriod($result, $value, $force);
             $this->recordListUnpackAssignSlot($resultOp, $result);
             $result->addref();
 
@@ -16053,6 +16062,20 @@ class JIT {
         }
     }
 
+    private function syncCompileTimeDatePeriod(Variable $dest, Variable $src, bool $force): void
+    {
+        if ($force || null !== $src->compileTimeLong) {
+            $dest->compileTimeLong = $src->compileTimeLong;
+        }
+        if ($force || null !== $src->compileTimeDatePeriodTimestamps) {
+            $dest->compileTimeDatePeriodTimestamps = $src->compileTimeDatePeriodTimestamps;
+            $dest->compileTimeDatePeriodTimezone = $src->compileTimeDatePeriodTimezone;
+        }
+        if ($force || null !== $src->compileTimeDateInterval) {
+            $dest->compileTimeDateInterval = $src->compileTimeDateInterval;
+        }
+    }
+
     private function copyValueBoxJitFlags(Variable $dest, Variable $src, bool $force = false): void
     {
         if (Variable::TYPE_VALUE !== $dest->type || Variable::TYPE_VALUE !== $src->type) {
@@ -16067,6 +16090,7 @@ class JIT {
         $this->syncCompileTimeFloat($dest, $src, $force);
         $this->syncCompileTimeBcmathNumber($dest, $src, $force);
         $this->syncCompileTimeDomTagName($dest, $src, $force);
+        $this->syncCompileTimeDatePeriod($dest, $src, $force);
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
@@ -16276,6 +16300,11 @@ class JIT {
             || $toCall instanceof JIT\Call\RandomizerConstruct
             || $toCall instanceof JIT\Call\SimpleXMLElementConstruct
             || $toCall instanceof JIT\Call\BcMathNumberConstruct
+            || $toCall instanceof JIT\Call\DateTimeConstruct
+            || $toCall instanceof JIT\Call\DateTimeImmutableConstruct
+            || $toCall instanceof JIT\Call\DateTimeZoneConstruct
+            || $toCall instanceof JIT\Call\DateIntervalConstruct
+            || $toCall instanceof JIT\Call\DatePeriodConstruct
         ) {
             return true;
         }

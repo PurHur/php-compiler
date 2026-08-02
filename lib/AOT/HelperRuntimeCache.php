@@ -85,6 +85,8 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\arraymapjithelper::mapwithclosuremultiple' => true,
         'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariable' => true,
         'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariabletwo' => true,
+        // #26772 — helper-runtime unit.o stubs format → null; NestedJIT self-contained helper.
+        'phpcompiler\\ext\\standard\\datetimeformatjithelper::formatstateargv' => true,
     ];
 
     private static bool $loggedHit = false;

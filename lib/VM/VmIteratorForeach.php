@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\WeakRefNative;
 use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\DatePeriodForeachSnapshot;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ObjectPropertyForeachHelper;
@@ -209,6 +210,12 @@ final class VmIteratorForeach
 
             return;
         }
+        // Before Iterator protocol — DatePeriod rewind/clone is AOT-unsafe (#26772).
+        if (DatePeriodForeachSnapshot::canLower($array)) {
+            DatePeriodForeachSnapshot::compileReset($context, $array, $slotKey);
+
+            return;
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             IteratorProtocolHelper::compileForeachReset($context, $array, $slotKey, $containerUserType);
 
@@ -239,6 +246,11 @@ final class VmIteratorForeach
         $slotKey = $array;
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValid($context, $slotKey, $containerUserType);
+        }
+        if (isset($context->foreachDatePeriodSnapshotHts[\spl_object_id($slotKey)])) {
+            $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
+
+            return self::compileValidHashtable($context, $ht, $slotKey);
         }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachValid($context, $slotKey, $containerUserType);
@@ -401,6 +413,11 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileKey($context, $slotKey, $containerUserType);
         }
+        if (isset($context->foreachDatePeriodSnapshotHts[\spl_object_id($slotKey)])) {
+            $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
+
+            return self::compileKeyHashtable($context, $ht, $slotKey);
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachKey($context, $slotKey, $containerUserType);
         }
@@ -500,6 +517,11 @@ final class VmIteratorForeach
         $slotKey = $array;
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);
+        }
+        if (isset($context->foreachDatePeriodSnapshotHts[\spl_object_id($slotKey)])) {
+            $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
+
+            return self::compileValueHashtable($context, $ht, $slotKey);
         }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachValue($context, $slotKey, $containerUserType);

@@ -9,7 +9,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for DateTime::format() via DateTimeFormatJitHelper PHP (#4043).
+ * JIT/AOT link for DateTime::format() via DateTimeFormatJitHelper PHP (#4043, #26772).
+ *
+ * Helper-runtime unit.o stubs format → null; USER_SCRIPT_INLINE_ONLY NestedJITs the
+ * NestedJIT-safe self-contained helper (#26772).
  */
 final class DateTimeFormatRuntime
 {
@@ -60,7 +63,7 @@ final class DateTimeFormatRuntime
             self::FORMAT_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#4043'
+            '#4043/#26772'
         );
     }
 }
