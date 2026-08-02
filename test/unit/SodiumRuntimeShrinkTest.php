@@ -30,4 +30,14 @@ final class SodiumRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('SodiumJitHelper.php', $spine);
         $this->assertStringContainsString('StringSodium.php', $spine);
     }
+
+    /** #26871 — AOT/JIT sodium_bin2hex reuses StringBin2hex (no stub LogicException). */
+    public function testSodiumBin2hexCallUsesStringBin2hex(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sodium/sodium_bin2hex.php');
+        $this->assertStringContainsString('StringBin2hex::ensureLinked', $source);
+        $this->assertStringContainsString('__compiler_bin2hex', $source);
+        $this->assertStringContainsString('lowerTrimFamilyString', $source);
+        $this->assertStringNotContainsString('JIT is not supported', $source);
+    }
 }
