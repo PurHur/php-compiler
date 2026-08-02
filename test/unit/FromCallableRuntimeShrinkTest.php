@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** FromCallable JIT routes TYPE_FROM_CALLABLE through VmFromCallable PHP (#10272). */
+/** FromCallable JIT routes TYPE_FROM_CALLABLE through VmFromCallable PHP (#10272, #26788). */
 final class FromCallableRuntimeShrinkTest extends TestCase
 {
     public function testFromCallableHelperRoutesThroughVmFromCallable(): void
@@ -23,8 +23,17 @@ final class FromCallableRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/VM/VmFromCallable.php');
         $this->assertStringContainsString('createClosureVariable', $source);
+        $this->assertStringContainsString('fromCallableString', $source);
         $this->assertStringContainsString('assertStaticMethodFcc', $source);
         $this->assertStringContainsString('ClosureSupport::fromCallable', $source);
         $this->assertGreaterThan(150, substr_count($source, "\n") + 1);
+    }
+
+    public function testClosureFromCallableJitProxyRegistered(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ClosureBindHelper.php');
+        $this->assertStringContainsString('closure::fromcallable', $helper);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Call/ClosureFromCallable.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Call/DateTimeCreateFromFormat.php');
     }
 }

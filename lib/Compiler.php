@@ -13127,6 +13127,10 @@ class Compiler {
                     $expr
                 );
             case Op\Expr\StaticCall::class:
+                $fromCallableFcc = $this->tryCompileClosureFromCallableAsFcc($expr, $block);
+                if (null !== $fromCallableFcc) {
+                    return $fromCallableFcc;
+                }
                 $parentScope = $this->staticCallUsesParentScope($expr->class);
                 $classSlot = $parentScope
                     ? $this->compileOperand(new Operand\Literal('parent'), $block, true)
@@ -42610,6 +42614,116 @@ class Compiler {
         }
 
         return true;
+    }
+
+
+    /**
+     * Lower Closure::fromCallable(constant) to TYPE_FROM_CALLABLE — same as FCC (#26788).
+     *
+     * @return OpCode[]|null
+     */
+    private function tryCompileClosureFromCallableAsFcc(Op\Expr\StaticCall $expr, Block $block): ?array
+    {
+        $className = $this->literalScopeClassName($expr->class)
+            ?? $this->staticNameFromOperand($expr->class);
+        $methodName = $this->staticNameFromOperand($expr->name);
+        if (null === $className || null === $methodName) {
+            return null;
+        }
+        if ('closure' !== strtolower(ltrim($className, '\\'))) {
+            return null;
+        }
+        if ('fromcallable' !== strtolower($methodName)) {
+            return null;
+        }
+        if (1 !== \count($expr->args)) {
+            return null;
+        }
+        $callableName = $this->literalCallableNameForFromCallable($expr->args[0], $block, $expr);
+        if (null === $callableName) {
+            return null;
+        }
+        $result = $this->compileOperand($expr->result, $block, false);
+        $callableSlot = $this->compileOperand(new Operand\Literal($callableName), $block, true);
+        $fromCallable = new OpCode(
+            OpCode::TYPE_FROM_CALLABLE,
+            $result,
+            $callableSlot
+        );
+        $this->assignSourceMetadata($fromCallable, $expr);
+
+        return [$fromCallable];
+    }
+
+    private function literalCallableNameForFromCallable(Operand $arg, Block $block, Op\Expr\StaticCall $callOp): ?string
+    {
+        $direct = $this->staticNameFromOperand($arg);
+        if (null !== $direct) {
+            return $direct;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        $arrayExpr = null;
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\Array_
+                && null !== $child->result
+                && $this->operandsReferToSameVariable($child->result, $arg)
+            ) {
+                $arrayExpr = $child;
+                break;
+            }
+        }
+        if (null === $arrayExpr) {
+            $callIndex = array_search($callOp, $block->orig->children, true);
+            if (\is_int($callIndex) && $callIndex > 0) {
+                $prev = $block->orig->children[$callIndex - 1] ?? null;
+                if ($prev instanceof Op\Expr\Array_) {
+                    $arrayExpr = $prev;
+                }
+            }
+        }
+        if (!$arrayExpr instanceof Op\Expr\Array_) {
+            return null;
+        }
+        $values = $arrayExpr->values ?? [];
+        if (2 !== \count($values)) {
+            return null;
+        }
+        $classPart = $this->literalCallableArrayElementString($values[0], $block);
+        $methodPart = $this->literalCallableArrayElementString($values[1], $block);
+        if (null === $classPart || null === $methodPart) {
+            return null;
+        }
+
+        return $classPart.'::'.$methodPart;
+    }
+
+    private function literalCallableArrayElementString(Operand $op, Block $block): ?string
+    {
+        $direct = $this->staticNameFromOperand($op);
+        if (null !== $direct) {
+            return $direct;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\ClassConstFetch
+                && null !== $child->result
+                && $this->operandsReferToSameVariable($child->result, $op)
+            ) {
+                $name = $this->staticNameFromOperand($child->name);
+                if ('class' === strtolower((string) $name)) {
+                    return $this->literalScopeClassName($child->class)
+                        ?? $this->staticNameFromOperand($child->class);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
