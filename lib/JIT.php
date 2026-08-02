@@ -8078,13 +8078,43 @@ class JIT {
                         }
                     }
                     if (
-                        $value->type === Variable::TYPE_OBJECT
-                        && 'splobjectstorage' === strtolower($containerUserType)
-                        && Variable::TYPE_OBJECT === $dim->type
+                        'splobjectstorage' === strtolower($containerUserType)
+                        && (
+                            Variable::TYPE_OBJECT === $value->type
+                            || Variable::TYPE_VALUE === $value->type
+                        )
+                        && (
+                            Variable::TYPE_OBJECT === $dim->type
+                            || Variable::TYPE_VALUE === $dim->type
+                        )
                     ) {
-                        $ht = $this->context->type->object->splBackingHashtable($value);
-                        $htVal = $this->context->helper->loadValue($ht);
-                        $keyObj = $this->context->helper->loadValue($dim);
+                        // AOT boxes `new SplObjectStorage` as TYPE_VALUE (#26787; peer WeakMap #24681).
+                        if (Variable::TYPE_OBJECT === $value->type) {
+                            $ht = $this->context->type->object->splBackingHashtable($value);
+                            $htVal = $this->context->helper->loadValue($ht);
+                        } else {
+                            $objPtr = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readObject'),
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $value)
+                            );
+                            $ht = $this->context->type->object->splBackingHashtable(
+                                new Variable(
+                                    $this->context,
+                                    Variable::TYPE_OBJECT,
+                                    Variable::KIND_VALUE,
+                                    $objPtr
+                                )
+                            );
+                            $htVal = $this->context->helper->loadValue($ht);
+                        }
+                        if (Variable::TYPE_OBJECT === $dim->type) {
+                            $keyObj = $this->context->helper->loadValue($dim);
+                        } else {
+                            $keyObj = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readObject'),
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $dim)
+                            );
+                        }
                         if ($forWrite) {
                             $fetched = JIT\HashTableHelper::writableObjectKeyValueBox(
                                 $this->context,
