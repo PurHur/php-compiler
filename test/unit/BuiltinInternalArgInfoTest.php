@@ -147,6 +147,23 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** Zend gettype/get_resource_id Reflection stubs (#26376). */
+    public function testGettypeGetResourceIdReflectionStubTypes(): void
+    {
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('gettype', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('gettype', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('mixed', $info['type']);
+        // InternalArgInfo still says var; Reflection uses BuiltinParamNames value (#23263).
+        $this->assertSame(['value'], BuiltinParamNames::forFunction('gettype'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('gettype'));
+
+        $this->assertSame('int', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('get_resource_id'));
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_resource_id'));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('get_resource_id', 0));
+        $this->assertSame(['resource'], BuiltinParamNames::forFunction('get_resource_id'));
+    }
+
     /** php-src array.stub.php — InternalArgInfo return bool; Zend true (#26172). */
     public function testUsortKsortFamilyReturnTypeIsTrue(): void
     {
