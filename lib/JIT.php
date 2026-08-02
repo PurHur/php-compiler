@@ -11098,6 +11098,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $callArgs
                     );
+                    $this->propagateBcMathNumberMethodCompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $nameOp = $block->getOperand($op->arg1);
@@ -12906,6 +12910,28 @@ class JIT {
             return;
         }
         $this->context->getVariableFromOp($result)->compileTimeDomTagName = $tag;
+    }
+
+    /** Folded BcMath\Number::{add,mul} result metadata for (string) cast / further ops (#26803). */
+    private function propagateBcMathNumberMethodCompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!($toCall instanceof JIT\Call\BcMathNumberMethod)) {
+            return;
+        }
+        $ct = $toCall->lastCompileTimeBcmathNumber;
+        if (null === $ct || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeBcmathNumber = $ct;
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeBcmathNumber = $ct;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
     }
 
     /**

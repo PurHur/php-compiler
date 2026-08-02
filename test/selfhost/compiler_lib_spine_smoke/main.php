@@ -6849,7 +6849,9 @@ require_once __DIR__.'/../../../ext/apcu/apcu_key_info.php';
 require_once __DIR__.'/../../../ext/apcu/apcu_sma_info.php';
 require_once __DIR__.'/../../../ext/bcmath/JitBcMathNumberInit.php';
 require_once __DIR__.'/../../../ext/bcmath/JitBcMathNumberOperators.php';
+require_once __DIR__.'/../../../ext/bcmath/JitBcMathNumberMethods.php';
 require_once __DIR__.'/../../../lib/JIT/Call/BcMathNumberConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/BcMathNumberMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/BcMathNumberToString.php';
 require_once __DIR__.'/../../../ext/standard/JitOpenStreamHandles.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
