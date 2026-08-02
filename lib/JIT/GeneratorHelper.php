@@ -225,14 +225,26 @@ final class GeneratorHelper
 
         for ($i = 0; $i < $n; ++$i) {
             $context->builder->positionAtEnd($caseBlocks[$i]);
+            $prefixEntry = $caseBlocks[$i];
+            // Zend zend_generator_resume: apply send()/next() value into the prior yield
+            // expression result before running code after that yield (#26819).
+            if ($i > 0 && 'yield' === $points[$i - 1]['kind']) {
+                $prefixEntry = GeneratorIteratorJitHelper::emitInjectPendingSend(
+                    $jit,
+                    $func,
+                    $points[$i - 1]['block'],
+                    $points[$i - 1]['op'],
+                    $stateParam,
+                    $caseBlocks[$i]
+                );
+            }
             $point = $points[$i];
             $pointBlock = $point['block'];
             $yieldIdx = GeneratorJitHelper::opcodeIndex($pointBlock, $point['op']);
-            $prefixEntry = $caseBlocks[$i];
             if (0 === $i && $pointBlock !== $block) {
-                $prefixEntry = self::compileEntryLeadIn($jit, $func, $block, $point, $caseBlocks[$i]);
+                $prefixEntry = self::compileEntryLeadIn($jit, $func, $block, $point, $prefixEntry);
             } elseif ($i > 0 && $points[$i - 1]['block'] !== $pointBlock) {
-                self::compileCrossBlockResumePrefix($jit, $func, $points[$i - 1], $point, $caseBlocks[$i]);
+                self::compileCrossBlockResumePrefix($jit, $func, $points[$i - 1], $point, $prefixEntry);
             }
             $catchDispatchBb = $context->generatorCatchDispatchEntry[spl_object_id($pointBlock)] ?? null;
             $prefixStart = GeneratorJitHelper::resumePrefixStart($points, $i);
