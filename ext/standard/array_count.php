@@ -95,6 +95,11 @@ final class array_count extends Internal
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        // User-script AOT: SimpleXMLElement child views fold via host tree (#26863).
+        $sxeCount = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldCount($context, $args[0]);
+        if (null !== $sxeCount) {
+            return $sxeCount;
+        }
         $recursive = false;
         if (2 === $argc) {
             $modeLit = JitLongArg::compileTimeLiteral($args[1]);

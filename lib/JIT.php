@@ -8031,6 +8031,30 @@ class JIT {
                     $dim = $this->context->getVariableFromOp($dimOp);
                     $containerOp = $block->getOperand($op->arg2);
                     $containerUserType = $containerOp->type->userType ?? '';
+                    // User-script AOT: SimpleXMLElement dim via host tree (#26863).
+                    // CFG types the child view as "unknown", so ArrayAccess is skipped; fold here.
+                    if (
+                        !$forWrite
+                        && JIT\UserScriptAotEnv::isActive()
+                        && null !== ($value->magicGetOverloadedClass ?? null)
+                        && 0 === strcasecmp((string) $value->magicGetOverloadedClass, 'SimpleXMLElement')
+                    ) {
+                        $sxeDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetGet(
+                            $this->context,
+                            $value,
+                            $dim
+                        );
+                        if (null !== $sxeDim) {
+                            if ($forceBranchMerge) {
+                                $this->assignOperandValue($resultOp, $sxeDim, true);
+                            } else {
+                                $this->assignOperandValue($resultOp, $sxeDim);
+                            }
+                            $dimVar = $this->context->getVariableFromOp($resultOp);
+                            $dimVar->magicGetOverloadedClass = 'SimpleXMLElement';
+                            break;
+                        }
+                    }
                     if ($fetchIs) {
                         // FETCH_DIM_IS for nested isset()/empty() chains (#21991).
                         $bracketLabel = Variable::cannotUseBracketLabel($value->type);
@@ -11784,6 +11808,30 @@ class JIT {
                             }
                         }
                         if (!$forWrite) {
+                            // User-script AOT: SimpleXMLElement child views via host tree (#26863).
+                            // Magic __get is not always registered on Object_ for SXE; fold directly.
+                            if (JIT\UserScriptAotEnv::isActive()) {
+                                $declLc = strtolower(ltrim($declaringClass, '\\'));
+                                if ('simplexmlelement' === $declLc || 'simplemxml_element' === $declLc) {
+                                    $sxeReceiver = $this->context->getVariableFromOp($obj);
+                                    $sxeName = JIT\Variable::fromLiteral(
+                                        $this->context,
+                                        new Operand\Literal($name->value)
+                                    );
+                                    $sxeFetched = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryGet(
+                                        $this->context,
+                                        $sxeReceiver,
+                                        $sxeName
+                                    );
+                                    if (null !== $sxeFetched) {
+                                        $this->assignOperandValue($result, $sxeFetched);
+                                        $magicVar = $this->context->getVariableFromOp($result);
+                                        $magicVar->magicGetOverloadedClass = 'SimpleXMLElement';
+                                        $magicVar->magicGetOverloadedName = $name->value;
+                                        break;
+                                    }
+                                }
+                            }
                             $magicFetched = JIT\MagicMethodDispatch::tryEmitMagicGet(
                                 $this->context,
                                 $receiver,
@@ -12660,6 +12708,10 @@ class JIT {
             $declaringClass = $this->context->scope->className !== ''
                 ? $this->context->scope->className
                 : 'object';
+        }
+        // php-types InternalArgInfo typo: simplexml_load_* → simplemxml_element (#25338, #26863).
+        if (0 === strcasecmp(ltrim($declaringClass, '\\'), 'simplemxml_element')) {
+            $declaringClass = 'SimpleXMLElement';
         }
 
         return $declaringClass;

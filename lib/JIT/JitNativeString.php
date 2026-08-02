@@ -37,12 +37,24 @@ final class JitNativeString
             return $var;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
+            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast($context, $var);
+            if (null !== $sxeFold) {
+                return $sxeFold;
+            }
             // Operand PHPTypes userType — Variable::$type is an int, so echo/cast must pass the hint (#26821).
             if (null === $classHint || '' === $classHint) {
                 $fromOp = $sourceOperand?->type?->userType ?? null;
                 if (\is_string($fromOp) && '' !== ltrim($fromOp, '\\')) {
                     $classHint = $fromOp;
                 }
+            }
+            if (
+                (null === $classHint || '' === $classHint || 'object' === strtolower((string) $classHint)
+                    || 'unknown' === strtolower((string) $classHint))
+                && null !== ($var->magicGetOverloadedClass ?? null)
+                && '' !== $var->magicGetOverloadedClass
+            ) {
+                $classHint = $var->magicGetOverloadedClass;
             }
             $classHint = null !== $classHint ? ltrim($classHint, '\\') : null;
             $magic = MagicMethodDispatch::coerceObjectToString(
@@ -100,6 +112,10 @@ final class JitNativeString
         }
         if (Variable::TYPE_VALUE === $var->type) {
             self::ensureInsertBlock($context);
+            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast($context, $var);
+            if (null !== $sxeFold) {
+                return $sxeFold;
+            }
             // Folded BcMath\Number method results carry value/scale metadata (#26803).
             $bcCt = $var->compileTimeBcmathNumber ?? null;
             if (null !== $bcCt && \PHPCompiler\CompilerVersion::supportsBcmath()) {

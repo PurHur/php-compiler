@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** simplexml_load_string() — parse XML into SimpleXMLElement tree (#3338, #22406). */
+/** simplexml_load_string() — parse XML into SimpleXMLElement tree (#3338, #22406, #26863). */
 final class simplexml_load_string extends Internal
 {
     public function __construct()
@@ -62,6 +62,6 @@ final class simplexml_load_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('simplexml_load_string() is not JIT-lowered in this compiler build');
+        return JitSimpleXmlLoadString::invoke($context, ...$args);
     }
 }

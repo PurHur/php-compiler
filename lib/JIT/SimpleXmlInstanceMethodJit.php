@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Call;
 
-/** Lazy registration for ext/simplexml user-script AOT proxies (#19306). */
+/** Lazy registration for ext/simplexml user-script AOT proxies (#19306, #26863). */
 final class SimpleXmlInstanceMethodJit
 {
     /** @var array<string, true> */
@@ -16,7 +16,18 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::asxml' => true,
         'simplexmlelement::savexml' => true,
         'simplexmlelement::xpath' => true,
+        'simplexmlelement::__get' => true,
+        'simplexmlelement::offsetget' => true,
+        'simplexmlelement::count' => true,
+        'simplexmlelement::__tostring' => true,
     ];
+
+    public static function isSimpleXmlInstanceMethodProxy(string $proxyName): bool
+    {
+        $lc = strtolower(ltrim($proxyName, '\\'));
+
+        return isset(self::METHODS[$lc]);
+    }
 
     public static function ensureProxy(Context $context, string $proxyName): void
     {
@@ -46,6 +57,26 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::xpath' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementXpath();
+
+            return;
+        }
+        if ('simplexmlelement::__get' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementGet();
+
+            return;
+        }
+        if ('simplexmlelement::offsetget' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementOffsetGet();
+
+            return;
+        }
+        if ('simplexmlelement::count' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementCount();
+
+            return;
+        }
+        if ('simplexmlelement::__tostring' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementToString();
         }
     }
 }
