@@ -45,8 +45,8 @@ PHP);
     }
 
     /**
-     * Int-backed tryFrom match + miss must survive thin AOT (≥5 runs) (#26855).
-     */
+     * Issue repro: tryFrom + var_export(..., true) must survive thin AOT (≥5 runs) (#26855).
+     * Root cause was NestedJIT var_export under thin AOT (peer print_r #24266).     */
     public function testAotIntBackedTryFromDoesNotSegfault(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
@@ -56,9 +56,7 @@ PHP);
         $src = $this->writeScript($root, <<<'PHP'
 <?php
 enum E: int { case A = 1; }
-$miss = E::tryFrom(9);
-echo E::tryFrom(1)->name, ' ', ($miss === null ? 'NULL' : 'bad'), "\n";
-PHP);
+echo E::tryFrom(1)->name, ' ', var_export(E::tryFrom(9), true), "\n";PHP);
         $bin = sys_get_temp_dir().'/phpc_enum_tryfrom_26855_'.getmypid().'.bin';
         $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
             .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';

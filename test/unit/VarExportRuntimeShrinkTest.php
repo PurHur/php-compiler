@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringVarExport JIT routes through VarExportJitHelper PHP for embed + user-script AOT (#9189, #20589). */
+/** StringVarExport: NestedJIT helper for embed; thin scalar AOT bridge (#9189, #20589, #26855). */
 final class VarExportRuntimeShrinkTest extends TestCase
 {
     public function testStringVarExportUsesJitHelperNotKernel(): void
@@ -15,13 +15,13 @@ final class VarExportRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VarExportJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('var_export_bridge_entry', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThinScalarBridge', $source);
         $this->assertStringNotContainsString('JitVarExportKernel', $source);
         $this->assertStringNotContainsString('var_export_user_script_bridge', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringVarExportJit', $source);
         $this->assertStringNotContainsString('StringVarExportUserScriptLlvm', $source);
-        $this->assertLessThan(160, \substr_count($source, "\n"), 'StringVarExport must be a thin bridge (#9189)');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitVarExportKernel.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringVarExportUserScriptLlvm.php');
     }
