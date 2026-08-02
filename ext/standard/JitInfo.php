@@ -316,7 +316,7 @@ final class JitInfo
         StringInfo::ensureLinked($context);
         // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
         $nullExt = JITVariable::TYPE_NULL === $extension->type || ($extension->isNullConstant ?? false);
-        $extStr = JitStringBuiltinArg::lowerZparamStr($context, $extension, 'get_extension_funcs', 0, 'extension_name');
+        $extStr = JitStringBuiltinArg::lowerZparamStr($context, $extension, 'get_extension_funcs', 0, 'extension');
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         if (

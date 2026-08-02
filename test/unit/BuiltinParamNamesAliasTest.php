@@ -718,6 +718,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23569 — Zend stub names vs InternalArgInfo option_name/extension_name/arg */
+    public function testGetCfgVarExtensionFuncsCliSetProcessTitleZendStubNamedParams(): void
+    {
+        $cfg = BuiltinParamNames::forFunction('get_cfg_var');
+        self::assertSame(['option'], $cfg);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($cfg, 'option', 'get_cfg_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($cfg, 'option_name', 'get_cfg_var'));
+        self::assertSame(['option'], BuiltinParamNames::paramNamesForInternalFunction('get_cfg_var'));
+
+        $ext = BuiltinParamNames::forFunction('get_extension_funcs');
+        self::assertSame(['extension'], $ext);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ext, 'extension', 'get_extension_funcs'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ext, 'extension_name', 'get_extension_funcs'));
+        self::assertSame(['extension'], BuiltinParamNames::paramNamesForInternalFunction('get_extension_funcs'));
+
+        $title = BuiltinParamNames::forFunction('cli_set_process_title');
+        self::assertSame(['title'], $title);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($title, 'title', 'cli_set_process_title'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($title, 'arg', 'cli_set_process_title'));
+        self::assertSame(['title'], BuiltinParamNames::paramNamesForInternalFunction('cli_set_process_title'));
+    }
+
     /** @covers issue #10126 / #23404 — Zend stub uses env_vars not env */
     public function testProcOpenNamedParameters(): void
     {

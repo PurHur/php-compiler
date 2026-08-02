@@ -755,6 +755,15 @@ final class BuiltinParamNames
                 return ['assignment'];
             case 'ini_get':
                 return ['option'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says option_name (#23569)
+            case 'get_cfg_var':
+                return ['option'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says extension_name (#23569)
+            case 'get_extension_funcs':
+                return ['extension'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says arg (#23569)
+            case 'cli_set_process_title':
+                return ['title'];
             // php-src ext/standard/basic_functions.stub.php — ?string $extension = null, bool $details = true (#25276)
             case 'ini_get_all':
                 return ['extension=', 'details='];
