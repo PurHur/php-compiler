@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Builtin\LastErrorRuntime;
 use PHPCompiler\JIT\Builtin\SilenceRuntime;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -15,11 +16,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815, #19660, #23004).
+ * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815, #19660, #23004, #26929).
  *
  * Quarantined from lib/JIT/Builtin/StreamSyncJit — {@see \PHPCompiler\JIT\Builtin\StreamSync}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
  * (peer StreamMeta #22994 / StreamBuffer #22979 / StreamMode #22968).
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit (peer #26884 / #26900).
  *
  * php-src: ext/standard/file.c — PHP_FUNCTION(fsync) / fdatasync
  */
@@ -55,6 +57,9 @@ final class JitStreamSyncKernel
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit
+        // (fsync/fdatasync thin AOT: "Current basic block has no parent function", #26929 / peer #26900).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StreamGlobalsJit::implement($context);
         self::ensureLibc($context);
         self::ensureJitHelperCompiled($context);
@@ -62,7 +67,11 @@ final class JitStreamSyncKernel
         self::implementIfMissing($context, '__compiler_fsync', static fn ($ctx, $fn) => self::emitSync($ctx, $fn, 0));
         self::implementIfMissing($context, '__compiler_fdatasync', static fn ($ctx, $fn) => self::emitSync($ctx, $fn, 1));
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
