@@ -77,6 +77,27 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertLessThan($voidStubPos, $identityPos, 'Identity stubs must register before void stub loop');
     }
 
+    public function testM5ParseFloorWiredInsteadOfNestedJit(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $this->assertFileExists($root.'/lib/JIT/RuntimeParseM5Native.php');
+        $floor = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5Native.php');
+        $this->assertStringContainsString('#26756', $floor);
+        $this->assertStringContainsString('PHPCfg\\Parser', $floor);
+        $jit = (string) file_get_contents($root.'/lib/JIT.php');
+        $this->assertStringContainsString('RuntimeParseM5Native.php', $jit);
+        $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $jit);
+        // M5 must stub NestedJIT of parse and emit C-floor instead.
+        $stubPos = strpos($jit, "\$emitHelperStubMethods = array_merge(\$emitHelperStubMethods, [\n                    'parse'");
+        if (false === $stubPos) {
+            $stubPos = strpos($jit, "'parse',\n                    'initparsepipeline'");
+        }
+        $this->assertNotFalse($stubPos, 'M5 must list parse among emitHelperStubMethods');
+        $smoke = (string) file_get_contents($root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $smoke);
+        $this->assertStringContainsString('emitRuntimeParseAndCompileDefault', $smoke);
+    }
+
     public function testJitWiresM5FloorBeforeNestedJit(): void
     {
         $jitPath = dirname(__DIR__, 2).'/lib/JIT.php';

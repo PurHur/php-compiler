@@ -671,18 +671,28 @@ final class BootstrapCompileSmokeM3Emit
         $runtime = $func->getParam(0);
         $code = $func->getParam(1);
         $filename = $func->getParam(2);
-        $script = $context->builder->call(
-            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
-            $runtime,
-            $code,
-            $filename
-        );
-        $block = $context->builder->call(
-            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $runtime,
-            $script
-        );
-        $context->builder->returnValue($block);
+        // M5 argv / gen-0: compileEmitSmoke is a 3-byte null stub (`xor eax,eax; ret`).
+        // Prefer real Runtime::compile when present so parseAndCompile can succeed (#26756).
+        $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $preferCompile = '1' === $m5Host || 'true' === strtolower((string) $m5Host);
+        if ($preferCompile) {
+            $context->builder->returnValue(
+                self::emitRuntimeParseAndCompileDefault($context, $runtime, $code, $filename)
+            );
+        } else {
+            $script = $context->builder->call(
+                self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+                $runtime,
+                $code,
+                $filename
+            );
+            $block = $context->builder->call(
+                self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+                $runtime,
+                $script
+            );
+            $context->builder->returnValue($block);
+        }
         $context->builder->clearInsertionPosition();
         $context->builder = $saved;
         $context->functions[$lc] = $func;

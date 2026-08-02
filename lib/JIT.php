@@ -16,6 +16,7 @@ require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
+require_once __DIR__.'/JIT/RuntimeParseM5Native.php';
 require_once __DIR__.'/JIT/RuntimePrepareSpineIdentity.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
@@ -2064,6 +2065,15 @@ class JIT {
                 return $this->compileRuntimeParseAndCompileM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::parse')) {
+                // M5 argv: C-floor parse (skip prepare list-unpack SEGV; no NestedJIT mid-BB) (#26756).
+                if ($this->shouldUseM5DriverHostCompile()) {
+                    return JIT\RuntimeParseM5Native::emitFunction(
+                        $this->context,
+                        $internalName,
+                        $logicalName,
+                        fn (string $n): string => $this->llvmInternalName($n)
+                    );
+                }
                 if ($this->shouldUseM3EmitTuRuntimeMethodStub('parse')) {
                     return $this->emitM3EmitTuRuntimeParseStubNative($internalName, $logicalName, $block);
                 }
@@ -4791,8 +4801,10 @@ class JIT {
             ];
             if ($this->shouldUseM5DriverHostCompile()) {
                 // C-floor initParsePipeline via compileRuntimeInitParsePipelineM3Native (#26756).
+                // C-floor Runtime::parse via RuntimeParseM5Native — skip NestedJIT mid-BB + prepare SEGV.
                 // prepare/preprocess/rewrite stay as identity stubs (RuntimePrepareSpineIdentity).
                 $emitHelperStubMethods = array_merge($emitHelperStubMethods, [
+                    'parse',
                     'initparsepipeline',
                     'noteparsecompilenullforscript',
                     'peeklastparsefailure',
@@ -4819,6 +4831,19 @@ class JIT {
                 continue;
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+        }
+        // M5: emit C-floor parse after stubbing NestedJIT of Runtime.php::parse (#26756).
+        if ($this->shouldUseM5DriverHostCompile()) {
+            $parseLogical = 'PHPCompiler\\Runtime::parse';
+            $parseLc = strtolower($parseLogical);
+            if (!isset($this->context->functions[$parseLc])) {
+                JIT\RuntimeParseM5Native::emitFunction(
+                    $this->context,
+                    $this->llvmInternalName($parseLogical),
+                    $parseLogical,
+                    fn (string $n): string => $this->llvmInternalName($n)
+                );
+            }
         }
         // M5 argv seed host-lowers Runtime::parse first; emitting the sidecar standalone
         // stub here runQueues mid-parse and fatals on a null LLVM insert block (#26756).
