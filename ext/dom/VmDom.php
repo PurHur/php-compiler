@@ -7705,7 +7705,9 @@ final class VmDom
                 )->id],
                 $childIds
             );
-        } elseif (!$noDefDtd) {
+        } elseif (!$noDefDtd && !$isLiving) {
+            // Legacy libxml loadHTML invents HTML 4.0 Transitional when no doctype is present.
+            // Dom\HTMLDocument (lexbor / php-src html_document.c) leaves doctype null (#26924).
             $childIds = array_merge(
                 [self::attachDoctypeChild(
                     $ctx,
