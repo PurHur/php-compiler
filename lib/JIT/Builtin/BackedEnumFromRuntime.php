@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -32,8 +33,11 @@ final class BackedEnumFromRuntime
         self::ensureExternals($context);
     }
 
-    public static function normalizeStringBacking(Context $context, Value $valuePtr): Value
-    {
+    public static function normalizeStringBacking(
+        Context $context,
+        Value $valuePtr,
+        string $function = 'BackedEnum::from'
+    ): Value {
         self::ensureLinked($context);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -131,7 +135,14 @@ final class BackedEnumFromRuntime
             $typeErrorEmit
         );
         $context->builder->positionAtEnd($nullBlock);
-        // Zend: null→"0" (same as false), not convert_to_string empty (#20072).
+        // Zend: E_DEPRECATED then null→"0" (same as false) (#20072, #26786).
+        JitStringBuiltinArg::emitNullStringParamDeprecation(
+            $context,
+            $function,
+            0,
+            'value',
+            'string|int'
+        );
         $nullStr = $context->builder->load($context->constantStringFromString('0'));
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
@@ -156,8 +167,15 @@ final class BackedEnumFromRuntime
         return $phi;
     }
 
-    public static function normalizeIntBacking(Context $context, string $className, Value $valuePtr): Value
-    {
+    public static function normalizeIntBacking(
+        Context $context,
+        string $className,
+        Value $valuePtr,
+        string $function = ''
+    ): Value {
+        if ('' === $function) {
+            $function = $className.'::from';
+        }
         self::ensureLinked($context);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -233,7 +251,14 @@ final class BackedEnumFromRuntime
             $afterNull
         );
         $context->builder->positionAtEnd($nullBlock);
-        // Zend: null→0 under weak types (#20072).
+        // Zend: E_DEPRECATED then null→0 under weak types (#20072, #26786).
+        JitStringBuiltinArg::emitNullStringParamDeprecation(
+            $context,
+            $function,
+            0,
+            'value',
+            'string|int'
+        );
         $nullInt = $i64->constInt(0, false);
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

@@ -90,7 +90,11 @@ final class BackedEnumFromJit
     ): void {
         $fn = BasicBlockHelper::parentFunction($context);
         $noMatchBlock = $fn->appendBasicBlock('enum_from_string_no_match');
-        $normalized = BackedEnumFromRuntime::normalizeStringBacking($context, $arg);
+        $normalized = BackedEnumFromRuntime::normalizeStringBacking(
+            $context,
+            $arg,
+            $className.'::'.($isTry ? 'tryFrom' : 'from')
+        );
         $lastIdx = \count($caseKeys) - 1;
         for ($idx = 0; $idx <= $lastIdx; ++$idx) {
             $matchBlock = $fn->appendBasicBlock('enum_from_string_match_'.$idx);
@@ -133,7 +137,12 @@ final class BackedEnumFromJit
     ): void {
         $fn = BasicBlockHelper::parentFunction($context);
         $noMatchBlock = $fn->appendBasicBlock('enum_from_int_no_match');
-        $normalized = BackedEnumFromRuntime::normalizeIntBacking($context, $className, $arg);
+        $normalized = BackedEnumFromRuntime::normalizeIntBacking(
+            $context,
+            $className,
+            $arg,
+            $className.'::'.($isTry ? 'tryFrom' : 'from')
+        );
         $i64 = $context->getTypeFromString('int64');
         $lastIdx = \count($caseKeys) - 1;
         for ($idx = 0; $idx <= $lastIdx; ++$idx) {

@@ -40,11 +40,13 @@ final class EnumFromJitHelper
     public static function stringBackingFromNull(): string
     {
         // Zend zend_enum_from_base: null coerces like false → "0" (#20072).
+        // E_DEPRECATED is emitted by the VM/JIT call site before this coerce (#26786).
         return '0';
     }
 
     public static function intBackingFromNull(): int
     {
+        // E_DEPRECATED is emitted by the VM/JIT call site before this coerce (#26786).
         return 0;
     }
 
