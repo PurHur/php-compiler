@@ -6321,6 +6321,13 @@ class JIT {
         ) {
             return $this->emitM3EmitTuRuntimeBlockPtrStubNative($internalName, $logicalName, $block);
         }
+        // M5 argv diagnostics — void/null stubs (not PHP CFG) (#26756).
+        if (str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')) {
+            return $this->emitM3EmitTuRuntimeTwoObjectVoidStub($internalName, $logicalName, $block);
+        }
+        if (str_ends_with($lower, '\\runtime::peeklastparsefailure')) {
+            return $this->emitM3EmitTuCompilerNullStringGetterStub($internalName, $logicalName, $block);
+        }
 
         throw new \LogicException('Unhandled M3 emit TU Runtime spine: '.$logicalName);
     }
@@ -6741,6 +6748,51 @@ class JIT {
                 'peeklastparsefailure',
                 'noteparsecompilenullforscript',
             ], true)) {
+                // M5 argv seed: keep diagnostics on void/null stubs — host CFG is unnecessary
+                // and noteParseCompileNullForScript had no spine-stub handler (#26756).
+                if ($this->shouldUseM5DriverHostCompile()
+                    && in_array($methodLc, [
+                        'noteparsecompilenullforscript',
+                        'peeklastparsefailure',
+                        'compileemitsmoke',
+                        'preparesourceforparser',
+                        'preprocesssourceforparse',
+                        'rewritesourcebeforeparser',
+                    ], true)
+                ) {
+                    $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+                    if (null === $stubBlock) {
+                        return;
+                    }
+                    if ('noteparsecompilenullforscript' === $methodLc) {
+                        $this->emitM3EmitTuRuntimeTwoObjectVoidStub(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } elseif ('peeklastparsefailure' === $methodLc) {
+                        $this->emitM3EmitTuCompilerNullStringGetterStub(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } elseif ('compileemitsmoke' === $methodLc) {
+                        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                            $this->llvmInternalName($logical),
+                            $logical,
+                            $stubBlock
+                        );
+                    } else {
+                        // Identity preprocess/prepare CFG stubs (#11809 / #26756).
+                        $this->compileSkippedCompilerSplitCfgStub(
+                            $this->llvmInternalName($logical),
+                            $stubBlock,
+                            $logical
+                        );
+                    }
+
+                    return;
+                }
                 if ($this->shouldRealLowerInventoryArgvParseSpine()) {
                     // Drop map entry so Runtime.php lowering can run; early null stubs must not win (#26756).
                     unset(
