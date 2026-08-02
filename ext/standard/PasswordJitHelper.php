@@ -17,22 +17,6 @@ use PHPCompiler\VM\HashTable;
  */
 final class PasswordJitHelper
 {
-    private const BCRYPT_ITOA64 = './ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
-    private const BCRYPT_DEFAULT_COST = 10;
-
-    private const ARGON2_TYPE_I = 1;
-
-    private const ARGON2_TYPE_ID = 2;
-
-    private const ARGON2_DEFAULT_MEMORY = 65536;
-
-    private const ARGON2_DEFAULT_TIME = 4;
-
-    private const ARGON2_DEFAULT_THREADS = 1;
-
-    private const ARGON2_SALT_RAW_LEN = 16;
-
     /**
      * @return string empty string when hash fails (NestedJIT/?string returns were nullled under AOT — #26773)
      *
@@ -104,36 +88,18 @@ final class PasswordJitHelper
 
     private static function hashArgvThin(string $password, int $algo, int $cost): string
     {
-        // Argon2i=2 / Argon2id=3; avoid class-const !== under NestedJIT.
-        if (2 === $algo || 3 === $algo) {
-            $type = 2 === $algo ? self::ARGON2_TYPE_I : self::ARGON2_TYPE_ID;
-            // User-script AOT random_bytes works; password-only ABI returned null under NestedJIT.
-            $rnd = \random_bytes(self::ARGON2_SALT_RAW_LEN);
-            if (!\is_string($rnd)) {
-                return '';
-            }
-            if (self::ARGON2_SALT_RAW_LEN !== \strlen($rnd)) {
-                return '';
-            }
-            // php-src password.c — 16 raw salt bytes.
-            $result = \phpc_argon2_hash(
-                $password,
-                $type,
-                self::ARGON2_DEFAULT_MEMORY,
-                self::ARGON2_DEFAULT_TIME,
-                self::ARGON2_DEFAULT_THREADS,
-                $rnd
-            );
-            if (!\is_string($result)) {
-                return '';
-            }
-
-            return $result;
+        // Literal type ints only — NestedJIT miscompiles class-const ternaries (#26773).
+        // Argon2_i=1, Argon2_id=2 (libargon2); algo 2/3 are VmPassword::PASSWORD_ARGON2*.
+        if (2 === $algo) {
+            return self::argon2HashThin($password, 1);
+        }
+        if (3 === $algo) {
+            return self::argon2HashThin($password, 2);
         }
         if (1 !== $algo) {
             return '';
         }
-        $bcryptCost = $cost > 0 ? $cost : self::BCRYPT_DEFAULT_COST;
+        $bcryptCost = $cost > 0 ? $cost : 10;
         if ($bcryptCost < 4 || $bcryptCost > 31) {
             return '';
         }
@@ -144,7 +110,6 @@ final class PasswordJitHelper
         if (16 !== \strlen($rnd)) {
             return '';
         }
-        // Avoid sprintf — __compiler_sprintf unbound in helper TUs (#26773).
         $costTwo = ($bcryptCost < 10 ? '0' : '').(string) $bcryptCost;
         $setting = '$2y$'.$costTwo.'$'.self::bcryptEncodeSalt22($rnd);
         $result = \phpc_libcrypt_kernel($password, $setting);
@@ -155,13 +120,30 @@ final class PasswordJitHelper
         return $result;
     }
 
+    private static function argon2HashThin(string $password, int $type): string
+    {
+        $rnd = \random_bytes(16);
+        if (!\is_string($rnd)) {
+            return '';
+        }
+        if (16 !== \strlen($rnd)) {
+            return '';
+        }
+        $result = \phpc_argon2_hash($password, $type, 65536, 4, 1, $rnd);
+        if (!\is_string($result)) {
+            return '';
+        }
+
+        return $result;
+    }
+
     private static function verifyArgvThin(string $password, string $hash): int
     {
         if (\str_starts_with($hash, '$argon2i$')) {
-            return \phpc_argon2_verify($password, $hash, self::ARGON2_TYPE_I);
+            return \phpc_argon2_verify($password, $hash, 1);
         }
         if (\str_starts_with($hash, '$argon2id$')) {
-            return \phpc_argon2_verify($password, $hash, self::ARGON2_TYPE_ID);
+            return \phpc_argon2_verify($password, $hash, 2);
         }
         if (\strlen($hash) < 29) {
             return 0;
@@ -175,7 +157,8 @@ final class PasswordJitHelper
 
     private static function bcryptEncodeSalt22(string $rnd16): string
     {
-        $itoa = self::BCRYPT_ITOA64;
+        // Local literal — NestedJIT class-const string can be null (#26773).
+        $itoa = './ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         $out = '';
         $len = \strlen($rnd16);
         $i = 0;
