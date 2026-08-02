@@ -16,13 +16,15 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 12400;
 
-    public function testArrayFlipRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayFlipRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void
     {
+        // #26970: NestedJIT of ArrayFlipJitHelper fatals on iterateKeyed; call-site ArrayFlipLlvm.
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFlipRuntime.php');
-        $this->assertStringContainsString('ArrayFlipJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayFlipLlvm', $runtime);
         $this->assertStringContainsString('loadHashTable', $runtime);
-        $this->assertStringNotContainsString('buildFlipArray', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ensureCompiled', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_flip.php');
         $this->assertStringContainsString('ArrayFlipRuntime::flip', $builtin);
@@ -32,6 +34,10 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildFlipArray', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildFlipHashTable', $arrayBuiltin);
         $this->assertStringNotContainsString('function flipStorePackedEntry', $arrayBuiltin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayFlipLlvm.php');
+        $this->assertStringContainsString('function flipHashTable', $llvm);
+        $this->assertStringContainsString('storeFlipped', $llvm);
     }
 
     public function testArrayValuesRuntimeUsesJitHelperNotDirectLlvmMonolith(): void

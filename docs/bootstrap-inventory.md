@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6804 |
-| Phase A inventory files (M2 ratio SSOT) | 6804 |
+| PHP files on vm.php path | 6805 |
+| Phase A inventory files (M2 ratio SSOT) | 6805 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21997 |
+| Source constructs flagged (warnings) | 22002 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2682,7 +2682,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitIdate.php` | 0 | 2 |
 | `ext/standard/JitImageTypeArg.php` | 0 | 1 |
 | `ext/standard/JitImageTypeToMimeType.php` | 0 | 1 |
-| `ext/standard/JitImplode.php` | 0 | 2 |
+| `ext/standard/JitImplode.php` | 0 | 3 |
 | `ext/standard/JitIncludePath.php` | 0 | 1 |
 | `ext/standard/JitInet.php` | 0 | 1 |
 | `ext/standard/JitInfo.php` | 0 | 1 |
@@ -4945,6 +4945,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
 | `lib/JIT/ArrayFindLlvm.php` | 0 | 2 |
+| `lib/JIT/ArrayFlipLlvm.php` | 0 | 4 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayMapLlvm.php` | 0 | 5 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
@@ -27869,8 +27870,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitImplode.php`
 
 **Warnings** (review for bootstrap subset):
-- new strval (line 37)
-- 1 class method(s)
+- new strval (line 38)
+- new Variable (line 136)
+- 4 class method(s)
 
 ### `ext/standard/JitIncludePath.php`
 
@@ -43948,6 +43950,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NestedClosureInvoke (line 91)
 - 2 class method(s)
 
+### `lib/JIT/ArrayFlipLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 109)
+- new Variable (line 187)
+- new Variable (line 204)
+- 7 class method(s)
+
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -44095,7 +44105,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayFlipRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayIntersectAssocRuntime.php`
 
@@ -48013,7 +48023,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/HashTableWriteNested.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 74)
+- new Variable (line 78)
 - 4 class method(s)
 
 ### `lib/JIT/Call/IncludePathResolverResolve.php`
@@ -49437,8 +49447,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 70)
-- new Call\HashTableMutateNested (line 72)
+- new Call\HashTableWriteNested (line 72)
+- new Call\HashTableMutateNested (line 74)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
