@@ -14,10 +14,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_str_split() — multibyte string to array (php-src ext/mbstring/mbstring.c; #3299).
+ * mb_str_split() — multibyte string to array (php-src ext/mbstring/mbstring.c; #3299, #26870).
  *
  * Zend Z_PARAM_STR soft-null + DEP on $string under PROFILE=8.4 (not TypeError) — #24207,
  * peer #24176 / #24209 (mb_trim / mb_convert_kana family).
+ *
+ * JIT/AOT: {@see JitMbStrSplit} → NestedJIT {@see MbStrSplitJitHelper} (#26870).
  */
 final class mb_str_split extends Internal
 {
@@ -55,6 +57,6 @@ final class mb_str_split extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_str_split() is not lowered for JIT/AOT in this compiler build');
+        return JitMbStrSplit::invoke($context, ...$args);
     }
 }
