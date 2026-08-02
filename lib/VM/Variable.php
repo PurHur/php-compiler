@@ -1576,6 +1576,13 @@ final class Variable {
         }
         TypedPropertyCheck::assertReadable($var);
         if (self::TYPE_ARRAY === $var->type) {
+            // Stream-context (and other resource-like) arrays are Zend resources: pass-by-value
+            // must share the handle table, not zend_array_dup (#26762).
+            if ($var->array->isResourceLikeHandle()) {
+                $this->copyFrom($var);
+
+                return;
+            }
             $this->array($var->array->duplicate());
 
             return;
