@@ -296,6 +296,23 @@ final class VmStreamContext
     }
 
     /**
+     * Canonical options/params HashTable for a stream-context handle (#26762).
+     *
+     * ARG_SEND by-value used to zend_array_dup the context; mutators then wrote a fork
+     * while get_options still read the caller's table. Always prefer {@see $activeById}.
+     */
+    private static function canonicalHashTable(Variable $context): HashTable
+    {
+        $id = self::idFrom($context);
+        if (null !== $id && isset(self::$activeById[$id])) {
+            return self::$activeById[$id];
+        }
+        $context->separateArrayForWrite();
+
+        return $context->toArray();
+    }
+
+    /**
      * stream_context_set_option() — singular or batch wrapper option write (ext/standard/streams.c, #3448).
      *
      * Two-arg form merges a full options array; four-arg form sets one wrapper option.
@@ -318,8 +335,7 @@ final class VmStreamContext
             $exportedValue = '';
         }
 
-        $context->separateArrayForWrite();
-        VmParseStr::mergeInto($context->toArray(), [
+        VmParseStr::mergeInto(self::canonicalHashTable($context), [
             $wrapperName => [$optionName => $exportedValue],
         ]);
 
@@ -406,8 +422,7 @@ final class VmStreamContext
             );
         }
 
-        $context->separateArrayForWrite();
-        VmParseStr::mergeInto($context->toArray(), $exported);
+        VmParseStr::mergeInto(self::canonicalHashTable($context), $exported);
 
         return true;
     }
@@ -422,6 +437,11 @@ final class VmStreamContext
     public static function setParams(Variable $context, Variable $params): bool
     {
         $context = self::requireRepresentation($context, 'stream_context_set_params');
+        // Bind the Variable to the canonical live HT before param writes (#26762).
+        $canonical = self::canonicalHashTable($context);
+        if ($context->toArray() !== $canonical) {
+            $context->array($canonical);
+        }
         $context->separateArrayForWrite();
         $params = self::requireParamsArray($params, 'stream_context_set_params');
 
@@ -501,7 +521,7 @@ final class VmStreamContext
     public static function getOptionsHashTable(Variable $context): HashTable
     {
         $context = self::requireRepresentation($context, 'stream_context_get_options');
-        $source = $context->toArray();
+        $source = self::canonicalHashTable($context);
         $out = new HashTable();
         foreach ($source->iterateKeyed(true) as [$key, $value]) {
             $k = $key->resolveIndirect();
