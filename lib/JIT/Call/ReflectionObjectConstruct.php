@@ -74,7 +74,12 @@ final class ReflectionObjectConstruct implements Call
             $heapPtr,
             $strPtr
         );
-        $context->builder->store($context->bytePtr($heapPtr), $slot);
+        // Property slots are void**; store void* (not i8*/bytePtr) — LLVM verify (#26828 / #26795).
+        $voidPtr = $context->getTypeFromString('void*');
+        $context->builder->store(
+            $context->builder->pointerCast($heapPtr, $voidPtr),
+            $slot
+        );
     }
 
     private static function writeObjectProp(
@@ -95,6 +100,10 @@ final class ReflectionObjectConstruct implements Call
             $heapPtr,
             $target
         );
-        $context->builder->store($context->bytePtr($heapPtr), $slot);
+        $voidPtr = $context->getTypeFromString('void*');
+        $context->builder->store(
+            $context->builder->pointerCast($heapPtr, $voidPtr),
+            $slot
+        );
     }
 }
