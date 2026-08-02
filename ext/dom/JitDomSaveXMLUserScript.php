@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\ext\standard\JitStringConcat;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** User-script standalone AOT: pure-LLVM DOMDocument::saveXML() (#18268, #23251). */
@@ -71,11 +73,24 @@ final class JitDomSaveXMLUserScript
         if (!$objectType->hasProperty($elementClassId, 'textContent')) {
             $objectType->defineProperty($elementClassId, 'textContent', JITVariable::TYPE_STRING);
         }
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
+        }
         // Prefer compile-time root tag — documentElement temps often lose DOMElement type
         // so runtime tagName reads can see an empty dynamic slot (#23251).
         $tagStr = $context->builder->load(
             $context->constantStringFromString(DomParseSimpleXmlJitHelper::rootTagArgv($xmlLit))
         );
+        // Prefer ParentNode append/prepend markup when present (#26765); else textContent
+        // (textContent-only mutations / loadXML root text).
+        $innerVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $node,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            $elementClassId
+        );
+        $innerStr = $context->helper->loadValue($innerVar);
         $textVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $node,
@@ -84,6 +99,29 @@ final class JitDomSaveXMLUserScript
             $elementClassId
         );
         $textStr = $context->helper->loadValue($textVar);
+        // Use inner XML when non-empty; otherwise fall back to textContent.
+        $innerLen = $context->builder->load(
+            $context->builder->structGep($innerStr, $context->structFieldMap['__string__']['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $hasInner = $context->builder->icmp(Builder::INT_SGT, $innerLen, $zero);
+        $bodySlot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__string__*')
+        );
+        $pickInner = BasicBlockHelper::append($context, 'dom_savexml_pick_inner');
+        $pickText = BasicBlockHelper::append($context, 'dom_savexml_pick_text');
+        $bodyMerge = BasicBlockHelper::append($context, 'dom_savexml_body_merge');
+        $context->builder->branchIf($hasInner, $pickInner, $pickText);
+        $context->builder->positionAtEnd($pickInner);
+        $context->builder->store($innerStr, $bodySlot);
+        $context->builder->branch($bodyMerge);
+        $context->builder->positionAtEnd($pickText);
+        $context->builder->store($textStr, $bodySlot);
+        $context->builder->branch($bodyMerge);
+        $context->builder->positionAtEnd($bodyMerge);
+        $bodyStr = $context->builder->load($bodySlot);
         $lt = $context->builder->load($context->constantStringFromString('<'));
         $gt = $context->builder->load($context->constantStringFromString('>'));
         $ltSlash = $context->builder->load($context->constantStringFromString('</'));
@@ -97,8 +135,8 @@ final class JitDomSaveXMLUserScript
             JitStringConcat::concat($context, $ltSlash, $tagStr),
             $gt
         );
-        $withText = JitStringConcat::concat($context, $open, $textStr);
-        $xml = JitStringConcat::concat($context, $withText, $close);
+        $withBody = JitStringConcat::concat($context, $open, $bodyStr);
+        $xml = JitStringConcat::concat($context, $withBody, $close);
 
         return self::boxStringValue($context, $xml);
     }
