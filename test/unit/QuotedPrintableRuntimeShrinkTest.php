@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** quoted_printable_* JIT via QuotPrintJitHelper + JitVmHelperLink::ensureCompiled (#9910, #24620). */
+/** quoted_printable_* JIT via QuotPrintJitHelper + JitVmHelperLink::ensureBridge (#9910, #24620, #26899). */
 final class QuotedPrintableRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -35,9 +35,10 @@ final class QuotedPrintableRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringQuotPrint::ensureLinked', $encode);
         $this->assertStringContainsString('__compiler_quoted_printable_encode', $encode);
         $this->assertStringContainsString('QuotPrintJitHelper', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
-        $this->assertStringContainsString('VmString::quoted_printable_encode', $helper);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        // NestedJIT-self-contained — no VmString call (would ExternalMethod-stub → AOT segfault #26899).
+        $this->assertStringNotContainsString('VmString::', $helper);
+        $this->assertStringContainsString('byteOrd', $helper);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
         $this->assertStringNotContainsString('parseAndCompile', $bridge);
         $this->assertStringNotContainsString('new JIT(', $bridge);
@@ -50,14 +51,24 @@ final class QuotedPrintableRuntimeShrinkTest extends TestCase
 
     public function testQuotPrintJitHelperSemanticsMatchVmString(): void
     {
+        $cases = ["foo\r\nbar", 'hello', 'a=b', '', "line \r\n", str_repeat('x', 80)];
+        foreach ($cases as $raw) {
+            $this->assertSame(
+                \PHPCompiler\ext\standard\VmString::quoted_printable_encode($raw),
+                \PHPCompiler\ext\standard\QuotPrintJitHelper::encode($raw),
+                'encode: '.var_export($raw, true)
+            );
+            $encoded = \PHPCompiler\ext\standard\QuotPrintJitHelper::encode($raw);
+            $this->assertSame(
+                \PHPCompiler\ext\standard\VmString::quoted_printable_decode($encoded),
+                \PHPCompiler\ext\standard\QuotPrintJitHelper::decode($encoded),
+                'decode of encode: '.var_export($raw, true)
+            );
+        }
+        // Soft-break / soft-line decode path
         $this->assertSame(
-            \PHPCompiler\ext\standard\VmString::quoted_printable_encode("foo\r\nbar"),
-            \PHPCompiler\ext\standard\QuotPrintJitHelper::encode("foo\r\nbar")
-        );
-        $encoded = \PHPCompiler\ext\standard\QuotPrintJitHelper::encode('hello');
-        $this->assertSame(
-            \PHPCompiler\ext\standard\VmString::quoted_printable_decode($encoded),
-            \PHPCompiler\ext\standard\QuotPrintJitHelper::decode($encoded)
+            \PHPCompiler\ext\standard\VmString::quoted_printable_decode("a=\r\nb"),
+            \PHPCompiler\ext\standard\QuotPrintJitHelper::decode("a=\r\nb")
         );
     }
 }
