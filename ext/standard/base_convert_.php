@@ -15,7 +15,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
