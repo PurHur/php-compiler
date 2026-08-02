@@ -6,14 +6,17 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** dirname()/basename() JIT uses PathJitHelper PHP, not JitStringSearch scheme LLVM (#15286). */
+/** dirname()/basename() JIT emits path LLVM directly (#26905), not NestedJIT PathJitHelper. */
 final class JitPathRuntimeShrinkTest extends TestCase
 {
-    public function testJitPathUsesPathJitHelperNotJitStringSearch(): void
+    public function testJitPathUsesInlineLlvmNotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPath.php');
-        $this->assertStringContainsString('StringPath::invokeDirname', $source);
-        $this->assertStringNotContainsString('JitStringSearch::findOffsetI32', $source);
+        $this->assertStringContainsString('public static function dirname', $source);
+        $this->assertStringContainsString('public static function basename', $source);
+        $this->assertStringContainsString('trimTrailingSeparators', $source);
+        $this->assertStringNotContainsString('StringPath::invokeDirname', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink', $source);
         $this->assertStringNotContainsString("lookupFunction('strstr')", $source);
     }
 }
