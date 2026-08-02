@@ -3497,7 +3497,7 @@ class Object_ extends Type {
             }
         }
         if ('arrayiterator' === $lcname || 'recursivearrayiterator' === $lcname) {
-            // Thin user-script AOT foreach via __spl_ht packed walk (#26783, #26775).
+            // Thin user-script AOT foreach via `__spl_ht` packed walk (#26783, #26775).
             // php-src ext/spl/spl_array.stub.php — SeekableIterator + ArrayAccess + Serializable + Countable.
             $this->ensureZendBuiltinInterfaces();
             $ifaces = [
@@ -3537,6 +3537,31 @@ class Object_ extends Type {
                 'count', 'append', 'getarraycopy', 'getflags', 'setflags',
                 'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
                 'haschildren', 'getchildren',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
+        if ('arrayobject' === $lcname) {
+            // Thin AOT: `__spl_ht` + IteratorAggregate foreach / ArrayAccess (#26823).
+            // php-src ext/spl/spl_array.stub.php — IteratorAggregate, ArrayAccess, Serializable, Countable.
+            $this->ensureZendBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, [
+                'IteratorAggregate',
+                'ArrayAccess',
+                'Serializable',
+                'Countable',
+            ]);
+            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            $this->seedExternalClassConstants($id, [
+                'STD_PROP_LIST' => 1,
+                'ARRAY_AS_PROPS' => 2,
+            ]);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'count', 'getarraycopy', 'getiterator',
+                'getflags', 'setflags', 'append', 'exchangearray',
+                'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
             ] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
