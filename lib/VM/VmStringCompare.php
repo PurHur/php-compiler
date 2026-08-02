@@ -247,6 +247,10 @@ final class VmStringCompare
 
     public static function identical(Context $context, Value $leftStr, Value $rightStr): Value
     {
+        // NestedJIT / entryAlloca can leave insert cleared mid-Runtime::parse; without an
+        // open BB, branchIf to jit_strcmp_* is parentless and sealFunction writes unreachable
+        // onto the prior block (#26756).
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'jit_strcmp_identical_entry');
         $map = $context->structFieldMap['__string__'];
         $leftLen = $context->builder->load(
             $context->builder->structGep($leftStr, $map['length'])

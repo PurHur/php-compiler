@@ -572,8 +572,20 @@ final class Variable {
                 $literal = (int) $op->value;
                 break;
             case self::TYPE_STRING:
+                // Mirror JitValueBox::alloc — entryAlloca with cleared insert leaves the
+                // separate/store parentless under NestedJIT / M5 argv (#26756).
+                BasicBlockHelper::ensureOpenInsertBlock($context, 'string_literal_alloc_cont');
                 $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
-                $loaded = $context->builder->load($context->constantStringFromString($op->value));
+                $resume = BasicBlockHelper::tryGetInsertBlock($context);
+                $global = $context->constantStringFromString($op->value);
+                // constantStringFromString may emit on a temp init builder; always resume the
+                // caller's open BB before load/separate/store (#26756).
+                if (null !== $resume) {
+                    BasicBlockHelper::restoreInsertBlock($context, $resume);
+                } else {
+                    BasicBlockHelper::ensureOpenInsertBlock($context, 'string_literal_init_cont');
+                }
+                $loaded = $context->builder->load($global);
                 $owned = $context->builder->call(
                     $context->lookupFunction('__string__separate'),
                     $loaded

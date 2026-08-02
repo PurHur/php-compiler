@@ -195,6 +195,9 @@ return_string:
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
+        // Operand eval (fromLiteral / value_copy) can leave insert cleared after const-string
+        // builder swaps; reload must not create parentless loads (#26756).
+        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'binary_op_load_cont');
         JitEnumNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right);
         if (OpCode::TYPE_BITWISE_AND === $opcode->type
             || OpCode::TYPE_BITWISE_OR === $opcode->type
@@ -1896,6 +1899,7 @@ return_bool:
     }
 
     public function loadValue(Variable $variable): PHPLLVM\Value {
+        BasicBlockHelper::ensureOpenInsertBlock($this->context, 'load_value_cont');
         TypedPropertyUninitGuard::emitBeforeRead($this->context, $variable);
         if (null !== $variable->valueBoxAliasPtr) {
             $ptr = JitValueBox::normalizeValuePtr($this->context, $variable->valueBoxAliasPtr);

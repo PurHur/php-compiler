@@ -92,12 +92,20 @@ final class BasicBlockHelper
      * Continue emission in an open block; if the insert block is already sealed, use a fresh one.
      *
      * Never append instructions after an existing terminator (invalid IR).
+     * When insert is cleared mid-function (NestedJIT / const-string builder swap), prefer the
+     * function's last open BB over an orphaned label with no preds (Runtime::parse M5 — #26756).
      */
     public static function ensureOpenInsertBlock(Context $context, string $label): void
     {
         $insert = self::tryGetInsertBlock($context);
         if (null === $insert) {
             $fn = self::parentFunction($context);
+            $open = self::lastOpenBasicBlock($fn);
+            if (null !== $open) {
+                $context->builder->positionAtEnd($open);
+
+                return;
+            }
             $next = $fn->appendBasicBlock($label);
             $context->builder->positionAtEnd($next);
 
@@ -108,6 +116,26 @@ final class BasicBlockHelper
         }
         $next = self::append($context, $label);
         $context->builder->positionAtEnd($next);
+    }
+
+    /**
+     * Last basic block in $fn that still lacks a terminator (may be mid-lower open tail).
+     */
+    public static function lastOpenBasicBlock(Function_ $fn): ?BasicBlock
+    {
+        $open = null;
+        if (0 === $fn->countBasicBlocks()) {
+            return null;
+        }
+        $block = $fn->getFirstBasicBlock();
+        while (null !== $block) {
+            if (null === $block->getTerminator()) {
+                $open = $block;
+            }
+            $block = $block->getNext();
+        }
+
+        return $open;
     }
 
     public static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
@@ -161,14 +189,13 @@ final class BasicBlockHelper
             $context->builder->positionAtEnd($entry);
         }
         $slot = $context->builder->alloca($type);
-        if (null !== $restore && null === $restore->getTerminator()) {
-            $context->builder->positionAtEnd($restore);
-        } else {
-            // Never positionBefore(terminator): further emits become "terminator in the middle"
-            // (Runtime::parse host-lower under M5 argv — #26756). Cleared insert forces callers
-            // through ensureOpenInsertBlock instead of splicing before an existing branch.
-            $context->builder->clearInsertionPosition();
+        if (null !== $restore) {
+            // Never positionBefore(terminator) / never clear when a restore BB exists —
+            // callers keep emitting (fromLiteral string init, value-box writes). Sealed
+            // restore → append open cont via restoreInsertBlock (Runtime::parse M5 — #26756).
+            self::restoreInsertBlock($context, $restore);
         }
+        // restore === null: leave insert after the alloca in entry so callers can emit.
 
         return $slot;
     }
@@ -210,16 +237,9 @@ final class BasicBlockHelper
             }
         }
         $context->builder->store($value, $slot);
-        if (null !== $restore) {
-            $terminator = $restore->getTerminator();
-            if (null !== $terminator) {
-                $context->builder->positionBefore($terminator);
-            } else {
-                $context->builder->positionAtEnd($restore);
-            }
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Same sealed-block rule as entryAllocaForFunction (#26756): do not splice before a
+        // terminator or clear insert when the caller will keep emitting.
+        self::restoreInsertBlock($context, $restore);
     }
 
     public static function sealOpenBlock(Context $context, BasicBlock $block): void
