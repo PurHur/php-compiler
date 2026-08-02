@@ -4653,7 +4653,9 @@ class JIT {
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
-        if ($sidecar && null !== $this->m3EmitTuMainBlock) {
+        // M5 argv seed host-lowers Runtime::parse first; emitting the sidecar standalone
+        // stub here runQueues mid-parse and fatals on a null LLVM insert block (#26756).
+        if ($sidecar && null !== $this->m3EmitTuMainBlock && !$this->shouldUseM5DriverHostCompile()) {
             $this->emitM3EmitTuRuntimeStandaloneStubNative(
                 $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
                 'PHPCompiler\\Runtime::standalone',
@@ -4662,6 +4664,13 @@ class JIT {
         }
         if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
             $this->runQueue();
+        }
+        if ($sidecar && null !== $this->m3EmitTuMainBlock && $this->shouldUseM5DriverHostCompile()) {
+            $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                'PHPCompiler\\Runtime::standalone',
+                $this->m3EmitTuMainBlock
+            );
         }
     }
 
@@ -6623,7 +6632,10 @@ class JIT {
         }
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
-        if ($this->shouldUseM3InventoryEmitDriver()) {
+        // Inventory emit OR M5 argv seed real-lower: host-parse lib/Runtime.php (#2967, #26756).
+        // M4 bin/compile.php + M5_DRIVER_HOST can have shouldRealLower true while
+        // shouldUseM3InventoryEmitDriver() is false — still need the Runtime.php path.
+        if ($this->shouldUseM3InventoryEmitDriver() || $this->shouldRealLowerInventoryArgvParseSpine()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
             if (in_array($methodLc, [
