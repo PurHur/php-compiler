@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * microtime() for compiled JIT/AOT modules (#9181 slice, php-in-PHP).
+ * microtime() semantics reference for VM (#9181, php-in-PHP).
  *
+ * Thin AOT/JIT emit uses libc gettimeofday via {@see \PHPCompiler\JIT\Builtin\StringMicrotime}
+ * (NestedJIT of this helper orphans insert blocks / segfaults — #26930).
  * SSOT: {@see VmDate::microtime()}
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(microtime)
  */

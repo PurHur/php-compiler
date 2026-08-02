@@ -7,16 +7,17 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\MicrotimeJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** StringMicrotime routes through MicrotimeJitHelper PHP not gettimeofday LLVM (#9181). */
+/** StringMicrotime emits gettimeofday LLVM (NestedJIT SEGV under thin AOT, #26930). */
 final class StringMicrotimeRuntimeShrinkTest extends TestCase
 {
-    public function testStringMicrotimeRoutesThroughMicrotimeJitHelper(): void
+    public function testStringMicrotimeUsesLibcGettimeofday(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMicrotime.php');
-        $this->assertStringContainsString('MicrotimeJitHelper', $source);
-        $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $source);
-        $this->assertStringNotContainsString('readWallClock', $source);
-        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString("lookupFunction('gettimeofday')", $source);
+        $this->assertStringContainsString('__phpc_microtime_wall_usec', $source);
+        $this->assertStringContainsString('tryGetInsertBlock', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
     public function testMicrotimeJitHelperDelegatesToVmDate(): void
