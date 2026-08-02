@@ -102,6 +102,8 @@ final class LibcExtern
             'hypot' => [$dbl, false, [$dbl, $dbl]],
             'fmod' => [$dbl, false, [$dbl, $dbl]],
             'ceil' => [$dbl, false, [$dbl]],
+            'cos' => [$dbl, false, [$dbl]],
+            'cosh' => [$dbl, false, [$dbl]],
             'floor' => [$dbl, false, [$dbl]],
             'sqrt' => [$dbl, false, [$dbl]],
             // VmFloatCompare NestedJIT (#21109 / #9976) — math.h

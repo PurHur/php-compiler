@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitCosKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for cos() via CosJitHelper PHP (#15087).
+ * JIT/AOT link for cos() via CosJitHelper PHP (#15087, #27005).
  *
- * Replaces libc `cos` LLVM lookup in ext/standard/cos.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see CosJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering CosJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(cos)
  */
 final class MathCos
@@ -28,6 +31,8 @@ final class MathCos
         self::COS_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'cos_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathCos
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitCosKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathCos
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_COS);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_COS, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_COS,
-            'cos_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::COS_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15087'
+            '#27005'
         );
     }
 }
