@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6827 |
-| Phase A inventory files (M2 ratio SSOT) | 6827 |
+| PHP files on vm.php path | 6828 |
+| Phase A inventory files (M2 ratio SSOT) | 6828 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22062 |
+| Source constructs flagged (warnings) | 22065 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4955,6 +4955,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 6 |
+| `lib/JIT/ArrayColumnLlvm.php` | 0 | 3 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
@@ -42685,8 +42686,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2152)
-- new ArgumentCountError (line 2163)
+- new ArgumentCountError (line 2161)
+- new ArgumentCountError (line 2172)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -44045,6 +44046,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 216)
 - 10 class method(s)
 
+### `lib/JIT/ArrayColumnLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 114)
+- new Variable (line 184)
+- 4 class method(s)
+
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -44156,7 +44164,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayColumnRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 19 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
 
