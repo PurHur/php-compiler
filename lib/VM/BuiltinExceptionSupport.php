@@ -113,6 +113,11 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        // Class withheld on ≤8.2 reference profile (#26741) — fall back to Error like Zend 8.2.
+        if (!isset($ctx->classes[self::CLASS_FIBER_STACK_OVERFLOW])) {
+            return self::materializeError($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable($ctx, self::CLASS_FIBER_STACK_OVERFLOW, $message, $file, $line);
     }
 

@@ -1,11 +1,13 @@
 --TEST--
-FiberStackOverflow class registration and fiber recursion guard (#7267)
+FiberStackOverflow class registration and fiber recursion guard (#7267, #26741)
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID < 80400) {
     die('skip FiberStackOverflow requires PHP 8.4+ on Zend reference');
 }
 ?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 putenv('PHP_COMPILER_FIBER_MAX_STACK_FRAMES=64');

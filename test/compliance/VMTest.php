@@ -1115,6 +1115,11 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'request_parse_body_exception_reference_profile')) {
                 continue;
             }
+            // fiber_stack_overflow.phpt sets PROFILE=8.4 via --ENV--; always include (#26741).
+            if (CompilerVersion::advertisesFiberStackOverflowClass()
+                && str_contains($name, 'fiber_stack_overflow_reference_profile')) {
+                continue;
+            }
             if ((!CompilerVersion::advertisesDelayedTargetValidationAttributeClass()
                     || !CompilerVersion::advertisesCompileTimeAttributeClass()
                     || !CompilerVersion::advertisesNoDiscardAttributeClass())
