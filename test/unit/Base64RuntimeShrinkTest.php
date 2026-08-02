@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\Base64JitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** base64_encode()/base64_decode() JIT routes through Base64JitHelper PHP (#17234, #18918). */
+/** base64_encode()/base64_decode() JIT routes through Base64JitHelper PHP (#17234, #18918, #26890). */
 final class Base64RuntimeShrinkTest extends TestCase
 {
     public function testStringBase64EncodeUsesJitHelperNotLlvmMonolith(): void
@@ -45,15 +45,30 @@ final class Base64RuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitBase64Decode', $builtin);
     }
 
-    public function testBase64JitHelperDelegatesToVmString(): void
+    public function testBase64JitHelperIsSelfContained(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Base64JitHelper.php');
-        $this->assertStringContainsString('VmString::base64_encode', $source);
-        $this->assertStringContainsString('VmString::base64_decode', $source);
+        // Call site must not delegate into VmString (NestedJIT stubs that path — #26890 / #26868).
+        $this->assertStringNotContainsString('return VmString::', $source);
+        $this->assertStringNotContainsString('VmString::base64_', $source);
+        $this->assertStringContainsString('reverseChar', $source);
+        $this->assertStringContainsString('byteAt', $source);
+        $this->assertStringContainsString('lowBits', $source);
+        $this->assertStringNotContainsString('$out[$j]', $source);
+
         $this->assertSame('Zm9v', Base64JitHelper::encodeArgv('foo'));
-        $this->assertSame('Zm9v', VmString::base64_encode('foo'));
         $this->assertSame('foo', Base64JitHelper::decodeArgv('Zm9v'));
-        $this->assertSame('foo', VmString::base64_decode('Zm9v', false));
+        $this->assertSame('hi', Base64JitHelper::decodeArgv('aGk='));
+        $this->assertSame('', Base64JitHelper::encodeArgv(''));
+        $this->assertSame('', Base64JitHelper::decodeArgv(''));
+        // Host / VM SSOT still matches.
+        $this->assertSame(VmString::base64_encode('foo'), Base64JitHelper::encodeArgv('foo'));
+        $this->assertSame(VmString::base64_decode('Zm9v', false), Base64JitHelper::decodeArgv('Zm9v'));
+        $this->assertSame(VmString::base64_encode("a\0b"), Base64JitHelper::encodeArgv("a\0b"));
+        $this->assertSame(
+            VmString::base64_decode(Base64JitHelper::encodeArgv("a\0b"), false),
+            Base64JitHelper::decodeArgv(Base64JitHelper::encodeArgv("a\0b"))
+        );
     }
 
     public function testSpineBundleOmitsDeletedBase64Llvm(): void

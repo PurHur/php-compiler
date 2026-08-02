@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringBase64Decode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -73,12 +74,10 @@ final class base64_decode extends Internal
 
             return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'base64_decode', 0, 'string');
         }
+        // Match encode: fold compile-time literals (JitStringArg fallback — #26890).
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
-            $maybeLiteral = $args[0]->compileTimeString ?? null;
-            if (null !== $maybeLiteral && JITVariable::KIND_VALUE === $args[0]->kind) {
-                $literal = $maybeLiteral;
-            }
+            $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         }
         if (null !== $literal && (1 === $argc || null !== ($args[1]->compileTimeBool ?? null))) {
             $result = VmString::base64_decode($literal, $strictConst);
