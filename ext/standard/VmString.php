@@ -13,6 +13,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -4725,11 +4726,16 @@ final class VmString
     }
 
     /**
+     * php-src ext/standard/string.c — empty replace_pairs key is skipped with E_WARNING (#26704).
+     */
+    public const STRTR_EMPTY_REPLACEMENT_WARNING = 'strtr(): Ignoring replacement of empty string';
+
+    /**
      * strtr() replace_pairs HashTable form — nested JIT safe (numeric pair list, no string-key stores).
      *
      * @see php/php-src ext/standard/string.c php_strtr_array()
      */
-    public static function strtrArrayFromHashTable(string $string, HashTable $replacePairs): string
+    public static function strtrArrayFromHashTable(string $string, HashTable $replacePairs, ?Frame $frame = null): string
     {
         $tupleList = [];
         foreach ($replacePairs->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
@@ -4739,7 +4745,7 @@ final class VmString
             ];
         }
 
-        return self::strtrArrayFromPairTuples($string, $tupleList);
+        return self::strtrArrayFromPairTuples($string, $tupleList, $frame);
     }
 
     /**
@@ -4749,7 +4755,7 @@ final class VmString
      *
      * @param array<string, string> $replacePairs
      */
-    public static function strtrArray(string $string, array $replacePairs): string
+    public static function strtrArray(string $string, array $replacePairs, ?Frame $frame = null): string
     {
         $slen = self::byteLength($string);
         if (0 === $slen) {
@@ -4768,6 +4774,8 @@ final class VmString
                 $to = (string) $to;
             }
             if ('' === $from) {
+                // php-src php_strtr_array() — php_error_docref(E_WARNING) then skip (#26704).
+                self::warnStrtrEmptyReplacement($frame);
                 continue;
             }
             if (self::byteLength($from) > $slen) {
@@ -4800,16 +4808,41 @@ final class VmString
     }
 
     /**
+     * php-src php_strtr_array() empty from-key — E_WARNING then skip (#26704).
+     *
+     * VM: ErrorReporter via call frame. JIT/AOT helpers: compiler_language_warning().
+     */
+    public static function warnStrtrEmptyReplacement(?Frame $frame): void
+    {
+        if (null !== $frame && null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                self::STRTR_EMPTY_REPLACEMENT_WARNING,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame,
+                $frame->callSiteLine
+            );
+
+            return;
+        }
+
+        if (\function_exists('compiler_language_warning')) {
+            compiler_language_warning(self::STRTR_EMPTY_REPLACEMENT_WARNING);
+        }
+    }
+
+    /**
      * @param list<array{0: string, 1: string}> $tupleList
      */
-    private static function strtrArrayFromPairTuples(string $string, array $tupleList): string
+    private static function strtrArrayFromPairTuples(string $string, array $tupleList, ?Frame $frame = null): string
     {
         $pairs = [];
         foreach ($tupleList as [$from, $to]) {
             $pairs[$from] = $to;
         }
 
-        return self::strtrArray($string, $pairs);
+        return self::strtrArray($string, $pairs, $frame);
     }
 
     /**

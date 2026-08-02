@@ -38,6 +38,42 @@ PHP;
         $this->assertSame(self::SCALAR_EXPECT, $this->runBin('bin/vm.php', self::SCALAR_CODE));
     }
 
+    public function testVmEmptyReplacementKeyWarns(): void
+    {
+        $code = <<<'PHP'
+error_reporting(E_ALL);
+$warns = [];
+set_error_handler(static function (int $no, string $msg) use (&$warns): bool {
+    $warns[] = $no . ':' . $msg;
+    return true;
+});
+$out = strtr('ab', ['' => 'x', 'a' => 'A']);
+echo 'out=' . $out . "\n";
+echo 'warns=' . json_encode($warns) . "\n";
+PHP;
+        $expect = "out=Ab\nwarns=[\"2:strtr(): Ignoring replacement of empty string\"]\n";
+        $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotEmptyReplacementKeyWarns(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $code = <<<'PHP'
+error_reporting(E_ALL);
+$out = strtr('ab', ['' => 'x', 'a' => 'A']);
+echo 'out=' . $out . "\n";
+PHP;
+        [$stdout, $stderr] = $this->runAotBinaryCapturing($code);
+        $this->assertSame("out=Ab\n", $this->normalize($stdout));
+        $this->assertStringContainsString('strtr(): Ignoring replacement of empty string', $stderr);
+    }
+
     /**
      * @group llvm
      * @group jit
@@ -50,13 +86,23 @@ PHP;
         $this->assertSame(self::EXPECT, $this->runAotBinary());
     }
 
-    private function runAotBinary(): string
+    private function runAotBinary(string $code = self::CODE): string
+    {
+        [$stdout] = $this->runAotBinaryCapturing($code);
+
+        return $this->normalize($stdout);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function runAotBinaryCapturing(string $code = self::CODE): array
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_strtr_');
         $out = $tmp . '_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . self::CODE);
+        file_put_contents($tmp, "<?php\n" . $code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
@@ -81,14 +127,15 @@ PHP;
         );
         $this->assertIsResource($run);
         fclose($runPipes[0]);
-        $result = stream_get_contents($runPipes[1]);
+        $stdout = stream_get_contents($runPipes[1]);
+        $stderr = stream_get_contents($runPipes[2]);
         fclose($runPipes[1]);
         fclose($runPipes[2]);
-        $this->assertSame(0, proc_close($run));
+        $this->assertSame(0, proc_close($run), trim((string) $stderr));
         @unlink($tmp);
         @unlink($out);
 
-        return $this->normalize((string) $result);
+        return [(string) $stdout, (string) $stderr];
     }
 
     private function runBin(string $bin, string $code = self::CODE): string
