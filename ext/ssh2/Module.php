@@ -79,6 +79,7 @@ class Module extends ModuleAbstract
             new ssh2_sftp_rename(),
             new ssh2_sftp_chmod(),
             new ssh2_sftp_realpath(),
+            new ssh2_sftp_statvfs(),
             new ssh2_sftp_symlink(),
             new ssh2_sftp_readlink(),
             new ssh2_publickey_init(),

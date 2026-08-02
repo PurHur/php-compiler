@@ -1444,6 +1444,56 @@ final class ssh2_sftp_realpath extends Ssh2Function
 }
 
 /**
+ * ssh2_sftp_statvfs(resource $sftp, string $path): array|false
+ *
+ * Remote filesystem statistics (libssh2_sftp_statvfs; #26740).
+ */
+final class ssh2_sftp_statvfs extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_sftp_statvfs');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_sftp_statvfs() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sftpObj = $this->requireSftp($frame->calledArgs[0], 'ssh2_sftp_statvfs', 1);
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_sftp_statvfs', 2, 'path');
+        $native = VmSsh2Sftp::nativeSftp($sftpObj);
+        if (null === $native) {
+            @\trigger_error('ssh2_sftp_statvfs(): Failed to statvfs remote filesystem', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $raw = VmSsh2Native::sftpStatvfs($native, $path);
+        if (false === $raw) {
+            @\trigger_error('ssh2_sftp_statvfs(): Failed to statvfs remote filesystem', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($raw as $key => $value) {
+            $slot = new Variable();
+            $slot->int((int) $value);
+            $ht->add((string) $key, $slot);
+        }
+        $frame->returnVar->array($ht);
+    }
+}
+
+/**
  * ssh2_sftp_symlink(resource $sftp, string $target, string $link): bool
  */
 final class ssh2_sftp_symlink extends Ssh2Function

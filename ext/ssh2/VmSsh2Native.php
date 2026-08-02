@@ -855,6 +855,43 @@ final class VmSsh2Native
     }
 
     /**
+     * Filesystem statistics via libssh2_sftp_statvfs (#26740).
+     *
+     * Associative keys match the PECL-shaped surface documented on the issue
+     * (bsize/frsize/… without the C `f_` prefix).
+     *
+     * @param \FFI\CData $sftp LIBSSH2_SFTP*
+     *
+     * @return array<string, int>|false
+     */
+    public static function sftpStatvfs(\FFI\CData $sftp, string $path)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $st = $ffi->new('LIBSSH2_SFTP_STATVFS');
+        $rc = (int) $ffi->libssh2_sftp_statvfs($sftp, $path, \strlen($path), \FFI::addr($st));
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return [
+            'bsize' => (int) $st->f_bsize,
+            'frsize' => (int) $st->f_frsize,
+            'blocks' => (int) $st->f_blocks,
+            'bfree' => (int) $st->f_bfree,
+            'bavail' => (int) $st->f_bavail,
+            'files' => (int) $st->f_files,
+            'ffree' => (int) $st->f_ffree,
+            'favail' => (int) $st->f_favail,
+            'fsid' => (int) $st->f_fsid,
+            'flag' => (int) $st->f_flag,
+            'namemax' => (int) $st->f_namemax,
+        ];
+    }
+
+    /**
      * Resolve remote symlink target (PECL ssh2_sftp_readlink; #26662).
      *
      * @param \FFI\CData $sftp LIBSSH2_SFTP*
@@ -1442,6 +1479,20 @@ int libssh2_sftp_rmdir_ex(LIBSSH2_SFTP *sftp, const char *path, size_t path_len)
 int libssh2_sftp_unlink_ex(LIBSSH2_SFTP *sftp, const char *filename, size_t filename_len);
 int libssh2_sftp_rename_ex(LIBSSH2_SFTP *sftp, const char *source_filename, unsigned int source_filename_len, const char *dest_filename, unsigned int dest_filename_len, long flags);
 int libssh2_sftp_symlink_ex(LIBSSH2_SFTP *sftp, const char *path, unsigned int path_len, char *target, unsigned int target_len, int link_type);
+typedef struct _LIBSSH2_SFTP_STATVFS {
+    unsigned long long f_bsize;
+    unsigned long long f_frsize;
+    unsigned long long f_blocks;
+    unsigned long long f_bfree;
+    unsigned long long f_bavail;
+    unsigned long long f_files;
+    unsigned long long f_ffree;
+    unsigned long long f_favail;
+    unsigned long long f_fsid;
+    unsigned long long f_flag;
+    unsigned long long f_namemax;
+} LIBSSH2_SFTP_STATVFS;
+int libssh2_sftp_statvfs(LIBSSH2_SFTP *sftp, const char *path, size_t path_len, LIBSSH2_SFTP_STATVFS *st);
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
 typedef struct _LIBSSH2_LISTENER LIBSSH2_LISTENER;
 typedef struct _LIBSSH2_AGENT LIBSSH2_AGENT;

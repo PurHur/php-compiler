@@ -52,15 +52,15 @@
           This is <em>not</em> a full php-src inventory — only items we measure in
           <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities-syntax.md"><code>capabilities-syntax.md</code></a>
           and <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md"><code>capabilities.md</code></a>.
-          Generated 2026-08-01 (matrix mtime).
+          Generated 2026-08-02 (matrix mtime).
         </p>
       </header>
 
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>80</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 5 gaps</p>
+          <strong>79</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 6 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
@@ -91,7 +91,7 @@
 <tr data-support="full"><td><code>`class` / `new`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/58">#58</a></td></tr>
 <tr data-support="full"><td><code>Anonymous class `new class { }`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1233">#1233</a></td></tr>
 <tr data-support="full"><td><code>Enum declarations `enum Foo: string { case Bar = &#039;x&#039;; }`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1356">#1356</a></td></tr>
-<tr data-support="full"><td><code>Abstract enum `abstract enum E { case A; }`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3737">#3737</a></td></tr>
+<tr data-support="gap"><td><code>Abstract enum `abstract enum E { case A; }`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/26519">#26519</a></td></tr>
 <tr data-support="full"><td><code>Instance methods (`ClassMethod` / `Expr_MethodCall`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/58">#58</a></td></tr>
 <tr data-support="full"><td><code>Static methods on user classes (`Expr_StaticCall`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2209">#2209</a></td></tr>
 <tr data-support="full"><td><code>Constructors (`__construct`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/145">#145</a></td></tr>
