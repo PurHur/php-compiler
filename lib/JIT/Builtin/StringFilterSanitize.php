@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_filter_sanitize_string via FilterSanitizeJitHelper PHP (#11419).
+ * JIT/AOT link for __compiler_filter_sanitize_string via FilterSanitizeJitHelper PHP (#11419, #27033).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterUrl #26766 / StringFilterInt #26699).
  * php-src: ext/filter/sanitizing_filters.c
  */
 final class StringFilterSanitize
@@ -32,16 +34,7 @@ final class StringFilterSanitize
 
     public static function ensureLinked(Context $context): void
     {
-        $restore = $context->builder->getInsertBlock();
         self::implement($context);
-        if (null !== $restore) {
-            $terminator = $restore->getTerminator();
-            if (null !== $terminator) {
-                $context->builder->positionBefore($terminator);
-            } else {
-                $context->builder->positionAtEnd($restore);
-            }
-        }
     }
 
     public static function implement(Context $context): void
@@ -53,10 +46,18 @@ final class StringFilterSanitize
             return;
         }
 
+        // Restore caller insert block after bridge emit (#20988 / peer StringFilterUrl #26766) —
+        // clearInsertionPosition left the user-script builder detached
+        // ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementSanitizeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementSanitizeBridge(Context $context): void
@@ -94,56 +95,18 @@ final class StringFilterSanitize
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after FilterSanitizeJitHelper compile (#11419)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27033');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FilterSanitizeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('FilterSanitizeJitHelper.php parseAndCompile failed (#11419)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#11419)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#27033'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
