@@ -23,7 +23,7 @@ final class StringFilterEmailStandaloneTest extends TestCase
         $jitFilter = (string) file_get_contents(__DIR__.'/../../../ext/filter/JitFilter.php');
         $this->assertStringContainsString('StringFilterEmail', $jitFilter);
         $emailJit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringFilterEmail.php');
-        $this->assertStringContainsString('FilterEmailJitHelper', $emailJit);
+        $this->assertStringContainsString('FilterEmailValidate', $emailJit);
         $this->assertStringContainsString('__compiler_filter_validate_email', $emailJit);
     }
 
