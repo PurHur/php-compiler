@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6824 |
-| Phase A inventory files (M2 ratio SSOT) | 6824 |
+| PHP files on vm.php path | 6825 |
+| Phase A inventory files (M2 ratio SSOT) | 6825 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22059 |
+| Source constructs flagged (warnings) | 22060 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2350,6 +2350,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/Crc32JitHelper.php` | 0 | 1 |
 | `ext/standard/CslashesJitHelper.php` | 0 | 1 |
 | `ext/standard/CsvJitHelper.php` | 0 | 3 |
+| `ext/standard/CsvStrGetcsvJitHelper.php` | 0 | 1 |
 | `ext/standard/DateConstants.php` | 0 | 1 |
 | `ext/standard/DateIntervalFormatJitHelper.php` | 0 | 1 |
 | `ext/standard/DateMutationJitHelper.php` | 0 | 1 |
@@ -26106,6 +26107,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 87)
 - 5 class method(s)
 
+### `ext/standard/CsvStrGetcsvJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/DateConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46876,7 +46882,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrGetcsv.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/StringStrIncdec.php`
 
