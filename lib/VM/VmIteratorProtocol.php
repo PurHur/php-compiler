@@ -53,8 +53,12 @@ final class VmIteratorProtocol
         JitVariable $container,
         ?string $containerUserType
     ): bool {
-        if (null !== $containerUserType && 'splobjectstorage' === strtolower($containerUserType)) {
-            return false;
+        if (null !== $containerUserType) {
+            $ut = strtolower($containerUserType);
+            // HT-backed SPL — foreach walks __spl_ht, not Iterator method proxies (#26783).
+            if ('splobjectstorage' === $ut || 'arrayiterator' === $ut) {
+                return false;
+            }
         }
         if ($container->type & JitVariable::IS_NATIVE_ARRAY) {
             return false;

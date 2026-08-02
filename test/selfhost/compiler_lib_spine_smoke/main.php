@@ -5328,6 +5328,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefSetup.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ZendDoubleStringRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ZlibRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ArrayIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBindTo.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithBinding.php';
