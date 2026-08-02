@@ -15,6 +15,9 @@ final class MetaphoneRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMetaphone.php');
         $this->assertStringContainsString('MetaphoneJitHelper', $source);
+        $this->assertStringContainsString('VmMetaphone.php', $source);
+        $this->assertStringContainsString('HELPER_BUNDLE', $source);
+        $this->assertStringContainsString('ensureCompiledBundle', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -35,6 +38,7 @@ final class MetaphoneRuntimeShrinkTest extends TestCase
         $this->assertSame('NFTSBRJ', MetaphoneJitHelper::metaphoneArgv('Knightsbridge', 0));
         $this->assertSame('NFTS', MetaphoneJitHelper::metaphoneArgv('Knightsbridge', 4));
         $this->assertSame('ELR', VmMetaphone::encode('Euler', 0));
+        $this->assertSame('PRKRMNK', VmMetaphone::encode('programming', 0));
     }
 
     public function testSpineBundleOmitsDeletedJitMetaphone(): void
