@@ -57,6 +57,9 @@ final class PregAotFastPath
         if (8 === $kind) {
             return self::matchLiteralGroups($pattern, $subject, $offset);
         }
+        if (9 === $kind) {
+            return self::matchAnchoredLiteralPrefix($pattern, $subject, $offset);
+        }
 
         return self::matchClassPlus($kind, $subject, $offset);
     }
@@ -121,6 +124,9 @@ final class PregAotFastPath
         if (self::isLiteralGroupsPattern($pattern)) {
             return 8;
         }
+        if (self::isAnchoredLiteralPrefixPattern($pattern)) {
+            return 9;
+        }
         $plen = \strlen($pattern);
         if ($plen < 3) {
             return 0;
@@ -152,7 +158,7 @@ final class PregAotFastPath
     public static function replaceOrEmpty(string $pattern, string $replacement, string $subject, int $limit): string
     {
         $kind = self::patternKind($pattern);
-        if (0 === $kind || 8 === $kind) {
+        if (0 === $kind || 8 === $kind || 9 === $kind) {
             return '';
         }
         if (1 === $kind) {
@@ -245,6 +251,73 @@ final class PregAotFastPath
         }
 
         return $groups >= 1;
+    }
+
+    /**
+     * `/^literal/` / `#^literal#` — start-anchored literal body (#26825 RegexIterator MATCH).
+     *
+     * Body after `^` must be NestedJIT-safe literal (no other metacharacters).
+     */
+    private static function isAnchoredLiteralPrefixPattern(string $pattern): bool
+    {
+        $plen = \strlen($pattern);
+        if ($plen < 4) {
+            return false;
+        }
+        $delim = \substr($pattern, 0, 1);
+        if ('/' !== $delim && '#' !== $delim) {
+            return false;
+        }
+        if ($delim !== \substr($pattern, $plen - 1, 1)) {
+            return false;
+        }
+        $body = \substr($pattern, 1, $plen - 2);
+        if ('' === $body || '^' !== \substr($body, 0, 1)) {
+            return false;
+        }
+        $lit = \substr($body, 1);
+        $llen = \strlen($lit);
+        if (0 === $llen) {
+            return false;
+        }
+        $i = 0;
+        while ($i < $llen) {
+            $c = \substr($lit, $i, 1);
+            if ('\\' === $c || '[' === $c || '(' === $c || ')' === $c || '|' === $c
+                || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
+                || '^' === $c || '$' === $c || '.' === $c) {
+                return false;
+            }
+            ++$i;
+        }
+
+        return true;
+    }
+
+    private static function matchAnchoredLiteralPrefix(string $pattern, string $subject, int $offset): int
+    {
+        $plen = \strlen($pattern);
+        $lit = \substr($pattern, 2, $plen - 3);
+        $litLen = \strlen($lit);
+        $subLen = \strlen($subject);
+        if ($offset > 0) {
+            // ^ only matches at start of subject (not after offset) for thin AOT.
+            return 0;
+        }
+        if ($litLen > $subLen) {
+            return 0;
+        }
+        $i = 0;
+        while ($i < $litLen) {
+            if (\substr($subject, $i, 1) !== \substr($lit, $i, 1)) {
+                return 0;
+            }
+            ++$i;
+        }
+        self::$cap0 = \substr($subject, 0, $litLen);
+        self::$capCount = 1;
+
+        return 1;
     }
 
     private static function matchExactAbGroups(string $subject, int $offset): int

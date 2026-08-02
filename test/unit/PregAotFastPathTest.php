@@ -50,4 +50,14 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame('b', PregAotFastPath::lastCap(2));
         $this->assertSame(0, PregAotFastPath::matchCount('/(a)(b)/', 'xy', 0));
     }
+
+    public function testAnchoredLiteralPrefix(): void
+    {
+        $this->assertSame(9, PregAotFastPath::patternKind('/^b/'));
+        $this->assertSame(9, PregAotFastPath::patternKind('#^foo#'));
+        $this->assertSame(0, PregAotFastPath::matchCount('/^b/', 'foo', 0));
+        $this->assertSame(1, PregAotFastPath::matchCount('/^b/', 'bar', 0));
+        $this->assertSame(1, PregAotFastPath::matchCount('/^b/', 'baz', 0));
+        $this->assertSame(0, PregAotFastPath::patternKind('/^b$/'));
+    }
 }

@@ -54,10 +54,10 @@ final class VmIteratorProtocol
         ?string $containerUserType
     ): bool {
         if (null !== $containerUserType) {
-            $ut = strtolower($containerUserType);
-            // HT-backed SPL — foreach walks __spl_ht, not Iterator method proxies (#26783, #26775).
-            if ('splobjectstorage' === $ut || 'arrayiterator' === $ut
-                || 'recursivearrayiterator' === $ut || 'recursiveiteratoriterator' === $ut) {
+            $ut = strtolower(ltrim($containerUserType, '\\'));
+            // HT-backed SPL — foreach walks `__spl_ht`, not Iterator method proxies (#26783, #26775, #26825).
+            if ('splobjectstorage' === $ut
+                || \PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($containerUserType)) {
                 return false;
             }
         }
@@ -264,13 +264,31 @@ final class VmIteratorProtocol
         }
         $candidates = self::methodCandidates($context, $methodLc);
         if (1 === \count($candidates)) {
-            return reset($candidates);
+            $only = reset($candidates);
+            // Never treat Generator::* as the universal sole Iterator (#26825).
+            // Real Generators go through hydrateGeneratorMetadata / isGeneratorVariable first.
+            if (self::isGeneratorIteratorProxy($only)) {
+                throw new \LogicException(
+                    "iterator protocol method {$methodLc}() must not resolve solely to Generator"
+                );
+            }
+
+            return $only;
         }
         if ([] === $candidates) {
             throw new \LogicException("iterator protocol method {$methodLc}() is not available in this compile unit");
         }
 
         return new RuntimeIndirectInstanceMethodCall($receiver, $methodLc, $candidates);
+    }
+
+    private static function isGeneratorIteratorProxy(Call $proxy): bool
+    {
+        return $proxy instanceof \PHPCompiler\JIT\Call\GeneratorRewind
+            || $proxy instanceof \PHPCompiler\JIT\Call\GeneratorNext
+            || $proxy instanceof \PHPCompiler\JIT\Call\GeneratorValid
+            || $proxy instanceof \PHPCompiler\JIT\Call\GeneratorCurrent
+            || $proxy instanceof \PHPCompiler\JIT\Call\GeneratorKey;
     }
 
     public static function classImplementsIteratorProtocol(Context $context, string $classLc): bool

@@ -82,6 +82,10 @@ final class iterator_to_array extends Internal
             return JitIteratorToArray::invokeWithPreserveKeysFlag($context, $args[0], $preserveKeys);
         }
 
-        return JitIteratorToArray::invoke($context, $args[0], true);
+        return JitIteratorToArray::invoke(
+            $context,
+            $args[0],
+            true,
+        );
     }
 }

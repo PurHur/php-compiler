@@ -62,16 +62,66 @@ final class JitIteratorToArray
         bool $preserveKeys,
         ?string $containerUserType = null
     ): Value {
+        $opUserType = $context->jitIteratorToArrayIteratorOperand?->type?->userType ?? null;
+        $userType = $containerUserType
+            ?? (is_string($opUserType) && '' !== $opUserType ? $opUserType : null)
+            ?? $iterator->userType
+            ?? $iterator->classUserType
+            ?? (Variable::TYPE_OBJECT === $iterator->type || Variable::TYPE_VALUE === $iterator->type
+                ? ($iterator->compileTimeString ?? $iterator->objectPropertyClassName)
+                : null);
+        if (\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($userType)) {
+            return self::materializeFromSplHt($context, $iterator, $preserveKeys);
+        }
         GeneratorHelper::ensureTypes($context);
         $gen = self::resolveGenerator($context, $iterator);
         if (null !== $gen) {
             return self::materializeFromGenerator($context, $gen, $preserveKeys);
         }
-        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $iterator, $containerUserType)) {
-            return self::materializeFromIteratorProtocol($context, $iterator, $containerUserType);
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $iterator, $userType)) {
+            return self::materializeFromIteratorProtocol($context, $iterator, $userType);
         }
 
         return self::materializeFromArray($context, $iterator, $preserveKeys);
+    }
+
+    private static function materializeFromSplHt(
+        Context $context,
+        Variable $iterator,
+        bool $preserveKeys
+    ): Value {
+        $receiver = IteratorProtocolHelper::normalizeObjectReceiver($context, $iterator);
+        $userType = $context->jitIteratorToArrayIteratorOperand?->type?->userType
+            ?? $iterator->classUserType
+            ?? $iterator->compileTimeString
+            ?? 'ArrayIterator';
+        $className = ltrim((string) $userType, '\\');
+        if ('' === $className || 'object' === strtolower($className)) {
+            $className = 'ArrayIterator';
+        }
+        $objPtr = $context->helper->loadValue($receiver);
+        $slot = $context->type->object->propertySlotFor(
+            $objPtr,
+            $className,
+            \PHPCompiler\VM\SplOuterIteratorHt::PROP_HT
+        );
+        $srcHt = $context->builder->pointerCast(
+            $context->builder->load($slot),
+            $context->getTypeFromString('__hashtable__*')
+        );
+        if ($preserveKeys) {
+            return self::copyHashtablePreserveKeys($context, $srcHt);
+        }
+        $out = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        $out->nextFreeElement = 0;
+        self::reindexHashtable($context, $out, $srcHt);
+
+        return $context->helper->loadValue($out);
     }
 
     private static function wrapHashTable(Context $context, Value $ht): Value

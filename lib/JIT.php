@@ -11075,6 +11075,14 @@ class JIT {
                     ) {
                         $this->context->jitJsonEncodeValueOperand = $callOperands[0];
                     }
+                    $savedIteratorToArrayOperand = $this->context->jitIteratorToArrayIteratorOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'iterator_to_array' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[0])
+                    ) {
+                        $this->context->jitIteratorToArrayIteratorOperand = $callOperands[0];
+                    }
                     $savedXmlrpcEncodeValueOperand = $this->context->jitXmlrpcEncodeValueOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
@@ -11108,6 +11116,7 @@ class JIT {
                     $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
+                    $this->context->jitIteratorToArrayIteratorOperand = $savedIteratorToArrayOperand;
                     $this->context->jitXmlrpcEncodeValueOperand = $savedXmlrpcEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
                     $this->context->jitMbNumericEntityConvmapOperand = $savedMbNumericEntityConvmapOperand;
@@ -11456,9 +11465,13 @@ class JIT {
                             );
                             // Compile-time class for Closure::call / bindTo scope (#26872).
                             $obj->compileTimeString = $resolvedName;
+                            $obj->classUserType = $resolvedName;
                             $resultOp = $block->getOperand($op->arg1);
                             $this->assignOperand($resultOp, $obj, true);
                             $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
+                            $resultVar = $this->context->getVariableFromOp($resultOp);
+                            $resultVar->classUserType = $resolvedName;
+                            $resultVar->compileTimeString = $resolvedName;
                             if ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
                             ) {
@@ -16246,6 +16259,9 @@ class JIT {
         if ($force || null !== $src->compileTimeString) {
             $dest->compileTimeString = $src->compileTimeString;
         }
+        if ($force || null !== $src->classUserType) {
+            $dest->classUserType = $src->classUserType;
+        }
     }
 
     private function syncCompileTimeFloat(Variable $dest, Variable $src, bool $force): void
@@ -16517,9 +16533,15 @@ class JIT {
             || $toCall instanceof JIT\Call\DatePeriodConstruct
             || $toCall instanceof JIT\Call\ArrayIteratorConstruct
             || $toCall instanceof JIT\Call\RecursiveIteratorIteratorConstruct
+            || $toCall instanceof JIT\Call\LimitIteratorConstruct
+            || $toCall instanceof JIT\Call\RegexIteratorConstruct
+            || ($toCall instanceof JIT\Call\AppendIteratorMethod
+                && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplDllistMethod
+                && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\SplFixedArrayMethod
                 && '__construct' === strtolower($toCall->methodName()))
         ) {
             return true;
