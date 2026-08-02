@@ -41,6 +41,18 @@ final class MetaphoneRuntimeShrinkTest extends TestCase
         $this->assertSame('PRKRMNK', VmMetaphone::encode('programming', 0));
     }
 
+    /** NestedJIT compound summed index assign is a silent no-op → AOT SIGKILL (#26815). */
+    public function testVmMetaphoneAvoidsCompoundSummedIndexAdvance(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmMetaphone.php');
+        // Strip docblocks so the forbidden pattern is not matched inside comments.
+        $code = (string) preg_replace('#/\*\*.*?\*/#s', '', $source);
+        $this->assertStringNotContainsString('$wIdx += 1 + $skip', $code);
+        $this->assertStringNotContainsString('$wIdx += 2', $code);
+        $this->assertStringContainsString('advanceIdx', $source);
+        $this->assertStringContainsString('++$wIdx', $source);
+    }
+
     public function testSpineBundleOmitsDeletedJitMetaphone(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
