@@ -54,6 +54,20 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('__hashtable__setStringAt', $source);
     }
 
+    public function testRuntimeParseSkipsPrepareWhenM5FlagSet(): void
+    {
+        $path = dirname(__DIR__, 2).'/lib/Runtime.php';
+        $source = (string) file_get_contents($path);
+        $parsePos = strpos($source, 'function parse(string $code, string $filename)');
+        $this->assertNotFalse($parsePos);
+        $chunk = substr($source, $parsePos, 1400);
+        $flagPos = strpos($chunk, 'm5ArgvIdentityParsePrepare');
+        $preparePos = strpos($chunk, 'prepareSourceForParser');
+        $this->assertNotFalse($flagPos);
+        $this->assertNotFalse($preparePos);
+        $this->assertLessThan($preparePos, $flagPos, 'M5 flag gate must precede prepareSourceForParser');
+    }
+
     public function testPrepareSpineIdentityWiredBeforeVoidStubs(): void
     {
         $root = dirname(__DIR__, 2);
