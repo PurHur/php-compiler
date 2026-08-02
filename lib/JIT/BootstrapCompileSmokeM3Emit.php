@@ -556,8 +556,8 @@ final class BootstrapCompileSmokeM3Emit
         Value $filename
     ): Value {
         $objPtr = $context->getTypeFromString('__object__*');
-        // M5 argv / gen-0: trivial echo shape via NestedJIT M5TrivialEchoScript (#26756).
-        $trivialFn = M5TrivialEchoScript::lookup($context);
+        // M5 argv / gen-0: trivial echo via C-floor (or NestedJIT) M5TrivialEchoScript (#26756).
+        $trivialFn = M5TrivialEchoNative::lookup($context) ?? M5TrivialEchoScript::lookup($context);
         if (null !== $trivialFn) {
             $tag = 'te'.(string) ++self::$seq;
             $okBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_ok_'.$tag);

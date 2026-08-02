@@ -321,13 +321,40 @@ function bootstrap_gen0_build_receipt_sources(): array
 }
 
 /**
- * The spine binary a full link produces — link evidence that copying committed blobs cannot fake.
+ * The spine binary a full link produces — primary link evidence (#22642).
  *
  * Uncommitted and gitignored, so its presence means this tree actually ran the spine link.
+ * Argv-only refresh ({@see bootstrap-gen0-refresh-argv-driver.sh}) may instead use
+ * build/bin-compile-aot after functional smoke (#26756 / re-#23468).
  */
 function bootstrap_gen0_build_receipt_link_evidence_path(string $root): string
 {
     return rtrim($root, '/').'/build/selfhost-lib-spine-smoke';
+}
+
+/**
+ * Resolve link evidence for a gen-0 receipt: prefer spine, else argv driver when allowed.
+ *
+ * @return array{abs: string, rel: string}|null
+ */
+function bootstrap_gen0_build_receipt_resolve_link_evidence(string $root): ?array
+{
+    $spineRel = 'build/selfhost-lib-spine-smoke';
+    $spineAbs = rtrim($root, '/').'/'.$spineRel;
+    if (is_file($spineAbs)) {
+        return ['abs' => $spineAbs, 'rel' => $spineRel];
+    }
+    $argvOnly = getenv('BOOTSTRAP_GEN0_ARGV_ONLY_RECEIPT');
+    if ('1' !== $argvOnly && 'true' !== strtolower((string) $argvOnly)) {
+        return null;
+    }
+    $argvRel = 'build/bin-compile-aot';
+    $argvAbs = rtrim($root, '/').'/'.$argvRel;
+    if (!is_file($argvAbs) || !is_executable($argvAbs)) {
+        return null;
+    }
+
+    return ['abs' => $argvAbs, 'rel' => $argvRel];
 }
 
 /**
@@ -355,16 +382,17 @@ function bootstrap_gen0_write_build_receipt(string $root, ?string $fingerprint =
         throw new \RuntimeException('invalid lowering_source_fingerprint (want 64 hex chars)');
     }
 
-    $evidenceAbs = bootstrap_gen0_build_receipt_link_evidence_path($root);
-    if (!is_file($evidenceAbs)) {
+    $evidence = bootstrap_gen0_build_receipt_resolve_link_evidence($root);
+    if (null === $evidence) {
         throw new \RuntimeException(
-            'gen-0 build receipt: missing '.$evidenceAbs
+            'gen-0 build receipt: missing '.bootstrap_gen0_build_receipt_link_evidence_path($root)
             .' — a receipt may only be written by a tree that ran the spine link (#22642)'
+            .' (or BOOTSTRAP_GEN0_ARGV_ONLY_RECEIPT=1 with build/bin-compile-aot after functional smoke — #26756)'
         );
     }
-    $evidenceSha = hash_file('sha256', $evidenceAbs);
+    $evidenceSha = hash_file('sha256', $evidence['abs']);
     if (!\is_string($evidenceSha)) {
-        throw new \RuntimeException('gen-0 build receipt: cannot hash '.$evidenceAbs);
+        throw new \RuntimeException('gen-0 build receipt: cannot hash '.$evidence['abs']);
     }
 
     $artifacts = [];
@@ -387,7 +415,7 @@ function bootstrap_gen0_write_build_receipt(string $root, ?string $fingerprint =
         'lowering_source_fingerprint' => $fp,
         'generated_at' => gmdate('c'),
         'link_evidence' => [
-            'source' => 'build/selfhost-lib-spine-smoke',
+            'source' => $evidence['rel'],
             'sha256' => strtolower($evidenceSha),
         ],
         'artifacts' => $artifacts,
@@ -447,13 +475,14 @@ function bootstrap_gen0_build_receipt_errors(string $root, string $fingerprint):
     if (!\is_array($evidence) || !isset($evidence['sha256'])) {
         return ['build receipt carries no link_evidence — rewrite it from a tree that ran the spine link (#22642)'];
     }
-    $evidenceAbs = bootstrap_gen0_build_receipt_link_evidence_path($root);
+    $evidenceRel = (string) ($evidence['source'] ?? 'build/selfhost-lib-spine-smoke');
+    $evidenceAbs = rtrim($root, '/').'/'.$evidenceRel;
     if (!is_file($evidenceAbs)) {
         return ['build receipt references '.$evidenceAbs.', which is gone — relink before stamping'];
     }
     $evidenceSha = hash_file('sha256', $evidenceAbs);
     if (!\is_string($evidenceSha) || strtolower($evidenceSha) !== strtolower((string) $evidence['sha256'])) {
-        return ['build receipt link_evidence does not match the spine binary now in build/ — relink before stamping'];
+        return ['build receipt link_evidence does not match '.$evidenceRel.' now in build/ — rebuild before stamping'];
     }
 
     $artifacts = $receipt['artifacts'] ?? null;

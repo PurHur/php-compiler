@@ -51,10 +51,15 @@ final class M5TrivialEchoScriptTest extends TestCase
     {
         $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('M5TrivialEchoScript::lookup', $smoke);
+        $this->assertStringContainsString('M5TrivialEchoNative::lookup', $smoke);
         $this->assertStringContainsString('emitRuntimeParseAndCompileDefaultFallback', $smoke);
         $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
         $this->assertStringContainsString('M5TrivialEchoScript.php', $jit);
-        $this->assertStringContainsString('ensureM5TrivialEchoScriptParseAndCompileLowered', $jit);
+        $this->assertStringContainsString('M5TrivialEchoNative.php', $jit);
+        $this->assertStringContainsString('M5TrivialEchoNative::ensureParseAndCompile', $jit);
         $this->assertStringContainsString('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT', $jit);
+        $native = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoNative.php');
+        $this->assertStringContainsString('__m5_te_try_extract', $native);
+        $this->assertStringContainsString('__m5_te_emit_to_path', $native);
     }
 }

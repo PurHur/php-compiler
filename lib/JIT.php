@@ -19,6 +19,7 @@ require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
 require_once __DIR__.'/JIT/RuntimeParseM5Native.php';
 require_once __DIR__.'/JIT/RuntimeParseM5PhpCfgParser.php';
 require_once __DIR__.'/JIT/M5TrivialEchoScript.php';
+require_once __DIR__.'/JIT/M5TrivialEchoNative.php';
 require_once __DIR__.'/JIT/RuntimePrepareSpineIdentity.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
@@ -4852,12 +4853,17 @@ class JIT {
                     return $this->context->runtime->parse($code, $path);
                 }
             );
-            // Opt-in NestedJIT of M5TrivialEchoScript::parseAndCompile — default off; NestedJIT
-            // of the helper hangs at runtime in the argv driver (#26756). Host helper +
-            // emitRuntimeParseAndCompileDefault wiring stay ready for a pure C-floor next.
+            // Pure C-floor M5TrivialEchoScript::parseAndCompile — NestedJIT of the PHP helper
+            // hangs at runtime in the argv driver (#26756). Opt-in NestedJIT still available for
+            // experiments via PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT=1 (overrides C-floor).
             $m5TrivialNested = getenv('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT');
             if ('1' === $m5TrivialNested || 'true' === strtolower((string) $m5TrivialNested)) {
                 $this->ensureM5TrivialEchoScriptParseAndCompileLowered();
+            } else {
+                JIT\M5TrivialEchoNative::ensureParseAndCompile(
+                    $this->context,
+                    fn (string $n): string => $this->llvmInternalName($n)
+                );
             }
             $parseLogical = 'PHPCompiler\\Runtime::parse';
             $parseLc = strtolower($parseLogical);
@@ -6647,6 +6653,22 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
+        // M5 gen-0 never-seen echo: C-floor sentinel → cc ELF before sidecar/keepObject (#26756).
+        if (\PHPCompiler\JIT\M5TrivialEchoNative::isRegistered($this->context)) {
+            [$handled, $merge] = \PHPCompiler\JIT\M5TrivialEchoNative::emitStandaloneSentinelCheck(
+                $this->context,
+                $func->getParam(1),
+                $func->getParam(2),
+                'stub'
+            );
+            $cont = JIT\BasicBlockHelper::append($this->context, 'm5_te_stub_cont');
+            $done = JIT\BasicBlockHelper::append($this->context, 'm5_te_stub_done');
+            $this->context->builder->positionAtEnd($merge);
+            $this->context->builder->branchIf($handled, $done, $cont);
+            $this->context->builder->positionAtEnd($done);
+            $this->context->builder->returnVoid();
+            $this->context->builder->positionAtEnd($cont);
+        }
         if (null !== $keepObjectStandalone) {
             \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::emitStandaloneWithKeepObjectDispatch(
                 $this->context,
