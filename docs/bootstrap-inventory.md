@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6728 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21752 |
+| Source constructs flagged (warnings) | 21751 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5363,7 +5363,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilterIp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterMac.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterSanitize.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFindSubstr.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFormat.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsDir.php` | 0 | 1 |
@@ -46002,7 +46002,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilterUrl.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 123)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFindSubstr.php`
