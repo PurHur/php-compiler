@@ -14,7 +14,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT json_encode() lowering via JsonEncodeJitHelper PHP (#6852, #9267).
+ * JIT json_encode() lowering via JsonEncodeJitHelper PHP (#6852, #9267, #27020).
+ *
+ * Boxed `__value__*` arrays (get_object_vars AOT) must use the hashtable ABI —
+ * NestedJIT encodeValue resolveIndirect on those boxes SIGSEGVs (#27020).
  */
 final class JitJsonEncode
 {
@@ -41,11 +44,7 @@ final class JitJsonEncode
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return self::stringOrFalse(
                 $context,
-                $context->builder->call(
-                    $context->lookupFunction('__compiler_json_encode_value'),
-                    JitValueBox::valuePtrFromVariable($context, $arg),
-                    $flags
-                )
+                self::encodeBoxedValue($context, JitValueBox::valuePtrFromVariable($context, $arg), $flags)
             );
         }
 
@@ -61,6 +60,61 @@ final class JitJsonEncode
                 $flags
             )
         );
+    }
+
+    /**
+     * Route boxed hashtables to `__compiler_json_encode_array` (#27020).
+     */
+    private static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
+    {
+        $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+
+        $id = (string) (++self::$blockSerial);
+        $htBlock = BasicBlockHelper::append($context, 'json_encode_boxed_ht_'.$id);
+        $valueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_value_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'json_encode_boxed_done_'.$id);
+        $context->builder->branchIf($isHt, $htBlock, $valueBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $htResult = $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_array'),
+            $ht,
+            $flags
+        );
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($valueBlock);
+        $valueResult = $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_value'),
+            $valuePtr,
+            $flags
+        );
+        $valueEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $phi = $context->builder->phi($strPtr, 'json_encode_boxed_phi_'.$id);
+        $phi->addIncoming($htResult, $htEnd);
+        $phi->addIncoming($valueResult, $valueEnd);
+
+        return $phi;
     }
 
     /** @return Value __value__* — false bool when {@param $result} is null (Zend json_encode failure). */

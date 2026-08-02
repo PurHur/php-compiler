@@ -2775,6 +2775,7 @@ require_once __DIR__.'/../../../ext/standard/JitZlib.php';
 require_once __DIR__.'/../../../ext/standard/JsonDecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JsonValidateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JsonEncodeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JsonEncodeNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JsonStringOperandArg.php';
 require_once __DIR__.'/../../../ext/standard/KeySortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/LcgJitHelper.php';

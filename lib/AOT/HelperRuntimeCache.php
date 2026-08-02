@@ -87,6 +87,11 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariabletwo' => true,
         // #26772 — helper-runtime unit.o stubs format → null; NestedJIT self-contained helper.
         'phpcompiler\\ext\\standard\\datetimeformatjithelper::formatstateargv' => true,
+        // #27020 — helper-runtime unit.o for JsonEncodeJitHelper embeds eager
+        // `$ctx->runtime->vm` / VmJson::export and SIGSEGVs on thin standalone.
+        // NestedJIT JsonEncodeNestedJitHelper (Context-free) into the user AOT module.
+        'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodevalue' => true,
+        'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodehashtable' => true,
         // #26989 — PendingHeadersJitHelper unit.o calls __compiler_preg_match without a provider
         // in the helper TU; NestedJIT into the user module so PregMatchRuntime can link.
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::reset' => true,
