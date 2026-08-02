@@ -37,6 +37,25 @@ final class JitNativeString
             if (null !== $magic) {
                 return $magic;
             }
+            // Catch temps often lack a compile-time class hint — try Throwable::__toString (#26796).
+            $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $var, 'Throwable');
+            $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+                ? $isThrowable->value
+                : $context->helper->loadValue($isThrowable);
+            $yesBb = BasicBlockHelper::append($context, 'jit_cast_throwable_yes');
+            $noBb = BasicBlockHelper::append($context, 'jit_cast_throwable_no');
+            $joinBb = BasicBlockHelper::append($context, 'jit_cast_throwable_join');
+            $context->builder->branchIf($isBool, $yesBb, $noBb);
+            $context->builder->positionAtEnd($yesBb);
+            $toCall = $context->resolveFunctionProxy('exception::__tostring');
+            $raw = $toCall->call($context, $var);
+            $strPtr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $context,
+                JitValueBox::coerceToValuePtrForStore($context, $raw)
+            );
+            $yesEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($joinBb);
+            $context->builder->positionAtEnd($noBb);
             $classHint = ltrim((string) ($var->type?->userType ?? ''), '\\');
             if (
                 '' !== $classHint
@@ -48,16 +67,20 @@ final class JitNativeString
                     $context,
                     'Object of class '.$classHint.' could not be converted to string'
                 );
-
-                return new Variable(
-                    $context,
-                    Variable::TYPE_STRING,
-                    Variable::KIND_VALUE,
-                    $context->builder->load($context->constantStringFromString(''))
-                );
             }
-            throw new \LogicException(
-                'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
+            $empty = $context->builder->load($context->constantStringFromString(''));
+            $noEnd = $context->builder->getInsertBlock();
+            $context->builder->branch($joinBb);
+            $context->builder->positionAtEnd($joinBb);
+            $phi = $context->builder->phi($strPtr->typeOf());
+            $phi->addIncoming($strPtr, $yesEnd);
+            $phi->addIncoming($empty, $noEnd);
+
+            return new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $phi
             );
         }
         if (Variable::TYPE_VALUE === $var->type) {

@@ -14,11 +14,12 @@ final class StrContainsRuntimeShrinkTest extends TestCase
     public function testStringStrContainsUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrContains.php');
-        $this->assertStringContainsString('StrContainsJitHelper', $source);
+        $this->assertStringContainsString('VmStringCompare::containsIdentical', $source);
         $this->assertStringContainsString('VmStringCompare::prefixIdentical', $source);
         $this->assertStringContainsString('VmStringCompare::suffixIdentical', $source);
         $this->assertStringContainsString('invokeStartsWith', $source);
         $this->assertStringContainsString('invokeEndsWith', $source);
+        $this->assertStringContainsString('invokeContains', $source);
 
         $search = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStringSearch.php');
         $this->assertStringNotContainsString('function contains(', $search);

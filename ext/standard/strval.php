@@ -179,7 +179,26 @@ final class strval extends Internal
         $context->builder->positionAtEnd($objectBlock);
         $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
         $context->type->object->emitEnumObjectStringErrorIfMatches($context, $objPtr);
+        // Prefer Exception PROP_STRING when throw-seeded with redacted body (#26796).
+        // Avoid calling Exception::__toString here — that re-entered NestedJIT via strval.
         $objectEmpty = $context->builder->load($context->constantStringFromString(''));
+        $objectStr = $objectEmpty;
+        try {
+            $excId = $context->type->object->lookup('Exception');
+            if ($context->type->object->hasProperty($excId, \PHPCompiler\VM\ExceptionSupport::PROP_STRING)) {
+                $propVar = $context->type->object->propertyFetch(
+                    $objPtr,
+                    'Exception',
+                    \PHPCompiler\VM\ExceptionSupport::PROP_STRING
+                );
+                $objectStr = $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    JitValueBox::valuePtrFromVariable($context, $propVar)
+                );
+            }
+        } catch (\Throwable) {
+            $objectStr = $objectEmpty;
+        }
         $objectEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -220,7 +239,7 @@ final class strval extends Internal
         $phi->addIncoming($longStr, $longEndBlock);
         $phi->addIncoming($boolStr, $boolEndBlock);
         $phi->addIncoming($doubleStr, $doubleEndBlock);
-        $phi->addIncoming($objectEmpty, $objectEndBlock);
+        $phi->addIncoming($objectStr, $objectEndBlock);
         $phi->addIncoming($arrayStr, $arrayEndBlock);
         $phi->addIncoming($stringVal, $stringBlock);
         $phi->addIncoming($fallbackEmpty, $fallbackBlock);

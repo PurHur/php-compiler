@@ -11,6 +11,7 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\TryCatchRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
+use PHPCompiler\JIT\Builtin\ExceptionThrowToStringSeed;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -644,6 +645,7 @@ final class TryCatchHelper
                 return;
             }
             $obj = self::loadThrownObject($context, $thrown);
+            ExceptionThrowToStringSeed::seed($context, $obj, $block);
             if (self::isNonMainUserFunction($block)) {
                 $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
                 self::emitPropagateReturn($context, $func);
@@ -702,6 +704,7 @@ final class TryCatchHelper
             $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
         }
 
+        ExceptionThrowToStringSeed::seed($context, $obj, $block);
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($dispatchBb);
     }
