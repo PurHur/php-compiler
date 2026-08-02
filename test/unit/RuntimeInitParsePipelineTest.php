@@ -19,6 +19,7 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('AssignOp', $source);
         $this->assertStringContainsString('CompilerTypeReconstructor', $source);
         $this->assertStringContainsString('markObjectConstructed', $source);
+        $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $source);
         $this->assertStringContainsString('#26756', $source);
     }
 
@@ -29,15 +30,32 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $source = (string) file_get_contents($path);
         $runtimePos = strpos($source, "'phpcompiler\\runtime' === \$lcname");
         $this->assertNotFalse($runtimePos);
-        $chunk = substr($source, $runtimePos, 2200);
+        $chunk = substr($source, $runtimePos, 2400);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $chunk);
         $this->assertStringContainsString("'parser'", $chunk);
         $this->assertStringContainsString("'confusableBuiltinTypeHintCheck'", $chunk);
+        $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $chunk);
         // M5 host must not take the SELFHOST_AOT mode-only shortcut (#26756 SEGV).
         $this->assertMatchesRegularExpression(
             '/M5_DRIVER_HOST.*!\\$m5Host|!\\$m5Host.*SELFHOST_AOT|&&\\s*!\\$m5Host/s',
             $chunk
         );
+    }
+
+    public function testRuntimeParseSkipsPrepareWhenM5FlagSet(): void
+    {
+        $path = dirname(__DIR__, 2).'/lib/Runtime.php';
+        $source = (string) file_get_contents($path);
+        $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $source);
+        $parsePos = strpos($source, 'function parse(string $code, string $filename)');
+        $this->assertNotFalse($parsePos);
+        $chunk = substr($source, $parsePos, 1200);
+        $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $chunk);
+        $flagPos = strpos($chunk, 'm5ArgvIdentityParsePrepare');
+        $preparePos = strpos($chunk, 'prepareSourceForParser');
+        $this->assertNotFalse($flagPos);
+        $this->assertNotFalse($preparePos);
+        $this->assertLessThan($preparePos, $flagPos, 'M5 flag gate must precede prepareSourceForParser');
     }
 
     public function testPrepareSpineIdentityWiredBeforeVoidStubs(): void

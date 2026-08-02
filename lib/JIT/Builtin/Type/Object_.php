@@ -3387,6 +3387,8 @@ class Object_ extends Type {
                 }
                 $this->defineProperty($id, 'modules', Variable::TYPE_HASHTABLE);
                 $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
+                // C-floor sets true so parse() skips prepare list-unpack SEGV (#26756).
+                $this->defineProperty($id, 'm5ArgvIdentityParsePrepare', Variable::TYPE_NATIVE_BOOL);
             }
         }
         if ('closure' === $lcname) {

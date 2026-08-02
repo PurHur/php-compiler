@@ -75,6 +75,13 @@ final class RuntimeInitParsePipeline
                 self::allocConstructed($object, $class)
             );
         }
+
+        // Skip prepare list-unpack in host-lowered Runtime::parse (#26756 SEGV).
+        $i1 = $context->getTypeFromString('int1');
+        $true = $i1->constInt(1, false);
+        $flagVar = new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $true);
+        $flagSlot = $object->propertyFetch($runtimeThis, 'PHPCompiler\\Runtime', 'm5ArgvIdentityParsePrepare');
+        $object->propertyStore($flagSlot->objectPropertySlot, $flagVar, Variable::TYPE_NATIVE_BOOL);
     }
 
     private static function allocConstructed(ObjectType $object, string $class): Value

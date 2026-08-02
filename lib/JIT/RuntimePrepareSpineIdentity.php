@@ -103,15 +103,23 @@ final class RuntimePrepareSpineIdentity
         $outer = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $inner = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $code = $func->getParam(1);
-        // setStringAt may consume/ref the string — separate so the caller's $code stays valid (#26756).
-        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $code);
+        // Do not __string__separate here: under host-lowered Runtime::parse the $code param can
+        // be a non-null garbage pointer after NestedJIT ABI skew, and separate→alloc SEGVs
+        // (#26756). Store the pointer as-is; M5 parse skips this path via m5ArgvIdentityParsePrepare.
+        $nullStr = $stringPtr->constNull();
+        $isNull = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $code, $nullStr);
+        $empty = $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $toStore = $context->builder->select($isNull, $empty, $code);
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
             $outer,
             $zero,
-            $owned
+            $toStore
         );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setHashtableAt'),
