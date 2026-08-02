@@ -77,7 +77,7 @@ final class JitStrtr
      */
     private static function compileTimePairs(JITVariable $arg): ?array
     {
-        if (0 === ($arg->type & JITVariable::IS_NATIVE_ARRAY) || !\is_array($arg->compileTimeArray)) {
+        if (0 === ($arg->type & JITVariable::IS_NATIVE_ARRAY) || !\is_array($arg->compileTimeArray ?? null)) {
             return null;
         }
         $pairs = [];

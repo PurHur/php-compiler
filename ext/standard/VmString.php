@@ -4719,10 +4719,11 @@ final class VmString
     public static function strtrArrayFromHashTable(string $string, HashTable $replacePairs, ?Frame $frame = null): string
     {
         $tupleList = [];
-        foreach ($replacePairs->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
+        // NestedJIT: `$pair[0]`/`$pair[1]` only — list-assign aborts (#27020 / #27056).
+        foreach ($replacePairs->exportKeyValuePairs(true) as $pair) {
             $tupleList[] = [
-                self::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs'),
-                self::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs'),
+                self::coerceStringBuiltinArg($pair[0], 'strtr', 1, 'replace_pairs'),
+                self::coerceStringBuiltinArg($pair[1], 'strtr', 1, 'replace_pairs'),
             ];
         }
 

@@ -10,6 +10,7 @@ use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -161,6 +162,8 @@ final class StringStrtr
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
+        // NestedJIT HashTable::exportKeyValuePairs for StrtrArrayJitHelper (#27056 / #12908).
+        NestedVmHashTableMethodLlvm::ensureMethod($context, 'findindex');
         JitVmHelperLink::ensureCompiled(
             $context,
             self::ARRAY_HELPER_PATH,
