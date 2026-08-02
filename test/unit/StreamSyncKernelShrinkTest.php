@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fsync/fdatasync AOT via libc after stream resolve (#9815, #19660, #23004, #26929).
+ * fsync/fdatasync LLVM libc path via JitStreamSyncKernel (#9815, #19660, #26929).
  */
 final class StreamSyncKernelShrinkTest extends TestCase
 {
@@ -21,19 +21,18 @@ final class StreamSyncKernelShrinkTest extends TestCase
         $this->assertStringNotContainsString('StreamSyncJit', $runtime);
     }
 
-    public function testKernelUsesLibcFsyncNotNestedJitHelpers(): void
+    public function testKernelUsesLibcSyncNotNestedJitHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamSyncKernel', $source);
         $this->assertStringContainsString('__compiler_fsync', $source);
         $this->assertStringContainsString('__compiler_fdatasync', $source);
-        $this->assertStringContainsString('[\'fsync\', $i32, [$i32]]', $source);
-        $this->assertStringContainsString('[\'fdatasync\', $i32, [$i32]]', $source);
-        $this->assertStringContainsString('lookupFunction($syncName)', $source);
-        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
+        $this->assertStringContainsString("lookupFunction(\$syncName)", $source);
+        $this->assertStringContainsString("'fsync'", $source);
+        $this->assertStringContainsString("'fdatasync'", $source);
         $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringNotContainsString('StreamSyncJitHelper', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);

@@ -7,9 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\ErrorReporter;
 
 /**
- * fsync()/fdatasync() semantics for compiled JIT/AOT modules (#9815, php-in-PHP).
+ * fsync()/fdatasync() semantics reference for VM (#9815, php-in-PHP).
  *
- * VM SSOT: {@see VmFs::fsync()} / {@see VmFs::fdatasync()}
+ * Thin AOT/JIT emit uses libc via {@see JitStreamSyncKernel} (NestedJIT of this
+ * helper segfaults under user-script AOT — #26929). Keep algorithms aligned with
+ * {@see VmFs::fsync()} / {@see VmPhpFdStream::syncFileno()}.
+ *
  * php-src: ext/standard/file.c — PHP_FUNCTION(fsync), PHP_FUNCTION(fdatasync)
  */
 final class StreamSyncJitHelper
