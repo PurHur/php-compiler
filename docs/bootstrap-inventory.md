@@ -30517,7 +30517,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregAotFastPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/PregCallbackInvokeJitHelper.php`
 

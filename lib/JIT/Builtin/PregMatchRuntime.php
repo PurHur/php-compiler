@@ -336,8 +336,8 @@ final class PregMatchRuntime
         $context->builder->branchIf($hasCaps, $fillBb, $doneBb);
 
         $context->builder->positionAtEnd($fillBb);
-        // Bound to 2 slots (full match + one capture group) for thin fast path.
-        $max = 2;
+        // Bound to 8 slots (full match + up to 7 groups) for thin fast path (#26888).
+        $max = 8;
         for ($i = 0; $i < $max; ++$i) {
             $idxBb = $fn->appendBasicBlock('preg_match_ex_thin_cap_'.$i);
             $skipBb = $fn->appendBasicBlock('preg_match_ex_thin_skip_'.$i);
@@ -587,7 +587,10 @@ final class PregMatchRuntime
         // Thin standalone AOT: VmPregPure NestedJIT still hits CFG/property gaps (#16075).
         // Use PregJitHelperThinAot (fast paths, no Native→Pure) to avoid AOT segfault (#24115).
         // JIT/embed keeps PregJitHelper + Native (Pure resolves under MCJIT).
-        $bundle = $context->isThinStandaloneAotMain()
+        // Skip helper-runtime cache on thin path — cached PregJitHelper is the full Native
+        // TU and silently returns 0 for matches under thin AOT (#26888).
+        $thin = $context->isThinStandaloneAotMain();
+        $bundle = $thin
             ? [
                 '/ext/standard/StdlibConstants.php',
                 '/ext/standard/PregAotFastPath.php',
@@ -610,7 +613,8 @@ final class PregMatchRuntime
             $context,
             $bundle,
             self::COMPILED_HELPERS,
-            '#24943'
+            '#24943',
+            $thin
         );
     }
 
