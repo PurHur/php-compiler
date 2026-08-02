@@ -34144,16 +34144,43 @@ class Compiler {
                 continue;
             }
             if ($j === $producerIndex) {
-                $newExecBase = 0;
+                // New_ and prior MethodCall/StaticCall also emit FUNCCALL_EXEC_RETURN; omitting
+                // them maps array_keys(get_object_vars($o)) onto an earlier implode/string slot
+                // after $o->m() in the same block (#26770, related #21981/#25812).
+                $nonFuncCallExecBase = 0;
                 for ($k = 0; $k < $producerIndex; ++$k) {
-                    if (($cfgChildren[$k] ?? null) instanceof Op\Expr\New_) {
-                        ++$newExecBase;
+                    $prior = $cfgChildren[$k] ?? null;
+                    if ($prior instanceof Op\Expr\New_) {
+                        ++$nonFuncCallExecBase;
+                        continue;
+                    }
+                    if (
+                        $prior instanceof Op\Expr\MethodCall
+                        || $prior instanceof Op\Expr\NullsafeMethodCall
+                        || $prior instanceof Op\Expr\StaticCall
+                    ) {
+                        if (
+                            $prior instanceof Op\Expr\MethodCall
+                            && $this->methodCallHasStatementLevelSideEffects($prior)
+                        ) {
+                            continue;
+                        }
+                        if (
+                            $prior instanceof Op\Expr\MethodCall
+                            && !$this->methodCallInlineProducerSuppliesCallArgValue($prior)
+                        ) {
+                            continue;
+                        }
+                        $method = $this->staticNameFromOperand($prior->name);
+                        if (null === $method || !$this->methodCallIsKnownVoidReturn($method)) {
+                            ++$nonFuncCallExecBase;
+                        }
                     }
                 }
 
                 return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal(
                     $block,
-                    $funcCallOrdinal + $newExecBase
+                    $funcCallOrdinal + $nonFuncCallExecBase
                 );
             }
             ++$funcCallOrdinal;

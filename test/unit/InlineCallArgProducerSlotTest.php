@@ -4698,6 +4698,55 @@ PHP;
         self::assertStringNotContainsString('TypeError', $out);
     }
 
+    /**
+     * Issue #26770 — after echo implode(',', array_keys($o->m())), array_keys(get_object_vars($o))
+     * must ARG_SEND the get_object_vars EXEC_RETURN, not the prior implode string slot.
+     */
+    public function testArrayKeysGetObjectVarsAfterMethodCallEchoChain(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/issue-26770-get-object-vars-nested-echo.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'issue-26770-get-object-vars-nested-echo.php');
+
+        $getObjectVarsReturn = null;
+        $arrayKeysSendAfterGov = null;
+        $seenGovInit = false;
+        $pendingArrayKeys = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $name = $block->constants[$op->arg1]->toString();
+                if ('get_object_vars' === $name) {
+                    $seenGovInit = true;
+                    $pendingArrayKeys = false;
+                } elseif ('array_keys' === $name && $seenGovInit && null === $arrayKeysSendAfterGov) {
+                    $pendingArrayKeys = true;
+                } else {
+                    $pendingArrayKeys = false;
+                }
+            }
+            if ($seenGovInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $getObjectVarsReturn) {
+                $getObjectVarsReturn = $op->arg1;
+            }
+            if ($pendingArrayKeys && OpCode::TYPE_ARG_SEND === $op->type && null === $arrayKeysSendAfterGov) {
+                $arrayKeysSendAfterGov = $op->arg1;
+                $pendingArrayKeys = false;
+            }
+        }
+
+        self::assertNotNull($getObjectVarsReturn, 'get_object_vars EXEC_RETURN');
+        self::assertNotNull($arrayKeysSendAfterGov, 'array_keys ARG_SEND after get_object_vars');
+        self::assertSame(
+            $getObjectVarsReturn,
+            $arrayKeysSendAfterGov,
+            'array_keys must receive get_object_vars EXEC_RETURN, not prior implode'
+        );
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("B::vars keys=b,c,d\nglobal keys=c\n", ob_get_clean());
+    }
+
     /** Issue #15558 — maintainer_gap repro: assignment form matches var_export probe (#13776). */
     public function testArrayCombineInlineArrayKeysMaintainerGapRepro(): void
     {
