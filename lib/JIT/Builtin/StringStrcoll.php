@@ -15,7 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for strcoll via StrcollJitHelper PHP (#13566 phase 2, #22256).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer CopyRuntime #22231).
- * Replaces libc `strcoll` LLVM lookups in ext/standard and ksort SORT_LOCALE_STRING.
+ * PHP bridge uses `__compiler_strcoll` so AOT does not export libc `strcoll` (#26861).
  * SSOT: {@see \PHPCompiler\ext\standard\VmLocaleCollate}
  */
 final class StringStrcoll
@@ -24,6 +24,8 @@ final class StringStrcoll
 
     private const STRCOLL_HELPER = 'PHPCompiler\\ext\\standard\\StrcollJitHelper::strcollArgv';
 
+    public const ABI_STRCOLL = '__compiler_strcoll';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STRCOLL_HELPER,
@@ -31,7 +33,7 @@ final class StringStrcoll
 
     public static function ensureLinked(Context $context): void
     {
-        self::implementNamed($context, 'strcoll', self::STRCOLL_HELPER);
+        self::implementNamed($context, self::ABI_STRCOLL, self::STRCOLL_HELPER);
     }
 
     public static function ensureStandaloneBodies(Context $context): void

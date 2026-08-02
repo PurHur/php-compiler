@@ -56,6 +56,10 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_argon2_hash', $source);
         $this->assertStringContainsString('phpc_libcrypt_kernel', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        // NestedJIT: strlen($out) after .= never grows — infinite loop / SEGV (#26861).
+        $this->assertStringContainsString('while ($n < 22)', $source);
+        $this->assertMatchesRegularExpression('/while\s*\(\s*\$n\s*<\s*22\s*\)/', $source);
+        $this->assertDoesNotMatchRegularExpression('/while\s*\(\s*\\\\?strlen\s*\(\s*\$out\s*\)/', $source);
     }
 
     public function testPasswordJitHelperHashMatchesVmPassword(): void

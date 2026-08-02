@@ -16,6 +16,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\StringStrcoll;
 use PHPCompiler\JIT\Builtin\StringStrpbrk;
+use PHPCompiler\JIT\Builtin\StringStrspn;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -1019,17 +1020,9 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('substr_compare', $ft);
             $context->registerFunction('substr_compare', $fn);
         }
-        foreach (['strspn', 'strcspn'] as $name) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable $e) {
-                $i8p = $context->getTypeFromString('int8*');
-                $sizeT = $context->getTypeFromString('size_t');
-                $ft = $context->context->functionType($sizeT, false, $i8p, $i8p);
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
-        }
+        // libc strspn/strcspn — never emit PHP bridges under these names (#26861).
+        \PHPCompiler\JIT\LibcExtern::register($context);
+        StringStrspn::ensureLinked($context);
         StringStrpbrk::ensureLinked($context);
         try {
             $context->lookupFunction('strrchr');

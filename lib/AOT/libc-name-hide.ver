@@ -1,0 +1,15 @@
+# Hide PHP string-bridge leftovers that collide with libc (#26861).
+# Stale helper-runtime TUs may still define T strspn/strcspn/strcasecmp/…;
+# if those stay dynamically exported, libxcrypt crypt(3) interposes them and
+# returns *0 (password_hash/crypt AOT break). Main module now emits
+# __compiler_* names; this script keeps any residual libc-named copies local.
+{
+  global:
+    *;
+  local:
+    strspn;
+    strcspn;
+    strcasecmp;
+    strncasecmp;
+    strcoll;
+};

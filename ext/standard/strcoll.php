@@ -48,7 +48,7 @@ final class strcoll extends Internal
         StringStrcoll::ensureLinked($context);
         $p0 = $this->stringDataPtr($context, self::jitStringArg($context, $args[0], 0, 'string1'));
         $p1 = $this->stringDataPtr($context, self::jitStringArg($context, $args[1], 1, 'string2'));
-        $fn = $context->lookupFunction('strcoll');
+        $fn = $context->lookupFunction(StringStrcoll::ABI_STRCOLL);
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
 

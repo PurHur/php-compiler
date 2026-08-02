@@ -157,30 +157,50 @@ final class PasswordJitHelper
 
     private static function bcryptEncodeSalt22(string $rnd16): string
     {
+        // NestedJIT: never gate the loop on strlen($out) after `$out .=` — strlen stays 0
+        // and the loop never ends (#26861). Track emitted length in `$n` instead.
         // Local literal — NestedJIT class-const string can be null (#26773).
         $itoa = './ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
         $out = '';
-        $len = \strlen($rnd16);
         $i = 0;
-        while (\strlen($out) < 22) {
-            $c1 = \ord($rnd16[$i++]);
-            $c2 = $i < $len ? \ord($rnd16[$i++]) : 0;
+        $n = 0;
+        while ($n < 22) {
+            $c1 = \ord($rnd16[$i]);
+            $i = $i + 1;
+            $c2 = 0;
+            if ($i < 16) {
+                $c2 = \ord($rnd16[$i]);
+                $i = $i + 1;
+            }
             $out .= $itoa[$c1 >> 2];
-            if (\strlen($out) >= 22) {
+            $n = $n + 1;
+            if ($n >= 22) {
                 break;
             }
             $out .= $itoa[(($c1 & 0x03) << 4) | ($c2 >> 4)];
-            if (\strlen($out) >= 22) {
+            $n = $n + 1;
+            if ($n >= 22) {
                 break;
             }
-            $c3 = $i < $len ? \ord($rnd16[$i++]) : 0;
+            $c3 = 0;
+            if ($i < 16) {
+                $c3 = \ord($rnd16[$i]);
+                $i = $i + 1;
+            }
             $out .= $itoa[(($c2 & 0x0f) << 2) | ($c3 >> 6)];
-            if (\strlen($out) >= 22) {
+            $n = $n + 1;
+            if ($n >= 22) {
                 break;
             }
             $out .= $itoa[$c3 & 0x3f];
+            $n = $n + 1;
+        }
+        // Fixed-22 copy — avoid substr() NestedJIT edge cases (#26861 / soundex peer).
+        $result = '';
+        for ($j = 0; $j < 22; ++$j) {
+            $result .= $out[$j];
         }
 
-        return \substr($out, 0, 22);
+        return $result;
     }
 }
