@@ -5,30 +5,28 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableReverseLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_reverse() via ArrayReverseJitHelper PHP (#12329).
+ * JIT/AOT link for array_reverse() (#12329, #27067).
  *
- * Standalone AOT compiles {@see ArrayReverseJitHelper} via JitVmHelperLink (#14244); native literal arrays materialize to hashtable then route through PHP (#17922).
- * SSOT: {@see \PHPCompiler\VM\HashTable::reverseCopy()}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayReverseJitHelper} failed on
+ * unresolved HashTable::reverseCopy (#27067). Call-site LLVM via {@see HashTableReverseLlvm}
+ * (peer ArrayFlipRuntime / #26970).
+ *
+ * VM SSOT: {@see \PHPCompiler\VM\HashTable::reverseCopy()}
  * php-src: ext/standard/array.c — php_array_reverse()
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayReverseRuntime
 {
     private const ABI_REVERSE = '__array_reverse__copy';
-
-    private const HELPER_PATH = '/ext/standard/ArrayReverseJitHelper.php';
-
-    private const REVERSE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReverseJitHelper::reverseCopy';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::REVERSE_HELPER,
-    ];
 
     public static function reverse(Context $context, JITVariable $array, ?Value $preserveKeys = null): Value
     {
@@ -64,39 +62,43 @@ final class ArrayReverseRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_REVERSE,
-            'array_reverse_bridge_entry',
-            [$htPtr, $i1],
-            $htPtr,
-            self::REVERSE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12329'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitReverseBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitReverseBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i1 = $context->getTypeFromString('int1');
+        $probe = $context->module->getNamedFunction(self::ABI_REVERSE);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_REVERSE,
+                $context->context->functionType($htPtr, false, $htPtr, $i1)
+            );
+
+        $entry = $fn->appendBasicBlock('array_reverse_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $preserve = $fn->getParam(1);
+        $reversed = HashTableReverseLlvm::reverse($context, $src, $preserve);
+        $context->builder->returnValue($reversed);
+        $context->registerFunction(self::ABI_REVERSE, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_REVERSE);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_REVERSE.' missing after ArrayReverseRuntime bridge (#12329)');
+            throw new \LogicException(self::ABI_REVERSE.' missing after ArrayReverseRuntime bridge (#27067)');
         }
         $context->registerFunction(self::ABI_REVERSE, $fn);
     }

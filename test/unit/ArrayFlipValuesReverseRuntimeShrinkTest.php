@@ -58,13 +58,16 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildValuesFromHashTable', $arrayBuiltin);
     }
 
-    public function testArrayReverseRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayReverseRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void
     {
+        // #27067: NestedJIT of ArrayReverseJitHelper fatals on HashTable::reverseCopy; call-site HashTableReverseLlvm.
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReverseRuntime.php');
-        $this->assertStringContainsString('ArrayReverseJitHelper', $runtime);
+        $this->assertStringContainsString('HashTableReverseLlvm', $runtime);
         $this->assertStringContainsString('loadHashTable', $runtime);
-        $this->assertStringNotContainsString('buildReverseArray', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('buildReverseArray', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_reverse.php');
         $this->assertStringContainsString('ArrayReverseRuntime::reverse', $builtin);
@@ -74,6 +77,13 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildReverseArray', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildReverseFromNativeArray', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildReverseFromHashTable', $arrayBuiltin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReverseLlvm.php');
+        $this->assertStringContainsString('function reverse', $llvm);
+        $this->assertStringContainsString('writeReversedEntry', $llvm);
+
+        $nested = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedVmHashTableMethodLlvm.php');
+        $this->assertStringContainsString("'reversecopy'", $nested);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterFlipValuesReverseLlvmDeletion(): void
