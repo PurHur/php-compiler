@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DateMutationRuntime;
+use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -49,39 +50,188 @@ final class JitDateMutation
             throw new \ArgumentCountError('date_modify() expects exactly 2 arguments, '.\count($args).' given');
         }
 
-        DateMutationRuntime::ensureLinked($context);
+        return self::invokeObjectModify($context, false, 'date_modify', ...$args);
+    }
 
-        $dtObj = self::requireDateTimeObject($context, $args[0], 'date_modify()');
+    /**
+     * DateTime::modify() / DateTimeImmutable::modify() / date_modify() (#26789).
+     *
+     * Thin user-script AOT cannot NestedJIT {@see DateMutationRuntime} (missing
+     * {@see __nativearray__boundscheck}). Prefer compile-time {@see VmDateTimeNative::modifyRelative}
+     * when the receiver carries {@see JITVariable::$compileTimeLong} from construct; otherwise
+     * fixed-length unit deltas (+N day/hour/…) lower to pure LLVM add — no NestedJIT.
+     *
+     * Mutable: in-place timestamp update. Immutable: allocate+copy (or constant allocate) so the
+     * original stays unchanged (php-src zim_DateTimeImmutable_modify).
+     */
+    public static function invokeObjectModify(
+        Context $context,
+        bool $immutable,
+        string $function,
+        JITVariable ...$args
+    ): Value {
+        if (\count($args) < 2) {
+            throw new \LogicException($function.'() requires $this and a modifier argument');
+        }
+
         $modifierLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         if (null === $modifierLit) {
-            JitStringBuiltinArg::lower($context, $args[1], 'date_modify', 2, 'modifier');
+            JitStringBuiltinArg::lower($context, $args[1], $function, $immutable ? 0 : 2, 'modifier');
             throw new \LogicException(
-                'date_modify() requires compile-time string modifier in this compiler build (issue #4604)'
+                $function.'() requires a compile-time string modifier in this compiler build (#26789)'
             );
         }
 
-        $delta = self::parseModifyLiteral($modifierLit);
+        $layout = $immutable ? 'DateTimeImmutable' : 'DateTime';
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
-        $ts = self::readLongProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::TS_PROPERTY);
-        $tz = self::readStringProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::TZ_PROPERTY);
-        $tzCstr = self::stringData($context, $tz);
 
+        // Fast path: construct left compileTimeLong on $this — resolve entirely at compile time.
+        if (null !== $args[0]->compileTimeLong) {
+            $tzName = $args[0]->compileTimeString ?? 'UTC';
+            try {
+                $newTs = VmDateTimeNative::modifyRelative(
+                    (int) $args[0]->compileTimeLong,
+                    $modifierLit,
+                    $tzName
+                );
+            } catch (\Throwable $e) {
+                throw new \LogicException(
+                    $function.'(): Failed to apply modifier at compile time: '.$e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+
+            if ($immutable) {
+                $obj = self::allocateDateTimeLike($context, $layout, $newTs, 0, $tzName);
+                $ret = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    JitValueBox::pointer($context, $ret),
+                    $obj
+                );
+
+                return $ret;
+            }
+
+            $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
+            self::writeLongProp(
+                $context,
+                $object,
+                $dtObj,
+                $layout,
+                DateTimeSupport::TS_PROPERTY,
+                $context->getTypeFromString('int64')->constInt($newTs, false)
+            );
+
+            return self::returnObjectArg($context, $args[0]);
+        }
+
+        // Runtime receiver: fixed-length unit deltas without NestedJIT (#26789).
+        $delta = self::parseModifyLiteral($modifierLit);
+        $scale = self::fixedUnitScaleSeconds($delta['unit']);
+        if (null === $scale) {
+            throw new \LogicException(
+                $function.'(): month/year modifiers require a compile-time DateTime receiver in this build (#26789)'
+            );
+        }
+
+        if ($immutable) {
+            $receiver = ReflectionSetup::loadObjectFromArg($context, $args[0]);
+            $classId = $object->lookup($layout);
+            $target = $object->allocate($classId);
+            ReflectionSetup::markConstructed($context, $target);
+            foreach ([
+                DateTimeSupport::TS_PROPERTY,
+                DateTimeSupport::MICROSECOND_PROPERTY,
+                DateTimeSupport::TZ_PROPERTY,
+            ] as $prop) {
+                $val = $object->propertyFetch($receiver, $layout, $prop);
+                $object->propertyStore(
+                    $object->propertySlotFor($target, $layout, $prop),
+                    $val,
+                    $val->type
+                );
+            }
+            $dtObj = $target;
+        } else {
+            $dtObj = self::requireDateTimeObject($context, $args[0], $function.'()');
+        }
+
+        $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
         $i64 = $context->getTypeFromString('int64');
-        $i64p = $context->getTypeFromString('int64*');
-        $outTsSlot = $context->builder->alloca($i64, 1, 'date_mod_out_ts');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_date_modify_delta'),
-            $ts,
-            $i64->constInt($delta['amount'], false),
-            $i64->constInt($delta['unit'], false),
-            $tzCstr,
-            $outTsSlot
-        );
-        $newTs = $context->builder->load($outTsSlot);
-        self::writeLongProp($context, $object, $dtObj, 'DateTime', DateTimeSupport::TS_PROPERTY, $newTs);
+        $deltaSeconds = $delta['amount'] * $scale;
+        $newTs = $context->builder->add($ts, $i64->constInt($deltaSeconds, true));
+        self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
+
+        if ($immutable) {
+            $ret = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                JitValueBox::pointer($context, $ret),
+                $dtObj
+            );
+
+            return $ret;
+        }
 
         return self::returnObjectArg($context, $args[0]);
+    }
+
+    /**
+     * Seconds per unit for fixed-length modifiers (not month/year).
+     * unit: 0=second, 1=minute, 2=hour, 3=day, 4=week, 5=month, 6=year
+     */
+    private static function fixedUnitScaleSeconds(int $unitCode): ?int
+    {
+        return match ($unitCode) {
+            0 => 1,
+            1 => 60,
+            2 => 3600,
+            3 => 86400,
+            4 => 604800,
+            default => null,
+        };
+    }
+
+    private static function allocateDateTimeLike(
+        Context $context,
+        string $className,
+        int $timestamp,
+        int $microsecond,
+        string $tzName
+    ): Value {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup($className);
+        $obj = $objectType->allocate($classId);
+        $i64 = $context->getTypeFromString('int64');
+        $voidPtr = $context->getTypeFromString('void*');
+
+        $tsPtr = $context->memory->malloc($i64);
+        $context->builder->store($i64->constInt($timestamp, false), $tsPtr);
+        $context->builder->store(
+            $context->builder->pointerCast($tsPtr, $voidPtr),
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::TS_PROPERTY)
+        );
+
+        $usPtr = $context->memory->malloc($i64);
+        $context->builder->store($i64->constInt($microsecond, false), $usPtr);
+        $context->builder->store(
+            $context->builder->pointerCast($usPtr, $voidPtr),
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::MICROSECOND_PROPERTY)
+        );
+
+        $tzStr = $context->builder->load($context->constantStringFromString($tzName));
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $tzStr);
+        $context->builder->store(
+            $context->builder->pointerCast($owned, $voidPtr),
+            $objectType->propertySlotFor($obj, $className, DateTimeSupport::TZ_PROPERTY)
+        );
+
+        $objectType->markObjectConstructed($obj);
+
+        return $obj;
     }
 
     public static function invokeDiff(Context $context, JITVariable ...$args): Value
