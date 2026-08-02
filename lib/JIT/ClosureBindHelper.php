@@ -33,6 +33,8 @@ final class ClosureBindHelper
     {
         $context->functionProxies['closure::bindto'] = new Call\ClosureBindTo();
         $context->functionProxies['closure::bind'] = new Call\ClosureBind();
+        // Avoid ExternalMethod null stub on user-script AOT (#26788).
+        $context->functionProxies['closure::fromcallable'] = new Call\ClosureFromCallable();
     }
 
     public static function ensureClosureBindingProperties(Context $context): void

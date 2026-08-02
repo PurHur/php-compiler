@@ -68,6 +68,14 @@ final class VmFromCallable
         throw new \LogicException('TYPE_FROM_CALLABLE: unsupported callable form in JIT');
     }
 
+    /**
+     * Closure::fromCallable('strlen') / 'Class::method' — shared with FCC string form (#26788).
+     */
+    public static function fromCallableString(Context $context, string $name, ?Block $block = null): JitVariable
+    {
+        return self::fromStringCallable($context, $block ?? new Block(), $name);
+    }
+
     private static function fromStringCallable(Context $context, Block $block, string $name): JitVariable
     {
         // php-src compile-fatal for `new Class(...)` FCC on every version (#10130, #26188).
