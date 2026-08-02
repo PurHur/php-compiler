@@ -3475,6 +3475,26 @@ class Object_ extends Type {
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            // php-src ext/spl/spl_observer.stub.php — Countable + Iterator + Serializable + ArrayAccess.
+            // Thin AOT TYPE_VALUE dim needs ArrayAccess so object keys avoid Illegal offset (#26787 / #24681).
+            $this->ensureZendBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, [
+                'Countable',
+                'Iterator',
+                'Traversable',
+                'Serializable',
+                'ArrayAccess',
+            ]);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'attach', 'detach', 'contains', 'addall', 'removeall', 'removeallexcept',
+                'gethash', 'count', 'rewind', 'valid', 'key', 'current', 'next',
+                'offsetset', 'offsetget', 'offsetexists', 'offsetunset',
+                'getinfo', 'setinfo',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
         }
         if ('arrayiterator' === $lcname || 'recursivearrayiterator' === $lcname) {
             // Thin user-script AOT foreach via __spl_ht packed walk (#26783, #26775).

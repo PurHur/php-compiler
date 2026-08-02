@@ -8,15 +8,16 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_levenshtein via LevenshteinJitHelper PHP (#14648).
+ * JIT/AOT link for phpc_levenshtein via LevenshteinJitHelper PHP (#14648, #26830).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer BcmathJit #23671).
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathRound #26800).
  * Replaces ~196-line LLVM DP in ext/standard/JitLevenshtein.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * SSOT: {@see \PHPCompiler\ext\standard\LevenshteinJitHelper} (same-class NestedJIT).
  * php-src: ext/standard/levenshtein.c — PHP_FUNCTION(levenshtein)
  */
 final class StringLevenshtein
@@ -30,6 +31,8 @@ final class StringLevenshtein
         self::COMPUTE_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'levenshtein_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -42,8 +45,12 @@ final class StringLevenshtein
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('phpc_levenshtein');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction('phpc_levenshtein', $probe);
 
             return;
@@ -68,7 +75,7 @@ final class StringLevenshtein
     {
         $abiName = 'phpc_levenshtein';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -82,7 +89,7 @@ final class StringLevenshtein
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('levenshtein_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $fail = $fn->appendBasicBlock('levenshtein_bridge_fail');
         $body = $fn->appendBasicBlock('levenshtein_bridge_body');
         $context->builder->positionAtEnd($entry);
@@ -118,7 +125,7 @@ final class StringLevenshtein
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#23768');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26830');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -127,7 +134,7 @@ final class StringLevenshtein
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#23768'
+            '#26830'
         );
     }
 }

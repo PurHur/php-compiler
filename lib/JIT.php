@@ -8078,13 +8078,43 @@ class JIT {
                         }
                     }
                     if (
-                        $value->type === Variable::TYPE_OBJECT
-                        && 'splobjectstorage' === strtolower($containerUserType)
-                        && Variable::TYPE_OBJECT === $dim->type
+                        'splobjectstorage' === strtolower($containerUserType)
+                        && (
+                            Variable::TYPE_OBJECT === $value->type
+                            || Variable::TYPE_VALUE === $value->type
+                        )
+                        && (
+                            Variable::TYPE_OBJECT === $dim->type
+                            || Variable::TYPE_VALUE === $dim->type
+                        )
                     ) {
-                        $ht = $this->context->type->object->splBackingHashtable($value);
-                        $htVal = $this->context->helper->loadValue($ht);
-                        $keyObj = $this->context->helper->loadValue($dim);
+                        // AOT boxes `new SplObjectStorage` as TYPE_VALUE (#26787; peer WeakMap #24681).
+                        if (Variable::TYPE_OBJECT === $value->type) {
+                            $ht = $this->context->type->object->splBackingHashtable($value);
+                            $htVal = $this->context->helper->loadValue($ht);
+                        } else {
+                            $objPtr = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readObject'),
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $value)
+                            );
+                            $ht = $this->context->type->object->splBackingHashtable(
+                                new Variable(
+                                    $this->context,
+                                    Variable::TYPE_OBJECT,
+                                    Variable::KIND_VALUE,
+                                    $objPtr
+                                )
+                            );
+                            $htVal = $this->context->helper->loadValue($ht);
+                        }
+                        if (Variable::TYPE_OBJECT === $dim->type) {
+                            $keyObj = $this->context->helper->loadValue($dim);
+                        } else {
+                            $keyObj = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readObject'),
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $dim)
+                            );
+                        }
                         if ($forWrite) {
                             $fetched = JIT\HashTableHelper::writableObjectKeyValueBox(
                                 $this->context,
@@ -10702,7 +10732,8 @@ class JIT {
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                     if (is_null($this->context->scope->toCall)) {
-                        // short circuit
+                        // short circuit (incl. Fiber::suspend() discard in resume fn, #26801)
+                        $this->context->scope->fiberSuspendResultPending = false;
                         break;
                     }
                     $this->context->callSiteLine = (int) ($op->arg1 ?? 0);
@@ -10779,6 +10810,33 @@ class JIT {
                         $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
                         if ($this->context->scope->preserveNewResultOnNullCall) {
                             $this->context->scope->preserveNewResultOnNullCall = false;
+                            break;
+                        }
+                        // Fiber::suspend() in a resume function → value from Fiber::resume()/throw (#26801).
+                        if ($this->context->scope->fiberSuspendResultPending) {
+                            $this->context->scope->fiberSuspendResultPending = false;
+                            JIT\FiberHelper::ensureTypes($this->context);
+                            $stateParam = $this->context->fiberStateParam;
+                            if (null === $stateParam) {
+                                throw new \LogicException('Fiber::suspend() result requires fiber state param');
+                            }
+                            $map = $this->context->structFieldMap['__fiber_state__'];
+                            $resumeArgField = $this->context->builder->structGep(
+                                $stateParam,
+                                $map['resume_argument']
+                            );
+                            $resultVar = new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VARIABLE,
+                                JIT\JitValueBox::alloc($this->context)
+                            );
+                            JIT\JitValueBox::copyFromPointer(
+                                $this->context,
+                                $resultVar->value,
+                                $resumeArgField
+                            );
+                            $this->assignOperandForced($block->getOperand($op->arg1), $resultVar);
                             break;
                         }
                         $nullVar = new Variable(
@@ -17800,6 +17858,33 @@ class JIT {
             } elseif ('prepend' === $methodLc && $this->context->functionIsRegistered('domnode::prepend')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('after' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::after');
+                if ($this->context->functionIsRegistered('domnode::after')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('before' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::before');
+                if ($this->context->functionIsRegistered('domnode::before')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('replacewith' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::replacewith');
+                if ($this->context->functionIsRegistered('domnode::replacewith')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif (
+                'remove' === $methodLc
+                && !str_contains($declaringClassLc, 'tokenlist')
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::remove');
+                if ($this->context->functionIsRegistered('domnode::remove')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('replacechildren' === $methodLc && $this->context->functionIsRegistered('domnode::replacechildren')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -18727,8 +18812,11 @@ class JIT {
             return;
         }
         if ($this->context->compilingFiberResume && 'fiber' === $declaringClassLc && 'suspend' === $methodLc) {
+            // Resume continuation: FUNCCALL_EXEC_RETURN loads resume_argument (#26801).
             $this->context->scope->toCall = null;
             $this->context->scope->args = [];
+            $this->context->scope->argOperands = [];
+            $this->context->scope->fiberSuspendResultPending = true;
 
             return;
         }

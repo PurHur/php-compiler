@@ -80,6 +80,26 @@ final class DomInstanceMethodJit
         'domelement::replacechild' => true,
         'domnode::insertbefore' => true,
         'domelement::insertbefore' => true,
+        'domnode::after' => true,
+        'domelement::after' => true,
+        'domcharacterdata::after' => true,
+        'domtext::after' => true,
+        'domcomment::after' => true,
+        'domnode::before' => true,
+        'domelement::before' => true,
+        'domcharacterdata::before' => true,
+        'domtext::before' => true,
+        'domcomment::before' => true,
+        'domnode::replacewith' => true,
+        'domelement::replacewith' => true,
+        'domcharacterdata::replacewith' => true,
+        'domtext::replacewith' => true,
+        'domcomment::replacewith' => true,
+        'domnode::remove' => true,
+        'domelement::remove' => true,
+        'domcharacterdata::remove' => true,
+        'domtext::remove' => true,
+        'domcomment::remove' => true,
         'domnode::normalize' => true,
         'domelement::normalize' => true,
         'domdocument::normalize' => true,
@@ -369,6 +389,46 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::after' === $lc
+                || 'domelement::after' === $lc
+                || 'domcharacterdata::after' === $lc
+                || 'domtext::after' === $lc
+                || 'domcomment::after' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeAfter();
+
+                return;
+            }
+            if ('domnode::before' === $lc
+                || 'domelement::before' === $lc
+                || 'domcharacterdata::before' === $lc
+                || 'domtext::before' === $lc
+                || 'domcomment::before' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeBefore();
+
+                return;
+            }
+            if ('domnode::replacewith' === $lc
+                || 'domelement::replacewith' === $lc
+                || 'domcharacterdata::replacewith' === $lc
+                || 'domtext::replacewith' === $lc
+                || 'domcomment::replacewith' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeReplaceWith();
+
+                return;
+            }
+            if ('domnode::remove' === $lc
+                || 'domelement::remove' === $lc
+                || 'domcharacterdata::remove' === $lc
+                || 'domtext::remove' === $lc
+                || 'domcomment::remove' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeChildRemove();
+
+                return;
+            }
             if ('domnode::normalize' === $lc
                 || 'domelement::normalize' === $lc
                 || 'domdocument::normalize' === $lc
@@ -525,6 +585,26 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::replacechild');
             self::ensureProxy($context, 'domnode::insertbefore');
             self::ensureProxy($context, 'domelement::insertbefore');
+            self::ensureProxy($context, 'domnode::after');
+            self::ensureProxy($context, 'domelement::after');
+            self::ensureProxy($context, 'domcharacterdata::after');
+            self::ensureProxy($context, 'domtext::after');
+            self::ensureProxy($context, 'domcomment::after');
+            self::ensureProxy($context, 'domnode::before');
+            self::ensureProxy($context, 'domelement::before');
+            self::ensureProxy($context, 'domcharacterdata::before');
+            self::ensureProxy($context, 'domtext::before');
+            self::ensureProxy($context, 'domcomment::before');
+            self::ensureProxy($context, 'domnode::replacewith');
+            self::ensureProxy($context, 'domelement::replacewith');
+            self::ensureProxy($context, 'domcharacterdata::replacewith');
+            self::ensureProxy($context, 'domtext::replacewith');
+            self::ensureProxy($context, 'domcomment::replacewith');
+            self::ensureProxy($context, 'domnode::remove');
+            self::ensureProxy($context, 'domelement::remove');
+            self::ensureProxy($context, 'domcharacterdata::remove');
+            self::ensureProxy($context, 'domtext::remove');
+            self::ensureProxy($context, 'domcomment::remove');
             self::ensureProxy($context, 'domnode::normalize');
             self::ensureProxy($context, 'domelement::normalize');
             self::ensureProxy($context, 'domdocument::normalize');

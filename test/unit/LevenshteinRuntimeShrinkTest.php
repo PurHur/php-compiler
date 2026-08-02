@@ -33,10 +33,14 @@ final class LevenshteinRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitLevenshtein', $builtin);
     }
 
-    public function testLevenshteinJitHelperDelegatesToVmString(): void
+    public function testLevenshteinJitHelperIsSelfContainedSsot(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/LevenshteinJitHelper.php');
-        $this->assertStringContainsString('VmString::levenshtein', $source);
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('Same-class only', $source);
+
+        $vm = (string) file_get_contents(__DIR__.'/../../ext/standard/VmString.php');
+        $this->assertStringContainsString('LevenshteinJitHelper::computeArgv', $vm);
 
         $this->assertSame(3, LevenshteinJitHelper::computeArgv('kitten', 'sitting', 1, 1, 1));
         $this->assertSame(3, VmString::levenshtein('kitten', 'sitting'));
