@@ -6,14 +6,18 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for round() via RoundJitHelper PHP (#15211).
+ * JIT/AOT link for round() via RoundJitHelper PHP (#15211, #26800).
  *
  * Replaces ~477 LOC inline LLVM in ext/standard/JitRoundLowering.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmRound}.
+ * SSOT: {@see \PHPCompiler\ext\standard\RoundJitHelper::roundArgv}.
  * php-src: ext/standard/math.c — _php_math_round
+ *
+ * Solo RoundJitHelper NestedJIT (algorithm is same-class — no cross-class stub).
+ * Peer AbsJitHelper; metaphone needed HELPER_BUNDLE only because SSOT was elsewhere (#26794).
  */
 final class MathRound
 {
@@ -27,6 +31,8 @@ final class MathRound
     private const COMPILED_HELPERS = [
         self::ROUND_HELPER,
     ];
+
+    private const BRIDGE_ENTRY = 'round_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -52,12 +58,23 @@ final class MathRound
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_ROUND);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_ROUND, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_ROUND,
-            'round_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double, $i64, $i64],
             $double,
             self::ROUND_HELPER,
