@@ -31,12 +31,14 @@ final class VmProcessIdentityPureRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('getpid')", $source);
     }
 
-    public function testJitGetCurrentUserRoutesThroughProcessIdentityJit(): void
+    public function testJitGetCurrentUserUsesLibcGeteuidGetpwuid(): void
     {
+        // Thin AOT NestedJIT of ProcessIdentityJitHelper SEGVs (#26941); restore libc path (#6119).
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetCurrentUser.php');
-        $this->assertStringContainsString('ProcessIdentityJit::getCurrentUser', $source);
-        $this->assertStringNotContainsString("lookupFunction('getpwuid')", $source);
-        $this->assertStringNotContainsString("lookupFunction('geteuid')", $source);
+        $this->assertStringContainsString("lookupFunction('geteuid')", $source);
+        $this->assertStringContainsString("lookupFunction('getpwuid')", $source);
+        $this->assertStringNotContainsString('ProcessIdentityJit::getCurrentUser', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
     }
 
     public function testGetCurrentUserEmptyForVirtualScriptPaths(): void
