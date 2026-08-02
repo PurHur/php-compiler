@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6772 |
-| Phase A inventory files (M2 ratio SSOT) | 6772 |
+| PHP files on vm.php path | 6773 |
+| Phase A inventory files (M2 ratio SSOT) | 6773 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21890 |
+| Source constructs flagged (warnings) | 21892 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4934,6 +4934,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
+| `lib/JIT/ArrayFindLlvm.php` | 0 | 2 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayMapLlvm.php` | 0 | 5 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
@@ -43843,6 +43844,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `lib/JIT/ArrayFindLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new NestedClosureInvoke (line 91)
+- 2 class method(s)
 
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
 

@@ -59,12 +59,12 @@ final class ArrayFindJitHelper
                 $userFn,
                 $keyFirst
             ): Variable {
-                return VmUserCall::invokeTwo(
-                    $ctx,
-                    $userFn,
-                    $keyFirst ? $keyVar : $item,
-                    $keyFirst ? $item : $keyVar,
-                );
+                // Assign ternary results before ARG_SEND — inline `?:` call args leave
+                // Temporary slots unbound under NestedJIT (#26824).
+                $arg0 = $keyFirst ? $keyVar : $item;
+                $arg1 = $keyFirst ? $item : $keyVar;
+
+                return VmUserCall::invokeTwo($ctx, $userFn, $arg0, $arg1);
             };
         }
 
@@ -98,12 +98,12 @@ final class ArrayFindJitHelper
             $closureState,
             $keyFirst
         ): Variable {
-            return VmClosureCall::invoke(
-                $ctx,
-                $closureState,
-                $keyFirst ? $keyVar : $item,
-                $keyFirst ? $item : $keyVar,
-            );
+            // Assign ternary results before ARG_SEND — inline `?:` call args leave
+            // Temporary slots unbound under NestedJIT (#26824).
+            $arg0 = $keyFirst ? $keyVar : $item;
+            $arg1 = $keyFirst ? $item : $keyVar;
+
+            return VmClosureCall::invoke($ctx, $closureState, $arg0, $arg1);
         };
 
         return self::walkWithPredicate($ht, $mode, $strict, $invoke);
