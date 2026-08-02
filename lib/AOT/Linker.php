@@ -31,6 +31,9 @@ final class Linker
      * above); link the versioned .so directly — 22.04 pinned env ships OpenSSL 3. */
     private const OPENSSL_LINK_LIB = '-l:libcrypto.so.3';
 
+    /** Appended when libargon2 is present — PasswordJitHelper NestedJIT thin argon2 (#26773). */
+    private const ARGON2_LINK_LIB = '-l:libargon2.so.1';
+
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
 
@@ -214,8 +217,27 @@ final class Linker
         if (OpensslSignRuntime::opensslEvRuntimeAvailable()) {
             $libs .= ' '.self::OPENSSL_LINK_LIB;
         }
+        if (self::argon2RuntimeAvailable()) {
+            $libs .= ' '.self::ARGON2_LINK_LIB;
+        }
 
         return $libs;
+    }
+
+    /** libargon2.so.1 for AOT password_hash(PASSWORD_ARGON2*) thin kernel (#26773). */
+    private static function argon2RuntimeAvailable(): bool
+    {
+        foreach ([
+            '/usr/lib/x86_64-linux-gnu/libargon2.so.1',
+            '/usr/lib/libargon2.so.1',
+            '/lib/x86_64-linux-gnu/libargon2.so.1',
+        ] as $path) {
+            if (\is_file($path)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function progressAbiEnabled(): bool

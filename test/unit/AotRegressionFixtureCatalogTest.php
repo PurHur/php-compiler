@@ -121,6 +121,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'urldecode_enum_typeerror.php' => ['urldecode_enum_typeerror.php'],
             'urlencode_enum_typeerror.php' => ['urlencode_enum_typeerror.php'],
             'password_needs_rehash_enum_typeerror.php' => ['password_needs_rehash_enum_typeerror.php'],
+            'password_hash_argon2id_options.php' => ['password_hash_argon2id_options.php'],
             'password_hash_enum_case_typeerror.php' => ['password_hash_enum_case_typeerror.php'],
             'password_hash_null_password_coerce.php' => ['password_hash_null_password_coerce.php'],
             'json_encode_stringable.php' => ['json_encode_stringable.php'],

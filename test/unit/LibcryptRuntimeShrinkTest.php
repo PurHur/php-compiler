@@ -26,12 +26,13 @@ final class LibcryptRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
-    public function testLibcryptJitHelperUsesHostCrypt(): void
+    public function testLibcryptJitHelperUsesLibcryptKernelNotPhpCrypt(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/LibcryptJitHelper.php');
-        $this->assertStringContainsString('\\crypt(', $source);
-        // Body calls host crypt(); SSOT docblock may still name __compiler_libcrypt (#9275).
-        $this->assertStringContainsString('function_exists(\'crypt\')', $source);
+        $this->assertStringContainsString('phpc_libcrypt_kernel', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_libcrypt_kernel.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitLibcryptKernel.php');
 
         if (!\function_exists('crypt')) {
             $this->markTestSkipped('host crypt() unavailable');

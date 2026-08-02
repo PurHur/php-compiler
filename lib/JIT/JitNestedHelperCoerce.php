@@ -350,7 +350,12 @@ final class JitNestedHelperCoerce
         return $raw;
     }
 
-    /** Nested helpers may return {@see __value__*} for nullable string. */
+    /**
+     * Nested helpers may return {@see __value__*} / {@see __string__*} / i64 for nullable string.
+     *
+     * NestedJIT under user-script AOT may lower string returns as i64 (#20664 peer for hashtables;
+     * password_hash AOT bridge saw result=ok in-helper then null at the ABI — #26773).
+     */
     public static function extractStringPtrFromHelperResult(Context $context, Value $raw): Value
     {
         $strPtr = $context->getTypeFromString('__string__*');
@@ -362,6 +367,10 @@ final class JitNestedHelperCoerce
                 $context->lookupFunction('__value__readString'),
                 self::valueBoxPtrFromHelperResult($context, $raw)
             );
+        }
+        $haveStr = $context->getStringFromType($raw->typeOf());
+        if ('int64' === $haveStr || 'long long' === $haveStr) {
+            return self::i64ToTypedPtr($context, $raw, $strPtr);
         }
 
         return $context->builder->bitcast($raw, $strPtr);

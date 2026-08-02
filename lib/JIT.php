@@ -18635,6 +18635,22 @@ class JIT {
         $className = $this->resolveJitStaticScopeClass($block, $classOp);
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($nameOp->value);
+        // NestedJIT helper compile: fold isActive() → true so AOT-linked helpers keep
+        // the __compiler_* branch (VmPasswordPure / secureRandomBytes) (#26773).
+        if (
+            JIT\NestedJitCompileScope::isActive()
+            && 'isactive' === $methodLc
+            && (
+                'phpcompiler\\jit\\nestedjitcompilescope' === $declaringClassLc
+                || str_ends_with($declaringClassLc, '\\nestedjitcompilescope')
+                || 'nestedjitcompilescope' === $declaringClassLc
+            )
+        ) {
+            $this->context->scope->toCall = new JIT\Call\NestedJitCompileScopeIsActiveTrue();
+            $this->context->scope->args = [];
+
+            return;
+        }
         if ($this->context->compilingFiberResume && 'fiber' === $declaringClassLc && 'suspend' === $methodLc) {
             $this->context->scope->toCall = null;
             $this->context->scope->args = [];
