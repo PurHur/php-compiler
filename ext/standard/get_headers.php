@@ -71,6 +71,8 @@ final class get_headers extends Internal
 
         $headers = VmHttpFetchNative::fetchHeaders($url);
         if (false === $headers) {
+            // php-src head.c — php_stream_open_wrapper failure → E_WARNING + false (#26705).
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'get_headers', $url);
             $frame->returnVar->bool(false);
 
             return;

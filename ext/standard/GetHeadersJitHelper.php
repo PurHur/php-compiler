@@ -25,6 +25,12 @@ final class GetHeadersJitHelper
 
         $headers = VmHttpFetchNative::fetchHeaders($url);
         if (false === $headers) {
+            // php-src head.c — same Failed to open stream Warning as VM (#26705).
+            // TriggerErrorJitHelper (not compiler_language_warning) — NestedJIT-safe, matches #26383.
+            TriggerErrorJitHelper::warning(
+                VmStreamOpenFailure::failedToOpenMessage('get_headers', $url)
+            );
+
             return null;
         }
 
