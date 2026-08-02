@@ -58,14 +58,15 @@ final class MathRound
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_ROUND);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_ROUND, $probe);
 
+            return;
+        }
+
+        // Skip NestedJIT of RoundJitHelper inside another helper (#26862).
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 

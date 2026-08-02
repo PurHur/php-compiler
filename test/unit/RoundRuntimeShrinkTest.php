@@ -22,6 +22,10 @@ final class RoundRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('RoundJitHelper', $bridge);
         $this->assertStringContainsString('phpc_round', $bridge);
         $this->assertStringContainsString('ensureBridge', $bridge);
+        $this->assertMatchesRegularExpression(
+            '/hasNamedBridgeEntry\(.*?BRIDGE_ENTRY\).*?NestedJitCompileScope::isActive/s',
+            $bridge
+        );
 
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitRoundLowering.php');
     }

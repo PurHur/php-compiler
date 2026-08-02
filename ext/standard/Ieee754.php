@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
  * LLVM value stays `double`, so Helper emits integer `mul`/`sub` on doubles and
  * module verify fails. Do **not** use by-ref int params (NestedJIT segfault) or
  * bool endian args (ternary always takes the false branch under NestedJIT).
+ * Do **not** call \round() — MathRound skips under NestedJIT (#26862).
  */
 final class Ieee754
 {
@@ -99,8 +100,9 @@ final class Ieee754
         }
         $exp = $exp - 1 + 127;
         // Keep every intermediate as float — NestedJIT (#22990).
+        // Half-up without round builtin (#26862).
         $scaled = ($mantissa - 0.5) * 2.0 * 8388608.0;
-        $fraction = (int) \round($scaled);
+        $fraction = (int) ($scaled + 0.5);
         if ($fraction >= 8388608) {
             $fraction = 0;
             ++$exp;
@@ -168,8 +170,9 @@ final class Ieee754
             --$exp;
         }
         $exp = $exp - 1 + 1023;
+        // Half-up without round builtin (#26862).
         $scaled = ($mantissa - 0.5) * 2.0 * 4503599627370496.0;
-        $fraction = (int) \round($scaled);
+        $fraction = (int) ($scaled + 0.5);
         if ($fraction >= 4503599627370496) {
             $fraction = 0;
             ++$exp;

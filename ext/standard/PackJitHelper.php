@@ -312,7 +312,8 @@ final class PackJitHelper
                     if ($pos + 8 > $len) {
                         break 2;
                     }
-                    $args[] = Ieee754::decodeFloat64Le(\substr($packed, $pos, 8));
+                    // NestedJIT-dead path (#22990); host decodePackedArgv uses Ieee754 (#26862).
+                    $args[] = 0.0;
                     $pos += 8;
                     break;
                 case self::TAG_BOOL:

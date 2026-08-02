@@ -49,4 +49,13 @@ final class Ieee754Test extends TestCase
         $this->assertSame(INF, Ieee754::decodeFloat32(Ieee754::encodeFloat32(INF, true), true));
         $this->assertSame(-INF, Ieee754::decodeFloat32(Ieee754::encodeFloat32(-INF, true), true));
     }
+
+    /** NestedJIT pack must not call \round() — MathRound skips under NestedJIT (#26862). */
+    public function testEncodeAvoidsHostRoundBuiltin(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Ieee754.php');
+        $this->assertStringNotContainsString('\round($', $source);
+        $this->assertStringContainsString('#26862', $source);
+        $this->assertStringContainsString('(int) ($scaled + 0.5)', $source);
+    }
 }
