@@ -499,7 +499,17 @@ final class TryCatchHelper
 
             return;
         }
-        $func = $context->builder->getInsertBlock()->getParent();
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'catchable_error_resume');
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        }
+        if (null === $insert) {
+            ErrorRaise::emitRaise($context, $message);
+
+            return;
+        }
+        $func = $insert->getParent();
         assert($func instanceof Function_);
         $dispatchBb = null !== $jit
             ? self::dispatchBbFor($jit, $func, $context, $handler, [])

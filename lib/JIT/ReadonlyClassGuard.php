@@ -65,9 +65,19 @@ final class ReadonlyClassGuard
             $context->builder->structGep($obj, $objMap['class_id'])
         );
 
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof \PHPLLVM\Value\Function_);
-        $entry = $context->builder->getInsertBlock();
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            // NestedJIT / pending-Error body emission can clear the insert block; resume
+            // in an open block rather than Factory::basicBlock(null) (#26826).
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'readonly_guard_resume');
+            $entry = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null === $entry) {
+                return;
+            }
+            $fn = $entry->getParent();
+            assert($fn instanceof \PHPLLVM\Value\Function_);
+        }
         $storeBlock = $fn->appendBasicBlock('readonly_allow_store');
         $exitBlock = $fn->appendBasicBlock('readonly_guard_exit');
 
@@ -188,11 +198,17 @@ final class ReadonlyClassGuard
             $loaded,
             $voidPtr->constNull()
         );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $fn = BasicBlockHelper::parentFunction($context);
         $checkType = $fn->appendBasicBlock('readonly_slot_type_check');
         $merge = $fn->appendBasicBlock('readonly_slot_uninit_merge');
-        $entry = $context->builder->getInsertBlock();
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'readonly_slot_uninit_entry');
+            $entry = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null === $entry) {
+                return null;
+            }
+        }
         $context->builder->branchIf($isNull, $merge, $checkType);
 
         $context->builder->positionAtEnd($checkType);
@@ -255,8 +271,7 @@ final class ReadonlyClassGuard
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, $message);
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $fn = BasicBlockHelper::parentFunction($context);
         $exitBlock = $fn->appendBasicBlock('readonly_init_scope_exit');
         $context->builder->branch($exitBlock);
         $context->builder->positionAtEnd($exitBlock);
@@ -277,7 +292,8 @@ final class ReadonlyClassGuard
     ): void {
         if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
             TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
-            $insert = $context->builder->getInsertBlock();
+            // getInsertBlock() throws on null ref — use tryGetInsertBlock (#26826).
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
             if (null !== $insert && null === $insert->getTerminator()) {
                 ErrorRaise::registerDeclarations($context);
                 ErrorRaise::ensureLinked($context);
@@ -299,7 +315,12 @@ final class ReadonlyClassGuard
      */
     private static function returnAfterPendingError(Context $context): void
     {
-        $fn = $context->builder->getInsertBlock()->getParent();
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'readonly_pending_return');
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        }
+        $fn = null !== $insert ? $insert->getParent() : BasicBlockHelper::parentFunction($context);
         assert($fn instanceof \PHPLLVM\Value\Function_);
         if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
             $context->builder->returnVoid();
@@ -345,11 +366,19 @@ final class ReadonlyClassGuard
         ReadonlyBridge::ensureLinked($context);
         ReadonlyBridge::registerDeclarations($context);
 
+        // NestedJIT / ReadonlyRaise body emission can clear the insert block; store
+        // unconditionally rather than fatal via Builder::getInsertBlock (#26756, #26826).
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            $emitStore();
+
+            return;
+        }
+
         $fn = BasicBlockHelper::parentFunction($context);
         $doStore = $fn->appendBasicBlock('readonly_store_do');
         $skipStore = $fn->appendBasicBlock('readonly_store_skip');
         $done = $fn->appendBasicBlock('readonly_store_done');
-        $entry = $context->builder->getInsertBlock();
 
         $i32 = $context->getTypeFromString('int32');
         $zero = $i32->constInt(0, false);
