@@ -1174,6 +1174,11 @@ class Context {
         // Wire class static factories to date_create*_from_format JIT (#26788 / #6172).
         $this->functionProxies['datetime::createfromformat'] = new Call\DateTimeCreateFromFormat(false);
         $this->functionProxies['datetimeimmutable::createfromformat'] = new Call\DateTimeCreateFromFormat(true);
+        // PHP 8.4+ createFromTimestamp — avoid ExternalMethod null stub abort on thin AOT (#26936).
+        if (CompilerVersion::supportsDateTimeCreateFromTimestamp()) {
+            $this->functionProxies['datetime::createfromtimestamp'] = new Call\DateTimeCreateFromTimestamp(false);
+            $this->functionProxies['datetimeimmutable::createfromtimestamp'] = new Call\DateTimeCreateFromTimestamp(true);
+        }
         // php-src stub $datetime — InternalArgInfo still says time (#24589).
         $this->functionProxies['dateinterval::createfromdatestring'] = new Call\DateIntervalCreateFromDateString();
         // Mutable setTimezone — thin user-script AOT property write (#22824).
