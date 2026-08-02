@@ -373,21 +373,13 @@ final class ReflectionBuiltinHelper
 
     private static function classNameFromId(Context $context, Value $classId): Value
     {
-        GetClassRuntime::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__phpc_class_name_from_id'),
-            $classId
-        );
+        // Inline select-walk in the caller block — do not emit a mid-function ABI
+        // bridge (thin AOT get_class($local) / catch get_class($e) aborted, #26854).
+        return GetClassRuntime::emitClassNameFromId($context, $classId);
     }
 
     private static function debugTypeClassNameFromId(Context $context, Value $classId): Value
     {
-        GetClassRuntime::ensureDebugTypeLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__phpc_debug_type_class_name_from_id'),
-            $classId
-        );
+        return GetClassRuntime::emitDebugTypeClassNameFromId($context, $classId);
     }
 }

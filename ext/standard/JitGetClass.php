@@ -131,20 +131,23 @@ final class JitGetClass
             $context->builder->structGep($loaded, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED — AOT stores JIT tags (TYPE_OBJECT|0x80). Unmasked
+        // compare vs VM TYPE_OBJECT=5 missed objects and aborted (#26854 / #21921).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_NULL & 0x7f, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'get_class_ok');
         $checkStringBlock = BasicBlockHelper::append($context, 'get_class_check_string');
@@ -165,6 +168,11 @@ final class JitGetClass
                 'get_class() runtime string operand with allow_string requires a compile-time literal in this compiler build'
             );
         }
+
+        // checkNull was missing a terminator; the isNull branch was incorrectly
+        // appended to stringErr after abort, leaving checkNull unterminated and
+        // miscompiling the object path under thin AOT (#26854).
+        $context->builder->positionAtEnd($checkNullBlock);
         $context->builder->branchIf($isNull, $nullErrBlock, $mixedErrBlock);
 
         $context->builder->positionAtEnd($nullErrBlock);
@@ -222,6 +230,11 @@ final class JitGetClass
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
+        // Thin AOT miscompiles the parent function when abort blocks lack a
+        // terminator (unterminated siblings poison the object ok-path, #26854).
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
     }
 
     private static function scalarTypeError(int $type): string

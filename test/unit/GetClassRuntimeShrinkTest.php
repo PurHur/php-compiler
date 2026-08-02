@@ -8,20 +8,21 @@ use PHPCompiler\ext\standard\GetClassJitHelper;
 use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPUnit\Framework\TestCase;
 
-/** GetClassRuntime ABI select-walk for thin AOT get_class (#24976 / #26854). */
+/** GetClassRuntime inline select-walk for thin AOT get_class (#24976 / #26854). */
 final class GetClassRuntimeShrinkTest extends TestCase
 {
-    public function testGetClassRuntimeEmitsMainModuleAbi(): void
+    public function testGetClassRuntimeEmitsInlineSelectWalk(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GetClassRuntime.php');
-        $this->assertStringContainsString('__phpc_class_name_from_id', $source);
+        $this->assertStringContainsString('emitClassNameFromId', $source);
         $this->assertStringContainsString('emitSelectWalk', $source);
         $this->assertStringContainsString('seedThrowableClassNames', $source);
         $this->assertStringContainsString('helperSourceForMap', $source);
         $this->assertStringContainsString('constantStringFromString', $source);
         $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('__phpc_class_name_from_id', $source);
+        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
     }
 
     public function testHelperSourceForMapEmbedsClassTable(): void
