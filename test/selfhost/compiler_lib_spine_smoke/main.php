@@ -5699,6 +5699,7 @@ require_once __DIR__.'/../../../lib/JIT/RuntimeEmitTuInit.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimeInitParsePipeline.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimeParseM5Native.php';
+require_once __DIR__.'/../../../lib/JIT/RuntimeParseM5PhpCfgParser.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimePrepareSpineIdentity.php';
 require_once __DIR__.'/../../../lib/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/../../../lib/JIT/ScalarDimFetchHelper.php';

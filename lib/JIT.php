@@ -17,6 +17,7 @@ require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
 require_once __DIR__.'/JIT/RuntimeParseM5Native.php';
+require_once __DIR__.'/JIT/RuntimeParseM5PhpCfgParser.php';
 require_once __DIR__.'/JIT/RuntimePrepareSpineIdentity.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
@@ -4832,8 +4833,24 @@ class JIT {
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
-        // M5: emit C-floor parse after stubbing NestedJIT of Runtime.php::parse (#26756).
+        // M5: NestedJIT PHPCfg\Parser::parse first so C-floor Runtime::parse can call it (#26756).
         if ($this->shouldUseM5DriverHostCompile()) {
+            JIT\RuntimeParseM5PhpCfgParser::ensureParse(
+                $this->context,
+                fn (string $n): string => $this->llvmInternalName($n),
+                function (callable $body): void {
+                    JIT\NestedJitCompileScope::run($this->context, $body);
+                },
+                function ($block, string $logical): void {
+                    $this->compileBlock($block, $logical);
+                },
+                function (string $logical, $cfgFunc) {
+                    return $this->context->runtime->compileFunc($logical, $cfgFunc);
+                },
+                function (string $code, string $path) {
+                    return $this->context->runtime->parse($code, $path);
+                }
+            );
             $parseLogical = 'PHPCompiler\\Runtime::parse';
             $parseLc = strtolower($parseLogical);
             if (!isset($this->context->functions[$parseLc])) {

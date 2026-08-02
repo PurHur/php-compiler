@@ -84,9 +84,24 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $floor = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5Native.php');
         $this->assertStringContainsString('#26756', $floor);
         $this->assertStringContainsString('PHPCfg\\Parser', $floor);
+        $this->assertFileExists($root.'/lib/JIT/RuntimeParseM5PhpCfgParser.php');
+        $force = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5PhpCfgParser.php');
+        $this->assertStringContainsString('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT', $force);
+        $this->assertStringContainsString('PHPCfg\\Parser::parse', $force);
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
         $this->assertStringContainsString('RuntimeParseM5Native.php', $jit);
         $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $jit);
+        $this->assertStringContainsString('RuntimeParseM5PhpCfgParser.php', $jit);
+        $this->assertStringContainsString('RuntimeParseM5PhpCfgParser::ensureParse', $jit);
+        // Within compileM3EmitTuRuntimeSpineMethodsForRealLowering, force-include precedes C-floor.
+        $spineFn = strpos($jit, 'function compileM3EmitTuRuntimeSpineMethodsForRealLowering');
+        $this->assertNotFalse($spineFn);
+        $spineChunk = substr($jit, $spineFn, 8000);
+        $forcePos = strpos($spineChunk, 'RuntimeParseM5PhpCfgParser::ensureParse');
+        $floorPos = strpos($spineChunk, 'RuntimeParseM5Native::emitFunction');
+        $this->assertNotFalse($forcePos, 'ensureParse must be wired in spine real-lower');
+        $this->assertNotFalse($floorPos, 'C-floor emit must remain in spine real-lower');
+        $this->assertLessThan($floorPos, $forcePos, 'Parser NestedJIT must precede C-floor parse emit');
         // M5 must stub NestedJIT of parse and emit C-floor instead.
         $stubPos = strpos($jit, "\$emitHelperStubMethods = array_merge(\$emitHelperStubMethods, [\n                    'parse'");
         if (false === $stubPos) {
