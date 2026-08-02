@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Builtin;
 
 class Type extends Builtin {
@@ -778,7 +779,12 @@ class Type extends Builtin {
         );
         $this->context->registerFunction('__compiler_gettimeofday_float', $fnGettimeofdayFloat);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeHrtimeNs = $this->context->context->functionType($double, false);
+        // Match JitDate::hrtime / StringHrtimeRuntime: i64 on 64-bit (writeLong), double on 32-bit
+        // (writeDouble). Hardcoding double broke AOT module verify via writeLong (#26910).
+        $hrtimeNsRet = CompilerVersion::supportsHrtimeAsNumberFloat()
+            ? $double
+            : $this->context->getTypeFromString('int64');
+        $fntypeHrtimeNs = $this->context->context->functionType($hrtimeNsRet, false);
         $fnHrtimeNs = $this->context->module->addFunction('__compiler_hrtime_ns', $fntypeHrtimeNs);
         $this->context->registerFunction('__compiler_hrtime_ns', $fnHrtimeNs);
         $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);

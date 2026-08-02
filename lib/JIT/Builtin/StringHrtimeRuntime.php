@@ -17,12 +17,13 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * env clear — no hand-rolled NestedJit putenv). Peer: StringClockGettimeRuntime #21270.
  * SSOT: {@see \PHPCompiler\ext\standard\VmHrtimeNative}.
  * php-src: ext/standard/hrtime.c — hrtime
+ *
+ * Pair form: NestedJIT array returns are empty under thin AOT (#26910). Build [sec, nsec] in the
+ * LLVM bridge from nsInt (same monotonic read) via __hashtable__alloc / setLongAt.
  */
 final class StringHrtimeRuntime
 {
     private const HELPER_PATH = '/ext/standard/HrtimeJitHelper.php';
-
-    private const PAIR_HELPER = 'PHPCompiler\\ext\\standard\\HrtimeJitHelper::pair';
 
     private const NS_FLOAT_HELPER = 'PHPCompiler\\ext\\standard\\HrtimeJitHelper::nsFloat';
 
@@ -30,7 +31,6 @@ final class StringHrtimeRuntime
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::PAIR_HELPER,
         self::NS_FLOAT_HELPER,
         self::NS_INT_HELPER,
     ];
@@ -43,7 +43,52 @@ final class StringHrtimeRuntime
 
     private static function implementPairBridge(Context $context): void
     {
-        self::implementZeroArgBridge($context, '__compiler_hrtime_pair', self::PAIR_HELPER);
+        $abiName = '__compiler_hrtime_pair';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        self::ensureJitHelperCompiled($context);
+
+        $fn = null !== $probe
+            ? $probe
+            : $context->lookupFunction($abiName);
+
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $entry = $fn->appendBasicBlock('hrtime_pair_entry');
+        $context->builder->positionAtEnd($entry);
+
+        // One NestedJIT scalar read (AOT-reliable); unpack to php-src [sec, nsec] (#26910).
+        $totalRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::NS_INT_HELPER),
+            []
+        );
+        $total = JitNestedHelperCoerce::coerceHelperScalarResult($context, $totalRaw, $i64);
+        $nsPerSec = $i64->constInt(1_000_000_000, true);
+        $sec = $context->builder->signedDiv($total, $nsPerSec);
+        $nsec = $context->builder->signedRem($total, $nsPerSec);
+
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $ht,
+            $sizeT->constInt(0, false),
+            $sec
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $ht,
+            $sizeT->constInt(1, false),
+            $nsec
+        );
+        $context->builder->returnValue($ht);
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementNsBridge(Context $context): void
@@ -81,37 +126,6 @@ final class StringHrtimeRuntime
             $context->builder->positionAtEnd($entry);
             $result = $context->builder->call(self::helperFunction($context, self::NS_INT_HELPER));
         }
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementZeroArgBridge(
-        Context $context,
-        string $abiName,
-        string $helperLogical
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-
-        $fn = null !== $probe
-            ? $probe
-            : $context->lookupFunction($abiName);
-
-        $entry = $fn->appendBasicBlock('hrtime_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $resultRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, $helperLogical),
-            []
-        );
-        $result = JitNestedHelperCoerce::coerceToHashtablePtr($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();

@@ -21,6 +21,8 @@ final class HrtimeJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringHrtimeRuntime::ensureLinked', $source);
         $runtimeSource = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHrtimeRuntime.php');
         $this->assertStringContainsString('HrtimeJitHelper::nsFloat', $runtimeSource);
+        $this->assertStringContainsString('__hashtable__alloc', $runtimeSource);
+        $this->assertStringContainsString('__hashtable__setLongAt', $runtimeSource);
     }
 
     /** StringHrtimeRuntime: JitVmHelperLink::ensureCompiled — no hand-rolled NestedJit putenv (#21378). */
