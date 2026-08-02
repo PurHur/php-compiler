@@ -2304,16 +2304,24 @@ class JIT {
                 $rawType = $this->rawTypeFromCfgParam($param);
                 $type = $this->llvmTypeForCfgParam($param, $block, $idx);
                 // M5 argv NestedJIT of Runtime::parse: keep string formals as __string__*
-                // even if CFG marks them mixed/nullable — callers pass __string__* from
-                // file_get_contents; __value__* formals fail module verify / SEGV (#26756).
+                // even if CFG marks them mixed after prepare-skip branches — callers pass
+                // __string__* from file_get_contents (#26756).
                 if (
                     $this->shouldUseM5DriverHostCompile()
                     && JIT\NestedJitCompileScope::isActive()
                     && null !== $logicalName
                     && str_ends_with(strtolower($logicalName), '\\runtime::parse')
-                    && Type::TYPE_STRING === ($rawType->type ?? null)
                 ) {
-                    $type = $this->context->getTypeFromString('__string__*');
+                    $declName = null;
+                    if ($param->declaredType instanceof Op\Type\Literal) {
+                        $declName = strtolower($param->declaredType->name);
+                    }
+                    if (
+                        'string' === $declName
+                        || Type::TYPE_STRING === ($rawType->type ?? null)
+                    ) {
+                        $type = $this->context->getTypeFromString('__string__*');
+                    }
                 }
                 $callbackType .= $callbackSep . $this->context->getStringFromType($type);
                 $callbackSep = ', ';
