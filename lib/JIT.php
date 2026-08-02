@@ -17858,6 +17858,33 @@ class JIT {
             } elseif ('prepend' === $methodLc && $this->context->functionIsRegistered('domnode::prepend')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('after' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::after');
+                if ($this->context->functionIsRegistered('domnode::after')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('before' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::before');
+                if ($this->context->functionIsRegistered('domnode::before')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif ('replacewith' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::replacewith');
+                if ($this->context->functionIsRegistered('domnode::replacewith')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
+            } elseif (
+                'remove' === $methodLc
+                && !str_contains($declaringClassLc, 'tokenlist')
+            ) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::remove');
+                if ($this->context->functionIsRegistered('domnode::remove')) {
+                    $className = 'DOMNode';
+                    $declaringClassLc = 'domnode';
+                }
             } elseif ('replacechildren' === $methodLc && $this->context->functionIsRegistered('domnode::replacechildren')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
