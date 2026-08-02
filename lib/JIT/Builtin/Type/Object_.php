@@ -3407,14 +3407,20 @@ class Object_ extends Type {
             }
             $this->defineProperty($id, 'f', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'days', Variable::TYPE_NATIVE_BOOL);
+            // Thin user-script AOT must call __construct (not allocate-only) (#26772).
+            $this->markHasConstructor($id);
         }
         if ('datetimeimmutable' === $lcname || 'datetime' === $lcname) {
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TS_PROPERTY, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::MICROSECOND_PROPERTY, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TZ_PROPERTY, Variable::TYPE_STRING);
+            // Thin user-script AOT must call __construct (not allocate-only) (#26772).
+            $this->markHasConstructor($id);
         }
         if ('datetimezone' === $lcname) {
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TZ_NAME_PROPERTY, Variable::TYPE_STRING);
+            // Thin user-script AOT must call __construct (not allocate-only) (#26772).
+            $this->markHasConstructor($id);
         }
         if ('dateperiod' === $lcname) {
             $this->ensureTraversableBuiltinInterfaces();
@@ -3450,6 +3456,8 @@ class Object_ extends Type {
             foreach (['getiterator', 'getstartdate', 'getenddate', 'getdateinterval', 'getrecurrences'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
+            // Thin user-script AOT must call __construct (not allocate-only) (#26772).
+            $this->markHasConstructor($id);
         }
         if ('domelement' === $lcname) {
             $this->defineProperty($id, 'nodeName', Variable::TYPE_STRING);

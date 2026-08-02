@@ -282,6 +282,8 @@ if (null !== $unitPath) {
         // var_dump/print_r need consumer-module NestedJIT + live VM (#16075 / #23540).
         '/ext/standard/VarDumpJitHelper.php' => true,
         '/ext/standard/PrintRJitHelper.php' => true,
+        // #26772 — unit.o stubs format → null; NestedJIT self-contained helper into user AOT.
+        '/ext/standard/DateTimeFormatJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => $unitFingerprint,

@@ -120,6 +120,23 @@ final class Variable {
      */
     public ?string $compileTimeDomTagName = null;
 
+    /**
+     * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
+     *
+     * @var list<int>|null
+     */
+    public ?array $compileTimeDatePeriodTimestamps = null;
+
+    /** Timezone name for {@see $compileTimeDatePeriodTimestamps} DateTimeImmutable values (#26772). */
+    public ?string $compileTimeDatePeriodTimezone = null;
+
+    /**
+     * DateInterval::__construct() parse when $duration is a compile-time string (#26772).
+     *
+     * @var array{y:int,m:int,d:int,h:int,i:int,s:int,f:float,invert:int}|null
+     */
+    public ?array $compileTimeDateInterval = null;
+
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 

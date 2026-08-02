@@ -317,6 +317,13 @@ class Context {
     /** @var array<int, PHPLLVM\Value> Iterator protocol advance flag (int1) per foreach container (#4011) */
     public array $foreachIteratorAdvanceSlots = [];
 
+    /**
+     * DatePeriod compile-time foreach snapshot hashtables (#26772).
+     *
+     * @var array<int, Variable>
+     */
+    public array $foreachDatePeriodSnapshotHts = [];
+
     /** @var array<string, Variable> */
     public array $jitGlobalVariables = [];
 
@@ -1062,6 +1069,12 @@ class Context {
         FiberHelper::registerJitMethods($this);
         GeneratorHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);
+        // DateTime / DateInterval / DatePeriod ctors — thin user-script AOT (#26772).
+        $this->functionProxies['datetime::__construct'] = new Call\DateTimeConstruct();
+        $this->functionProxies['datetimeimmutable::__construct'] = new Call\DateTimeImmutableConstruct();
+        $this->functionProxies['datetimezone::__construct'] = new Call\DateTimeZoneConstruct();
+        $this->functionProxies['dateinterval::__construct'] = new Call\DateIntervalConstruct();
+        $this->functionProxies['dateperiod::__construct'] = new Call\DatePeriodConstruct();
         if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
             $this->functionProxies['dateperiod::createfromiso8601string'] = new Call\DatePeriodCreateFromISO8601String();
             foreach (['rewind', 'valid', 'current', 'key', 'next'] as $dpIterMethod) {

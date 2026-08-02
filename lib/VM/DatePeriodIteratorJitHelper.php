@@ -209,13 +209,13 @@ final class DatePeriodIteratorJitHelper
 
     private static function storeObjectProperty(Context $context, Value $periodObj, string $prop, Value $valueObj): void
     {
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            JitValueBox::pointer($context, $slot),
+        // Object slots hold __object__* (peer JitDatePeriodConstruct #26772).
+        $propVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
             $valueObj
         );
-        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $context->type->object->propertyStore(
             $context->type->object->propertySlotFor($periodObj, self::CLASS_PERIOD, $prop),
             $propVar,
