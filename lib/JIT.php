@@ -184,12 +184,7 @@ class JIT {
                 );
             }
             $runtimeEmitLc = 'phpcompiler\\runtime::compileemitsmoke';
-            if (!isset($this->context->functions[$runtimeEmitLc])
-                && !(
-                    $this->shouldRealLowerInventoryArgvParseSpine()
-                    && $this->shouldUseM5DriverHostCompile()
-                )
-            ) {
+            if (!isset($this->context->functions[$runtimeEmitLc])) {
                 $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
                     $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
                     'PHPCompiler\\Runtime::compileEmitSmoke',
@@ -1710,8 +1705,7 @@ class JIT {
         }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             if ($this->shouldRealLowerInventoryArgvParseSpine()) {
-                // Gen-0 argv seed (M5_DRIVER_HOST): real-lower compileEmitSmoke (#26756).
-                return $this->shouldUseM5DriverHostCompile();
+                return false;
             }
 
             return true;
@@ -4565,13 +4559,6 @@ class JIT {
             if ('parse' === $spineLc && $this->shouldRealLowerInventoryArgvParseSpine()) {
                 continue;
             }
-            if (
-                'compileemitsmoke' === $spineLc
-                && $this->shouldRealLowerInventoryArgvParseSpine()
-                && $this->shouldUseM5DriverHostCompile()
-            ) {
-                continue;
-            }
             if ('parse' === $spineLc) {
                 $this->emitM3EmitTuRuntimeParseStubNative(
                     $this->llvmInternalName($spineLogical),
@@ -4629,10 +4616,9 @@ class JIT {
             $emitHelperStubMethods = ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
         } elseif ($this->shouldRealLowerInventoryArgvParseSpine()) {
             // Inventory argv: real-lower parse; preprocess helpers stay CFG stubs (#11809).
-            // M5 argv / gen-0 seed also needs compileEmitSmoke for never-seen inputs (#26756).
-            $emitHelperStubMethods = $this->shouldUseM5DriverHostCompile()
-                ? ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser']
-                : ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
+            // Keep compileEmitSmoke stubbed — full CFG hits object::optimize() under NestedJIT (#26756).
+            // emitRuntimeParseAndCompileDefault falls through to Runtime::compile when emit-smoke is null.
+            $emitHelperStubMethods = ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
         }
         $inventoryEmitHelper = $this->shouldStubM3InventoryEmitJitSpineMethods();
         foreach ([
