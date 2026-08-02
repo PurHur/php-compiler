@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6799 |
-| Phase A inventory files (M2 ratio SSOT) | 6799 |
+| PHP files on vm.php path | 6801 |
+| Phase A inventory files (M2 ratio SSOT) | 6801 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21980 |
+| Source constructs flagged (warnings) | 21988 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2515,6 +2515,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDate.php` | 0 | 5 |
 | `ext/standard/JitDateCreate.php` | 0 | 5 |
 | `ext/standard/JitDateCreateFromFormat.php` | 0 | 5 |
+| `ext/standard/JitDateCreateFromTimestamp.php` | 0 | 5 |
 | `ext/standard/JitDateIntervalConstruct.php` | 0 | 5 |
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 6 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
@@ -5613,6 +5614,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DatePeriodIteratorMethod.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeCreateFromFormat.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeCreateFromTimestamp.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeImmutableConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeModify.php` | 0 | 1 |
@@ -5816,7 +5818,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 116 |
+| `lib/JIT/Context.php` | 0 | 118 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 56 |
@@ -10107,62 +10109,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 7377)
 - new DOMException (line 7419)
 - new Error (line 7427)
-- new ObjectEntry (line 8285)
-- new DomNodeState (line 8287)
-- new DOMException (line 9005)
-- new Variable (line 9083)
-- new DOMException (line 9379)
-- new DOMException (line 9611)
-- new DOMException (line 9656)
-- new ObjectEntry (line 9760)
-- new DomNodeState (line 9764)
-- new Variable (line 9771)
-- new ObjectEntry (line 9789)
-- new DomNodeState (line 9793)
-- new Variable (line 9800)
-- new ObjectEntry (line 9818)
-- new DomNodeState (line 9822)
-- new Variable (line 9829)
-- new DOMException (line 9912)
-- new ObjectEntry (line 10237)
-- new DomNodeState (line 10241)
-- new Variable (line 10250)
-- new ObjectEntry (line 10300)
-- new DomNodeState (line 10303)
-- new Variable (line 10311)
-- new Variable (line 10549)
-- new Variable (line 10571)
-- new Variable (line 10588)
-- new Variable (line 10601)
-- new Variable (line 10619)
-- new DOMException (line 10810)
-- new DOMException (line 10819)
-- new DOMException (line 10854)
-- new Variable (line 10965)
-- new DOMException (line 12088)
-- new Variable (line 12224)
-- new Variable (line 12247)
-- new Variable (line 12276)
-- new Error (line 12294)
-- new Variable (line 12320)
-- new DOMException (line 12331)
-- new Variable (line 12333)
-- new DOMException (line 12507)
-- new DOMException (line 12534)
-- new DOMException (line 12570)
-- new DOMException (line 12800)
-- new DOMException (line 12808)
-- new Variable (line 12820)
-- new DOMException (line 12842)
-- new DOMException (line 12861)
-- new DOMException (line 12872)
-- new DOMException (line 12877)
-- new DOMException (line 12903)
-- new DOMException (line 12924)
-- new DOMException (line 12984)
-- new DOMException (line 13036)
-- new Error (line 14459)
-- new Error (line 14463)
+- new ObjectEntry (line 8287)
+- new DomNodeState (line 8289)
+- new DOMException (line 9007)
+- new Variable (line 9085)
+- new DOMException (line 9381)
+- new DOMException (line 9613)
+- new DOMException (line 9658)
+- new ObjectEntry (line 9762)
+- new DomNodeState (line 9766)
+- new Variable (line 9773)
+- new ObjectEntry (line 9791)
+- new DomNodeState (line 9795)
+- new Variable (line 9802)
+- new ObjectEntry (line 9820)
+- new DomNodeState (line 9824)
+- new Variable (line 9831)
+- new DOMException (line 9914)
+- new ObjectEntry (line 10239)
+- new DomNodeState (line 10243)
+- new Variable (line 10252)
+- new ObjectEntry (line 10302)
+- new DomNodeState (line 10305)
+- new Variable (line 10313)
+- new Variable (line 10551)
+- new Variable (line 10573)
+- new Variable (line 10590)
+- new Variable (line 10603)
+- new Variable (line 10621)
+- new DOMException (line 10812)
+- new DOMException (line 10821)
+- new DOMException (line 10856)
+- new Variable (line 10967)
+- new DOMException (line 12090)
+- new Variable (line 12226)
+- new Variable (line 12249)
+- new Variable (line 12278)
+- new Error (line 12296)
+- new Variable (line 12322)
+- new DOMException (line 12333)
+- new Variable (line 12335)
+- new DOMException (line 12509)
+- new DOMException (line 12536)
+- new DOMException (line 12572)
+- new DOMException (line 12802)
+- new DOMException (line 12810)
+- new Variable (line 12822)
+- new DOMException (line 12844)
+- new DOMException (line 12863)
+- new DOMException (line 12874)
+- new DOMException (line 12879)
+- new DOMException (line 12905)
+- new DOMException (line 12926)
+- new DOMException (line 12986)
+- new DOMException (line 13038)
+- new Error (line 14461)
+- new Error (line 14465)
 - 541 class method(s)
 - 4 closure(s)
 
@@ -10253,13 +10255,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 467)
 - new DOMException (line 498)
 - new DOMException (line 510)
-- new Exception (line 657)
-- new DOMException (line 683)
-- new Variable (line 689)
-- new Variable (line 723)
-- new ObjectEntry (line 1426)
-- new HashTable (line 1450)
-- new Variable (line 1452)
+- new Exception (line 679)
+- new DOMException (line 705)
+- new Variable (line 711)
+- new Variable (line 745)
+- new ObjectEntry (line 1448)
+- new HashTable (line 1472)
+- new Variable (line 1474)
 - 59 class method(s)
 - 1 closure(s)
 
@@ -26094,7 +26096,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/DateTimeFormatJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/DefaultTimezoneJitHelper.php`
 
@@ -26954,6 +26956,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 163)
 - new JITVariable (line 171)
 - 6 class method(s)
+
+### `ext/standard/JitDateCreateFromTimestamp.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new JITVariable (line 125)
+- new JITVariable (line 135)
+- new JITVariable (line 143)
+- 4 class method(s)
 
 ### `ext/standard/JitDateIntervalConstruct.php`
 
@@ -28271,7 +28282,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/JitPathArg.php`
 
@@ -46103,7 +46114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringChdir.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringChmod.php`
 
@@ -46523,7 +46534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringMicrotime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/StringMkdir.php`
 
@@ -46599,7 +46610,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringPathinfo.php`
 
@@ -47192,25 +47203,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2526)
 - new Variable (line 2539)
 - new Variable (line 2738)
-- new VMVariable (line 3907)
-- new VMVariable (line 3927)
-- new VMVariable (line 3937)
-- new VMVariable (line 3957)
-- new ReflectionClassConstant (line 5644)
-- new Variable (line 6063)
-- new Variable (line 6089)
-- new Variable (line 6097)
-- new Variable (line 6120)
-- new Variable (line 6146)
-- new Variable (line 6154)
-- new Variable (line 6228)
-- new Literal (line 6245)
-- new Literal (line 6250)
-- new Literal (line 6255)
-- new Variable (line 6266)
-- new Variable (line 6299)
-- new Variable (line 6322)
-- new Variable (line 6686)
+- new VMVariable (line 3909)
+- new VMVariable (line 3929)
+- new VMVariable (line 3939)
+- new VMVariable (line 3959)
+- new ReflectionClassConstant (line 5646)
+- new Variable (line 6065)
+- new Variable (line 6091)
+- new Variable (line 6099)
+- new Variable (line 6122)
+- new Variable (line 6148)
+- new Variable (line 6156)
+- new Variable (line 6230)
+- new Literal (line 6247)
+- new Literal (line 6252)
+- new Literal (line 6257)
+- new Variable (line 6268)
+- new Variable (line 6301)
+- new Variable (line 6324)
+- new Variable (line 6688)
 - 291 class method(s)
 - 8 closure(s)
 
@@ -47447,6 +47458,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/DateTimeCreateFromFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DateTimeCreateFromTimestamp.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -48665,25 +48681,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeFormat (line 1173)
 - new Call\DateTimeCreateFromFormat (line 1175)
 - new Call\DateTimeCreateFromFormat (line 1176)
-- new Call\DateIntervalCreateFromDateString (line 1178)
-- new Call\DateTimeSetTimezone (line 1180)
-- new Call\DateTimeSetTimezone (line 1186)
-- new Call\DateTimeModify (line 1190)
-- new Call\DateTimeModify (line 1191)
-- new Call\DateTimeZoneGetTransitions (line 1193)
-- new Result (line 1561)
-- new Result (line 1583)
-- new Variable (line 2256)
-- new Variable (line 2393)
-- new Variable (line 2647)
-- new Variable (line 2705)
-- new VMVariable (line 2867)
-- new VMVariable (line 2883)
-- new VMVariable (line 2889)
-- new VMVariable (line 2895)
-- new VMVariable (line 2906)
-- new Variable (line 2936)
-- new Variable (line 2979)
+- new Call\DateTimeCreateFromTimestamp (line 1179)
+- new Call\DateTimeCreateFromTimestamp (line 1180)
+- new Call\DateIntervalCreateFromDateString (line 1183)
+- new Call\DateTimeSetTimezone (line 1185)
+- new Call\DateTimeSetTimezone (line 1191)
+- new Call\DateTimeModify (line 1195)
+- new Call\DateTimeModify (line 1196)
+- new Call\DateTimeZoneGetTransitions (line 1198)
+- new Result (line 1566)
+- new Result (line 1588)
+- new Variable (line 2261)
+- new Variable (line 2398)
+- new Variable (line 2652)
+- new Variable (line 2710)
+- new VMVariable (line 2872)
+- new VMVariable (line 2888)
+- new VMVariable (line 2894)
+- new VMVariable (line 2900)
+- new VMVariable (line 2911)
+- new Variable (line 2941)
+- new Variable (line 2984)
 - 106 class method(s)
 - 32 closure(s)
 

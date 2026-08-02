@@ -16,10 +16,6 @@ final class DateTimeFormatJitHelper
 {
     public static function formatStateArgv(string $format, int $timestamp, int $microsecond, string $tzName): string
     {
-        if (0 !== $microsecond) {
-            // microseconds unused for the formats below
-        }
-
         $offset = self::parseNumericTimezoneOffsetSeconds($tzName);
         if (0 !== $offset) {
             $timestamp += $offset;
@@ -27,6 +23,10 @@ final class DateTimeFormatJitHelper
 
         if ('U' === $format) {
             return (string) $timestamp;
+        }
+        // php-src date.c — 'u' is zero-padded microseconds (#26936 createFromTimestamp float path).
+        if ('U.u' === $format) {
+            return (string) $timestamp.'.'.self::digits6($microsecond);
         }
 
         $days = intdiv($timestamp, 86400);
@@ -65,7 +65,17 @@ final class DateTimeFormatJitHelper
             return self::digits4($year).self::digits2($month).self::digits2($day);
         }
 
-        return self::formatTokensScalar($format, $timestamp, $year, $month, $day, $hour, $minute, $second);
+        return self::formatTokensScalar(
+            $format,
+            $timestamp,
+            $microsecond,
+            $year,
+            $month,
+            $day,
+            $hour,
+            $minute,
+            $second
+        );
     }
 
     /**
@@ -92,6 +102,7 @@ final class DateTimeFormatJitHelper
     private static function formatTokensScalar(
         string $format,
         int $timestamp,
+        int $microsecond,
         int $year,
         int $month,
         int $day,
@@ -125,6 +136,8 @@ final class DateTimeFormatJitHelper
                 $out = $out.self::digits2($second);
             } elseif ('U' === $ch) {
                 $out = $out.(string) $timestamp;
+            } elseif ('u' === $ch) {
+                $out = $out.self::digits6($microsecond);
             } elseif ('n' === $ch) {
                 $out = $out.(string) $month;
             } elseif ('j' === $ch) {
@@ -146,6 +159,34 @@ final class DateTimeFormatJitHelper
             $value = -$value;
         }
         if ($value < 10) {
+            return '0'.(string) $value;
+        }
+
+        return (string) $value;
+    }
+
+    /** php-src date format 'u' — microseconds zero-padded to 6 digits. */
+    private static function digits6(int $value): string
+    {
+        if ($value < 0) {
+            $value = -$value;
+        }
+        if ($value > 999999) {
+            $value = $value % 1000000;
+        }
+        if ($value < 10) {
+            return '00000'.(string) $value;
+        }
+        if ($value < 100) {
+            return '0000'.(string) $value;
+        }
+        if ($value < 1000) {
+            return '000'.(string) $value;
+        }
+        if ($value < 10000) {
+            return '00'.(string) $value;
+        }
+        if ($value < 100000) {
             return '0'.(string) $value;
         }
 
