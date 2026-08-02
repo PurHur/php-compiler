@@ -52,6 +52,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'named_args_skip_first_optional.phpt',
         'byref_param_int.phpt',
         'dateperiod_foreach_format.phpt',
+        'nullsafe_nested_coalesce_26818.phpt',
     ];
 
     /**

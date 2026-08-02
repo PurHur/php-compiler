@@ -475,12 +475,18 @@ class Object_ extends Type {
     {
         $objType = $this->context->getTypeFromString('__object__');
         $propCount = count($this->properties[$classId]);
-        if (0 === $propCount) {
+        // stdClass shares one layout across allocates; nested casts / dynamic writes call
+        // defineProperty after earlier allocates — reserve headroom (#26818).
+        $allocSlots = $propCount;
+        if ($this->allowsDynamicProperties($classId)) {
+            $allocSlots = max($propCount, 16);
+        }
+        if (0 === $allocSlots) {
             $obj = $this->context->memory->malloc($objType);
         } else {
             $obj = $this->context->memory->mallocWithExtra(
                 $objType,
-                $this->context->constantFromInteger(8 * $propCount, 'size_t')
+                $this->context->constantFromInteger(8 * $allocSlots, 'size_t')
             );
         }
 
@@ -527,8 +533,10 @@ class Object_ extends Type {
             $ref
         );
 
+        if ($allocSlots > 0) {
+            $this->initPropertySlots($obj, $allocSlots);
+        }
         if ($propCount > 0) {
-            $this->initPropertySlots($obj, $propCount);
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
