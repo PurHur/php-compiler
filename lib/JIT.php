@@ -4681,8 +4681,23 @@ class JIT {
         } elseif ($this->shouldRealLowerInventoryArgvParseSpine()) {
             // Inventory argv: real-lower parse; preprocess helpers stay CFG stubs (#11809).
             // Keep compileEmitSmoke stubbed — full CFG hits object::optimize() under NestedJIT (#26756).
-            // emitRuntimeParseAndCompileDefault falls through to Runtime::compile when emit-smoke is null.
-            $emitHelperStubMethods = ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
+            // M5 argv: also skip PHP CFG for init*/diagnostics (native RuntimeEmitTuInit / void stubs);
+            // host-lowering initParsePipeline hung the Zend rebuild for hours (#26756).
+            $emitHelperStubMethods = [
+                'preparesourceforparser',
+                'preprocesssourceforparse',
+                'rewritesourcebeforeparser',
+                'compileemitsmoke',
+            ];
+            if ($this->shouldUseM5DriverHostCompile()) {
+                $emitHelperStubMethods = array_merge($emitHelperStubMethods, [
+                    'initparsepipeline',
+                    'initcompiler',
+                    'loadcoremodules',
+                    'noteparsecompilenullforscript',
+                    'peeklastparsefailure',
+                ]);
+            }
         }
         $inventoryEmitHelper = $this->shouldStubM3InventoryEmitJitSpineMethods();
         foreach ([
