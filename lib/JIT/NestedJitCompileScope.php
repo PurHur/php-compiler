@@ -12,6 +12,9 @@ use PHPLLVM\BasicBlock;
  * Also clears outer emit-helper / self-host stub env so NestedJIT lowers real helper bodies
  * (e.g. VmUrlRewriterOb during RewriteVarsRuntime — #21965, peer SELFHOST_AOT clear).
  *
+ * Restore must use {@see BasicBlockHelper::restoreInsertBlock}: `positionAtEnd` on a sealed
+ * outer block leaves later emits as parentless / terminator-in-middle IR (Runtime::parse
+ * host-lower under M5 argv — #26756).
  */
 final class NestedJitCompileScope
 {
@@ -146,19 +149,11 @@ final class NestedJitCompileScope
 
     private static function captureInsertBlock(Context $context): ?BasicBlock
     {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
+        return BasicBlockHelper::tryGetInsertBlock($context);
     }
 
     private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
     {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        BasicBlockHelper::restoreInsertBlock($context, $block);
     }
 }

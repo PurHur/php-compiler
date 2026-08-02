@@ -31,6 +31,19 @@ final class BootstrapGen0DriverFunctionalSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_REPO_ROOT="${ROOT}"', $body);
     }
 
+    public function testArgvDriverRefreshDoesNotClassifyBinCompileAsUserScriptAot(): void
+    {
+        // Guard: Zend rebuild of bin/compile.php must keep SELFHOST_AOT for real parse spine (#26756).
+        // Do not require bin/compile.php here — it dispatches the CLI entrypoint.
+        $compile = (string) file_get_contents($this->root.'/bin/compile.php');
+        $fnPos = strpos($compile, 'function phpc_compile_is_user_script_aot');
+        $this->assertNotFalse($fnPos);
+        $fnChunk = substr($compile, $fnPos, 1200);
+        $this->assertStringContainsString("str_ends_with(\$normalized, '/bin/compile.php')", $fnChunk);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $fnChunk);
+        $this->assertStringContainsString('#26756', $fnChunk);
+    }
+
     public function testFunctionalSmokeFailsWhenDriverReturnsParseAndCompileNull(): void
     {
         $tmpdir = sys_get_temp_dir().'/phpc-gen0-func-'.bin2hex(random_bytes(4));

@@ -446,6 +446,14 @@ final class BootstrapCompileSmokeM3Emit
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             return true;
         }
+        // Full M5 argv / gen-0 seed drivers must bake RuntimeEmitTuInit + real parseAndCompile
+        // even though PHP_COMPILER_M3_COMPILE_DRIVER=1 (that flag alone selects stub spine for
+        // helloworld inventory argv — #12036). Without this, functional smoke dies at
+        // parseAndCompile null after source read succeeds (#26756 / re-#23468).
+        $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if ('1' === $m5Host || 'true' === strtolower((string) $m5Host)) {
+            return true;
+        }
         $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         if ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver)) {
             // Zend helloworld bin/compile.php inventory argv: thin ctor, stub spine (#12036).
@@ -542,6 +550,56 @@ final class BootstrapCompileSmokeM3Emit
     }
 
     public static function emitRuntimeParseAndCompileDefault(
+        Context $context,
+        Value $runtimeThis,
+        Value $code,
+        Value $filename
+    ): Value {
+        $objPtr = $context->getTypeFromString('__object__*');
+        // M5 argv / gen-0: trivial echo via C-floor (or NestedJIT) M5TrivialEchoScript (#26756).
+        $trivialFn = M5TrivialEchoNative::lookup($context) ?? M5TrivialEchoScript::lookup($context);
+        if (null !== $trivialFn) {
+            $tag = 'te'.(string) ++self::$seq;
+            $okBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_ok_'.$tag);
+            $missBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_miss_'.$tag);
+            $doneBb = BasicBlockHelper::append($context, 'csm3_pac_trivial_done_'.$tag);
+            $block = $context->builder->call($trivialFn, $code, $filename);
+            $isNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
+            $context->builder->branchIf($isNull, $missBb, $okBb);
+
+            $context->builder->positionAtEnd($okBb);
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($missBb);
+            $fallback = self::emitRuntimeParseAndCompileDefaultFallback(
+                $context,
+                $runtimeThis,
+                $code,
+                $filename
+            );
+            $missTail = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBb);
+
+            $context->builder->positionAtEnd($doneBb);
+            $phi = $context->builder->phi($objPtr);
+            $phi->addIncoming($block, $okBb);
+            $phi->addIncoming($fallback, $missTail);
+
+            return $phi;
+        }
+
+        return self::emitRuntimeParseAndCompileDefaultFallback(
+            $context,
+            $runtimeThis,
+            $code,
+            $filename
+        );
+    }
+
+    /**
+     * parse → compileEmitSmoke / compile fallback when trivial-echo path misses (#26756).
+     */
+    private static function emitRuntimeParseAndCompileDefaultFallback(
         Context $context,
         Value $runtimeThis,
         Value $code,
@@ -663,18 +721,28 @@ final class BootstrapCompileSmokeM3Emit
         $runtime = $func->getParam(0);
         $code = $func->getParam(1);
         $filename = $func->getParam(2);
-        $script = $context->builder->call(
-            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
-            $runtime,
-            $code,
-            $filename
-        );
-        $block = $context->builder->call(
-            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $runtime,
-            $script
-        );
-        $context->builder->returnValue($block);
+        // M5 argv / gen-0: compileEmitSmoke is a 3-byte null stub (`xor eax,eax; ret`).
+        // Prefer real Runtime::compile when present so parseAndCompile can succeed (#26756).
+        $m5Host = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        $preferCompile = '1' === $m5Host || 'true' === strtolower((string) $m5Host);
+        if ($preferCompile) {
+            $context->builder->returnValue(
+                self::emitRuntimeParseAndCompileDefault($context, $runtime, $code, $filename)
+            );
+        } else {
+            $script = $context->builder->call(
+                self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+                $runtime,
+                $code,
+                $filename
+            );
+            $block = $context->builder->call(
+                self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+                $runtime,
+                $script
+            );
+            $context->builder->returnValue($block);
+        }
         $context->builder->clearInsertionPosition();
         $context->builder = $saved;
         $context->functions[$lc] = $func;

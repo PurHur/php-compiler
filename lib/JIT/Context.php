@@ -2159,6 +2159,9 @@ class Context {
             );
             $global->setInitializer($this->type->string->pointer->constNull());
             $oldBuilder = $this->builder;
+            // Capture before swapping builders — restore must not leave Runtime::parse
+            // insert cleared/on __init__ (parentless jit_strcmp / seal unreachable — #26756).
+            $savedInsert = BasicBlockHelper::tryGetInsertBlock($this);
             $resumeInitEmission = $this->emitsInitLinearIR();
             $this->builder = $this->context->builderCreate();
             $this->positionBuilderAtInitEmission();
@@ -2173,6 +2176,8 @@ class Context {
             $this->builder = $oldBuilder;
             if ($resumeInitEmission) {
                 $this->positionBuilderAtInitEmission();
+            } else {
+                BasicBlockHelper::restoreInsertBlock($this, $savedInsert);
             }
             $this->stringConstantMap[$string] = $global;
         }

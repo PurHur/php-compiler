@@ -27,6 +27,20 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('isDeployRootRealLoweringMethod', $jit);
         $this->assertStringContainsString('isSourceBundlerRealLoweringMethod', $jit);
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
+        // M5 argv / gen-0 seed: C-floor initParsePipeline avoids NestedJIT hang (#26756).
+        $this->assertFileExists($root.'/lib/JIT/RuntimeInitParsePipeline.php');
+        $this->assertStringContainsString('RuntimeInitParsePipeline::emit', $jit);
+        $this->assertStringContainsString('require_once __DIR__.\'/JIT/RuntimeInitParsePipeline.php\'', $jit);
+        $allowPos = strpos($jit, 'function isM3CompileDriverRealLoweringName');
+        $this->assertNotFalse($allowPos);
+        $allowChunk = substr($jit, $allowPos, 4500);
+        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $allowChunk);
+        $this->assertStringContainsString('\\runtime::initparsepipeline', $allowChunk);
+        $floor = (string) file_get_contents($root.'/lib/JIT/RuntimeInitParsePipeline.php');
+        $this->assertStringContainsString("PHPCfg\\\\Parser", $floor);
+        $this->assertStringContainsString('allocConstructed', $floor);
+        $compilePhp = (string) file_get_contents($root.'/bin/compile.php');
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $compilePhp);
         $this->assertStringContainsString('Emit-helper binaries must init parse/compiler spine (#2633)', $emit);
         $this->assertStringContainsString('exitWithStatus', $emit);
         $this->assertStringContainsString('return true;', $emit);
