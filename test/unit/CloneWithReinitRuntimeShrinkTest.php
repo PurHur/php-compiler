@@ -14,6 +14,8 @@ final class CloneWithReinitRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CloneWithReinitRuntime.php');
         $this->assertStringContainsString('CloneWithJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('new JIT($context)', $source);
         $this->assertStringNotContainsString('CloneWithReinitRuntimeLlvm', $source);
         $this->assertStringNotContainsString('phpc_clone_with_end_runtime', $source);
         $this->assertStringNotContainsString('phpc_clone_with_try_consume_literal', $source);

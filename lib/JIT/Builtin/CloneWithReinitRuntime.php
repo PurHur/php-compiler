@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\BasicBlock;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for clone-with readonly reinit via CloneWithJitHelper PHP (#9498, #9717, #10108).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} so NestedJIT restores
+ * scope->className and jitEnclosingBlock (raw compile leaked CloneWithJitHelper into
+ * asymmetric set Error wording — #26873).
  *
  * VM SSOT: {@see \PHPCompiler\VM\CloneWithSupport}
  * php-src: Zend/zend_objects.c — IS_PROP_REINITABLE during clone-with
@@ -116,66 +119,19 @@ final class CloneWithReinitRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after CloneWithJitHelper compile (#9498)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#9498/#26873');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         self::ensureValueStringHelpers($context);
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        $savedBuilder = $context->builder;
-        $savedActive = $context->activeFunction;
-        $restoreBlock = self::captureInsertBlock($context);
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CloneWithJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('CloneWithJitHelper.php parseAndCompile failed (#9498)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-            $context->markJitIncludedFileCompiled($realPath);
-        } finally {
-            $context->builder = $savedBuilder;
-            self::restoreInsertBlock($context, $restoreBlock);
-            $context->activeFunction = $savedActive;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9498)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#9498/#26873'
+        );
     }
 
     private static function ensureValueStringHelpers(Context $context): void
@@ -198,24 +154,6 @@ final class CloneWithReinitRuntime
         } catch (\Throwable) {
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 }
