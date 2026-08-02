@@ -1733,6 +1733,18 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
             return true;
         }
+        // M5 argv / gen-0 seed: void/native RuntimeEmitTuInit stubs — PHP CFG host-lower of
+        // initParsePipeline hung the Zend rebuild for hours despite the emit-spine skip list
+        // (NestedJIT still consulted this allowlist via shouldUseM3EmitTuRuntimeMethodStub) (#26756).
+        if ($this->shouldUseM5DriverHostCompile()
+            && (str_ends_with($lower, '\\runtime::initparsepipeline')
+                || str_ends_with($lower, '\\runtime::initcompiler')
+                || str_ends_with($lower, '\\runtime::loadcoremodules')
+                || str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')
+                || str_ends_with($lower, '\\runtime::peeklastparsefailure'))
+        ) {
+            return false;
+        }
         if (str_ends_with($lower, '\\runtime::initparsepipeline')) {
             return true;
         }
@@ -2648,6 +2660,12 @@ class JIT {
                 'standalone',
             ];
             if (in_array($methodLc, $inventoryEmitSpine, true)) {
+                // M5 argv seed: keep init* on void/native stubs (NestedJIT hung on initParsePipeline) (#26756).
+                if ($this->shouldUseM5DriverHostCompile()
+                    && in_array($methodLc, ['initparsepipeline', 'initcompiler', 'loadcoremodules'], true)
+                ) {
+                    return true;
+                }
                 // Real argv parse spine needs ctor/init; standalone stays stubbed (#15597).
                 if ($this->shouldRealLowerInventoryArgvParseSpine() && 'standalone' !== $methodLc) {
                     return false;

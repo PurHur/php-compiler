@@ -32,6 +32,16 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertNotFalse($realLowerPos);
         $realLowerChunk = substr($jit, $realLowerPos, 700);
         $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $realLowerChunk);
+        // NestedJIT allowlist must also refuse initParsePipeline under M5 (emit-spine skip alone hung) (#26756).
+        $allowPos = strpos($jit, 'function isM3CompileDriverRealLoweringName');
+        $this->assertNotFalse($allowPos);
+        $allowChunk = substr($jit, $allowPos, 4500);
+        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $allowChunk);
+        $this->assertStringContainsString('\\runtime::initparsepipeline', $allowChunk);
+        $this->assertMatchesRegularExpression(
+            '/shouldUseM5DriverHostCompile\(\).*initparsepipeline.*return false;/s',
+            $allowChunk
+        );
         $this->assertStringContainsString('AssignOp::optimize', $jit);
         $this->assertStringContainsString("'optimize' === \$methodLc", $jit);
         $this->assertStringContainsString('isM5ArgvResolveSidecarIdentityStubName', $jit);
