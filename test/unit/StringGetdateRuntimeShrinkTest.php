@@ -5,32 +5,50 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\GetdateJitHelper;
+use PHPCompiler\ext\standard\IdateJitHelper;
+use PHPCompiler\ext\standard\VmDate;
 use PHPUnit\Framework\TestCase;
 
-/** StringGetdate routes through GetdateJitHelper PHP not localtime_r LLVM (#9181). */
+/** idate/getdate AOT use LLVM civil math; host helpers stay NestedJIT-safe (#26900). */
 final class StringGetdateRuntimeShrinkTest extends TestCase
 {
-    public function testStringGetdateRoutesThroughGetdateJitHelper(): void
+    public function testStringGetdateIsNoOpLinkForAot(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetdate.php');
-        $this->assertStringContainsString('GetdateJitHelper', $source);
-        $this->assertStringNotContainsString("lookupFunction('localtime')", $source);
-        $this->assertStringNotContainsString('__hashtable__setStringKeyLong', $source);
-        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('Intentionally empty', $source);
+        $this->assertLessThan(40, \substr_count($source, "\n") + 1);
     }
 
-    public function testGetdateJitHelperDelegatesToVmDate(): void
+    public function testStringIdateIsNoOpLinkForAot(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GetdateJitHelper.php');
-        $this->assertStringContainsString('VmDate::getdate', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringIdate.php');
+        $this->assertStringContainsString('Intentionally empty', $source);
     }
 
-    public function testGetdateJitHelperSemanticsMatchVmDate(): void
+    public function testJitGetdateAndIdateUseLlvmCivilMath(): void
     {
-        $ht = GetdateJitHelper::getdate(0);
-        foreach (['hours', 'mday', 'minutes', 'mon', 'month', 'seconds', 'wday', 'weekday', 'year', 'yday'] as $key) {
-            $this->assertNotNull($ht->find($key), 'missing key: '.$key);
-        }
-        $this->assertSame(1970, $ht->find('year')->resolveIndirect()->toInt());
+        $gd = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetdate.php');
+        $this->assertStringContainsString('__hashtable__alloc', $gd);
+        $this->assertStringContainsString('719468', $gd);
+        $id = (string) file_get_contents(__DIR__.'/../../ext/standard/JitIdate.php');
+        $this->assertStringContainsString('civilPartsPublic', $id);
+        $this->assertStringContainsString('selectPart', $id);
+    }
+
+    public function testHostHelpersMatchVmDate(): void
+    {
+        $ts = 1577923200;
+        $this->assertSame(
+            VmDate::idateValue('Y', $ts),
+            IdateJitHelper::idate('Y', $ts)
+        );
+        $b = VmDate::getdate($ts);
+        $ymd = GetdateJitHelper::ymdPacked($ts);
+        $this->assertSame(
+            $b->find('year')->resolveIndirect()->toInt() * 10000
+            + $b->find('mon')->resolveIndirect()->toInt() * 100
+            + $b->find('mday')->resolveIndirect()->toInt(),
+            $ymd
+        );
     }
 }

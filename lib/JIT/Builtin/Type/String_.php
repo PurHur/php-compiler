@@ -311,13 +311,14 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringStrftime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStrptime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStrtotime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGetdate::implement($this->context);
+        // StringGetdate: no-op link; HT built in JitGetdate IR (#26900).
         \PHPCompiler\JIT\Builtin\StringGmgetdate::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGmmktime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringMktime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringSyslog::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringLocaltime::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringIdate::implement($this->context);
+        // StringIdate / StringGetdate: link at call-site only — early Type init NestedJIT
+        // of idate civil math segfaults user AOT (#26900).
         \PHPCompiler\JIT\Builtin\StringMicrotime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGettimeofday::implement($this->context);
     }
