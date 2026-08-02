@@ -27,13 +27,31 @@ final class JitNativeString
         $context->builder->positionAtEnd($resume);
     }
 
-    public static function coerce(Context $context, Variable $var, ?Operand $sourceOperand = null): Variable
-    {
+    public static function coerce(
+        Context $context,
+        Variable $var,
+        ?Operand $sourceOperand = null,
+        ?string $classHint = null
+    ): Variable {
         if (Variable::TYPE_STRING === $var->type) {
             return $var;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            $magic = MagicMethodDispatch::coerceObjectToString($context, $var);
+            // Operand PHPTypes userType — Variable::$type is an int, so echo/cast must pass the hint (#26821).
+            if (null === $classHint || '' === $classHint) {
+                $fromOp = $sourceOperand?->type?->userType ?? null;
+                if (\is_string($fromOp) && '' !== ltrim($fromOp, '\\')) {
+                    $classHint = $fromOp;
+                }
+            }
+            $classHint = null !== $classHint ? ltrim($classHint, '\\') : null;
+            $magic = MagicMethodDispatch::coerceObjectToString(
+                $context,
+                $var,
+                (null !== $classHint && '' !== $classHint && 'object' !== strtolower($classHint))
+                    ? $classHint
+                    : null
+            );
             if (null !== $magic) {
                 return $magic;
             }
@@ -56,16 +74,13 @@ final class JitNativeString
             $yesEnd = $context->builder->getInsertBlock();
             $context->builder->branch($joinBb);
             $context->builder->positionAtEnd($noBb);
-            $classHint = ltrim((string) ($var->type?->userType ?? ''), '\\');
-            if (
-                '' !== $classHint
-                && 'object' !== strtolower($classHint)
-                && $context->type->object->isEnumClassLc(strtolower($classHint))
-            ) {
+            $hint = $classHint ?? '';
+            if ('' !== $hint && 'object' !== strtolower($hint)) {
+                // Zend zend_std_cast_object_tostring — Error when no __toString (#26821).
                 Builtin\ErrorRaise::ensureLinked($context);
                 Builtin\ErrorRaise::emitRaise(
                     $context,
-                    'Object of class '.$classHint.' could not be converted to string'
+                    \PHPCompiler\VM\ValueEchoSupport::objectToStringErrorMessage($hint)
                 );
             }
             $empty = $context->builder->load($context->constantStringFromString(''));
@@ -85,6 +100,48 @@ final class JitNativeString
         }
         if (Variable::TYPE_VALUE === $var->type) {
             self::ensureInsertBlock($context);
+            // Named locals are often value-boxed objects; strval() does not call __toString (#26821).
+            if (null === $classHint || '' === $classHint) {
+                $fromOp = $sourceOperand?->type?->userType ?? null;
+                if (\is_string($fromOp) && '' !== ltrim($fromOp, '\\')) {
+                    $classHint = ltrim($fromOp, '\\');
+                }
+            } else {
+                $classHint = ltrim($classHint, '\\');
+            }
+            if (
+                null !== $classHint
+                && '' !== $classHint
+                && 'object' !== strtolower($classHint)
+            ) {
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+                $objPtr = $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
+                $objVar = new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $objPtr
+                );
+                $magic = MagicMethodDispatch::coerceObjectToString($context, $objVar, $classHint);
+                if (null !== $magic) {
+                    return $magic;
+                }
+                Builtin\ErrorRaise::ensureLinked($context);
+                Builtin\ErrorRaise::emitRaise(
+                    $context,
+                    \PHPCompiler\VM\ValueEchoSupport::objectToStringErrorMessage($classHint)
+                );
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->builder->load($context->constantStringFromString(''))
+                );
+            }
 
             return new Variable(
                 $context,

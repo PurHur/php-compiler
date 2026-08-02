@@ -9218,10 +9218,17 @@ class JIT {
                     $this->assignOperandValue($block->getOperand($op->arg1), $double);
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $castSrcOp = $block->getOperand($op->arg2);
+                    $value = $this->context->getVariableFromOp($castSrcOp);
+                    $castClassHint = $castSrcOp->type?->userType ?? null;
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
-                        JIT\JitNativeString::coerce($this->context, $value)
+                        JIT\JitNativeString::coerce(
+                            $this->context,
+                            $value,
+                            $castSrcOp,
+                            \is_string($castClassHint) ? $castClassHint : null
+                        )
                     );
                     break;
                 case OpCode::TYPE_CAST_VOID:
