@@ -6,17 +6,20 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayFindCallbackPolicy;
+use PHPCompiler\JIT\ArrayFindLlvm;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * JIT/AOT link for array_find family via ArrayFindJitHelper PHP (#14842, #17547, #17674).
  *
- * String and closure callbacks route through nested PHP helpers.
+ * String callbacks route through NestedJIT {@see ArrayFindJitHelper}; Closures use
+ * {@see ArrayFindLlvm} under thin AOT (#26824, peer ArrayReduceLlvm).
  * SSOT: {@see \PHPCompiler\ext\standard\array_find} and siblings.
  * php-src: ext/standard/array.c
  */
@@ -87,18 +90,12 @@ final class ArrayFindRuntime
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
 
-        self::ensureLinked($context);
+        // Pure LLVM + caller closureCall — NestedJIT of ArrayFindJitHelper stubs
+        // VmClosureCall under thin AOT (null/false), peer ArrayReduceLlvm (#26824 / #24156).
+        NestedClosureInvokeLlvm::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $modeVal = $context->constantFromInteger($mode, 'int64');
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_FIND_CLOSURE),
-            $ht,
-            JitValueBox::valuePtrFromVariable($context, $callback),
-            $modeVal,
-            $strictI1,
-            $context->constantFromBool($unaryInternalUsesKey)
-        );
+        return ArrayFindLlvm::walkWithClosure($context, $ht, $callback, $mode);
     }
 
     public static function ensureLinked(Context $context): void

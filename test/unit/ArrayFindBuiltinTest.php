@@ -124,6 +124,61 @@ TXT;
         @unlink($tmp);
     }
 
+    /**
+     * User-script AOT execute for Closure predicates (#26824) — NestedJIT helper path
+     * previously crashed at emit; ArrayFindLlvm must match VM.
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAotNativeBinaryMatchesClosureSubset(): void
+    {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $repo = dirname(__DIR__, 2);
+        $code = <<<'PHP'
+$a = [10, 20, 30];
+echo array_find($a, fn ($x) => $x > 15), "\n";
+echo array_find_key($a, fn ($x) => $x > 15), "\n";
+echo array_any($a, fn ($x) => $x > 25) ? "any\n" : "noany\n";
+echo array_all($a, fn ($x) => $x > 5) ? "all\n" : "noall\n";
+echo array_find([1, 2], fn ($x) => $x > 5) === null ? "null\n" : "bad\n";
+PHP;
+        $expect = "20\n1\nany\nall\nnull\n";
+        $src = tempnam(sys_get_temp_dir(), 'phpc_af_src_');
+        $bin = tempnam(sys_get_temp_dir(), 'phpc_af_bin_');
+        $this->assertNotFalse($src);
+        $this->assertNotFalse($bin);
+        @unlink($bin);
+        file_put_contents($src, "<?php\n".$code);
+        $env = $_ENV;
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $proc = proc_open(
+            ['php', $repo.'/bin/compile.php', '-o', $bin, $src],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $repo,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $this->assertSame(0, proc_close($proc), trim((string) $stderr));
+        $this->assertFileExists($bin);
+        $out = shell_exec(escapeshellarg($bin));
+        @unlink($src);
+        @unlink($bin);
+        $this->assertSame($expect, $out);
+    }
+
     private function runBin(string $bin): string
     {
         $repo = dirname(__DIR__, 2);

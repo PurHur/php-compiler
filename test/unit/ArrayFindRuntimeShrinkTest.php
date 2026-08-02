@@ -20,13 +20,21 @@ final class ArrayFindRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFindRuntime.php');
         $this->assertStringContainsString('walkWithClosure', $runtime);
         $this->assertStringContainsString('walkWithNamedCallback', $runtime);
+        $this->assertStringContainsString('ArrayFindLlvm::walkWithClosure', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayFindLlvm.php');
+        $this->assertStringContainsString('NestedClosureInvoke', $llvm);
+        $this->assertStringContainsString('MODE_FIND_KEY', $llvm);
 
         $jitHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayFindJitHelper.php');
         $this->assertStringContainsString('walkWithClosure', $jitHelper);
         $this->assertStringContainsString('walkWithNamedCallback', $jitHelper);
         $this->assertStringContainsString('VmClosureCall::invoke', $jitHelper);
         $this->assertStringContainsString('VmUserCall::invokeTwo', $jitHelper);
+        // Ternaries must not be inline call args (NestedJIT ARG_SEND null slots, #26824).
+        $this->assertStringNotContainsString('invoke($ctx, $closureState, $keyFirst ?', $jitHelper);
+        $this->assertStringNotContainsString('invokeTwo($ctx, $userFn, $keyFirst ?', $jitHelper);
     }
 
     public function testArrayFindHelperLineCountShrink(): void
