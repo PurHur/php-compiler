@@ -175,6 +175,8 @@ final class BuiltinInternalArgInfo
             'get_object_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : int (#26376)
             'get_resource_id' => 'int',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; Zend : string (#26375)
+            'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)
             'exit', 'die' => 'never',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
@@ -399,6 +401,8 @@ final class BuiltinInternalArgInfo
             'is_a', 'is_subclass_of' => 0 === $index ? 'mixed' : null,
             // Zend/zend_builtin_functions.stub.php + basic_functions.stub.php — mixed $value; InternalArgInfo untyped (#26376)
             'gettype' => 0 === $index ? 'mixed' : null,
+            // Zend/zend_builtin_functions.stub.php — mixed $value; InternalArgInfo untyped (#26375)
+            'get_debug_type' => 0 === $index ? 'mixed' : null,
             // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
             // ext/standard/basic_functions.stub.php — object $object (InternalArgInfo omits) (#26210)

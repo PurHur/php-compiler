@@ -164,6 +164,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['resource'], BuiltinParamNames::forFunction('get_resource_id'));
     }
 
+    /** Zend get_debug_type Reflection stubs (#26375). */
+    public function testGetDebugTypeReflectionStubTypes(): void
+    {
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('get_debug_type', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('get_debug_type', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('mixed', $info['type']);
+        $this->assertSame(['value'], BuiltinParamNames::forFunction('get_debug_type'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('get_debug_type'));
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_debug_type'));
+    }
+
     /** php-src array.stub.php — InternalArgInfo return bool; Zend true (#26172). */
     public function testUsortKsortFamilyReturnTypeIsTrue(): void
     {
