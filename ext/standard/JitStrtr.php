@@ -6,13 +6,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\StringStrtr;
-use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
 /** JIT/AOT helper for strtr() — runtime via StrtrJitHelper PHP (#9392). */
@@ -56,13 +54,6 @@ final class JitStrtr
         if (null !== $pairsLit) {
             $sLit = JitStringArg::compileTimeLiteral($subjectArg);
             if (null !== $sLit) {
-                // Literal empty from-key: emit E_WARNING in the binary, then fold the rest
-                // (#26704). Avoids host-side warn during compile and the runtime HT path.
-                if (\array_key_exists('', $pairsLit)) {
-                    self::emitEmptyReplacementWarning($context);
-                    unset($pairsLit['']);
-                }
-
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::strtrArray($sLit, $pairsLit))
                 );
@@ -82,29 +73,6 @@ final class JitStrtr
     }
 
     /**
-     * Emit php-src empty-key E_WARNING for compile-time replace_pairs (#26704).
-     */
-    private static function emitEmptyReplacementWarning(Context $context): void
-    {
-        StringTriggerError::ensureLinked($context);
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $msg = $context->builder->pointerCast(
-            $context->constantFromString(VmString::STRTR_EMPTY_REPLACEMENT_WARNING),
-            $i8p
-        );
-        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msg);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msg,
-            $msgLen,
-            $i32->constInt(ErrorReporter::E_WARNING, false),
-            $context->builder->pointerCast($context->constantFromString(''), $i8p),
-            $i32->constInt(max(0, $context->callSiteLine), false)
-        );
-    }
-
-    /**
      * @return array<string, string>|null
      */
     private static function compileTimePairs(JITVariable $arg): ?array
@@ -115,6 +83,10 @@ final class JitStrtr
         $pairs = [];
         foreach ($arg->compileTimeArray as $key => $value) {
             if (!\is_string($key) || !\is_string($value)) {
+                return null;
+            }
+            // Empty from-key must run at runtime so E_WARNING reaches handlers (#26704).
+            if ('' === $key) {
                 return null;
             }
             $pairs[$key] = $value;
