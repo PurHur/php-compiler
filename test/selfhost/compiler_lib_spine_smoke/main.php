@@ -5337,6 +5337,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ZlibRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ArrayIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RecursiveIteratorIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureFromCallable.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBindTo.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithBinding.php';

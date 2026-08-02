@@ -35,6 +35,134 @@ final class ClosureBindHelper
         $context->functionProxies['closure::bind'] = new Call\ClosureBind();
         // Avoid ExternalMethod null stub on user-script AOT (#26788).
         $context->functionProxies['closure::fromcallable'] = new Call\ClosureFromCallable();
+        // Avoid ExternalMethod silent-null on user-script AOT (#26872).
+        $context->functionProxies['closure::call'] = new Call\ClosureCall();
+    }
+
+    /**
+     * Closure::call() — invoke once with a temporary $this (Zend/zend_closures.c, #26872).
+     */
+    public static function invokeCall(
+        Context $context,
+        Variable $closure,
+        Variable $newThis,
+        Variable ...$invokeArgs
+    ): Value {
+        self::ensureClosureBindingProperties($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+
+        self::assertObject($context, $newThis, ClosureBindJitHelper::thisArgLabel('Closure::call()'));
+
+        $resolved = ClosureHelper::resolveCall($context, $closure);
+        $innerForGuards = null === $resolved ? null : self::unwrapInnerCall($resolved);
+        if (self::emitStaticClosureInstanceBindFailure($context, $closure, $innerForGuards, $newThis)) {
+            return self::boxReturn($context, self::nullResult($context));
+        }
+
+        $boundThis = self::materializeBoundThis($context, $newThis);
+        // ZEND_METHOD(Closure, call): scope becomes the class of $newThis.
+        $boundScope = self::scopeForCallNewThis($context, $newThis);
+
+        if (
+            null !== $resolved
+            && !($resolved instanceof Call\RuntimeIndirectClosureCall)
+            && !(self::unwrapInnerCall($resolved) instanceof Call\RuntimeIndirectClosureCall)
+        ) {
+            $inner = self::unwrapInnerCall($resolved);
+
+            return (new ClosureWithBinding($inner, $boundThis, $boundScope))->call(
+                $context,
+                ...$invokeArgs
+            );
+        }
+
+        $candidates = ClosureHelper::closureCandidates($context);
+        if ([] === $candidates) {
+            return self::boxReturn($context, self::nullResult($context));
+        }
+
+        // Single-closure scripts: prefer direct invoke (binding props may be absent on older objs).
+        if (1 === \count($candidates)) {
+            $inner = self::unwrapInnerCall(\reset($candidates));
+
+            return (new ClosureWithBinding($inner, $boundThis, $boundScope))->call(
+                $context,
+                ...$invokeArgs
+            );
+        }
+
+        if (null !== $context->lastClosureCallProxy) {
+            $inner = self::unwrapInnerCall($context->lastClosureCallProxy);
+
+            return (new ClosureWithBinding($inner, $boundThis, $boundScope))->call(
+                $context,
+                ...$invokeArgs
+            );
+        }
+
+        $obj = ClosureHelper::loadObjectFromCallable($context, $closure);
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            'Closure',
+            self::BOUND_THIS_PROPERTY,
+            $boundThis
+        );
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            'Closure',
+            self::BOUND_SCOPE_PROPERTY,
+            $boundScope
+        );
+        $classId = $context->type->object->lookup('Closure');
+        $indirect = new Call\RuntimeIndirectClosureCall($closure, $candidates, $classId);
+
+        return $indirect->call($context, ...$invokeArgs);
+    }
+
+    /**
+     * Closure::call scope is get_class($newThis). Prefer compile-time class name from NEW (#26872).
+     */
+    private static function scopeForCallNewThis(Context $context, Variable $newThis): Variable
+    {
+        if (Variable::TYPE_OBJECT === $newThis->type && null !== $newThis->compileTimeString
+            && '' !== $newThis->compileTimeString
+        ) {
+            return self::stringVariable($context, $newThis->compileTimeString);
+        }
+
+        // Avoid ReflectionSetup class-name path in thin AOT — empty scope still allows
+        // runtime property slot dispatch for public props; private needs compile-time name.
+        return self::emptyScopeString($context);
+    }
+
+    /** Closure::call() requires a non-null object $newThis (zend_closures.stub.php). */
+    private static function assertObject(
+        Context $context,
+        Variable $arg,
+        string $label
+    ): void {
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            self::raiseTypeError($context, $label, 'object', 'null');
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::emitValueBoxObjectCheck($context, $arg, $label);
+
+            return;
+        }
+        if (ClosureBindJitHelper::jitTypeIsInvalidNullableObject($arg->type)) {
+            self::raiseTypeError(
+                $context,
+                $label,
+                'object',
+                ClosureBindJitHelper::jitScalarTypeLabel($arg->type)
+            );
+        }
     }
 
     public static function ensureClosureBindingProperties(Context $context): void
@@ -597,6 +725,31 @@ final class ClosureBindHelper
         $context->builder->branchIf($isInvalid, $invalidBlock, $mergeBlock);
         $context->builder->positionAtEnd($invalidBlock);
         self::raiseTypeError($context, $label, '?object', 'int');
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($mergeBlock);
+    }
+
+    /** Value-box $newThis for Closure::call — object only (null rejected). */
+    private static function emitValueBoxObjectCheck(
+        Context $context,
+        Variable $arg,
+        string $label
+    ): void {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $typeByte = self::loadValueTypeByte($context, $ptr);
+        ClosureBindRuntime::ensureLinked($context);
+        $kind = ClosureBindRuntime::callValueBoxKindForNullableObject($context, $typeByte);
+        $i32 = $context->getTypeFromString('int32');
+        $invalidBlock = BasicBlockHelper::append($context, 'closure_call_this_fail');
+        $mergeBlock = BasicBlockHelper::append($context, 'closure_call_this_merge');
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i32->constInt(ClosureBindJitHelper::KIND_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $mergeBlock, $invalidBlock);
+        $context->builder->positionAtEnd($invalidBlock);
+        self::raiseTypeError($context, $label, 'object', 'null');
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
     }
