@@ -1022,6 +1022,31 @@ final class HashTableWriteLlvm
             case Variable::TYPE_VALUE:
                 self::setValueBoxAtObjectKey($context, $ht, $keyObj, $element);
                 break;
+            case Variable::TYPE_STRING:
+            case Variable::TYPE_NULL:
+            case Variable::TYPE_NATIVE_DOUBLE:
+                // No __hashtable__setObjectKeyString — write through the value-box slot (#26787).
+                $writable = self::writableObjectKeyValueBox($context, $ht, $keyObj);
+                $dest = JitValueBox::valuePtrFromVariable($context, $writable);
+                if (Variable::TYPE_STRING === $element->type) {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeString'),
+                        $dest,
+                        self::ownedString($context, $element)
+                    );
+                } elseif (Variable::TYPE_NATIVE_DOUBLE === $element->type) {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeDouble'),
+                        $dest,
+                        $context->helper->loadValue($element)
+                    );
+                } else {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeNull'),
+                        $dest
+                    );
+                }
+                break;
             default:
                 throw new \LogicException(
                     'Object-key array element type not supported for JIT: '
