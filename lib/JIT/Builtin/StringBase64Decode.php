@@ -10,10 +10,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for base64_decode() via Base64JitHelper PHP (#17234, #17249, #18918).
+ * JIT/AOT link for base64_decode() via Base64JitHelper PHP (#17234, #17249, #18918, #26890).
  *
- * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * User-script AOT uses HelperRuntimeCache prelinked units (#15889). Peer: StringStrRot13 #26868.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString::base64_decode()} (VM); helper is NestedJIT-self-contained.
  * php-src: ext/standard/base64.c — PHP_FUNCTION(base64_decode)
  */
 final class StringBase64Decode
@@ -48,7 +48,7 @@ final class StringBase64Decode
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
@@ -75,7 +75,7 @@ final class StringBase64Decode
             self::DECODE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#18918'
+            '#26890'
         );
     }
 }
