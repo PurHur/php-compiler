@@ -4,25 +4,38 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\standard\GetcwdJitHelper;
+use PHPCompiler\ext\standard\VmGetcwdNative;
 use PHPUnit\Framework\TestCase;
 
 /**
- * GetcwdJit NestedJIT via JitVmHelperLink::ensureCompiled (#10451 / #25541 / peer #25527).
+ * getcwd() AOT via libc realpath(".") (#10451, #26928 — peer SysGetTempDir #26929).
  */
 final class GetcwdJitRuntimeShrinkTest extends TestCase
 {
-    public function testGetcwdJitUsesJitVmHelperLink(): void
+    public function testGetcwdJitUsesLibcRealpathNotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GetcwdJit.php');
-        $this->assertStringContainsString('GetcwdJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString("lookupFunction('realpath')", $source);
+        $this->assertStringContainsString('BasicBlockHelper::entryAlloca', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('HELPER_PATH', $source);
+        $this->assertStringNotContainsString('lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\BasicBlockHelper;', $source);
-        $this->assertLessThan(60, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(120, \substr_count($source, "\n") + 1);
+    }
+
+    public function testGetcwdJitHelperStillMatchesVmNative(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GetcwdJitHelper.php');
+        $this->assertStringContainsString('VmGetcwdNative::resolve', $source);
+        $viaHelper = GetcwdJitHelper::resolveJit();
+        $viaNative = VmGetcwdNative::resolve();
+        if (false === $viaNative) {
+            $this->assertSame('', $viaHelper);
+        } else {
+            $this->assertSame($viaNative, $viaHelper);
+        }
     }
 }
