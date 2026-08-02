@@ -10702,7 +10702,8 @@ class JIT {
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                     if (is_null($this->context->scope->toCall)) {
-                        // short circuit
+                        // short circuit (incl. Fiber::suspend() discard in resume fn, #26801)
+                        $this->context->scope->fiberSuspendResultPending = false;
                         break;
                     }
                     $this->context->callSiteLine = (int) ($op->arg1 ?? 0);
@@ -10779,6 +10780,33 @@ class JIT {
                         $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
                         if ($this->context->scope->preserveNewResultOnNullCall) {
                             $this->context->scope->preserveNewResultOnNullCall = false;
+                            break;
+                        }
+                        // Fiber::suspend() in a resume function → value from Fiber::resume()/throw (#26801).
+                        if ($this->context->scope->fiberSuspendResultPending) {
+                            $this->context->scope->fiberSuspendResultPending = false;
+                            JIT\FiberHelper::ensureTypes($this->context);
+                            $stateParam = $this->context->fiberStateParam;
+                            if (null === $stateParam) {
+                                throw new \LogicException('Fiber::suspend() result requires fiber state param');
+                            }
+                            $map = $this->context->structFieldMap['__fiber_state__'];
+                            $resumeArgField = $this->context->builder->structGep(
+                                $stateParam,
+                                $map['resume_argument']
+                            );
+                            $resultVar = new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VARIABLE,
+                                JIT\JitValueBox::alloc($this->context)
+                            );
+                            JIT\JitValueBox::copyFromPointer(
+                                $this->context,
+                                $resultVar->value,
+                                $resumeArgField
+                            );
+                            $this->assignOperandForced($block->getOperand($op->arg1), $resultVar);
                             break;
                         }
                         $nullVar = new Variable(
@@ -18727,8 +18755,11 @@ class JIT {
             return;
         }
         if ($this->context->compilingFiberResume && 'fiber' === $declaringClassLc && 'suspend' === $methodLc) {
+            // Resume continuation: FUNCCALL_EXEC_RETURN loads resume_argument (#26801).
             $this->context->scope->toCall = null;
             $this->context->scope->args = [];
+            $this->context->scope->argOperands = [];
+            $this->context->scope->fiberSuspendResultPending = true;
 
             return;
         }

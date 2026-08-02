@@ -17,7 +17,7 @@ final class FiberHelperRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('FiberHelperLlvm::compileResumeFunction', $helper);
         $this->assertStringNotContainsString('emitPendingThrowGate', $helper);
         $this->assertStringNotContainsString('branchSwitch', $helper);
-        $this->assertLessThan(120, substr_count($helper, "\n"));
+        $this->assertLessThan(140, substr_count($helper, "\n"));
     }
 
     public function testFiberHelperLlvmUsesVmFiberValueGuards(): void

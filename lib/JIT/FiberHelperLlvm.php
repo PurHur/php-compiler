@@ -125,7 +125,8 @@ final class FiberHelperLlvm
             return 0;
         }
 
-        return self::opcodeIndex($block, $points[$pointIndex - 1]['op']) + 1;
+        // Include prior Fiber::suspend STATICCALL_INIT so FUNCCALL_EXEC can load resume_argument (#26801).
+        return self::opcodeIndex($block, $points[$pointIndex - 1]['op']);
     }
 
     public static function compileResumeFunction(
@@ -196,7 +197,8 @@ final class FiberHelperLlvm
         }
 
         $context->builder->positionAtEnd($doneBb);
-        $tailStart = [] === $points ? 0 : self::opcodeIndex($block, $points[count($points) - 1]['op']) + 1;
+        // Include last suspend STATICCALL_INIT so resume_argument is bound to Fiber::suspend() (#26801).
+        $tailStart = [] === $points ? 0 : self::opcodeIndex($block, $points[count($points) - 1]['op']);
         $returnIdx = null;
         foreach ($block->opCodes as $i => $op) {
             if ($i < $tailStart) {
@@ -485,6 +487,53 @@ final class FiberHelperLlvm
         );
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $resultPtr);
+    }
+
+    /**
+     * Fiber status probes for AOT (VM builtins are unavailable in native binaries) (#26801).
+     *
+     * @param 'started'|'suspended'|'terminated'|'running' $which
+     */
+    public static function loadStatusBool(Context $context, Variable $fiberVar, string $which): Variable
+    {
+        self::ensureTypes($context);
+        $map = $context->structFieldMap['__fiber_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $statePtr = $fiberVar->fiberStatePtr ?? self::loadStateFromFiberObject($context, $fiberVar);
+        $stateBits = $context->builder->ptrtoint($statePtr, $i64);
+        $hasState = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $stateBits,
+            $i64->constInt(0, false)
+        );
+        $started = $context->builder->load($context->builder->structGep($statePtr, $map['started']));
+        $suspended = $context->builder->load($context->builder->structGep($statePtr, $map['suspended']));
+        $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
+        $flag = match ($which) {
+            'started' => $started,
+            'suspended' => $suspended,
+            'terminated' => $done,
+            'running' => $context->builder->and(
+                $started,
+                $context->builder->and(
+                    $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $suspended, $i1->constInt(0, false)),
+                    $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $done, $i1->constInt(0, false))
+                )
+            ),
+            default => throw new \LogicException("Unknown fiber status probe: {$which}"),
+        };
+        $bool = $context->builder->and(
+            $hasState,
+            $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $flag, $i1->constInt(0, false))
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $bool
+        );
     }
 
     private static function llvmInternalName(string $name): string

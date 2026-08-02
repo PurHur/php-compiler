@@ -33,6 +33,10 @@ final class FiberHelper
         $context->functionProxies['fiber::throw'] = new Call\FiberThrow();
         $context->functionProxies['fiber::suspend'] = new Call\FiberSuspendStatic();
         $context->functionProxies['fiber::getreturn'] = new Call\FiberGetReturn();
+        $context->functionProxies['fiber::isterminated'] = new Call\FiberIsTerminated();
+        $context->functionProxies['fiber::isstarted'] = new Call\FiberIsStarted();
+        $context->functionProxies['fiber::issuspended'] = new Call\FiberIsSuspended();
+        $context->functionProxies['fiber::isrunning'] = new Call\FiberIsRunning();
     }
 
     public static function blockContainsFiberSuspend(?Block $block): bool
@@ -108,5 +112,13 @@ final class FiberHelper
     public static function runResumeAndBoxResult(Context $context, string $resumeLc, Value $statePtr): Variable
     {
         return FiberHelperLlvm::runResumeAndBoxResult($context, $resumeLc, $statePtr);
+    }
+
+    /**
+     * @param 'started'|'suspended'|'terminated'|'running' $which
+     */
+    public static function loadStatusBool(Context $context, Variable $fiberVar, string $which): Variable
+    {
+        return FiberHelperLlvm::loadStatusBool($context, $fiberVar, $which);
     }
 }
