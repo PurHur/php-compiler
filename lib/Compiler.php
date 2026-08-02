@@ -55621,6 +55621,10 @@ class Compiler {
     /**
      * decoct(fileperms($f) & 0777) on CFG branch blocks — ARG_SEND must use the AND dest (#15902).
      *
+     * Only when the arithmetic producer immediately precedes this call. A sibling
+     * `get(Box::Y)+1` leaves TYPE_PLUS in the merge block; the next `get(Box::Z)` must
+     * keep its ClassConstFetch slot, not steal the plus result (#26990).
+     *
      * @param list<OpCode> $outerArgSends
      * @param list<OpCode> $nestedProducerOps
      */
@@ -55641,6 +55645,10 @@ class Compiler {
         ) {
             return;
         }
+        // Intervening ClassConstFetch/ConstFetch before this call — not decoct(expr&mask) (#26990).
+        if (!$this->cfgCallImmediatelyConsumesPrecedingArithmetic($block, $cfgCallOp)) {
+            return;
+        }
         $dest = $this->slotForRecentInlineArithmeticCallArg(
             $block,
             array_merge($nestedProducerOps, $outerArgSends)
@@ -55653,6 +55661,21 @@ class Compiler {
                 $send->arg1 = $dest;
             }
         }
+    }
+
+    /**
+     * True when the CFG child immediately before $cfgCallOp is an arithmetic/bitwise
+     * producer feeding that call (#15902 decoct; negative for #26990 ClassConstFetch).
+     */
+    private function cfgCallImmediatelyConsumesPrecedingArithmetic(Block $block, Op $cfgCallOp): bool
+    {
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 1 || null === $block->orig) {
+            return false;
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+
+        return $this->isArithmeticInlineCallArgProducer($prev);
     }
 
     /**
