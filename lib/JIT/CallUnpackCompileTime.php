@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\JIT;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\CallUnpackJitHelper;
@@ -117,7 +118,82 @@ final class CallUnpackCompileTime
 
     public static function tryCompileTimeArrayFromOperand(Block $block, Operand $operand): ?VmVariable
     {
-        return self::tryCompileTimeArrayFromSlot($block, $block->getVarSlot($operand, true));
+        $slot = $block->getVarSlot($operand, true);
+        // By-ref builtins (array_splice/sort/…) mutate the CV after INIT_ARRAY; folding
+        // json_encode($a) from the pre-mutation literal prints the wrong AOT result (#27075).
+        if (self::slotHasByRefMutation($block, $slot)) {
+            return null;
+        }
+
+        return self::tryCompileTimeArrayFromSlot($block, $slot);
+    }
+
+    /**
+     * True when $slot is ARG_SEND to a by-ref builtin parameter in this block.
+     *
+     * Conservative: any such send refuses compile-time array recovery (missed folds OK).
+     */
+    private static function slotHasByRefMutation(Block $block, int $slot): bool
+    {
+        $fn = null;
+        $argIdx = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $fn = null;
+                $argIdx = 0;
+                if (null !== $op->arg1 && isset($block->constants[$op->arg1])) {
+                    $const = $block->constants[$op->arg1];
+                    if (VmVariable::TYPE_STRING === $const->type) {
+                        $fn = strtolower($const->toString());
+                    }
+                }
+
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                if (null !== $fn && $op->arg1 === $slot) {
+                    if (\in_array($argIdx, BuiltinByRefParams::forFunction($fn), true)) {
+                        return true;
+                    }
+                    $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($fn);
+                    if (null !== $variadicFrom && $argIdx >= $variadicFrom) {
+                        if (
+                            'array_multisort' !== $fn
+                            || !self::argSendLooksLikeMultisortFlag($block, $op)
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                ++$argIdx;
+
+                continue;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
+            ) {
+                $fn = null;
+                $argIdx = 0;
+            }
+        }
+
+        return false;
+    }
+
+    private static function argSendLooksLikeMultisortFlag(Block $block, OpCode $op): bool
+    {
+        if (null === $op->arg1 || !isset($block->constants[$op->arg1])) {
+            return false;
+        }
+        $const = $block->constants[$op->arg1];
+        if (VmVariable::TYPE_INTEGER !== $const->type) {
+            return false;
+        }
+        $n = $const->toInt();
+
+        // SORT_* / SORT_FLAG_* range used by array_multisort (#9481).
+        return $n >= 0 && $n <= 8;
     }
 
     private static function tryCompileTimeArrayFromSlot(Block $block, int $slot, array &$visited = []): ?VmVariable
