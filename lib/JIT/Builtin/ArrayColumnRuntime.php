@@ -238,7 +238,9 @@ final class ArrayColumnRuntime
         }
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('int8*');
+        // NestedJIT string params are `__string__*` — i8* bridges mismatch the call site and
+        // fail module verify under thin AOT (peer MathBaseConvertRuntime / #26884, #26955).
+        $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
 
         JitVmHelperLink::ensureBridge(
