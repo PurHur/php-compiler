@@ -13,9 +13,9 @@ use PHPCfg\Operand;
  *
  * RuntimeParseM5Native already calls Parser::parse when the symbol is registered;
  * nm on prior tips showed zero PHPCfg\Parser symbols because Runtime.php::parse was
- * C-floor-stubbed and never pulled the vendor class. Soft-fail on errors so a hung
- * or unverifiable NestedJIT does not brick the Zend rebuild (opt-out via
- * PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT=0).
+ * C-floor-stubbed and never pulled the vendor class. Opt-in via
+ * PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT=1 — default NestedJIT leaves mid-BB
+ * terminators and fails module verify on argv refresh.
  */
 final class RuntimeParseM5PhpCfgParser
 {
@@ -35,7 +35,9 @@ final class RuntimeParseM5PhpCfgParser
         callable $parseFile
     ): bool {
         $flag = getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT');
-        if ('0' === $flag || 'false' === strtolower((string) $flag)) {
+        // Opt-in only: default NestedJIT of Parser::parse leaves mid-BB terminators
+        // and fails module verify during argv refresh (#26756). Set =1 to experiment.
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return false;
         }
 
