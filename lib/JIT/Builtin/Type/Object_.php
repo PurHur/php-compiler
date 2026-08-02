@@ -3573,13 +3573,16 @@ class Object_ extends Type {
         ) {
             // Thin AOT: snapshot / filter into `__spl_ht` at construct (#26825).
             // php-src ext/spl/spl_iterators.stub.php — OuterIterator + Iterator.
+            // markHasConstructor requires isVoidJitConstructCall recognition or
+            // constructed stays 0 and get_class / HT reads abort (#26825).
             $this->ensureZendBuiltinInterfaces();
             $this->markInterfaceClass('OuterIterator');
             $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
+            // Iterator-first rematerialized order (#25798).
             $this->setClassInterfaces($displayName, [
-                'OuterIterator',
-                'Traversable',
                 'Iterator',
+                'Traversable',
+                'OuterIterator',
             ]);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
             if ('regexiterator' === $lcname) {

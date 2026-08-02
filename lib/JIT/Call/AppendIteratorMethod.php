@@ -24,6 +24,11 @@ final class AppendIteratorMethod implements Call
     ) {
     }
 
+    public function methodName(): string
+    {
+        return $this->method;
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
         return match (strtolower($this->method)) {

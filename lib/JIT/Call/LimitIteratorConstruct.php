@@ -20,8 +20,8 @@ use PHPLLVM\Value;
  *
  * php-src: ext/spl/spl_iterators.c — spl_dual_it_construct / LimitIterator
  *
- * NOTE: propertyStore of the sliced HT currently segfaults at ITA read time on
- * LimitIterator objects (ArrayIterator same pattern is fine). See issue handoff.
+ * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs
+ * after __construct (otherwise constructed=0 aborts get_class / HT reads).
  */
 final class LimitIteratorConstruct implements Call
 {
