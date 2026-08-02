@@ -53,7 +53,16 @@ final class AttributeRegistryLookupRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($sizeT, false, $i8p);
-        $fn = $context->module->addFunction($abiName, $ft);
+        // Reuse ReflectionNative declare — addFunction renames to .1 and leaves U undef (#26828).
+        $probe = $context->module->getNamedFunction($abiName);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
         $entry = $fn->appendBasicBlock('attr_class_count_bridge');
         $context->builder->positionAtEnd($entry);
 
@@ -81,7 +90,15 @@ final class AttributeRegistryLookupRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i8p, false, $i8p, $sizeT);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $probe = $context->module->getNamedFunction($abiName);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
         $entry = $fn->appendBasicBlock('attr_class_name_at_bridge');
         $context->builder->positionAtEnd($entry);
 
@@ -121,7 +138,15 @@ final class AttributeRegistryLookupRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($sizeT, false, $i8p, $i8p);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $probe = $context->module->getNamedFunction($abiName);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
         $entry = $fn->appendBasicBlock('attr_method_count_bridge');
         $context->builder->positionAtEnd($entry);
 
@@ -159,7 +184,15 @@ final class AttributeRegistryLookupRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $probe = $context->module->getNamedFunction($abiName);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
         $entry = $fn->appendBasicBlock('attr_method_name_at_bridge');
         $context->builder->positionAtEnd($entry);
 
@@ -228,7 +261,15 @@ final class AttributeRegistryLookupRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $voidp = $context->getTypeFromString('void*');
         $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $probe = $context->module->getNamedFunction($abiName);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
         $entry = $fn->appendBasicBlock('attr_class_args_ht_null');
         $context->builder->positionAtEnd($entry);
         $context->builder->returnValue(

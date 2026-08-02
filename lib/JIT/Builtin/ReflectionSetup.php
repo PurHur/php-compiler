@@ -72,9 +72,10 @@ final class ReflectionSetup
             $heapPtr,
             $str
         );
+        // Property slots are void**; store void* (not i8*/bytePtr) — LLVM verify (#26828 / #26795).
         $voidPtr = $context->getTypeFromString('void*');
         $context->builder->store(
-            $context->bytePtr($heapPtr),
+            $context->builder->pointerCast($heapPtr, $voidPtr),
             $slot
         );
     }
