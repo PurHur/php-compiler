@@ -23,6 +23,9 @@ final class ArrayColumnRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('columnWithRuntimeKey', $runtime);
         $this->assertStringContainsString('ABI_COLUMN_RUNTIME', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        // Thin AOT NestedJIT string keys are `__string__*` — i8* bridges fail module verify (#26955).
+        $this->assertStringContainsString("getTypeFromString('__string__*')", $runtime);
+        $this->assertStringNotContainsString("getTypeFromString('int8*')", $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_column.php');
         $this->assertStringContainsString('ArrayColumnRuntime::column', $builtin);
@@ -33,6 +36,22 @@ final class ArrayColumnRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildColumnArray', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildColumnFromHashTable', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildColumnWithIndexFromHashTable', $arrayBuiltin);
+    }
+
+    /** NestedJIT must not lower EnumCaseEntry::fetchProperty as helper::fetchproperty (#26955). */
+    public function testArrayColumnJitHelperAvoidsEnumCaseEntryFetchProperty(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayColumnJitHelper.php');
+        $this->assertStringContainsString('readEnumOrObjectColumn', $helper);
+        $this->assertStringContainsString('receiverForInstanceMethod', $helper);
+        // Strip comments so docblock/example mentions do not trip the call-site guard.
+        $code = preg_replace('!//.*$!m', '', $helper) ?? $helper;
+        $code = preg_replace('!/\*.*?\*/!s', '', $code) ?? $code;
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$\w+->fetchProperty\s*\(/',
+            $code,
+            'ArrayColumnJitHelper must not call EnumCaseEntry::fetchProperty under NestedJIT (#26955)'
+        );
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterNativeColumnLlvmDeletion(): void
