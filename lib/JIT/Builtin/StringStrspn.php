@@ -36,11 +36,16 @@ final class StringStrspn
         self::STRCSPN_TWO_ARG,
     ];
 
-    /** @var list<string> */
+    /**
+     * LLVM ABI names must not collide with libc — AOT exports of `strspn`/`strcspn`
+     * interpose into libxcrypt and make crypt(3) return `*0` (#26861).
+     *
+     * @var list<string>
+     */
     private const ABI_FUNCTIONS = [
         'phpc_strspn_extended',
-        'strspn',
-        'strcspn',
+        '__compiler_strspn',
+        '__compiler_strcspn',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -70,8 +75,8 @@ final class StringStrspn
 
         self::ensureJitHelperCompiled($context);
         self::implementExtendedBridge($context);
-        self::implementTwoArgBridge($context, 'strspn', self::STRSPN_TWO_ARG);
-        self::implementTwoArgBridge($context, 'strcspn', self::STRCSPN_TWO_ARG);
+        self::implementTwoArgBridge($context, '__compiler_strspn', self::STRSPN_TWO_ARG);
+        self::implementTwoArgBridge($context, '__compiler_strcspn', self::STRCSPN_TWO_ARG);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {

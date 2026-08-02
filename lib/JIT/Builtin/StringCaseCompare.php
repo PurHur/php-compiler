@@ -15,7 +15,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for strcasecmp/strncasecmp via CaseCompareJitHelper PHP (#15225, #23862).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringStrtotime #23832).
- * Replaces libc `strcasecmp`/`strncasecmp` LLVM lookups in ext/standard. Keeps i8* ABI.
+ * PHP bridges use `__compiler_strcasecmp` / `__compiler_strncasecmp` so AOT does not
+ * export libc-named symbols that interpose into libxcrypt (#26861). Keeps i8* ABI.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}
  */
 final class StringCaseCompare
@@ -26,6 +27,10 @@ final class StringCaseCompare
 
     private const STRNCASECMP_HELPER = 'PHPCompiler\\ext\\standard\\CaseCompareJitHelper::strncasecmpArgv';
 
+    public const ABI_STRCASECMP = '__compiler_strcasecmp';
+
+    public const ABI_STRNCASECMP = '__compiler_strncasecmp';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STRCASECMP_HELPER,
@@ -34,12 +39,12 @@ final class StringCaseCompare
 
     public static function ensureStrcasecmpLinked(Context $context): void
     {
-        self::implementBinaryNamed($context, 'strcasecmp', self::STRCASECMP_HELPER);
+        self::implementBinaryNamed($context, self::ABI_STRCASECMP, self::STRCASECMP_HELPER);
     }
 
     public static function ensureStrncasecmpLinked(Context $context): void
     {
-        self::implementTernaryNamed($context, 'strncasecmp', self::STRNCASECMP_HELPER);
+        self::implementTernaryNamed($context, self::ABI_STRNCASECMP, self::STRNCASECMP_HELPER);
     }
 
     public static function ensureStandaloneBodies(Context $context): void

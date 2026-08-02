@@ -231,7 +231,7 @@ class HashTable extends Type
             $this->context->registerFunction('strnatcasecmp', $fn);
         }
         try {
-            $this->context->lookupFunction('strcoll');
+            $this->context->lookupFunction(StringStrcoll::ABI_STRCOLL);
         } catch (\Throwable $e) {
             StringStrcoll::ensureLinked($this->context);
         }
@@ -2268,7 +2268,7 @@ class HashTable extends Type
             $valNext
         );
         $cmp = $this->context->builder->call(
-            $this->context->lookupFunction('strcoll'),
+            $this->context->lookupFunction(StringStrcoll::ABI_STRCOLL),
             $this->stringDataPtr($strCur),
             $this->stringDataPtr($strNext)
         );

@@ -56,7 +56,12 @@ final class strncasecmp extends Internal
             ),
             $context->getTypeFromString('size_t')
         );
-        $raw = $context->builder->call($context->lookupFunction('strncasecmp'), $p0, $p1, $length);
+        $raw = $context->builder->call(
+            $context->lookupFunction(\PHPCompiler\JIT\Builtin\StringCaseCompare::ABI_STRNCASECMP),
+            $p0,
+            $p1,
+            $length
+        );
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);

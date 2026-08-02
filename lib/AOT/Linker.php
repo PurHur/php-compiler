@@ -110,6 +110,7 @@ final class Linker
                 escapeshellarg($ld),
                 AotDebugSymbols::linkFlag(),
                 self::helperMuldefsFlag('-z muldefs'),
+                self::libcNameHideFlag(false),
                 '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crt1.o'),
                 escapeshellarg($crtbegin),
@@ -145,7 +146,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::helperMuldefsFlag(' -Wl,-z,muldefs').$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().self::helperMuldefsFlag(' -Wl,-z,muldefs').self::libcNameHideFlag(true).$objects.' '.self::HOST_LIB_SEARCH.' -lm '.self::runtimeLinkLibs().' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -159,6 +160,22 @@ final class Linker
     private static function helperMuldefsFlag(string $flag): string
     {
         return [] !== HelperRuntimeCache::linkObjects() ? ' '.$flag.' ' : '';
+    }
+
+    /**
+     * Version script that keeps libc-colliding PHP bridge leftovers local (#26861).
+     *
+     * @param bool $asWlPrefix true when the driver is clang/gcc (needs -Wl,)
+     */
+    private static function libcNameHideFlag(bool $asWlPrefix): string
+    {
+        $ver = __DIR__.'/libc-name-hide.ver';
+        if (!\is_file($ver)) {
+            return '';
+        }
+        $arg = '--version-script='.$ver;
+
+        return $asWlPrefix ? ' -Wl,'.\escapeshellarg($arg).' ' : ' '.\escapeshellarg($arg).' ';
     }
 
     /**
@@ -500,7 +517,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . AotDebugSymbols::linkFlag() . self::helperMuldefsFlag(' -Wl,-z,muldefs') . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . self::helperMuldefsFlag(' -Wl,-z,muldefs') . self::libcNameHideFlag(true) . $objects . ' '.self::HOST_LIB_SEARCH.' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
