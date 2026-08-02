@@ -163,7 +163,7 @@ final class VmPasswordNative
         $type = self::PASSWORD_ARGON2I === $algo ? self::ARGON2_TYPE_I : self::ARGON2_TYPE_ID;
 
         try {
-            $saltEncoded = self::bcryptEncodeSalt22(\random_bytes(self::ARGON2_SALT_RAW_LEN));
+            $saltEncoded = self::bcryptEncodeSalt22(self::secureRandomBytes(self::ARGON2_SALT_RAW_LEN));
         } catch (\Throwable) {
             return false;
         }

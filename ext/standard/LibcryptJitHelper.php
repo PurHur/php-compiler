@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\NestedJitCompileScope;
+
 /**
  * __compiler_libcrypt() for compiled JIT/AOT modules (#9275, php-in-PHP).
  *
@@ -13,13 +15,23 @@ namespace PHPCompiler\ext\standard;
  */
 final class LibcryptJitHelper
 {
-    /** @return string|null null when crypt fails (JIT ABI uses null __string__*) */
+    /**
+     * @return string|null null when crypt fails (JIT ABI uses null __string__*)
+     *
+     * NestedJIT (isActive folded true under helper compile — #26773): thin
+     * {@see phpc_libcrypt_kernel} → libc crypt(3). Host unit tests / VM-adjacent:
+     * PHP crypt(). Never call crypt() under NestedJIT — that lowers into
+     * {@see PasswordJitHelper} and nulls AOT password_hash.
+     */
     public static function cryptArgv(string $key, string $salt): ?string
     {
-        if (!\function_exists('crypt')) {
+        if (NestedJitCompileScope::isActive()) {
+            $result = \phpc_libcrypt_kernel($key, $salt);
+        } elseif (\function_exists('crypt')) {
+            $result = \crypt($key, $salt);
+        } else {
             return null;
         }
-        $result = \crypt($key, $salt);
         if (!\is_string($result) || '' === $result || '*' === $result[0]) {
             return null;
         }

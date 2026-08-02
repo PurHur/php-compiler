@@ -665,6 +665,7 @@ class Module extends ModuleAbstract
             new phpc_rename_kernel(),
             new phpc_ob_write_stdout_kernel(),
             new phpc_random_bytes_kernel(),
+            new phpc_libcrypt_kernel(),
             new phpc_chdir_kernel(),
             new phpc_gethostname_kernel(),
             new phpc_getenv_kernel(),
