@@ -1159,6 +1159,12 @@ class Context {
         if (!UserScriptAotEnv::isActive()) {
             $this->functionProxies['datetimeimmutable::settimezone'] = new Call\DateTimeSetTimezone(true);
         }
+        // modify() — avoid ExternalMethod null stub segfault after chained format() (#26789).
+        // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
+        $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);
+        $this->functionProxies['datetimeimmutable::modify'] = new Call\DateTimeModify(true);
+        // DateTimeZone::getTransitions — compile-time materialize (peer timezone_transitions_get) (#26799).
+        $this->functionProxies['datetimezone::gettransitions'] = new Call\DateTimeZoneGetTransitions();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         if (CompilerVersion::supportsDomTokenList()) {

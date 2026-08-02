@@ -14,7 +14,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for timezone_transitions_get() (#6041 phase 2, ext/date/php_date.c). */
+/** LLVM lowering for timezone_transitions_get() / DateTimeZone::getTransitions() (#6041, #26799). */
 final class JitTimezoneTransitionsGet
 {
     private const TYPE_ERROR =
@@ -29,13 +29,31 @@ final class JitTimezoneTransitionsGet
             );
         }
 
+        return self::lower($context, 'timezone_transitions_get', ...$args);
+    }
+
+    /** DateTimeZone::getTransitions($this, …) — same ABI as procedural (#26799). */
+    public static function invokeMethod(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(
+                \sprintf('DateTimeZone::getTransitions() expects at most 2 arguments, %d given', max(0, $argc - 1))
+            );
+        }
+
+        return self::lower($context, 'DateTimeZone::getTransitions', ...$args);
+    }
+
+    private static function lower(Context $context, string $function, JITVariable ...$args): Value
+    {
         $zoneName = self::tryCompileTimeZoneName($context, $args[0]);
         $begin = self::tryCompileTimeInt($context, $args[1] ?? null) ?? \PHP_INT_MIN;
         $end = self::tryCompileTimeInt($context, $args[2] ?? null) ?? \PHP_INT_MAX;
 
         if (null === $zoneName) {
             throw new \LogicException(
-                'timezone_transitions_get() requires a compile-time DateTimeZone name in this compiler build (issue #6041 phase 2)'
+                $function.'() requires a compile-time DateTimeZone name in this compiler build (#26799)'
             );
         }
 
@@ -91,6 +109,11 @@ final class JitTimezoneTransitionsGet
 
     private static function tryCompileTimeZoneName(Context $context, JITVariable $arg): ?string
     {
+        // DateTimeZone::__construct leaves the zone name on $this (#26772 / #26799).
+        if (null !== $arg->compileTimeString && '' !== $arg->compileTimeString) {
+            return $arg->compileTimeString;
+        }
+
         $literal = JitStringBuiltinArg::compileTimeLiteral($arg);
         if (null !== $literal) {
             return $literal;
@@ -112,6 +135,9 @@ final class JitTimezoneTransitionsGet
     {
         if (null === $arg) {
             return null;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return (int) $arg->compileTimeLong;
         }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
             $lib = $context->llvm->lib;

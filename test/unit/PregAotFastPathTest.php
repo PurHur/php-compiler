@@ -39,4 +39,15 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(1, PregAotFastPath::matchCount('/abc/', 'xxabcxx', 0));
         $this->assertSame(0, PregAotFastPath::matchCount('/abc/', 'xyz', 0));
     }
+
+    public function testLiteralCaptureGroups(): void
+    {
+        $this->assertSame(8, PregAotFastPath::patternKind('/(a)(b)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(a)(b)/', 'ab', 0));
+        $this->assertSame(3, PregAotFastPath::lastCapCount());
+        $this->assertSame('ab', PregAotFastPath::lastCap(0));
+        $this->assertSame('a', PregAotFastPath::lastCap(1));
+        $this->assertSame('b', PregAotFastPath::lastCap(2));
+        $this->assertSame(0, PregAotFastPath::matchCount('/(a)(b)/', 'xy', 0));
+    }
 }
