@@ -119,6 +119,23 @@ final class VmMetaphone
         return $out.$c;
     }
 
+    /**
+     * NestedJIT-safe index advance (#26815).
+     *
+     * Compound assign of a summed RHS (one plus skip) does not update the index under
+     * NestedJIT/AOT — infinite phoneme loop → SIGKILL. Prefer ++$wIdx plus a separate delta.
+     */
+    private static function advanceIdx(int $wIdx, int $delta): int
+    {
+        $i = 0;
+        while ($i < $delta) {
+            ++$wIdx;
+            ++$i;
+        }
+
+        return $wIdx;
+    }
+
     public static function encode(string $word, int $maxPhonemes = 0): string
     {
         if ($maxPhonemes < 0) {
@@ -144,7 +161,7 @@ final class VmMetaphone
             case 'A':
                 if ('E' === $next) {
                     $out = self::appendPhoneme($out, 'E');
-                    $wIdx += 2;
+                    $wIdx = self::advanceIdx($wIdx, 2);
                 } else {
                     $out = self::appendPhoneme($out, 'A');
                     ++$wIdx;
@@ -155,16 +172,16 @@ final class VmMetaphone
             case 'P':
                 if ('N' === $next) {
                     $out = self::appendPhoneme($out, 'N');
-                    $wIdx += 2;
+                    $wIdx = self::advanceIdx($wIdx, 2);
                 }
                 break;
             case 'W':
                 if ('R' === $next) {
                     $out = self::appendPhoneme($out, $next);
-                    $wIdx += 2;
+                    $wIdx = self::advanceIdx($wIdx, 2);
                 } elseif ('H' === $next || self::isVowel($next)) {
                     $out = self::appendPhoneme($out, 'W');
-                    $wIdx += 2;
+                    $wIdx = self::advanceIdx($wIdx, 2);
                 }
                 break;
             case 'X':
@@ -325,7 +342,10 @@ final class VmMetaphone
                     break;
             }
 
-            $wIdx += 1 + $skip;
+            ++$wIdx;
+            if ($skip > 0) {
+                $wIdx = self::advanceIdx($wIdx, $skip);
+            }
         }
 
         if ($maxPhonemes > 0) {
