@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -103,6 +104,9 @@ final class ReadonlyRaise
         }
 
         self::$implementing = true;
+        // Body emission / NestedJIT may clear the insert block; restore so readonly
+        // store guards do not hit Factory::basicBlock(null) mid-user AOT (#26826).
+        $restore = BasicBlockHelper::tryGetInsertBlock($context);
         try {
             self::ensureJitHelperCompiled($context);
             self::implementRaiseBridge($context);
@@ -111,8 +115,8 @@ final class ReadonlyRaise
             self::implementCopyPendingBridge($context);
             self::implementAbortIfPending($context);
             self::registerLinkedRuntime($context);
-            $context->builder->clearInsertionPosition();
         } finally {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
             self::$implementing = false;
         }
     }

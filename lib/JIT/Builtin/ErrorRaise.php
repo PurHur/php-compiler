@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM;
@@ -42,10 +43,17 @@ final class ErrorRaise
             return;
         }
 
-        self::registerPendingGlobals($context);
-        self::implementRaiseFunction($context);
-        self::implementPendingHelpers($context);
-        self::implementAbortIfPending($context);
+        // Body emission clears the insert block; restore caller position so readonly
+        // store guards (and other mid-function emitters) do not hit Factory::basicBlock(null) (#26826).
+        $restore = BasicBlockHelper::tryGetInsertBlock($context);
+        try {
+            self::registerPendingGlobals($context);
+            self::implementRaiseFunction($context);
+            self::implementPendingHelpers($context);
+            self::implementAbortIfPending($context);
+        } finally {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
     }
 
     public static function emitRaise(Context $context, string $message): void

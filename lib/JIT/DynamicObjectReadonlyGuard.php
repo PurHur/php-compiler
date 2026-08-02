@@ -45,9 +45,13 @@ final class DynamicObjectReadonlyGuard
             $i8->constInt(0, false)
         );
 
-        $fn = $context->builder->getInsertBlock()->getParent();
+        // NestedJIT / pending-Error body emission can clear the insert block (#26756 / #26826).
+        $entry = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $entry) {
+            return;
+        }
+        $fn = $entry->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
-        $entry = $context->builder->getInsertBlock();
         $allowBlock = $fn->appendBasicBlock('dyn_readonly_allow');
         $checkBlock = $fn->appendBasicBlock('dyn_readonly_check');
         $exitBlock = $fn->appendBasicBlock('dyn_readonly_exit');
