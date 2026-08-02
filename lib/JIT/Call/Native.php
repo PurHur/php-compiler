@@ -485,6 +485,17 @@ class Native implements Call {
                         );
 
                         return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_DOUBLE:
+                        // Peer of NATIVE_LONG above — NestedJIT RoundJitHelper (and similar)
+                        // passes typed doubles into __value__ native params (#26921).
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeDouble'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
+                        return $context->builder->load($slot);
                     case Variable::TYPE_NULL:
                         $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
                         $context->builder->call(
