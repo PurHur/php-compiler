@@ -3468,6 +3468,31 @@ class Object_ extends Type {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
+        if ('arrayiterator' === $lcname) {
+            // Thin user-script AOT foreach via __spl_ht packed walk (#26783).
+            // php-src ext/spl/spl_array.stub.php — SeekableIterator + ArrayAccess + Serializable + Countable.
+            $this->ensureZendBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, [
+                'SeekableIterator',
+                'ArrayAccess',
+                'Serializable',
+                'Countable',
+            ]);
+            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            $this->seedExternalClassConstants($id, [
+                'STD_PROP_LIST' => 1,
+                'ARRAY_AS_PROPS' => 2,
+            ]);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
+                'count', 'append', 'getarraycopy', 'getflags', 'setflags',
+                'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('sensitiveparametervalue' === $lcname) {
             // Trace redaction marker — store wrapped arg for getValue() (#3351, #4621, #22487).
             // Private like Zend zend_exceptions.stub.php — json_encode must not leak (#23042).

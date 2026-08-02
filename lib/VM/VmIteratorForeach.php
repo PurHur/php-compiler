@@ -53,6 +53,13 @@ final class VmIteratorForeach
             && 'splobjectstorage' === strtolower($containerUserType);
     }
 
+    /** ArrayIterator stores the iterated array in `__spl_ht` (packed/string keys) (#26783). */
+    private static function usesArrayIteratorHt(?string $containerUserType): bool
+    {
+        return null !== $containerUserType
+            && 'arrayiterator' === strtolower($containerUserType);
+    }
+
     private static function usesWeakMapHashtable(?string $containerUserType): bool
     {
         return null !== $containerUserType
@@ -127,6 +134,22 @@ final class VmIteratorForeach
         if (null !== $fromPropertySlot) {
             return $fromPropertySlot;
         }
+        // VALUE-boxed objects (common after `new` temps) must not go through __value__readHashtable (#26783).
+        if (self::usesObjectKeys($containerUserType)
+            || self::usesArrayIteratorHt($containerUserType)
+            || self::usesWeakMapHashtable($containerUserType)
+        ) {
+            if (JitVariable::TYPE_OBJECT === $array->type || JitVariable::TYPE_VALUE === $array->type) {
+                $receiver = JitVariable::TYPE_OBJECT === $array->type
+                    ? $array
+                    : VmIteratorProtocol::normalizeObjectReceiver($context, $array);
+                if (self::usesWeakMapHashtable($containerUserType)) {
+                    return $context->type->object->weakMapBackingHashtable($receiver);
+                }
+
+                return $context->type->object->splBackingHashtable($receiver);
+            }
+        }
         if (JitVariable::TYPE_VALUE === $array->type) {
             $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
             $ht = $context->builder->call(
@@ -142,7 +165,7 @@ final class VmIteratorForeach
             );
         }
         if (JitVariable::TYPE_OBJECT === $array->type) {
-            if (self::usesObjectKeys($containerUserType)) {
+            if (self::usesObjectKeys($containerUserType) || self::usesArrayIteratorHt($containerUserType)) {
                 return $context->type->object->splBackingHashtable($array);
             }
             if (self::usesWeakMapHashtable($containerUserType)) {

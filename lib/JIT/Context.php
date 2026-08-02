@@ -998,6 +998,8 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetexists'] = new Call\SplObjectStorageMethod('offsetexists');
         $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
+        // ArrayIterator::__construct — copy array into `__spl_ht` for thin AOT foreach (#26783).
+        $this->functionProxies['arrayiterator::__construct'] = new Call\ArrayIteratorConstruct();
 
         $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
         $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();

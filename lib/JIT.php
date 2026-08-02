@@ -16305,6 +16305,7 @@ class JIT {
             || $toCall instanceof JIT\Call\DateTimeZoneConstruct
             || $toCall instanceof JIT\Call\DateIntervalConstruct
             || $toCall instanceof JIT\Call\DatePeriodConstruct
+            || $toCall instanceof JIT\Call\ArrayIteratorConstruct
         ) {
             return true;
         }
