@@ -39,6 +39,12 @@ class Scope {
     /** `new` without __construct: FUNCCALL_EXEC_RETURN must not clobber the object slot (#8308). */
     public bool $preserveNewResultOnNullCall = false;
 
+    /**
+     * Fiber::suspend() was short-circuited in a resume function — next FUNCCALL_EXEC_RETURN
+     * must load {@see __fiber_state__}::resume_argument (#26801, Zend/zend_fibers.c).
+     */
+    public bool $fiberSuspendResultPending = false;
+
     public function __construct() {
         $this->blockStorage = new \SplObjectStorage;
         $this->blockEntryStorage = new \SplObjectStorage;
