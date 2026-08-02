@@ -215,10 +215,19 @@ final class CastArrayShared
 
     private static function emitGetObjectVarsArray(Context $context, Variable $src, bool $mangledKeys): Variable
     {
-        $objCast = JitGetObjectVars::invoke($context, $src, $mangledKeys);
-        $arrayFromObj = HashTableHelper::emptyVariable($context);
-        $arrayFromObj->value = $objCast;
+        // JitGetObjectVars returns a boxed `__value__*` (array), not a bare `__hashtable__*`
+        // (#27020 — PHI type mismatch vs wrapResourceInArray / SPL cast).
+        $boxed = JitGetObjectVars::invoke($context, $src, $mangledKeys);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $boxed
+        );
 
-        return $arrayFromObj;
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
     }
 }

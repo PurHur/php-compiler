@@ -8,25 +8,28 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\HashTableNestedExportLlvm;
+use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_json_encode_* via JsonEncodeJitHelper PHP (#9267, #13239, #20816).
+ * JIT/AOT link for __compiler_json_encode_* via JsonEncodeNestedJitHelper PHP
+ * (#9267, #13239, #20816, #27020).
  *
- * Embed + thin standalone AOT: {@see JsonEncodeJitHelper} via {@see JitVmHelperLink}
- * (Serialize #20773 / VarExport #20589 shape — no thin null stubs).
+ * Embed + thin standalone AOT: {@see JsonEncodeNestedJitHelper} via {@see JitVmHelperLink}
+ * (Context-free NestedJIT path — avoids `$ctx->runtime->vm` SIGSEGV on thin AOT).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class StringJsonEncode
 {
-    private const HELPER_PATH = '/ext/standard/JsonEncodeJitHelper.php';
+    private const HELPER_PATH = '/ext/standard/JsonEncodeNestedJitHelper.php';
 
-    private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeJitHelper::encodeValue';
+    private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeNestedJitHelper::encodeValue';
 
-    private const ENCODE_HT_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeJitHelper::encodeHashtable';
+    private const ENCODE_HT_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeNestedJitHelper::encodeHashtable';
 
     private const VALUE_BRIDGE_ENTRY = 'json_encode_value_bridge_entry';
 
@@ -67,6 +70,15 @@ final class StringJsonEncode
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
         NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'array');
+        // NestedJIT methods used by slim JsonEncodeJitHelper (#27020 / peer StringHttpBuildQuery).
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toint');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
+        // NestedJIT HashTable::exportKeyValuePairs for encodeHashtable (#12908 / #27020).
+        HashTableNestedExportLlvm::ensureLinked($context);
+        NestedVmHashTableMethodLlvm::ensureMethod($context, 'findindex');
 
         $valueProbe = $context->module->getNamedFunction('__compiler_json_encode_value');
         $htProbe = $context->module->getNamedFunction('__compiler_json_encode_array');
@@ -128,7 +140,7 @@ final class StringJsonEncode
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after JsonEncodeJitHelper compile (#20816)');
+            throw new \LogicException($logical.' missing after JsonEncodeNestedJitHelper compile (#20816/#27020)');
         }
 
         return $fn;
