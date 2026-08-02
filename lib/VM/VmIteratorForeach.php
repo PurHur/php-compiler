@@ -66,6 +66,57 @@ final class VmIteratorForeach
             || 'recursiveiteratoriterator' === $ut;
     }
 
+    /**
+     * IteratorAggregate-only (getIterator, no rewind): unwrap then walk inner `__spl_ht` (#26785).
+     *
+     * Thin AOT without any Iterator::rewind in the unit cannot take the method-protocol path, and
+     * must not fall through to casting the aggregate object pointer as a hashtable (segfault).
+     */
+    private static function canLowerAggregateInnerHt(
+        Context $context,
+        JitVariable $array,
+        ?string $containerUserType
+    ): bool {
+        if (null === $containerUserType || '' === $containerUserType) {
+            return false;
+        }
+        $classLc = strtolower(ltrim($containerUserType, '\\'));
+        if ('object' === $classLc || self::usesArrayIteratorHt($containerUserType) || self::usesObjectKeys($containerUserType)) {
+            return false;
+        }
+        if ($array->type & JitVariable::IS_NATIVE_ARRAY || JitVariable::TYPE_HASHTABLE === $array->type) {
+            return false;
+        }
+        if (JitVariable::TYPE_OBJECT !== $array->type && JitVariable::TYPE_VALUE !== $array->type) {
+            return false;
+        }
+        if (!$context->functionIsRegistered($classLc.'::getiterator')) {
+            return false;
+        }
+        // Full Iterator (rewind on the same class) keeps the method-protocol path.
+        if ($context->functionIsRegistered($classLc.'::rewind')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function hashtableFromAggregateInner(Context $context, JitVariable $slotKey): JitVariable
+    {
+        $receiver = IteratorProtocolHelper::loadReceiver($context, $slotKey);
+
+        return $context->type->object->splBackingHashtable($receiver);
+    }
+
+    private static function initHashtableIndex(Context $context, JitVariable $slotKey): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $invalid = $context->builder->sub($zero, $one);
+        $context->builder->store($invalid, self::indexSlot($context, $slotKey));
+    }
+
     private static function usesWeakMapHashtable(?string $containerUserType): bool
     {
         return null !== $containerUserType
@@ -245,6 +296,15 @@ final class VmIteratorForeach
 
             return;
         }
+        // IteratorAggregate → getIterator() → ArrayIterator `__spl_ht` (#26785).
+        if (self::canLowerAggregateInnerHt($context, $array, $containerUserType)) {
+            $receiver = IteratorProtocolHelper::resolveForeachReceiver($context, $array, $containerUserType);
+            IteratorProtocolHelper::storeReceiver($context, $slotKey, $receiver);
+            $context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)] = true;
+            self::initHashtableIndex($context, $slotKey);
+
+            return;
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             IteratorProtocolHelper::compileForeachReset($context, $array, $slotKey, $containerUserType);
 
@@ -260,11 +320,7 @@ final class VmIteratorForeach
 
             return;
         }
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $invalid = $context->builder->sub($zero, $one);
-        $context->builder->store($invalid, self::indexSlot($context, $slotKey));
+        self::initHashtableIndex($context, $slotKey);
     }
 
     public static function compileValid(
@@ -280,6 +336,13 @@ final class VmIteratorForeach
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileValidHashtable($context, $ht, $slotKey);
+        }
+        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+            return self::compileValidHashtable(
+                $context,
+                self::hashtableFromAggregateInner($context, $slotKey),
+                $slotKey
+            );
         }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachValid($context, $slotKey, $containerUserType);
@@ -447,6 +510,13 @@ final class VmIteratorForeach
 
             return self::compileKeyHashtable($context, $ht, $slotKey);
         }
+        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+            return self::compileKeyHashtable(
+                $context,
+                self::hashtableFromAggregateInner($context, $slotKey),
+                $slotKey
+            );
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachKey($context, $slotKey, $containerUserType);
         }
@@ -552,6 +622,13 @@ final class VmIteratorForeach
 
             return self::compileValueHashtable($context, $ht, $slotKey);
         }
+        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+            return self::compileValueHashtable(
+                $context,
+                self::hashtableFromAggregateInner($context, $slotKey),
+                $slotKey
+            );
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachValue($context, $slotKey, $containerUserType);
         }
@@ -572,6 +649,14 @@ final class VmIteratorForeach
         $slotKey = $array;
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValueByRef($context, $slotKey, $containerUserType);
+        }
+        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+            // Inner ArrayIterator `__spl_ht` — same FE_RESET_RW allow-list as ArrayIterator (#19444, #26785).
+            return self::compileValueByRefHashtable(
+                $context,
+                self::hashtableFromAggregateInner($context, $slotKey),
+                $slotKey
+            );
         }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             // Zend FE_RESET_RW allow-list: ArrayIterator / ArrayObject / RecursiveArrayIterator (#19444).

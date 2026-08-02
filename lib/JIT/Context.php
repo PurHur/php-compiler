@@ -324,6 +324,14 @@ class Context {
      */
     public array $foreachDatePeriodSnapshotHts = [];
 
+    /**
+     * IteratorAggregate foreach slots that unwrap getIterator() then walk `__spl_ht`
+     * on the inner ArrayIterator (#26785). Keyed by container Variable id.
+     *
+     * @var array<int, true>
+     */
+    public array $foreachAggregateInnerHtSlots = [];
+
     /** @var array<string, Variable> */
     public array $jitGlobalVariables = [];
 
