@@ -1213,6 +1213,183 @@ final class VmSsh2Native
     }
 
     /**
+     * Init publickey subsystem (PECL ssh2_publickey_init; #26717).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return \FFI\CData|null LIBSSH2_PUBLICKEY*
+     */
+    public static function publickeyInit(\FFI\CData $session)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        try {
+            $pkey = $ffi->libssh2_publickey_init($session);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $pkey;
+    }
+
+    /**
+     * Add a public key via subsystem (PECL ssh2_publickey_add; #26717).
+     *
+     * @param \FFI\CData $pkey LIBSSH2_PUBLICKEY*
+     */
+    public static function publickeyAdd(
+        \FFI\CData $pkey,
+        string $algo,
+        string $blob,
+        bool $overwrite
+    ): bool {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $rc = (int) $ffi->libssh2_publickey_add_ex(
+                $pkey,
+                $algo,
+                \strlen($algo),
+                $blob,
+                \strlen($blob),
+                $overwrite ? 1 : 0,
+                0,
+                null
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return 0 === $rc;
+    }
+
+    /**
+     * Remove a public key via subsystem (PECL ssh2_publickey_remove; #26717).
+     *
+     * @param \FFI\CData $pkey LIBSSH2_PUBLICKEY*
+     */
+    public static function publickeyRemove(\FFI\CData $pkey, string $algo, string $blob): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $rc = (int) $ffi->libssh2_publickey_remove_ex(
+                $pkey,
+                $algo,
+                \strlen($algo),
+                $blob,
+                \strlen($blob)
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return 0 === $rc;
+    }
+
+    /**
+     * List installed public keys (PECL ssh2_publickey_list; #26717).
+     *
+     * @param \FFI\CData $pkey LIBSSH2_PUBLICKEY*
+     *
+     * @return list<array{name: string, blob: string, attrs: array<string, string>}>|false
+     */
+    public static function publickeyList(\FFI\CData $pkey)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $numKeys = $ffi->new('unsigned long');
+            $listPtr = $ffi->new('libssh2_publickey_list*');
+            $rc = (int) $ffi->libssh2_publickey_list_fetch(
+                $pkey,
+                \FFI::addr($numKeys),
+                \FFI::addr($listPtr)
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+        if (0 !== $rc || null === $listPtr) {
+            return false;
+        }
+        $n = (int) $numKeys->cdata;
+        $out = [];
+        try {
+            for ($i = 0; $i < $n; ++$i) {
+                $entry = $listPtr[$i];
+                $nameLen = (int) $entry->name_len;
+                $blobLen = (int) $entry->blob_len;
+                $name = $nameLen > 0 && null !== $entry->name
+                    ? \FFI::string($entry->name, $nameLen)
+                    : '';
+                $blob = $blobLen > 0 && null !== $entry->blob
+                    ? \FFI::string($entry->blob, $blobLen)
+                    : '';
+                $attrs = [];
+                $numAttrs = (int) $entry->num_attrs;
+                if ($numAttrs > 0 && null !== $entry->attrs) {
+                    for ($j = 0; $j < $numAttrs; ++$j) {
+                        $attr = $entry->attrs[$j];
+                        $aNameLen = (int) $attr->name_len;
+                        $aValLen = (int) $attr->value_len;
+                        if ($aNameLen <= 0 || null === $attr->name) {
+                            continue;
+                        }
+                        $aName = \FFI::string($attr->name, $aNameLen);
+                        $aVal = ($aValLen > 0 && null !== $attr->value)
+                            ? \FFI::string($attr->value, $aValLen)
+                            : '';
+                        $attrs[$aName] = $aVal;
+                    }
+                }
+                $out[] = [
+                    'name' => $name,
+                    'blob' => $blob,
+                    'attrs' => $attrs,
+                ];
+            }
+        } catch (\Throwable) {
+            try {
+                $ffi->libssh2_publickey_list_free($pkey, $listPtr);
+            } catch (\Throwable) {
+            }
+
+            return false;
+        }
+        try {
+            $ffi->libssh2_publickey_list_free($pkey, $listPtr);
+        } catch (\Throwable) {
+        }
+
+        return $out;
+    }
+
+    /**
+     * Shutdown publickey subsystem (PECL pkey dtor; #26717).
+     *
+     * @param \FFI\CData $pkey LIBSSH2_PUBLICKEY*
+     */
+    public static function publickeyShutdown(\FFI\CData $pkey): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            $ffi->libssh2_publickey_shutdown($pkey);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
      * @return \FFI|null
      */
     private static function ffi()
@@ -1296,6 +1473,29 @@ int libssh2_agent_get_identity(LIBSSH2_AGENT *agent, struct libssh2_agent_public
 int libssh2_agent_userauth(LIBSSH2_AGENT *agent, const char *username, struct libssh2_agent_publickey *identity);
 int libssh2_agent_disconnect(LIBSSH2_AGENT *agent);
 void libssh2_agent_free(LIBSSH2_AGENT *agent);
+typedef struct _LIBSSH2_PUBLICKEY LIBSSH2_PUBLICKEY;
+typedef struct _libssh2_publickey_attribute {
+    const char *name;
+    unsigned long name_len;
+    const char *value;
+    unsigned long value_len;
+    char mandatory;
+} libssh2_publickey_attribute;
+typedef struct _libssh2_publickey_list {
+    unsigned char *packet;
+    const unsigned char *name;
+    unsigned long name_len;
+    const unsigned char *blob;
+    unsigned long blob_len;
+    unsigned long num_attrs;
+    libssh2_publickey_attribute *attrs;
+} libssh2_publickey_list;
+LIBSSH2_PUBLICKEY *libssh2_publickey_init(LIBSSH2_SESSION *session);
+int libssh2_publickey_add_ex(LIBSSH2_PUBLICKEY *pkey, const unsigned char *name, unsigned long name_len, const unsigned char *blob, unsigned long blob_len, char overwrite, unsigned long num_attrs, const libssh2_publickey_attribute *attrs);
+int libssh2_publickey_remove_ex(LIBSSH2_PUBLICKEY *pkey, const unsigned char *name, unsigned long name_len, const unsigned char *blob, unsigned long blob_len);
+int libssh2_publickey_list_fetch(LIBSSH2_PUBLICKEY *pkey, unsigned long *num_keys, libssh2_publickey_list **pkey_list);
+void libssh2_publickey_list_free(LIBSSH2_PUBLICKEY *pkey, libssh2_publickey_list *pkey_list);
+int libssh2_publickey_shutdown(LIBSSH2_PUBLICKEY *pkey);
 C;
         foreach (['libssh2.so.1', 'libssh2.so', '/usr/lib/x86_64-linux-gnu/libssh2.so.1'] as $lib) {
             try {
