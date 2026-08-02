@@ -227,6 +227,8 @@ final class ThrowableManifest
             'DateMalformedIntervalException',
             'DateMalformedPeriodException' => false,
             'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
+            // PHP 8.4+ only — withhold on 8.2 reference profile (#26741, re-#7267).
+            'FiberStackOverflow' => CompilerVersion::advertisesFiberStackOverflowClass(),
             'StreamException' => CompilerVersion::advertisesStreamErrorApi(),
             'PharException' => \PHPCompiler\ext\phar\PharExtensionPolicy::advertisesExtension(),
             'IntlException' => \PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesExtension(),

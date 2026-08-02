@@ -3179,6 +3179,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ FiberStackOverflow (Zend/zend_exceptions.stub.php, Zend/zend_fibers.c, #26741, re-#7267).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 class_exists gate). Enable via
+     * stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4} forward profile.
+     */
+    public static function advertisesFiberStackOverflowClass(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ request_parse_body() (ext/standard/http.c, issue #16927).
      *
      * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.

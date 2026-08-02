@@ -1,9 +1,10 @@
 <?php
 /**
- * Issue #7267 — FiberStackOverflow registration + fiber stack guard.
+ * Issue #7267 / #26741 — FiberStackOverflow registration + fiber stack guard (PROFILE=8.4+).
  *
- * Run: php bin/vm.php test/repro/fiber_stack_overflow.php
+ * Run: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/fiber_stack_overflow.php
  */
+putenv('PHP_COMPILER_PROFILE=8.4');
 putenv('PHP_COMPILER_FIBER_MAX_STACK_FRAMES=64');
 
 echo class_exists('FiberStackOverflow', false) ? "yes\n" : "no\n";
