@@ -1000,6 +1000,16 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
         // ArrayIterator::__construct — copy array into `__spl_ht` for thin AOT foreach (#26783).
         $this->functionProxies['arrayiterator::__construct'] = new Call\ArrayIteratorConstruct();
+        // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
+        foreach ([
+            'splmaxheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MAX,
+            'splminheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MIN,
+            'splheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_USER,
+        ] as $heapLc => $heapKind) {
+            foreach (['__construct', 'insert', 'count', 'rewind', 'valid', 'current', 'key', 'next'] as $heapMethod) {
+                $this->functionProxies[$heapLc.'::'.$heapMethod] = new Call\SplHeapMethod($heapMethod, $heapKind);
+            }
+        }
 
         $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
         $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();
