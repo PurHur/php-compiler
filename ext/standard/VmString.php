@@ -1514,6 +1514,8 @@ final class VmString
 
     /**
      * levenshtein() — byte-oriented edit distance (subset of PHP; issue #2406).
+     *
+     * SSOT: {@see LevenshteinJitHelper::computeArgv} (NestedJIT-safe; #26830).
      */
     public static function levenshtein(
         string $string1,
@@ -1522,34 +1524,13 @@ final class VmString
         int $replacementCost = 1,
         int $deletionCost = 1
     ): int {
-        $len1 = self::byteLength($string1);
-        $len2 = self::byteLength($string2);
-        if (0 === $len1) {
-            return $len2 * $insertionCost;
-        }
-        if (0 === $len2) {
-            return $len1 * $deletionCost;
-        }
-
-        $prev = [];
-        for ($j = 0; $j <= $len2; ++$j) {
-            $prev[$j] = $j * $insertionCost;
-        }
-        for ($i = 1; $i <= $len1; ++$i) {
-            $cur = [];
-            $cur[0] = $i * $deletionCost;
-            for ($j = 1; $j <= $len2; ++$j) {
-                $subst = $string1[$i - 1] === $string2[$j - 1] ? 0 : $replacementCost;
-                $cur[$j] = min(
-                    $cur[$j - 1] + $insertionCost,
-                    $prev[$j] + $deletionCost,
-                    $prev[$j - 1] + $subst
-                );
-            }
-            $prev = $cur;
-        }
-
-        return $prev[$len2];
+        return LevenshteinJitHelper::computeArgv(
+            $string1,
+            $string2,
+            $insertionCost,
+            $replacementCost,
+            $deletionCost
+        );
     }
 
     /**
