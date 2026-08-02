@@ -5,30 +5,27 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayFlipLlvm;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_flip() via ArrayFlipJitHelper PHP (#12329).
+ * JIT/AOT link for array_flip() (#12329, #26970).
  *
- * Standalone AOT compiles {@see ArrayFlipJitHelper} via JitVmHelperLink (#14244); native literal arrays materialize to hashtable then route through PHP (#17922).
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayFlipJitHelper} fatals on
+ * HashTable::iterateKeyed (#21981). Call-site LLVM via {@see ArrayFlipLlvm} (pre-#17922 walk).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray::flip()}
  * php-src: ext/standard/array.c — php_array_flip()
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayFlipRuntime
 {
     private const ABI_FLIP = '__array_flip__flip';
-
-    private const HELPER_PATH = '/ext/standard/ArrayFlipJitHelper.php';
-
-    private const FLIP_HELPER = 'PHPCompiler\\ext\\standard\\ArrayFlipJitHelper::flip';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::FLIP_HELPER,
-    ];
 
     public static function flip(Context $context, JITVariable $array): Value
     {
@@ -59,38 +56,41 @@ final class ArrayFlipRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_FLIP,
-            'array_flip_bridge_entry',
-            [$htPtr],
-            $htPtr,
-            self::FLIP_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12329'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitFlipBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitFlipBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction(self::ABI_FLIP);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_FLIP,
+                $context->context->functionType($htPtr, false, $htPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_flip_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $flipped = ArrayFlipLlvm::flipHashTable($context, $src);
+        $context->builder->returnValue($flipped);
+        $context->registerFunction(self::ABI_FLIP, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_FLIP);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_FLIP.' missing after ArrayFlipRuntime bridge (#12329)');
+            throw new \LogicException(self::ABI_FLIP.' missing after ArrayFlipRuntime bridge (#26970)');
         }
         $context->registerFunction(self::ABI_FLIP, $fn);
     }

@@ -44,6 +44,8 @@ final class NestedVmHashTableMethodLlvm
         // Writes share one NestedJIT proxy (#14601).
         'add' => Call\HashTableWriteNested::class,
         'addindex' => Call\HashTableWriteNested::class,
+        // String-key overwrite used by ArrayFlipJitHelper / ArrayColumnJitHelper (#26970).
+        'update' => Call\HashTableWriteNested::class,
         'updateindex' => Call\HashTableWriteNested::class,
         'append' => Call\HashTableWriteNested::class,
         // In-place mutators for usort/asort peers (#24157).
