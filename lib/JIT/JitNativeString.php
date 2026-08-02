@@ -100,6 +100,16 @@ final class JitNativeString
         }
         if (Variable::TYPE_VALUE === $var->type) {
             self::ensureInsertBlock($context);
+            // Folded BcMath\Number method results carry value/scale metadata (#26803).
+            $bcCt = $var->compileTimeBcmathNumber ?? null;
+            if (null !== $bcCt && \PHPCompiler\CompilerVersion::supportsBcmath()) {
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->builder->load($context->constantStringFromString($bcCt['value']))
+                );
+            }
             // Named locals are often value-boxed objects; strval() does not call __toString (#26821).
             if (null === $classHint || '' === $classHint) {
                 $fromOp = $sourceOperand?->type?->userType ?? null;
@@ -140,6 +150,79 @@ final class JitNativeString
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
                     $context->builder->load($context->constantStringFromString(''))
+                );
+            }
+
+            // Value-boxed BcMath\Number without a class hint — same class_id probe as echo (#24683 / #26803).
+            if (
+                \PHPCompiler\CompilerVersion::supportsBcmath()
+                && $context->functionIsRegistered('bcmath\\number::__tostring')
+            ) {
+                $numberLc = 'bcmath\\number';
+                $object = $context->type->object;
+                $numberId = $object->lookup($numberLc);
+                $numberProxy = 'bcmath\\number::__tostring';
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
+                $map = $context->structFieldMap['__value__'];
+                $kindRaw = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
+                $i8 = $context->getTypeFromString('int8');
+                $isObj = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->and($kindRaw, $i8->constInt(0x7f, false)),
+                    $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+                );
+                $yesKind = BasicBlockHelper::append($context, 'cast_bcmath_kind_yes');
+                $noKind = BasicBlockHelper::append($context, 'cast_bcmath_kind_no');
+                $join = BasicBlockHelper::append($context, 'cast_bcmath_join');
+                $context->builder->branchIf($isObj, $yesKind, $noKind);
+
+                $context->builder->positionAtEnd($yesKind);
+                $objPtr = $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    $valuePtr
+                );
+                $objMap = $context->structFieldMap['__object__'];
+                $isNumber = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->load($context->builder->structGep($objPtr, $objMap['class_id'])),
+                    $context->getTypeFromString('int64')->constInt($numberId, false)
+                );
+                $yesNum = BasicBlockHelper::append($context, 'cast_bcmath_number_yes');
+                $context->builder->branchIf($isNumber, $yesNum, $noKind);
+                $context->builder->positionAtEnd($yesNum);
+                $objVar = new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $objPtr
+                );
+                $toCall = $context->resolveFunctionProxy($numberProxy);
+                $raw = $toCall->call($context, $objVar);
+                $numStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    JitValueBox::coerceToValuePtrForStore($context, $raw)
+                );
+                $yesEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($join);
+
+                $context->builder->positionAtEnd($noKind);
+                $fallbackStr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    $valuePtr
+                );
+                $noEnd = $context->builder->getInsertBlock();
+                $context->builder->branch($join);
+
+                $context->builder->positionAtEnd($join);
+                $phi = $context->builder->phi($numStr->typeOf());
+                $phi->addIncoming($numStr, $yesEnd);
+                $phi->addIncoming($fallbackStr, $noEnd);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $phi
                 );
             }
 

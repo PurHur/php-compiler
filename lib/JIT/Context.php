@@ -1035,6 +1035,10 @@ class Context {
         if (CompilerVersion::supportsBcmath()) {
             $this->functionProxies['bcmath\number::__construct'] = new Call\BcMathNumberConstruct();
             $this->functionProxies['bcmath\number::__tostring'] = new Call\BcMathNumberToString();
+            // User-script AOT: unbound methods were silent null (#579 / #26803).
+            foreach (['add', 'mul', 'compare'] as $bcMethod) {
+                $this->functionProxies['bcmath\number::'.$bcMethod] = new Call\BcMathNumberMethod($bcMethod);
+            }
         }
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
