@@ -1876,6 +1876,15 @@ class JIT {
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
         }
+        // M5 argv / gen-0 seed: ResolveSidecarJitHelper NestedJIT explodes (no phpc_str_replace
+        // under NestedJitCompileScope; helper unit failed.json) — identity path stubs (#26756).
+        if (
+            $this->shouldUseM5DriverHostCompile()
+            && null !== $logicalName
+            && $this->isM5ArgvResolveSidecarIdentityStubName(strtolower($logicalName))
+        ) {
+            return $this->emitM5ArgvResolveSidecarIdentityStub($internalName, $logicalName, $block);
+        }
         // M5 bootstrap sidecar: CLI entry scripts under `PHP_COMPILER_SELFHOST_AOT=1` only need a
         // linkable bundle; stub {main} to avoid LLVM 9 crashing while lowering argv driver chains
         // (#2697, #2699). `PHP_COMPILER_M5_DRIVER_HOST=1` opts into real argv lowering (#1521).
@@ -2917,6 +2926,61 @@ class JIT {
             $logicalName,
             [$objectPtr],
             $this->collectParamDefaults($block)
+        );
+
+        return $func;
+    }
+
+    /**
+     * ResolveSidecarJitHelper path remap — identity is enough for gen-0 argv functional smoke
+     * (never-seen scripts use live paths). Avoids NestedJIT IR blow-up (#26756 / #23970).
+     */
+    private function isM5ArgvResolveSidecarIdentityStubName(string $lower): bool
+    {
+        return str_contains($lower, '\\resolvesidecarjithelper::');
+    }
+
+    private function emitM5ArgvResolveSidecarIdentityStub(
+        string $internalName,
+        string $logicalName,
+        Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $args = $this->normalizeSelfHostNativeCallArgTypes(
+            $this->collectStubFunctionArgTypes($block),
+            $logicalName
+        );
+        $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__value__';
+        $returnType = $this->context->getTypeFromString($callbackType);
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($returnType, false, ...$args)
+        );
+        $bb = $func->appendBasicBlock('m5_argv_resolve_sidecar_identity');
+        $saved = $this->context->builder;
+        $savedActive = $this->context->activeFunction;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->functions[$lcname] = $func;
+        $this->context->activeFunction = $lcname;
+        $defaultArgs = $this->collectParamDefaults($block);
+        if ($func->countParams() > 0) {
+            $this->context->builder->returnValue($func->getParam(0));
+        } else {
+            $this->emitSelfHostStubReturn($callbackType, $func);
+        }
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->activeFunction = $savedActive;
+        $this->context->functionReturnType[$lcname] = $callbackType;
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            $args,
+            $defaultArgs
         );
 
         return $func;

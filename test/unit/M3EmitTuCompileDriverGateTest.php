@@ -34,6 +34,8 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $realLowerChunk);
         $this->assertStringContainsString('AssignOp::optimize', $jit);
         $this->assertStringContainsString("'optimize' === \$methodLc", $jit);
+        $this->assertStringContainsString('isM5ArgvResolveSidecarIdentityStubName', $jit);
+        $this->assertStringContainsString('emitM5ArgvResolveSidecarIdentityStub', $jit);
         $compilePhp = (string) file_get_contents($root.'/bin/compile.php');
         $this->assertStringContainsString("str_ends_with(\$normalized, '/bin/compile.php')", $compilePhp);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $compilePhp);
