@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\JitStreamSyncKernel;
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for fsync()/fdatasync() stream sync (#6062, #6813, #19660). */
+/** JIT LLVM bodies for fsync()/fdatasync() via libc after stream resolve (#6062, #6813, #19660, #26929). */
 final class StreamSync
 {
     public static function ensureLinked(Context $context): void

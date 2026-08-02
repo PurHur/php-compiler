@@ -4,44 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\LastErrorRuntime;
-use PHPCompiler\JIT\Builtin\SilenceRuntime;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
-use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815, #19660, #23004, #26929).
+ * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync (#9815, #19660, #23004, #26929).
  *
- * Quarantined from lib/JIT/Builtin/StreamSyncJit — {@see \PHPCompiler\JIT\Builtin\StreamSync}
- * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
- * (peer StreamMeta #22994 / StreamBuffer #22979 / StreamMode #22968).
- * Call-site {@see ensureLinked} restores the caller insert block after bridge emit (peer #26884 / #26900).
+ * Thin AOT NestedJIT of the former stream-sync PHP helper mis-saw fopen handles as unsyncable
+ * then aborted in the warn path (#26929). Happy path is libc fsync(2)/fdatasync(2) after
+ * __phpc_resolve_stream + fflush + fileno — same shape as getmypid → getpid (#26944).
+ * VM SSOT stays {@see VmFs::fsync} / {@see VmPhpFdStream::syncFileno}.
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (peer #26884 / #26900 — parentless BB).
  *
  * php-src: ext/standard/file.c — PHP_FUNCTION(fsync) / fdatasync
  */
 final class JitStreamSyncKernel
 {
-    private const HELPER_PATH = '/ext/standard/StreamSyncJitHelper.php';
-
-    private const IS_SUPPORTED_HELPER = 'PHPCompiler\\ext\\standard\\StreamSyncJitHelper::isSyncSupported';
-
-    private const WARN_HELPER = 'PHPCompiler\\ext\\standard\\StreamSyncJitHelper::warnUnsyncable';
-
-    private const SYNC_FILENO_HELPER = 'PHPCompiler\\ext\\standard\\StreamSyncJitHelper::syncFileno';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::IS_SUPPORTED_HELPER,
-        self::WARN_HELPER,
-        self::SYNC_FILENO_HELPER,
-    ];
-
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_fsync',
@@ -62,10 +45,9 @@ final class JitStreamSyncKernel
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StreamGlobalsJit::implement($context);
         self::ensureLibc($context);
-        self::ensureJitHelperCompiled($context);
 
-        self::implementIfMissing($context, '__compiler_fsync', static fn ($ctx, $fn) => self::emitSync($ctx, $fn, 0));
-        self::implementIfMissing($context, '__compiler_fdatasync', static fn ($ctx, $fn) => self::emitSync($ctx, $fn, 1));
+        self::implementIfMissing($context, '__compiler_fsync', static fn ($ctx, $fn) => self::emitSync($ctx, $fn, false));
+        self::implementIfMissing($context, '__compiler_fdatasync', static fn ($ctx, $fn) => self::emitSync($ctx, $fn, true));
         self::registerLinkedRuntime($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
@@ -120,6 +102,8 @@ final class JitStreamSyncKernel
             ['__phpc_resolve_stream', $i8p, [$i64]],
             ['fflush', $i32, [$i8p]],
             ['fileno', $i32, [$i8p]],
+            ['fsync', $i32, [$i32]],
+            ['fdatasync', $i32, [$i32]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -135,36 +119,18 @@ final class JitStreamSyncKernel
         }
     }
 
-    private static function emitSync(Context $context, LlvmFunction $fn, int $dataOnly): void
+    private static function emitSync(Context $context, LlvmFunction $fn, bool $dataOnly): void
     {
         $handle = $fn->getParam(0);
         $entry = $fn->appendBasicBlock('sync_entry');
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
         $nullFile = $i8p->constNull();
 
-        $supportedRaw = $context->builder->call(
-            self::helperFunction($context, self::IS_SUPPORTED_HELPER),
-            $handle
-        );
-        $supported = JitNestedHelperCoerce::i64ToScalar($context, $supportedRaw, $i32);
-        $notSupported = $context->builder->icmp(Builder::INT_EQ, $supported, $zero);
-        $warnBb = $fn->appendBasicBlock('sync_warn');
-        $resolveBb = $fn->appendBasicBlock('sync_resolve');
-        $context->builder->branchIf($notSupported, $warnBb, $resolveBb);
-
-        $context->builder->positionAtEnd($warnBb);
-        $context->builder->call(
-            self::helperFunction($context, self::WARN_HELPER),
-            JitNestedHelperCoerce::scalarToI64($context, $i32->constInt($dataOnly, false), $i32)
-        );
-        $context->builder->returnValue($zero);
-
-        $context->builder->positionAtEnd($resolveBb);
         $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
         $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullFile);
         $failBb = $fn->appendBasicBlock('sync_fail');
@@ -184,51 +150,13 @@ final class JitStreamSyncKernel
         $context->builder->branchIf($fdBad, $failBb, $doSyncBb);
 
         $context->builder->positionAtEnd($failBb);
-        $context->builder->call(
-            self::helperFunction($context, self::WARN_HELPER),
-            JitNestedHelperCoerce::scalarToI64($context, $i32->constInt($dataOnly, false), $i32)
-        );
         $context->builder->returnValue($zero);
 
         $context->builder->positionAtEnd($doSyncBb);
-        $rcRaw = $context->builder->call(
-            self::helperFunction($context, self::SYNC_FILENO_HELPER),
-            JitNestedHelperCoerce::scalarToI64($context, $fd, $i32),
-            JitNestedHelperCoerce::scalarToI64($context, $i32->constInt($dataOnly, false), $i32)
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::i64ToScalar($context, $rcRaw, $i32));
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#23004');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        LastErrorRuntime::ensureLinked($context);
-        SilenceRuntime::ensureLinked($context);
-        StringTriggerError::ensureLinked($context);
-
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#23004'
-        );
+        $syncName = $dataOnly ? 'fdatasync' : 'fsync';
+        $rc = $context->builder->call($context->lookupFunction($syncName), $fd);
+        $ok = $context->builder->icmp(Builder::INT_EQ, $rc, $zero);
+        $context->builder->returnValue($context->builder->select($ok, $one, $zero));
     }
 
     private static function registerLinkedRuntime(Context $context): void
