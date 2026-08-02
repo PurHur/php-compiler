@@ -9,11 +9,16 @@ use PHPCompiler\JIT\Builtin\StringJsonDecode;
 use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPCfg\Operand;
 use PHPLLVM\Value;
 
 /**
  * Compile-time json_encode() for inline array literals — avoids deferred AOT stubs (#14040).
+ *
+ * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080) — thin AOT
+ * NestedJIT cannot yet materialize split hashtables for `__compiler_json_encode_array`.
  *
  * php-src: ext/json/php_json.c — php_json_encode
  */
@@ -30,6 +35,14 @@ final class JitJsonEncodeCompileTime
         }
         $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
         if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromPregSplit($block, $operand);
+        }
+        if (null === $vmArray) {
+            $foldedFalse = self::tryEncodePregSplitFalse($context, $block, $operand, $flags);
+            if (null !== $foldedFalse) {
+                return $foldedFalse;
+            }
+
             return null;
         }
         try {
@@ -85,5 +98,158 @@ final class JitJsonEncodeCompileTime
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * Resolve `json_encode(preg_split(…))` when pattern/subject(/limit/flags) are literals (#27080).
+     */
+    private static function tryCompileTimeArrayFromPregSplit(Block $block, Operand $operand): ?VmVariable
+    {
+        $parts = self::evalCompileTimePregSplit($block, $operand);
+        if (null === $parts || false === $parts) {
+            return null;
+        }
+        $ht = VmPreg::splitPartsToHashTable($parts, self::$lastPregSplitFlags);
+        $var = new VmVariable();
+        $var->array($ht);
+
+        return $var;
+    }
+
+    private static int $lastPregSplitFlags = 0;
+
+    /**
+     * When preg_split constexpr-fails (false), json_encode soft-encodes boolean false.
+     *
+     * @return Value|null
+     */
+    private static function tryEncodePregSplitFalse(
+        Context $context,
+        Block $block,
+        Operand $operand,
+        int $flags
+    ): ?Value {
+        $parts = self::evalCompileTimePregSplit($block, $operand);
+        if (false !== $parts) {
+            return null;
+        }
+        // json_encode(false) with default flags → "false"
+        $encoded = VmJsonFormat::encodeExported(false, $flags);
+        if (false === $encoded) {
+            return self::emitFalse($context);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * @return list<string>|list<array{0:string,1:int}>|false|null
+     *         null = not a foldable preg_split result; false = PCRE error
+     */
+    private static function evalCompileTimePregSplit(Block $block, Operand $operand): array|false|null
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'preg_split');
+        if (null === $args) {
+            return null;
+        }
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            return null;
+        }
+        if (VmVariable::TYPE_STRING !== $args[0]->type || VmVariable::TYPE_STRING !== $args[1]->type) {
+            return null;
+        }
+        $pattern = $args[0]->toString();
+        $subject = $args[1]->toString();
+        $limit = -1;
+        $flags = 0;
+        if ($argc >= 3) {
+            if (VmVariable::TYPE_INTEGER !== $args[2]->type) {
+                return null;
+            }
+            $limit = $args[2]->toInt();
+        }
+        if (4 === $argc) {
+            if (VmVariable::TYPE_INTEGER !== $args[3]->type) {
+                return null;
+            }
+            $flags = $args[3]->toInt();
+        }
+        self::$lastPregSplitFlags = $flags;
+
+        return VmPreg::pregSplit($pattern, $subject, $limit, $flags);
+    }
+
+    private static function followAssignSourceSlot(Block $block, int $slot): int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && $op->arg2 === $slot && null !== $op->arg3) {
+                return self::followAssignSourceSlot($block, (int) $op->arg3);
+            }
+        }
+
+        return $slot;
+    }
+
+    /**
+     * @return list<VmVariable>|null
+     */
+    private static function literalArgsForFuncCallResult(Block $block, int $resultSlot, string $callee): ?array
+    {
+        $ops = $block->opCodes;
+        $execIdx = null;
+        foreach ($ops as $i => $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && $op->arg1 === $resultSlot) {
+                $execIdx = $i;
+                break;
+            }
+        }
+        if (null === $execIdx) {
+            return null;
+        }
+        $initIdx = null;
+        for ($i = $execIdx - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $ops[$i]->type) {
+                $initIdx = $i;
+                break;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $ops[$i]->type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $ops[$i]->type
+            ) {
+                return null;
+            }
+        }
+        if (null === $initIdx) {
+            return null;
+        }
+        $nameSlot = $ops[$initIdx]->arg1;
+        if (null === $nameSlot || !isset($block->constants[$nameSlot])) {
+            return null;
+        }
+        $nameVar = $block->constants[$nameSlot];
+        if (VmVariable::TYPE_STRING !== $nameVar->type) {
+            return null;
+        }
+        if (\strtolower($nameVar->toString()) !== \strtolower($callee)) {
+            return null;
+        }
+        $args = [];
+        for ($i = $initIdx + 1; $i < $execIdx; ++$i) {
+            $op = $ops[$i];
+            if (OpCode::TYPE_ARG_SEND !== $op->type) {
+                continue;
+            }
+            if (null === $op->arg1 || !isset($block->constants[$op->arg1])) {
+                return null;
+            }
+            $copy = new VmVariable();
+            $copy->copyFrom($block->constants[$op->arg1]);
+            $args[] = $copy;
+        }
+
+        return $args;
     }
 }

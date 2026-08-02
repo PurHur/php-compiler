@@ -61,39 +61,9 @@ final class preg_split extends Internal
                 'preg_split() expects 2 to 4 arguments in this compiler build'
             );
         }
-        $patternLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
-        $subjectLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        $canConstexpr = null !== $patternLit && null !== $subjectLit;
-        $limit = -1;
-        $flags = 0;
-        if ($argc >= 3) {
-            $limitCt = self::compileTimeLimit($context, $args[2]);
-            if (null === $limitCt) {
-                $canConstexpr = false;
-            } else {
-                $limit = $limitCt;
-            }
-        }
-        if (4 === $argc) {
-            $flagsCt = self::compileTimeLimit($context, $args[3]);
-            if (null === $flagsCt) {
-                $canConstexpr = false;
-            } else {
-                $flags = $flagsCt;
-            }
-        }
-        if ($canConstexpr) {
-            $parts = VmPreg::pregSplit($patternLit, $subjectLit, $limit, $flags);
-            if (false === $parts) {
-                return $context->getTypeFromString('bool')->constInt(0, false);
-            }
-            $ht = VmPreg::splitPartsToHashTable($parts, $flags);
-
-            return $context->constantArrayFromVmHashTable(
-                'preg_split_'.md5($patternLit."\0".$subjectLit."\0".$limit."\0".$flags),
-                $ht
-            );
-        }
+        // Do not constexpr via constantArrayFromVmHashTable (#27080): raw `__value__**` fails
+        // module verify into `__compiler_json_encode_array`; boxed copy yields empty strings
+        // under thin AOT. Always use the runtime ABI (thin: splitStore + LLVM HT fill).
         $limit = $context->getTypeFromString('int64')->constInt(-1, true);
         $flags = $context->getTypeFromString('int64')->constInt(0, false);
         if ($argc >= 3) {
@@ -121,23 +91,5 @@ final class preg_split extends Internal
             $limit,
             $flags
         );
-    }
-
-    private static function compileTimeLimit(Context $context, JITVariable $arg): ?int
-    {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
-            $lib = $context->llvm->lib;
-            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
-                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
-            }
-        }
-        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
-            $const = $arg->value;
-            if ($const instanceof Value && $const->isConstant()) {
-                return VmMath::floatToZendLong((float) $const->constDouble());
-            }
-        }
-
-        return null;
     }
 }
