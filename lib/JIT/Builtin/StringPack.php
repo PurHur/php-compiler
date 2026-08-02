@@ -12,27 +12,27 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062, #22842).
  *
- * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (Ieee754 →
- * PackEngineEncode → PackJitHelper) in one NestedJIT scope (#22981 / #22990).
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (PackEngineEncode →
+ * PackJitHelper) in one NestedJIT scope (#22981 / #22990 / #26862).
+ * Ieee754 excluded from NestedJIT — float NestedJIT OOMs thin AOT and pulled
+ * MathRound (`phpc_round`) under NestedJIT (#26862). PackJitHelper encodes floats
+ * via bit ops; PackJitEngine (not NestedJIT'd) uses Ieee754 for host float formats.
  * PackJitEngine is not NestedJIT'd — its specs/list-assign path yields empty output;
  * PackJitHelper::packFromBlob fast-paths instead (#22990).
  */
 final class StringPack
 {
-    private const IEEE_PATH = '/ext/standard/Ieee754.php';
-
     private const ENCODE_PATH = '/ext/standard/PackEngineEncode.php';
 
     /** Repo-root path for PackJitHelper — not `*HELPER_PATH` (corpus skip — #22981). */
     private const PACK_HELPER_FILE = '/ext/standard/PackJitHelper.php';
 
     /**
-     * Ordered NestedJIT sources for runtime StringPack (#22981 / #22990).
+     * Ordered NestedJIT sources for runtime StringPack (#22981 / #22990 / #26862).
      *
      * @var list<string>
      */
     private const PACK_HELPER_BUNDLE = [
-        self::IEEE_PATH,
         self::ENCODE_PATH,
         self::PACK_HELPER_FILE,
     ];

@@ -237,7 +237,7 @@ final class PackJitEngine
             $output = PackEngineEncode::writeAt(
                 $output,
                 $outputPos,
-                PackEngineEncode::putFloat(self::takeArgDouble($args, $currentArg), $le)
+                Ieee754::encodeFloat32(self::takeArgDouble($args, $currentArg), $le)
             );
             $outputPos = $outputPos + 4;
         }
@@ -258,7 +258,7 @@ final class PackJitEngine
             $output = PackEngineEncode::writeAt(
                 $output,
                 $outputPos,
-                PackEngineEncode::putDouble(self::takeArgDouble($args, $currentArg), $le)
+                Ieee754::encodeFloat64(self::takeArgDouble($args, $currentArg), $le)
             );
             $outputPos = $outputPos + 8;
         }

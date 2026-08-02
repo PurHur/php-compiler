@@ -47,12 +47,13 @@ final class PackJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PACK_HELPER_FILE', $bridge);
         $this->assertMatchesRegularExpression(
             '/PACK_HELPER_BUNDLE\s*=\s*\[[^\]]*'
-            .'IEEE_PATH[^\]]*'
             .'ENCODE_PATH[^\]]*'
             .'PACK_HELPER_FILE/s',
             $bridge
         );
         $this->assertStringNotContainsString('ENGINE_PATH', $bridge);
+        $this->assertStringNotContainsString('IEEE_PATH', $bridge);
+        $this->assertStringNotContainsString('Ieee754.php', $bridge);
     }
 
     public function testPackJitHelperAvoidsFunctionStaticNullDefault(): void

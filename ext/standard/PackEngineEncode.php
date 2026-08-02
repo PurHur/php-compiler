@@ -15,7 +15,7 @@ namespace PHPCompiler\ext\standard;
  * Do **not** call host `\pack()` / `\unpack()` here: NestedJIT of this unit is on
  * the pack() helper path, and `\pack` → StringPack → PackEngineEncode → `\pack`
  * is the #22981 / #22843 non-termination cycle. Byte encode with chr/shifts
- * (peer {@see Ieee754::u32ToBytes}).
+ * (peer byte encode with chr/shifts — floats via Ieee754 in PackJitEngine).
  */
 final class PackEngineEncode
 {
@@ -91,28 +91,6 @@ final class PackEngineEncode
             .\chr(($bits >> 16) & 0xFF)
             .\chr(($bits >> 8) & 0xFF)
             .\chr($bits & 0xFF);
-    }
-
-    public static function putFloat(float $value, bool $littleEndian): string
-    {
-        return $littleEndian ? self::putFloatLe($value) : Ieee754::encodeFloat32($value, false);
-    }
-
-    public static function putDouble(float $value, bool $littleEndian): string
-    {
-        return $littleEndian ? self::putDoubleLe($value) : Ieee754::encodeFloat64($value, false);
-    }
-
-    /** NestedJIT-safe machine-endian float (#22990). */
-    public static function putFloatLe(float $value): string
-    {
-        return Ieee754::encodeFloat32Le($value);
-    }
-
-    /** NestedJIT-safe machine-endian double (#22990). */
-    public static function putDoubleLe(float $value): string
-    {
-        return Ieee754::encodeFloat64Le($value);
     }
 
     public static function writeAt(string $output, int $pos, string $chunk): string
