@@ -9905,6 +9905,13 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $nullsafeResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$nullsafeResult] = true;
+                    // Pre-allocate one stack slot before branches so null/fetch/merge all write
+                    // the same alloca — otherwise AOT coalesce/assign reads an untouched temp (#26818).
+                    $this->ensureCoalesceMergeStackSlot($nullsafeResult);
+                    $nullsafeMergeSlot = $block->slotForOperand($nullsafeResult);
+                    if (null !== $nullsafeMergeSlot) {
+                        $this->context->coalesceMergeSlotOperands[$nullsafeMergeSlot] = $nullsafeResult;
+                    }
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $isNull = JIT\NullsafeHelper::isReceiverNull(
                         $this,
@@ -11466,7 +11473,29 @@ class JIT {
                     $nonObjectLabel = Variable::propertyFetchNonObjectTypeLabel(
                         Variable::getTypeFromType($obj->type)
                     );
-                    if (null !== $nonObjectLabel && null !== $propName) {
+                    // Nested ?->: prior nullsafe result Temporaries are often typed TYPE_NULL even
+                    // though the fetch arm runs only after a runtime non-null check and the JIT
+                    // receiver is a VALUE/OBJECT box (#26818).
+                    $nullsafeRuntimeObjectReceiver = false;
+                    if (
+                        $op->nullsafeFetchPropertyRead
+                        && null !== $propName
+                        && (
+                            'null' === $nonObjectLabel
+                            || $op->nullsafeUninitNullableToNull
+                        )
+                        && $this->context->hasVariableOpInScopes($obj)
+                    ) {
+                        $nullsafeRecvVar = $this->context->getVariableFromOpInScopes($obj);
+                        // Ignore isNullConstant: the nullsafe null arm may set it on the shared
+                        // merge slot before the fetch arm is compiled (#26818).
+                        $nullsafeRuntimeObjectReceiver = \in_array(
+                            $nullsafeRecvVar->type,
+                            [Variable::TYPE_VALUE, Variable::TYPE_OBJECT],
+                            true
+                        );
+                    }
+                    if (null !== $nonObjectLabel && null !== $propName && !$nullsafeRuntimeObjectReceiver) {
                         $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                         if ($forWrite) {
                             if (
@@ -11521,8 +11550,26 @@ class JIT {
                         );
                         break;
                     }
-                    assert($obj->type->type === Type::TYPE_OBJECT);
+                    if (!$nullsafeRuntimeObjectReceiver) {
+                        assert(null !== $obj->type && $obj->type->type === Type::TYPE_OBJECT);
+                    }
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
+                    // Lost userType after $c = $obj->prop / nested ?-> yields generic "object".
+                    // Prefer stdClass when that layout owns the property (object casts) (#26818).
+                    $forWritePreview = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                    if ('object' === strtolower(ltrim($declaringClass, '\\'))) {
+                        $stdClassId = $this->context->type->object->lookup('stdClass');
+                        if (
+                            $forWritePreview
+                            || (
+                                null !== $propName
+                                && $this->context->type->object->hasProperty($stdClassId, $propName)
+                            )
+                            || $nullsafeRuntimeObjectReceiver
+                        ) {
+                            $declaringClass = 'stdClass';
+                        }
+                    }
                     // User-script AOT: documentElement temps often lose DOMElement userType (#23251).
                     if (
                         null !== $propName
@@ -11646,6 +11693,10 @@ class JIT {
                                 $block->scriptPath(),
                                 $deprecationLine
                             );
+                            // AOT external-only abort clears the insert block — stop this opcode (#26818).
+                            if (null === JIT\BasicBlockHelper::tryGetInsertBlock($this->context)) {
+                                break;
+                            }
                         }
                         if (!$forWrite) {
                             $magicFetched = JIT\MagicMethodDispatch::tryEmitMagicGet(

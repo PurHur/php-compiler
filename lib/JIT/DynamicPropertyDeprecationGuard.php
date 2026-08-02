@@ -33,6 +33,12 @@ final class DynamicPropertyDeprecationGuard
         if ($objectType->isReadonlyClass($classId)) {
             return;
         }
+        // Generic "object" operands (lost userType after $c = $obj->prop) are external-only
+        // without allowsDynamicProperties. AOT used to Error+clear insert, then PROPERTY_FETCH
+        // continued and hit parentFunction (#26818). Zend allows dynamic props on these.
+        if ('object' === strtolower(ltrim($className, '\\'))) {
+            return;
+        }
         // ZEND_ACC_NO_DYNAMIC_PROPERTIES: Error, not E_DEPRECATED (zend_object_handlers.c; #26371).
         // Dom\* are not sealed — Deprecated+write like other internals (#26566).
         // Enums sealed via declareEnum (#26588). Catchable try/catch is emitted at the

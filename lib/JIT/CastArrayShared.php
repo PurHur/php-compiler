@@ -20,11 +20,10 @@ final class CastArrayShared
         if (null === $insert) {
             throw new \LogicException('JIT cast lowering requires an active basic block');
         }
+        // Sealed insert: move to a fresh block — never branch from a block that already
+        // has a terminator (creates "terminator in the middle", #26818).
         if (null !== $insert->getTerminator()) {
-            $next = BasicBlockHelper::append($context, $label);
-            $context->builder->positionAtEnd($insert);
-            $context->builder->branch($next);
-            $context->builder->positionAtEnd($next);
+            BasicBlockHelper::ensureOpenInsertBlock($context, $label);
         }
     }
 

@@ -16,7 +16,6 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Op;
 use PHPTypes\Type;
-use PHPLLVM\BasicBlock;
 use PHPLLVM\Value;
 
 /**
@@ -33,7 +32,6 @@ final class CastObjectFromHashtableJit
         OpCode $op
     ): Variable {
         CastArrayShared::ensureInsertBlock($context, 'cast_object_body');
-        $savedInsert = self::captureInsertBlock($context);
         /** @var ObjectBuiltin $object */
         $object = $context->type->object;
         $classId = $object->lookup('stdClass');
@@ -45,11 +43,14 @@ final class CastObjectFromHashtableJit
             }
             $object->defineProperty($classId, $key, Variable::TYPE_VALUE);
         }
+        // allocate() may split CFG (prop_value_init/done). Stay on the block allocate left
+        // open — never rewind to a pre-allocate insert that now holds a terminator (#26818).
         $objVal = $object->allocate($classId);
-        self::restoreInsertBlock($context, $savedInsert);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'cast_object_after_alloc');
         $object->markObjectConstructed($objVal);
         $ht = $context->helper->loadValue($src);
         $className = 'stdClass';
+        $voidPtr = $context->getTypeFromString('void*');
         foreach ($object->instancePropertySets($classId) as $propset) {
             $propName = $propset[1];
             $keyStr = $context->builder->load($context->constantStringFromString($propName));
@@ -58,14 +59,15 @@ final class CastObjectFromHashtableJit
                 $ht,
                 $keyStr
             );
+            // Point the property slot at the hashtable value box (array is consumed by the
+            // cast). propertyStore copy paths segfault under AOT for nested object values (#26818).
             $slot = $object->propertySlotFor($objVal, $className, $propName);
-            $context->builder->call(
-                $context->lookupFunction('__object__load_value_slot'),
-                $slot,
-                $valEntry
+            $context->builder->store(
+                $context->builder->pointerCast($valEntry, $voidPtr),
+                $slot
             );
         }
-        self::restoreInsertBlock($context, $savedInsert);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'cast_object_after_props');
 
         return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
     }
@@ -80,25 +82,6 @@ final class CastObjectFromHashtableJit
         $object->markObjectConstructed($objVal);
 
         return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objVal);
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-
-            return;
-        }
-        $context->builder->clearInsertionPosition();
     }
 
     /**

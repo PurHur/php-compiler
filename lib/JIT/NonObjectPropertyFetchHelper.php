@@ -32,6 +32,37 @@ final class NonObjectPropertyFetchHelper
 
     public static function lowerNullPropertyDest(Context $context, Operand $destOp): void
     {
+        // Nullsafe/?? merge temps must keep one alloca across branches (#26818).
+        if ($context->coalesceAssignTargets->contains($destOp)) {
+            if (!$context->hasVariableOp($destOp)) {
+                $slot = JitValueBox::alloc($context);
+                $context->setVariableOp(
+                    $destOp,
+                    new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot)
+                );
+            }
+            $mergeDest = $context->getVariableFromOp($destOp);
+            if (Variable::KIND_VALUE === $mergeDest->kind) {
+                $slot = JitValueBox::alloc($context);
+                $context->setVariableOp(
+                    $destOp,
+                    new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot)
+                );
+                $mergeDest = $context->getVariableFromOp($destOp);
+            }
+            if (
+                Variable::TYPE_VALUE === $mergeDest->type
+                && Variable::KIND_VARIABLE === $mergeDest->kind
+            ) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $mergeDest->value)
+                );
+                $mergeDest->isNullConstant = true;
+
+                return;
+            }
+        }
         $nullBox = JitValueBox::alloc($context);
         $nullVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $nullBox);
         $context->setVariableOp($destOp, $nullVar);
