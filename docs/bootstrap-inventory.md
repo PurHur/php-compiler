@@ -5556,6 +5556,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUtf8Latin1.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUtf8Runtime.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUtf8StrlenJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUtf8ValidJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringVarDump.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringVarExport.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringVersionCompare.php` | 0 | 1 |
@@ -47157,7 +47159,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUtf8Runtime.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 6 class method(s)
+
+### `lib/JIT/Builtin/StringUtf8StrlenJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `lib/JIT/Builtin/StringUtf8ValidJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringVarDump.php`
 

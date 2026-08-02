@@ -57,11 +57,32 @@ final class mb_strlen extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('mb_strlen() requires one or two arguments');
         }
-        if (1 === $argc && Variable::TYPE_STRING === $args[0]->type && null !== ($args[0]->compileTimeString ?? null)) {
-            return $context->constantFromInteger(
-                VmString::utf8CharLength($args[0]->compileTimeString),
-                'int64'
-            );
+        if (Variable::TYPE_STRING === $args[0]->type && null !== ($args[0]->compileTimeString ?? null)) {
+            if (1 === $argc) {
+                return $context->constantFromInteger(
+                    VmString::utf8CharLength($args[0]->compileTimeString),
+                    'int64'
+                );
+            }
+            if (2 === $argc
+                && Variable::TYPE_STRING === $args[1]->type
+                && null !== ($args[1]->compileTimeString ?? null)
+            ) {
+                // Fold lit+encoding before NestedJIT ABI (#27051); encodings match VmMbstring::strlen.
+                $enc = $args[1]->compileTimeString;
+                if ('UTF-8' === $enc) {
+                    return $context->constantFromInteger(
+                        VmString::utf8CharLength($args[0]->compileTimeString),
+                        'int64'
+                    );
+                }
+                if ('ASCII' === $enc || '8BIT' === $enc || 'ISO-8859-1' === $enc) {
+                    return $context->constantFromInteger(
+                        VmString::byteLength($args[0]->compileTimeString),
+                        'int64'
+                    );
+                }
+            }
         }
 
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_strlen', 0, 'string');
