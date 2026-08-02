@@ -9,25 +9,26 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_multisort() JIT routes through MultisortJitHelper PHP not ArrayBuiltinHelper LLVM (#15667). */
+/**
+ * array_multisort() JIT/AOT uses LLVM `__multisort__packed` (#26908);
+ * MultisortJitHelper remains the Zend-hosted SSOT for unit tests (#15667).
+ */
 final class MultisortRuntimeShrinkTest extends TestCase
 {
-    public function testMultisortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testMultisortRuntimeUsesLlvmPackedNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MultisortRuntime.php');
-        $this->assertStringContainsString('MultisortJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('__multisort__packed', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('MultisortJitHelper::multisortPacked', $runtime);
 
-        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/MultisortJitHelper.php');
-        $this->assertStringContainsString('multisortPacked', $helper);
-        $this->assertStringContainsString('swapPackedAt', $helper);
+        $hashTableType = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringContainsString('implementMultisortPacked', $hashTableType);
+        $this->assertStringContainsString("'__multisort__packed'", $hashTableType);
 
         $multisort = (string) file_get_contents(__DIR__.'/../../ext/standard/array_multisort.php');
         $this->assertStringContainsString('MultisortRuntime::multisortPacked', $multisort);
         $this->assertStringContainsString('SortRuntime::sortPacked', $multisort);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::multisortPacked', $multisort);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPacked(', $multisort);
 
         $arrayHelper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
         $this->assertStringNotContainsString('function multisortPacked', $arrayHelper);

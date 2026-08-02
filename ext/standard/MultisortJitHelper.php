@@ -9,10 +9,14 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_multisort() coupled packed paths for compiled JIT/AOT modules (#15667, php-in-PHP).
+ * array_multisort() coupled packed paths — Zend-hosted helper + unit-test SSOT (#15667).
  *
- * SSOT shared with {@see array_multisort} VM execute() packed homogeneous paths
+ * JIT/AOT thin user builds use LLVM `__multisort__packed` instead (#26908 / #24010): NestedJIT
+ * MultisortJitHelper method dispatch aborts under standalone AOT.
+ *
  * php-src: ext/standard/array.c — php_array_multisort
+ *
+ * NestedJIT note: prefer exportKeyValuePairs over iterate() (#12908 / #23974).
  */
 final class MultisortJitHelper
 {
@@ -41,7 +45,7 @@ final class MultisortJitHelper
 
         $primary = $hts[0];
         $first = null;
-        foreach ($primary->iterate(true) as $value) {
+        foreach ($primary->exportKeyValuePairs(true) as [, $value]) {
             $first = $value;
             break;
         }
@@ -71,7 +75,7 @@ final class MultisortJitHelper
     private static function unpackSources(HashTable $sources): array
     {
         $hts = [];
-        foreach ($sources->iterate(true) as $value) {
+        foreach ($sources->exportKeyValuePairs(true) as [, $value]) {
             $hts[] = $value->resolveIndirect()->toArray();
         }
 
