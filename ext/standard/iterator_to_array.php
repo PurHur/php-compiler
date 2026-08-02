@@ -77,6 +77,11 @@ final class iterator_to_array extends Internal
             return $context->getTypeFromString('__value__*')->constNull();
         }
         if (2 === $argc) {
+            $preserveConst = self::compileTimePreserveKeys($context, $args[1]);
+            if (null !== $preserveConst) {
+                // Avoid diamond CFG when preserve_keys is a literal (#26802).
+                return JitIteratorToArray::invoke($context, $args[0], $preserveConst);
+            }
             $preserveKeys = JitBoolArg::lower($context, $args[1], 'iterator_to_array() preserve_keys');
 
             return JitIteratorToArray::invokeWithPreserveKeysFlag($context, $args[0], $preserveKeys);
@@ -87,5 +92,35 @@ final class iterator_to_array extends Internal
             $args[0],
             true,
         );
+    }
+
+    private static function compileTimePreserveKeys(Context $context, JITVariable $var): ?bool
+    {
+        if (null !== $var->compileTimeConstantName) {
+            $name = strtolower($var->compileTimeConstantName);
+            if ('true' === $name) {
+                return true;
+            }
+            if ('false' === $name) {
+                return false;
+            }
+        }
+        if (null !== $var->compileTimeLong) {
+            return 0 !== $var->compileTimeLong;
+        }
+        if (null === $var->value) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+            return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+            return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        }
+
+        return null;
     }
 }
