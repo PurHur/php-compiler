@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -11,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Issue #5634: AOT standalone must define hrtime helpers without phpc_hrtime.c.
  * Issue #9018 / #9182: JIT hrtime routes through HrtimeJitHelper + VmHrtimeNative PHP.
+ * Issue #26910: __compiler_hrtime_ns return ABI must match writeLong (i64) vs writeDouble.
  *
  * @group aot-lint
  */
@@ -26,6 +28,27 @@ final class StringHrtimeRuntimeStandaloneTest extends TestCase
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
+        }
+    }
+
+    /** Type.php declaration must agree with JitDate boxing (#26910). */
+    public function testHrtimeNsDeclarationMatchesPlatformAbi(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        $fn = $ctx->lookupFunction('__compiler_hrtime_ns');
+        $this->assertNotNull($fn);
+        $retTy = $fn->typeOf();
+        // Function values type as pointer-to-function under LLVM-C.
+        if (\method_exists($retTy, 'getElementType')) {
+            $retTy = $retTy->getElementType();
+        }
+        $this->assertTrue(\method_exists($retTy, 'getReturnType'));
+        $printed = $retTy->getReturnType()->toString();
+        if (CompilerVersion::supportsHrtimeAsNumberFloat()) {
+            $this->assertStringContainsString('double', $printed);
+        } else {
+            $this->assertMatchesRegularExpression('/i64|int64/', $printed);
         }
     }
 
