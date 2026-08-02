@@ -50,3 +50,46 @@ final class MbStrcut
         );
     }
 }
+
+/**
+ * JIT/AOT link hook for mb_substr() — compiles MbSubstrJitHelper (#27028).
+ *
+ * Helper lives in MbStrcutJitHelper.php (shared NestedJIT unit; no new inventory file).
+ */
+final class MbSubstr
+{
+    private const HELPER_PATH = '/ext/mbstring/MbStrcutJitHelper.php';
+
+    private const HELPER_LOGICAL = 'PHPCompiler\\ext\\mbstring\\MbSubstrJitHelper::substr';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER_LOGICAL,
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::ensureJitHelperCompiled($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+    }
+
+    public static function helperFunction(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#27028');
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#27028'
+        );
+    }
+}
