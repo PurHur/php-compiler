@@ -2858,6 +2858,7 @@ require_once __DIR__.'/../../../ext/standard/RequestParseBodyNativeJitHelper.php
 require_once __DIR__.'/../../../ext/standard/ResolveSidecarJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReturnPendingJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RmdirJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/RoundMath.php';
 require_once __DIR__.'/../../../ext/standard/RoundJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ScandirFailureJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ScopeBuiltinJitHelper.php';

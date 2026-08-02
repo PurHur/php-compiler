@@ -21,6 +21,7 @@ final class RoundRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRound.php');
         $this->assertStringContainsString('RoundJitHelper', $bridge);
         $this->assertStringContainsString('phpc_round', $bridge);
+        $this->assertStringContainsString('ensureBridge', $bridge);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitRoundLowering.php');
     }
@@ -28,7 +29,9 @@ final class RoundRuntimeShrinkTest extends TestCase
     public function testRoundJitHelperDelegatesToVmRound(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RoundJitHelper.php');
-        $this->assertStringContainsString('VmRound::mathRound', $source);
+        $this->assertStringContainsString('roundPlacesZero', $source);
+        $this->assertStringContainsString('1.0e+308', $source);
+        $this->assertStringContainsString('26800', $source);
 
         $this->assertSame(
             VmRound::mathRound(1.5, 0, StdlibConstants::PHP_ROUND_HALF_UP),
@@ -46,6 +49,7 @@ final class RoundRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('RoundJitHelper.php', $spine);
+        $this->assertStringContainsString('RoundMath.php', $spine);
         $this->assertStringContainsString('MathRound.php', $spine);
         $this->assertStringNotContainsString('JitRoundLowering.php', $spine);
     }

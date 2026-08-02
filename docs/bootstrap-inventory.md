@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6752 |
-| Phase A inventory files (M2 ratio SSOT) | 6752 |
+| PHP files on vm.php path | 6756 |
+| Phase A inventory files (M2 ratio SSOT) | 6756 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21823 |
+| Source constructs flagged (warnings) | 21830 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3065,6 +3065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ReturnPendingJitHelper.php` | 0 | 1 |
 | `ext/standard/RmdirJitHelper.php` | 0 | 1 |
 | `ext/standard/RoundJitHelper.php` | 0 | 1 |
+| `ext/standard/RoundMath.php` | 0 | 1 |
 | `ext/standard/ScandirFailureJitHelper.php` | 0 | 1 |
 | `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 8 |
 | `ext/standard/SerializeJitHelper.php` | 0 | 2 |
@@ -5067,6 +5068,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ExceptionHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ExceptionThrowToStringSeed.php` | 0 | 2 |
 | `lib/JIT/Builtin/ExecutionLimitsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputTypeJit.php` | 0 | 1 |
@@ -5643,6 +5645,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ExceptionConstruct.php` | 0 | 6 |
 | `lib/JIT/Call/ExceptionGetCode.php` | 0 | 1 |
 | `lib/JIT/Call/ExceptionGetMessage.php` | 0 | 1 |
+| `lib/JIT/Call/ExceptionGetTraceAsString.php` | 0 | 1 |
+| `lib/JIT/Call/ExceptionToString.php` | 0 | 1 |
 | `lib/JIT/Call/ExternalMethod.php` | 0 | 1 |
 | `lib/JIT/Call/FiberConstruct.php` | 0 | 2 |
 | `lib/JIT/Call/FiberGetReturn.php` | 0 | 1 |
@@ -5774,7 +5778,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 100 |
+| `lib/JIT/Context.php` | 0 | 102 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 52 |
@@ -30685,6 +30689,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/RoundJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/standard/RoundMath.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/standard/ScandirFailureJitHelper.php`
@@ -33201,7 +33210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmRound.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmRoundMode.php`
 
@@ -44523,6 +44532,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Builtin/ExceptionThrowToStringSeed.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 62)
+- 2 class method(s)
+
 ### `lib/JIT/Builtin/ExecutionLimitsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47521,6 +47536,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/ExceptionGetTraceAsString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/ExceptionToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `lib/JIT/Call/ExternalMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48327,32 +48352,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 1076)
 - new Call\ExceptionGetMessage (line 1077)
 - new Call\ExceptionGetCode (line 1078)
-- new Call\ExceptionConstruct (line 1079)
-- new Call\DateTimeConstruct (line 1095)
-- new Call\DateTimeImmutableConstruct (line 1096)
-- new Call\DateTimeZoneConstruct (line 1097)
-- new Call\DateIntervalConstruct (line 1098)
-- new Call\DatePeriodConstruct (line 1099)
-- new Call\DatePeriodCreateFromISO8601String (line 1101)
-- new Call\DatePeriodIteratorMethod (line 1103)
-- new Call\DateTimeFormat (line 1106)
-- new Call\DateTimeFormat (line 1107)
-- new Call\DateIntervalCreateFromDateString (line 1109)
-- new Call\DateTimeSetTimezone (line 1111)
-- new Call\DateTimeSetTimezone (line 1117)
-- new Result (line 1485)
-- new Result (line 1507)
-- new Variable (line 2180)
-- new Variable (line 2317)
-- new Variable (line 2571)
-- new Variable (line 2629)
-- new VMVariable (line 2791)
-- new VMVariable (line 2807)
-- new VMVariable (line 2813)
-- new VMVariable (line 2819)
-- new VMVariable (line 2830)
-- new Variable (line 2860)
-- new Variable (line 2903)
+- new Call\ExceptionToString (line 1079)
+- new Call\ExceptionGetTraceAsString (line 1080)
+- new Call\ExceptionConstruct (line 1083)
+- new Call\DateTimeConstruct (line 1104)
+- new Call\DateTimeImmutableConstruct (line 1105)
+- new Call\DateTimeZoneConstruct (line 1106)
+- new Call\DateIntervalConstruct (line 1107)
+- new Call\DatePeriodConstruct (line 1108)
+- new Call\DatePeriodCreateFromISO8601String (line 1110)
+- new Call\DatePeriodIteratorMethod (line 1112)
+- new Call\DateTimeFormat (line 1115)
+- new Call\DateTimeFormat (line 1116)
+- new Call\DateIntervalCreateFromDateString (line 1118)
+- new Call\DateTimeSetTimezone (line 1120)
+- new Call\DateTimeSetTimezone (line 1126)
+- new Result (line 1494)
+- new Result (line 1516)
+- new Variable (line 2189)
+- new Variable (line 2326)
+- new Variable (line 2580)
+- new Variable (line 2638)
+- new VMVariable (line 2800)
+- new VMVariable (line 2816)
+- new VMVariable (line 2822)
+- new VMVariable (line 2828)
+- new VMVariable (line 2839)
+- new Variable (line 2869)
+- new Variable (line 2912)
 - 106 class method(s)
 - 32 closure(s)
 
@@ -48827,11 +48854,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitNativeString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 52)
-- new Variable (line 66)
-- new Variable (line 80)
-- new Variable (line 88)
+- new Variable (line 79)
+- new Variable (line 89)
+- new Variable (line 103)
 - new Variable (line 111)
+- new Variable (line 134)
 - 4 class method(s)
 
 ### `lib/JIT/JitNestedHelperCoerce.php`
@@ -49304,14 +49331,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/TryCatchHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new TryCatchHandler (line 159)
-- new TryCatchHandler (line 318)
-- new Variable (line 455)
-- new Variable (line 517)
-- new Variable (line 536)
-- new Variable (line 538)
-- new Variable (line 801)
-- new Variable (line 826)
+- new TryCatchHandler (line 160)
+- new TryCatchHandler (line 319)
+- new Variable (line 456)
+- new Variable (line 518)
+- new Variable (line 537)
+- new Variable (line 539)
+- new Variable (line 804)
+- new Variable (line 829)
 - 34 class method(s)
 
 ### `lib/JIT/TryCatchState.php`
@@ -54759,7 +54786,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmStringCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `lib/VM/VmTryCatch.php`
 
