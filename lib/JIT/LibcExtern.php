@@ -94,6 +94,8 @@ final class LibcExtern
             'waitpid' => [$i32, false, [$i32, $i32p, $i32]],
             '__phpc_resolve_stream' => [$i8p, false, [$i64]],
             'fileno' => [$i32, false, [$i8p]],
+            'fsync' => [$i32, false, [$i32]],
+            'fdatasync' => [$i32, false, [$i32]],
             'flock' => [$i32, false, [$i32, $i32]],
             'pow' => [$dbl, false, [$dbl, $dbl]],
             'nextafter' => [$dbl, false, [$dbl, $dbl]],

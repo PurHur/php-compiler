@@ -6,23 +6,26 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** JitStreamSyncKernel routes libc sync + warnings through StreamSyncJitHelper via JitVmHelperLink (#9815, #19660, #23004). */
+/**
+ * JitStreamSyncKernel emits libc fsync/fdatasync (NestedJIT SEGV under thin AOT, #26929).
+ */
 final class StreamSyncRuntimeShrinkTest extends TestCase
 {
-    public function testStreamSyncKernelUsesStreamSyncJitHelperNotLibcFsync(): void
+    public function testStreamSyncKernelUsesLibcFsyncNotNestedJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
-        $this->assertStringContainsString('StreamSyncJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString("lookupFunction(\$syncName)", $source);
+        $this->assertStringContainsString("'fsync'", $source);
+        $this->assertStringContainsString("'fdatasync'", $source);
+        $this->assertStringContainsString('__compiler_trigger_error', $source);
+        $this->assertStringContainsString('emitUnsyncableWarning', $source);
+        $this->assertStringContainsString('tryGetInsertBlock', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('StreamSyncStandaloneLlvm', $source);
-        $this->assertStringNotContainsString("lookupFunction('fsync')", $source);
-        $this->assertStringNotContainsString("lookupFunction('fdatasync')", $source);
-        $this->assertStringNotContainsString('__compiler_trigger_error', $source);
-        $this->assertStringNotContainsString('emitUnsyncableWarning', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamSyncStandaloneLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamSyncJit.php');
-        $this->assertLessThan(250, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
     }
 
     public function testStreamSyncJitHelperDelegatesToVmPhpFdStream(): void
@@ -31,5 +34,6 @@ final class StreamSyncRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmStreamSync::isSupported', $source);
         $this->assertStringContainsString('VmPhpFdStream::syncFileno', $source);
         $this->assertStringContainsString('TriggerErrorJitHelper', $source);
+        $this->assertStringContainsString('JitStreamSyncKernel', $source);
     }
 }

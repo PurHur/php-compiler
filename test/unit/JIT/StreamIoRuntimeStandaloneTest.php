@@ -52,7 +52,7 @@ final class StreamIoRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testUserScriptLoweringUsesNestedJitBridges(): void
+    public function testUserScriptLoweringUsesLibcKernelBridges(): void
     {
         $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
@@ -61,20 +61,15 @@ final class StreamIoRuntimeStandaloneTest extends TestCase
         try {
             $runtime = new Runtime(Runtime::MODE_AOT);
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-            // User-script NestedJIT StreamIoJitHelper bridges (#20943).
+            // Thin AOT: JitStreamIoKernel libc path (#26929 / #16075).
             StreamIoJit::implement($ctx);
             $tmp = $ctx->module->getNamedFunction('__compiler_tmpfile');
             $this->assertNotNull($tmp);
             $this->assertFalse(StreamIoRuntime::isDeferStub($tmp));
-            // NestedJIT nullary bridge is a single named block (libc kernel was multi-block).
-            $this->assertGreaterThan(0, $tmp->countBasicBlocks());
+            $this->assertGreaterThan(1, $tmp->countBasicBlocks(), 'libc kernel tmpfile is multi-block');
             $supports = $ctx->module->getNamedFunction('__compiler_stream_supports');
             $this->assertNotNull($supports);
             $this->assertFalse(StreamIoRuntime::isDeferStub($supports));
-            $this->assertStringContainsString(
-                'stream_io_',
-                (string) (iterator_to_array($tmp->getBasicBlocks())[0]?->getName() ?? '')
-            );
 
             StreamIoRuntime::ensureLinkedForUserScriptLowering($ctx);
             $this->assertFalse(StreamIoRuntime::isDeferStub(

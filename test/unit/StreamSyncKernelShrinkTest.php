@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fsync/fdatasync NestedJIT via JitVmHelperLink (#9815, #19660, #23004).
+ * fsync/fdatasync LLVM libc path via JitStreamSyncKernel (#9815, #19660, #26929).
  */
 final class StreamSyncKernelShrinkTest extends TestCase
 {
@@ -21,23 +21,25 @@ final class StreamSyncKernelShrinkTest extends TestCase
         $this->assertStringNotContainsString('StreamSyncJit', $runtime);
     }
 
-    public function testKernelUsesJitVmHelperLinkNotHandRolledNestedJit(): void
+    public function testKernelUsesLibcSyncNotNestedJitHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamSyncKernel', $source);
         $this->assertStringContainsString('__compiler_fsync', $source);
         $this->assertStringContainsString('__compiler_fdatasync', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
-        $this->assertStringContainsString('StreamSyncJitHelper', $source);
+        $this->assertStringContainsString("lookupFunction(\$syncName)", $source);
+        $this->assertStringContainsString("'fsync'", $source);
+        $this->assertStringContainsString("'fdatasync'", $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 2)', $source);
-        $this->assertLessThan(250, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinJit(): void

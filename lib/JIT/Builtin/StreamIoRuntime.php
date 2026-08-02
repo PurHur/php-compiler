@@ -13,15 +13,17 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT stream I/O ABI via StreamIoJitHelper PHP (#10326, #20943).
+ * JIT/AOT stream I/O ABI (#10326, #20943, #26929).
  *
- * Embed + thin standalone AOT: NestedJIT {@see StreamIoJitHelper} via {@see JitVmHelperLink}
- * (IncludePath #20877 / PendingHeaders #20930 shape — no libc kernel or void stub fork).
- * SSOT: {@see \PHPCompiler\ext\standard\StreamIoJitHelper}
+ * Embed: NestedJIT {@see StreamIoJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone / user-script AOT: {@see JitStreamIoKernel} libc + handle-table
+ * (NestedJIT VmFs::fopen is ExternalMethod → handle 0; blocks fsync/fwrite, #16075 / #26929).
+ * SSOT (embed): {@see \PHPCompiler\ext\standard\StreamIoJitHelper}
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
 final class StreamIoRuntime
@@ -110,10 +112,19 @@ final class StreamIoRuntime
     }
 
     /**
-     * User-script / fopen lowering: NestedJIT StreamIoJitHelper bridges (#9142, #20943).
+     * User-script / fopen lowering (#9142, #19462, #26929).
+     *
+     * Thin AOT: upgrade via {@see JitStreamIoKernel} libc + handle-table bridges.
+     * Embed: NestedJIT {@see StreamIoJitHelper}.
      */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
+        if ($context->isThinStandaloneAotMain()) {
+            JitStreamIoKernel::implementForUserScriptLowering($context);
+
+            return;
+        }
+
         if (self::allIoRuntimeFunctionsLinked($context)) {
             self::registerIoRuntime($context);
             self::ensureSupportsBridgeLinked($context);

@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fsync()/fdatasync() LLVM helpers via StreamSyncJitHelper PHP (#6062, #6813, #9815).
+ * fsync()/fdatasync() LLVM helpers via libc (#6062, #6813, #9815, #26929).
  *
  * @group aot-lint
  */
@@ -30,9 +30,11 @@ final class StreamSyncRuntimeStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
 
-        $this->assertNotNull(
-            $ctx->functions[\strtolower('PHPCompiler\\ext\\standard\\StreamSyncJitHelper::syncFileno')] ?? null,
-            'StreamSyncJitHelper::syncFileno must be compiled into standalone module'
-        );
+        foreach (['fsync', 'fdatasync', 'fflush', 'fileno'] as $name) {
+            $this->assertNotNull(
+                $ctx->functions[\strtolower($name)] ?? $ctx->module->getNamedFunction($name),
+                $name.' must be declared for StreamSync libc emit'
+            );
+        }
     }
 }
