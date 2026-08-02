@@ -160,42 +160,31 @@ final class ArrayColumnJitHelper
 
             return $cell->resolveIndirect();
         }
-        if (Variable::TYPE_ENUM_CASE === $row->type || Variable::TYPE_OBJECT === $row->type) {
-            // NestedJIT of `$entry->fetchProperty()` resolves as ArrayColumnJitHelper::fetchproperty
-            // and aborts thin AOT (#26955). Materialize TYPE_ENUM_CASE as ObjectEntry and share
-            // the ObjectEntry enum / public-property paths (no EnumCaseEntry instance call).
-            return self::readEnumOrObjectColumn($row, $field);
-        }
-
-        return null;
-    }
-
-    /**
-     * Enum-case / object row column read for NestedJIT (#26955).
-     *
-     * TYPE_ENUM_CASE is materialized to an ObjectEntry case so NestedJIT never lowers
-     * {@see EnumCaseEntry::fetchProperty}.
-     */
-    private static function readEnumOrObjectColumn(Variable $row, string|int $field): ?Variable
-    {
-        $propName = \is_string($field) ? $field : (string) $field;
         if (Variable::TYPE_ENUM_CASE === $row->type) {
-            $row = EnumCaseSupport::receiverForInstanceMethod($row);
-        }
-        if (Variable::TYPE_OBJECT !== $row->type) {
-            return null;
-        }
-        $object = $row->toObject();
-        if ($object->isEnumCase) {
-            if (!EnumCaseSupport::propertyExistsOnCase($object->class, $propName)) {
+            $propName = \is_string($field) ? $field : (string) $field;
+            $entry = $row->toEnumCase();
+            if (!EnumCaseSupport::propertyExistsOnCase($entry->enumClass, $propName)) {
                 return null;
             }
 
-            return EnumCaseSupport::getProperty($object, $propName);
+            return $entry->fetchProperty($propName);
+        }
+        if (Variable::TYPE_OBJECT === $row->type) {
+            $propName = \is_string($field) ? $field : (string) $field;
+            $object = $row->toObject();
+            if ($object->isEnumCase) {
+                if (!EnumCaseSupport::propertyExistsOnCase($object->class, $propName)) {
+                    return null;
+                }
+
+                return EnumCaseSupport::getProperty($object, $propName);
+            }
+
+            // php-src php_array_column: silent public property read — no __get (#23511).
+            return self::readPublicObjectColumnProperty($object, $propName);
         }
 
-        // php-src php_array_column: silent public property read — no __get (#23511).
-        return self::readPublicObjectColumnProperty($object, $propName);
+        return null;
     }
 
     /**

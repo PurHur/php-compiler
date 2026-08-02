@@ -4715,6 +4715,7 @@ require_once __DIR__.'/../../../lib/JIT/ArrayFindCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayFindHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayFindLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayFlipLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayColumnLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayMapCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayReduceCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/AsymmetricVisibilityGuard.php';

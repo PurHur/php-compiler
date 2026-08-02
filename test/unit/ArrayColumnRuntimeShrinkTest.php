@@ -9,23 +9,27 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_column() JIT routes all operands through ArrayColumnJitHelper PHP not ArrayBuiltinHelper native LLVM (#14256, #14264, #17973). */
+/** array_column() JIT uses call-site LLVM (ArrayColumnLlvm), not NestedJIT helpers (#14256, #26955). */
 final class ArrayColumnRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 9150;
 
-    public function testArrayColumnRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayColumnRuntimeUsesCallSiteLlvmNotNestedJit(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayColumnRuntime.php');
-        $this->assertStringContainsString('ArrayColumnJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayColumnLlvm', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildColumnArray', $runtime);
         $this->assertStringContainsString('columnWithRuntimeKey', $runtime);
         $this->assertStringContainsString('ABI_COLUMN_RUNTIME', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         // Thin AOT NestedJIT string keys are `__string__*` — i8* bridges fail module verify (#26955).
         $this->assertStringContainsString("getTypeFromString('__string__*')", $runtime);
-        $this->assertStringNotContainsString("getTypeFromString('int8*')", $runtime);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayColumnLlvm.php');
+        $this->assertStringContainsString('columnWithStringKey', $llvm);
+        $this->assertStringContainsString('__hashtable__readStringKeyValue', $llvm);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_column.php');
         $this->assertStringContainsString('ArrayColumnRuntime::column', $builtin);
@@ -38,20 +42,14 @@ final class ArrayColumnRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildColumnWithIndexFromHashTable', $arrayBuiltin);
     }
 
-    /** NestedJIT must not lower EnumCaseEntry::fetchProperty as helper::fetchproperty (#26955). */
-    public function testArrayColumnJitHelperAvoidsEnumCaseEntryFetchProperty(): void
+    /** Call-site LLVM must not pull EnumCaseEntry::fetchProperty (#26955). */
+    public function testArrayColumnLlvmAvoidsEnumCaseEntryFetchProperty(): void
     {
-        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayColumnJitHelper.php');
-        $this->assertStringContainsString('readEnumOrObjectColumn', $helper);
-        $this->assertStringContainsString('receiverForInstanceMethod', $helper);
-        // Strip comments so docblock/example mentions do not trip the call-site guard.
-        $code = preg_replace('!//.*$!m', '', $helper) ?? $helper;
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayColumnLlvm.php');
+        $code = preg_replace('!//.*$!m', '', $llvm) ?? $llvm;
         $code = preg_replace('!/\*.*?\*/!s', '', $code) ?? $code;
-        $this->assertDoesNotMatchRegularExpression(
-            '/\$\w+->fetchProperty\s*\(/',
-            $code,
-            'ArrayColumnJitHelper must not call EnumCaseEntry::fetchProperty under NestedJIT (#26955)'
-        );
+        $this->assertDoesNotMatchRegularExpression('/fetchProperty\s*\(/', $code);
+        $this->assertDoesNotMatchRegularExpression('/hasProperty\s*\(/', $code);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterNativeColumnLlvmDeletion(): void
