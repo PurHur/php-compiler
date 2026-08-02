@@ -1158,6 +1158,8 @@ class Context {
         // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
         $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);
         $this->functionProxies['datetimeimmutable::modify'] = new Call\DateTimeModify(true);
+        // DateTimeZone::getTransitions — compile-time materialize (peer timezone_transitions_get) (#26799).
+        $this->functionProxies['datetimezone::gettransitions'] = new Call\DateTimeZoneGetTransitions();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         if (CompilerVersion::supportsDomTokenList()) {
