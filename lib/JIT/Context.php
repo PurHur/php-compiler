@@ -1286,6 +1286,7 @@ class Context {
             if (!$this->isThinStandaloneAotMain() && !Builtin\StreamIoRuntime::isStandaloneInitPhase()) {
                 Builtin\StringSoundex::ensureStandaloneBodies($this);
                 Builtin\StringQuotemeta::ensureStandaloneBodies($this);
+                Builtin\StringPregQuote::ensureStandaloneBodies($this);
                 Builtin\StringNl2br::ensureStandaloneBodies($this);
                 Builtin\StringUcwords::ensureStandaloneBodies($this);
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);

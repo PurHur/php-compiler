@@ -58,12 +58,17 @@ final class preg_quote extends Internal
         StringPregQuote::ensureLinked($context);
 
         $subject = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'preg_quote', 0, 'str');
-        $null = $context->getTypeFromString('__string__*')->constNull();
+        // Empty __string__* sentinel = no delimiter (#21109 / #26827). Prefer alloc(0) over
+        // null or load(constantStringFromString('')) — both segfault in user-script AOT 1-arg calls.
+        $noDelimiter = $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $context->constantFromInteger(0, 'size_t')
+        );
         if (1 === $argc) {
             return $context->builder->call(
                 $context->lookupFunction('__string__preg_quote'),
                 $subject,
-                $null
+                $noDelimiter
             );
         }
 
