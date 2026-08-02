@@ -221,11 +221,12 @@ function run(string $filename, string $code, array $options): void
         if (false === $m4BinCompile || '' === $m4BinCompile) {
             putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
         }
-        // Gen-2+ argv driver recompiling bin/compile.php must register bootstrap-aot sidecars (#3004).
-        $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
-        if (false === $m5DriverHost || '' === $m5DriverHost) {
-            putenv('PHP_COMPILER_M5_DRIVER_HOST=1');
-        }
+        // Do NOT auto-set PHP_COMPILER_M5_DRIVER_HOST here. Under Zend, src/cli.php also
+        // defines php_compiler_cli_should_skip_entry_driver, so auto-set poisoned every
+        // user-script AOT build: phpc_compile_is_user_script_aot returned false (#26756),
+        // DomDocumentLoadXML was skipped, and loadXML aborted via VmDomInstanceInvoke
+        // (#27039 / re-#26757). Refresh scripts export M5_DRIVER_HOST=1 explicitly
+        // (bootstrap-gen0-refresh-argv-driver.sh, bootstrap-selfhost-driver-host-compile.sh).
     }
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
