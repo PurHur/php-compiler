@@ -2831,6 +2831,7 @@ require_once __DIR__.'/../../../ext/standard/PregEmptyPatternReplaceJitHelper.ph
 require_once __DIR__.'/../../../ext/standard/PregExpandJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregAotFastPath.php';
 require_once __DIR__.'/../../../ext/standard/PregJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/PregJitHelperThinAot.php';
 require_once __DIR__.'/../../../ext/standard/PregQuoteJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregReplacementExpand.php';
 require_once __DIR__.'/../../../ext/standard/PrintRJitHelper.php';
@@ -5360,8 +5361,10 @@ require_once __DIR__.'/../../../lib/JIT/Call/DateTimeConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeCreateFromFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeImmutableConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DateTimeModify.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeSetTimezone.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DateTimeZoneGetTransitions.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentAppendChild.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateAttributeNS.php';
