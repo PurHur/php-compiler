@@ -64,6 +64,9 @@ final class VmDomInstanceInvoke
         return match ($methodLc) {
             'createelement' => VmDomJitDispatch::createElement($ctx, $self, $extra),
             'loadhtml' => VmDomJitDispatch::loadHTML($ctx, $self, $extra),
+            'loadxml' => VmDomJitDispatch::loadXML($ctx, $self, $extra),
+            'load' => VmDomJitDispatch::load($ctx, $self, $extra),
+            'savexml' => VmDomJitDispatch::saveXML($self, $extra),
             'getelementbyid' => VmDomJitDispatch::getElementById($self, $extra),
             'appendchild' => VmDomJitDispatch::appendChild($ctx, $self, $extra),
             'append' => VmDomJitDispatch::append($ctx, $self, $extra),

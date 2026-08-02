@@ -42,6 +42,10 @@ final class BootstrapGen0DriverFunctionalSmokeTest extends TestCase
         $this->assertStringContainsString("str_ends_with(\$normalized, '/bin/compile.php')", $fnChunk);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $fnChunk);
         $this->assertStringContainsString('#26756', $fnChunk);
+        // run() must not auto-putenv M5_DRIVER_HOST — src/cli.php defines the skip-entry
+        // helper under Zend too, which poisoned every user-script AOT build (#27039).
+        $this->assertStringContainsString('#27039', $compile);
+        $this->assertStringNotContainsString("putenv('PHP_COMPILER_M5_DRIVER_HOST=1')", $compile);
     }
 
     public function testFunctionalSmokeFailsWhenDriverReturnsParseAndCompileNull(): void

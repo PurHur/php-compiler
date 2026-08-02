@@ -48,6 +48,89 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function loadXML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680 / #27039).
+        $xml = VmString::coerceStringBuiltinArg(
+            ($extra[0] ?? self::missingArg('loadXML', 0))->resolveIndirect(),
+            'DOMDocument::loadXML',
+            0,
+            'source'
+        );
+        $options = 0;
+        if (isset($extra[1])) {
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::loadXML',
+                2,
+                'options'
+            );
+        }
+        $ok = VmDom::loadXML($ctx, $document, $xml, null, $options);
+        $var = new Variable();
+        $var->bool($ok);
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function load(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $filename = VmString::coerceStringBuiltinArg(
+            ($extra[0] ?? self::missingArg('load', 0))->resolveIndirect(),
+            'DOMDocument::load',
+            0,
+            'filename'
+        );
+        $options = 0;
+        if (isset($extra[1])) {
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::load',
+                2,
+                'options'
+            );
+        }
+        $ok = VmDom::load($ctx, $document, $filename, $options);
+        $var = new Variable();
+        $var->bool($ok);
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function saveXML(ObjectEntry $document, array $extra): Variable
+    {
+        $node = null;
+        if (isset($extra[0])) {
+            $arg = $extra[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                $node = VariableObject::entry($arg);
+            }
+        }
+        $options = 0;
+        if (isset($extra[1])) {
+            $options = VmMath::parseZParamLongBuiltinArg(
+                $extra[1],
+                'DOMDocument::saveXML',
+                2,
+                'options'
+            );
+        }
+        $xml = VmDom::saveXML($document, $node, $options);
+        $var = new Variable();
+        $var->string($xml);
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function getElementById(ObjectEntry $document, array $extra): Variable
     {
         $id = self::stringArg($extra[0] ?? self::missingArg('getElementById', 0), 'getElementById', 0);
