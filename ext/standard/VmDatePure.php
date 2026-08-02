@@ -88,41 +88,158 @@ final class VmDatePure
     }
 
     /**
+     * Local civil breakdown from Unix timestamp.
+     *
+     * Must not call host {@see getdate()} — under thin AOT / NestedJIT that is missing or
+     * circular with GetdateJitHelper (#26900). UTC civil math matches default timezone UTC
+     * (CI); named-zone local offsets are not applied here (peer DateTimeFormatJitHelper).
+     *
      * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
      */
     public static function localtime(int $timestamp): ?array
     {
-        if (!\function_exists('getdate')) {
-            return null;
-        }
-        $d = @\getdate($timestamp);
-        if (!\is_array($d)) {
-            return null;
-        }
-
-        return self::tmPartsFromGetdate($d);
+        return self::civilTmParts($timestamp);
     }
 
     /**
+     * UTC civil breakdown from Unix timestamp (no host {@see gmdate()} — NestedJIT/AOT safe, #26900).
+     *
      * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
      */
     public static function gmtime(int $timestamp): ?array
     {
-        if (!\function_exists('gmdate')) {
-            return null;
+        return self::civilTmParts($timestamp);
+    }
+
+    /**
+     * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}
+     */
+    private static function civilTmParts(int $timestamp): array
+    {
+        $days = intdiv($timestamp, 86400);
+        $rem = $timestamp - ($days * 86400);
+        if ($rem < 0) {
+            --$days;
+            $rem += 86400;
         }
+        $hour = intdiv($rem, 3600);
+        $rem = $rem - ($hour * 3600);
+        $minute = intdiv($rem, 60);
+        $second = $rem - ($minute * 60);
+
+        $ymd = self::civilYmdPacked($days);
+        $year = intdiv($ymd, 10000);
+        $month = intdiv($ymd % 10000, 100);
+        $day = $ymd % 100;
+        $wday = self::civilWeekday($year, $month, $day);
+        $yday = self::civilDayOfYear($year, $month, $day);
 
         return [
-            'tm_sec' => (int) \gmdate('s', $timestamp),
-            'tm_min' => (int) \gmdate('i', $timestamp),
-            'tm_hour' => (int) \gmdate('G', $timestamp),
-            'tm_mday' => (int) \gmdate('j', $timestamp),
-            'tm_mon' => (int) \gmdate('n', $timestamp) - 1,
-            'tm_year' => (int) \gmdate('Y', $timestamp) - 1900,
-            'tm_wday' => (int) \gmdate('w', $timestamp),
-            'tm_yday' => (int) \gmdate('z', $timestamp),
+            'tm_sec' => $second,
+            'tm_min' => $minute,
+            'tm_hour' => $hour,
+            'tm_mday' => $day,
+            'tm_mon' => $month - 1,
+            'tm_year' => $year - 1900,
+            'tm_wday' => $wday,
+            'tm_yday' => $yday,
             'tm_isdst' => 0,
         ];
+    }
+
+    /** Civil yyyymmdd from days since Unix epoch (Howard Hinnant). */
+    private static function civilYmdPacked(int $days): int
+    {
+        $z = $days + 719468;
+        $era = intdiv($z >= 0 ? $z : $z - 146096, 146097);
+        $doe = $z - $era * 146097;
+        $yoe = intdiv($doe - intdiv($doe, 1460) + intdiv($doe, 36524) - intdiv($doe, 146096), 365);
+        $y = $yoe + $era * 400;
+        $doy = $doe - (365 * $yoe + intdiv($yoe, 4) - intdiv($yoe, 100));
+        $mp = intdiv(5 * $doy + 2, 153);
+        $d = $doy - intdiv(153 * $mp + 2, 5) + 1;
+        $m = $mp < 10 ? $mp + 3 : $mp - 9;
+        if ($m <= 2) {
+            ++$y;
+        }
+
+        return $y * 10000 + $m * 100 + $d;
+    }
+
+    private static function civilDayOfYear(int $year, int $mon, int $mday): int
+    {
+        $yday = $mday - 1;
+        if ($mon > 1) {
+            $yday += 31;
+        }
+        if ($mon > 2) {
+            $leap = (0 === $year % 4 && 0 !== $year % 100) || 0 === $year % 400;
+            $yday += $leap ? 29 : 28;
+        }
+        if ($mon > 3) {
+            $yday += 31;
+        }
+        if ($mon > 4) {
+            $yday += 30;
+        }
+        if ($mon > 5) {
+            $yday += 31;
+        }
+        if ($mon > 6) {
+            $yday += 30;
+        }
+        if ($mon > 7) {
+            $yday += 31;
+        }
+        if ($mon > 8) {
+            $yday += 31;
+        }
+        if ($mon > 9) {
+            $yday += 30;
+        }
+        if ($mon > 10) {
+            $yday += 31;
+        }
+        if ($mon > 11) {
+            $yday += 30;
+        }
+
+        return $yday;
+    }
+
+    /** Sakamoto — Sunday=0 … Saturday=6. */
+    private static function civilWeekday(int $year, int $mon, int $mday): int
+    {
+        $y = $year;
+        if ($mon < 3) {
+            --$y;
+        }
+        $t = 4;
+        if (1 === $mon) {
+            $t = 0;
+        } elseif (2 === $mon) {
+            $t = 3;
+        } elseif (3 === $mon) {
+            $t = 2;
+        } elseif (4 === $mon) {
+            $t = 5;
+        } elseif (5 === $mon) {
+            $t = 0;
+        } elseif (6 === $mon) {
+            $t = 3;
+        } elseif (7 === $mon) {
+            $t = 5;
+        } elseif (8 === $mon) {
+            $t = 1;
+        } elseif (9 === $mon) {
+            $t = 4;
+        } elseif (10 === $mon) {
+            $t = 6;
+        } elseif (11 === $mon) {
+            $t = 2;
+        }
+
+        return (int) (($y + (int) ($y / 4) - (int) ($y / 100) + (int) ($y / 400) + $t + $mday) % 7);
     }
 
     public static function mktime(
