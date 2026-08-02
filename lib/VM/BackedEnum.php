@@ -208,10 +208,36 @@ final class BackedEnum
             return self::normalizeIntBackingArgument($enum->name, $arg, $vmContext, $frame, $methodName);
         }
         if ('string' === $backedType) {
-            return self::normalizeStringBackingArgument($arg, $vmContext, $frame);
+            return self::normalizeStringBackingArgument(
+                $enum->name,
+                $arg,
+                $vmContext,
+                $frame,
+                $methodName
+            );
         }
 
         throw new \LogicException('Unsupported enum backing type: '.$backedType);
+    }
+
+    /**
+     * Zend BackedEnum stub is `int|string $value` — null soft-pass emits this before coerce (#26786).
+     */
+    private static function deprecateNullBackingArg(
+        string $enumName,
+        string $methodName,
+        Context $vmContext,
+        ?Frame $frame,
+    ): void {
+        $vmContext->errors->internalDeprecated(
+            sprintf(
+                '%s::%s(): Passing null to parameter #1 ($value) of type string|int is deprecated',
+                $enumName,
+                $methodName
+            ),
+            $vmContext,
+            $frame
+        );
     }
 
     /**
@@ -231,7 +257,10 @@ final class BackedEnum
 
                 return $result;
             case Variable::TYPE_NULL:
-                // Zend zend_enum_from_base: null coerces to 0 under weak types (#20072).
+                // Zend zend_enum_from_base: E_DEPRECATED then null→0 under weak types (#20072, #26786).
+                if (null !== $vmContext) {
+                    self::deprecateNullBackingArg($enumName, $methodName, $vmContext, $frame);
+                }
                 $result->int(0);
 
                 return $result;
@@ -266,9 +295,11 @@ final class BackedEnum
      * Z_PARAM_STR_OR_LONG: float → long (deprecate) → zend_long_to_str (#22947).
      */
     private static function normalizeStringBackingArgument(
+        string $enumName,
         Variable $arg,
         ?Context $vmContext = null,
         ?Frame $frame = null,
+        string $methodName = 'from',
     ): Variable {
         $result = new Variable(Variable::TYPE_STRING);
         switch ($arg->type) {
@@ -297,7 +328,10 @@ final class BackedEnum
 
                 return $result;
             case Variable::TYPE_NULL:
-                // Zend: null→"0" (same as false), not convert_to_string empty (#20072).
+                // Zend: E_DEPRECATED then null→"0" (same as false) (#20072, #26786).
+                if (null !== $vmContext) {
+                    self::deprecateNullBackingArg($enumName, $methodName, $vmContext, $frame);
+                }
                 $result->string('0');
 
                 return $result;
