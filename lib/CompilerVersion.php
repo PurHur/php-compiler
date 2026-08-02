@@ -2806,6 +2806,25 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4-only pcntl APIs (php-src ext/pcntl/pcntl.stub.php; #26742).
+     *
+     * {@code pcntl_getcpu}, affinity getters/setters, {@code pcntl_setns}, {@code pcntl_waitid}
+     * are absent from PHP 8.2 stubs. Same withhold shape as {@see supportsPhp84ArraySearchFunctions()}:
+     * withheld on 8.4.0-dev reference / unset PROFILE; enable via stable 8.4.0+ or
+     * {@code PHP_COMPILER_PROFILE=8.4}.
+     */
+    public static function supportsPhp84PcntlApis(): bool
+    {
+        return self::supportsPhp84ArraySearchFunctions();
+    }
+
+    /** PHP 8.4 pcntl_* visible to function_exists() / get_defined_functions (#26742). */
+    public static function advertisesPhp84PcntlApis(): bool
+    {
+        return self::supportsPhp84PcntlApis();
+    }
+
+    /**
      * PHP 8.5+ array_first()/array_last() (ext/standard/array.c; #21173).
      *
      * Withheld on 8.4.0-dev / PROFILE=8.4 so function_exists matches Zend 8.4. Enable via

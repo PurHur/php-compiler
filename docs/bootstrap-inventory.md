@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6728 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21753 |
+| Source constructs flagged (warnings) | 21752 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5012,7 +5012,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Crc32Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DateTimeFormatRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DefineRuntime.php` | 0 | 6 |
@@ -19349,37 +19349,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pcntl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 18)
-- new pcntl_fork (line 27)
-- new pcntl_wait (line 28)
-- new pcntl_waitpid (line 29)
-- new pcntl_wifexited (line 30)
-- new pcntl_wexitstatus (line 31)
-- new pcntl_wifsignaled (line 32)
-- new pcntl_wifstopped (line 33)
-- new pcntl_wtermsig (line 34)
-- new pcntl_wstopsig (line 35)
-- new pcntl_alarm (line 36)
-- new pcntl_exec (line 37)
-- new pcntl_signal (line 38)
-- new pcntl_signal_dispatch (line 39)
-- new pcntl_async_signals (line 40)
-- new pcntl_signal_get_handler (line 41)
-- new pcntl_sigprocmask (line 42)
-- new pcntl_sigtimedwait (line 43)
-- new pcntl_waitid (line 44)
-- new pcntl_getpriority (line 45)
-- new pcntl_setpriority (line 46)
+- new VM\Variable (line 19)
+- new pcntl_fork (line 28)
+- new pcntl_wait (line 29)
+- new pcntl_waitpid (line 30)
+- new pcntl_wifexited (line 31)
+- new pcntl_wexitstatus (line 32)
+- new pcntl_wifsignaled (line 33)
+- new pcntl_wifstopped (line 34)
+- new pcntl_wtermsig (line 35)
+- new pcntl_wstopsig (line 36)
+- new pcntl_alarm (line 37)
+- new pcntl_exec (line 38)
+- new pcntl_signal (line 39)
+- new pcntl_signal_dispatch (line 40)
+- new pcntl_async_signals (line 41)
+- new pcntl_signal_get_handler (line 42)
+- new pcntl_sigprocmask (line 43)
+- new pcntl_sigtimedwait (line 44)
+- new pcntl_waitid (line 46)
 - new pcntl_getcpuaffinity (line 47)
 - new pcntl_setcpuaffinity (line 48)
 - new pcntl_getcpu (line 49)
-- new pcntl_unshare (line 50)
-- new pcntl_setns (line 51)
-- new pcntl_strerror (line 52)
-- new pcntl_get_last_error (line 53)
-- new pcntl_errno (line 54)
-- new pcntl_wifcontinued (line 55)
-- new pcntl_sigwaitinfo (line 56)
+- new pcntl_setns (line 50)
+- new pcntl_getpriority (line 52)
+- new pcntl_setpriority (line 53)
+- new pcntl_unshare (line 54)
+- new pcntl_strerror (line 55)
+- new pcntl_get_last_error (line 56)
+- new pcntl_errno (line 57)
+- new pcntl_wifcontinued (line 58)
+- new pcntl_sigwaitinfo (line 59)
 - 2 class method(s)
 
 ### `ext/pcntl/PcntlConstants.php`
@@ -42312,7 +42312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 950)
+- new InternalArgInfo (line 954)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -43389,7 +43389,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 296 class method(s)
+- 299 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -44183,7 +44183,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DateMutationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 314)
 - 11 class method(s)
 
 ### `lib/JIT/Builtin/DateTimeFormatRuntime.php`
@@ -53040,10 +53039,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/BuiltinExceptionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 215)
-- new Variable (line 217)
-- new ObjectEntry (line 700)
-- new Variable (line 706)
+- new HashTable (line 220)
+- new Variable (line 222)
+- new ObjectEntry (line 705)
+- new Variable (line 711)
 - 45 class method(s)
 
 ### `lib/VM/BuiltinExecute.php`

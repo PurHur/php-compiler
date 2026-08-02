@@ -290,6 +290,21 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'php84_array_search_phantom')) {
                 continue;
             }
+            // PHP 8.4 pcntl_* — *_forward84 cases set PROFILE via --ENV--; phantom on default (#26742).
+            if (!CompilerVersion::supportsPhp84PcntlApis()
+                && (str_contains($name, 'pcntl_setns')
+                    || str_contains($name, 'pcntl_cpuaffinity')
+                    || str_contains($name, 'pcntl_getcpu')
+                    || str_contains($name, 'pcntl_waitid')
+                    || str_contains($name, 'pcntl_84_apis_exists'))
+                && !str_contains($name, 'pcntl_84_apis_phantom')
+                && !str_contains($name, 'forward84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp84PcntlApis()
+                && str_contains($name, 'pcntl_84_apis_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp85ArrayFirstLast()
                 && ((str_contains($name, 'array_first') && !str_contains($name, 'array_first_key') && !str_contains($name, 'array_first_last_key'))
                     || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key') && !str_contains($name, 'array_first_last_key')))

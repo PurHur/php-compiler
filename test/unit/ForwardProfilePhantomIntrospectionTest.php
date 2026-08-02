@@ -619,4 +619,90 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    /** Issue #26742: PHP 8.4 pcntl_* withheld on default 8.4.0-dev reference (Zend 8.2). */
+    public function testPhp84PcntlApisWithheldOnDefaultProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPhp84PcntlApis());
+            $this->assertFalse(CompilerVersion::advertisesPhp84PcntlApis());
+            foreach ([
+                'pcntl_getcpu',
+                'pcntl_getcpuaffinity',
+                'pcntl_setcpuaffinity',
+                'pcntl_setns',
+                'pcntl_waitid',
+            ] as $fn) {
+                $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+            }
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach ([
+                'pcntl_getcpu',
+                'pcntl_getcpuaffinity',
+                'pcntl_setcpuaffinity',
+                'pcntl_setns',
+                'pcntl_waitid',
+            ] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]));
+                $this->assertFalse(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
+                );
+            }
+            $this->assertTrue(isset($ctx->functions['pcntl_fork']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'pcntl_fork')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #26742: PHP 8.4 pcntl_* advertised on PROFILE=8.4. */
+    public function testPhp84PcntlApisAdvertisedOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp84PcntlApis());
+            $this->assertTrue(CompilerVersion::advertisesPhp84PcntlApis());
+            foreach ([
+                'pcntl_getcpu',
+                'pcntl_getcpuaffinity',
+                'pcntl_setcpuaffinity',
+                'pcntl_setns',
+                'pcntl_waitid',
+            ] as $fn) {
+                $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised($fn));
+            }
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach ([
+                'pcntl_getcpu',
+                'pcntl_getcpuaffinity',
+                'pcntl_setcpuaffinity',
+                'pcntl_setns',
+                'pcntl_waitid',
+            ] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]));
+                $this->assertTrue(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $fn)
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

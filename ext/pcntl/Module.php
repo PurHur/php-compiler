@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\pcntl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -41,14 +42,16 @@ class Module extends ModuleAbstract
             new pcntl_signal_get_handler(),
             new pcntl_sigprocmask(),
             new pcntl_sigtimedwait(),
-            new pcntl_waitid(),
+            ...(CompilerVersion::supportsPhp84PcntlApis() ? [
+                new pcntl_waitid(),
+                new pcntl_getcpuaffinity(),
+                new pcntl_setcpuaffinity(),
+                new pcntl_getcpu(),
+                new pcntl_setns(),
+            ] : []),
             new pcntl_getpriority(),
             new pcntl_setpriority(),
-            new pcntl_getcpuaffinity(),
-            new pcntl_setcpuaffinity(),
-            new pcntl_getcpu(),
             new pcntl_unshare(),
-            new pcntl_setns(),
             new pcntl_strerror(),
             new pcntl_get_last_error(),
             new pcntl_errno(),
