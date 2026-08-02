@@ -8,15 +8,15 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_hex2bin via Hex2binJitHelper PHP (#14627, #22746).
+ * JIT/AOT link for __compiler_hex2bin via Hex2binJitHelper PHP (#14627, #22746, #27008).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringUtf8Latin1 #22701).
- * Replaces ~253-line LLVM in ext/standard/JitHex2bin.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Helper is NestedJIT-self-contained (peer Bin2hex #20452 / Base64Decode #26890). Bridge maps
+ * string|false → __value__ writeString / writeBool (i32 ABI). No tag+static lastString.
  * php-src: ext/standard/string.c — PHP_FUNCTION(hex2bin)
  */
 final class StringHex2bin
@@ -25,12 +25,11 @@ final class StringHex2bin
 
     private const HEX2BIN_HELPER = 'PHPCompiler\\ext\\standard\\Hex2binJitHelper::hex2binArgv';
 
-    private const LAST_STRING = 'PHPCompiler\\ext\\standard\\Hex2binJitHelper::lastString';
+    private const BRIDGE_ENTRY = 'hex2bin_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::HEX2BIN_HELPER,
-        self::LAST_STRING,
     ];
 
     /** @var list<string> */
@@ -50,26 +49,24 @@ final class StringHex2bin
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_hex2bin');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringTriggerError::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
@@ -79,7 +76,7 @@ final class StringHex2bin
     {
         $abiName = '__compiler_hex2bin';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -96,7 +93,10 @@ final class StringHex2bin
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('hex2bin_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $falseBb = $fn->appendBasicBlock('hex2bin_false');
+        $okBb = $fn->appendBasicBlock('hex2bin_ok');
+        $doneBb = $fn->appendBasicBlock('hex2bin_done');
         $context->builder->positionAtEnd($entry);
 
         $data = $fn->getParam(0);
@@ -108,43 +108,28 @@ final class StringHex2bin
             $i8->constInt(0, false)
         );
 
-        $tag = JitNestedHelperCoerce::callHelper(
+        $raw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::HEX2BIN_HELPER),
             [$data, $strictBool]
         );
-        $tagI32 = $context->builder->trunc(
-            JitNestedHelperCoerce::coerceHelperScalarResult($context, $tag, $i32),
-            $i32
-        );
-        $isFalse = $context->builder->icmp(
-            Builder::INT_EQ,
-            $tagI32,
-            $i32->constInt(\PHPCompiler\ext\standard\Hex2binJitHelper::TAG_FALSE, false)
-        );
-        $falseBb = BasicBlockHelper::append($context, 'hex2bin_false');
-        $okBb = BasicBlockHelper::append($context, 'hex2bin_ok');
-        $doneBb = BasicBlockHelper::append($context, 'hex2bin_done');
+        $isFalse = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
         $context->builder->branchIf($isFalse, $falseBb, $okBb);
 
         $context->builder->positionAtEnd($falseBb);
+        // __value__writeBool ABI is (__value__*, i32) — not i8 (#27008).
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),
             $out,
-            $i8->constInt(0, false)
+            $i32->constInt(0, false)
         );
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($okBb);
-        $resultStr = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::LAST_STRING),
-            []
-        );
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $out,
-            JitNestedHelperCoerce::coerceHelperScalarResult($context, $resultStr, $strPtr)
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
         );
         $context->builder->branch($doneBb);
 
@@ -157,7 +142,7 @@ final class StringHex2bin
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#22746');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27008');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -166,7 +151,7 @@ final class StringHex2bin
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#22746'
+            '#27008'
         );
     }
 
@@ -175,7 +160,7 @@ final class StringHex2bin
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringHex2bin bridge (#14627)');
+                throw new \LogicException($name.' missing after StringHex2bin bridge (#27008)');
             }
             $context->registerFunction($name, $fn);
         }
