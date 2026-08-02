@@ -368,6 +368,60 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * True when the document element has at least one element child (#26757).
+     */
+    public static function rootHasElementChildren(string $xml): bool
+    {
+        return [] !== self::directElementChildTags($xml);
+    }
+
+    /**
+     * Raw inner markup of the document element for user-script saveXML (#26757).
+     *
+     * Includes element children (e.g. {@code <x/>}) so PROP_USER_SCRIPT_INNER_XML is
+     * non-empty after loadXML — textContent alone strips tags.
+     */
+    public static function rootInnerXmlArgv(string $xml): string
+    {
+        if (!preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?(\/?)>/', $xml, $root, PREG_OFFSET_CAPTURE)) {
+            return '';
+        }
+        if ('/' === ($root[2][0] ?? '')) {
+            return '';
+        }
+        $tag = $root[1][0];
+        $afterRoot = (int) $root[0][1] + \strlen($root[0][0]);
+        $close = stripos($xml, '</'.$tag.'>', $afterRoot);
+        if (false === $close) {
+            return substr($xml, $afterRoot);
+        }
+
+        return substr($xml, $afterRoot, $close - $afterRoot);
+    }
+
+    /**
+     * Direct element-child tag names under the document element (#23251 / #26757).
+     *
+     * @return list<string>
+     */
+    public static function directElementChildTags(string $xml): array
+    {
+        $inner = self::rootInnerXmlArgv($xml);
+        if ('' === $inner) {
+            return [];
+        }
+        $tags = [];
+        if (!preg_match_all('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?\/?>/', $inner, $matches)) {
+            return [];
+        }
+        foreach ($matches[1] as $tag) {
+            $tags[] = strtolower($tag);
+        }
+
+        return $tags;
+    }
+
+    /**
      * First child under the document element for user-script AOT navigation (#19455).
      *
      * @return null|array{kind: 'comment'|'text'|'element', data: string}

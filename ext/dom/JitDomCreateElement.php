@@ -200,10 +200,25 @@ final class JitDomCreateElement
                 JITVariable::TYPE_STRING
             );
         }
-        $emptyInner = $context->builder->load($context->constantStringFromString(''));
+        // Default empty; loadXML seeds real child markup via storeUserScriptInnerXml (#26757).
+        self::storeUserScriptInnerXml($context, $element, '');
+    }
+
+    /** Seed/replace {@see VmDom::PROP_USER_SCRIPT_INNER_XML} for AOT saveXML (#26757 / #26765). */
+    public static function storeUserScriptInnerXml(
+        Context $context,
+        Value $element,
+        string $innerXml
+    ): void {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
+            $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
+        }
+        $innerStr = $context->builder->load($context->constantStringFromString($innerXml));
         $ownedInner = $context->builder->call(
             $context->lookupFunction('__string__separate'),
-            $emptyInner
+            $innerStr
         );
         $innerVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $ownedInner);
         $objectType->propertyStore(

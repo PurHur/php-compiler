@@ -7,6 +7,8 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+use PHPCompiler\ext\standard\JitStringConcat;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
@@ -252,7 +254,8 @@ final class DomNodeLiveMutationRuntime
             }
             self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
             // saveXML($node) must emit element children, not only textContent (#26765).
-            self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs);
+            // Concat onto loadXML-seeded markup so appendChild keeps prior children (#26757).
+            self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
 
             return self::nullValuePtr($context);
         }
@@ -513,16 +516,17 @@ final class DomNodeLiveMutationRuntime
     /**
      * Write ParentNode append/prepend args into __phpcUserScriptInnerXml for AOT saveXML (#26765).
      *
-     * Compile-time only: string literals + createElement() result Variables carrying
-     * {@see Variable::$compileTimeDomTagName}. Stores this call's markup (replace), not a
-     * process-global accum — IR lowering may invoke sync more than once per call site.
+     * Compile-time pieces (string literals + createElement tags) are concatenated onto the
+     * existing slot at runtime so loadXML-seeded children survive appendChild (#26757).
+     * Empty prior slot keeps #26765 empty-root append behaviour.
      *
      * @param list<Variable> $extraArgs document order (caller passes original append args)
      */
     private static function syncUserScriptInnerXmlFromArgs(
         Context $context,
         Variable $receiver,
-        array $extraArgs
+        array $extraArgs,
+        string $kind = 'append'
     ): void {
         if ([] === $extraArgs) {
             return;
@@ -552,12 +556,23 @@ final class DomNodeLiveMutationRuntime
             $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, Variable::TYPE_STRING);
         }
         $receiverObj = self::receiverObject($context, $receiver);
-        $textStr = $context->builder->load(
+        $deltaStr = $context->builder->load(
             $context->constantStringFromString(implode('', $pieces))
         );
+        $existingVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $receiverObj,
+            'DOMElement',
+            VmDom::PROP_USER_SCRIPT_INNER_XML,
+            $classId
+        );
+        $existingStr = $context->helper->loadValue($existingVar);
+        $merged = 'prepend' === $kind
+            ? JitStringConcat::concat($context, $deltaStr, $existingStr)
+            : JitStringConcat::concat($context, $existingStr, $deltaStr);
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
-            $textStr
+            $merged
         );
         $propVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $owned);
         $objectType->propertyStore(

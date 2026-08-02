@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -111,6 +112,8 @@ final class JitDomLoadXMLUserScript
         foreach (DomParseSimpleXmlIdsJitHelper::parseIndexedElementIds($lit) as $parsed) {
             self::materializeIndexedElement($context, $args[0], $parsed);
         }
+        // Stable documentElement + inner markup so saveXML($node)/appendChild see children (#26757).
+        self::materializeAndStoreDocumentElement($context, $args[0], $lit);
 
         $slot = JitValueBox::alloc($context);
         $i1 = $context->getTypeFromString('int1');
@@ -122,6 +125,45 @@ final class JitDomLoadXMLUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /**
+     * Materialize documentElement once at loadXML and pin it on the document (#26757).
+     *
+     * Rematerializing on every {@see JitDomDocumentElement::fetch} dropped mutations and
+     * left PROP_USER_SCRIPT_INNER_XML empty so saveXML($node) emitted {@code <root></root>}.
+     */
+    private static function materializeAndStoreDocumentElement(
+        Context $context,
+        JITVariable $receiver,
+        string $xml
+    ): void {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_loadxml_us_document_element');
+        $document = self::loadObjectArg($context, $receiver);
+        $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
+        $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
+        $inner = DomParseSimpleXmlJitHelper::rootInnerXmlArgv($xml);
+        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        JitDomCreateElement::storeUserScriptInnerXml($context, $element, $inner);
+        JitDomDocumentElement::syncChildrenFromXmlPublic($context, $element, $xml);
+
+        $objectType = $context->type->object;
+        $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT)) {
+            $objectType->defineProperty($docClassId, VmDom::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+        }
+        $elemJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $element
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, VmDom::PROP_DOCUMENT_ELEMENT),
+            $elemJit,
+            JITVariable::TYPE_OBJECT
+        );
+        self::pinUserScriptLoadSideEffects($context);
     }
 
     /**
