@@ -20,9 +20,11 @@ final class CsvRuntimeShrinkTest extends TestCase
     public function testStringStrGetcsvUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrGetcsv.php');
-        $this->assertStringContainsString('CsvJitHelper', $source);
+        $this->assertStringContainsString('CsvStrGetcsvJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('JitNestedHelperCoerce::coerceToHashtablePtr', $source);
+        $this->assertStringContainsString('constantStringFromString', $source);
         $this->assertStringNotContainsString('StringStrGetcsvJit', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
@@ -30,6 +32,10 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        // #27069 — raw cstr globals are not __string__* for __string__separate
+        $this->assertStringNotContainsString('constantFromString($default)', $source);
+        // Do not NestedJIT CsvJitHelper.php (pulls VmFs via fgetcsvArgv).
+        $this->assertStringNotContainsString('/ext/standard/CsvJitHelper.php', $source);
     }
 
     public function testStringFgetcsvJitUsesJitVmHelperLink(): void
@@ -39,6 +45,7 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('implementFgetcsvBridge', $source);
+        $this->assertStringContainsString('JitNestedHelperCoerce::coerceToHashtablePtr', $source);
         $this->assertStringNotContainsString('emitCompilerFgetcsvPhpParse', $source);
         $this->assertStringNotContainsString('lookupFunction(\'fgets\')', $source);
         $this->assertStringNotContainsString('lookupFunction(\'malloc\')', $source);
@@ -48,6 +55,36 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+    }
+
+    public function testCsvStrGetcsvJitHelperMatchesVmCsv(): void
+    {
+        $fields = \PHPCompiler\ext\standard\VmCsv::parseLine('a,"b,c",d');
+        $row = \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper::strGetcsvArgv('a,"b,c",d', ',', '"', '\\');
+        $this->assertSame($fields, $row);
+    }
+
+    public function testCsvStrGetcsvJitHelperEmptySignalsNullRow(): void
+    {
+        // NestedJIT cannot materialize [null]; bridge expands [] → [null] (#27069).
+        $this->assertSame([], \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper::strGetcsvArgv('', ',', '"', '\\'));
+        $this->assertSame([], \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper::strGetcsvArgv("\n", ',', '"', '\\'));
+    }
+
+    public function testJitStrGetcsvDoesNotPullStringStreamCsv(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrGetcsv.php');
+        $this->assertStringContainsString('StringStrGetcsv::ensureLinked', $source);
+        $this->assertStringNotContainsString('StringStreamCsv', $source);
+    }
+
+    public function testSpineBundleIncludesCsvStrGetcsvJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('CsvJitHelper.php', $spine);
+        $this->assertStringContainsString('CsvStrGetcsvJitHelper.php', $spine);
+        $this->assertStringContainsString('StringStrGetcsv.php', $spine);
+        $this->assertStringNotContainsString('StringStrGetcsvJit.php', $spine);
     }
 
     public function testCsvJitHelperFgetcsvArgvMatchesVmFs(): void

@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_fgetcsv via CsvJitHelper PHP (#6750, #9444, #13440, #26135).
+ * JIT/AOT link for __compiler_fgetcsv via CsvJitHelper PHP (#6750, #9444, #13440, #26135, #27069).
  *
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
  * (VmCsv → VmFs → CsvJitHelper) in one NestedJIT scope (peer StringStrGetcsv #26135 / Unpack #25830).
+ * Bridge coerces NestedJIT HashTable|null via {@see JitNestedHelperCoerce} before null icmp
+ * (peer StringStrGetcsv — Module verify under thin AOT).
  * php-src: ext/standard/file.c — PHP_FUNCTION(fgetcsv)
  */
 final class StringFgetcsvJit
@@ -108,14 +111,12 @@ final class StringFgetcsvJit
         $sepSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $separator, ',');
         $encSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $enclosure, '"');
         $escSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $escape, '\\');
-        $ht = $context->builder->call(
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::FGETCSV_HELPER),
-            $handle,
-            $length,
-            $sepSep,
-            $encSep,
-            $escSep
+            [$handle, $length, $sepSep, $encSep, $escSep]
         );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $nullBb = $fn->appendBasicBlock('fgetcsv_bridge_null');
         $retBb = $fn->appendBasicBlock('fgetcsv_bridge_ret');
