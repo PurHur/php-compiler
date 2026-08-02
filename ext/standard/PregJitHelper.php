@@ -143,6 +143,17 @@ final class PregJitHelper
         return '';
     }
 
+    /** Thin-AOT split bridge stubs — real impl in PregJitHelperThinAot (#27080). */
+    public static function thinSplitPartCount(): int
+    {
+        return 0;
+    }
+
+    public static function thinSplitPart(int $index): string
+    {
+        return '';
+    }
+
     /** @return int match count, or -1 on PCRE error */
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {

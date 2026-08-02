@@ -52,6 +52,10 @@ final class PregMatchRuntime
 
     private const THIN_MATCH_EX_CAP = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExCap';
 
+    private const THIN_SPLIT_PART_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinSplitPartCount';
+
+    private const THIN_SPLIT_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinSplitPart';
+
     private const MATCH_ALL_EX_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::matchAllExArgv';
 
     private const TAKE_MATCH_ALL_EX_HT = 'PHPCompiler\\ext\\standard\\PregJitHelper::takeLastMatchAllExHashTable';
@@ -77,6 +81,8 @@ final class PregMatchRuntime
         self::TAKE_MATCH_EX_HT,
         self::THIN_MATCH_EX_CAP_COUNT,
         self::THIN_MATCH_EX_CAP,
+        self::THIN_SPLIT_PART_COUNT,
+        self::THIN_SPLIT_PART,
         self::MATCH_ALL_EX_HELPER,
         self::TAKE_MATCH_ALL_EX_HT,
         self::REPLACE_HELPER,
@@ -559,15 +565,87 @@ final class PregMatchRuntime
             $fn->getParam(3)
         );
         $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+
+        // Thin standalone AOT: splitArgv returns null + thinSplitPart* (#27080).
+        if ($context->isThinStandaloneAotMain()) {
+            $errRaw = $context->builder->call(
+                self::helperFunction($context, self::LAST_ERROR_HELPER)
+            );
+            $err = JitNestedHelperCoerce::scalarToI64($context, $errRaw, $errRaw->typeOf());
+            $hasErr = $context->builder->icmp(
+                Builder::INT_NE,
+                $err,
+                $i64->constInt(0, false)
+            );
+            $partCountRaw = $context->builder->call(
+                self::helperFunction($context, self::THIN_SPLIT_PART_COUNT)
+            );
+            $partCount = JitNestedHelperCoerce::scalarToI64(
+                $context,
+                $partCountRaw,
+                $partCountRaw->typeOf()
+            );
+            $thinBb = $fn->appendBasicBlock('preg_split_thin_fill');
+            $context->builder->branchIf($hasErr, $failBb, $thinBb);
+            $context->builder->positionAtEnd($failBb);
+            $context->builder->returnValue($htPtr->constNull());
+            $context->builder->positionAtEnd($thinBb);
+            $thinHt = self::emitThinSplitHashtableFromParts($context, $fn, $partCount);
+            $context->builder->returnValue($thinHt);
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
+
         $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $context->builder->branchIf($isNull, $failBb, $okBb);
-
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($htPtr->constNull());
-
         $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue($ht);
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Build split result from PregJitHelper::thinSplitPart* (NestedJIT-safe strings, #27080).
+     */
+    private static function emitThinSplitHashtableFromParts(
+        Context $context,
+        LlvmFunction $fn,
+        Value $partCount
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $max = 8;
+        for ($i = 0; $i < $max; ++$i) {
+            $idxBb = $fn->appendBasicBlock('preg_split_thin_part_'.$i);
+            $skipBb = $fn->appendBasicBlock('preg_split_thin_skip_'.$i);
+            $need = $context->builder->icmp(
+                Builder::INT_SGT,
+                $partCount,
+                $i64->constInt($i, true)
+            );
+            $context->builder->branchIf($need, $idxBb, $skipBb);
+
+            $context->builder->positionAtEnd($idxBb);
+            $partRaw = $context->builder->call(
+                self::helperFunction($context, self::THIN_SPLIT_PART),
+                $i64->constInt($i, true)
+            );
+            $partStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $partRaw);
+            $slot = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $partStr
+            );
+            HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $slot);
+            $context->builder->branch($skipBb);
+            $context->builder->positionAtEnd($skipBb);
+        }
+
+        return $ht;
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

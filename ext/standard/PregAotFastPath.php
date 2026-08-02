@@ -602,4 +602,210 @@ final class PregAotFastPath
 
         return ($o >= 48 && $o <= 57) || ($o >= 65 && $o <= 90) || ($o >= 97 && $o <= 122) || 95 === $o;
     }
+
+    /**
+     * NestedJIT-safe preg_split subset (#27080).
+     *
+     * @return list<string>|null null when pattern unsupported / error
+     */
+    public static function splitParts(string $pattern, string $subject, int $limit, int $flags): ?array
+    {
+        if (0 !== $flags) {
+            return null;
+        }
+        $kind = self::patternKind($pattern);
+        if (0 === $kind || 8 === $kind || 9 === $kind) {
+            return null;
+        }
+        if (1 === $kind) {
+            return self::splitLiteral($pattern, $subject, $limit);
+        }
+
+        return self::splitClassPlus($kind, $subject, $limit);
+    }
+
+    private static int $splitCount = 0;
+
+    private static string $split0 = '';
+
+    private static string $split1 = '';
+
+    private static string $split2 = '';
+
+    private static string $split3 = '';
+
+    private static string $split4 = '';
+
+    private static string $split5 = '';
+
+    private static string $split6 = '';
+
+    private static string $split7 = '';
+
+    /** Store parts for thin AOT LLVM bridge; @return int count or -1 on error/unsupported. */
+    public static function splitStore(string $pattern, string $subject, int $limit, int $flags): int
+    {
+        self::$splitCount = 0;
+        self::$split0 = '';
+        self::$split1 = '';
+        self::$split2 = '';
+        self::$split3 = '';
+        self::$split4 = '';
+        self::$split5 = '';
+        self::$split6 = '';
+        self::$split7 = '';
+        $parts = self::splitParts($pattern, $subject, $limit, $flags);
+        if (null === $parts) {
+            return -1;
+        }
+        $n = \count($parts);
+        if ($n > self::MAX_CAPS) {
+            return -1;
+        }
+        $i = 0;
+        while ($i < $n) {
+            self::storeSplitAt($i, ''.$parts[$i]);
+            ++$i;
+        }
+        self::$splitCount = $n;
+
+        return $n;
+    }
+
+    public static function splitPartCount(): int
+    {
+        return self::$splitCount;
+    }
+
+    public static function splitPart(int $index): string
+    {
+        if (0 === $index) {
+            return '' . self::$split0;
+        }
+        if (1 === $index) {
+            return '' . self::$split1;
+        }
+        if (2 === $index) {
+            return '' . self::$split2;
+        }
+        if (3 === $index) {
+            return '' . self::$split3;
+        }
+        if (4 === $index) {
+            return '' . self::$split4;
+        }
+        if (5 === $index) {
+            return '' . self::$split5;
+        }
+        if (6 === $index) {
+            return '' . self::$split6;
+        }
+        if (7 === $index) {
+            return '' . self::$split7;
+        }
+
+        return '';
+    }
+
+    private static function storeSplitAt(int $index, string $value): void
+    {
+        if (0 === $index) {
+            self::$split0 = $value;
+        } elseif (1 === $index) {
+            self::$split1 = $value;
+        } elseif (2 === $index) {
+            self::$split2 = $value;
+        } elseif (3 === $index) {
+            self::$split3 = $value;
+        } elseif (4 === $index) {
+            self::$split4 = $value;
+        } elseif (5 === $index) {
+            self::$split5 = $value;
+        } elseif (6 === $index) {
+            self::$split6 = $value;
+        } elseif (7 === $index) {
+            self::$split7 = $value;
+        }
+    }
+
+    /** @return list<string>|null */
+    private static function splitLiteral(string $pattern, string $subject, int $limit): ?array
+    {
+        $delim = \substr($pattern, 0, 1);
+        $close = \strrpos($pattern, $delim);
+        if (false === $close || $close < 1) {
+            return null;
+        }
+        $body = \substr($pattern, 1, $close - 1);
+        $bodyLen = \strlen($body);
+        if (0 === $bodyLen) {
+            return null;
+        }
+        $parts = [];
+        $subLen = \strlen($subject);
+        $cursor = 0;
+        $n = 0;
+        while ($cursor <= $subLen) {
+            if ($limit > 0 && $n + 1 >= $limit) {
+                $parts[] = \substr($subject, $cursor);
+
+                return $parts;
+            }
+            $i = $cursor;
+            $found = false;
+            while ($i + $bodyLen <= $subLen) {
+                if (0 === \strncmp(\substr($subject, $i), $body, $bodyLen)) {
+                    $parts[] = \substr($subject, $cursor, $i - $cursor);
+                    $cursor = $i + $bodyLen;
+                    ++$n;
+                    $found = true;
+                    break;
+                }
+                ++$i;
+            }
+            if (!$found) {
+                $parts[] = \substr($subject, $cursor);
+
+                return $parts;
+            }
+        }
+
+        return $parts;
+    }
+
+    /** @return list<string> */
+    private static function splitClassPlus(int $kind, string $subject, int $limit): array
+    {
+        $charClass = 2;
+        if (4 === $kind || 5 === $kind) {
+            $charClass = 3;
+        } elseif (6 === $kind || 7 === $kind) {
+            $charClass = 4;
+        }
+        $parts = [];
+        $subLen = \strlen($subject);
+        $cursor = 0;
+        $n = 0;
+        while ($cursor < $subLen) {
+            while ($cursor < $subLen && self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                ++$cursor;
+            }
+            if ($cursor >= $subLen) {
+                break;
+            }
+            if ($limit > 0 && $n + 1 >= $limit) {
+                $parts[] = \substr($subject, $cursor);
+
+                return $parts;
+            }
+            $start = $cursor;
+            while ($cursor < $subLen && !self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                ++$cursor;
+            }
+            $parts[] = \substr($subject, $start, $cursor - $start);
+            ++$n;
+        }
+
+        return $parts;
+    }
 }
