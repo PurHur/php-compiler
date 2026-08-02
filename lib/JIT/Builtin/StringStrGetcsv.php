@@ -6,35 +6,32 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_str_getcsv via CsvJitHelper PHP (#9444, #13358, #26135).
+ * JIT/AOT link for __compiler_str_getcsv via CsvStrGetcsvJitHelper PHP (#9444, #13358, #26135, #27069).
  *
- * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
- * (VmCsv → CsvJitHelper) in one NestedJIT scope (peer StringUnpack #25830 / apache_note #26120).
+ * Helper compile: NestedJIT {@see CsvStrGetcsvJitHelper} only (no VmFs / fgetcsvArgv).
+ * Bridge: default CSV chars via {@see Context::constantStringFromString} (not raw cstr →
+ * `__string__separate`), and NestedJIT HashTable returns via {@see JitNestedHelperCoerce}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_getcsv)
  */
 final class StringStrGetcsv
 {
-    private const HELPER_PATH = '/ext/standard/CsvJitHelper.php';
-
-    private const VM_CSV_PATH = '/ext/standard/VmCsv.php';
+    private const HELPER_PATH = '/ext/standard/CsvStrGetcsvJitHelper.php';
 
     /**
-     * Ordered NestedJIT sources — VmCsv before helper (#26135).
-     *
      * @var list<string>
      */
     private const HELPER_BUNDLE = [
-        self::VM_CSV_PATH,
         self::HELPER_PATH,
     ];
 
-    private const STR_GETCSV_HELPER = 'PHPCompiler\\ext\\standard\\CsvJitHelper::strGetcsvArgv';
+    private const STR_GETCSV_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::strGetcsvArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -121,18 +118,61 @@ final class StringStrGetcsv
 
         $context->builder->positionAtEnd($bodyBb);
         $inputSep = $context->builder->call($context->lookupFunction('__string__separate'), $input);
+        // Empty / whitespace-free zero-length input → [null] without NestedJIT (return [null]
+        // aborts; empty-array helper + setNullAt left count() aborting — #27069).
+        $map = $context->structFieldMap['__string__'];
+        $inLen = $context->builder->load($context->builder->structGep($inputSep, $map['length']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $isZeroLen = $context->builder->icmp(Builder::INT_EQ, $inLen, $sizeT->constInt(0, false));
+        $zeroLenBb = $fn->appendBasicBlock('str_getcsv_bridge_zero_len');
+        $parseBb = $fn->appendBasicBlock('str_getcsv_bridge_parse');
+        $context->builder->branchIf($isZeroLen, $zeroLenBb, $parseBb);
+
+        $context->builder->positionAtEnd($zeroLenBb);
+        $context->builder->returnValue(self::allocNullRowHashtable($context));
+
+        $context->builder->positionAtEnd($parseBb);
         $sepSep = self::coerceOptionalCsvString($context, $separator, ',');
         $encSep = self::coerceOptionalCsvString($context, $enclosure, '"');
         $escSep = self::coerceOptionalCsvString($context, $escape, '\\');
-        $ht = $context->builder->call(
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::STR_GETCSV_HELPER),
-            $inputSep,
-            $sepSep,
-            $encSep,
-            $escSep
+            [$inputSep, $sepSep, $encSep, $escSep]
         );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        // Line-terminator-only rows: helper returns [] → synthesize [null] (#27069 / #10623).
+        $htIsNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $num = $context->builder->select(
+            $htIsNull,
+            $sizeT->constInt(0, false),
+            $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $ht)
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $sizeT->constInt(0, false));
+        $emptyBb = $fn->appendBasicBlock('str_getcsv_bridge_empty_null_row');
+        $retBb = $fn->appendBasicBlock('str_getcsv_bridge_ret');
+        $context->builder->branchIf($isEmpty, $emptyBb, $retBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->returnValue(self::allocNullRowHashtable($context));
+
+        $context->builder->positionAtEnd($retBb);
         $context->builder->returnValue($ht);
         $context->registerFunction($abiName, $fn);
+    }
+
+    /** php-src empty / CRLF-only CSV row → one NULL field (#4922 / #10623). */
+    private static function allocNullRowHashtable(Context $context): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $nullRow = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $nullRow,
+            $sizeT->constInt(0, false)
+        );
+
+        return $nullRow;
     }
 
     public static function coerceOptionalCsvStringForFgetcsv(Context $context, Value $arg, string $default): Value
@@ -145,9 +185,11 @@ final class StringStrGetcsv
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
+        // Load before CFG split — constantStringFromString may temporarily move the builder;
+        // never pass raw php_cstr ([N x i8]*) into __string__separate (#27069 Module verify).
+        $defaultStr = $context->builder->load($context->constantStringFromString($default));
 
         $fn = BasicBlockHelper::parentFunction($context);
-        $entry = $context->builder->getInsertBlock();
         $nullBb = $fn->appendBasicBlock('csv_opt_str_null');
         $checkBb = $fn->appendBasicBlock('csv_opt_str_check');
         $useBb = $fn->appendBasicBlock('csv_opt_str_use');
@@ -157,10 +199,6 @@ final class StringStrGetcsv
         $context->builder->branchIf($isNull, $nullBb, $checkBb);
 
         $context->builder->positionAtEnd($nullBb);
-        $defaultSep = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $context->constantFromString($default)
-        );
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($checkBb);
@@ -174,10 +212,9 @@ final class StringStrGetcsv
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-        $phi = $context->builder->phi($strPtr, [
-            [$defaultSep, $nullBb],
-            [$separated, $useBb],
-        ]);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($defaultStr, $nullBb);
+        $phi->addIncoming($separated, $useBb);
 
         return $phi;
     }
@@ -186,7 +223,7 @@ final class StringStrGetcsv
     {
         self::ensureJitHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#26135');
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27069');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -195,14 +232,13 @@ final class StringStrGetcsv
             $context,
             self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
-            '#26135'
+            '#27069'
         );
     }
 
     private static function ensureRuntimeHelpers(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
 
         foreach (
             [
