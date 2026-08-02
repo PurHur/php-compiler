@@ -92,6 +92,11 @@ final class HelperRuntimeCache
         // NestedJIT JsonEncodeNestedJitHelper (Context-free) into the user AOT module.
         'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodevalue' => true,
         'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodehashtable' => true,
+        // #27056 — prelinked StrtrArrayJitHelper unit.o still linked the old
+        // VmString::strtrArrayFromHashTable path (list-assign / ExternalMethod stubs)
+        // and SIGSEGVd after c:main_before_php. Force NestedJIT of the self-contained
+        // helper into the user AOT module.
+        'phpcompiler\\ext\\standard\\strtrarrayjithelper::strtrarray' => true,
         // #26989 — PendingHeadersJitHelper unit.o calls __compiler_preg_match without a provider
         // in the helper TU; NestedJIT into the user module so PregMatchRuntime can link.
         'phpcompiler\\ext\\standard\\pendingheadersjithelper::reset' => true,

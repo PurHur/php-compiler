@@ -20,13 +20,20 @@ final class StrtrRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringStrtrJit.php');
     }
 
-    public function testStrtrJitHelpersDelegateToVmString(): void
+    public function testStrtrJitHelpersAreNestedJitSafe(): void
     {
         $twoString = (string) file_get_contents(__DIR__.'/../../ext/standard/StrtrTwoStringJitHelper.php');
         $this->assertStringContainsString('VmString::strtr(', $twoString);
 
+        // #27056 — array form must be self-contained (no VmString) for thin AOT NestedJIT.
         $array = (string) file_get_contents(__DIR__.'/../../ext/standard/StrtrArrayJitHelper.php');
-        $this->assertStringContainsString('VmString::strtrArrayFromHashTable', $array);
+        $this->assertStringNotContainsString('VmString::', $array);
+        $this->assertStringContainsString('exportKeyValuePairs', $array);
+        $this->assertStringContainsString('$pair[0]', $array);
+        $this->assertStringContainsString('$pair[1]', $array);
+        $this->assertStringContainsString('(string) $pair[0]', $array);
+        $this->assertStringNotContainsString('as [$', $array);
+        $this->assertStringNotContainsString('->toString()', $array);
     }
 
     public function testStringStrtrStandaloneLlvmDeleted(): void

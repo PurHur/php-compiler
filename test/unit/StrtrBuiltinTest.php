@@ -82,14 +82,16 @@ PHP;
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        // Two-string form only — array-form AOT via __compiler_strtr_array segfaults on master.
+        // Two-string + array-pairs forms (#27056 NestedJIT-safe StrtrArrayJitHelper).
         $code = <<<'PHP'
 echo strtr('abc', 'a', 'A'), "\n";
 echo strtr('baab', 'ab', '12'), "\n";
 echo strtr('hello', 'lo', '12'), "\n";
 echo strtr('same', '', 'x'), "\n";
+echo strtr('hi', ['h' => 'H', 'i' => 'I']), "\n";
+echo strtr('baab', ['a' => 'o']), "\n";
 PHP;
-        $expect = "Abc\n2112\nhe112\nsame\n";
+        $expect = "Abc\n2112\nhe112\nsame\nHI\nboob\n";
         $this->assertSame($expect, $this->runAotBinary($code));
     }
 
