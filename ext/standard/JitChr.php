@@ -262,11 +262,18 @@ final class JitChr
 
     private static function compileTimeObjectGivenLabel(Context $context, JITVariable $arg): string
     {
-        if (JITVariable::KIND_VALUE !== $arg->kind) {
+        // Only inspect typed object immediates. Boxed TYPE_VALUE slots are `__value__*`
+        // (and NestedJIT may hand a non-pointer); structGep(__object__) aborts emit
+        // when VmMetaphone NestedJITs chr()/ord() (#26811 / #26794).
+        if (JITVariable::TYPE_OBJECT !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
             return 'object';
         }
         $objMap = $context->structFieldMap['__object__'] ?? null;
         if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $llvmType = $context->getStringFromType($arg->value->typeOf());
+        if ('__object__*' !== $llvmType && !str_ends_with((string) $llvmType, '__object__*')) {
             return 'object';
         }
         $classIdVal = $context->builder->load(

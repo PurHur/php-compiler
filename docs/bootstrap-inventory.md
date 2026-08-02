@@ -381,7 +381,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateElement.php` | 0 | 8 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 6 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
-| `ext/dom/JitDomDocumentElement.php` | 0 | 10 |
+| `ext/dom/JitDomDocumentElement.php` | 0 | 9 |
 | `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
 | `ext/dom/JitDomElementTextContent.php` | 0 | 7 |
@@ -397,7 +397,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomLoadHTMLUserScript.php` | 0 | 4 |
 | `ext/dom/JitDomLoadUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomLoadXML.php` | 0 | 1 |
-| `ext/dom/JitDomLoadXMLUserScript.php` | 0 | 4 |
+| `ext/dom/JitDomLoadXMLUserScript.php` | 0 | 5 |
 | `ext/dom/JitDomNodeChildProperty.php` | 0 | 1 |
 | `ext/dom/JitDomNodeIsConnected.php` | 0 | 2 |
 | `ext/dom/JitDomNodeListItem.php` | 0 | 1 |
@@ -8643,7 +8643,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 20 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -9061,12 +9061,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 112)
 - new JITVariable (line 196)
-- new JITVariable (line 208)
-- new JITVariable (line 293)
-- new JITVariable (line 313)
-- new JITVariable (line 335)
-- new JITVariable (line 337)
-- 15 class method(s)
+- new JITVariable (line 223)
+- new JITVariable (line 308)
+- new JITVariable (line 328)
+- new JITVariable (line 350)
+- new JITVariable (line 352)
+- 16 class method(s)
 
 ### `ext/dom/JitDomCreateElementNS.php`
 
@@ -9087,15 +9087,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 53)
-- new JITVariable (line 91)
-- new JITVariable (line 103)
-- new JITVariable (line 109)
-- new JITVariable (line 155)
+- new JITVariable (line 102)
+- new JITVariable (line 114)
+- new JITVariable (line 120)
 - new JITVariable (line 166)
-- new JITVariable (line 232)
-- new JITVariable (line 238)
-- new JITVariable (line 264)
+- new JITVariable (line 177)
+- new JITVariable (line 221)
+- new JITVariable (line 227)
+- new JITVariable (line 253)
 - 9 class method(s)
 
 ### `ext/dom/JitDomDocumentMethodKernel.php`
@@ -9192,10 +9191,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadXMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 138)
-- new JITVariable (line 201)
-- new JITVariable (line 218)
-- 13 class method(s)
+- new JITVariable (line 155)
+- new JITVariable (line 180)
+- new JITVariable (line 243)
+- new JITVariable (line 260)
+- 14 class method(s)
 
 ### `ext/dom/JitDomNodeChildProperty.php`
 
@@ -44378,16 +44378,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomNodeLiveMutationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 343)
-- new Variable (line 344)
-- new Variable (line 361)
-- new Variable (line 402)
-- new Variable (line 403)
-- new Variable (line 414)
-- new Variable (line 455)
-- new Variable (line 466)
-- new Variable (line 505)
-- new Variable (line 562)
+- new Variable (line 346)
+- new Variable (line 347)
+- new Variable (line 364)
+- new Variable (line 405)
+- new Variable (line 406)
+- new Variable (line 417)
+- new Variable (line 458)
+- new Variable (line 469)
+- new Variable (line 508)
+- new Variable (line 577)
 - 34 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
@@ -46988,7 +46988,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 97)
 - new Variable (line 118)
 - new Variable (line 150)
-- new Variable (line 255)
+- new Variable (line 260)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`

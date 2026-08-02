@@ -1,13 +1,13 @@
 {
-  "version": 1,
-  "generated_at": "2026-08-02T04:42:07+00:00",
-  "arch": "x86_64-linux",
-  "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
-  "core_fingerprint": "9e3fdbbc7c424ca71565",
-  "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
-  "unit_count": 363,
-  "published_fresh": 363,
-  "kept_live_unpublished": 0,
-  "total_bytes": 450065976,
-  "refresh": "targeted helper-runtime refresh: DateTimeFormat/Libcrypt/Password stale units + publish FilterUrl (#24302 gate)"
+    "version": 1,
+    "generated_at": "2026-08-02T05:04:23+00:00",
+    "arch": "x86_64-linux",
+    "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
+    "core_fingerprint": "9e3fdbbc7c424ca71565",
+    "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
+    "unit_count": 363,
+    "published_fresh": 1,
+    "kept_live_unpublished": 362,
+    "total_bytes": 450241920,
+    "refresh": "surgical publish MetaphoneJitHelper after JitChr NestedJIT guard (#26811)"
 }
