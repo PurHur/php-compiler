@@ -22,6 +22,68 @@ use PHPLLVM\Value;
  */
 final class GeneratorIteratorJitHelper
 {
+    /**
+     * On resume past a yield: copy pending_send into the yield expression result (or
+     * discard when the yield has no receive slot) — Zend zend_generator_resume (#26819).
+     *
+     * @return \PHPLLVM\BasicBlock block to continue resume-prefix lowering from
+     */
+    public static function emitInjectPendingSend(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        Block $block,
+        OpCode $yieldOp,
+        Value $stateParam,
+        \PHPLLVM\BasicBlock $entryBlock
+    ): \PHPLLVM\BasicBlock {
+        $context = $jit->context;
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $hasPendingPtr = $context->builder->structGep($stateParam, $map['has_pending_send']);
+        if (null === $yieldOp->arg1) {
+            // Plain `yield expr` — discard the sent value (VM #18108 / #23712).
+            $context->builder->store($i1->constInt(0, false), $hasPendingPtr);
+
+            return $entryBlock;
+        }
+        $resultOp = $block->getOperand($yieldOp->arg1);
+        if (!$context->hasVariableOpInScopes($resultOp)) {
+            $context->makeVariableFromOp($func, $entryBlock, $block, $resultOp);
+        }
+        $resultVar = $context->getVariableFromOp($resultOp);
+        $pendingField = $context->builder->structGep($stateParam, $map['pending_send']);
+        $hasPending = $context->builder->load($hasPendingPtr);
+        $parent = $context->builder->getInsertBlock()->getParent();
+        $copyBb = $parent->appendBasicBlock('gen_inject_send');
+        $nullBb = $parent->appendBasicBlock('gen_inject_null');
+        $doneBb = $parent->appendBasicBlock('gen_inject_done');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $hasPending, $i1->constInt(0, false)),
+            $copyBb,
+            $nullBb
+        );
+
+        $context->builder->positionAtEnd($copyBb);
+        JitValueBox::copyFromPointer(
+            $context,
+            JitValueBox::pointer($context, $resultVar->value),
+            $pendingField
+        );
+        $context->builder->store($i1->constInt(0, false), $hasPendingPtr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $resultVar->value)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $doneBb;
+    }
+
     public static function emitYieldPoint(
         \PHPCompiler\JIT $jit,
         Block $block,
@@ -316,12 +378,15 @@ final class GeneratorIteratorJitHelper
         }
         $genVar = self::normalizeGeneratorObjectVariable($context, $genVar);
         JitGeneratorHelper::ensureTypes($context);
+        // Mirror FiberHelperLlvm::loadStateFromFiberObject — propertyFetch returns a
+        // KIND_VARIABLE slot (i64*); inttoptr needs the loaded i64 bits (#26819).
+        $objVal = $context->helper->loadValue($genVar);
         $stateVar = $context->type->object->propertyFetch(
-            $genVar->value,
+            $objVal,
             'Generator',
             GeneratorJitHelper::STATE_PROPERTY
         );
-        $stateBits = self::loadNativeLongFromPropertyVariable($context, $stateVar);
+        $stateBits = $context->helper->loadValue($stateVar);
         $statePtr = $context->builder->inttoptr(
             $stateBits,
             $context->getTypeFromString('__generator_state__*')
@@ -393,21 +458,6 @@ final class GeneratorIteratorJitHelper
             );
 
             return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objPtr);
-        }
-
-        throw new \LogicException('Generator missing __generator_state in JIT');
-    }
-
-    private static function loadNativeLongFromPropertyVariable(Context $context, Variable $stateVar): Value
-    {
-        if (Variable::TYPE_NATIVE_LONG === $stateVar->type) {
-            return $stateVar->value;
-        }
-        if (Variable::TYPE_VALUE === $stateVar->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                JitValueBox::pointer($context, $stateVar->value)
-            );
         }
 
         throw new \LogicException('Generator missing __generator_state in JIT');
