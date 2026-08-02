@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6728 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21750 |
+| Source constructs flagged (warnings) | 21753 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2236,7 +2236,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/VmSqlite3BlobStream.php` | 0 | 2 |
 | `ext/sqlite3/VmSqlite3Native.php` | 0 | 13 |
 | `ext/sqlite3/VmSqlite3Udf.php` | 0 | 9 |
-| `ext/ssh2/Module.php` | 0 | 34 |
+| `ext/ssh2/Module.php` | 0 | 35 |
 | `ext/ssh2/Ssh2Constants.php` | 0 | 1 |
 | `ext/ssh2/Ssh2ExtensionPolicy.php` | 0 | 1 |
 | `ext/ssh2/VmSsh2Listener.php` | 0 | 4 |
@@ -2245,7 +2245,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ssh2/VmSsh2Session.php` | 0 | 4 |
 | `ext/ssh2/VmSsh2Sftp.php` | 0 | 4 |
 | `ext/ssh2/VmSsh2Stream.php` | 0 | 4 |
-| `ext/ssh2/ssh2_functions.php` | 0 | 44 |
+| `ext/ssh2/ssh2_functions.php` | 0 | 46 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -25239,12 +25239,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ssh2_sftp_rename (line 79)
 - new ssh2_sftp_chmod (line 80)
 - new ssh2_sftp_realpath (line 81)
-- new ssh2_sftp_symlink (line 82)
-- new ssh2_sftp_readlink (line 83)
-- new ssh2_publickey_init (line 84)
-- new ssh2_publickey_add (line 85)
-- new ssh2_publickey_remove (line 86)
-- new ssh2_publickey_list (line 87)
+- new ssh2_sftp_statvfs (line 82)
+- new ssh2_sftp_symlink (line 83)
+- new ssh2_sftp_readlink (line 84)
+- new ssh2_publickey_init (line 85)
+- new ssh2_publickey_add (line 86)
+- new ssh2_publickey_remove (line 87)
+- new ssh2_publickey_list (line 88)
 - 3 class method(s)
 
 ### `ext/ssh2/Ssh2Constants.php`
@@ -25268,7 +25269,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ssh2/VmSsh2Native.php`
 
 **Warnings** (review for bootstrap subset):
-- 46 class method(s)
+- 47 class method(s)
 - 2 closure(s)
 
 ### `ext/ssh2/VmSsh2Publickey.php`
@@ -25338,18 +25339,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1342)
 - new ArgumentCountError (line 1377)
 - new ArgumentCountError (line 1412)
-- new ArgumentCountError (line 1460)
-- new ArgumentCountError (line 1495)
+- new ArgumentCountError (line 1462)
+- new Variable (line 1488)
+- new ArgumentCountError (line 1510)
 - new ArgumentCountError (line 1545)
-- new ArgumentCountError (line 1597)
-- new ArgumentCountError (line 1658)
-- new ArgumentCountError (line 1700)
-- new Variable (line 1727)
-- new Variable (line 1730)
-- new Variable (line 1735)
-- new Variable (line 1739)
-- new Variable (line 1742)
-- 40 class method(s)
+- new ArgumentCountError (line 1595)
+- new ArgumentCountError (line 1647)
+- new ArgumentCountError (line 1708)
+- new ArgumentCountError (line 1750)
+- new Variable (line 1777)
+- new Variable (line 1780)
+- new Variable (line 1785)
+- new Variable (line 1789)
+- new Variable (line 1792)
+- 41 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
@@ -42312,7 +42315,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 946)
+- new InternalArgInfo (line 950)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
