@@ -38,10 +38,18 @@ final class JitDomSaveXMLUserScript
             if (null !== $serialized) {
                 return $serialized;
             }
+
+            // DomRegistry / non-pure load: never substitute the compile-time document literal
+            // for a node-scoped save — fall through to DomSaveXMLRuntime (#26757).
+            return null;
         }
 
         $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xmlLit || '' === trim($xmlLit)) {
+            return null;
+        }
+        // Document-wide constant replay is only valid for pure user-script loads (#26757).
+        if (!JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return null;
         }
 

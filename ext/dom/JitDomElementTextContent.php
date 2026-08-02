@@ -270,6 +270,8 @@ final class JitDomElementTextContent
             JITVariable::TYPE_VALUE
         );
         JitDomDocumentElement::storeChildNodesLength($context, $receiver, 1);
+        // Prefer empty inner markup so saveXML falls back to textContent (#26757 / #23251).
+        JitDomCreateElement::storeUserScriptInnerXml($context, $receiver, '');
     }
 
     /** Load __object__* from a DOMNode firstChild/lastChild TYPE_VALUE slot (or null). */

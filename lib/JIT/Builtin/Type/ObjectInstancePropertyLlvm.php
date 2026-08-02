@@ -230,6 +230,8 @@ final class ObjectInstancePropertyLlvm
                 $i64->constInt($classId, false)
             );
             $caseBlock = $fn->appendBasicBlock('prop_fetch_rt_class_'.$classId);
+            // Last miss jumps straight to $fallback — do not also branch($fallback) after the
+            // loop (that placed a terminator mid-block: "Terminator found in the middle…"; #26757).
             $nextBlock = $classId === $lastKey
                 ? $fallback
                 : $fn->appendBasicBlock('prop_fetch_rt_try_'.$classId);
@@ -240,8 +242,11 @@ final class ObjectInstancePropertyLlvm
             $context->builder->branch($done);
             $checkBlock = $nextBlock;
         }
-        $context->builder->positionAtEnd($checkBlock);
-        $context->builder->branch($fallback);
+        // Only emit an explicit miss edge when the last candidate did not already target fallback.
+        if ($checkBlock !== $fallback) {
+            $context->builder->positionAtEnd($checkBlock);
+            $context->builder->branch($fallback);
+        }
         $context->builder->positionAtEnd($fallback);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -37,25 +38,27 @@ final class JitDomDocumentElement
             );
         }
 
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
-        if (null === $xml) {
-            return self::boxNull($context);
+        // Prefer the documentElement pinned at loadXML (pure path) or DomRegistry (#26757).
+        // Rematerializing a fresh shallow element each fetch dropped saveXML children and
+        // made appendChild mutate a throwaway object.
+        if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
+            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+        ) {
+            $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+            if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
+                $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
+            }
+
+            return ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $obj,
+                self::CLASS_DOCUMENT,
+                self::PROP_DOCUMENT_ELEMENT,
+                $docClassId
+            );
         }
 
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_document_element_us');
-        $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
-        $text = DomParseSimpleXmlJitHelper::rootTextContentArgv($xml);
-        // Seed textContent/nodeValue from compile-time XML so reads after loadXML
-        // do not hit an uninitialized string slot (#25475 / re-#23251).
-        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
-        self::syncChildrenFromXml($context, $element, $xml);
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_OBJECT,
-            JITVariable::KIND_VALUE,
-            $element
-        );
+        return self::boxNull($context);
     }
 
     /**
@@ -63,12 +66,20 @@ final class JitDomDocumentElement
      *
      * Element children are required so held references survive textContent writes (detach).
      */
+    public static function syncChildrenFromXmlPublic(
+        \PHPCompiler\JIT\Context $context,
+        Value $element,
+        string $xml
+    ): void {
+        self::syncChildrenFromXml($context, $element, $xml);
+    }
+
     private static function syncChildrenFromXml(
         \PHPCompiler\JIT\Context $context,
         Value $element,
         string $xml
     ): void {
-        $children = self::directElementChildTags($xml);
+        $children = DomParseSimpleXmlJitHelper::directElementChildTags($xml);
         if ([] === $children) {
             $node = DomParseSimpleXmlJitHelper::firstChildNodeArgv($xml);
             if (null === $node || 'comment' !== $node['kind']) {
@@ -174,28 +185,6 @@ final class JitDomDocumentElement
             $listJit,
             JITVariable::TYPE_OBJECT
         );
-    }
-
-    /** @return list<string> */
-    private static function directElementChildTags(string $xml): array
-    {
-        if (!preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?>/', $xml, $root, PREG_OFFSET_CAPTURE)) {
-            return [];
-        }
-        $afterRoot = (int) $root[0][1] + \strlen($root[0][0]);
-        $close = stripos($xml, '</'.$root[1][0].'>', $afterRoot);
-        $inner = false === $close
-            ? substr($xml, $afterRoot)
-            : substr($xml, $afterRoot, $close - $afterRoot);
-        $tags = [];
-        if (!preg_match_all('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?\/?>/', $inner, $matches)) {
-            return [];
-        }
-        foreach ($matches[1] as $tag) {
-            $tags[] = strtolower($tag);
-        }
-
-        return $tags;
     }
 
     private static function ensureLinkProps(\PHPCompiler\JIT\Context $context): void
