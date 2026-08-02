@@ -10,6 +10,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringHex2bin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -118,10 +119,32 @@ final class hex2bin extends Internal
             return JitValueBox::pointer($context, $slot);
         }
         $strictI8 = null;
+        $strictConst = false;
         if (2 === $argc) {
             $strictI8 = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
+            $ct = $args[1]->compileTimeBool ?? null;
+            if (null !== $ct) {
+                $strictConst = (bool) $ct;
+            }
         } else {
             $strictI8 = $context->getTypeFromString('int8')->constInt(0, false);
+        }
+
+        // Fold compile-time literals (peer base64_decode #26890) — keeps AOT fixtures off the
+        // runtime value-box === false path when args are constants (#27008).
+        $literal = null;
+        if (JITVariable::TYPE_VALUE !== $args[0]->type) {
+            $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
+        }
+        if (null !== $literal && (1 === $argc || null !== ($args[1]->compileTimeBool ?? null))) {
+            $result = VmString::hex2bin($literal, $strictConst);
+            if (false === $result) {
+                return $context->constantFromBool(false);
+            }
+
+            return $context->builder->load(
+                $context->constantStringFromString($result)
+            );
         }
 
         StringHex2bin::ensureLinked($context);
