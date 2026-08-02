@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #10222: get_class() class-id lookup routes through GetClassJitHelper PHP.
+ * Issue #10222 / #26854: get_class() class-id lookup via GetClassRuntime ABI.
  *
  * @group aot-lint
  */
@@ -19,8 +19,9 @@ final class GetClassRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('__phpc_class_name_from_id', $runtime);
         $this->assertStringContainsString('GetClassJitHelper', $runtime);
         $this->assertStringContainsString('helperSourceForMap', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledFromSource', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringContainsString('emitSelectWalk', $runtime);
+        $this->assertStringContainsString('constantStringFromString', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiledFromSource', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         // Mid-emit ensureLinked must restore the outer insert block (#24163).
         $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $runtime);

@@ -6,29 +6,21 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_class_name_from_id via GetClassJitHelper PHP (#10222, #24976).
+ * JIT/AOT link for __phpc_class_name_from_id (#10222, #24976, #26854).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiledFromSource} (per-TU class-id map;
- * peer DefaultTimezone #24962 / HttpBuildQuery #24887 — on-disk helpers use ensureCompiled).
- * Replaces LLVM select-walk in {@see \PHPCompiler\JIT\ReflectionBuiltinHelper::classNameFromId}.
+ * Emits a per-TU class-id → name select-walk into the ABI function using the
+ * main module's {@see Context::constantStringFromString} (initialized for thin AOT).
+ * NestedJIT of GetClassJitHelper left `__string__*` globals null under standalone AOT,
+ * so get_class(Error) aborted after a successful id match (#26854).
+ *
  * php-src: ext/standard/basic_functions.c — get_class / zend_get_object_classname
  */
 final class GetClassRuntime
 {
-    private const CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\GetClassJitHelper::classNameFromClassId';
-
-    private const DEBUG_TYPE_CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\GetClassJitHelper::debugTypeClassNameFromClassId';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CLASS_NAME_HELPER,
-        self::DEBUG_TYPE_CLASS_NAME_HELPER,
-    ];
-
     private const ABI_NAME = '__phpc_class_name_from_id';
 
     private const DEBUG_TYPE_ABI_NAME = '__phpc_debug_type_class_name_from_id';
@@ -53,36 +45,9 @@ final class GetClassRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
-
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        if (null === self::probeLinked($context, self::ABI_NAME)) {
-            JitVmHelperLink::ensureBridge(
-                $context,
-                self::ABI_NAME,
-                'get_class_name_bridge_entry',
-                [$i64],
-                $strPtr,
-                self::CLASS_NAME_HELPER,
-                self::helperRelativePath(),
-                [self::CLASS_NAME_HELPER],
-                '#10222'
-            );
-        }
-        if (null === self::probeLinked($context, self::DEBUG_TYPE_ABI_NAME)) {
-            JitVmHelperLink::ensureBridge(
-                $context,
-                self::DEBUG_TYPE_ABI_NAME,
-                'get_debug_type_class_name_bridge_entry',
-                [$i64],
-                $strPtr,
-                self::DEBUG_TYPE_CLASS_NAME_HELPER,
-                self::helperRelativePath(),
-                [self::DEBUG_TYPE_CLASS_NAME_HELPER, self::CLASS_NAME_HELPER],
-                '#17443'
-            );
-        }
+        self::seedThrowableClassNames($context);
+        self::emitClassNameAbi($context);
+        self::emitDebugTypeAbi($context);
 
         if (null !== $savedBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
@@ -91,9 +56,18 @@ final class GetClassRuntime
         }
     }
 
+    /**
+     * Test helper: shape of a generated per-TU map (switch arms, not a static array).
+     *
+     * @param array<int, string> $namesById
+     */
     public static function helperSourceForMap(array $namesById): string
     {
-        $exported = var_export($namesById, true);
+        $cases = '';
+        ksort($namesById, \SORT_NUMERIC);
+        foreach ($namesById as $id => $name) {
+            $cases .= '            case '.(int) $id.': return '.var_export((string) $name, true).";\n";
+        }
 
         return <<<PHP
 <?php
@@ -105,12 +79,12 @@ namespace PHPCompiler\\ext\\standard;
 /** @generated per compile unit — {@see GetClassRuntime} */
 final class GetClassJitHelper
 {
-    /** @var array<int, string> */
-    private static array \$namesById = {$exported};
-
     public static function classNameFromClassId(int \$classId): string
     {
-        return self::\$namesById[\$classId] ?? '';
+        switch (\$classId) {
+{$cases}            default:
+                return '';
+        }
     }
 
     public static function debugTypeClassNameFromClassId(int \$classId): string
@@ -127,22 +101,67 @@ final class GetClassJitHelper
 PHP;
     }
 
-    private static function helperRelativePath(): string
+    private static function seedThrowableClassNames(Context $context): void
     {
-        return '/ext/standard/GetClassJitHelper.php';
+        $object = $context->type->object;
+        foreach (['Throwable', 'Error', 'Exception', 'TypeError', 'ValueError'] as $name) {
+            $object->lookup($name);
+        }
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function emitClassNameAbi(Context $context): void
     {
-        $map = $context->type->object->allClassNamesById();
-        $source = self::helperSourceForMap($map);
-        JitVmHelperLink::ensureCompiledFromSource(
-            $context,
-            $source,
-            'GetClassJitHelper.php',
-            self::COMPILED_HELPERS,
-            '#24976'
-        );
+        if (null !== self::probeLinked($context, self::ABI_NAME)) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $i64);
+        $fn = $context->module->addFunction(self::ABI_NAME, $ft);
+        $entry = $fn->appendBasicBlock('get_class_name_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $classId = $fn->getParam(0);
+        $context->builder->returnValue(self::emitSelectWalk($context, $classId));
+        $context->registerFunction(self::ABI_NAME, $fn);
+    }
+
+    private static function emitDebugTypeAbi(Context $context): void
+    {
+        if (null !== self::probeLinked($context, self::DEBUG_TYPE_ABI_NAME)) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $i64);
+        $fn = $context->module->addFunction(self::DEBUG_TYPE_ABI_NAME, $ft);
+        $entry = $fn->appendBasicBlock('get_debug_type_class_name_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $classId = $fn->getParam(0);
+        $anonLabel = $context->builder->load($context->constantStringFromString('class@anonymous'));
+        $result = self::emitSelectWalk($context, $classId);
+        foreach ($context->type->object->allClassNamesById() as $id => $mapped) {
+            if (!str_contains((string) $mapped, '@anonymous')) {
+                continue;
+            }
+            $expected = $context->constantFromInteger((int) $id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+            $result = $context->builder->select($isId, $anonLabel, $result);
+        }
+        $context->builder->returnValue($result);
+        $context->registerFunction(self::DEBUG_TYPE_ABI_NAME, $fn);
+    }
+
+    private static function emitSelectWalk(Context $context, \PHPLLVM\Value $classId): \PHPLLVM\Value
+    {
+        $result = $context->builder->load($context->constantStringFromString(''));
+        foreach ($context->type->object->allClassNamesById() as $id => $name) {
+            $expected = $context->constantFromInteger((int) $id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+            $candidate = $context->builder->load($context->constantStringFromString((string) $name));
+            $result = $context->builder->select($isId, $candidate, $result);
+        }
+
+        return $result;
     }
 
     private static function probeLinked(Context $context, string $abiName): ?LlvmFunction

@@ -8,36 +8,31 @@ use PHPCompiler\ext\standard\GetClassJitHelper;
 use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPUnit\Framework\TestCase;
 
-/** GetClassRuntime NestedJIT → JitVmHelperLink::ensureCompiledFromSource (#24976). */
+/** GetClassRuntime ABI select-walk for thin AOT get_class (#24976 / #26854). */
 final class GetClassRuntimeShrinkTest extends TestCase
 {
-    public function testGetClassRuntimeRoutesThroughEnsureCompiledFromSource(): void
+    public function testGetClassRuntimeEmitsMainModuleAbi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GetClassRuntime.php');
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('__phpc_class_name_from_id', $source);
+        $this->assertStringContainsString('emitSelectWalk', $source);
+        $this->assertStringContainsString('seedThrowableClassNames', $source);
         $this->assertStringContainsString('helperSourceForMap', $source);
+        $this->assertStringContainsString('constantStringFromString', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
-    }
-
-    public function testJitVmHelperLinkExposesEnsureCompiledFromSource(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitVmHelperLink.php');
-        $this->assertStringContainsString('function ensureCompiledFromSource(', $source);
-        $this->assertStringContainsString('Intentionally skip HelperRuntimeCache', $source);
-        $this->assertStringContainsString('runNestedHelperCompile', $source);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
     }
 
     public function testHelperSourceForMapEmbedsClassTable(): void
     {
         $php = GetClassRuntime::helperSourceForMap([3 => 'Foo\\Bar', 7 => 'class@anonymous']);
+        $this->assertStringContainsString('switch ($classId)', $php);
+        $this->assertStringContainsString('case 3: return ', $php);
         $this->assertStringContainsString('Foo\\\\Bar', $php);
+        $this->assertStringContainsString('case 7: return ', $php);
         $this->assertStringContainsString('class@anonymous', $php);
+        $this->assertStringNotContainsString('private static array $namesById', $php);
         $this->assertStringContainsString('classNameFromClassId', $php);
         $this->assertStringContainsString('debugTypeClassNameFromClassId', $php);
     }
