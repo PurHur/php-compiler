@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6777 |
-| Phase A inventory files (M2 ratio SSOT) | 6777 |
+| PHP files on vm.php path | 6778 |
+| Phase A inventory files (M2 ratio SSOT) | 6778 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21901 |
+| Source constructs flagged (warnings) | 21904 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5606,6 +5606,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DateTimeCreateFromFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeImmutableConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeModify.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeSetTimezone.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeZoneConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentAppendChild.php` | 0 | 1 |
@@ -5798,7 +5799,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 106 |
+| `lib/JIT/Context.php` | 0 | 108 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 56 |
@@ -26932,14 +26933,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDateMutation.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 49)
-- new ArgumentCountError (line 91)
-- new ArgumentCountError (line 172)
-- new JITVariable (line 282)
-- new JITVariable (line 293)
-- new JITVariable (line 303)
-- new JITVariable (line 505)
-- 19 class method(s)
+- new ArgumentCountError (line 50)
+- new ArgumentCountError (line 241)
+- new ArgumentCountError (line 322)
+- new JITVariable (line 432)
+- new JITVariable (line 443)
+- new JITVariable (line 453)
+- new JITVariable (line 655)
+- 22 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
 
@@ -30964,7 +30965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StrRot13JitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/StrWordCountJitHelper.php`
 
@@ -46699,7 +46700,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrRot13.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringStrWordCount.php`
 
@@ -47373,6 +47374,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/DateTimeImmutableConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DateTimeModify.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -48519,19 +48525,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateIntervalCreateFromDateString (line 1147)
 - new Call\DateTimeSetTimezone (line 1149)
 - new Call\DateTimeSetTimezone (line 1155)
-- new Result (line 1524)
-- new Result (line 1546)
-- new Variable (line 2219)
-- new Variable (line 2356)
-- new Variable (line 2610)
-- new Variable (line 2668)
-- new VMVariable (line 2830)
-- new VMVariable (line 2846)
-- new VMVariable (line 2852)
-- new VMVariable (line 2858)
-- new VMVariable (line 2869)
-- new Variable (line 2899)
-- new Variable (line 2942)
+- new Call\DateTimeModify (line 1159)
+- new Call\DateTimeModify (line 1160)
+- new Result (line 1528)
+- new Result (line 1550)
+- new Variable (line 2223)
+- new Variable (line 2360)
+- new Variable (line 2614)
+- new Variable (line 2672)
+- new VMVariable (line 2834)
+- new VMVariable (line 2850)
+- new VMVariable (line 2856)
+- new VMVariable (line 2862)
+- new VMVariable (line 2873)
+- new Variable (line 2903)
+- new Variable (line 2946)
 - 106 class method(s)
 - 32 closure(s)
 
