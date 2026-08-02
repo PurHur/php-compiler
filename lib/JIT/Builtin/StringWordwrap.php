@@ -10,10 +10,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for wordwrap() via WordwrapJitHelper PHP (#14565, #17724).
+ * JIT/AOT link for wordwrap() via WordwrapJitHelper PHP (#14565, #17724, #26904).
  *
- * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * User-script AOT uses HelperRuntimeCache prelinked units (#15889). Helper is
+ * NestedJIT-self-contained (no VmString) — peer Soundex #26882 / StrRot13 #26868.
  * php-src: ext/standard/string.c — PHP_FUNCTION(wordwrap)
  */
 final class StringWordwrap
@@ -48,7 +48,7 @@ final class StringWordwrap
         }
 
         $probe = $context->module->getNamedFunction(self::ABI_WORDWRAP);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_WORDWRAP, $probe);
 
             return;
@@ -77,7 +77,7 @@ final class StringWordwrap
             self::WORDWRAP_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#17724'
+            '#26904'
         );
     }
 }
