@@ -40,4 +40,14 @@ final class ProcessIdentityRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmProcessIdentity::getmygid()', $source);
         $this->assertStringContainsString('VmProcessIdentity::getCurrentUserForScript', $source);
     }
+
+    public function testGetCurrentUserUsesLibcNotNestedHelper(): void
+    {
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessIdentityJit.php');
+        $this->assertStringContainsString('JitGetCurrentUser::invoke', $jit);
+        $this->assertStringNotContainsString('resolveGetCurrentUser', $jit);
+        $emit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGetCurrentUser.php');
+        $this->assertStringContainsString("lookupFunction('geteuid')", $emit);
+        $this->assertStringContainsString("lookupFunction('getpwuid')", $emit);
+    }
 }
