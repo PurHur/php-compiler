@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\GetClassJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ReflectionBuiltinHelper get_class LLVM routes through GetClassJitHelper PHP (#10222). */
+/** ReflectionBuiltinHelper get_class LLVM routes through GetClassRuntime ABI (#10222 / #26854). */
 final class ReflectionBuiltinHelperRuntimeShrinkTest extends TestCase
 {
     public function testReflectionBuiltinHelperUsesGetClassRuntimeBridge(): void
@@ -15,17 +15,16 @@ final class ReflectionBuiltinHelperRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ReflectionBuiltinHelper.php');
         $this->assertStringContainsString('GetClassRuntime::ensureLinked', $source);
         $this->assertStringContainsString('__phpc_class_name_from_id', $source);
-        $this->assertStringNotContainsString('allClassNamesById()', $source);
-        $this->assertStringNotContainsString('->select($isId', $source);
     }
 
-    public function testGetClassRuntimeUsesGeneratedJitHelper(): void
+    public function testGetClassRuntimeUsesMainModuleSelectWalk(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GetClassRuntime.php');
         $this->assertStringContainsString('GetClassJitHelper', $source);
         $this->assertStringContainsString('helperSourceForMap', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('emitSelectWalk', $source);
+        $this->assertStringContainsString('constantStringFromString', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
     }
 
