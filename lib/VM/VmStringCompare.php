@@ -293,6 +293,89 @@ final class VmStringCompare
     }
 
     /**
+     * True when $haystack contains $needle as a byte subsequence (#26796 / #24161 class).
+     *
+     * Empty needle → true (php-src str_contains). Sliding memcmp window — NestedJIT of
+     * StrContainsJitHelper::containsArgv returns always-true under AOT (#15704 bool path).
+     */
+    public static function containsIdentical(Context $context, Value $haystack, Value $needle): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $trueVal = $i1->constInt(1, false);
+        $falseVal = $i1->constInt(0, false);
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $hayLen = $context->builder->load(
+            $context->builder->structGep($haystack, $map['length'])
+        );
+        $needleLen = $context->builder->load(
+            $context->builder->structGep($needle, $map['length'])
+        );
+        $needleEmpty = $context->builder->icmp(Builder::INT_EQ, $needleLen, $zero);
+        $emptyBb = BasicBlockHelper::append($context, 'jit_contains_empty_needle');
+        $checkLenBb = BasicBlockHelper::append($context, 'jit_contains_check_len');
+        $loopHeader = BasicBlockHelper::append($context, 'jit_contains_loop_header');
+        $loopBody = BasicBlockHelper::append($context, 'jit_contains_loop_body');
+        $foundBb = BasicBlockHelper::append($context, 'jit_contains_found');
+        $advanceBb = BasicBlockHelper::append($context, 'jit_contains_advance');
+        $missBb = BasicBlockHelper::append($context, 'jit_contains_miss');
+        $mergeBb = BasicBlockHelper::append($context, 'jit_contains_done');
+        $context->builder->branchIf($needleEmpty, $emptyBb, $checkLenBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($checkLenBb);
+        $lenOk = $context->builder->icmp(Builder::INT_SGE, $hayLen, $needleLen);
+        $context->builder->branchIf($lenOk, $loopHeader, $missBb);
+
+        $context->builder->positionAtEnd($loopHeader);
+        $idx = $context->builder->phi($i64);
+        $idx->addIncoming($zero, $checkLenBb);
+        $limit = $context->builder->sub($hayLen, $needleLen);
+        $inRange = $context->builder->icmp(Builder::INT_SLE, $idx, $limit);
+        $context->builder->branchIf($inRange, $loopBody, $missBb);
+
+        $context->builder->positionAtEnd($loopBody);
+        $sizeT = $context->getTypeFromString('size_t');
+        $hayChars = $context->builder->structGep($haystack, $map['value']);
+        $window = $context->builder->gep($hayChars, $idx);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('memcmp'),
+            $window,
+            $context->builder->structGep($needle, $map['value']),
+            $context->builder->zExt($needleLen, $sizeT)
+        );
+        $eq = $context->builder->icmp(
+            Builder::INT_EQ,
+            $cmp,
+            $cmp->typeOf()->constInt(0, false)
+        );
+        $context->builder->branchIf($eq, $foundBb, $advanceBb);
+
+        $context->builder->positionAtEnd($advanceBb);
+        $next = $context->builder->add($idx, $one);
+        $idx->addIncoming($next, $advanceBb);
+        $context->builder->branch($loopHeader);
+
+        $context->builder->positionAtEnd($foundBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($trueVal, $emptyBb);
+        $phi->addIncoming($trueVal, $foundBb);
+        $phi->addIncoming($falseVal, $missBb);
+
+        return $phi;
+    }
+
+    /**
      * Strict equality between a boxed {@see __value__} and a native {@see __string__}.
      */
     public static function identicalValueToString(
