@@ -7,30 +7,22 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableSpliceLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_splice() via ArraySpliceJitHelper PHP (#13643, #17967).
+ * JIT/AOT link for array_splice() (#13643, #17967, #27075).
  *
- * Standalone AOT compiles {@see ArraySpliceJitHelper} via JitVmHelperLink (#14304); native literal arrays materialize to hashtable then route through PHP (#17967).
- * SSOT: {@see \PHPCompiler\ext\standard\array_splice}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArraySpliceJitHelper} failed on
+ * unresolved HashTable::spliceInPlace (`spliceinplace`, #27075). Emits
+ * {@see HashTableSpliceLlvm} inline into the caller (peer {@see ArrayShiftRuntime} / #24025).
+ *
+ * VM SSOT: {@see \PHPCompiler\VM\HashTable::spliceInPlace()}
  * php-src: ext/standard/array.c — php_array_splice()
  */
 final class ArraySpliceRuntime
 {
-    private const ABI_SPLICE = '__array_splice__mutate';
-
-    private const HELPER_PATH = '/ext/standard/ArraySpliceJitHelper.php';
-
-    private const SPLICE_HELPER = 'PHPCompiler\\ext\\standard\\ArraySpliceJitHelper::spliceInPlace';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::SPLICE_HELPER,
-    ];
-
     public static function splice(
         Context $context,
         JITVariable $array,
@@ -40,8 +32,7 @@ final class ArraySpliceRuntime
         ?JITVariable $replacement,
         bool $hasReplacementArg
     ): Value {
-        self::ensureLinked($context);
-        $ht = self::argToHashtable($context, $array);
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
         $hasReplFlag = $hasReplacementArg
@@ -52,8 +43,8 @@ final class ArraySpliceRuntime
             $replHt = self::lowerReplacementHashTable($context, $replacement);
         }
 
-        $removed = $context->builder->call(
-            $context->lookupFunction(self::ABI_SPLICE),
+        $removed = HashTableSpliceLlvm::spliceInPlace(
+            $context,
             $ht,
             $offset,
             $hasLength,
@@ -66,61 +57,14 @@ final class ArraySpliceRuntime
         return $removed;
     }
 
-    private static function argToHashtable(Context $context, JITVariable $arg): Value
-    {
-        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
-            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
-        }
-
-        return ArrayBuiltinHelper::loadHashTable($context, $arg);
-    }
-
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        // Inline emission in splice() — nothing to pre-link (#27075 / peer #24025).
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
-    }
-
-    public static function implement(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction(self::ABI_SPLICE);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_SPLICE,
-            'array_splice_bridge_entry',
-            [$htPtr, $i64, $i1, $i64, $i1, $htPtr],
-            $htPtr,
-            self::SPLICE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#13643'
-        );
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        self::ensureLinked($context);
     }
 
     private static function lowerReplacementHashTable(Context $context, JITVariable $replacement): Value
@@ -136,14 +80,5 @@ final class ArraySpliceRuntime
         ArrayBuiltinHelper::appendElement($context, $wrapped, $replacement);
 
         return $wrapped;
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        $fn = $context->module->getNamedFunction(self::ABI_SPLICE);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_SPLICE.' missing after ArraySpliceRuntime bridge (#13643)');
-        }
-        $context->registerFunction(self::ABI_SPLICE, $fn);
     }
 }

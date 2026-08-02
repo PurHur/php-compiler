@@ -34,6 +34,7 @@ final class NestedVmHashTableMethodLlvmTest extends TestCase
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('addindex'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('slicecopy'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('reversecopy'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('spliceinplace'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('duplicate'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('unioncopy'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('replacepackedvalues'));

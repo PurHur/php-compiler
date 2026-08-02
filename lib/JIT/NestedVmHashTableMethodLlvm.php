@@ -34,6 +34,8 @@ final class NestedVmHashTableMethodLlvm
         'slicecopy' => Call\HashTableSliceCopy::class,
         // NestedJIT-safe reverse for ArrayReverseJitHelper (#27067).
         'reversecopy' => Call\HashTableReverseCopy::class,
+        // NestedJIT-safe splice for ArraySpliceJitHelper (#27075).
+        'spliceinplace' => Call\HashTableSpliceInPlace::class,
         'mergestringkeysfrom' => Call\HashTableMergeStringKeysFrom::class,
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
         // NestedJIT-safe packed list shift for ArrayShiftJitHelper (#24025).
