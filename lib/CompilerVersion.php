@@ -2794,6 +2794,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4 final StreamBucket class (ext/standard/user_filters.stub.php; #26923).
+     *
+     * On ≤8.3 Zend, stream_bucket_new() returns stdClass and class_exists('StreamBucket')
+     * is false (#10325). Same withhold shape as {@see supportsPhp84ArraySearchFunctions()}:
+     * withheld on 8.4.0-dev reference / unset PROFILE; enable via stable 8.4.0+ or
+     * {@code PHP_COMPILER_PROFILE=8.4}.
+     */
+    public static function supportsStreamBucketClass(): bool
+    {
+        return self::supportsPhp84ArraySearchFunctions();
+    }
+
+    /**
      * PHP 8.4 array_all/any/find family visible to function_exists() (#17007, #24821).
      *
      * Does not include array_first()/array_last() — those are PHP 8.5 (#21173).

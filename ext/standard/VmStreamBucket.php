@@ -4,25 +4,36 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Stream filter bucket brigade registry — php-src ext/standard/streams.c (#7089, #6053).
+ * Stream filter bucket brigade registry — php-src ext/standard/user_filters.c (#7089, #6053, #26923).
  *
  * Brigades and bucket handles are tagged integers in {@see Variable}; no C in phpc_stream.c.
+ * PHP 8.4+ materializes final {@see StreamBucket}; ≤8.3 keeps stdClass (#10325).
  */
 final class VmStreamBucket
 {
     private const STDCLASS_LC = 'stdclass';
+
+    public const CLASS_NAME = 'StreamBucket';
+
+    public const CLASS_LC = 'streambucket';
 
     public const PROP_BUCKET = 'bucket';
 
     public const PROP_DATA = 'data';
 
     public const PROP_DATALEN = 'datalen';
+
+    public const PROP_DATA_LENGTH = 'dataLength';
 
     /** @var array<int, list<int>> */
     private static array $brigades = [];
@@ -33,6 +44,64 @@ final class VmStreamBucket
     private static int $nextBrigadeId = 1;
 
     private static int $nextBucketId = 1;
+
+    /** Register final StreamBucket under PROFILE≥8.4 (php-src user_filters.stub.php; #26923). */
+    public static function registerClass(Context $ctx): void
+    {
+        if (!CompilerVersion::supportsStreamBucketClass()) {
+            return;
+        }
+        if (isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+
+        $entry = new ClassEntry(self::CLASS_NAME);
+        $entry->isFinal = true;
+        $entry->isInternal = true;
+        $entry->allowsDynamicProperties = false;
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $strProto = new Variable(Variable::TYPE_UNDEFINED);
+        $strProto->declaredTypeLabel = 'string';
+        $intProto = new Variable(Variable::TYPE_UNDEFINED);
+        $intProto->declaredTypeLabel = 'int';
+
+        $entry->properties[] = new ClassProperty(
+            self::PROP_BUCKET,
+            $nullProto,
+            new Variable(Variable::TYPE_NULL),
+            false,
+            $pub,
+            self::CLASS_LC
+        );
+        $entry->properties[] = new ClassProperty(
+            self::PROP_DATA,
+            null,
+            $strProto,
+            false,
+            $pub,
+            self::CLASS_LC
+        );
+        $entry->properties[] = new ClassProperty(
+            self::PROP_DATALEN,
+            null,
+            $intProto,
+            false,
+            $pub,
+            self::CLASS_LC
+        );
+        $entry->properties[] = new ClassProperty(
+            self::PROP_DATA_LENGTH,
+            null,
+            clone $intProto,
+            false,
+            $pub,
+            self::CLASS_LC
+        );
+
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
 
     public static function allocateBrigade(): int
     {
@@ -119,7 +188,18 @@ final class VmStreamBucket
             ));
         }
         $entry = $v->toObject();
-        if (!$entry->hasProperty(self::PROP_BUCKET)) {
+        if (CompilerVersion::supportsStreamBucketClass()) {
+            if (self::CLASS_LC !== strtolower($entry->class->name)) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, %s given',
+                    $functionName,
+                    $argNum,
+                    $paramName,
+                    self::CLASS_NAME,
+                    $entry->class->name
+                ));
+            }
+        } elseif (!$entry->hasProperty(self::PROP_BUCKET)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($%s) must be an object that has a "bucket" property',
                 $functionName,
@@ -222,9 +302,7 @@ final class VmStreamBucket
         }
         $data = $entry->getProperty(self::PROP_DATA)->resolveIndirect()->toString();
         self::$bucketData[$bucketId] = $data;
-        if ($entry->hasProperty(self::PROP_DATALEN)) {
-            $entry->getProperty(self::PROP_DATALEN)->int(\strlen($data));
-        }
+        // Zend attach copies buf from ->data only; leave datalen/dataLength as user wrote them.
     }
 
     public static function bucketObjectForFrame(Context $ctx, int $bucketId, ?string $data = null): Variable
@@ -239,18 +317,43 @@ final class VmStreamBucket
 
     private static function materializeStdClassBucket(Context $ctx, int $bucketId, string $data): Variable
     {
-        $class = $ctx->classes[self::STDCLASS_LC] ?? null;
+        $useStreamBucket = CompilerVersion::supportsStreamBucketClass();
+        $classLc = $useStreamBucket ? self::CLASS_LC : self::STDCLASS_LC;
+        $class = $ctx->classes[$classLc] ?? null;
         if (null === $class) {
-            throw new \LogicException('stdClass is not registered in this compiler build');
+            throw new \LogicException(
+                ($useStreamBucket ? self::CLASS_NAME : 'stdClass')
+                .' is not registered in this compiler build'
+            );
         }
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $obj = new Variable(Variable::TYPE_OBJECT);
         $obj->object($entry);
 
-        self::bucketHandle($entry->allocateProperty(self::PROP_BUCKET), $bucketId);
-        $entry->allocateProperty(self::PROP_DATA)->string($data);
-        $entry->allocateProperty(self::PROP_DATALEN)->int(\strlen($data));
+        $len = \strlen($data);
+        if ($entry->hasProperty(self::PROP_BUCKET)) {
+            self::bucketHandle($entry->getProperty(self::PROP_BUCKET), $bucketId);
+        } else {
+            self::bucketHandle($entry->allocateProperty(self::PROP_BUCKET), $bucketId);
+        }
+        if ($entry->hasProperty(self::PROP_DATA)) {
+            $entry->getProperty(self::PROP_DATA)->string($data);
+        } else {
+            $entry->allocateProperty(self::PROP_DATA)->string($data);
+        }
+        if ($entry->hasProperty(self::PROP_DATALEN)) {
+            $entry->getProperty(self::PROP_DATALEN)->int($len);
+        } else {
+            $entry->allocateProperty(self::PROP_DATALEN)->int($len);
+        }
+        if ($useStreamBucket) {
+            if ($entry->hasProperty(self::PROP_DATA_LENGTH)) {
+                $entry->getProperty(self::PROP_DATA_LENGTH)->int($len);
+            } else {
+                $entry->allocateProperty(self::PROP_DATA_LENGTH)->int($len);
+            }
+        }
 
         return $obj;
     }

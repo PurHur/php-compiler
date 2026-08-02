@@ -8,9 +8,9 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Context;
 
 /**
- * Register ext/standard builtin classes (php-src ext/standard/streams.c; #7086, #10325).
+ * Register ext/standard builtin classes (php-src ext/standard/streams.c / user_filters.c).
  *
- * stream_bucket_new() returns stdClass in php-src — no StreamBucket user class.
+ * StreamBucket is PHP 8.4+ only (#26923); ≤8.3 keeps stdClass from stream_bucket_new (#10325).
  */
 final class BuiltinClasses
 {
@@ -22,6 +22,7 @@ final class BuiltinClasses
             RangeBuiltin::registerClass($ctx);
         }
         StreamErrorBuiltin::registerClass($ctx);
+        VmStreamBucket::registerClass($ctx);
         VmZlibContext::registerClasses($ctx);
     }
 }

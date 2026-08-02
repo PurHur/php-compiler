@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6819 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22038 |
+| Source constructs flagged (warnings) | 22051 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -494,7 +494,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDom.php` | 0 | 417 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
-| `ext/dom/VmDomJitDispatch.php` | 0 | 52 |
+| `ext/dom/VmDomJitDispatch.php` | 0 | 55 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
 | `ext/dom/VmDomLiving.php` | 0 | 21 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
@@ -2875,7 +2875,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrReplaceSubject.php` | 0 | 1 |
 | `ext/standard/JitStrShuffle.php` | 0 | 1 |
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
-| `ext/standard/JitStreamBucket.php` | 0 | 3 |
+| `ext/standard/JitStreamBucket.php` | 0 | 4 |
 | `ext/standard/JitStreamBucketKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamBufferKernel.php` | 0 | 2 |
 | `ext/standard/JitStreamCapsKernel.php` | 0 | 1 |
@@ -3468,7 +3468,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamArg.php` | 0 | 1 |
 | `ext/standard/VmStreamBlockingNative.php` | 0 | 1 |
 | `ext/standard/VmStreamBlockingPure.php` | 0 | 1 |
-| `ext/standard/VmStreamBucket.php` | 0 | 3 |
+| `ext/standard/VmStreamBucket.php` | 0 | 12 |
 | `ext/standard/VmStreamContext.php` | 0 | 21 |
 | `ext/standard/VmStreamContextOptions.php` | 0 | 1 |
 | `ext/standard/VmStreamEnableCrypto.php` | 0 | 1 |
@@ -10194,64 +10194,67 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomInstanceInvoke.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 117)
+- new Error (line 120)
 - 6 class method(s)
 
 ### `ext/dom/VmDomJitDispatch.php`
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 42)
-- new Variable (line 55)
-- new Variable (line 74)
-- new Variable (line 109)
-- new Variable (line 127)
-- new Variable (line 147)
-- new ArgumentCountError (line 170)
-- new Variable (line 179)
-- new ArgumentCountError (line 191)
-- new Variable (line 196)
-- new Variable (line 218)
+- new Variable (line 70)
+- new Variable (line 97)
+- new Variable (line 125)
+- new Variable (line 138)
+- new Variable (line 157)
+- new Variable (line 192)
+- new Variable (line 210)
 - new Variable (line 230)
-- new Variable (line 242)
-- new Variable (line 254)
-- new Variable (line 266)
-- new Variable (line 292)
-- new Variable (line 304)
-- new ArgumentCountError (line 387)
-- new ArgumentCountError (line 392)
-- new Variable (line 415)
-- new Variable (line 433)
-- new Variable (line 472)
-- new Variable (line 520)
-- new Variable (line 549)
-- new Variable (line 576)
-- new ArgumentCountError (line 590)
-- new Variable (line 594)
-- new Variable (line 606)
-- new Variable (line 618)
-- new Variable (line 630)
-- new Error (line 644)
-- new Error (line 656)
+- new ArgumentCountError (line 253)
+- new Variable (line 262)
+- new ArgumentCountError (line 274)
+- new Variable (line 279)
+- new Variable (line 301)
+- new Variable (line 313)
+- new Variable (line 325)
+- new Variable (line 337)
+- new Variable (line 349)
+- new Variable (line 375)
+- new Variable (line 387)
+- new ArgumentCountError (line 470)
+- new ArgumentCountError (line 475)
+- new Variable (line 498)
+- new Variable (line 516)
+- new Variable (line 555)
+- new Variable (line 603)
+- new Variable (line 632)
 - new Variable (line 659)
-- new Error (line 678)
-- new Variable (line 690)
-- new Variable (line 708)
-- new Error (line 725)
-- new Variable (line 741)
-- new Variable (line 764)
-- new Variable (line 785)
-- new Variable (line 812)
-- new Variable (line 838)
-- new Variable (line 850)
-- new Variable (line 864)
-- new Variable (line 876)
-- new Variable (line 926)
-- new Variable (line 938)
-- new Variable (line 955)
-- new Variable (line 980)
-- new Variable (line 1022)
-- new ArgumentCountError (line 1071)
-- 64 class method(s)
+- new ArgumentCountError (line 673)
+- new Variable (line 677)
+- new Variable (line 689)
+- new Variable (line 701)
+- new Variable (line 713)
+- new Error (line 727)
+- new Error (line 739)
+- new Variable (line 742)
+- new Error (line 761)
+- new Variable (line 773)
+- new Variable (line 791)
+- new Error (line 808)
+- new Variable (line 824)
+- new Variable (line 847)
+- new Variable (line 868)
+- new Variable (line 895)
+- new Variable (line 921)
+- new Variable (line 933)
+- new Variable (line 947)
+- new Variable (line 959)
+- new Variable (line 1009)
+- new Variable (line 1021)
+- new Variable (line 1038)
+- new Variable (line 1063)
+- new Variable (line 1105)
+- new ArgumentCountError (line 1154)
+- 67 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
 
@@ -28891,9 +28894,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamBucket.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 231)
-- new JITVariable (line 247)
-- 11 class method(s)
+- new JITVariable (line 244)
+- new JITVariable (line 260)
+- new JITVariable (line 276)
+- 12 class method(s)
 
 ### `ext/standard/JitStreamBucketKernel.php`
 
@@ -33654,9 +33658,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamBucket.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 246)
-- new Variable (line 248)
-- 20 class method(s)
+- new ClassEntry (line 58)
+- new Variable (line 64)
+- new Variable (line 65)
+- new Variable (line 67)
+- new ClassProperty (line 70)
+- new Variable (line 73)
+- new ClassProperty (line 78)
+- new ClassProperty (line 86)
+- new ClassProperty (line 94)
+- new ObjectEntry (line 329)
+- new Variable (line 331)
+- 21 class method(s)
 
 ### `ext/standard/VmStreamContext.php`
 
@@ -43695,7 +43708,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 299 class method(s)
+- 300 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -47284,25 +47297,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2526)
 - new Variable (line 2539)
 - new Variable (line 2738)
-- new VMVariable (line 3921)
-- new VMVariable (line 3941)
-- new VMVariable (line 3951)
-- new VMVariable (line 3971)
-- new ReflectionClassConstant (line 5662)
-- new Variable (line 6081)
-- new Variable (line 6107)
+- new VMVariable (line 3929)
+- new VMVariable (line 3949)
+- new VMVariable (line 3959)
+- new VMVariable (line 3979)
+- new ReflectionClassConstant (line 5670)
+- new Variable (line 6089)
 - new Variable (line 6115)
-- new Variable (line 6138)
-- new Variable (line 6164)
+- new Variable (line 6123)
+- new Variable (line 6146)
 - new Variable (line 6172)
-- new Variable (line 6246)
-- new Literal (line 6263)
-- new Literal (line 6268)
-- new Literal (line 6273)
-- new Variable (line 6284)
-- new Variable (line 6317)
-- new Variable (line 6340)
-- new Variable (line 6704)
+- new Variable (line 6180)
+- new Variable (line 6254)
+- new Literal (line 6271)
+- new Literal (line 6276)
+- new Literal (line 6281)
+- new Variable (line 6292)
+- new Variable (line 6325)
+- new Variable (line 6348)
+- new Variable (line 6712)
 - 291 class method(s)
 - 8 closure(s)
 
