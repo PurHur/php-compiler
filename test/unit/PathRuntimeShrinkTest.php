@@ -8,20 +8,24 @@ use PHPCompiler\ext\standard\PathJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** dirname()/basename() JIT routes through PathJitHelper PHP not inline LLVM (#15286). */
+/** dirname()/basename() JIT: inline LLVM via JitPath (#26905; NestedJIT PathJitHelper SEGV). */
 final class PathRuntimeShrinkTest extends TestCase
 {
-    public function testJitPathUsesPhpBridgeNotInlineLlvm(): void
+    public function testJitPathUsesInlineLlvmNotNestedJitBridge(): void
     {
         $jitPath = (string) file_get_contents(__DIR__.'/../../ext/standard/JitPath.php');
-        $this->assertStringContainsString('StringPath::invokeDirname', $jitPath);
-        $this->assertStringContainsString('StringPath::invokeBasename', $jitPath);
-        $this->assertStringNotContainsString('trimTrailingSeparators', $jitPath);
-        $this->assertStringNotContainsString('scanBackwardForSeparator', $jitPath);
+        $this->assertStringContainsString('trimTrailingSeparators', $jitPath);
+        $this->assertStringContainsString('scanBackwardForSeparator', $jitPath);
+        $this->assertStringContainsString('basenameWithSuffix', $jitPath);
+        $this->assertStringNotContainsString('StringPath::invoke', $jitPath);
+        $this->assertStringNotContainsString('JitVmHelperLink', $jitPath);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPath.php');
-        $this->assertStringContainsString('PathJitHelper', $bridge);
-        $this->assertStringContainsString('phpc_dirname', $bridge);
+        $this->assertStringContainsString('JitPath::dirname', $bridge);
+        $this->assertStringContainsString('JitPath::basename', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('phpc_dirname', $bridge);
+        $this->assertStringNotContainsString('PathJitHelper::', $bridge);
     }
 
     public function testPathJitHelperDelegatesToVmString(): void
