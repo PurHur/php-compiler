@@ -539,12 +539,7 @@ class Runtime {
         BacktickShellExecDeprecation::emitForSource($code, $filename, $this->vmContext);
         // Original source — (integer)/(boolean)/(double)/(binary) before any rewrite (#26281).
         NonCanonicalCastDeprecation::emitForSource($code, $filename, $this->vmContext);
-        // M5 argv: C-floor sets m5ArgvIdentityParsePrepare — skip prepare list-unpack SEGV (#26756).
-        if ($this->m5ArgvIdentityParsePrepare) {
-            $bareRethrowLines = [];
-        } else {
-            [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
-        }
+        [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
         }

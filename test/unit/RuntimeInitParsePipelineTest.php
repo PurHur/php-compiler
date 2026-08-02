@@ -54,18 +54,13 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('__hashtable__setStringAt', $source);
     }
 
-    public function testRuntimeParseSkipsPrepareWhenM5FlagSet(): void
+    public function testM5ParseStringFormalAbiForced(): void
     {
-        $path = dirname(__DIR__, 2).'/lib/Runtime.php';
-        $source = (string) file_get_contents($path);
-        $parsePos = strpos($source, 'function parse(string $code, string $filename)');
-        $this->assertNotFalse($parsePos);
-        $chunk = substr($source, $parsePos, 1400);
-        $flagPos = strpos($chunk, 'm5ArgvIdentityParsePrepare');
-        $preparePos = strpos($chunk, 'prepareSourceForParser');
-        $this->assertNotFalse($flagPos);
-        $this->assertNotFalse($preparePos);
-        $this->assertLessThan($preparePos, $flagPos, 'M5 flag gate must precede prepareSourceForParser');
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('runtime::parse', $jit);
+        $this->assertStringContainsString('Type::string()', $jit);
+        $pos = strpos($jit, 'M5 argv NestedJIT of Runtime::parse');
+        $this->assertNotFalse($pos, 'ABI force comment for #26756 must remain');
     }
 
     public function testPrepareSpineIdentityWiredBeforeVoidStubs(): void

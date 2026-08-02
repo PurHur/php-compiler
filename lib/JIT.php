@@ -2321,6 +2321,7 @@ class JIT {
                         || Type::TYPE_STRING === ($rawType->type ?? null)
                     ) {
                         $type = $this->context->getTypeFromString('__string__*');
+                        $rawType = Type::string();
                     }
                 }
                 $callbackType .= $callbackSep . $this->context->getStringFromType($type);
