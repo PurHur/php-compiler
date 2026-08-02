@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableSpliceLlvm;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -73,6 +74,15 @@ final class ArraySpliceRuntime
             return ArrayBuiltinHelper::nativeListToHashTable($context, $replacement);
         }
         if (JITVariable::TYPE_HASHTABLE === ($replacement->type & ~JITVariable::IS_NATIVE_ARRAY)) {
+            return ArrayBuiltinHelper::loadHashTable($context, $replacement);
+        }
+        // Thin AOT boxes `[9]` as TYPE_VALUE (+ valueBoxHashtable). Appending that box nested
+        // the replacement HT as one element (`foreach` saw `1:Array`) (#27075).
+        if (
+            $replacement->valueBoxHashtable
+            || JITVariable::TYPE_VALUE === $replacement->type
+            || JitValueBox::isValueOperand($replacement)
+        ) {
             return ArrayBuiltinHelper::loadHashTable($context, $replacement);
         }
 

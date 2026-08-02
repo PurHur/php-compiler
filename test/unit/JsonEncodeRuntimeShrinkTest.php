@@ -35,6 +35,7 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         // Thin AOT NestedJIT cannot touch Context/runtime->vm (#27020) or VmJson::export.
         $this->assertStringContainsString('encodeHashtable', $source);
         $this->assertStringContainsString('exportKeyValuePairs', $source);
+        $this->assertStringContainsString("\$out = '['", $source);
         $this->assertStringNotContainsString('VmJson::export', $source);
         $this->assertStringNotContainsString('VmJsonFormat::encodeExported', $source);
         $this->assertStringNotContainsString('VmActiveContextJitHelper::resolve', $source);
