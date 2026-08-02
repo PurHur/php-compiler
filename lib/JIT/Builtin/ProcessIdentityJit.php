@@ -13,18 +13,20 @@ use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for getmypid/getmyuid/getmygid/get_current_user via ProcessIdentityJitHelper PHP (#9017, #21259).
+ * JIT/AOT link for getmypid/getmyuid/getmygid/get_current_user (#9017, #21259, #26944).
  *
- * Nested helper compile: {@see JitVmHelperLink::ensureCompiled} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit putenv). Peer: gethostname #21166 / rename #19215.
- * SSOT: {@see \PHPCompiler\ext\standard\VmProcessIdentity}, {@see \PHPCompiler\ext\standard\VmDate::getmypid}.
+ * getmypid: libc getpid() directly (same shape as {@see \PHPCompiler\ext\standard\JitDate::time}) —
+ * NestedJIT of ProcessIdentityJitHelper alone left VmDate::getmypid as an external stub that
+ * returns 0 under thin AOT (#26944). php-src: ext/standard/basic_functions.c PHP_FUNCTION(getmypid).
+ *
+ * getmyuid/getmygid/get_current_user: Nested helper compile via {@see JitVmHelperLink::ensureCompiled}
+ * (HelperRuntimeCache + user-script env clear). Peer: gethostname #21166 / rename #19215.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmProcessIdentity}, {@see \PHPCompiler\ext\standard\VmDate::getmypid} (VM).
  * php-src: ext/standard/basic_functions.c — getmypid, getmyuid, getmygid, get_current_user
  */
 final class ProcessIdentityJit
 {
     private const HELPER_PATH = '/ext/standard/ProcessIdentityJitHelper.php';
-
-    private const GETMYPID = 'PHPCompiler\\ext\\standard\\ProcessIdentityJitHelper::resolveGetmypid';
 
     private const GETMYUID = 'PHPCompiler\\ext\\standard\\ProcessIdentityJitHelper::resolveGetmyuid';
 
@@ -34,15 +36,24 @@ final class ProcessIdentityJit
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::GETMYPID,
         self::GETMYUID,
         self::GETMYGID,
         self::GET_CURRENT_USER,
     ];
 
+    /**
+     * getmypid() — libc getpid at runtime (not NestedJIT /proc helper; #26944).
+     *
+     * Declared in {@see Type} libc table as i32; widen to i64 for NATIVE_LONG returns.
+     */
     public static function getmypid(Context $context): Value
     {
-        return self::callIntHelper($context, self::GETMYPID);
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('getpid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
     }
 
     public static function getmyuid(Context $context): Value
