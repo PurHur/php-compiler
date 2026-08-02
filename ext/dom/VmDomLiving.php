@@ -590,10 +590,32 @@ final class VmDomLiving
         return null;
     }
 
-    /** Dom\HTMLDocument::saveHtml() — php-src html_document.c (#19580). */
+    /**
+     * Dom\HTMLDocument::saveHtml() — php-src html_document.c (#19580, #26924).
+     *
+     * Living serialize differs from legacy libxml htmlDocDump: no trailing LF, and
+     * doctype is glued to the following markup (`<!DOCTYPE html><html>…`) rather than
+     * separated by a newline.
+     */
     public static function saveHtml(ObjectEntry $document, ?ObjectEntry $node = null): string
     {
-        return VmDom::saveHTML($document, $node, 0);
+        $html = VmDom::saveHTML($document, $node, 0);
+        if (null !== $node) {
+            return $html;
+        }
+        // Empty document: libxml-style dump yields a lone "\n"; lexbor emits "" (#26925).
+        if ("\n" === $html || '' === $html) {
+            return '';
+        }
+        if (str_ends_with($html, "\n")) {
+            $html = substr($html, 0, -1);
+        }
+        // Strip the legacy newline that formatHtmlDoctype appends after <!DOCTYPE …>.
+        if (1 === preg_match('/^(<!DOCTYPE[^>]*>)\n/', $html)) {
+            $html = preg_replace('/^(<!DOCTYPE[^>]*>)\n/', '$1', $html, 1) ?? $html;
+        }
+
+        return $html;
     }
 
     /**
