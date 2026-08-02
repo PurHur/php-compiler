@@ -27,6 +27,14 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('isDeployRootRealLoweringMethod', $jit);
         $this->assertStringContainsString('isSourceBundlerRealLoweringMethod', $jit);
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
+        // M5 argv / gen-0 seed must real-lower even when SELFHOST_AOT was cleared (#26756).
+        $realLowerPos = strpos($jit, 'function shouldUseM3CompileDriverRealLowering');
+        $this->assertNotFalse($realLowerPos);
+        $realLowerChunk = substr($jit, $realLowerPos, 700);
+        $this->assertStringContainsString('shouldUseM5DriverHostCompile()', $realLowerChunk);
+        $compilePhp = (string) file_get_contents($root.'/bin/compile.php');
+        $this->assertStringContainsString("str_ends_with(\$normalized, '/bin/compile.php')", $compilePhp);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $compilePhp);
         $this->assertStringContainsString('Emit-helper binaries must init parse/compiler spine (#2633)', $emit);
         $this->assertStringContainsString('exitWithStatus', $emit);
         $this->assertStringContainsString('return true;', $emit);
