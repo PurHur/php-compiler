@@ -683,6 +683,7 @@ class Module extends ModuleAbstract
             new phpc_nextafter_kernel(),
             new phpc_hypot_kernel(),
             new phpc_fmod_kernel(),
+            new phpc_ceil_kernel(),
             new phpc_sqrt_kernel(),
             new sys_get_temp_dir(),
             new sys_getloadavg(),
