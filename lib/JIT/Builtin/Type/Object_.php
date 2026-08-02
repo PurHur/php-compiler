@@ -3803,7 +3803,15 @@ class Object_ extends Type {
             }
         }
         if ('streambucket' === $lcname) {
-            // Removed: stream_bucket_new() returns stdClass (#10325).
+            // PHP 8.4+ final StreamBucket (user_filters.stub.php; #26923). ≤8.3 uses stdClass (#10325).
+            if (\PHPCompiler\CompilerVersion::supportsStreamBucketClass()) {
+                $this->classIdToName[$id] = 'StreamBucket';
+                $this->defineProperty($id, 'bucket', Variable::TYPE_NATIVE_LONG);
+                $this->defineProperty($id, 'data', Variable::TYPE_STRING);
+                $this->defineProperty($id, 'datalen', Variable::TYPE_NATIVE_LONG);
+                $this->defineProperty($id, 'dataLength', Variable::TYPE_NATIVE_LONG);
+                $this->noDynamicPropertiesClassIds[$id] = true;
+            }
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {
             foreach ([

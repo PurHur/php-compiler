@@ -1,5 +1,12 @@
 --TEST--
 stream_bucket_new() returns stdClass bucket object (VM, #7086, #10325)
+--SKIPIF--
+<?php
+$profile = getenv('PHP_COMPILER_PROFILE');
+if (\is_string($profile) && '' !== trim($profile)
+    && version_compare(ltrim(trim($profile), 'vV'), '8.4', '>=')) {
+    die('skip StreamBucket class on PROFILE≥8.4 (#26923)');
+}
 --FILE--
 <?php
 echo (int) class_exists('StreamBucket', false);

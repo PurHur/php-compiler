@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6819 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22038 |
+| Source constructs flagged (warnings) | 22050 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2875,7 +2875,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrReplaceSubject.php` | 0 | 1 |
 | `ext/standard/JitStrShuffle.php` | 0 | 1 |
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
-| `ext/standard/JitStreamBucket.php` | 0 | 3 |
+| `ext/standard/JitStreamBucket.php` | 0 | 4 |
 | `ext/standard/JitStreamBucketKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamBufferKernel.php` | 0 | 2 |
 | `ext/standard/JitStreamCapsKernel.php` | 0 | 1 |
@@ -3468,7 +3468,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamArg.php` | 0 | 1 |
 | `ext/standard/VmStreamBlockingNative.php` | 0 | 1 |
 | `ext/standard/VmStreamBlockingPure.php` | 0 | 1 |
-| `ext/standard/VmStreamBucket.php` | 0 | 3 |
+| `ext/standard/VmStreamBucket.php` | 0 | 12 |
 | `ext/standard/VmStreamContext.php` | 0 | 21 |
 | `ext/standard/VmStreamContextOptions.php` | 0 | 1 |
 | `ext/standard/VmStreamEnableCrypto.php` | 0 | 1 |
@@ -5384,7 +5384,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringCountChars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringDeployPath.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirRuntime.php` | 0 | 2 |
@@ -5401,7 +5401,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilterInt.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterIp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterMac.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringFilterSanitize.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFilterSanitize.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFindSubstr.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFormat.php` | 0 | 1 |
@@ -17017,7 +17017,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbStrcutJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `ext/mbstring/MbStrwidthJitHelper.php`
 
@@ -17585,9 +17585,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_substr.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
 - new ArgumentCountError (line 39)
-- new ArgumentCountError (line 45)
-- 6 class method(s)
+- 2 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/mb_substr_count.php`
@@ -28891,9 +28891,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamBucket.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 231)
-- new JITVariable (line 247)
-- 11 class method(s)
+- new JITVariable (line 244)
+- new JITVariable (line 260)
+- new JITVariable (line 276)
+- 12 class method(s)
 
 ### `ext/standard/JitStreamBucketKernel.php`
 
@@ -33654,9 +33655,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamBucket.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 246)
-- new Variable (line 248)
-- 20 class method(s)
+- new ClassEntry (line 58)
+- new Variable (line 64)
+- new Variable (line 65)
+- new Variable (line 67)
+- new ClassProperty (line 70)
+- new Variable (line 73)
+- new ClassProperty (line 78)
+- new ClassProperty (line 86)
+- new ClassProperty (line 94)
+- new ObjectEntry (line 329)
+- new Variable (line 331)
+- 21 class method(s)
 
 ### `ext/standard/VmStreamContext.php`
 
@@ -43695,7 +43705,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 299 class method(s)
+- 300 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -45308,7 +45318,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MbStrcut.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/MbStrwidth.php`
 
@@ -46267,6 +46277,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringDeployPath.php`
 
 **Warnings** (review for bootstrap subset):
+- new JIT (line 82)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/StringDir.php`
@@ -46353,6 +46364,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilterSanitize.php`
 
 **Warnings** (review for bootstrap subset):
+- new JIT (line 130)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFilterUrl.php`
@@ -47284,25 +47296,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2526)
 - new Variable (line 2539)
 - new Variable (line 2738)
-- new VMVariable (line 3921)
-- new VMVariable (line 3941)
-- new VMVariable (line 3951)
-- new VMVariable (line 3971)
-- new ReflectionClassConstant (line 5662)
-- new Variable (line 6081)
-- new Variable (line 6107)
+- new VMVariable (line 3929)
+- new VMVariable (line 3949)
+- new VMVariable (line 3959)
+- new VMVariable (line 3979)
+- new ReflectionClassConstant (line 5670)
+- new Variable (line 6089)
 - new Variable (line 6115)
-- new Variable (line 6138)
-- new Variable (line 6164)
+- new Variable (line 6123)
+- new Variable (line 6146)
 - new Variable (line 6172)
-- new Variable (line 6246)
-- new Literal (line 6263)
-- new Literal (line 6268)
-- new Literal (line 6273)
-- new Variable (line 6284)
-- new Variable (line 6317)
-- new Variable (line 6340)
-- new Variable (line 6704)
+- new Variable (line 6180)
+- new Variable (line 6254)
+- new Literal (line 6271)
+- new Literal (line 6276)
+- new Literal (line 6281)
+- new Variable (line 6292)
+- new Variable (line 6325)
+- new Variable (line 6348)
+- new Variable (line 6712)
 - 291 class method(s)
 - 8 closure(s)
 

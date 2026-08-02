@@ -210,19 +210,32 @@ final class JitStreamBucket
             );
         }
 
-        return self::buildStdClassBucketValue($context, $bucketHandle, $dataStr);
+        return self::buildBucketObjectValue($context, $bucketHandle, $dataStr);
     }
 
+    /** @deprecated Use {@see buildBucketObjectValue()} — name kept for NestedJIT call sites. */
     public static function buildStdClassBucketValue(Context $context, Value $bucketHandle, Value $dataStr): Value
     {
+        return self::buildBucketObjectValue($context, $bucketHandle, $dataStr);
+    }
+
+    public static function buildBucketObjectValue(Context $context, Value $bucketHandle, Value $dataStr): Value
+    {
         $objectType = $context->type->object;
-        $className = 'stdClass';
+        $useStreamBucket = \PHPCompiler\CompilerVersion::supportsStreamBucketClass();
+        $className = $useStreamBucket ? 'StreamBucket' : 'stdClass';
         $classId = $objectType->lookup($className);
         if (!$objectType->hasProperty($classId, 'bucket')) {
             $objectType->defineProperty($classId, 'bucket', JITVariable::TYPE_NATIVE_LONG);
         }
         if (!$objectType->hasProperty($classId, 'data')) {
             $objectType->defineProperty($classId, 'data', JITVariable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, 'datalen')) {
+            $objectType->defineProperty($classId, 'datalen', JITVariable::TYPE_NATIVE_LONG);
+        }
+        if ($useStreamBucket && !$objectType->hasProperty($classId, 'dataLength')) {
+            $objectType->defineProperty($classId, 'dataLength', JITVariable::TYPE_NATIVE_LONG);
         }
 
         $obj = $objectType->allocate($classId);
@@ -256,6 +269,29 @@ final class JitStreamBucket
             JITVariable::TYPE_STRING
         );
 
+        $len = $context->builder->call(
+            $context->lookupFunction('__string__strlen'),
+            $owned
+        );
+        $lenVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->builder->truncOrBitCast($len, $context->getTypeFromString('int64'))
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, $className, 'datalen'),
+            $lenVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        if ($useStreamBucket) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($obj, $className, 'dataLength'),
+                $lenVar,
+                JITVariable::TYPE_NATIVE_LONG
+            );
+        }
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
@@ -273,9 +309,12 @@ final class JitStreamBucket
         string $function
     ): Value {
         if (JITVariable::TYPE_OBJECT !== $arg->type) {
+            $expected = \PHPCompiler\CompilerVersion::supportsStreamBucketClass()
+                ? 'StreamBucket'
+                : 'object';
             TypeErrorRaise::emitRaise(
                 $context,
-                $function.'(): Argument #2 ($bucket) must be of type object, '
+                $function.'(): Argument #2 ($bucket) must be of type '.$expected.', '
                 .self::typeLabel($context, $arg).' given'
             );
             $context->builder->call($context->lookupFunction('abort'));
@@ -284,7 +323,10 @@ final class JitStreamBucket
         }
 
         $obj = $context->helper->loadValue($arg);
-        $bucketProp = $context->type->object->propertyFetch($obj, 'stdClass', 'bucket');
+        $className = \PHPCompiler\CompilerVersion::supportsStreamBucketClass()
+            ? 'StreamBucket'
+            : 'stdClass';
+        $bucketProp = $context->type->object->propertyFetch($obj, $className, 'bucket');
         if (JITVariable::TYPE_NATIVE_LONG !== $bucketProp->type) {
             TypeErrorRaise::emitRaise(
                 $context,
