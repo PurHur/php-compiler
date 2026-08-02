@@ -37,6 +37,16 @@ final class JitSimpleXmlUserScript
     /** Set when tryConstruct saw a compile-time literal rejected by host SimpleXMLElement (#22775). */
     private static bool $lastConstructParseFailed = false;
 
+    /**
+     * Pending xpath node-set metadata to attach after Call result assign (#26911).
+     *
+     * @var array{token: string, elements: list<JITVariable>}|null
+     */
+    private static ?array $pendingXpathAssign = null;
+
+    /** @var array<string, list<JITVariable>> */
+    private static array $xpathListsByToken = [];
+
     public static function lastConstructParseFailed(): bool
     {
         return self::$lastConstructParseFailed;
@@ -183,6 +193,13 @@ final class JitSimpleXmlUserScript
         if ([] === $args || !\extension_loaded('simplexml')) {
             return null;
         }
+        $token = $args[0]->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return $context->getTypeFromString('int64')->constInt(
+                \count(self::$xpathListsByToken[$token]),
+                false
+            );
+        }
         $tree = self::lookup($args[0]);
         if (null === $tree) {
             return null;
@@ -243,11 +260,19 @@ final class JitSimpleXmlUserScript
 
     /**
      * Fold count($sxe) when a host tree is known (#26863).
+     * XPath node-set Variables must count the list, not fall back to lastTree (#26911).
      */
     public static function tryFoldCount(Context $context, JITVariable $var): ?Value
     {
         if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
             return null;
+        }
+        $token = $var->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return $context->getTypeFromString('int64')->constInt(
+                \count(self::$xpathListsByToken[$token]),
+                false
+            );
         }
         $tree = self::lookup($var);
         if (null === $tree) {
@@ -384,12 +409,13 @@ final class JitSimpleXmlUserScript
     }
 
     /**
-     * Compile-time SimpleXMLElement::xpath via host php-src (#22720).
-     * Supports false (invalid / undef prefix) and empty node-sets; non-empty
-     * node results still need runtime materialization.
+     * Compile-time SimpleXMLElement::xpath via host php-src (#22720, #26911).
+     * Supports false (invalid / undef prefix), empty node-sets, and non-empty
+     * node-sets materialized as packed SimpleXMLElement objects for user-script AOT.
      */
     public static function tryXpath(Context $context, JITVariable ...$args): ?Value
     {
+        self::$pendingXpathAssign = null;
         if (\count($args) < 2 || !\extension_loaded('simplexml')) {
             return null;
         }
@@ -439,8 +465,76 @@ final class JitSimpleXmlUserScript
             return HashTableHelper::emptyVariable($context)->value;
         }
 
-        // Non-empty node-set: cannot reify SimpleXMLElement handles in user-script AOT yet.
-        return null;
+        $elementVars = [];
+        foreach ($result as $node) {
+            if (!($node instanceof \SimpleXMLElement)) {
+                continue;
+            }
+            $classId = $context->type->object->lookup('SimpleXMLElement');
+            $obj = $context->type->object->allocate($classId);
+            $context->type->object->markObjectConstructed($obj);
+            $receiver = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $obj
+            );
+            self::store($receiver, $node);
+            $elementVars[] = $receiver;
+        }
+        if ([] === $elementVars) {
+            return HashTableHelper::emptyVariable($context)->value;
+        }
+
+        $packed = HashTableHelper::packVariables($context, $elementVars);
+        $token = '__phpc_sxml_xpath_'.(++self::$tokenSeq);
+        $packed->compileTimeString = $token;
+        self::$xpathListsByToken[$token] = $elementVars;
+        self::$pendingXpathAssign = [
+            'token' => $token,
+            'elements' => $elementVars,
+        ];
+
+        return $packed->value;
+    }
+
+    /** Attach xpath node-set token after Call result assign so `$n[i]` can fold (#26911). */
+    public static function applyPendingXpathAssign(JITVariable $result): void
+    {
+        $pending = self::$pendingXpathAssign;
+        self::$pendingXpathAssign = null;
+        if (null === $pending) {
+            return;
+        }
+        $result->compileTimeString = $pending['token'];
+        self::$xpathListsByToken[$pending['token']] = $pending['elements'];
+    }
+
+    /**
+     * Fold `$xpathResult[$i]` to the compile-time SimpleXMLElement Variable (#26911).
+     */
+    public static function tryFoldXpathListDim(
+        Context $context,
+        JITVariable $container,
+        JITVariable $dim
+    ): ?JITVariable {
+        if (!UserScriptAotEnv::isActive()) {
+            return null;
+        }
+        $token = $container->compileTimeString;
+        if (null === $token || !isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        $idx = self::compileTimeDim($context, $dim);
+        if (!\is_int($idx)) {
+            return null;
+        }
+        $list = self::$xpathListsByToken[$token];
+        if ($idx < 0 || $idx >= \count($list)) {
+            return null;
+        }
+
+        return $list[$idx];
     }
 
     private static function materializeElement(Context $context, \SimpleXMLElement $tree, bool $asRoot = false): Value

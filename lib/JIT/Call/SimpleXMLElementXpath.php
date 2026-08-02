@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** SimpleXMLElement::xpath() — user-script AOT (#22720). */
+/** SimpleXMLElement::xpath() — user-script AOT (#22720, #26911). */
 final class SimpleXMLElementXpath implements Call
 {
     public function call(Context $context, Variable ...$args): Value
