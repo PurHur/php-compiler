@@ -118,9 +118,9 @@ final class PregJitHelper
 
     public static function splitArgv(string $pattern, string $subject, int $limit, int $flags): ?HashTable
     {
-        // Thin AOT: NestedJIT cannot return/build `__hashtable__*` safely (#27080).
-        // Store parts; return null always — LLVM bridge fills from thinSplitPart* when
-        // lastError==0 (peer matchEx caps / #24115).
+        // Thin AOT: NestedJIT cannot return/build `__hashtable__*` (#27080). Store parts in
+        // PregAotFastPath slots (int+string only — no PHP arrays) and return null; LLVM bridge
+        // fills from thinSplitPart* when lastError==0 (peer matchEx caps / #24115).
         self::$lastError = 0;
         $n = PregAotFastPath::splitStore($pattern, $subject, $limit, $flags);
         if ($n < 0) {

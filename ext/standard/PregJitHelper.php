@@ -143,7 +143,7 @@ final class PregJitHelper
         return '';
     }
 
-    /** Thin-AOT split bridge stubs — real impl in PregJitHelperThinAot (#27080). */
+    /** Thin AOT only — full helper never stores split parts here (#27080). */
     public static function thinSplitPartCount(): int
     {
         return 0;

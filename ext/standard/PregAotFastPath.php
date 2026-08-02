@@ -603,27 +603,6 @@ final class PregAotFastPath
         return ($o >= 48 && $o <= 57) || ($o >= 65 && $o <= 90) || ($o >= 97 && $o <= 122) || 95 === $o;
     }
 
-    /**
-     * NestedJIT-safe preg_split subset (#27080).
-     *
-     * @return list<string>|null null when pattern unsupported / error
-     */
-    public static function splitParts(string $pattern, string $subject, int $limit, int $flags): ?array
-    {
-        if (0 !== $flags) {
-            return null;
-        }
-        $kind = self::patternKind($pattern);
-        if (0 === $kind || 8 === $kind || 9 === $kind) {
-            return null;
-        }
-        if (1 === $kind) {
-            return self::splitLiteral($pattern, $subject, $limit);
-        }
-
-        return self::splitClassPlus($kind, $subject, $limit);
-    }
-
     private static int $splitCount = 0;
 
     private static string $split0 = '';
@@ -642,7 +621,11 @@ final class PregAotFastPath
 
     private static string $split7 = '';
 
-    /** Store parts for thin AOT LLVM bridge; @return int count or -1 on error/unsupported. */
+    /**
+     * NestedJIT-safe preg_split — int return + static string slots only (no PHP arrays, #27080).
+     *
+     * @return int part count, or -1 on unsupported/error
+     */
     public static function splitStore(string $pattern, string $subject, int $limit, int $flags): int
     {
         self::$splitCount = 0;
@@ -654,18 +637,48 @@ final class PregAotFastPath
         self::$split5 = '';
         self::$split6 = '';
         self::$split7 = '';
-        $parts = self::splitParts($pattern, $subject, $limit, $flags);
-        if (null === $parts) {
+        if (0 !== $flags) {
             return -1;
         }
-        $n = \count($parts);
-        if ($n > self::MAX_CAPS) {
+        $kind = self::patternKind($pattern);
+        if (0 === $kind || 8 === $kind || 9 === $kind || 1 === $kind) {
             return -1;
         }
-        $i = 0;
-        while ($i < $n) {
-            self::storeSplitAt($i, ''.$parts[$i]);
-            ++$i;
+        $charClass = 2;
+        if (4 === $kind || 5 === $kind) {
+            $charClass = 3;
+        } elseif (6 === $kind || 7 === $kind) {
+            $charClass = 4;
+        }
+        $subLen = \strlen($subject);
+        $cursor = 0;
+        $n = 0;
+        while ($cursor < $subLen) {
+            while ($cursor < $subLen && self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                ++$cursor;
+            }
+            if ($cursor >= $subLen) {
+                break;
+            }
+            if ($limit > 0 && $n + 1 >= $limit) {
+                if ($n >= self::MAX_CAPS) {
+                    return -1;
+                }
+                self::storeSplitAt($n, '' . \substr($subject, $cursor));
+                ++$n;
+                self::$splitCount = $n;
+
+                return $n;
+            }
+            $start = $cursor;
+            while ($cursor < $subLen && !self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                ++$cursor;
+            }
+            if ($n >= self::MAX_CAPS) {
+                return -1;
+            }
+            self::storeSplitAt($n, '' . \substr($subject, $start, $cursor - $start));
+            ++$n;
         }
         self::$splitCount = $n;
 
@@ -726,86 +739,5 @@ final class PregAotFastPath
         } elseif (7 === $index) {
             self::$split7 = $value;
         }
-    }
-
-    /** @return list<string>|null */
-    private static function splitLiteral(string $pattern, string $subject, int $limit): ?array
-    {
-        $delim = \substr($pattern, 0, 1);
-        $close = \strrpos($pattern, $delim);
-        if (false === $close || $close < 1) {
-            return null;
-        }
-        $body = \substr($pattern, 1, $close - 1);
-        $bodyLen = \strlen($body);
-        if (0 === $bodyLen) {
-            return null;
-        }
-        $parts = [];
-        $subLen = \strlen($subject);
-        $cursor = 0;
-        $n = 0;
-        while ($cursor <= $subLen) {
-            if ($limit > 0 && $n + 1 >= $limit) {
-                $parts[] = \substr($subject, $cursor);
-
-                return $parts;
-            }
-            $i = $cursor;
-            $found = false;
-            while ($i + $bodyLen <= $subLen) {
-                if (0 === \strncmp(\substr($subject, $i), $body, $bodyLen)) {
-                    $parts[] = \substr($subject, $cursor, $i - $cursor);
-                    $cursor = $i + $bodyLen;
-                    ++$n;
-                    $found = true;
-                    break;
-                }
-                ++$i;
-            }
-            if (!$found) {
-                $parts[] = \substr($subject, $cursor);
-
-                return $parts;
-            }
-        }
-
-        return $parts;
-    }
-
-    /** @return list<string> */
-    private static function splitClassPlus(int $kind, string $subject, int $limit): array
-    {
-        $charClass = 2;
-        if (4 === $kind || 5 === $kind) {
-            $charClass = 3;
-        } elseif (6 === $kind || 7 === $kind) {
-            $charClass = 4;
-        }
-        $parts = [];
-        $subLen = \strlen($subject);
-        $cursor = 0;
-        $n = 0;
-        while ($cursor < $subLen) {
-            while ($cursor < $subLen && self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
-                ++$cursor;
-            }
-            if ($cursor >= $subLen) {
-                break;
-            }
-            if ($limit > 0 && $n + 1 >= $limit) {
-                $parts[] = \substr($subject, $cursor);
-
-                return $parts;
-            }
-            $start = $cursor;
-            while ($cursor < $subLen && !self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
-                ++$cursor;
-            }
-            $parts[] = \substr($subject, $start, $cursor - $start);
-            ++$n;
-        }
-
-        return $parts;
     }
 }
