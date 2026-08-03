@@ -12442,7 +12442,7 @@ class JIT {
                         }
                         $this->assignOperand($block->getOperand($op->arg1), $closureVar, true);
                     } catch (\Error $e) {
-                        // Compile-time FCC reject → catchable runtime Error at FCC site (#24397).
+                        // Compile-time FCC reject → catchable runtime Error at FCC site (#24397, #27106).
                         $file = '';
                         $line = 0;
                         if (null !== $op->sourceLocation) {
@@ -12465,12 +12465,16 @@ class JIT {
                                 $line
                             );
                         } else {
+                            // Pend + abort_if_pending prints Zend-shaped fatal (not libc abort) (#27106).
                             JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
                             JIT\Builtin\ErrorRaise::ensureLinked($this->context);
                             JIT\Builtin\ErrorRaise::emitRaise($this->context, $e->getMessage());
-                            $this->context->builder->call($this->context->lookupFunction('abort'));
-                            $this->context->builder->clearInsertionPosition();
+                            JIT\Builtin\ErrorRaise::emitAbortIfPendingForStandaloneMain($this->context);
                         }
+                        // Stop like TYPE_THROW — further ops insert before the terminator (#27106).
+                        $this->context->builder->clearInsertionPosition();
+
+                        return $origBasicBlock;
                     }
                     break;
                 case OpCode::TYPE_BEGIN_SILENCE:
