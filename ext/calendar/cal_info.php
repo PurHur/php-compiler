@@ -11,7 +11,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * cal_info() — calendar metadata (php-src ext/calendar/calendar.c; #7252).
+ * cal_info() — calendar metadata (php-src ext/calendar/calendar.c; #7252 / #27354).
+ *
+ * Z_PARAM_LONG optional calendar — null soft-null DEP+coerce via CalendarArgs (#24967).
  */
 final class cal_info extends Internal
 {
@@ -41,6 +43,12 @@ final class cal_info extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('cal_info() is not implemented for JIT in this compiler build (issue #7252)');
+        if (\count($args) > 1) {
+            throw new \ArgumentCountError(
+                'cal_info() accepts at most 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitCalInfo::invoke($context, ...$args);
     }
 }
