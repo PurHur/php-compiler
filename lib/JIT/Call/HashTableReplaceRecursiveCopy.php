@@ -14,7 +14,7 @@ use PHPLLVM\Value;
  * HashTable::replaceRecursiveCopy() for NestedJIT (#26977).
  *
  * Must not NestedJIT-compile HashTable.php (#12910) — emit LLVM via
- * {@see HashTableReplaceRecursiveLlvm} (ported from ArrayBuiltinHelper #3166).
+ * {@see HashTableReplaceRecursiveLlvm} (C overlay port + Cow duplicate).
  */
 final class HashTableReplaceRecursiveCopy implements Call
 {
@@ -27,10 +27,13 @@ final class HashTableReplaceRecursiveCopy implements Call
         if (1 === \count($args)) {
             return HashTableReplaceRecursiveLlvm::replaceSingle($context, $left);
         }
+        // Match VM: duplicate receiver, then overlay each other in place (#26977).
+        // Do not replaceSingle+replaceTwo (double shallow copy of nested HTs).
         $result = HashTableReplaceRecursiveLlvm::replaceSingle($context, $left);
         for ($i = 1, $n = \count($args); $i < $n; ++$i) {
             $right = HashTableNestedReceiver::hashtableFromReceiver($context, $args[$i]);
-            $result = HashTableReplaceRecursiveLlvm::replaceTwo($context, $result, $right);
+            $overlay = HashTableReplaceRecursiveLlvm::ensureOverlayFunction($context);
+            $context->builder->call($overlay, $result, $right);
         }
 
         return $result;

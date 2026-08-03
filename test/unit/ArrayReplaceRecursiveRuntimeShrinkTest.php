@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_replace_recursive() NestedJIT via JitVmHelperLink::ensureCompiled (#12638 / #24077 / #26977).
+ * array_replace_recursive() call-site LLVM (#12638 / #24077 / #26977).
  */
 final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
 {
@@ -30,19 +30,18 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/phpc_array_replace_recursive.c');
     }
 
-    public function testArrayReplaceRecursiveRuntimeUsesJitVmHelperLink(): void
+    public function testArrayReplaceRecursiveRuntimeUsesCallSiteLlvm(): void
     {
         $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ArrayReplaceRecursiveRuntime.php');
         $this->assertIsString($runtime);
-        $this->assertStringContainsString('ArrayReplaceRecursiveJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringContainsString('HashTableReplaceRecursiveLlvm', $runtime);
+        $this->assertStringContainsString('arrayReplaceRecursive', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_replace_recursive.php');
         $this->assertIsString($builtin);
         $this->assertStringContainsString('ArrayReplaceRecursiveRuntime::replaceRecursive', $builtin);
-        $this->assertStringContainsString('replaceRecursiveCopy', $builtin);
     }
 
     public function testArrayReplaceRecursiveJitHelperSingleCopy(): void
@@ -95,7 +94,8 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertFileExists($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
         $llvm = file_get_contents($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
         $this->assertIsString($llvm);
-        $this->assertStringContainsString('HashTableReadLlvm::readIndexedToValueBox', $llvm);
-        $this->assertStringContainsString('JitValueBox::copyFromPointer', $llvm);
+        $this->assertStringContainsString('HashTableDuplicateRuntime::duplicate', $llvm);
+        $this->assertStringContainsString('__hashtable__replaceRecursiveOverlay', $llvm);
+        $this->assertStringContainsString('ensureOverlayFunction', $llvm);
     }
 }
