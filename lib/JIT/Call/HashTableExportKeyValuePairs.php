@@ -104,9 +104,6 @@ final class HashTableExportKeyValuePairs implements Call
         $htMap = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $nodePtrTy = $context->getTypeFromString('__strkey_node__*');
-        $map = $context->structFieldMap['__string__'];
-        $sizeT = $context->getTypeFromString('size_t');
-        $one = $sizeT->constInt(1, false);
 
         $nodeSlot = BasicBlockHelper::entryAlloca($context, $nodePtrTy);
         $headNode = $context->builder->load($context->builder->structGep($ht, $htMap['strKeys']));
@@ -123,10 +120,15 @@ final class HashTableExportKeyValuePairs implements Call
         $context->builder->branchIf($isNull, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        // Pass `__string__*` via separate — i8*/__string__init round-trip breaks NestedJIT
+        // string keys so exportKeyValuePairs yields empty and json_encode prints {} (#26977 /
+        // peer MathBaseConvertRuntime #26884).
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        $keyLen = $context->builder->load($context->builder->structGep($keyStr, $map['length']));
-        $keyPtr = $context->builder->structGep($keyStr, $map['value']);
-        $keyVar = self::stringValueBox($context, $keyPtr, $keyLen);
+        $keyOwned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $keyStr
+        );
+        $keyVar = self::stringPtrValueBox($context, $keyOwned);
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         $valVar = self::valueBoxFromEntry($context, $valField);
         self::appendPair($context, $result, $outIdxSlot, $keyVar, $valVar);
@@ -204,6 +206,19 @@ final class HashTableExportKeyValuePairs implements Call
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $slot),
             $str
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    /** Box an owned/separated `__string__*` without i8* re-init (NestedJIT-safe, #26977). */
+    private static function stringPtrValueBox(Context $context, Value $strPtr): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $strPtr
         );
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
