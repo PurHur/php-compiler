@@ -1744,13 +1744,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($raw, 'expires', 'setrawcookie'));
     }
 
-    /** @covers issue #17370 */
+    /** @covers issue #17370 / #26258 */
     public function testTokenGetAllFlagsNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('token_get_all');
-        self::assertSame(['code', 'flags'], $names);
+        self::assertSame(['code', 'flags='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'code', 'token_get_all'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'token_get_all'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('token_get_all'));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('token_get_all', 1));
+        $info = ['name' => 'flags', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('token_get_all', 1, $info, false));
+        $flags = new \PHPCompiler\VM\Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($flags, 'token_get_all', 1, $info));
+        self::assertSame(0, $flags->toInt());
     }
 
     /** @covers issue #17090 */
@@ -2955,6 +2962,39 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['known_string', 'user_string'], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'known_string', 'hash_equals'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'user_string', 'hash_equals'));
+    }
+
+    /** @covers issue #24490 */
+    public function testSodiumCryptoZendStubNamedParams(): void
+    {
+        $generichash = BuiltinParamNames::forFunction('sodium_crypto_generichash');
+        self::assertSame(['message', 'key=', 'length='], $generichash);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($generichash, 'message', 'sodium_crypto_generichash'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($generichash, 'key', 'sodium_crypto_generichash'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($generichash, 'length', 'sodium_crypto_generichash'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_generichash'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('sodium_crypto_generichash'));
+
+        $secretbox = BuiltinParamNames::forFunction('sodium_crypto_secretbox');
+        self::assertSame(['message', 'nonce', 'key'], $secretbox);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($secretbox, 'message', 'sodium_crypto_secretbox'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($secretbox, 'nonce', 'sodium_crypto_secretbox'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($secretbox, 'key', 'sodium_crypto_secretbox'));
+
+        $box = BuiltinParamNames::forFunction('sodium_crypto_box');
+        self::assertSame(['message', 'nonce', 'key_pair'], $box);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($box, 'key_pair', 'sodium_crypto_box'));
+
+        $sign = BuiltinParamNames::forFunction('sodium_crypto_sign');
+        self::assertSame(['message', 'secret_key'], $sign);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($sign, 'secret_key', 'sodium_crypto_sign'));
+
+        $pwhash = BuiltinParamNames::forFunction('sodium_crypto_pwhash_str');
+        self::assertSame(['password', 'opslimit', 'memlimit'], $pwhash);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($pwhash, 'password', 'sodium_crypto_pwhash_str'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($pwhash, 'opslimit', 'sodium_crypto_pwhash_str'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($pwhash, 'memlimit', 'sodium_crypto_pwhash_str'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('sodium_crypto_pwhash_str'));
     }
 
     /** @covers issue #23290 / #25018 */

@@ -113,6 +113,11 @@ final class BuiltinInternalDefaultValues
         'highlight_file' => [
             1 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/sodium/sodium_*.stub.php — key="" / length=SODIUM_CRYPTO_GENERICHASH_BYTES (#24490)
+        'sodium_crypto_generichash' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            2 => ['kind' => 'int', 'value' => 32],
+        ],
         'show_source' => [
             1 => ['kind' => 'bool', 'value' => false],
         ],
@@ -572,6 +577,10 @@ final class BuiltinInternalDefaultValues
         ],
         // php-src Zend/zend_builtin_functions.stub.php — int $mode = 0; sizeof absent from InternalArgInfo (#25966)
         'sizeof' => [
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
+        // php-src ext/tokenizer/tokenizer.stub.php — int $flags = 0 (#26258)
+        'token_get_all' => [
             1 => ['kind' => 'int', 'value' => 0],
         ],
         // php-src Zend/zend_builtin_functions.stub.php — string|int $status = 0 (union does not infer) (#26056)

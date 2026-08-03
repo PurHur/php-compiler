@@ -741,8 +741,9 @@ final class BuiltinParamNames
             // php-src ext/standard/file.stub.php — ?int $mtime = null, ?int $atime = null (#24971)
             case 'touch':
                 return ['filename', 'mtime=', 'atime='];
+            // php-src ext/tokenizer/tokenizer.stub.php — int $flags = 0; InternalArgInfo omits flags (#26258)
             case 'token_get_all':
-                return ['code', 'flags'];
+                return ['code', 'flags='];
             // php-src ext/tokenizer/tokenizer.stub.php — InternalArgInfo still says type (#23658)
             case 'token_name':
                 return ['id'];
@@ -1839,6 +1840,17 @@ final class BuiltinParamNames
             // php-src ext/sodium/sodium.stub.php — missing from InternalArgInfo (#23605)
             case 'sodium_memzero':
                 return ['&string'];
+            // php-src ext/sodium/sodium_*.stub.php — Reflection empty without this map (#24490)
+            case 'sodium_crypto_generichash':
+                return ['message', 'key=', 'length='];
+            case 'sodium_crypto_secretbox':
+                return ['message', 'nonce', 'key'];
+            case 'sodium_crypto_box':
+                return ['message', 'nonce', 'key_pair'];
+            case 'sodium_crypto_sign':
+                return ['message', 'secret_key'];
+            case 'sodium_crypto_pwhash_str':
+                return ['password', 'opslimit', 'memlimit'];
             // php-src ext/exif/exif.stub.php — InternalArgInfo still says filename/sections_needed/sub_arrays (#23605)
             case 'exif_read_data':
                 return ['file', 'required_sections=', 'as_arrays=', 'read_thumbnail='];

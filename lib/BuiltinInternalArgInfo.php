@@ -138,6 +138,12 @@ final class BuiltinInternalArgInfo
             'hash_pbkdf2' => 'string',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits the function (#25845)
             'hash_hkdf' => 'string',
+            // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
+            'sodium_crypto_generichash',
+            'sodium_crypto_secretbox',
+            'sodium_crypto_box',
+            'sodium_crypto_sign',
+            'sodium_crypto_pwhash_str' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
@@ -457,6 +463,25 @@ final class BuiltinInternalArgInfo
                 0, 1 => 'string',
                 default => null,
             },
+            // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
+            'sodium_crypto_generichash' => match ($index) {
+                0, 1 => 'string',
+                2 => 'int',
+                default => null,
+            },
+            'sodium_crypto_secretbox', 'sodium_crypto_box' => match ($index) {
+                0, 1, 2 => 'string',
+                default => null,
+            },
+            'sodium_crypto_sign' => match ($index) {
+                0, 1 => 'string',
+                default => null,
+            },
+            'sodium_crypto_pwhash_str' => match ($index) {
+                0 => 'string',
+                1, 2 => 'int',
+                default => null,
+            },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
             // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25587)
@@ -581,6 +606,8 @@ final class BuiltinInternalArgInfo
                 5 => 'int',
                 default => null,
             },
+            // ext/tokenizer/tokenizer.stub.php — int $flags = 0; InternalArgInfo omits flags (#26258)
+            'token_get_all' => 1 === $index ? 'int' : null,
             // ext/standard/basic_functions.stub.php — ?array $options/$params = null (#25069)
             'stream_context_create' => match ($index) {
                 0, 1 => '?array',
