@@ -2661,6 +2661,8 @@ require_once __DIR__.'/../../../ext/standard/JitSettype.php';
 require_once __DIR__.'/../../../ext/standard/JitSha1.php';
 require_once __DIR__.'/../../../ext/standard/JitShellExec.php';
 require_once __DIR__.'/../../../ext/standard/JitSinKernel.php';
+require_once __DIR__.'/../../../ext/standard/JitSinhKernel.php';
+
 require_once __DIR__.'/../../../ext/standard/JitSleep.php';
 require_once __DIR__.'/../../../ext/standard/JitSpaceshipCompareKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitSplAutoload.php';
@@ -3927,6 +3929,8 @@ require_once __DIR__.'/../../../ext/standard/phpc_putenv_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_rename_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
 require_once __DIR__.'/../../../ext/standard/phpc_sin_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_sinh_kernel.php';
+
 require_once __DIR__.'/../../../ext/standard/phpc_sqrt_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_stat_mode_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_tan_kernel.php';

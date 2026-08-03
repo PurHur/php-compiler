@@ -813,6 +813,7 @@ class Context {
             'phpc_cos_kernel',
             'phpc_cosh_kernel',
             'phpc_sin_kernel',
+            'phpc_sinh_kernel',
             'phpc_tan_kernel',
             'phpc_tanh_kernel',
             'phpc_acos_kernel',

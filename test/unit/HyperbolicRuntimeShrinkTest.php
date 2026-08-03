@@ -35,6 +35,8 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSinh.php');
         $this->assertStringContainsString('SinhJitHelper', $bridge);
         $this->assertStringContainsString('phpc_sinh', $bridge);
+        $this->assertStringContainsString('JitSinhKernel', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
     }
 
     public function testTanhUsesJitHelperNotLibcLookup(): void
@@ -83,9 +85,21 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertSame(VmMath::tanh(2.0), TanhJitHelper::tanhArgv(2.0));
     }
 
-    public function testSinhJitHelperDelegatesToVmMath(): void
+    public function testSinhJitHelperDelegatesToKernel(): void
     {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SinhJitHelper.php');
+        $this->assertStringContainsString('phpc_sinh_kernel', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function sinhArgv\(.*?\{[^}]*VmMath::sinh/s',
+            $source
+        );
+
+        if (!\function_exists('phpc_sinh_kernel')) {
+            $this->markTestSkipped('phpc_sinh_kernel requires compiler runtime');
+        }
+        $this->assertSame(VmMath::sinh(0.0), SinhJitHelper::sinhArgv(0.0));
         $this->assertSame(VmMath::sinh(1.0), SinhJitHelper::sinhArgv(1.0));
+        $this->assertSame(VmMath::sinh(2.0), SinhJitHelper::sinhArgv(2.0));
     }
 
     public function testSpineBundleIncludesHyperbolicJitHelpers(): void
@@ -98,8 +112,10 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MathSinh.php', $spine);
         $this->assertStringContainsString('MathTanh.php', $spine);
         $this->assertStringContainsString('JitCoshKernel.php', $spine);
+        $this->assertStringContainsString('JitSinhKernel.php', $spine);
         $this->assertStringContainsString('JitTanhKernel.php', $spine);
         $this->assertStringContainsString('phpc_cosh_kernel.php', $spine);
+        $this->assertStringContainsString('phpc_sinh_kernel.php', $spine);
         $this->assertStringContainsString('phpc_tanh_kernel.php', $spine);
     }
 }
