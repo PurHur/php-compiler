@@ -7097,6 +7097,43 @@ PHP;
         self::assertSame('ok', $out);
     }
 
+    /** Issue #27139 — call_user_func_array([A::class, 'm'], [...]) wires distinct Array_ slots. */
+    public function testCallUserFuncArrayClassConstCallableAndArgsDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+class CufaClassConstArgsProbe {
+    public static function who($x, $y = '') {
+        return static::class . ':' . $x . ':' . $y;
+    }
+}
+echo call_user_func_array([CufaClassConstArgsProbe::class, 'who'], ['z', 'w']);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'call_user_func_array_class_const_args.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0], 'callable Array_ must feed arg #0; sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[1], $sendSlots[1], 'args Array_ must feed arg #1; sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'sibling Array_ args must not alias');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('CufaClassConstArgsProbe:z:w', ob_get_clean());
+    }
+
     /** Issue #18015 — call_user_func_array('fn', [&$x]) must not wire ref dim-fetch to arg #0. */
     public function testCallUserFuncArrayInlineByRefArrayLiteralCallbackSlot(): void
     {
