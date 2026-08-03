@@ -2752,6 +2752,8 @@ require_once __DIR__.'/../../../ext/standard/JitSysGetTempDir.php';
 require_once __DIR__.'/../../../ext/standard/JitSysGetloadavg.php';
 require_once __DIR__.'/../../../ext/standard/JitSyslog.php';
 require_once __DIR__.'/../../../ext/standard/JitTanKernel.php';
+require_once __DIR__.'/../../../ext/standard/JitTanhKernel.php';
+
 require_once __DIR__.'/../../../ext/standard/JitTempnam.php';
 require_once __DIR__.'/../../../ext/standard/JitTimezoneAbbreviationsList.php';
 require_once __DIR__.'/../../../ext/standard/JitTimezoneIdentifiersList.php';
@@ -3928,6 +3930,7 @@ require_once __DIR__.'/../../../ext/standard/phpc_sin_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_sqrt_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_stat_mode_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_tan_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_tanh_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_weakref_null_slot.php';
 require_once __DIR__.'/../../../ext/standard/phpc_weakref_unset_map_key.php';
 require_once __DIR__.'/../../../ext/standard/phpcredits.php';
