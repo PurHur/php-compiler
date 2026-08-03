@@ -11,16 +11,24 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPLLVM\Value;
 
-/** User-script standalone AOT: compile-time DOMXPath::query() (#18493). */
+/** User-script standalone AOT: compile-time DOMXPath::query() (#18493, #27275). */
 final class JitDomXPathQueryUserScript
 {
     private const CLASS_NODELIST = 'DOMNodeList';
 
     private static ?string $lastCacheKey = null;
 
+    /** Last simple //tag query tag for NodeList::item(N) materialization (#27275). */
+    private static ?string $lastQueryTag = null;
+
     public static function lastCacheKey(): ?string
     {
         return self::$lastCacheKey;
+    }
+
+    public static function lastQueryTag(): ?string
+    {
+        return self::$lastQueryTag;
     }
 
     public static function shouldUse(Context $context): bool
@@ -53,6 +61,7 @@ final class JitDomXPathQueryUserScript
         $nsCount = DomParseSimpleXmlJitHelper::countNamespaceAxisArgv($xml, $exprLit);
         if (null !== $nsCount) {
             self::$lastCacheKey = null;
+            self::$lastQueryTag = null;
 
             return self::boxNodeList($context, $nsCount);
         }
@@ -74,6 +83,7 @@ final class JitDomXPathQueryUserScript
                 $numeric
             );
             self::$lastCacheKey = null;
+            self::$lastQueryTag = null;
             DomUserScriptLiveTagListLlvm::initCount($context, $axisMatches[1], $count);
 
             return self::boxNodeList($context, $count);
@@ -89,6 +99,7 @@ final class JitDomXPathQueryUserScript
         $tag = $matches[1];
         if (!isset($matches[2]) || '' === $matches[2]) {
             self::$lastCacheKey = null;
+            self::$lastQueryTag = strtolower($tag);
             $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
             DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
 
@@ -105,12 +116,15 @@ final class JitDomXPathQueryUserScript
         );
         if (null === $matched) {
             self::$lastCacheKey = null;
+            self::$lastQueryTag = null;
             DomUserScriptLiveTagListLlvm::initCount($context, $tag, 0);
 
             return self::boxNodeList($context, 0);
         }
         [$count, $text] = $matched;
         self::$lastCacheKey = strtolower($tag.'@'.$matches[2].'='.$attrValue.($numeric ? '#n' : ''));
+        // Predicate lists keep the first-match element cache; do not use unfiltered nth-tag (#27275).
+        self::$lastQueryTag = null;
         DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         $cacheKey = $context->builder->load(

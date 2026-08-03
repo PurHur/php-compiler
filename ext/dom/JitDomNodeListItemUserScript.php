@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** User-script standalone AOT: compile-time DOMNodeList::item() (#18493, #26752). */
+/** User-script standalone AOT: compile-time DOMNodeList::item() (#18493, #26752, #27275). */
 final class JitDomNodeListItemUserScript
 {
     public static function shouldUse(Context $context): bool
@@ -29,23 +29,34 @@ final class JitDomNodeListItemUserScript
         if (null === $index && null !== $args[1]->compileTimeString && is_numeric($args[1]->compileTimeString)) {
             $index = (int) $args[1]->compileTimeString;
         }
-        if (null === $index || 0 !== $index) {
+        if (null === $index || $index < 0) {
             return null;
         }
 
-        // XPath evaluate/query cache hit.
-        $cacheKey = JitDomXPathQueryUserScript::lastCacheKey();
-        if (null !== $cacheKey) {
-            $keyStr = $context->builder->load($context->constantStringFromString($cacheKey));
-            $found = DomUserScriptElementCacheLlvm::lookupObject($context, $keyStr);
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $queryTag = JitDomXPathQueryUserScript::lastQueryTag();
 
-            return self::boxObject($context, $found);
+        // XPath //tag (and predicate) lists: materialize Nth match with attrs (#27275).
+        if (null !== $xml && null !== $queryTag && '' !== $queryTag) {
+            return self::materializeNthQueryMatch($context, $xml, $queryTag, $index);
+        }
+
+        // Legacy XPath evaluate/query cache hit (item(0) only).
+        if (0 === $index) {
+            $cacheKey = JitDomXPathQueryUserScript::lastCacheKey();
+            if (null !== $cacheKey) {
+                $keyStr = $context->builder->load($context->constantStringFromString($cacheKey));
+                $found = DomUserScriptElementCacheLlvm::lookupObject($context, $keyStr);
+
+                return self::boxObject($context, $found);
+            }
         }
 
         // getElementsByTagName live list: return pinned root firstChild (#26752).
-        if (null === JitDomLoadXMLUserScript::lastCompileTimeXml()
-            || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
-        ) {
+        if (0 !== $index) {
+            return null;
+        }
+        if (null === $xml || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()) {
             return null;
         }
         $pinned = DomUserScriptPinnedRootLlvm::load($context);
@@ -66,6 +77,45 @@ final class JitDomNodeListItemUserScript
         );
 
         return self::boxObject($context, $firstObj);
+    }
+
+    /**
+     * Materialize //tag NodeList::item($index) from compile-time XML (#27275).
+     *
+     * Seeds DomUserScriptAttributeCacheLlvm so getAttribute() works on the result.
+     */
+    private static function materializeNthQueryMatch(
+        Context $context,
+        string $xml,
+        string $tag,
+        int $index
+    ): Value {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_nodelist_item_xpath_nth');
+        $position = $index + 1;
+        $openTag = DomParseSimpleXmlJitHelper::nthTagOpenTagArgv($xml, $tag, $position);
+        if (null === $openTag) {
+            return self::boxNull($context);
+        }
+        $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $position) ?? '';
+        $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
+        foreach (DomParseSimpleXmlJitHelper::attributesFromOpenTagArgv($openTag) as $attrPair) {
+            $qname = $attrPair['qname'];
+            $value = $attrPair['value'];
+            $pos = strpos($qname, ':');
+            $local = false === $pos ? $qname : substr($qname, $pos + 1);
+            $attr = JitDomAttributeNodeNS::materializeAttrFromLiterals(
+                $context,
+                '',
+                $qname,
+                $value
+            );
+            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $local, $attr, $value);
+            if ($local !== $qname) {
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $qname, $attr, $value);
+            }
+        }
+
+        return self::boxObject($context, $element);
     }
 
     private static function loadChildObjectFromSlot(
@@ -112,6 +162,15 @@ final class JitDomNodeListItemUserScript
             $ptr,
             $object
         );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function boxNull(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
