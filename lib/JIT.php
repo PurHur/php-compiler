@@ -5962,6 +5962,15 @@ class JIT {
         if (!is_string($code) || '' === $code) {
             return;
         }
+        // #27426 / #27428: examples/000-HelloWorld is M5 trivial-echo shaped. Registering it as an
+        // M3 content-matched sidecar makes argv-driver rebuilds prefer __compiler_copy of
+        // build/.m3_helloworld_aot_blob over M5TrivialEchoNative — copy fails silently (exit 1)
+        // while the C-floor shebang path handles the same source. Prefer M5 (#27429 intent).
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL === $sidecarRel
+            && null !== \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild($code, $path)
+        ) {
+            return;
+        }
         if (null === $this->m3EmitTuTrivialEchoSource) {
             $this->m3EmitTuTrivialEchoSource = $code;
             $this->context->m3EmitTuTrivialEchoSource = $code;
