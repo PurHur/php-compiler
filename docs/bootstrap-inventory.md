@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6953 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22357 |
+| Source constructs flagged (warnings) | 22358 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2503,7 +2503,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitAddcslashes.php` | 0 | 1 |
 | `ext/standard/JitArgon2Kernel.php` | 0 | 1 |
 | `ext/standard/JitArrayChunk.php` | 0 | 1 |
-| `ext/standard/JitArrayElem.php` | 0 | 1 |
+| `ext/standard/JitArrayElem.php` | 0 | 2 |
 | `ext/standard/JitArrayFill.php` | 0 | 1 |
 | `ext/standard/JitArrayIsList.php` | 0 | 1 |
 | `ext/standard/JitArrayKey.php` | 0 | 1 |
@@ -27076,7 +27076,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitArrayElem.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 13 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/JitArrayFill.php`
 
@@ -34928,7 +34929,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_key_exists.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/array_key_first.php`
 
@@ -48047,25 +48048,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2565)
 - new Variable (line 2578)
 - new Variable (line 2777)
-- new VMVariable (line 4055)
-- new VMVariable (line 4075)
-- new VMVariable (line 4085)
-- new VMVariable (line 4105)
-- new ReflectionClassConstant (line 5835)
-- new Variable (line 6254)
-- new Variable (line 6280)
-- new Variable (line 6288)
-- new Variable (line 6311)
-- new Variable (line 6337)
-- new Variable (line 6345)
-- new Variable (line 6419)
-- new Literal (line 6436)
-- new Literal (line 6441)
-- new Literal (line 6446)
-- new Variable (line 6457)
-- new Variable (line 6490)
-- new Variable (line 6513)
-- new Variable (line 6884)
+- new VMVariable (line 4056)
+- new VMVariable (line 4076)
+- new VMVariable (line 4086)
+- new VMVariable (line 4106)
+- new ReflectionClassConstant (line 5836)
+- new Variable (line 6255)
+- new Variable (line 6281)
+- new Variable (line 6289)
+- new Variable (line 6312)
+- new Variable (line 6338)
+- new Variable (line 6346)
+- new Variable (line 6420)
+- new Literal (line 6437)
+- new Literal (line 6442)
+- new Literal (line 6447)
+- new Variable (line 6458)
+- new Variable (line 6491)
+- new Variable (line 6514)
+- new Variable (line 6885)
 - 293 class method(s)
 - 8 closure(s)
 
@@ -50393,28 +50394,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/M5ParserAstPeer.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/M5TrivialEchoNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 90)
-- 14 class method(s)
+- new Call\Native (line 94)
+- 15 class method(s)
 
 ### `lib/JIT/M5TrivialEchoScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new Script (line 231)
-- new Func (line 233)
-- new Void_ (line 233)
-- new Echo_ (line 235)
-- new Literal (line 235)
-- new Return_ (line 236)
-- new Block (line 298)
-- new Variable (line 300)
-- new OpCode (line 303)
-- new OpCode (line 304)
-- 13 class method(s)
+- new Script (line 263)
+- new Func (line 265)
+- new Void_ (line 265)
+- new Echo_ (line 267)
+- new Literal (line 267)
+- new Return_ (line 268)
+- new Block (line 330)
+- new Variable (line 332)
+- new OpCode (line 335)
+- new OpCode (line 336)
+- 14 class method(s)
 
 ### `lib/JIT/MagicMethodDispatch.php`
 
@@ -50663,8 +50664,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/RuntimeParseM5Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 72)
-- 2 class method(s)
+- new Call\Native (line 75)
+- 3 class method(s)
 
 ### `lib/JIT/RuntimeParseM5PhpCfgParser.php`
 
