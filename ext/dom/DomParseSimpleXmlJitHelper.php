@@ -143,11 +143,23 @@ final class DomParseSimpleXmlJitHelper
         string $attr,
         int $position
     ): ?string {
+        $openTag = self::nthTagOpenTagArgv($xml, $tag, $position);
+        if (null === $openTag) {
+            return null;
+        }
+
+        return self::openTagAttrValue($openTag, $attr);
+    }
+
+    /**
+     * Nth (1-based) matching open-tag markup for //tag NodeList::item() (#27275).
+     */
+    public static function nthTagOpenTagArgv(string $xml, string $tag, int $position): ?string
+    {
         if ($position < 1) {
             return null;
         }
         $tag = strtolower($tag);
-        $attr = strtolower($attr);
         $needle = '<'.$tag;
         $seen = 0;
         $offset = 0;
@@ -167,19 +179,43 @@ final class DomParseSimpleXmlJitHelper
             }
             ++$seen;
             if ($seen === $position) {
-                $openTag = substr($xml, $pos, $gt - $pos + 1);
-                if (preg_match('/\b'.preg_quote($attr, '/').'\s*=\s*"([^"]*)"/i', $openTag, $m)
-                    || preg_match("/\b".preg_quote($attr, '/')."\s*=\s*'([^']*)'/i", $openTag, $m)
-                ) {
-                    return $m[1];
-                }
-
-                return null;
+                return substr($xml, $pos, $gt - $pos + 1);
             }
             $offset = $pos + 1;
         }
 
         return null;
+    }
+
+    /**
+     * Attributes from an open-tag string (xmlns* skipped) for user-script AOT (#27275).
+     *
+     * @return list<array{qname: string, value: string}>
+     */
+    public static function attributesFromOpenTagArgv(string $openTag): array
+    {
+        if (!preg_match('/^<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $openTag, $root)) {
+            return [];
+        }
+        $attrs = $root[2] ?? '';
+        if ('' === trim($attrs)) {
+            return [];
+        }
+        $out = [];
+        if (!preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)
+            && !preg_match_all("/([A-Za-z_][\w:.-]*)\s*=\s*'([^']*)'/", $attrs, $pairs, PREG_SET_ORDER)
+        ) {
+            return [];
+        }
+        foreach ($pairs as $pair) {
+            $qname = $pair[1];
+            if (0 === stripos($qname, 'xmlns')) {
+                continue;
+            }
+            $out[] = ['qname' => $qname, 'value' => $pair[2]];
+        }
+
+        return $out;
     }
 
     /**
