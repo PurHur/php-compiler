@@ -11644,6 +11644,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateDatePeriodCreateFromISO8601CompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateSimpleXmlXpathCompileTime(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -13561,6 +13565,31 @@ class JIT {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $this->context->namedVariableBindings[$resolved]->compileTimeBcmathNumber = $ct;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /** Thin-AOT DatePeriod::createFromISO8601String() foreach snapshot (#26937). */
+    private function propagateDatePeriodCreateFromISO8601CompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!($toCall instanceof JIT\Call\DatePeriodCreateFromISO8601String)) {
+            return;
+        }
+        $timestamps = $toCall->lastCompileTimeDatePeriodTimestamps;
+        if (null === $timestamps || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDatePeriodTimestamps = $timestamps;
+        $var->compileTimeDatePeriodTimezone = $toCall->lastCompileTimeDatePeriodTimezone ?? 'UTC';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                $bound->compileTimeDatePeriodTimestamps = $timestamps;
+                $bound->compileTimeDatePeriodTimezone = $var->compileTimeDatePeriodTimezone;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
