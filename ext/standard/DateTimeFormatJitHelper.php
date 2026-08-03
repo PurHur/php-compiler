@@ -17,6 +17,11 @@ final class DateTimeFormatJitHelper
     public static function formatStateArgv(string $format, int $timestamp, int $microsecond, string $tzName): string
     {
         $offset = self::parseNumericTimezoneOffsetSeconds($tzName);
+        if (0 === $offset) {
+            // Named IANA zones: apply active-zone offset when host date() exists (#27142).
+            // NestedJIT without date() stays UTC civil (peer #26900).
+            $offset = self::namedTimezoneOffsetSeconds($tzName, $timestamp);
+        }
         if (0 !== $offset) {
             $timestamp += $offset;
         }
@@ -212,7 +217,7 @@ final class DateTimeFormatJitHelper
     }
 
     /**
-     * Fixed ±HHMM / ±HH:MM offsets only. Named zones → 0 (UTC semantics for NestedJIT).
+     * Fixed ±HHMM / ±HH:MM offsets only.
      */
     private static function parseNumericTimezoneOffsetSeconds(string $tzName): int
     {
@@ -236,5 +241,28 @@ final class DateTimeFormatJitHelper
         $seconds = $hours * 3600 + $minutes * 60;
 
         return '-' === $signCh ? -$seconds : $seconds;
+    }
+
+    /**
+     * IANA / named zone offset via host date() when available (#27142).
+     * Returns 0 for UTC aliases or when date()/timezone APIs are unavailable (NestedJIT).
+     */
+    private static function namedTimezoneOffsetSeconds(string $tzName, int $timestamp): int
+    {
+        if ('' === $tzName || 'UTC' === $tzName || 'GMT' === $tzName || 'Z' === $tzName) {
+            return 0;
+        }
+        if (!\function_exists('date') || !\function_exists('date_default_timezone_set')
+            || !\function_exists('date_default_timezone_get')) {
+            return 0;
+        }
+        $previous = \date_default_timezone_get();
+        if (!@\date_default_timezone_set($tzName)) {
+            return 0;
+        }
+        $offset = (int) \date('Z', $timestamp);
+        \date_default_timezone_set($previous);
+
+        return $offset;
     }
 }

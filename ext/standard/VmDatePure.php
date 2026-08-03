@@ -91,14 +91,22 @@ final class VmDatePure
      * Local civil breakdown from Unix timestamp.
      *
      * Must not call host {@see getdate()} — under thin AOT / NestedJIT that is missing or
-     * circular with GetdateJitHelper (#26900). UTC civil math matches default timezone UTC
-     * (CI); named-zone local offsets are not applied here (peer DateTimeFormatJitHelper).
+     * circular with GetdateJitHelper (#26900). When host {@see date()} is available, apply
+     * the active default-timezone offset so named zones (via
+     * {@see VmDateTimeNative}::withTimezone / {@see pushProcessTimezone}) convert wall-clock
+     * correctly (#27142; peer fixed-offset path uses gmtime(ts+offset)).
+     * Without {@see date()}, fall back to UTC civil math (NestedJIT-safe).
      *
      * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
      */
     public static function localtime(int $timestamp): ?array
     {
-        return self::civilTmParts($timestamp);
+        $offset = 0;
+        if (\function_exists('date')) {
+            $offset = (int) \date('Z', $timestamp);
+        }
+
+        return self::civilTmParts($timestamp + $offset);
     }
 
     /**
