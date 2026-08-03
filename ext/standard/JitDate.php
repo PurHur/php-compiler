@@ -303,11 +303,14 @@ final class JitDate
     }
 
     /**
-     * Compile-time date()/gmdate() format literals via civil IR + snprintf (#27091, #27121).
+     * Compile-time date()/gmdate()/DateTime::format() literals via civil IR + snprintf
+     * (#27091, #27121, #27192).
      *
      * Returns null when the format needs the NestedJIT FormatDatetime path.
+     * Shared with DateTimeFormatJitHelper — NestedJIT formatStateArgv civil digests
+     * segfault under PHP_COMPILER_PROFILE=8.4 thin AOT (#27192).
      */
-    private static function tryFormatCivilLiteral(Context $context, string $fmtLit, Value $timestamp): ?Value
+    public static function tryFormatCivilLiteral(Context $context, string $fmtLit, Value $timestamp): ?Value
     {
         // 'U' is the unix timestamp itself — no civil breakdown (#27121).
         if ('U' === $fmtLit) {
