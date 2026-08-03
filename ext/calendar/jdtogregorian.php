@@ -35,6 +35,12 @@ final class jdtogregorian extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('jdtogregorian() is not implemented for JIT in this compiler build (issue #6759)');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'jdtogregorian() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitJdtogregorian::invoke($context, ...$args);
     }
 }
