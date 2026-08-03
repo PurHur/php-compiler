@@ -3002,8 +3002,10 @@ class Context {
                 case VMVariable::TYPE_FLOAT:
                     $type = $this->getTypeFromString('double');
                     $global = $this->module->addGlobal($type, $name);
-                    $global->setInitializer($type->constReal($phpVar->toFloat()));
-                    $this->constants[$name] = [Variable::TYPE_NATIVE_DOUBLE, $global];
+                    $floatVal = $phpVar->toFloat();
+                    $global->setInitializer($type->constReal($floatVal));
+                    // Keep host float for compile-time fold (round(M_PI, 5), #27249).
+                    $this->constants[$name] = [Variable::TYPE_NATIVE_DOUBLE, $global, $floatVal];
                     break;
                 case VMVariable::TYPE_BOOLEAN:
                     $type = $this->getTypeFromString('int1');
@@ -3041,6 +3043,12 @@ class Context {
             && \is_int($this->constants[$name][2])
         ) {
             $var->compileTimeLong = $this->constants[$name][2];
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $this->constants[$name][0]
+            && isset($this->constants[$name][2])
+            && \is_float($this->constants[$name][2])
+        ) {
+            $var->compileTimeFloat = $this->constants[$name][2];
         }
         if (Variable::TYPE_STRING === $this->constants[$name][0]
             && isset($this->constants[$name][2])

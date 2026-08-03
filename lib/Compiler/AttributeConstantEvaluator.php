@@ -221,6 +221,10 @@ final class AttributeConstantEvaluator
         if (null !== $stdlibInt) {
             return $stdlibInt;
         }
+        $stdlibFloat = StdlibConstants::CORE_FLOAT_BY_NAME[$lc] ?? null;
+        if (null !== $stdlibFloat) {
+            return $stdlibFloat;
+        }
         $dateStr = DateConstants::CORE_STRING_BY_NAME[$lc] ?? null;
         if (null !== $dateStr) {
             return $dateStr;

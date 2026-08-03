@@ -14,6 +14,9 @@ use PHPLLVM\Value;
 
 /**
  * JIT/AOT helper for round() (int/float, precision, PHP_ROUND_* mode) via RoundJitHelper (#15211).
+ *
+ * When num/precision/mode are compile-time scalars, evaluate on the host and emit a float
+ * constant — NestedJIT RoundJitHelper mis-handles places>0 on cold AOT calls (#27249 / #26800).
  */
 final class JitRound
 {
@@ -22,6 +25,11 @@ final class JitRound
         $argc = \count($args);
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('round() requires one to three arguments');
+        }
+
+        $folded = self::tryFoldCompileTime($context, $args);
+        if (null !== $folded) {
+            return $folded;
         }
 
         $number = self::coerceDouble($context, $args[0]);
@@ -41,6 +49,24 @@ final class JitRound
         ?JITVariable $precision,
         int $mode
     ): Value {
+        // Mode is a known int — fold when num (+ optional precision) are compile-time.
+        if (null === $precision) {
+            $folded = self::tryFoldCompileTime($context, [
+                $num,
+                JITVariable::fromConstantInt($context, 0),
+                JITVariable::fromConstantInt($context, $mode),
+            ]);
+        } else {
+            $folded = self::tryFoldCompileTime($context, [
+                $num,
+                $precision,
+                JITVariable::fromConstantInt($context, $mode),
+            ]);
+        }
+        if (null !== $folded) {
+            return $folded;
+        }
+
         $number = self::coerceDouble($context, $num);
         $prec = null !== $precision
             ? self::lowerPrecisionArg($context, $precision)
@@ -48,6 +74,52 @@ final class JitRound
         $modeVal = $context->getTypeFromString('int64')->constInt($mode, false);
 
         return MathRound::invoke($context, $number, $prec, $modeVal);
+    }
+
+    /**
+     * Host-evaluate round() when all operands are compile-time scalars (#27249).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function tryFoldCompileTime(Context $context, array $args): ?Value
+    {
+        $num = self::compileTimeNumber($args[0] ?? null);
+        if (null === $num) {
+            return null;
+        }
+        $places = 0;
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
+            if (null === $args[1]->compileTimeLong) {
+                return null;
+            }
+            $places = (int) $args[1]->compileTimeLong;
+        }
+        $mode = StdlibConstants::PHP_ROUND_HALF_UP;
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            if (null === $args[2]->compileTimeLong) {
+                return null;
+            }
+            $mode = (int) $args[2]->compileTimeLong;
+        }
+
+        $result = RoundJitHelper::roundArgv((float) $num, $places, $mode);
+
+        return $context->getTypeFromString('double')->constReal($result);
+    }
+
+    private static function compileTimeNumber(?JITVariable $arg): ?float
+    {
+        if (null === $arg) {
+            return null;
+        }
+        if (null !== $arg->compileTimeFloat) {
+            return (float) $arg->compileTimeFloat;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return (float) $arg->compileTimeLong;
+        }
+
+        return null;
     }
 
     private static function lowerPrecisionArg(Context $context, JITVariable $arg): Value
