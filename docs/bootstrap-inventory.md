@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6884 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22178 |
+| Source constructs flagged (warnings) | 22181 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -410,7 +410,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomNormalize.php` | 0 | 1 |
 | `ext/dom/JitDomParentNodeProperty.php` | 0 | 2 |
 | `ext/dom/JitDomRemoveChild.php` | 0 | 2 |
-| `ext/dom/JitDomReplaceChild.php` | 0 | 2 |
+| `ext/dom/JitDomReplaceChild.php` | 0 | 5 |
 | `ext/dom/JitDomSaveHTML.php` | 0 | 1 |
 | `ext/dom/JitDomSaveHTMLFile.php` | 0 | 1 |
 | `ext/dom/JitDomSaveHTMLUserScript.php` | 0 | 4 |
@@ -9411,8 +9411,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomReplaceChild.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 59)
-- 4 class method(s)
+- new JITVariable (line 80)
+- new JITVariable (line 96)
+- new JITVariable (line 121)
+- new JITVariable (line 152)
+- 5 class method(s)
 
 ### `ext/dom/JitDomSaveHTML.php`
 
@@ -31493,7 +31496,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StrpbrkJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/StrposJitHelper.php`
 
@@ -44976,10 +44979,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 419)
 - new Variable (line 460)
 - new Variable (line 471)
-- new Variable (line 538)
-- new Variable (line 577)
-- new Variable (line 646)
-- 35 class method(s)
+- new Variable (line 558)
+- new Variable (line 597)
+- new Variable (line 666)
+- 36 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
 
@@ -47286,7 +47289,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrpbrk.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/StringStrpos.php`
 
@@ -49584,9 +49587,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 188)
 - new Variable (line 192)
 - new Variable (line 194)
-- new Variable (line 1894)
-- new Variable (line 1898)
-- new Variable (line 2173)
+- new Variable (line 1936)
+- new Variable (line 1940)
+- new Variable (line 2215)
 - 11 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
@@ -51066,8 +51069,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 42)
 - new JITVariable (line 51)
-- new JITVariable (line 132)
-- new JITVariable (line 139)
+- new JITVariable (line 133)
+- new JITVariable (line 140)
 - 10 class method(s)
 
 ### `lib/VM/ArraySpread.php`
