@@ -4,39 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\ext\standard\IsFiniteJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** is_finite() JIT routes through IsFiniteJitHelper PHP not isnan/isinf LLVM (#15188). */
+/** is_finite() uses MathIsFinite → JitIsFiniteKernel (#15188, #27021). */
 final class IsFiniteRuntimeShrinkTest extends TestCase
 {
-    public function testIsFiniteUsesJitHelperNotLibcCompose(): void
+    public function testIsFiniteUsesKernelLeaf(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/is_finite.php');
         $this->assertStringContainsString('MathIsFinite::invoke', $builtin);
-        $this->assertStringNotContainsString('JitIsFinite', $builtin);
-
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/JitIsFinite.php');
-
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathIsFinite.php');
-        $this->assertStringContainsString('IsFiniteJitHelper', $bridge);
-        $this->assertStringContainsString('phpc_is_finite', $bridge);
+        $this->assertStringContainsString('JitIsFiniteKernel', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink', $bridge);
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/IsFiniteJitHelper.php');
+        $this->assertStringContainsString('phpc_is_finite_kernel', $helper);
+        $this->assertStringNotContainsString('\is_finite', $helper);
     }
 
-    public function testIsFiniteJitHelperDelegatesToPhpIsFinite(): void
+    public function testContextAllowlistsKernels(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/IsFiniteJitHelper.php');
-        $this->assertStringContainsString('\\is_finite', $source);
-
-        $this->assertSame(\is_finite(1.0), IsFiniteJitHelper::isFiniteArgv(1.0));
-        $this->assertSame(\is_finite(\INF), IsFiniteJitHelper::isFiniteArgv(\INF));
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('phpc_is_finite_kernel', $source);
     }
 
-    public function testSpineBundleIncludesIsFiniteJitHelper(): void
+    public function testSpineIncludesKernels(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
-        $this->assertStringContainsString('IsFiniteJitHelper.php', $spine);
-        $this->assertStringContainsString('MathIsFinite.php', $spine);
-        $this->assertStringNotContainsString('JitIsFinite.php', $spine);
+        $this->assertStringContainsString('JitIsFiniteKernel.php', $spine);
+        $this->assertStringContainsString('phpc_is_finite_kernel.php', $spine);
     }
 }
