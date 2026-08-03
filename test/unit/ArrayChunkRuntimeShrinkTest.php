@@ -25,6 +25,8 @@ final class ArrayChunkRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_chunk.php');
         $this->assertStringContainsString('ArrayChunkRuntime::chunk', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildChunkArray', $builtin);
+        // Same-namespace JitIntdiv — not PHPCompiler\JIT\JitIntdiv (#27074 / peer #26997).
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\JitIntdiv', $builtin);
 
         $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
         $this->assertStringNotContainsString('function buildChunkArray', $arrayBuiltin);
