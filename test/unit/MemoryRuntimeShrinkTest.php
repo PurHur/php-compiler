@@ -28,7 +28,10 @@ final class MemoryRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitReadRssBytes', $source);
         $this->assertStringNotContainsString('/proc/self/statm', $source);
         $this->assertStringNotContainsString('GLOBAL_PEAK_EMALLOC', $source);
-        $this->assertLessThan(300, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('useThinStandaloneUsageFloor', $source);
+        $this->assertStringContainsString('THIN_AOT_USAGE_FLOOR', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
     public function testMemoryJitHelperDelegatesToVmMemoryAndAccounting(): void

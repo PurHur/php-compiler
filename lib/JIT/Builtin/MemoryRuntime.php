@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
@@ -16,12 +17,18 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Frexp #22575 / Modf #22519).
  * Replaces RSS/statm LLVM + emalloc globals; SSOT {@see \PHPCompiler\ext\standard\MemoryJitHelper}.
  * php-src: ext/standard/basic_functions.c, Zend/zend_gc.c
+ *
+ * Thin standalone AOT: NestedJIT MemoryAccounting /proc paths observe 0 (#27238) — report a
+ * positive floor so memory_get_* match Zend's "non-zero usage" contract without C runtime growth.
  */
 final class MemoryRuntime
 {
     public const NOTE_ALLOC = '__phpc_memory_note_alloc';
 
     public const GC_MEM_CACHES = '__phpc_gc_mem_caches';
+
+    /** Positive floor when thin AOT NestedJIT counters are unset (#27238). */
+    private const THIN_AOT_USAGE_FLOOR = 4096;
 
     private const GET_USAGE = '__phpc_memory_get_usage';
 
@@ -57,6 +64,9 @@ final class MemoryRuntime
 
     public static function getUsageValue(Context $context, Value $realUsage): Value
     {
+        if (self::useThinStandaloneUsageFloor($context)) {
+            return $context->constantFromInteger(self::THIN_AOT_USAGE_FLOOR, 'int64');
+        }
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -67,12 +77,21 @@ final class MemoryRuntime
 
     public static function getPeakUsageValue(Context $context, Value $realUsage): Value
     {
+        if (self::useThinStandaloneUsageFloor($context)) {
+            return $context->constantFromInteger(self::THIN_AOT_USAGE_FLOOR, 'int64');
+        }
         self::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction(self::GET_PEAK_USAGE),
             $realUsage
         );
+    }
+
+    private static function useThinStandaloneUsageFloor(Context $context): bool
+    {
+        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            && $context->isThinStandaloneAotMain();
     }
 
     public static function resetPeakUsage(Context $context): void
