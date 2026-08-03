@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6917 |
-| Phase A inventory files (M2 ratio SSOT) | 6917 |
+| PHP files on vm.php path | 6926 |
+| Phase A inventory files (M2 ratio SSOT) | 6926 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22266 |
+| Source constructs flagged (warnings) | 22281 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -122,21 +122,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bz2/bzwrite.php` | 0 | 1 |
 | `ext/calendar/CalDaysInMonthJitHelper.php` | 0 | 1 |
 | `ext/calendar/CalInfoJitHelper.php` | 0 | 1 |
+| `ext/calendar/CalToJdJitHelper.php` | 0 | 1 |
 | `ext/calendar/CalendarArgs.php` | 0 | 1 |
 | `ext/calendar/CalendarConstants.php` | 0 | 1 |
 | `ext/calendar/CalendarFunction.php` | 0 | 1 |
 | `ext/calendar/CalendarTables.php` | 0 | 1 |
 | `ext/calendar/EasterDaysJitHelper.php` | 0 | 1 |
+| `ext/calendar/JdtogregorianJitHelper.php` | 0 | 1 |
+| `ext/calendar/JewishtojdJitHelper.php` | 0 | 1 |
 | `ext/calendar/JitCalDaysInMonth.php` | 0 | 1 |
 | `ext/calendar/JitCalInfo.php` | 0 | 2 |
+| `ext/calendar/JitCalToJd.php` | 0 | 2 |
 | `ext/calendar/JitEasterDays.php` | 0 | 2 |
+| `ext/calendar/JitJdtogregorian.php` | 0 | 2 |
+| `ext/calendar/JitJewishtojd.php` | 0 | 2 |
 | `ext/calendar/Module.php` | 0 | 20 |
 | `ext/calendar/VmCalendar.php` | 0 | 11 |
 | `ext/calendar/VmJewishFrenchCalendar.php` | 0 | 1 |
 | `ext/calendar/cal_days_in_month.php` | 0 | 3 |
 | `ext/calendar/cal_from_jd.php` | 0 | 2 |
 | `ext/calendar/cal_info.php` | 0 | 3 |
-| `ext/calendar/cal_to_jd.php` | 0 | 2 |
+| `ext/calendar/cal_to_jd.php` | 0 | 3 |
 | `ext/calendar/easter_date.php` | 0 | 2 |
 | `ext/calendar/easter_days.php` | 0 | 2 |
 | `ext/calendar/frenchtojd.php` | 0 | 2 |
@@ -144,11 +150,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/calendar/jddayofweek.php` | 0 | 2 |
 | `ext/calendar/jdmonthname.php` | 0 | 2 |
 | `ext/calendar/jdtofrench.php` | 0 | 2 |
-| `ext/calendar/jdtogregorian.php` | 0 | 2 |
+| `ext/calendar/jdtogregorian.php` | 0 | 3 |
 | `ext/calendar/jdtojewish.php` | 0 | 2 |
 | `ext/calendar/jdtojulian.php` | 0 | 2 |
 | `ext/calendar/jdtounix.php` | 0 | 2 |
-| `ext/calendar/jewishtojd.php` | 0 | 2 |
+| `ext/calendar/jewishtojd.php` | 0 | 3 |
 | `ext/calendar/juliantojd.php` | 0 | 2 |
 | `ext/calendar/unixtojd.php` | 0 | 2 |
 | `ext/ctype/CtypeFunction.php` | 0 | 1 |
@@ -5088,6 +5094,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bz2StreamRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/CalDaysInMonthRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CalInfoRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/CalToJdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
@@ -5211,6 +5218,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Internal.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsAnonymousClassRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsNullFn.php` | 0 | 2 |
+| `lib/JIT/Builtin/JdtogregorianRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/JewishtojdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitHelperAbiBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitReturnPending.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitThrow.php` | 0 | 2 |
@@ -7482,6 +7491,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/calendar/CalToJdJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/calendar/CalendarArgs.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7507,6 +7521,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/calendar/JdtogregorianJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/calendar/JewishtojdJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/calendar/JitCalDaysInMonth.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7518,10 +7542,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 2 class method(s)
 
+### `ext/calendar/JitCalToJd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 4 class method(s)
+
 ### `ext/calendar/JitEasterDays.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 4 class method(s)
+
+### `ext/calendar/JitJdtogregorian.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 4 class method(s)
+
+### `ext/calendar/JitJewishtojd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
 - 4 class method(s)
 
 ### `ext/calendar/Module.php`
@@ -7592,6 +7634,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- new ArgumentCountError (line 68)
 - 4 class method(s)
 
 ### `ext/calendar/easter_date.php`
@@ -7640,6 +7683,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- new ArgumentCountError (line 39)
 - 2 class method(s)
 
 ### `ext/calendar/jdtojewish.php`
@@ -7664,6 +7708,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- new ArgumentCountError (line 40)
 - 2 class method(s)
 
 ### `ext/calendar/juliantojd.php`
@@ -27247,13 +27292,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 50)
-- new ArgumentCountError (line 241)
-- new ArgumentCountError (line 256)
-- new ArgumentCountError (line 380)
-- new JITVariable (line 490)
-- new JITVariable (line 501)
-- new JITVariable (line 518)
-- new JITVariable (line 715)
+- new ArgumentCountError (line 262)
+- new ArgumentCountError (line 277)
+- new ArgumentCountError (line 401)
+- new JITVariable (line 511)
+- new JITVariable (line 522)
+- new JITVariable (line 539)
+- new JITVariable (line 736)
 - 26 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
@@ -27896,7 +27941,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/JitGetenvKernel.php`
 
@@ -44894,6 +44939,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/CalToJdRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/CallArgv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -45551,6 +45601,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new is_type (line 20)
 - 1 class method(s)
+
+### `lib/JIT/Builtin/JdtogregorianRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `lib/JIT/Builtin/JewishtojdRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/JitHelperAbiBridge.php`
 
