@@ -8,14 +8,17 @@ use PHPCompiler\ext\standard\StrstrJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** strstr()/stristr() JIT routes through StrstrJitHelper PHP not inline LLVM (#14778). */
+/** strstr()/stristr() AOT uses VmStringCompare scan + slice (#27185); helper kept as SSOT peer. */
 final class StrstrRuntimeShrinkTest extends TestCase
 {
-    public function testStringStrstrUsesJitHelperNotInlineLlvm(): void
+    public function testStringStrstrEmitsScanAbiNotNestedJitBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrstr.php');
-        $this->assertStringContainsString('StrstrJitHelper', $source);
-        $this->assertStringNotContainsString('JitStringSearch::findOffsetI32', $source);
+        $this->assertStringContainsString('phpc_strstr_scan', $source);
+        $this->assertStringContainsString('phpc_stristr_scan', $source);
+        $this->assertStringContainsString('VmStringCompare::findOffset', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('StrstrJitHelper::', $source);
 
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrstr.php');
         $this->assertStringContainsString('StringStrstr::invoke', $jit);
@@ -40,7 +43,7 @@ final class StrstrRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testSpineBundleIncludesStrstrJitHelper(): void
+    public function testSpineBundleIncludesStringStrstr(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('StrstrJitHelper.php', $spine);

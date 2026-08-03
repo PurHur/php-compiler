@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** stristr() for two strings (subset of PHP; JIT via JitStringSearch CI + slice). */
+/** stristr() for two strings (subset of PHP; LLVM via VmStringCompare CI scan + slice). */
 final class stristr extends Internal
 {
     public function execute(Frame $frame): void

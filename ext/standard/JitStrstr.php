@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 /**
- * LLVM lowering for strstr()/stristr()/strchr() via StringStrstr / StrstrJitHelper PHP (#14778).
+ * LLVM lowering for strstr()/stristr()/strchr() via StringStrstr scan ABI (#14778, #27185).
+ *
+ * Boxes {@see StringStrstr} {@see __string__*}|null into `__value__*` string|false.
  */
 
 namespace PHPCompiler\ext\standard;
