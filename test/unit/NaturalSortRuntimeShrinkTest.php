@@ -4,27 +4,50 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\standard\NaturalCompareJitHelper;
 use PHPCompiler\ext\standard\NaturalSortJitHelper;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** natsort()/natcasesort() JIT routes through NaturalSortJitHelper PHP not ArrayBuiltinHelper LLVM (#12753, #14529). */
+/**
+ * natsort()/natcasesort() JIT/AOT uses LLVM `__hashtable__sortPackedNatural*` (#26975);
+ * NaturalSortJitHelper remains Zend-hosted SSOT for unit tests.
+ * strnatcmp NestedJIT must not call VmString (external stub → 0 under thin AOT).
+ */
 final class NaturalSortRuntimeShrinkTest extends TestCase
 {
-    public function testNaturalSortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testNaturalSortRuntimeUsesLlvmPackedNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/NaturalSortRuntime.php');
-        $this->assertStringContainsString('NaturalSortJitHelper', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::natsortByValue', $runtime);
+        $this->assertStringContainsString('__hashtable__sortPackedNatural', $runtime);
+        $this->assertStringContainsString('__hashtable__sortStringKeyValuesNatural', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('NaturalSortJitHelper::natsortByValue', $runtime);
+
+        $hashTableType = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
+        $this->assertStringContainsString('implementSortPackedNatural', $hashTableType);
+        $this->assertStringContainsString("'__hashtable__sortPackedNatural'", $hashTableType);
 
         $natsort = (string) file_get_contents(__DIR__.'/../../ext/standard/natsort_.php');
         $natcasesort = (string) file_get_contents(__DIR__.'/../../ext/standard/natcasesort_.php');
         $this->assertStringContainsString('NaturalSortRuntime::natsortByValue', $natsort);
         $this->assertStringContainsString('NaturalSortRuntime::natcasesortByValue', $natcasesort);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::natsortByValue', $natsort);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::natcasesortByValue', $natcasesort);
+    }
+
+    public function testNaturalCompareJitHelperDoesNotCallVmString(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/NaturalCompareJitHelper.php');
+        // Docblock may @see VmString; the call itself must stay local (#26975 NestedJIT stub).
+        $this->assertStringNotContainsString('VmString::strnatcmp(', $source);
+        $this->assertStringNotContainsString('VmString::strnatcasecmp(', $source);
+        $this->assertStringContainsString('strlen', $source);
+        $this->assertSame(-1, NaturalCompareJitHelper::strnatcmpArgv('img2', 'img10'));
+        $this->assertSame(1, NaturalCompareJitHelper::strnatcmpArgv('img10', 'img2'));
+        $this->assertSame(0, NaturalCompareJitHelper::strnatcmpArgv('a', 'a'));
+        $this->assertSame(VmString::strnatcmp('img2', 'img10'), NaturalCompareJitHelper::strnatcmpArgv('img2', 'img10'));
+        $this->assertSame(VmString::strnatcasecmp('A2', 'a10'), NaturalCompareJitHelper::strnatcasecmpArgv('A2', 'a10'));
     }
 
     public function testNaturalSortJitHelperMatchesVmNatsortSemantics(): void

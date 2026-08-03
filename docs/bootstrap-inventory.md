@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6930 |
-| Phase A inventory files (M2 ratio SSOT) | 6930 |
+| PHP files on vm.php path | 6931 |
+| Phase A inventory files (M2 ratio SSOT) | 6931 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22304 |
+| Source constructs flagged (warnings) | 22305 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5534,6 +5534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNCompare.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNaturalCompare.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringNaturalCompareJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetInterfacesJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetworkServices.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetworkServicesNameLookup.php` | 0 | 1 |
@@ -30852,7 +30853,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/NaturalCompareJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/NaturalSortJitHelper.php`
 
@@ -45961,7 +45962,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/NaturalSortRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php`
 
@@ -47231,7 +47232,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringNaturalCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 3 class method(s)
+
+### `lib/JIT/Builtin/StringNaturalCompareJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
 
 ### `lib/JIT/Builtin/StringNetInterfacesJit.php`
 
@@ -47814,7 +47820,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/HashTable.php`
 
 **Warnings** (review for bootstrap subset):
-- 56 class method(s)
+- 57 class method(s)
 
 ### `lib/JIT/Builtin/Type/MaskedArray.php`
 
