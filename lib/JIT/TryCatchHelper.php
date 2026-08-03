@@ -16,8 +16,10 @@ use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\UncaughtThrowPrinter;
+use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPTypes\Type;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -521,6 +523,9 @@ final class TryCatchHelper
         }
 
         $object = $context->type->object;
+        // Parent chain before allocate — catch may already be lowered (#27107 / #27106).
+        GetClassRuntime::ensureLinked($context);
+        $object->lookup($className);
         $classId = $object->lookup($className);
         $obj = $object->allocate($classId);
         $object->markObjectConstructed($obj);
@@ -556,6 +561,41 @@ final class TryCatchHelper
 
         $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $context->builder->branch($dispatchBb);
+    }
+
+    /**
+     * Class hint for catch-bound $e so method resolution finds Error/Exception proxies (#27106).
+     *
+     * @param list<string> $catchTypes lowercase type names from TYPE_CATCH
+     */
+    private static function catchVariableClassHint(array $catchTypes): string
+    {
+        if ([] === $catchTypes) {
+            return 'Throwable';
+        }
+        $lc = $catchTypes[0];
+        if ('throwable' === $lc) {
+            return 'Throwable';
+        }
+        if ('error' === $lc) {
+            return 'Error';
+        }
+        if ('exception' === $lc) {
+            return 'Exception';
+        }
+        foreach (
+            [
+                'TypeError', 'ValueError', 'ParseError', 'CompileError',
+                'ArgumentCountError', 'UnhandledMatchError', 'ArithmeticError',
+                'DivisionByZeroError', 'AssertionError', 'ErrorException',
+            ] as $name
+        ) {
+            if (strtolower($name) === $lc) {
+                return $name;
+            }
+        }
+
+        return 'Throwable';
     }
 
     public static function emitRethrow(
@@ -783,6 +823,9 @@ final class TryCatchHelper
         $dispatch = self::appendBlock($func, 'try_catch_dispatch_'.$suffix);
         // Pin before catch lowering: emitMergeEntryCheck re-enters dispatchBbFor mid-build (#4041).
         $handler->dispatchBb = $dispatch;
+        // Catch arms compile before the try body — seed Throwable/Error so getMessage /
+        // get_class see full layouts (peer #26854 / #27107, #27106).
+        GetClassRuntime::ensureLinked($context);
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
@@ -836,6 +879,13 @@ final class TryCatchHelper
             try {
             if (null !== $catchOp->arg3) {
                 $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
+                // TYPE_CATCH binds before try-body typing; without a class hint,
+                // $e->getMessage() lowers as object::… and aborts under thin AOT (#27106).
+                $operand->type = new Type(
+                    Type::TYPE_OBJECT,
+                    [],
+                    self::catchVariableClassHint($types)
+                );
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
             }
