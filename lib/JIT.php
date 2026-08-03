@@ -18380,6 +18380,11 @@ class JIT {
         if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
             return false;
         }
+        // Closures inherit func->class via propagateEnclosingClassOntoClosureFunc (#26459).
+        // Only closureBodyUsesThis should add LLVM $this (#27163).
+        if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) {
+            return false;
+        }
         if (null !== $block->func->class) {
             return true;
         }

@@ -189,6 +189,28 @@ PHP;
         $this->assertStringContainsString('__phpcMcjitClassPad', $out);
     }
 
+    /** @covers issue #27163 — nested Closure braces must not skip the MCJIT empty-class pad */
+    public function testPadsPropertylessClassContainingNestedClosure(): void
+    {
+        $in = <<<'PHP'
+<?php
+class A {
+    public function f() {
+        $c = function () {
+            return get_class($this);
+        };
+
+        return $c();
+    }
+}
+var_export((new A())->f());
+echo "\n";
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringContainsString('get_class($this)', $out);
+    }
+
     public function testPrependsBootstrapForReadonlyPromotedOnlyClass(): void
     {
         $in = <<<'PHP'

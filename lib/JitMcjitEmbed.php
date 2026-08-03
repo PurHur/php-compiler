@@ -88,22 +88,20 @@ final class JitMcjitEmbed
         // - docblock phrases like "class constant E::a" cannot span into a following class/enum (#25929)
         // - `eval("class Foo {}")` / string payloads are not rewritten (pad is for top-level JIT IR only, #26424)
         $mask = self::blankPhpOpaqueRegionsPreservingLength($code);
-        if (!preg_match_all(
-            '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+)\b[^{]*)\{((?:[^{}]|\{[^{}]*\})*)\}/',
-            $mask,
-            $matches,
-            PREG_OFFSET_CAPTURE
-        )) {
+        // Brace-balanced scan: the old single-nesting regex missed methods that contain
+        // Closures / nested blocks, so empty classes with `function () { ... }` never got
+        // the MCJIT pad and segfaulted on execute (#27163 / #4954).
+        $matches = self::findBraceBalancedClassDeclarations($mask);
+        if ([] === $matches) {
             return $code;
         }
 
         $out = $code;
         // Apply from the end so earlier offsets stay valid.
-        for ($i = \count($matches[0]) - 1; $i >= 0; --$i) {
-            $full = $matches[0][$i][0];
-            $offset = $matches[0][$i][1];
-            $header = $matches[1][$i][0];
-            $body = $matches[2][$i][0];
+        for ($i = \count($matches) - 1; $i >= 0; --$i) {
+            [$offset, $header, $body] = $matches[$i];
+            $fullLen = \strlen($header) + 1 + \strlen($body) + 1;
+            $full = substr($mask, $offset, $fullLen);
             if (preg_match('/\binterface\s+/i', $header)) {
                 continue;
             }
@@ -111,10 +109,10 @@ final class JitMcjitEmbed
                 continue;
             }
             // Same slices from the real source (comments restored).
-            $realFull = substr($code, $offset, \strlen($full));
             $headerLen = \strlen($header);
             $realHeader = substr($code, $offset, $headerLen);
             $realBody = substr($code, $offset + $headerLen + 1, \strlen($body));
+            $realFull = substr($code, $offset, $fullLen);
             if (str_contains($realBody, '__phpcMcjitClassPad')) {
                 continue;
             }
@@ -136,6 +134,52 @@ final class JitMcjitEmbed
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<array{0: int, 1: string, 2: string}> offset, header (through `{` exclusive), body
+     */
+    private static function findBraceBalancedClassDeclarations(string $mask): array
+    {
+        $matches = [];
+        if (!preg_match_all(
+            '/\b((?:(?:abstract\s+|final\s+|readonly\s+)*)class\s+(?:[\w\\\\]+)\b[^{]*)\{/',
+            $mask,
+            $headers,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return $matches;
+        }
+        $len = \strlen($mask);
+        foreach ($headers[1] as $i => $headerMatch) {
+            $header = $headerMatch[0];
+            $headerOffset = $headerMatch[1];
+            $openBrace = $headers[0][$i][1] + \strlen($headers[0][$i][0]) - 1;
+            if ($openBrace < 0 || $openBrace >= $len || '{' !== $mask[$openBrace]) {
+                continue;
+            }
+            $depth = 1;
+            $bodyStart = $openBrace + 1;
+            $j = $bodyStart;
+            for (; $j < $len; ++$j) {
+                $ch = $mask[$j];
+                if ('{' === $ch) {
+                    ++$depth;
+                } elseif ('}' === $ch) {
+                    --$depth;
+                    if (0 === $depth) {
+                        break;
+                    }
+                }
+            }
+            if (0 !== $depth || $j >= $len) {
+                continue;
+            }
+            $body = substr($mask, $bodyStart, $j - $bodyStart);
+            $matches[] = [$headerOffset, $header, $body];
+        }
+
+        return $matches;
     }
 
     /**
