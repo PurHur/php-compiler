@@ -30,16 +30,30 @@ final class StrIncdecRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_str_decrement', $bridge);
     }
 
-    public function testStrIncdecJitHelperDelegatesToVmString(): void
+    public function testStrIncdecJitHelperInlinesWithoutVmStringCall(): void
     {
+        // NestedJIT must not call VmString — unbound stub segfaults thin AOT (#27345 / #23204).
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StrIncdecJitHelper.php');
-        $this->assertStringContainsString('VmString::strIncrement', $source);
-        $this->assertStringContainsString('VmString::strDecrement', $source);
+        $this->assertDoesNotMatchRegularExpression('/return\s+VmString::str(Increment|Decrement)\s*\(/', $source);
+        $this->assertStringNotContainsString('VmString::strIncrement($', $source);
+        $this->assertStringNotContainsString('VmString::strDecrement($', $source);
+        // VM builtins still SSOT via VmString.
+        $this->assertStringContainsString('VmString::strIncrement', (string) file_get_contents(
+            __DIR__.'/../../ext/standard/str_increment.php'
+        ));
+        $this->assertStringContainsString('VmString::strDecrement', (string) file_get_contents(
+            __DIR__.'/../../ext/standard/str_decrement.php'
+        ));
 
         $this->assertSame('b', StrIncdecJitHelper::incrementArgv('a'));
         $this->assertSame('b', VmString::strIncrement('a'));
         $this->assertSame('a', StrIncdecJitHelper::decrementArgv('b'));
         $this->assertSame('a', VmString::strDecrement('b'));
+        $this->assertSame('10', StrIncdecJitHelper::incrementArgv('9'));
+        $this->assertSame('aa', StrIncdecJitHelper::incrementArgv('z'));
+        $this->assertSame('Ba', StrIncdecJitHelper::incrementArgv('Az'));
+        $this->assertSame('9', StrIncdecJitHelper::decrementArgv('10'));
+        $this->assertSame('z', StrIncdecJitHelper::decrementArgv('aa'));
     }
 
     public function testSpineBundleIncludesStrIncdecJitHelper(): void
