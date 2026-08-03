@@ -9,13 +9,16 @@ use PHPCfg\Op;
 use PHPCfg\Operand;
 
 /**
- * Force NestedJIT of PHPCfg\Parser::parse into the M5 argv / gen-0 module (#26756).
+ * Force NestedJIT of PHPCfg\Parser::parse into the M5 argv / gen-0 module (#26756 / #27426).
  *
  * RuntimeParseM5Native already calls Parser::parse when the symbol is registered;
  * nm on prior tips showed zero PHPCfg\Parser symbols because Runtime.php::parse was
  * C-floor-stubbed and never pulled the vendor class. Opt-in via
- * PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT=1 — default NestedJIT leaves mid-BB
- * terminators and fails module verify on argv refresh.
+ * PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT=1 — default off until NestedJIT ABI is proven.
+ *
+ * Untyped vendor parse() must be NestedJIT'd as
+ * (__object__*, __string__*, __string__*) -> __object__* (see JIT::isM5NestedJitPhpCfgParserParse);
+ * the prior mid-BB / verify failure was often an ABI mismatch (__value__ vs __string__/__object__).
  */
 final class RuntimeParseM5PhpCfgParser
 {
@@ -35,8 +38,8 @@ final class RuntimeParseM5PhpCfgParser
         callable $parseFile
     ): bool {
         $flag = getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT');
-        // Opt-in only: default NestedJIT of Parser::parse leaves mid-BB terminators
-        // and fails module verify during argv refresh (#26756). Set =1 to experiment.
+        // Opt-in only until NestedJIT ABI + body for Parser::parse is proven under argv
+        // refresh (#26756 / #27426). Set =1 to experiment.
         if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
             return false;
         }
