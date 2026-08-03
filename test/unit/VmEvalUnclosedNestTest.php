@@ -31,4 +31,16 @@ final class VmEvalUnclosedNestTest extends TestCase
     {
         $this->assertSame("<?php\nreturn \$x + 1;", VmEval::wrapEvalCode('$x + 1'));
     }
+
+    /** @covers \PHPCompiler\ext\standard\VmEval::normalizeParseMessage */
+    public function testNormalizeParseMessageUsesZendUnclosedBrace(): void
+    {
+        $this->assertSame(
+            "Unclosed '{'",
+            VmEval::normalizeParseMessage(
+                'eval(): Syntax error, unexpected EOF on line 2',
+                'class X { function foo() {'
+            )
+        );
+    }
 }

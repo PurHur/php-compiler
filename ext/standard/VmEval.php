@@ -252,11 +252,14 @@ final class VmEval
     }
 
     /**
-     * Map php-parser diagnostics toward Zend scanner/parser wording (#26691).
+     * Map php-parser diagnostics toward Zend scanner/parser wording (#26691, #27107).
+     *
+     * Public for AOT TYPE_EVAL emit of catchable ParseError (EvalRuntime) — same text as
+     * {@see failEvalParse()} / VM.
      *
      * php-src: Zend/zend_language_scanner.l — check_nesting_at_end() / report_bad_nesting().
      */
-    private static function normalizeParseMessage(string $detail, ?string $code = null): string
+    public static function normalizeParseMessage(string $detail, ?string $code = null): string
     {
         if (null !== $code) {
             $open = self::innermostUnclosedNestChar($code);

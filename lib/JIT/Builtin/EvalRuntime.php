@@ -10,11 +10,11 @@ use PHPCompiler\Block;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\IncludeHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
-use PHPCompiler\OpCode;
 use PHPCompiler\Runtime;
 
 /**
@@ -45,10 +45,10 @@ final class EvalRuntime
 
             // Type/function decls: bin/jit.php VM-lowers via Block::literalEvalSourceNeedsVm
             // (#25535). AOT still lowers TYPE_EVAL here — must not emitFalse without first
-            // surfacing CompileFatal (final plain property on reference profile → parsed_ok, #26169).
+            // surfacing CompileFatal (final plain property on reference profile → parsed_ok, #26169)
+            // or a catchable ParseError for syntax rejects (unclosed class body → ok, #27107).
             if (Block::literalEvalSourceNeedsVm($literal)) {
-                self::assertDeclLiteralEvalOrThrow($literal, $evalFile);
-                self::emitFalse($jit, $resultOp);
+                self::compileDeclLiteralEval($jit, $resultOp, $literal, $evalFile);
 
                 return;
             }
@@ -57,7 +57,7 @@ final class EvalRuntime
             $evalBlock = VmEval::tryCompileBlock($jit->context->runtime, $literal, $evalFile);
             if ($evalBlock instanceof Block) {
                 $evalBlock->setScriptPath($evalFile);
-                IncludeHelper::compileInlinedBlock(
+                \PHPCompiler\JIT\IncludeHelper::compileInlinedBlock(
                     $jit,
                     $func,
                     $callerBlock,
@@ -69,6 +69,11 @@ final class EvalRuntime
 
                 return;
             }
+
+            // Zend eval() throws ParseError on syntax failure — never silently return false (#27107).
+            self::emitEvalParseError($jit, $literal, $evalFile, Runtime::getLastParseFailure());
+
+            return;
         }
 
         self::emitFalse($jit, $resultOp);
@@ -78,19 +83,70 @@ final class EvalRuntime
      * Probe class/function-declaring eval on an isolated Runtime so CompileFatal propagates
      * during AOT/JIT emit without registering decls into the outer compile unit (#26169).
      *
-     * {@see Runtime::parseAndCompile()} suppresses stderr for eval()'d filenames (VM prints via
-     * raiseEvalCompileFatal). AOT must emit the Zend-shaped line here before rethrowing.
+     * Syntax rejects become catchable ParseError at runtime (#27107 / VmEval::failEvalParse).
+     * Non-syntax CompileFatal (reference-profile rejectors) still abort the AOT build (#26169).
      */
-    private static function assertDeclLiteralEvalOrThrow(string $literal, string $evalFile): void
-    {
+    private static function compileDeclLiteralEval(
+        JIT $jit,
+        Operand $resultOp,
+        string $literal,
+        string $evalFile
+    ): void {
         try {
-            VmEval::tryCompileBlockOrThrowCompileFatal(new Runtime(), $literal, $evalFile);
+            $evalBlock = VmEval::tryCompileBlockOrThrowCompileFatal(new Runtime(), $literal, $evalFile);
         } catch (CompileFatal $e) {
+            if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
+                self::emitEvalParseError($jit, $literal, $evalFile, $e->getMessage());
+
+                return;
+            }
+            // Reference-profile / compile-time fatals: Zend exits uncatchable — abort emit (#26169).
             if (\defined('STDERR') && \is_resource(STDERR)) {
                 fwrite(STDERR, $e->zendStderrLine());
             }
             throw $e;
         }
+
+        if (!$evalBlock instanceof Block) {
+            self::emitEvalParseError($jit, $literal, $evalFile, Runtime::getLastParseFailure());
+
+            return;
+        }
+
+        // Decl succeeded but cannot MCJIT-inline into the outer unit (#25535).
+        self::emitFalse($jit, $resultOp);
+    }
+
+    /**
+     * Emit catchable ParseError matching VmEval::failEvalParse / php-src zif_eval (#27107).
+     *
+     * Seed Error→CompileError→ParseError before allocate so catch(Throwable) / get_class work
+     * under thin AOT (external-only class without parents aborted previously).
+     */
+    private static function emitEvalParseError(
+        JIT $jit,
+        string $literal,
+        string $evalFile,
+        ?string $detail
+    ): void {
+        $message = VmEval::normalizeParseMessage(
+            $detail ?? 'Parse error',
+            $literal
+        );
+        $object = $jit->context->type->object;
+        // Parent chain before ParseError allocate (#27107).
+        $object->lookup('Error');
+        $object->lookup('CompileError');
+        $object->lookup('ParseError');
+        TryCatchHelper::emitCatchableClassError(
+            $jit->context,
+            'ParseError',
+            $message,
+            $jit,
+            $evalFile,
+            1
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($jit->context, 'eval_parse_error_cont');
     }
 
     public static function emitFalse(JIT $jit, Operand $resultOp): void
