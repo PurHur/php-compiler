@@ -814,10 +814,12 @@ class Context {
             'phpc_cosh_kernel',
             'phpc_sin_kernel',
             'phpc_tan_kernel',
+            'phpc_tanh_kernel',
             'phpc_acos_kernel',
             'phpc_exp_kernel',
             'phpc_log_kernel',
             'phpc_log10_kernel',
+
             'phpc_deg2rad_kernel',
             'phpc_rad2deg_kernel',
             'phpc_floor_kernel',

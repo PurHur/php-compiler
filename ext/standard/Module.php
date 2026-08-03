@@ -688,10 +688,12 @@ class Module extends ModuleAbstract
             new phpc_cosh_kernel(),
             new phpc_sin_kernel(),
             new phpc_tan_kernel(),
+            new phpc_tanh_kernel(),
             new phpc_acos_kernel(),
             new phpc_exp_kernel(),
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
+
             new phpc_deg2rad_kernel(),
             new phpc_rad2deg_kernel(),
             new phpc_floor_kernel(),

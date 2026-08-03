@@ -106,12 +106,14 @@ final class LibcExtern
             'cosh' => [$dbl, false, [$dbl]],
             'sin' => [$dbl, false, [$dbl]],
             'tan' => [$dbl, false, [$dbl]],
+            'tanh' => [$dbl, false, [$dbl]],
             'acos' => [$dbl, false, [$dbl]],
             'exp' => [$dbl, false, [$dbl]],
             'log' => [$dbl, false, [$dbl]],
             'log10' => [$dbl, false, [$dbl]],
             'floor' => [$dbl, false, [$dbl]],
             'sqrt' => [$dbl, false, [$dbl]],
+
             // VmFloatCompare NestedJIT (#21109 / #9976) — math.h
             'isnan' => [$i32, false, [$dbl]],
             'isinf' => [$i32, false, [$dbl]],
