@@ -76,6 +76,7 @@ final class OpensslEncryptRuntime
             // Helper uses base64_encode/decode; those ABIs no-op while NestedJIT is active (#21065).
             StringBase64Encode::ensureLinked($context);
             StringBase64Decode::ensureLinked($context);
+            \PHPCompiler\ext\openssl\JitOpensslCipherKernel::ensureEvpLeaves($context);
             self::ensureJitHelperCompiled($context);
             self::implementIfMissing($context, '__compiler_openssl_encrypt', self::implementEncryptBridge(...));
             self::implementIfMissing($context, '__compiler_openssl_decrypt', self::implementDecryptBridge(...));

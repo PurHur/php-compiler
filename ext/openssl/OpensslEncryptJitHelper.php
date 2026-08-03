@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 /**
- * openssl_encrypt()/openssl_decrypt() for compiled JIT/AOT modules (#21065, AEAD #21135, php-in-PHP).
+ * openssl_encrypt()/openssl_decrypt() NestedJIT helper (#21065, AEAD #21135).
+ *
+ * Used when &$tag is present (AEAD / null-tag writeback). Non-AEAD without &$tag goes through
+ * {@see JitOpensslCipherKernel} EVP leaves directly from {@see JitOpensslEncrypt} (#27265) because
+ * thin-standalone AOT has no FFI.
  *
  * SSOT: {@see VmOpenssl}, {@see VmOpensslCipherNative}
  * php-src: ext/openssl/openssl.c
- *
- * When $tagMode != 0, ciphertext is returned and the AEAD tag (or null for non-AEAD) is stashed on
- * {@see VmOpensslCipherNative} for takeEncryptTag* so LLVM can write &$tag (no NestedJIT statics).
  */
 final class OpensslEncryptJitHelper
 {
