@@ -213,9 +213,17 @@ final class ValueEchoRuntime
             $context->lookupFunction('__value__readDouble'),
             $valuePtr
         );
-        $context->builder->call(
-            $context->lookupFunction('__phpc_ob_echo_double'),
-            $doubleVal
+        // Boxed AOT temps (echo INF / fdiv result) must match Zend casing — not libc
+        // snprintf "inf" via __phpc_ob_echo_double (#27412; peer native path #21963).
+        $formatted = ZendDoubleStringRuntime::format($context, $doubleVal);
+        ValueEchoHelper::echoStringVariable(
+            $context,
+            new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $formatted
+            )
         );
         $context->builder->branch($doneBlock);
 
