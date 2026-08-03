@@ -91,7 +91,7 @@ final class JitArrayElem
             $errBlock = BasicBlockHelper::append($context, 'array_elem_req_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            // Boxed null under try/catch SSA must say "null given", not "mixed" (#27448 / #27446).
+            // Boxed null under try/catch SSA must say "null given", not "mixed" (#27447 / #27448).
             $typeField = $context->structFieldMap['__value__']['type'];
             $typeByte = $context->builder->load(
                 $context->builder->structGep($loaded, $typeField)
@@ -308,6 +308,7 @@ final class JitArrayElem
      */
     private static function emitErrorAndAbort(Context $context, string $message): void
     {
+        // Catchable in try/catch; uncaught AOT uses abort_if_pending (not raw abort) (#27447 / #27448).
         ExceptionBridge::emitTypeErrorAndAbort($context, $message);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'array_elem_te_cont');
     }

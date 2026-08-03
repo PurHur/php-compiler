@@ -14,7 +14,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayKeyExistsRuntime;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -61,47 +60,23 @@ final class array_key_exists extends Internal
         }
         $key = $args[0];
         $array = $args[1];
+        // php-src 8.0+ Z_PARAM_ARRAY — TypeError on null (catchable under AOT; #27447).
+        if (JITVariable::TYPE_NULL === $array->type || ($array->isNullConstant ?? false)) {
+            JitArrayElem::requireArrayParam($context, $array, $fn, 2, 'array');
+
+            return $context->constantFromInteger(0, 'int1');
+        }
         if (JITVariable::TYPE_HASHTABLE !== $array->type
             && !($array->type & JITVariable::IS_NATIVE_ARRAY)
         ) {
+            JitArrayElem::requireArrayParam($context, $array, $fn, 2, 'array');
             if (JITVariable::TYPE_VALUE === $array->type) {
-                JitArrayElem::requireArrayParam($context, $array, $fn, 2, 'array');
-
                 return ArrayKeyExistsRuntime::keyExists($context, $key, $array, $fn);
             }
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::registerDeclarations($context);
-            TypeErrorRaise::emitRaise(
-                $context,
-                \sprintf(
-                    '%s(): Argument #2 ($array) must be of type array, %s given',
-                    $fn,
-                    self::jitArgTypeLabel($array)
-                )
-            );
-            $context->builder->call($context->lookupFunction('abort'));
 
             return $context->constantFromInteger(0, 'int1');
         }
 
         return ArrayKeyExistsRuntime::keyExists($context, $key, $array, $fn);
-    }
-
-    private static function jitArgTypeLabel(JITVariable $arg): string
-    {
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return 'int';
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return 'float';
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return 'bool';
-            case JITVariable::TYPE_STRING:
-                return 'string';
-            case JITVariable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
     }
 }
