@@ -5,20 +5,35 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\tokenizer;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for token_name() (#3171, #7254). */
+/**
+ * LLVM lowering for token_name() (#3171, #7254, #27278).
+ *
+ * Compile-time T_* / ConstantInt folding stays as an optional fast path.
+ * Runtime ints (e.g. token_get_all()[$i][0]) use an inline id→name select-walk
+ * (peer: {@see \PHPCompiler\JIT\Call\PhpTokenGetTokenName}).
+ *
+ * php-src: ext/tokenizer/tokenizer.c — PHP_FUNCTION(token_name)
+ */
 final class JitTokenName
 {
     public static function lower(Context $context, JITVariable $arg): Value
     {
-        $name = self::resolveCompileTimeName($context, $arg);
+        $folded = self::tryResolveCompileTimeName($context, $arg);
+        if (null !== $folded) {
+            return $context->builder->load($context->constantStringFromString($folded));
+        }
 
-        return $context->builder->load($context->constantStringFromString($name));
+        $tokenId = JitLongArg::lower($context, $arg, 'token_name() argument');
+
+        return self::emitNameSelectWalk($context, $tokenId);
     }
 
-    private static function resolveCompileTimeName(Context $context, JITVariable $arg): string
+    private static function tryResolveCompileTimeName(Context $context, JITVariable $arg): ?string
     {
         if (null !== $arg->compileTimeConstantName) {
             $constants = TokenConstants::registeredConstants();
@@ -33,16 +48,29 @@ final class JitTokenName
             if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
                 $id = (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
                 $name = TokenConstants::nameForId($id);
-                if (null !== $name) {
-                    return $name;
-                }
 
-                return 'UNKNOWN';
+                return null !== $name ? $name : 'UNKNOWN';
             }
         }
 
-        throw new \LogicException(
-            'token_name() argument must be a compile-time T_* constant in this compiler build'
-        );
+        return null;
+    }
+
+    /** @return Value {@see __string__*} */
+    private static function emitNameSelectWalk(Context $context, Value $tokenId): Value
+    {
+        $result = $context->builder->load($context->constantStringFromString('UNKNOWN'));
+        // Prefer the committed lexer map so AOT ids from LanguageScanner / token_get_all match.
+        foreach (TokenConstantsData::idToName() as $id => $name) {
+            if ('TOKEN_PARSE' === $name) {
+                continue;
+            }
+            $expected = $context->constantFromInteger((int) $id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $tokenId, $expected);
+            $candidate = $context->builder->load($context->constantStringFromString((string) $name));
+            $result = $context->builder->select($isId, $candidate, $result);
+        }
+
+        return $result;
     }
 }
