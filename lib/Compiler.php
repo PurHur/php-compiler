@@ -9182,12 +9182,8 @@ class Compiler {
         // php-src zend_API.c — private(set) promoted props are implicitly final (#23068).
         $declare->propertyFinal = $explicitFinal
             || PropertyVisibility::isImplicitlyFinalFromPrivateSet((int) $declare->propertySetVisibility);
-        if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
-            // php-src Zend/zend_compile.c — pre-8.4 (#24895, re-#22451/#22308).
-            $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
-            $propName = $param->name instanceof Operand\Literal && is_string($param->name->value)
-                ? $param->name->value
-                : 'property';
+        if ($explicitFinal && !CompilerVersion::supportsFinalPromotedProperties()) {
+            // php-src Zend/zend_compile.c — final on parameter rejected until 8.5 (#27123).
             $sourceFile = $param->getFile();
             if ('' === $sourceFile) {
                 $sourceFile = 'unknown';
@@ -9195,11 +9191,7 @@ class Compiler {
             throw new CompileFatal(
                 $sourceFile,
                 max(1, $param->getLine()),
-                sprintf(
-                    'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
-                    $classDisplay,
-                    $propName
-                )
+                \PHPCompiler\Ast\FinalPromotedPropertyRewriter::REFERENCE_PROFILE_FINAL_ON_PARAMETER
             );
         }
         $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(

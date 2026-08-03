@@ -12,8 +12,8 @@ final class FinalPromotedPropertyRewriterTest extends TestCase
 {
     public function testRewritesPublicFinalPromotedParam(): void
     {
-        if (!CompilerVersion::supportsFinalProperties()) {
-            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+        if (!CompilerVersion::supportsFinalPromotedProperties()) {
+            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.5');
         }
         $src = <<<'PHP'
 <?php
@@ -32,8 +32,8 @@ PHP;
 
     public function testRewritesPrivateAndProtectedFinal(): void
     {
-        if (!CompilerVersion::supportsFinalProperties()) {
-            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+        if (!CompilerVersion::supportsFinalPromotedProperties()) {
+            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.5');
         }
         $src = <<<'PHP'
 <?php
@@ -52,8 +52,8 @@ PHP;
 
     public function testBareFinalPromotesAsPublic(): void
     {
-        if (!CompilerVersion::supportsFinalProperties()) {
-            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+        if (!CompilerVersion::supportsFinalPromotedProperties()) {
+            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.5');
         }
         $src = '<?php class C { public function __construct(final string $x) {} }';
         $out = FinalPromotedPropertyRewriter::rewrite($src);
@@ -65,8 +65,8 @@ PHP;
 
     public function testLeavesPlainFinalPropertyUntouched(): void
     {
-        if (!CompilerVersion::supportsFinalProperties()) {
-            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.4');
+        if (!CompilerVersion::supportsFinalPromotedProperties()) {
+            self::markTestSkipped('requires PHP_COMPILER_PROFILE=8.5');
         }
         $src = <<<'PHP'
 <?php
@@ -77,9 +77,32 @@ PHP;
         self::assertSame($src, FinalPromotedPropertyRewriter::rewrite($src));
     }
 
+    public function testNoopOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertFalse(CompilerVersion::supportsFinalPromotedProperties());
+            $src = '<?php class C { public function __construct(public final string $x) {} }';
+            self::assertSame($src, FinalPromotedPropertyRewriter::rewrite($src));
+            $err = FinalPromotedPropertyRewriter::referenceProfileSyntaxError($src);
+            self::assertNotNull($err);
+            self::assertSame(
+                FinalPromotedPropertyRewriter::REFERENCE_PROFILE_FINAL_ON_PARAMETER,
+                $err['message']
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testNoopOnReferenceProfile(): void
     {
-        if (CompilerVersion::supportsFinalProperties()) {
+        if (CompilerVersion::supportsFinalPromotedProperties()) {
             self::markTestSkipped('reference-profile only');
         }
         $src = '<?php class C { public function __construct(public final string $x) {} }';

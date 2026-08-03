@@ -393,6 +393,7 @@ class Runtime {
         GlobalTypedConstSyntaxRejector::reject($code, $filename);
         GlobalDeprecatedConstSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
+        FinalPromotedPropertySyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();
         $code = TryCatchElseSupport::extract($code);
