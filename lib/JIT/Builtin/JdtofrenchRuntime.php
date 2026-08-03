@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT\Builtin;
+
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value;
+
+/**
+ * JIT/AOT link for jdtofrench() via JdtofrenchJitHelper PHP (#27383).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (peer jdtogregorian #27355).
+ * SSOT: {@see \PHPCompiler\ext\calendar\VmJewishFrenchCalendar}.
+ * php-src: ext/calendar/calendar.c — PHP_FUNCTION(jdtofrench)
+ */
+final class JdtofrenchRuntime
+{
+    private const ABI = 'phpc_jdtofrench';
+
+    private const HELPER_PATH = '/ext/calendar/JdtofrenchJitHelper.php';
+
+    private const HELPER = 'PHPCompiler\\ext\\calendar\\JdtofrenchJitHelper::jdtofrenchArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER,
+    ];
+
+    /** @var list<string> */
+    private const BUNDLE_PATHS = [
+        '/ext/calendar/CalendarConstants.php',
+        '/ext/calendar/CalendarTables.php',
+        '/ext/calendar/VmJewishFrenchCalendar.php',
+        self::HELPER_PATH,
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
+    }
+
+    public static function invoke(Context $context, Value $julianDay): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI),
+            $julianDay
+        );
+    }
+
+    private static function implement(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        if (self::helpersMissing($context)) {
+            JitVmHelperLink::ensureCompiledBundle(
+                $context,
+                self::BUNDLE_PATHS,
+                self::COMPILED_HELPERS,
+                '#27383'
+            );
+        }
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            'jdtofrench_bridge_entry',
+            [$i64],
+            $strPtr,
+            self::HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#27383'
+        );
+    }
+
+    private static function helpersMissing(Context $context): bool
+    {
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
