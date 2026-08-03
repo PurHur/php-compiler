@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6890 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22206 |
+| Source constructs flagged (warnings) | 22205 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5270,7 +5270,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ObOutputExecCaptureRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ObOutputJitBridge.php` | 0 | 2 |
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ObStatusRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ObStatusRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObStorageGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslDigestCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslDigestRuntime.php` | 0 | 1 |
@@ -45819,7 +45819,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObStatusRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 423)
 - 17 class method(s)
 
 ### `lib/JIT/Builtin/ObStorageGlobals.php`
