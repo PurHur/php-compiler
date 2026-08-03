@@ -62,6 +62,12 @@ final class PregMatchRuntime
 
     private const REPLACE_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceArgv';
 
+    private const REPLACE_FIND_NEXT = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceFindNext';
+
+    private const TAKE_LAST_REPLACE_POS = 'PHPCompiler\\ext\\standard\\PregJitHelper::takeLastReplacePos';
+
+    private const TAKE_LAST_REPLACE_BODY_LEN = 'PHPCompiler\\ext\\standard\\PregJitHelper::takeLastReplaceBodyLen';
+
     private const REPLACE_CALLBACK_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceCallbackArgv';
 
     private const REPLACE_CALLBACK_ARRAY_HELPER =
@@ -86,6 +92,9 @@ final class PregMatchRuntime
         self::MATCH_ALL_EX_HELPER,
         self::TAKE_MATCH_ALL_EX_HT,
         self::REPLACE_HELPER,
+        self::REPLACE_FIND_NEXT,
+        self::TAKE_LAST_REPLACE_POS,
+        self::TAKE_LAST_REPLACE_BODY_LEN,
         self::REPLACE_CALLBACK_HELPER,
         self::REPLACE_CALLBACK_ARRAY_HELPER,
         self::SPLIT_HELPER,
@@ -388,12 +397,152 @@ final class PregMatchRuntime
             return;
         }
 
+        // Always use int-find + LLVM concat — NestedJIT string returns are corrupt under thin
+        // AOT and sticky under HELPER_RUNTIME_O=0 (#27181). Embed also benefits.
+        self::implementThinReplaceBridge($context, $probe);
+    }
+
+    /**
+     * Thin AOT: NestedJIT finds match offsets (ints) on the *original* subject; LLVM
+     * concatenates durable subject slices + replacement (#27181).
+     * Never re-search a rebuilt haystack (StrReplace #23912 sticky-suffix peer).
+     */
+    private static function implementThinReplaceBridge(Context $context, ?LlvmFunction $probe): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $map = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                '__compiler_preg_replace',
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i64)
+            );
+        $entry = $fn->appendBasicBlock('preg_replace_thin_entry');
+        $zeroLimBb = $fn->appendBasicBlock('preg_replace_thin_zero_limit');
+        $initBb = $fn->appendBasicBlock('preg_replace_thin_init');
+        $headBb = $fn->appendBasicBlock('preg_replace_thin_head');
+        $findBb = $fn->appendBasicBlock('preg_replace_thin_find');
+        $failBb = $fn->appendBasicBlock('preg_replace_thin_fail');
+        $matchBb = $fn->appendBasicBlock('preg_replace_thin_match');
+        $restBb = $fn->appendBasicBlock('preg_replace_thin_rest');
+        $doneBb = $fn->appendBasicBlock('preg_replace_thin_done');
+        $context->builder->positionAtEnd($entry);
+
+        $zeroLimit = $context->builder->icmp(Builder::INT_EQ, $fn->getParam(3), $zero);
+        $context->builder->branchIf($zeroLimit, $zeroLimBb, $initBb);
+
+        $context->builder->positionAtEnd($zeroLimBb);
+        $context->builder->returnValue($fn->getParam(2));
+
+        $context->builder->positionAtEnd($initBb);
+        $offSlot = $context->builder->alloca($i64, 1, 'preg_replace_off');
+        $nSlot = $context->builder->alloca($i64, 1, 'preg_replace_n');
+        $outSlot = $context->builder->alloca($strPtr, 1, 'preg_replace_out');
+        $context->builder->store($zero, $offSlot);
+        $context->builder->store($zero, $nSlot);
+        $empty = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
+        $context->builder->store($empty, $outSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $limit = $fn->getParam(3);
+        $n = $context->builder->load($nSlot);
+        $limitNonNeg = $context->builder->icmp(Builder::INT_SGE, $limit, $zero);
+        $atLimit = $context->builder->icmp(Builder::INT_SGE, $n, $limit);
+        $stopLimit = $context->builder->and($limitNonNeg, $atLimit);
+        $context->builder->branchIf($stopLimit, $restBb, $findBb);
+
+        $context->builder->positionAtEnd($findBb);
+        $off = $context->builder->load($offSlot);
+        // Always scan original subject param — never a rebuilt haystack (#23912 / #27181).
+        $rcRaw = $context->builder->call(
+            self::helperFunction($context, self::REPLACE_FIND_NEXT),
+            $fn->getParam(0),
+            $fn->getParam(2),
+            $off
+        );
+        $rc = JitNestedHelperCoerce::coerceBridgeResult($context, $rcRaw, $i64);
+        $isErr = $context->builder->icmp(Builder::INT_SLT, $rc, $zero);
+        $isMatch = $context->builder->icmp(Builder::INT_EQ, $rc, $one);
+        $afterErr = $fn->appendBasicBlock('preg_replace_thin_after_err');
+        $context->builder->branchIf($isErr, $failBb, $afterErr);
+        $context->builder->positionAtEnd($afterErr);
+        $context->builder->branchIf($isMatch, $matchBb, $restBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($matchBb);
+        $posRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_POS));
+        $blenRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_BODY_LEN));
+        $pos = JitNestedHelperCoerce::coerceBridgeResult($context, $posRaw, $i64);
+        $blen = JitNestedHelperCoerce::coerceBridgeResult($context, $blenRaw, $i64);
+        $subj = $fn->getParam(2);
+        $repl = $fn->getParam(1);
+        $curOff = $context->builder->load($offSlot);
+        $prefixLen = $context->builder->sub($pos, $curOff);
+        $replLen = $context->builder->load($context->builder->structGep($repl, $map['length']));
+        $out = $context->builder->load($outSlot);
+        $outLen = $context->builder->load($context->builder->structGep($out, $map['length']));
+        $total = $context->builder->add(
+            $context->builder->add($outLen, $prefixLen),
+            $replLen
+        );
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $total);
+        // Peer String_::concat — structGep value (no int8* cast); re-point intrinsic builder (#2967).
+        $context->intrinsic->builder = $context->builder;
+        $destChar = $context->builder->structGep($dest, $map['value']);
+        $outChar = $context->builder->structGep($out, $map['value']);
+        $subjChar = $context->builder->structGep($subj, $map['value']);
+        $replChar = $context->builder->structGep($repl, $map['value']);
+        $context->intrinsic->memcpy($destChar, $outChar, $outLen, false);
+        $atPrefix = $context->builder->gep($destChar, $outLen);
+        $srcPrefix = $context->builder->gep($subjChar, $curOff);
+        $context->intrinsic->memcpy($atPrefix, $srcPrefix, $prefixLen, false);
+        $atRepl = $context->builder->gep($atPrefix, $prefixLen);
+        $context->intrinsic->memcpy($atRepl, $replChar, $replLen, false);
+        $context->builder->store($dest, $outSlot);
+        $context->builder->store($context->builder->add($pos, $blen), $offSlot);
+        $context->builder->store($context->builder->add($n, $one), $nSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($restBb);
+        $subj = $fn->getParam(2);
+        $subjLen = $context->builder->load($context->builder->structGep($subj, $map['length']));
+        $restOff = $context->builder->load($offSlot);
+        $restLen = $context->builder->sub($subjLen, $restOff);
+        $out = $context->builder->load($outSlot);
+        $outLen = $context->builder->load($context->builder->structGep($out, $map['length']));
+        $total = $context->builder->add($outLen, $restLen);
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $total);
+        $context->intrinsic->builder = $context->builder;
+        $destChar = $context->builder->structGep($dest, $map['value']);
+        $outChar = $context->builder->structGep($out, $map['value']);
+        $subjChar = $context->builder->structGep($subj, $map['value']);
+        $context->intrinsic->memcpy($destChar, $outChar, $outLen, false);
+        $atRest = $context->builder->gep($destChar, $outLen);
+        $srcRest = $context->builder->gep($subjChar, $restOff);
+        $context->intrinsic->memcpy($atRest, $srcRest, $restLen, false);
+        $context->builder->store($dest, $outSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnValue($context->builder->load($outSlot));
+        $context->registerFunction('__compiler_preg_replace', $fn);
+    }
+
+    /** Embed/JIT: NestedJIT VmPregNative string return is durable under MCJIT. */
+    private static function implementEmbedReplaceBridge(Context $context, ?LlvmFunction $probe): void
+    {
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
-                $abiName,
+                '__compiler_preg_replace',
                 $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i64)
             );
         $entry = $fn->appendBasicBlock('preg_replace_entry');
@@ -415,7 +564,7 @@ final class PregMatchRuntime
 
         $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue(JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw));
-        $context->registerFunction($abiName, $fn);
+        $context->registerFunction('__compiler_preg_replace', $fn);
     }
 
     private static function implementReplaceCallbackBridge(Context $context): void
@@ -676,6 +825,7 @@ final class PregMatchRuntime
             ]
             : [
                 '/ext/standard/StdlibConstants.php',
+                '/ext/standard/PregAotFastPath.php',
                 '/ext/standard/VmPregPattern.php',
                 '/ext/standard/VmPregNative.php',
                 '/ext/standard/VmPregMatches.php',

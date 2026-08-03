@@ -187,7 +187,18 @@ final class preg_replace extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
+        $limitLit = 4 === $argc ? self::compileTimeLimit($args[3]) : -1;
         if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+            $folded = JitPregReplaceCompileTime::tryFoldReplaceString(
+                $context,
+                $args[0],
+                $args[1],
+                $args[2],
+                $limitLit
+            );
+            if (null !== $folded) {
+                return $folded;
+            }
             return JitPregReplace::invokeString(
                 $context,
                 $pattern,

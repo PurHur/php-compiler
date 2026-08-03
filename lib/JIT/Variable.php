@@ -258,6 +258,14 @@ final class Variable {
     /** Inline `[]` literal with no elements yet at JIT emit time (#11729). */
     public bool $compileTimeEmptyArrayLiteral = false;
 
+    /**
+     * Packed string literals from INIT_ARRAY / `$a[]=` when every element had
+     * {@see $compileTimeString} (#27181 preg_filter/replace fold).
+     *
+     * @var array<int, string>|null
+     */
+    public ?array $compileTimeArray = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

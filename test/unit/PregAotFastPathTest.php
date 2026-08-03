@@ -48,6 +48,11 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame('bXb', PregAotFastPath::replaceOrEmpty('/a/', 'X', 'bab', -1));
         $this->assertSame(1, PregAotFastPath::patternKind('#a#'));
         $this->assertSame('bXb', PregAotFastPath::replaceOrEmpty('#a#', 'X', 'bab', -1));
+        // Issue #27181 — int-only find for LLVM concat bridge.
+        $this->assertSame(1, PregAotFastPath::replaceFindNext('/a/', 'bab', 0));
+        $this->assertSame(1, PregAotFastPath::takeLastReplacePos());
+        $this->assertSame(1, PregAotFastPath::takeLastReplaceBodyLen());
+        $this->assertSame(0, PregAotFastPath::replaceFindNext('/a/', 'xyz', 0));
     }
 
     public function testLiteralCaptureGroups(): void

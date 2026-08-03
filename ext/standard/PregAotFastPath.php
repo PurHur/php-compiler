@@ -187,6 +187,10 @@ final class PregAotFastPath
         return true;
     }
 
+    private static int $lastReplacePos = -1;
+
+    private static int $lastReplaceBodyLen = 0;
+
     public static function replaceOrEmpty(string $pattern, string $replacement, string $subject, int $limit): string
     {
         $kind = self::patternKind($pattern);
@@ -198,6 +202,91 @@ final class PregAotFastPath
         }
 
         return self::replaceClassPlus($kind, $replacement, $subject, $limit);
+    }
+
+    /**
+     * Find next literal match — NestedJIT int-only (#27181).
+     * Result offsets in {@see $lastReplacePos} / {@see $lastReplaceBodyLen}.
+     *
+     * @return int 1 matched, 0 no match, -1 unsupported
+     */
+    public static function replaceFindNext(string $pattern, string $subject, int $offset): int
+    {
+        self::$lastReplacePos = -1;
+        self::$lastReplaceBodyLen = 0;
+        $kind = self::patternKind($pattern);
+        if (0 === $kind || 8 === $kind || 9 === $kind) {
+            return -1;
+        }
+        if (1 !== $kind) {
+            // Class-plus: scan for first class run at/after offset.
+            return self::findClassPlus($kind, $subject, $offset);
+        }
+        $close = self::delimitedBodyClose($pattern);
+        if ($close < 1) {
+            return -1;
+        }
+        $body = \substr($pattern, 1, $close - 1);
+        $bodyLen = \strlen($body);
+        $subLen = \strlen($subject);
+        if (0 === $bodyLen) {
+            return -1;
+        }
+        self::$lastReplaceBodyLen = $bodyLen;
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i + $bodyLen <= $subLen) {
+            if (self::literalEqualsAt($subject, $i, $body, $bodyLen)) {
+                self::$lastReplacePos = $i;
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    public static function takeLastReplacePos(): int
+    {
+        return self::$lastReplacePos;
+    }
+
+    public static function takeLastReplaceBodyLen(): int
+    {
+        return self::$lastReplaceBodyLen;
+    }
+
+    private static function findClassPlus(int $kind, string $subject, int $offset): int
+    {
+        $charClass = 2;
+        if (4 === $kind || 5 === $kind) {
+            $charClass = 3;
+        } elseif (6 === $kind || 7 === $kind) {
+            $charClass = 4;
+        }
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i < $subLen) {
+            if (self::charInClass(\substr($subject, $i, 1), $charClass)) {
+                $j = $i + 1;
+                while ($j < $subLen && self::charInClass(\substr($subject, $j, 1), $charClass)) {
+                    ++$j;
+                }
+                self::$lastReplacePos = $i;
+                self::$lastReplaceBodyLen = $j - $i;
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
     }
 
     private static function clearCaps(): void

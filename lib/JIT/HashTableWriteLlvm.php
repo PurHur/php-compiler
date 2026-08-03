@@ -764,10 +764,22 @@ final class HashTableWriteLlvm
             );
             self::setAtIndex($context, $ht, $index, $element);
             $array->nextFreeElementFromRuntime = true;
+            // Track string literals for compile-time folds (preg_filter #27181 / str_replace peers).
+            $cts = $element->compileTimeString;
+            if (null !== $cts) {
+                if (!\is_array($array->compileTimeArray)) {
+                    $array->compileTimeArray = [];
+                }
+                $array->compileTimeArray[$array->nextFreeElement] = $cts;
+            } else {
+                $array->compileTimeArray = null;
+            }
             ++$array->nextFreeElement;
 
             return;
         }
+        // Keyed writes invalidate packed compile-time string tracking (#27181).
+        $array->compileTimeArray = null;
         if (Variable::TYPE_OBJECT === $key->type
             || Variable::TYPE_HASHTABLE === $key->type) {
             HashTableHelper::emitIllegalOffsetType($context);
@@ -1694,6 +1706,7 @@ final class HashTableWriteLlvm
     public static function initArray(Context $context, Variable $result): void
     {
         $result->nextFreeElement = 0;
+        $result->compileTimeArray = [];
         if ($result->type & Variable::IS_NATIVE_ARRAY) {
             return;
         }

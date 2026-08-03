@@ -191,6 +191,22 @@ final class PregJitHelper
         return $result;
     }
 
+    /** Thin-AOT stubs — real find-next impl in PregJitHelperThinAot (#27181). */
+    public static function replaceFindNext(string $pattern, string $subject, int $offset): int
+    {
+        return -1;
+    }
+
+    public static function takeLastReplacePos(): int
+    {
+        return -1;
+    }
+
+    public static function takeLastReplaceBodyLen(): int
+    {
+        return 0;
+    }
+
     public static function splitArgv(string $pattern, string $subject, int $limit, int $flags): ?HashTable
     {
         $parts = VmPregNative::pregSplit($pattern, $subject, $limit, $flags);

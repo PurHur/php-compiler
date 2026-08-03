@@ -103,17 +103,40 @@ final class PregJitHelper
         return null;
     }
 
-    public static function replaceArgv(string $pattern, string $replacement, string $subject, int $limit): string
+    /**
+     * Int status for thin AOT find — LLVM builds the string from durable subject/replacement (#27181).
+     *
+     * @return int 1 matched, 0 no match, -1 unsupported
+     */
+    public static function replaceFindNext(string $pattern, string $subject, int $offset): int
     {
         self::$lastError = 0;
-        $kind = PregAotFastPath::patternKind($pattern);
-        if (0 === $kind) {
+        $rc = PregAotFastPath::replaceFindNext($pattern, $subject, $offset);
+        if ($rc < 0) {
             self::$lastError = 1;
-
-            return '';
         }
 
-        return '' . PregAotFastPath::replaceOrEmpty($pattern, $replacement, $subject, $limit);
+        return $rc;
+    }
+
+    public static function takeLastReplacePos(): int
+    {
+        return PregAotFastPath::takeLastReplacePos();
+    }
+
+    public static function takeLastReplaceBodyLen(): int
+    {
+        return PregAotFastPath::takeLastReplaceBodyLen();
+    }
+
+    /**
+     * Unused under thin AOT (LLVM find+concat bridge) — kept for COMPILED_HELPERS parity.
+     *
+     * @return int always -1
+     */
+    public static function replaceArgv(string $pattern, string $replacement, string $subject, int $limit): int
+    {
+        return -1;
     }
 
     public static function splitArgv(string $pattern, string $subject, int $limit, int $flags): ?HashTable
