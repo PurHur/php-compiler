@@ -461,8 +461,8 @@ PHP;
     }
 
     /**
-     * @covers issue #24770 — ternary/branch between class decls moves the child
-     * Class_ into a successor CFG block; collect() must still see the override.
+     * @covers issue #24770 / #27122 — ternary/branch between class decls moves the
+     * child Class_ into a successor CFG block; collect() must still see the override.
      */
     public function testChildCannotOverrideFinalPropertyAfterTernary(): void
     {
@@ -472,11 +472,14 @@ PHP;
 class A {
     public final string $x = 'a';
 }
+true ? 1 : 0;
 echo 'instance_isFinal=', (new ReflectionProperty('A', 'x'))->isFinal() ? '1' : '0', "\n";
 class S {
     public final static string $s = 's';
 }
+false ? 1 : 0;
 echo 'static_isFinal=', (new ReflectionProperty('S', 's'))->isFinal() ? '1' : '0', "\n";
+true ? 1 : 0;
 class B extends A {
     public string $x = 'b';
 }
@@ -485,6 +488,37 @@ PHP;
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage('Cannot override final property A::$x');
         $runtime->parseAndCompile($code, 'final_plain_override_after_ternary.php');
+    }
+
+    /**
+     * @covers issue #27122 — same-script issue-body: isFinal=true + compile Fatal on
+     * child redeclaration (not only the eval() inheritFromParent path).
+     */
+    public function testIssue27122SameScriptIsFinalAndOverrideCompileFatal(): void
+    {
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $isFinalCode = <<<'PHP'
+<?php
+class C { public final string $name = 'x'; }
+var_export((new ReflectionProperty(C::class, 'name'))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($isFinalCode, 'issue27122_isFinal.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("true\n", ob_get_clean());
+
+        $overrideCode = <<<'PHP'
+<?php
+class C { public final string $name = 'x'; }
+class D extends C { public string $name = 'y'; }
+echo (new D())->name, "\n";
+PHP;
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage('Cannot override final property C::$name');
+        $runtime->parseAndCompile($overrideCode, 'issue27122_override.php');
     }
 
     /** @covers issue #22474 — final set does not block overriding get alone */
