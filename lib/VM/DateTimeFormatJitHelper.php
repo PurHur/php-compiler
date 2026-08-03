@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\JitDate;
 use PHPCompiler\JIT\Builtin\DateTimeFormatRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -26,12 +27,24 @@ final class DateTimeFormatJitHelper
         string $function = 'DateTime::format',
         int $formatArgIndex = 0
     ): Value {
-        DateTimeFormatRuntime::ensureLinked($context);
         $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
         $objectType = $context->type->object;
         $timestamp = $context->helper->loadValue(
             $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::TS_PROPERTY)
         );
+
+        // Thin AOT under PROFILE=8.4: NestedJIT formatStateArgv civil digests segfault
+        // (#27192). Common compile-time literals use the same UTC civil IR as date()/gmdate()
+        // (#27091/#27121). Matches NestedJIT AOT when date() is unavailable (offset 0).
+        $fmtLit = JitStringBuiltinArg::compileTimeLiteral($formatArg) ?? $formatArg->compileTimeString;
+        if (\is_string($fmtLit)) {
+            $civil = JitDate::tryFormatCivilLiteral($context, $fmtLit, $timestamp);
+            if (null !== $civil) {
+                return $civil;
+            }
+        }
+
+        DateTimeFormatRuntime::ensureLinked($context);
         $microsecond = $context->helper->loadValue(
             $objectType->propertyFetch($obj, self::CLASS_DATETIME, DateTimeSupport::MICROSECOND_PROPERTY)
         );
