@@ -1238,6 +1238,8 @@ class Context {
         $this->functionProxies['datetimeimmutable::modify'] = new Call\DateTimeModify(true);
         // DateTimeZone::getTransitions — compile-time materialize (peer timezone_transitions_get) (#26799).
         $this->functionProxies['datetimezone::gettransitions'] = new Call\DateTimeZoneGetTransitions();
+        // DateTimeZone::getName — avoid ExternalMethod silent NULL on thin AOT (#27307).
+        $this->functionProxies['datetimezone::getname'] = new Call\DateTimeZoneGetName();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         // Dom\XMLDocument::createFromString — avoid ExternalMethod silent NULL (#27108).

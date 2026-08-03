@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6894 |
-| Phase A inventory files (M2 ratio SSOT) | 6894 |
+| PHP files on vm.php path | 6895 |
+| Phase A inventory files (M2 ratio SSOT) | 6895 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22221 |
+| Source constructs flagged (warnings) | 22224 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2973,7 +2973,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitTimezoneIdentifiersList.php` | 0 | 1 |
 | `ext/standard/JitTimezoneLocationGet.php` | 0 | 2 |
 | `ext/standard/JitTimezoneNameFromAbbr.php` | 0 | 1 |
-| `ext/standard/JitTimezoneNameGet.php` | 0 | 2 |
+| `ext/standard/JitTimezoneNameGet.php` | 0 | 3 |
 | `ext/standard/JitTimezoneOffsetGet.php` | 0 | 2 |
 | `ext/standard/JitTimezoneOpen.php` | 0 | 3 |
 | `ext/standard/JitTimezoneProceduralArg.php` | 0 | 1 |
@@ -5685,6 +5685,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DateTimeSetMicrosecond.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeSetTimezone.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeZoneConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeZoneGetName.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeZoneGetTransitions.php` | 0 | 1 |
 | `lib/JIT/Call/DomAttrRename.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentAppendChild.php` | 0 | 1 |
@@ -5897,7 +5898,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 128 |
+| `lib/JIT/Context.php` | 0 | 129 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 62 |
@@ -29506,8 +29507,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneNameGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 39)
+- 4 class method(s)
 
 ### `ext/standard/JitTimezoneOffsetGet.php`
 
@@ -29525,7 +29527,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneProceduralArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/JitTimezoneTransitionsGet.php`
 
@@ -44323,20 +44325,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 18530)
 - new VM\PropertyIsInitializedHandler (line 18627)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18683)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19112)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19324)
-- new JIT\Call\VmCoerceVariableToString (line 19451)
-- new JIT\Call\NoOpConstruct (line 19623)
-- new JIT\Call\IncludePathResolverResolve (line 19793)
-- new Operand\Literal (line 19880)
-- new Operand\Literal (line 19883)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19926)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20073)
-- new VM (line 21171)
-- new VM\Variable (line 21180)
-- new Variable (line 21201)
-- new Variable (line 21247)
-- new Variable (line 21955)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19119)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19331)
+- new JIT\Call\VmCoerceVariableToString (line 19458)
+- new JIT\Call\NoOpConstruct (line 19630)
+- new JIT\Call\IncludePathResolverResolve (line 19800)
+- new Operand\Literal (line 19887)
+- new Operand\Literal (line 19890)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19933)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20080)
+- new VM (line 21178)
+- new VM\Variable (line 21187)
+- new Variable (line 21208)
+- new Variable (line 21254)
+- new Variable (line 21962)
 - 419 class method(s)
 - 20 closure(s)
 
@@ -48005,6 +48007,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DateTimeZoneGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DateTimeZoneGetTransitions.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49290,20 +49297,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeModify (line 1237)
 - new Call\DateTimeModify (line 1238)
 - new Call\DateTimeZoneGetTransitions (line 1240)
-- new Call\DomXmlDocumentCreateFromString (line 1245)
-- new Result (line 1612)
-- new Result (line 1634)
-- new Variable (line 2312)
-- new Variable (line 2449)
-- new Variable (line 2703)
-- new Variable (line 2761)
-- new VMVariable (line 2923)
-- new VMVariable (line 2939)
-- new VMVariable (line 2945)
-- new VMVariable (line 2951)
-- new VMVariable (line 2962)
-- new Variable (line 2992)
-- new Variable (line 3037)
+- new Call\DateTimeZoneGetName (line 1242)
+- new Call\DomXmlDocumentCreateFromString (line 1247)
+- new Result (line 1614)
+- new Result (line 1636)
+- new Variable (line 2314)
+- new Variable (line 2451)
+- new Variable (line 2705)
+- new Variable (line 2763)
+- new VMVariable (line 2925)
+- new VMVariable (line 2941)
+- new VMVariable (line 2947)
+- new VMVariable (line 2953)
+- new VMVariable (line 2964)
+- new Variable (line 2994)
+- new Variable (line 3039)
 - 106 class method(s)
 - 32 closure(s)
 

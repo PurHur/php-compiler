@@ -64,6 +64,29 @@ final class JitTimezoneProceduralArg
         );
     }
 
+    /**
+     * Return `__string__*` for a string property (no load of TYPE_STRING slots).
+     *
+     * Needed before `__string__separate` / helpers that take `__string__*` (#27307).
+     */
+    public static function readStringPropPtr(
+        Context $context,
+        ObjectBuiltin $object,
+        Value $objPtr,
+        string $className,
+        string $propName
+    ): Value {
+        $prop = $object->propertyFetch($objPtr, $className, $propName);
+        if (JITVariable::TYPE_STRING === $prop->type) {
+            return $prop->value;
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $prop->value
+        );
+    }
+
     public static function readDateTimeTimezoneNameProp(
         Context $context,
         ObjectBuiltin $object,
