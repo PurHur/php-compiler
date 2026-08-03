@@ -1105,6 +1105,11 @@ class Context {
         $this->functionProxies['weakmap::offsetunset'] = new Call\WeakMapMethod('offsetunset');
         $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
 
+        // PhpToken OOP API — user-script AOT (#27263 / #6794).
+        $this->functionProxies['phptoken::__construct'] = new Call\PhpTokenConstruct();
+        $this->functionProxies['phptoken::tokenize'] = new Call\PhpTokenTokenize();
+        $this->functionProxies['phptoken::gettokenname'] = new Call\PhpTokenGetTokenName();
+
         if (CompilerVersion::supportsBcmath()) {
             $this->functionProxies['bcmath\number::__construct'] = new Call\BcMathNumberConstruct();
             $this->functionProxies['bcmath\number::__tostring'] = new Call\BcMathNumberToString();

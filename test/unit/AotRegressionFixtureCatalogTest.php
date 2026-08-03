@@ -58,6 +58,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'weakreference_main_unset.phpt',
         'reflection_new_lazy_ghost_property.phpt',
         'reflection_constant_get_name_value.phpt',
+        'phptoken_tokenize_gettokenname.phpt',
     ];
 
     /**
