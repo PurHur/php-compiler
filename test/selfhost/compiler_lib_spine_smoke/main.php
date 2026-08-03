@@ -7071,4 +7071,5 @@ unset($__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringZlibJit.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
