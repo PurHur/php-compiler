@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** frenchtojd() — French republican calendar to Julian day (php-src ext/calendar/calendar.c; #11875). */
+/** frenchtojd() — French republican calendar to Julian day (php-src ext/calendar/calendar.c; #11875 / #27382). */
 final class frenchtojd extends Internal
 {
     public function __construct()
@@ -36,6 +36,12 @@ final class frenchtojd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('frenchtojd() is not implemented for JIT in this compiler build (issue #11875)');
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'frenchtojd() expects exactly 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitFrenchtojd::invoke($context, ...$args);
     }
 }
