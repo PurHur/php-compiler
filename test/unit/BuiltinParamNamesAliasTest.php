@@ -565,6 +565,43 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #24664 — php-src ext/mysqli/mysqli.stub.php */
+    public function testMysqliQueryPrepareEscapeZendStubNamedParams(): void
+    {
+        $query = BuiltinParamNames::forFunction('mysqli_query');
+        self::assertSame(['mysql', 'query', 'result_mode='], $query);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($query, 'mysql', 'mysqli_query'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($query, 'query', 'mysqli_query'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($query, 'result_mode', 'mysqli_query'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($query, 'link', 'mysqli_query'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($query, 'resultmode', 'mysqli_query'));
+        self::assertSame(
+            ['mysql', 'query', 'result_mode='],
+            BuiltinParamNames::paramNamesForInternalFunction('mysqli_query')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('mysqli_query'));
+
+        $prepare = BuiltinParamNames::forFunction('mysqli_prepare');
+        self::assertSame(['mysql', 'query'], $prepare);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($prepare, 'mysql', 'mysqli_prepare'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($prepare, 'query', 'mysqli_prepare'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($prepare, 'link', 'mysqli_prepare'));
+        self::assertSame(['mysql', 'query'], BuiltinParamNames::paramNamesForInternalFunction('mysqli_prepare'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('mysqli_prepare'));
+
+        $escape = BuiltinParamNames::forFunction('mysqli_real_escape_string');
+        self::assertSame(['mysql', 'string'], $escape);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($escape, 'mysql', 'mysqli_real_escape_string'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($escape, 'string', 'mysqli_real_escape_string'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($escape, 'link', 'mysqli_real_escape_string'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($escape, 'escapestr', 'mysqli_real_escape_string'));
+        self::assertSame(
+            ['mysql', 'string'],
+            BuiltinParamNames::paramNamesForInternalFunction('mysqli_real_escape_string')
+        );
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('mysqli_real_escape_string'));
+    }
+
     /** @covers issue #24640 — php-src ext/sysvshm/sysvshm.stub.php */
     public function testShmAttachPutVarZendStubNamedParams(): void
     {
