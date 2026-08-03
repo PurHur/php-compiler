@@ -270,11 +270,15 @@ final class JitDate
             )
             : self::time($context);
 
-        // Thin AOT: NestedJIT FormatDatetime segfaults; Y-m-d via UTC civil IR (#27091).
+        // Thin AOT: NestedJIT FormatDatetime segfaults; common literals via UTC civil IR
+        // (#27091 Y-m-d; #27121 date('Y', strtotime(...)) and peer single-token formats).
         // Matches Zend when default timezone is UTC (CI / docker image default).
         $fmtLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-        if ('Y-m-d' === $fmtLit && ($gmt || self::defaultTimezoneIsUtc())) {
-            return self::formatYmdCivil($context, $timestamp);
+        if (\is_string($fmtLit) && ($gmt || self::defaultTimezoneIsUtc())) {
+            $civil = self::tryFormatCivilLiteral($context, $fmtLit, $timestamp);
+            if (null !== $civil) {
+                return $civil;
+            }
         }
 
         // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)
@@ -298,19 +302,89 @@ final class JitDate
         return 'UTC' === $tz || 'Etc/UTC' === $tz || 'Z' === $tz || 'GMT' === $tz;
     }
 
-    /** Format timestamp as Y-m-d via {@see JitGetdate::civilPartsPublic} + snprintf (#27091). */
-    private static function formatYmdCivil(Context $context, Value $timestamp): Value
+    /**
+     * Compile-time date()/gmdate() format literals via civil IR + snprintf (#27091, #27121).
+     *
+     * Returns null when the format needs the NestedJIT FormatDatetime path.
+     */
+    private static function tryFormatCivilLiteral(Context $context, string $fmtLit, Value $timestamp): ?Value
     {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_ymd_civil');
+        // 'U' is the unix timestamp itself — no civil breakdown (#27121).
+        if ('U' === $fmtLit) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'date_u_civil');
+            $i8 = $context->getTypeFromString('int8');
+            $i64 = $context->getTypeFromString('int64');
+            $sizeT = $context->getTypeFromString('size_t');
+            $charPtr = $context->getTypeFromString('char*');
+            $buf = $context->builder->alloca($i8, 24, 'u_buf');
+            $bufChar = $context->builder->pointerCast($buf, $charPtr);
+            self::ensureSnprintf($context);
+            $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $charPtr);
+            $written = $context->builder->call(
+                $context->lookupFunction('snprintf'),
+                $bufChar,
+                $sizeT->constInt(24, false),
+                $fmt,
+                $timestamp
+            );
+            $len = $context->builder->sext($written, $i64);
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $len,
+                $bufChar
+            );
+        }
+
+        /** @var array<string, array{0:string,1:list<string>,2:int}> $specs */
+        $specs = [
+            'Y' => ['%04lld', ['year'], 8],
+            'y' => ['%02lld', ['year2'], 4],
+            'm' => ['%02lld', ['month'], 4],
+            'd' => ['%02lld', ['day'], 4],
+            'H' => ['%02lld', ['hour'], 4],
+            'i' => ['%02lld', ['minute'], 4],
+            's' => ['%02lld', ['second'], 4],
+            'Y-m-d' => ['%04lld-%02lld-%02lld', ['year', 'month', 'day'], 16],
+            'Ymd' => ['%04lld%02lld%02lld', ['year', 'month', 'day'], 12],
+            'H:i:s' => ['%02lld:%02lld:%02lld', ['hour', 'minute', 'second'], 12],
+        ];
+        if (!isset($specs[$fmtLit])) {
+            return null;
+        }
+        [$printfFmt, $keys, $bufSize] = $specs[$fmtLit];
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_civil_lit');
         $parts = JitGetdate::civilPartsPublic($context, $timestamp);
-        $i8 = $context->getTypeFromString('int8');
+        // Two-digit year for 'y' — Zend date('y') (#27121 peer).
         $i64 = $context->getTypeFromString('int64');
+        $parts['year2'] = $context->builder->signedRem($parts['year'], $i64->constInt(100, false));
+        $i8 = $context->getTypeFromString('int8');
         $sizeT = $context->getTypeFromString('size_t');
         $charPtr = $context->getTypeFromString('char*');
-        $buf = $context->builder->alloca($i8, 16, 'ymd_buf');
+        $buf = $context->builder->alloca($i8, $bufSize, 'civil_buf');
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
-        $fmt = $context->builder->pointerCast($context->constantFromString('%04lld-%02lld-%02lld'), $charPtr);
+        self::ensureSnprintf($context);
+        $fmt = $context->builder->pointerCast($context->constantFromString($printfFmt), $charPtr);
+        $callArgs = [$bufChar, $sizeT->constInt($bufSize, false), $fmt];
+        foreach ($keys as $key) {
+            $callArgs[] = $parts[$key];
+        }
+        $written = $context->builder->call($context->lookupFunction('snprintf'), ...$callArgs);
+        $len = $context->builder->sext($written, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $bufChar
+        );
+    }
+
+    private static function ensureSnprintf(Context $context): void
+    {
         if (null === $context->module->getNamedFunction('snprintf')) {
+            $charPtr = $context->getTypeFromString('char*');
+            $sizeT = $context->getTypeFromString('size_t');
             $context->module->addFunction(
                 'snprintf',
                 $context->context->functionType(
@@ -322,22 +396,6 @@ final class JitDate
                 )
             );
         }
-        $written = $context->builder->call(
-            $context->lookupFunction('snprintf'),
-            $bufChar,
-            $sizeT->constInt(16, false),
-            $fmt,
-            $parts['year'],
-            $parts['month'],
-            $parts['day']
-        );
-        $len = $context->builder->sext($written, $i64);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $len,
-            $bufChar
-        );
     }
 
     public static function formatStrftime(Context $context, bool $gmt, JITVariable ...$args): Value
