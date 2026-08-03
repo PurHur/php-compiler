@@ -45,13 +45,46 @@ final class JsonEncodeNestedJitHelper
     {
         // Single-pass NestedJIT-safe list form. Prior stub always emitted `{"":…}` because
         // int-key toString() lowered empty under NestedJIT (#27075 / #27020).
+        // Inline nested-array handling here — do not call encodeValue() (mutual NestedJIT
+        // recursion with encodeHashtable aborts under thin AOT, #27074).
         $out = '[';
         $n = 0;
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
             if ($n > 0) {
                 $out .= ',';
             }
-            $out .= (string) $pair[1]->toInt();
+            $val = $pair[1];
+            $t = $val->type & 0x7f;
+            if (6 === $t || 7 === $t) {
+                // Nested array: encode via foreach (NestedJIT-safe on Variable locals).
+                // Avoid encodeValue↔encodeHashtable mutual recursion and toArray() (#27074).
+                $inner = '[';
+                $m = 0;
+                foreach ($val as $elem) {
+                    if ($m > 0) {
+                        $inner .= ',';
+                    }
+                    $et = $elem->type & 0x7f;
+                    if (1 === $et) {
+                        $inner .= (string) $elem->toInt();
+                    } elseif (0 === $et) {
+                        $inner .= 'null';
+                    } elseif (6 === $et || 7 === $et) {
+                        $inner .= self::encodeHashtable($elem->toArray(), $flags) ?? 'null';
+                    } else {
+                        $inner .= (string) $elem->toInt();
+                    }
+                    ++$m;
+                }
+                $inner .= ']';
+                $out .= $inner;
+            } elseif (1 === $t) {
+                $out .= (string) $val->toInt();
+            } elseif (0 === $t) {
+                $out .= 'null';
+            } else {
+                $out .= (string) $val->toInt();
+            }
             ++$n;
         }
         $out .= ']';
