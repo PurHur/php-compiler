@@ -484,12 +484,14 @@ final class VmDebugBacktrace
         return '->';
     }
 
-    /** zend_print_flat_zval() argument formatting (ext/standard/var.c). */
+    /**
+     * zend_print_flat_zval / debug_print_backtrace arg formatting (ext/standard/var.c).
+     *
+     * SensitiveParameterValue is printed as Object(SensitiveParameterValue) — same as any
+     * object — not the legacy `[Sensitive Parameter]` token (#27124 / php-src RFC).
+     */
     private static function formatFlatTraceArg(Variable $arg): string
     {
-        if (SensitiveParamSupport::isMarker($arg)) {
-            return SensitiveParamSupport::TRACE_ARG_LABEL;
-        }
         $arg = $arg->resolveIndirect();
         switch ($arg->type) {
             case Variable::TYPE_STRING:
