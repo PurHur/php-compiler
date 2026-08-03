@@ -30,13 +30,23 @@ final class ChunkSplitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitChunkSplit::split', $builtin);
     }
 
-    public function testChunkSplitJitHelperDelegatesToVmString(): void
+    /** #26992: NestedJIT-safe self-contained helper (no VmString ExternalMethod stub). */
+    public function testChunkSplitJitHelperIsSelfContainedAndMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ChunkSplitJitHelper.php');
-        $this->assertStringContainsString('VmString::chunkSplit', $source);
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('Self-contained', $source);
 
         $expected = VmString::chunkSplit('1234567890', 3, '-');
         $this->assertSame($expected, ChunkSplitJitHelper::chunkSplitArgv('1234567890', 3, '-'));
+        $this->assertSame(
+            VmString::chunkSplit('123456789', 3, ':'),
+            ChunkSplitJitHelper::chunkSplitArgv('123456789', 3, ':')
+        );
+        $this->assertSame(
+            VmString::chunkSplit('', 4, "\r\n"),
+            ChunkSplitJitHelper::chunkSplitArgv('', 4, "\r\n")
+        );
     }
 
     public function testSpineBundleIncludesChunkSplitJitHelper(): void

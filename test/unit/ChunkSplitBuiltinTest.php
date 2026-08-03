@@ -18,7 +18,8 @@ echo chunk_split('x', 1, '.'), "\n";
 echo chunk_split('', 4), "\n";
 PHP;
 
-    private const EXPECT = "123-456-789-0-\nab|cd|e|\nx.\n\n";
+    // Empty subject returns default "\r\n"; echo adds "\n"; normalize "\r\n"→"\n" ⇒ trailing "\n\n\n".
+    private const EXPECT = "123-456-789-0-\nab|cd|e|\nx.\n\n\n";
 
     public function testVmMatchesPhpSubset(): void
     {

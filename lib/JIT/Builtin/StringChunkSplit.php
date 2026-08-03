@@ -9,11 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_chunk_split via ChunkSplitJitHelper PHP (#14626, #21399).
+ * JIT/AOT link for __compiler_chunk_split via ChunkSplitJitHelper PHP (#14626, #21399, #26992).
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringSoundex #21362 / StringMetaphone #21342.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringSoundex #21362 / StringWordwrap #26904.
+ * Helper is NestedJIT-self-contained (no VmString call — #16075 / #26992).
  * php-src: ext/standard/string.c — PHP_FUNCTION(chunk_split)
  */
 final class StringChunkSplit
