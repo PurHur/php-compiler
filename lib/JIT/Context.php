@@ -227,6 +227,12 @@ class Context {
     public ?int $ternarySharedReturnSlot = null;
 
     /**
+     * Most recent WeakReference::get() result operand — released at the next JUMPIF
+     * so ternary-echo merges do not keep the referent across unset (#27118).
+     */
+    public ?Operand $pendingWeakReferenceGetResult = null;
+
+    /**
      * ?: arm temp slot => phi dest operand when merge-block ECHO still references the arm temp (#18052).
      *
      * @var array<int, Operand>
