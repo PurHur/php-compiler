@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * easter_date() — midnight local timestamp for Easter Sunday (php-src ext/calendar/easter.c; #7223).
+ * easter_date() — midnight local timestamp for Easter Sunday (php-src ext/calendar/easter.c; #7223 / #27356).
  */
 final class easter_date extends Internal
 {
@@ -63,7 +63,7 @@ final class easter_date extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('easter_date() is not implemented for JIT in this compiler build (issue #7223)');
+        return JitEasterDate::invoke($context, ...$args);
     }
 
     private static function resolveYear(Frame $frame): int
