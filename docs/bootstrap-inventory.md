@@ -26672,7 +26672,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/HtmlspecialcharsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/HttpBuildQueryJitHelper.php`
 
@@ -28007,7 +28007,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitHtmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/JitHtmlspecialcharsDecode.php`
 
@@ -36653,7 +36653,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/htmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/htmlspecialchars_decode.php`
 
@@ -46925,7 +46925,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php`
 
