@@ -26,7 +26,22 @@ final class TempnamRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringTempnam.php');
         $this->assertStringContainsString('TempnamJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringContainsString('ensureCompiledBundle', $source);
+        $this->assertStringContainsString('FsDirJitHelper.php', $source);
+        // Thin AOT: libc mkstemp kernel — NestedJIT host-fopen cannot create (#27089).
+        $this->assertStringContainsString('JitTempnamKernel::implementForThinAot', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('tryGetInsertBlock', $source);
+        $this->assertStringNotContainsString('BasicBlockHelper::append(', $source);
         $this->assertStringNotContainsString("lookupFunction('mkstemp')", $source);
+    }
+
+    public function testJitTempnamKernelUsesLibcMkstemp(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTempnamKernel.php');
+        $this->assertStringContainsString("lookupFunction('mkstemp')", $source);
+        $this->assertStringContainsString('SysGetTempDirRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('__phpc_jit_tempnam', $source);
     }
 
     public function testTempnamJitHelperMatchesFsDirHelper(): void

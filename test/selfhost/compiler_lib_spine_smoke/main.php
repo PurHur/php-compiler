@@ -2769,6 +2769,7 @@ require_once __DIR__.'/../../../ext/standard/JitTanKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitTanhKernel.php';
 
 require_once __DIR__.'/../../../ext/standard/JitTempnam.php';
+require_once __DIR__.'/../../../ext/standard/JitTempnamKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitTimezoneAbbreviationsList.php';
 require_once __DIR__.'/../../../ext/standard/JitTimezoneIdentifiersList.php';
 require_once __DIR__.'/../../../ext/standard/JitTimezoneLocationGet.php';

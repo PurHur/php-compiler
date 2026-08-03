@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6883 |
-| Phase A inventory files (M2 ratio SSOT) | 6883 |
+| PHP files on vm.php path | 6884 |
+| Phase A inventory files (M2 ratio SSOT) | 6884 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22177 |
+| Source constructs flagged (warnings) | 22178 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2967,6 +2967,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitTanKernel.php` | 0 | 1 |
 | `ext/standard/JitTanhKernel.php` | 0 | 1 |
 | `ext/standard/JitTempnam.php` | 0 | 1 |
+| `ext/standard/JitTempnamKernel.php` | 0 | 1 |
 | `ext/standard/JitTimezoneAbbreviationsList.php` | 0 | 1 |
 | `ext/standard/JitTimezoneIdentifiersList.php` | 0 | 1 |
 | `ext/standard/JitTimezoneLocationGet.php` | 0 | 2 |
@@ -29444,6 +29445,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/JitTempnamKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
+
 ### `ext/standard/JitTimezoneAbbreviationsList.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47370,7 +47376,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringTempnam.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringTraitExists.php`
 
