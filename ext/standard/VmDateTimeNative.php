@@ -3348,11 +3348,14 @@ final class VmDateTimeNative
         }
 
         return self::withTimezone($tzName, static function () use ($timestamp, $microsecond, $format, $tzName): string {
-            $tm = self::localtime($timestamp);
+            // Same shape as the fixed-offset branch: civil fields from UTC epoch+offset
+            // (#27142). Relying on localtime alone regressed after #26900 made VmDatePure
+            // localtime UTC-only without applying the active zone offset.
+            $offset = self::offsetSecondsForTimestamp($timestamp);
+            $tm = self::gmtime($timestamp + $offset);
             if (null === $tm) {
                 return '';
             }
-            $offset = self::timezoneOffsetSeconds($tzName, $timestamp);
 
             return VmDate::formatDateTimeFromTm($format, $timestamp, $microsecond, $tm, $offset, $tzName);
         });
