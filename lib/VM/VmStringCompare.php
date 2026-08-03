@@ -380,6 +380,309 @@ final class VmStringCompare
     }
 
     /**
+     * Byte offset of $needle in $haystack from $offset, or -1 when absent (#27184).
+     *
+     * Sliding memcmp — NestedJIT of StrposJitHelper miss returns corrupt/0 under thin AOT.
+     * Empty needle → $offset (php-src strpos). Case-insensitive uses ASCII tolower in IR.
+     */
+    public static function findOffset(
+        Context $context,
+        Value $haystack,
+        Value $needle,
+        Value $offset,
+        bool $caseInsensitive = false
+    ): Value {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $notFound = $i64->constInt(-1, true);
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $hayLen = $context->builder->load(
+            $context->builder->structGep($haystack, $map['length'])
+        );
+        $needleLen = $context->builder->load(
+            $context->builder->structGep($needle, $map['length'])
+        );
+        $off = $context->builder->truncOrBitCast($offset, $i64);
+
+        $needleEmpty = $context->builder->icmp(Builder::INT_EQ, $needleLen, $zero);
+        $emptyBb = BasicBlockHelper::append($context, 'jit_find_empty_needle');
+        $checkOffBb = BasicBlockHelper::append($context, 'jit_find_check_off');
+        $checkLenBb = BasicBlockHelper::append($context, 'jit_find_check_len');
+        $loopHeader = BasicBlockHelper::append($context, 'jit_find_loop_header');
+        $loopBody = BasicBlockHelper::append($context, 'jit_find_loop_body');
+        $foundBb = BasicBlockHelper::append($context, 'jit_find_found');
+        $advanceBb = BasicBlockHelper::append($context, 'jit_find_advance');
+        $missBb = BasicBlockHelper::append($context, 'jit_find_miss');
+        $mergeBb = BasicBlockHelper::append($context, 'jit_find_done');
+        $context->builder->branchIf($needleEmpty, $emptyBb, $checkOffBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        // Empty needle: return offset when 0 <= offset <= hayLen, else -1.
+        $offGe0 = $context->builder->icmp(Builder::INT_SGE, $off, $zero);
+        $offLeLen = $context->builder->icmp(Builder::INT_SLE, $off, $hayLen);
+        $emptyOk = $context->builder->and($offGe0, $offLeLen);
+        $emptyResult = $context->builder->select($emptyOk, $off, $notFound);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($checkOffBb);
+        $offOk = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $off, $zero),
+            $context->builder->icmp(Builder::INT_SLE, $off, $hayLen)
+        );
+        $context->builder->branchIf($offOk, $checkLenBb, $missBb);
+
+        $context->builder->positionAtEnd($checkLenBb);
+        $remain = $context->builder->sub($hayLen, $off);
+        $lenOk = $context->builder->icmp(Builder::INT_SGE, $remain, $needleLen);
+        $context->builder->branchIf($lenOk, $loopHeader, $missBb);
+
+        $context->builder->positionAtEnd($loopHeader);
+        $idx = $context->builder->phi($i64);
+        $idx->addIncoming($off, $checkLenBb);
+        $limit = $context->builder->sub($hayLen, $needleLen);
+        $inRange = $context->builder->icmp(Builder::INT_SLE, $idx, $limit);
+        $context->builder->branchIf($inRange, $loopBody, $missBb);
+
+        $context->builder->positionAtEnd($loopBody);
+        $hayChars = $context->builder->structGep($haystack, $map['value']);
+        $window = $context->builder->gep($hayChars, $idx);
+        $needleChars = $context->builder->structGep($needle, $map['value']);
+        if ($caseInsensitive) {
+            $eq = self::emitAsciiCiEqual($context, $window, $needleChars, $needleLen);
+        } else {
+            $cmp = $context->builder->call(
+                $context->lookupFunction('memcmp'),
+                $window,
+                $needleChars,
+                $context->builder->zExt($needleLen, $sizeT)
+            );
+            $eq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $cmp,
+                $cmp->typeOf()->constInt(0, false)
+            );
+        }
+        $context->builder->branchIf($eq, $foundBb, $advanceBb);
+
+        $context->builder->positionAtEnd($advanceBb);
+        $next = $context->builder->add($idx, $one);
+        $idx->addIncoming($next, $advanceBb);
+        $context->builder->branch($loopHeader);
+
+        $context->builder->positionAtEnd($foundBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($emptyResult, $emptyBb);
+        $phi->addIncoming($idx, $foundBb);
+        $phi->addIncoming($notFound, $missBb);
+
+        return $phi;
+    }
+
+    /**
+     * Last byte offset of $needle in $haystack (Zend strrpos offset window), or -1 (#27184).
+     */
+    public static function findROffset(
+        Context $context,
+        Value $haystack,
+        Value $needle,
+        Value $offset,
+        bool $caseInsensitive = false
+    ): Value {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $notFound = $i64->constInt(-1, true);
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $hayLen = $context->builder->load(
+            $context->builder->structGep($haystack, $map['length'])
+        );
+        $needleLen = $context->builder->load(
+            $context->builder->structGep($needle, $map['length'])
+        );
+        $off = $context->builder->truncOrBitCast($offset, $i64);
+
+        // Positive offset: minStart = offset; negative: maxStart = hayLen+offset.
+        $offNeg = $context->builder->icmp(Builder::INT_SLT, $off, $zero);
+        $suffixEnd = $context->builder->add($hayLen, $off);
+        $minStart = $context->builder->select($offNeg, $zero, $off);
+        $maxStart = $context->builder->select($offNeg, $suffixEnd, $hayLen);
+
+        $negBad = $context->builder->and(
+            $offNeg,
+            $context->builder->icmp(Builder::INT_SLT, $suffixEnd, $zero)
+        );
+        $badBb = BasicBlockHelper::append($context, 'jit_rfind_bad');
+        $emptyCheckBb = BasicBlockHelper::append($context, 'jit_rfind_empty_check');
+        $emptyBb = BasicBlockHelper::append($context, 'jit_rfind_empty');
+        $lenCheckBb = BasicBlockHelper::append($context, 'jit_rfind_len');
+        $loopHeader = BasicBlockHelper::append($context, 'jit_rfind_loop_header');
+        $loopBody = BasicBlockHelper::append($context, 'jit_rfind_loop_body');
+        $foundBb = BasicBlockHelper::append($context, 'jit_rfind_found');
+        $retreatBb = BasicBlockHelper::append($context, 'jit_rfind_retreat');
+        $missBb = BasicBlockHelper::append($context, 'jit_rfind_miss');
+        $mergeBb = BasicBlockHelper::append($context, 'jit_rfind_done');
+        $context->builder->branchIf($negBad, $badBb, $emptyCheckBb);
+
+        $context->builder->positionAtEnd($badBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($emptyCheckBb);
+        $needleEmpty = $context->builder->icmp(Builder::INT_EQ, $needleLen, $zero);
+        $context->builder->branchIf($needleEmpty, $emptyBb, $lenCheckBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $emptyResult = $maxStart;
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($lenCheckBb);
+        $tooLong = $context->builder->icmp(Builder::INT_SGT, $needleLen, $hayLen);
+        $start0 = $context->builder->sub($maxStart, $needleLen);
+        $maxIdx = $context->builder->sub($hayLen, $needleLen);
+        $startClamped = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SGT, $start0, $maxIdx),
+            $maxIdx,
+            $start0
+        );
+        $context->builder->branchIf($tooLong, $missBb, $loopHeader);
+
+        $context->builder->positionAtEnd($loopHeader);
+        $idx = $context->builder->phi($i64);
+        $idx->addIncoming($startClamped, $lenCheckBb);
+        $inRange = $context->builder->icmp(Builder::INT_SGE, $idx, $minStart);
+        $context->builder->branchIf($inRange, $loopBody, $missBb);
+
+        $context->builder->positionAtEnd($loopBody);
+        $hayChars = $context->builder->structGep($haystack, $map['value']);
+        $window = $context->builder->gep($hayChars, $idx);
+        $needleChars = $context->builder->structGep($needle, $map['value']);
+        if ($caseInsensitive) {
+            $eq = self::emitAsciiCiEqual($context, $window, $needleChars, $needleLen);
+        } else {
+            $cmp = $context->builder->call(
+                $context->lookupFunction('memcmp'),
+                $window,
+                $needleChars,
+                $context->builder->zExt($needleLen, $sizeT)
+            );
+            $eq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $cmp,
+                $cmp->typeOf()->constInt(0, false)
+            );
+        }
+        $context->builder->branchIf($eq, $foundBb, $retreatBb);
+
+        $context->builder->positionAtEnd($retreatBb);
+        $prev = $context->builder->sub($idx, $one);
+        $idx->addIncoming($prev, $retreatBb);
+        $context->builder->branch($loopHeader);
+
+        $context->builder->positionAtEnd($foundBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($notFound, $badBb);
+        $phi->addIncoming($emptyResult, $emptyBb);
+        $phi->addIncoming($idx, $foundBb);
+        $phi->addIncoming($notFound, $missBb);
+
+        return $phi;
+    }
+
+    /** ASCII case-insensitive equality of $len bytes at $a / $b. */
+    private static function emitAsciiCiEqual(
+        Context $context,
+        Value $a,
+        Value $b,
+        Value $len
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $trueVal = $i1->constInt(1, false);
+        $falseVal = $i1->constInt(0, false);
+
+        $preHeader = $context->builder->getInsertBlock();
+        $header = BasicBlockHelper::append($context, 'jit_ci_eq_header');
+        $body = BasicBlockHelper::append($context, 'jit_ci_eq_body');
+        $nextBb = BasicBlockHelper::append($context, 'jit_ci_eq_next');
+        $okBb = BasicBlockHelper::append($context, 'jit_ci_eq_ok');
+        $failBb = BasicBlockHelper::append($context, 'jit_ci_eq_fail');
+        $doneBb = BasicBlockHelper::append($context, 'jit_ci_eq_done');
+        $context->builder->branch($header);
+
+        $context->builder->positionAtEnd($header);
+        $j = $context->builder->phi($i64);
+        $j->addIncoming($zero, $preHeader);
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $j, $len);
+        $context->builder->branchIf($inRange, $body, $okBb);
+
+        $context->builder->positionAtEnd($body);
+        $ca = $context->builder->load($context->builder->gep($a, $j));
+        $cb = $context->builder->load($context->builder->gep($b, $j));
+        $la = self::emitAsciiToLowerI8($context, $ca);
+        $lb = self::emitAsciiToLowerI8($context, $cb);
+        $same = $context->builder->icmp(Builder::INT_EQ, $la, $lb);
+        $context->builder->branchIf($same, $nextBb, $failBb);
+
+        $context->builder->positionAtEnd($nextBb);
+        $jn = $context->builder->add($j, $one);
+        $j->addIncoming($jn, $nextBb);
+        $context->builder->branch($header);
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($trueVal, $okBb);
+        $phi->addIncoming($falseVal, $failBb);
+
+        return $phi;
+    }
+
+    private static function emitAsciiToLowerI8(Context $context, Value $ch): Value
+    {
+        $i8 = $ch->typeOf();
+        $i32 = $context->getTypeFromString('int32');
+        $ext = $context->builder->zExt($ch, $i32);
+        $geA = $context->builder->icmp(
+            Builder::INT_SGE,
+            $ext,
+            $i32->constInt(65, false)
+        );
+        $leZ = $context->builder->icmp(
+            Builder::INT_SLE,
+            $ext,
+            $i32->constInt(90, false)
+        );
+        $isUpper = $context->builder->and($geA, $leZ);
+        $lowered = $context->builder->add($ext, $i32->constInt(32, false));
+        $chosen = $context->builder->select($isUpper, $lowered, $ext);
+
+        return $context->builder->trunc($chosen, $i8);
+    }
+
+    /**
      * Strict equality between a boxed {@see __value__} and a native {@see __string__}.
      */
     public static function identicalValueToString(

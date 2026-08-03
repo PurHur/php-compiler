@@ -4,41 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\VM\VmStringCompare;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for phpc_strpos/phpc_stripos via StrposJitHelper PHP (#14766).
+ * JIT/AOT lowering for strpos()/stripos() (#14766, #27184).
  *
- * Replaces ~75 LOC inline LLVM in JitStrpos.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Search via {@see VmStringCompare::findOffset} (memcmp IR — NestedJIT helpers corrupt
+ * miss under thin AOT). Result boxed as `__value__*` int|false.
+ *
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString} (compile-time fold + VM).
  * php-src: ext/standard/string.c — PHP_FUNCTION(strpos), PHP_FUNCTION(stripos)
  */
 final class StringStrpos
 {
-    public const NOT_FOUND = 0;
-
-    private const ABI_STRPOS = 'phpc_strpos';
-
-    private const ABI_STRIPOS = 'phpc_stripos';
-
-    private const HELPER_PATH = '/ext/standard/StrposJitHelper.php';
-
-    private const STRPOS_HELPER = 'PHPCompiler\\ext\\standard\\StrposJitHelper::strposArgv';
-
-    private const STRIPOS_HELPER = 'PHPCompiler\\ext\\standard\\StrposJitHelper::striposArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::STRPOS_HELPER,
-        self::STRIPOS_HELPER,
-    ];
+    public const NOT_FOUND = -1;
 
     public static function ensureLinked(Context $context): void
     {
-        self::implementStrpos($context);
-        self::implementStripos($context);
+        self::ensureMemcmp($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -53,50 +41,81 @@ final class StringStrpos
         ?Value $offset,
         bool $caseInsensitive = false
     ): Value {
-        self::ensureLinked($context);
+        self::ensureMemcmp($context);
         $i64 = $context->getTypeFromString('int64');
         $off = $offset ?? $i64->constInt(0, false);
-        $abi = $caseInsensitive ? self::ABI_STRIPOS : self::ABI_STRPOS;
-
-        return $context->builder->call(
-            $context->lookupFunction($abi),
+        $found = VmStringCompare::findOffset(
+            $context,
             $haystack,
             $needle,
-            $off
+            $off,
+            $caseInsensitive
         );
+
+        return self::boxFoundI64($context, $found);
     }
 
-    private static function implementStrpos(Context $context): void
+    /**
+     * @param int|false $pos
+     */
+    public static function boxIntOrFalse(Context $context, int|false $pos): Value
     {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_STRPOS,
-            'strpos_bridge_entry',
-            [$strPtr, $strPtr, $i64],
-            $i64,
-            self::STRPOS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14766'
-        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'strpos_box');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (false === $pos) {
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        } else {
+            JitValueBox::writeLong(
+                $context,
+                $slot,
+                $context->getTypeFromString('int64')->constInt($pos, true)
+            );
+        }
+
+        return $ptr;
     }
 
-    private static function implementStripos(Context $context): void
+    private static function boxFoundI64(Context $context, Value $found): Value
     {
-        $strPtr = $context->getTypeFromString('__string__*');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'strpos_box_found');
         $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_STRIPOS,
-            'stripos_bridge_entry',
-            [$strPtr, $strPtr, $i64],
-            $i64,
-            self::STRIPOS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14766'
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $isMiss = $context->builder->icmp(
+            Builder::INT_EQ,
+            $found,
+            $i64->constInt(self::NOT_FOUND, true)
         );
+        $missBb = BasicBlockHelper::append($context, 'strpos_found_miss');
+        $hitBb = BasicBlockHelper::append($context, 'strpos_found_hit');
+        $doneBb = BasicBlockHelper::append($context, 'strpos_found_done');
+        $context->builder->branchIf($isMiss, $missBb, $hitBb);
+
+        $context->builder->positionAtEnd($missBb);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($hitBb);
+        JitValueBox::writeLong($context, $slot, $found);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ptr;
+    }
+
+    private static function ensureMemcmp(Context $context): void
+    {
+        try {
+            $context->lookupFunction('memcmp');
+        } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
+            $fn = $context->module->addFunction('memcmp', $ft);
+            $context->registerFunction('memcmp', $fn);
+        }
     }
 }

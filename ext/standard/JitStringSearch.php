@@ -48,7 +48,7 @@ final class JitStringSearch
     }
 
     /**
-     * strpos()/stripos() — byte offset or NOT_FOUND (0 for JIT strpos sentinel).
+     * strpos()/stripos() — byte offset or NOT_FOUND (-1 miss sentinel).
      */
     public static function find(
         Context $context,

@@ -57,10 +57,7 @@ final class strripos extends Internal
         if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
             $pos = VmString::strripos($hayLit, $needleLit, $offsetLit);
 
-            return $context->constantFromInteger(
-                false === $pos ? StringStrrpos::NOT_FOUND : $pos,
-                'int64'
-            );
+            return StringStrrpos::boxIntOrFalse($context, $pos);
         }
         StringStrrpos::ensureLinked($context);
         $hay = $context->callerStrictTypes

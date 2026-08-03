@@ -64,10 +64,7 @@ final class strrpos extends Internal
         if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
             $pos = VmString::strrpos($hayLit, $needleLit, $offsetLit);
 
-            return $context->constantFromInteger(
-                false === $pos ? StringStrrpos::NOT_FOUND : $pos,
-                'int64'
-            );
+            return StringStrrpos::boxIntOrFalse($context, $pos);
         }
 
         StringStrrpos::ensureLinked($context);
