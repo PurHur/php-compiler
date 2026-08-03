@@ -4912,6 +4912,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/GcStatusRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetBrowserRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetClassRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/GetClassVarsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetHeadersRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetcwdJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGethostname.php';

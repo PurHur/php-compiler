@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6882 |
-| Phase A inventory files (M2 ratio SSOT) | 6882 |
+| PHP files on vm.php path | 6883 |
+| Phase A inventory files (M2 ratio SSOT) | 6883 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22172 |
+| Source constructs flagged (warnings) | 22177 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5154,6 +5154,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GcToggleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GetBrowserRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GetClassRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/GetClassVarsRuntime.php` | 0 | 5 |
 | `lib/JIT/Builtin/GetHeadersRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GetcwdJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/GethostbyaddrRuntime.php` | 0 | 1 |
@@ -45190,6 +45191,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `lib/JIT/Builtin/GetClassVarsRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 129)
+- new JITVariable (line 139)
+- new JITVariable (line 149)
+- new JITVariable (line 159)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/GetHeadersRuntime.php`
 

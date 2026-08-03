@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\GetClassVarsRuntime;
 use PHPCompiler\JIT\Builtin\StringGetClassVars;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -14,17 +15,24 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT helper for get_class_vars() via GetClassVarsJitHelper PHP (#3159, #16713).
  *
- * Compile-time literal class names route through PHP SSOT; no inline registry LLVM.
+ * Thin standalone AOT: compile-time Object_ defaults via {@see GetClassVarsRuntime} (#27229).
+ * NestedJIT / VM: PHP SSOT bridge (scope-aware, #23531).
  * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(get_class_vars)
  */
 final class JitGetClassVars
 {
     public static function invoke(Context $context, JITVariable $classArg): Value
     {
-        if (null === JitStringArg::compileTimeLiteral($classArg)) {
+        $literal = JitStringArg::compileTimeLiteral($classArg);
+        if (null === $literal) {
             throw new \LogicException(
                 'get_class_vars() class name must be a string literal in this compiler build'
             );
+        }
+
+        // Helper-runtime GetClassVarsJitHelper stubs VmReflection → silent NULL under thin AOT (#27229 / #579).
+        if ($context->isThinStandaloneAotMain()) {
+            return GetClassVarsRuntime::emitForClassName($context, $literal);
         }
 
         return self::routeThroughPhpHelper($context, $classArg);
