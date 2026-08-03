@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitTempnamKernel;
 use PHPCompiler\ext\standard\VmFsTempnam;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -12,12 +13,15 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for tempnam() via TempnamJitHelper PHP (#15685).
+ * JIT/AOT link for tempnam() via TempnamJitHelper PHP (#15685, #27089).
  *
- * Replaces inline LLVM in ext/standard/JitTempnam.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmFsTempnam}.
+ * Thin standalone AOT: libc mkstemp via {@see JitTempnamKernel} (NestedJIT host-fopen
+ * cannot create files — peer SysGetTempDirRuntime #26929 / InetRuntime #27088).
+ * Embed: NestedJIT TempnamJitHelper + FsDirJitHelper.
+ * SSOT (VM): {@see \PHPCompiler\ext\standard\VmFsTempnam}.
  * php-src: ext/standard/file.c — php_tempnam
  */
 final class StringTempnam
@@ -26,9 +30,17 @@ final class StringTempnam
 
     private const HELPER_PATH = '/ext/standard/TempnamJitHelper.php';
 
+    private const FS_DIR_HELPER_PATH = '/ext/standard/FsDirJitHelper.php';
+
     private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\TempnamJitHelper::resolveArgv';
 
     private const NOTICE_HELPER = 'PHPCompiler\\ext\\standard\\TempnamJitHelper::consumeNotice';
+
+    /** @var list<string> */
+    private const HELPER_BUNDLE = [
+        self::FS_DIR_HELPER_PATH,
+        self::HELPER_PATH,
+    ];
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -62,21 +74,55 @@ final class StringTempnam
             return;
         }
 
-        StringTriggerError::ensureLinked($context);
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15685');
+        // Preserve caller insert — NestedJIT / kernel emit must not orphan mid-emit (#27089 / #27088).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($valuePtr, false, $strPtr, $strPtr)
+        if ($context->isThinStandaloneAotMain()) {
+            JitTempnamKernel::implementForThinAot($context);
+        } else {
+            StringTriggerError::ensureLinked($context);
+            JitVmHelperLink::ensureCompiledBundle(
+                $context,
+                self::HELPER_BUNDLE,
+                self::COMPILED_HELPERS,
+                '#27089'
             );
+
+            $strPtr = $context->getTypeFromString('__string__*');
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction(
+                    self::ABI,
+                    $context->context->functionType($valuePtr, false, $strPtr, $strPtr)
+                );
+
+            self::emitNestedBridge($context, $fn);
+            $context->registerFunction(self::ABI, $fn);
+        }
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function emitNestedBridge(Context $context, LlvmFunction $fn): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
+        $i8p = $context->getTypeFromString('int8*');
 
         $entry = $fn->appendBasicBlock('tempnam_bridge_entry');
         $failBb = $fn->appendBasicBlock('tempnam_bridge_fail');
         $bodyBb = $fn->appendBasicBlock('tempnam_bridge_body');
+        $noticeDo = $fn->appendBasicBlock('tempnam_bridge_notice_do');
+        $afterNotice = $fn->appendBasicBlock('tempnam_bridge_after_notice');
+        $failResultBb = $fn->appendBasicBlock('tempnam_bridge_result_fail');
+        $okResultBb = $fn->appendBasicBlock('tempnam_bridge_result_ok');
+
         $context->builder->positionAtEnd($entry);
 
         $dir = $fn->getParam(0);
@@ -88,26 +134,22 @@ final class StringTempnam
         $context->builder->branchIf($bad, $failBb, $bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::RESOLVE_HELPER, '#15685');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::RESOLVE_HELPER, '#27089');
         $pathRaw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$dir, $pfx]);
         $pendingRaw = JitNestedHelperCoerce::callHelper(
             $context,
-            JitVmHelperLink::lookupCompiled($context, self::NOTICE_HELPER, '#15685'),
+            JitVmHelperLink::lookupCompiled($context, self::NOTICE_HELPER, '#27089'),
             []
         );
-        $i32 = $context->getTypeFromString('int32');
         $emitNotice = $context->builder->icmp(
             Builder::INT_NE,
             JitNestedHelperCoerce::coerceHelperScalarResult($context, $pendingRaw, $i32),
             $i32->constInt(0, false)
         );
-        $noticeDo = BasicBlockHelper::append($context, 'tempnam_bridge_notice_do');
-        $afterNotice = BasicBlockHelper::append($context, 'tempnam_bridge_after_notice');
         $context->builder->branchIf($emitNotice, $noticeDo, $afterNotice);
 
         $context->builder->positionAtEnd($noticeDo);
         $message = VmFsTempnam::NOTICE_MESSAGE;
-        $i8p = $context->getTypeFromString('int8*');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
@@ -123,8 +165,6 @@ final class StringTempnam
 
         $context->builder->positionAtEnd($afterNotice);
         $pathNull = JitNestedHelperCoerce::isHelperResultNull($context, $pathRaw);
-        $failResultBb = BasicBlockHelper::append($context, 'tempnam_bridge_result_fail');
-        $okResultBb = BasicBlockHelper::append($context, 'tempnam_bridge_result_ok');
         $context->builder->branchIf($pathNull, $failResultBb, $okResultBb);
 
         $context->builder->positionAtEnd($failResultBb);
@@ -141,11 +181,7 @@ final class StringTempnam
         $context->builder->positionAtEnd($failBb);
         $failSlot = JitValueBox::alloc($context);
         $failPtr = JitValueBox::pointer($context, $failSlot);
-        $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
         $context->builder->returnValue($failPtr);
-
-        $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
     }
 }
