@@ -18476,11 +18476,28 @@ class Compiler {
                 return false;
             }
         }
+        // Prefer the stmt-before Array_; with sibling flat literals the ClassConstFetch array
+        // may be earlier (call_user_func_array([A::class, 'm'], [...]) — #27139).
         $array = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
-        if (!$array instanceof Op\Expr\Array_) {
-            return false;
+        if (
+            (!$array instanceof Op\Expr\Array_ || !$this->arrayLiteralHasClassConstFetchValue($array))
+            && null !== $block->orig
+        ) {
+            $array = null;
+            foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
+                $block->orig->children,
+                $cfgCallOp
+            ) as $producer) {
+                if (
+                    $producer instanceof Op\Expr\Array_
+                    && $this->arrayLiteralHasClassConstFetchValue($producer)
+                ) {
+                    $array = $producer;
+                    break;
+                }
+            }
         }
-        if (!$this->arrayLiteralHasClassConstFetchValue($array)) {
+        if (!$array instanceof Op\Expr\Array_ || !$this->arrayLiteralHasClassConstFetchValue($array)) {
             return false;
         }
         $argc = \count($cfgCallOp->args ?? []);
@@ -35613,6 +35630,10 @@ class Compiler {
     /**
      * Map consecutive hoisted Array_ producers to array-shaped call args by order (#10094, #10808).
      *
+     * When every call arg is a dead temp and Array_ producer count matches arity, also treat
+     * unknown/mixed dead temps as array args — ClassConstFetch inside `[A::class, 'm']` leaves
+     * the callable temp untyped so type-only matching bound `$args` to the first Array_ (#27139).
+     *
      * @param list<Op\Expr> $producers
      * @param list<Operand> $callArgs
      */
@@ -35632,6 +35653,35 @@ class Compiler {
         foreach ($callArgs as $i => $arg) {
             if (null !== $arg && $this->callArgOperandExpectsArrayProducer($arg)) {
                 $arrayArgIndices[] = $i;
+            }
+        }
+        // Sibling flat Array_ literals with equal arity — include unknown dead temps (#27139, #12730).
+        if (
+            \count($arrayProducers) >= 2
+            && \count($arrayProducers) === \count($callArgs)
+            && \count($arrayArgIndices) < \count($arrayProducers)
+            && !$this->arrayProducersFormNestedChain($arrayProducers)
+        ) {
+            $allDeadTemps = true;
+            foreach ($callArgs as $arg) {
+                if (null === $arg || !$this->callArgIsDeadInlineTemporary($arg)) {
+                    $allDeadTemps = false;
+                    break;
+                }
+            }
+            if ($allDeadTemps) {
+                $arrayArgIndices = [];
+                foreach ($callArgs as $i => $arg) {
+                    if (
+                        null !== $arg
+                        && (
+                            $this->callArgOperandExpectsArrayProducer($arg)
+                            || $this->callArgIsDeadUnknownOrMixedTemporary($arg)
+                        )
+                    ) {
+                        $arrayArgIndices[] = $i;
+                    }
+                }
             }
         }
         $position = array_search($argIndex, $arrayArgIndices, true);
