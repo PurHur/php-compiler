@@ -218,6 +218,11 @@ final class VmDom
      */
     public const PROP_USER_SCRIPT_INNER_XML = '__phpcUserScriptInnerXml';
 
+    /**
+     * Thin-AOT childNodes NodeList → owning node, for item() walks without DomRegistry (#27410).
+     */
+    public const PROP_CHILD_NODES_OWNER = '__phpcChildNodesOwner';
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {
@@ -12199,6 +12204,37 @@ final class VmDom
         self::linkChildToParent($child, $document);
         self::propagateDocumentId($child, $document->id);
         self::registerSubtreeElementIdsIfConnected($child);
+    }
+
+    /** NodeList::item via {@see PROP_CHILD_NODES_OWNER} walk (#27410). */
+    public static function nodeListItemViaChildNodesOwner(ObjectEntry $nodeList, int $index): ?ObjectEntry
+    {
+        if ($index < 0 || !$nodeList->hasProperty(self::PROP_CHILD_NODES_OWNER)) {
+            return null;
+        }
+        $ownerVar = $nodeList->getProperty(self::PROP_CHILD_NODES_OWNER)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $ownerVar->type) {
+            return null;
+        }
+        $owner = $ownerVar->toObject();
+        if (!$owner->hasProperty(self::PROP_FIRST_CHILD)) {
+            return null;
+        }
+        $curVar = $owner->getProperty(self::PROP_FIRST_CHILD)->resolveIndirect();
+        $pos = 0;
+        while (Variable::TYPE_OBJECT === $curVar->type) {
+            $cur = $curVar->toObject();
+            if ($pos === $index) {
+                return $cur;
+            }
+            if (!$cur->hasProperty(self::PROP_NEXT_SIBLING)) {
+                return null;
+            }
+            $curVar = $cur->getProperty(self::PROP_NEXT_SIBLING)->resolveIndirect();
+            ++$pos;
+        }
+
+        return null;
     }
 
     /**

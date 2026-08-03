@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** DOMDocument::appendChild() — parentNode + documentElement (#18927, #21687). */
+/** DOMDocument::appendChild() — parentNode + documentElement + reparent (#18927, #21687, #27410). */
 final class DomDocumentAppendChild implements Call
 {
     public function call(Context $context, Variable ...$args): Value
