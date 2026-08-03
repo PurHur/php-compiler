@@ -78,6 +78,9 @@ final class M5TrivialEchoScriptTest extends TestCase
         $this->assertStringContainsString('M5TrivialEchoScript.php', $jit);
         $this->assertStringContainsString('M5TrivialEchoNative.php', $jit);
         $this->assertStringContainsString('M5TrivialEchoNative::ensureParseAndCompile', $jit);
+        // #27428: do not M3-content-match HelloWorld when M5 trivial-echo accepts it
+        $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('M5TrivialEchoScript::tryBuild', $jit);
         $this->assertStringContainsString('PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT', $jit);
         $native = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoNative.php');
         $this->assertStringContainsString('__m5_te_try_extract', $native);
