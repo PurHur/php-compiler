@@ -91,7 +91,7 @@ final class JitArrayElem
             $errBlock = BasicBlockHelper::append($context, 'array_elem_req_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            // Boxed null under try/catch SSA must say "null given", not "mixed" (#27448 / #27446).
+            // Boxed null under try/catch SSA must say "null given", not "mixed" (#27447 / #27448).
             $typeField = $context->structFieldMap['__value__']['type'];
             $typeByte = $context->builder->load(
                 $context->builder->structGep($loaded, $typeField)
@@ -179,6 +179,95 @@ final class JitArrayElem
         return $context->builder->or(
             $isVmArray,
             $context->builder->or($isJitHt, $hasHt)
+        );
+    }
+
+    private static function emitBoxedNonArrayTypeErrorParam(
+        Context $context,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType,
+        Value $typeByte
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $nullBlock = BasicBlockHelper::append($context, 'array_param_req_null');
+        $afterNull = BasicBlockHelper::append($context, 'array_param_req_after_null');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+        $context->builder->positionAtEnd($nullBlock);
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'null')
+        );
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_param_req_string');
+        $afterString = BasicBlockHelper::append($context, 'array_param_req_after_string');
+        $context->builder->positionAtEnd($afterNull);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+        $context->builder->positionAtEnd($stringBlock);
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'string')
+        );
+
+        $intBlock = BasicBlockHelper::append($context, 'array_param_req_int');
+        $afterInt = BasicBlockHelper::append($context, 'array_param_req_after_int');
+        $context->builder->positionAtEnd($afterString);
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_INTEGER, false)
+        );
+        $context->builder->branchIf($isInt, $intBlock, $afterInt);
+        $context->builder->positionAtEnd($intBlock);
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'int')
+        );
+
+        $floatBlock = BasicBlockHelper::append($context, 'array_param_req_float');
+        $afterFloat = BasicBlockHelper::append($context, 'array_param_req_after_float');
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_FLOAT, false)
+        );
+        $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
+        $context->builder->positionAtEnd($floatBlock);
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'float')
+        );
+
+        $boolBlock = BasicBlockHelper::append($context, 'array_param_req_bool');
+        $mixedBlock = BasicBlockHelper::append($context, 'array_param_req_mixed');
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_BOOLEAN, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $mixedBlock);
+        $context->builder->positionAtEnd($boolBlock);
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'bool')
+        );
+        $context->builder->positionAtEnd($mixedBlock);
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'mixed')
         );
     }
 
@@ -308,6 +397,7 @@ final class JitArrayElem
      */
     private static function emitErrorAndAbort(Context $context, string $message): void
     {
+        // Catchable in try/catch; uncaught AOT uses abort_if_pending (not raw abort) (#27447 / #27448).
         ExceptionBridge::emitTypeErrorAndAbort($context, $message);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'array_elem_te_cont');
     }
