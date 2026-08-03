@@ -68,6 +68,12 @@ final class cal_days_in_month extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('cal_days_in_month() is not implemented for JIT in this compiler build (issue #7223)');
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'cal_days_in_month() expects exactly 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitCalDaysInMonth::invoke($context, ...$args);
     }
 }
