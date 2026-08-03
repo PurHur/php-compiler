@@ -9,20 +9,23 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_keys() JIT routes all operands through ArrayKeysJitHelper PHP not ArrayBuiltinHelper LLVM (#12340, #14387, #18287). */
+/** array_keys() JIT: call-site HashTableKeysLlvm for 1-arg; NestedJIT for filtered (#12340, #27211). */
 final class ArrayKeysRuntimeShrinkTest extends TestCase
 {
-    public function testArrayKeysRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayKeysRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void
     {
+        // #27211: NestedJIT of ArrayKeysJitHelper returned empty under thin AOT; call-site HashTableKeysLlvm.
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayKeysRuntime.php');
-        $this->assertStringContainsString('ArrayKeysJitHelper', $runtime);
+        $this->assertStringContainsString('HashTableKeysLlvm', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::loadHashTable', $runtime);
         $this->assertStringNotContainsString('buildKeysArrayFromVariable', $runtime);
         $this->assertStringNotContainsString('buildKeysArrayFiltered', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayKeysJitHelper::keysCopy', $runtime);
 
         $keysCopy = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/HashTableKeysCopy.php');
-        $this->assertStringContainsString('ArrayKeysRuntime::keys', $keysCopy);
+        $this->assertStringContainsString('HashTableKeysLlvm::keys', $keysCopy);
+        $this->assertStringNotContainsString('ArrayKeysRuntime::keys', $keysCopy);
         $this->assertStringNotContainsString('buildKeysArrayFromVariable', $keysCopy);
 
         $keysMatching = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/HashTableKeysMatchingCopy.php');
@@ -37,6 +40,14 @@ final class ArrayKeysRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayKeysRuntime::keys', $builtin);
         $this->assertStringContainsString('ArrayKeysRuntime::keysFiltered', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildKeysArray', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableKeysLlvm.php');
+        $this->assertStringContainsString('function keys', $llvm);
+        $this->assertStringContainsString('keysFromPairs', $llvm);
+
+        $nested = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedVmHashTableMethodLlvm.php');
+        $this->assertStringContainsString("'keyscopy'", $nested);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain()', $nested);
     }
 
     public function testArrayKeysJitHelperMatchesHashTableKeysCopy(): void

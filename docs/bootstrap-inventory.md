@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6874 |
-| Phase A inventory files (M2 ratio SSOT) | 6874 |
+| PHP files on vm.php path | 6876 |
+| Phase A inventory files (M2 ratio SSOT) | 6876 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 22163 |
@@ -5762,7 +5762,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableGetNumElements.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableIsPackedList.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableIterate.php` | 0 | 1 |
-| `lib/JIT/Call/HashTableKeysCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableKeysCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableKeysMatchingCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableMergeStringKeysFrom.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableMutateNested.php` | 0 | 1 |
@@ -5776,7 +5776,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableUnionCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableUnshiftPrepend.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableUpdateIndex.php` | 0 | 1 |
-| `lib/JIT/Call/HashTableValuesCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableValuesCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableWriteNested.php` | 0 | 2 |
 | `lib/JIT/Call/IncludePathResolverResolve.php` | 0 | 1 |
 | `lib/JIT/Call/LimitIteratorConstruct.php` | 0 | 5 |
@@ -5909,6 +5909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableChunkLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableCowLlvm.php` | 0 | 3 |
 | `lib/JIT/HashTableHelper.php` | 0 | 10 |
+| `lib/JIT/HashTableKeysLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableMutateNestedLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableNestedExportLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableReadLlvm.php` | 0 | 7 |
@@ -5917,6 +5918,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableShiftLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableSliceLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableSpliceLlvm.php` | 0 | 1 |
+| `lib/JIT/HashTableValuesLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableWriteLlvm.php` | 0 | 16 |
 | `lib/JIT/HeaderCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/Helper.php` | 0 | 7 |
@@ -44496,7 +44498,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayKeysRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/ArrayMapRuntime.php`
 
@@ -44620,7 +44622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayValuesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayWalkRuntime.php`
 
@@ -48359,8 +48361,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/HashTableKeysCopy.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/HashTableKeysMatchingCopy.php`
 
@@ -48435,8 +48436,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/HashTableValuesCopy.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/HashTableWriteNested.php`
 
@@ -49441,6 +49441,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 490)
 - 43 class method(s)
 
+### `lib/JIT/HashTableKeysLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/HashTableMutateNestedLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49487,6 +49492,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `lib/JIT/HashTableValuesLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/HashTableWriteLlvm.php`
 
@@ -49927,8 +49937,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 80)
-- new Call\HashTableMutateNested (line 82)
+- new Call\HashTableWriteNested (line 77)
+- new Call\HashTableMutateNested (line 79)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
