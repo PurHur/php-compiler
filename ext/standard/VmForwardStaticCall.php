@@ -43,15 +43,21 @@ final class VmForwardStaticCall
         if (self::isPlainFunctionNameCallable($callable)) {
             return VmCallable::invoke($frame->vmContext, $callable, ...$extraArgs);
         }
-        $calledScope = self::calledScopeClass($frame, $builtinName, $callable);
+        // Caller late-static class (EG called_scope). Method lookup uses the callable class;
+        // LSB is forwarded only when caller LSB instanceof callable calling_scope (#20251, #27140).
+        $callerLsb = self::callerLateStaticClass($frame, $builtinName, $callable);
         $methodName = self::parseMethodName($callable, $builtinName);
-        // php-src: method lookup uses the callable's class; called-scope stays the caller LSB (#20251).
-        $methodOwner = self::resolveMethodOwnerClass($frame, $callable, $calledScope, $builtinName);
+        $methodOwner = self::resolveMethodOwnerClass($frame, $callable, $callerLsb, $builtinName);
+        $calledScope = self::resolveForwardStaticCalledScope(
+            $frame->vmContext,
+            $callerLsb,
+            $methodOwner
+        );
         self::assertForwardStaticCallable(
             $frame->vmContext,
             $builtinName,
             $methodOwner,
-            $calledScope,
+            $callerLsb,
             $methodName
         );
         $vm = $frame->vmContext->runtime->vm;
@@ -225,7 +231,18 @@ final class VmForwardStaticCall
         return null;
     }
 
+    /**
+     * Caller's late-static class for forward_static_call* (zend_get_called_scope).
+     *
+     * Visibility checks always use this frame scope. Effective EG called_scope for the
+     * invoked method may differ — see {@see resolveForwardStaticCalledScope()} (#27140).
+     */
     public static function calledScopeClass(Frame $frame, string $builtinName, Variable $callable): string
+    {
+        return self::callerLateStaticClass($frame, $builtinName, $callable);
+    }
+
+    private static function callerLateStaticClass(Frame $frame, string $builtinName, Variable $callable): string
     {
         try {
             return VmReflection::getCalledClass($frame);
@@ -241,6 +258,24 @@ final class VmForwardStaticCall
 
             throw new \Error("Cannot call {$builtinName}() when no class scope is active");
         }
+    }
+
+    /**
+     * php-src basic_functions.c forward_static_call*:
+     *   if (called_scope && calling_scope && instanceof_function(called_scope, calling_scope))
+     *       fci_cache.called_scope = called_scope;
+     * otherwise keep the callable's calling_scope (named / resolved class) as called_scope (#27140).
+     */
+    public static function resolveForwardStaticCalledScope(
+        Context $ctx,
+        string $callerLsb,
+        string $callingScope
+    ): string {
+        if (self::isSameOrSubclassOf($ctx, strtolower($callerLsb), strtolower($callingScope))) {
+            return $callerLsb;
+        }
+
+        return $callingScope;
     }
 
     /**

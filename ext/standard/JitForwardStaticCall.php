@@ -125,7 +125,8 @@ final class JitForwardStaticCall
     }
 
     /**
-     * Call the method declared on {@see $ownerClass} while keeping the caller's late-static class (#20251).
+     * Call the method declared on {@see $ownerClass}; late-static class follows php-src
+     * instanceof gate (caller LSB only when LSB instanceof owner/calling_scope) (#20251, #27140).
      *
      * @param list<JITVariable> $extraArgs
      */
@@ -145,11 +146,14 @@ final class JitForwardStaticCall
         }
         $objectType = $context->type->object;
         if (LateStaticBindingHelper::useRuntimeLateStatic($context)) {
-            // Keep LSB as the caller's late-static class (not the method owner). Same constant
-            // store pattern as dispatchByClassId / INIT_STATIC_CALL (#20251).
+            // php-src: forward LSB only when caller LSB instanceof callable calling_scope;
+            // otherwise called_scope is the named/owner class (#20251, #27140).
             $called = $context->scope->calledClassName;
             if ('' === $called) {
                 $called = $block->func->class->value ?? '';
+            }
+            if ('' !== $called && !$objectType->classIsInstanceOf($called, $ownerClass)) {
+                $called = $ownerClass;
             }
             if ('' !== $called) {
                 LateStaticBindingHelper::emitStoreClassId(
