@@ -3754,6 +3754,24 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('splpriorityqueue' === $lcname) {
+            // Thin AOT: parallel `__spl_data` / `__spl_prio` + extract (#27277).
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, ['Countable', 'Iterator']);
+            $this->defineProperty($id, \PHPCompiler\VM\SplPriorityQueueJitHelper::PROP_DATA, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplPriorityQueueJitHelper::PROP_PRIO, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplPriorityQueueJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\SplPriorityQueueJitHelper::PROP_ITER_POS, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'insert', 'extract', 'top', 'count', 'isempty',
+                'setextractflags', 'getextractflags',
+                'rewind', 'valid', 'current', 'key', 'next',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if (
             'spldoublylinkedlist' === $lcname
             || 'splqueue' === $lcname

@@ -17286,6 +17286,8 @@ class JIT {
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\SplPriorityQueueMethod
+                && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplDllistMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplFixedArrayMethod
