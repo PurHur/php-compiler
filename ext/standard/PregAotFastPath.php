@@ -889,6 +889,9 @@ final class PregAotFastPath
     /**
      * NestedJIT-safe preg_split — int return + static string slots only (no PHP arrays, #27080).
      *
+     * Thin standalone AOT no longer calls this — LLVM uses replaceFindNext + subject slices
+     * (#27208). Kept for host unit tests / ThinAot splitArgv stub parity.
+     *
      * @return int part count, or -1 on unsupported/error
      */
     public static function splitStore(string $pattern, string $subject, int $limit, int $flags): int
@@ -936,7 +939,10 @@ final class PregAotFastPath
                 return $n;
             }
             $start = $cursor;
-            while ($cursor < $subLen && !self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+            while ($cursor < $subLen) {
+                if (self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                    break;
+                }
                 ++$cursor;
             }
             if ($n >= self::MAX_CAPS) {

@@ -2637,6 +2637,7 @@ require_once __DIR__.'/../../../ext/standard/JitPregReplaceCompileTime.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCallback.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCallbackArray.php';
 require_once __DIR__.'/../../../ext/standard/JitPregSplit.php';
+require_once __DIR__.'/../../../ext/standard/JitPregSplitCompileTime.php';
 require_once __DIR__.'/../../../ext/standard/JitPregSubject.php';
 require_once __DIR__.'/../../../ext/standard/JitPrintR.php';
 require_once __DIR__.'/../../../ext/standard/JitPrintf.php';
