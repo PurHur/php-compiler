@@ -61,9 +61,31 @@ final class preg_split extends Internal
                 'preg_split() expects 2 to 4 arguments in this compiler build'
             );
         }
-        // Do not constexpr via constantArrayFromVmHashTable (#27080): raw `__value__**` fails
-        // module verify into `__compiler_json_encode_array`; boxed copy yields empty strings
-        // under thin AOT. Always use the runtime ABI (thin: splitStore + LLVM HT fill).
+        $limitLit = null;
+        $flagsLit = null;
+        if ($argc >= 3 && null !== $args[2]->compileTimeInt) {
+            $limitLit = (int) $args[2]->compileTimeInt;
+        }
+        if (4 === $argc && null !== $args[3]->compileTimeInt) {
+            $flagsLit = (int) $args[3]->compileTimeInt;
+        }
+        // Literal fold — thin AOT NestedJIT split HT fill is unreliable (#27208 / peer #27181).
+        if (
+            (2 === $argc || null !== $limitLit)
+            && (4 !== $argc || null !== $flagsLit)
+        ) {
+            $folded = JitPregSplitCompileTime::tryFold(
+                $context,
+                $args[0],
+                $args[1],
+                $limitLit,
+                $flagsLit
+            );
+            if (null !== $folded) {
+                return $folded;
+            }
+        }
+        // Runtime ABI (thin: replaceFindNext + LLVM HT fill; embed: splitArgv HT).
         $limit = $context->getTypeFromString('int64')->constInt(-1, true);
         $flags = $context->getTypeFromString('int64')->constInt(0, false);
         if ($argc >= 3) {

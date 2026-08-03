@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6952 |
-| Phase A inventory files (M2 ratio SSOT) | 6952 |
+| PHP files on vm.php path | 6953 |
+| Phase A inventory files (M2 ratio SSOT) | 6953 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22345 |
+| Source constructs flagged (warnings) | 22357 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2835,6 +2835,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPregReplaceCallbackArray.php` | 0 | 1 |
 | `ext/standard/JitPregReplaceCompileTime.php` | 0 | 4 |
 | `ext/standard/JitPregSplit.php` | 0 | 1 |
+| `ext/standard/JitPregSplitCompileTime.php` | 0 | 9 |
 | `ext/standard/JitPregSubject.php` | 0 | 1 |
 | `ext/standard/JitPrintR.php` | 0 | 1 |
 | `ext/standard/JitPrintf.php` | 0 | 2 |
@@ -5349,7 +5350,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PowIntRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 6 |
+| `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 9 |
 | `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
@@ -28879,6 +28880,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitPregSplitCompileTime.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 58)
+- new VmVariable (line 60)
+- new VmVariable (line 66)
+- new HashTable (line 69)
+- new VmVariable (line 70)
+- new VmVariable (line 72)
+- new VmVariable (line 74)
+- new VmVariable (line 76)
+- 1 class method(s)
+
 ### `ext/standard/JitPregSubject.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46331,8 +46345,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 382)
 - new Variable (line 445)
 - new Variable (line 455)
-- new Variable (line 865)
-- 20 class method(s)
+- new Variable (line 914)
+- new Variable (line 933)
+- new Variable (line 951)
+- new Variable (line 1031)
+- 22 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php`
@@ -48030,25 +48047,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2565)
 - new Variable (line 2578)
 - new Variable (line 2777)
-- new VMVariable (line 4043)
-- new VMVariable (line 4063)
-- new VMVariable (line 4073)
-- new VMVariable (line 4093)
-- new ReflectionClassConstant (line 5823)
-- new Variable (line 6242)
-- new Variable (line 6268)
-- new Variable (line 6276)
-- new Variable (line 6299)
-- new Variable (line 6325)
-- new Variable (line 6333)
-- new Variable (line 6407)
-- new Literal (line 6424)
-- new Literal (line 6429)
-- new Literal (line 6434)
-- new Variable (line 6445)
-- new Variable (line 6478)
-- new Variable (line 6501)
-- new Variable (line 6872)
+- new VMVariable (line 4055)
+- new VMVariable (line 4075)
+- new VMVariable (line 4085)
+- new VMVariable (line 4105)
+- new ReflectionClassConstant (line 5835)
+- new Variable (line 6254)
+- new Variable (line 6280)
+- new Variable (line 6288)
+- new Variable (line 6311)
+- new Variable (line 6337)
+- new Variable (line 6345)
+- new Variable (line 6419)
+- new Literal (line 6436)
+- new Literal (line 6441)
+- new Literal (line 6446)
+- new Variable (line 6457)
+- new Variable (line 6490)
+- new Variable (line 6513)
+- new Variable (line 6884)
 - 293 class method(s)
 - 8 closure(s)
 

@@ -19,11 +19,7 @@ $bad = preg_split('(bad[', 'x');
 echo $bad === false ? 'false' : 'bad', "\n";
 PHP;
 
-    private const EXPECT = <<<'TXT'
-3
-one|two|three
-false
-TXT;
+    private const EXPECT = "3\none|two|three\nfalse\n";
 
     public function testVmMatchesPhpSubset(): void
     {
