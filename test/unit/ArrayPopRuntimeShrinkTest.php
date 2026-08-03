@@ -9,14 +9,19 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_pop() JIT routes through ArrayPopJitHelper PHP not ArrayBuiltinHelper LLVM (#12647, #14317). */
+/**
+ * array_pop() JIT emits HashTablePopLastLlvm (not ArrayBuiltinHelper monolith);
+ * VM keeps ArrayPopJitHelper PHP (#12647, #27214).
+ */
 final class ArrayPopRuntimeShrinkTest extends TestCase
 {
-    public function testArrayPopRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayPopRuntimeUsesPopLlvmNotBuiltinMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPopRuntime.php');
+        $this->assertStringContainsString('HashTablePopLastLlvm', $runtime);
         $this->assertStringContainsString('ArrayPopJitHelper', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::popLast', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
@@ -24,6 +29,11 @@ final class ArrayPopRuntimeShrinkTest extends TestCase
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pop.php');
         $this->assertStringContainsString('ArrayPopRuntime::pop', $builtin);
+
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/HashTablePopLastLlvm.php');
+        $this->assertTrue(
+            \PHPCompiler\JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod('poplast')
+        );
     }
 
     public function testArrayPopJitHelperPopsLastElement(): void
