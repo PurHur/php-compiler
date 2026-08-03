@@ -13,8 +13,10 @@ use PHPCompiler\VM\Variable;
  *
  * php-src: ext/dom/xml_document.c — load_from_helper(DOM_LOAD_STRING)
  *
- * Note: thin-AOT get_class / property fetch on the returned living document still needs
- * Dom\ class_id sync or LLVM materialization (peer JitDomLoadXMLUserScript) — see #27108.
+ * Note: thin-AOT get_class / documentElement still segfault — NestedJIT ObjectEntry* is
+ * not thin __object__ layout (class_id load crashes; rewriting class_id also crashes).
+ * Next: LLVM materialize Dom\XMLDocument (peer JitDomLoadXMLUserScript) + DomRegistry
+ * Attr slots for rename, or NestedJIT-only get_class/property with no thin class_id (#27108).
  */
 final class DomXmlDocumentCreateFromStringJitHelper
 {
