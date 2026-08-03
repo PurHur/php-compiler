@@ -4,22 +4,32 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\BasicBlock;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_preg_expand_replacement via PregExpandJitHelper PHP (#10064).
+ * JIT/AOT link for phpc_preg_expand_replacement via PregExpandJitHelper PHP (#10064, #27456).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiledBundle} (peer PregEmptyPatternReplaceRuntime #27432).
  * Replaces lib/AOT/runtime/phpc_preg_expand.c. SSOT: {@see \PHPCompiler\ext\standard\PregReplacementExpand}.
  * php-src: ext/pcre/php_pcre.c — php_pcre_replace_impl replacement parsing
  */
 final class PregExpandRuntime
 {
     private const HELPER_PATH = '/ext/standard/PregExpandJitHelper.php';
+
+    private const CORE_PATH = '/ext/standard/PregReplacementExpand.php';
+
+    /**
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::CORE_PATH,
+        self::HELPER_PATH,
+    ];
 
     private const EXPAND_HELPER = 'PHPCompiler\\ext\\standard\\PregExpandJitHelper::expand';
 
@@ -231,81 +241,19 @@ final class PregExpandRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after PregExpandJitHelper compile (#10064)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27456');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         self::ensureValueStringHelpers($context);
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        $path = $root.self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        $expandPath = $root.'/ext/standard/PregReplacementExpand.php';
-        $expandReal = \realpath($expandPath) ?: $expandPath;
-        $savedBuilder = $context->builder;
-        $savedActive = $context->activeFunction;
-        $restoreBlock = self::captureInsertBlock($context);
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $jit = new JIT($context);
-            if (!$context->hasJitIncludedFileCompiled($expandReal)) {
-                $expandBlock = $runtime->parseAndCompile(
-                    (string) \file_get_contents($expandPath),
-                    'PregReplacementExpand.php'
-                );
-                if (null === $expandBlock) {
-                    throw new \LogicException('PregReplacementExpand.php parseAndCompile failed (#10064)');
-                }
-                $jit->compile($expandBlock);
-                $context->markJitIncludedFileCompiled($expandReal);
-            }
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PregExpandJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('PregExpandJitHelper.php parseAndCompile failed (#10064)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-            $context->markJitIncludedFileCompiled($realPath);
-        } finally {
-            $context->builder = $savedBuilder;
-            self::restoreInsertBlock($context, $restoreBlock);
-            $context->activeFunction = $savedActive;
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10064)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#27456'
+        );
     }
 
     private static function ensureLibc(Context $context): void
@@ -346,24 +294,6 @@ final class PregExpandRuntime
         } catch (\Throwable) {
             $fn = $context->module->addFunction($name, $fnType);
             $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 }
