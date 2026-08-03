@@ -105,6 +105,7 @@ final class LibcExtern
             'cos' => [$dbl, false, [$dbl]],
             'cosh' => [$dbl, false, [$dbl]],
             'sin' => [$dbl, false, [$dbl]],
+            'sinh' => [$dbl, false, [$dbl]],
             'tan' => [$dbl, false, [$dbl]],
             'tanh' => [$dbl, false, [$dbl]],
             'acos' => [$dbl, false, [$dbl]],
