@@ -6,14 +6,25 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** LateStaticBindingHelper must route scope id through LateStaticJitHelper PHP (#10247). */
+/**
+ * LateStaticBindingRuntime routes through LateStaticJitHelper via JitVmHelperLink::ensureCompiled
+ * (#10247 / #27416 / peer #27321).
+ */
 final class LateStaticRuntimeShrinkTest extends TestCase
 {
-    public function testLateStaticBindingRuntimeUsesJitHelper(): void
+    public function testLateStaticBindingRuntimeUsesJitHelperNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/LateStaticBindingRuntime.php');
         $this->assertStringContainsString('LateStaticJitHelper', $source);
         $this->assertStringContainsString('effectiveCalledClassId', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('putenv', $source);
+        $this->assertStringNotContainsString('PHP_COMPILER_SELFHOST_AOT', $source);
     }
 
     public function testLateStaticBindingHelperDelegatesToRuntime(): void

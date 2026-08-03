@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\Block;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for late-static scope via LateStaticJitHelper PHP (#10247).
+ * JIT/AOT link for late-static scope via LateStaticJitHelper PHP (#10247, #27416).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ObStatusRuntime #27321 / StringDeployPath #27037).
  * Replaces inline LLVM select in LateStaticBindingHelper. Global storage stays thin ABI.
  * php-src: Zend/zend_execute.c — get_called_scope()
  * SSOT: {@see \PHPCompiler\VM\LateStaticBinding}, {@see \PHPCompiler\VM\LateStaticJitHelper}
@@ -127,55 +128,17 @@ final class LateStaticBindingRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after LateStaticJitHelper compile (#10247)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27416');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'LateStaticJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('LateStaticJitHelper.php parseAndCompile failed (#10247)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10247)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#27416'
+        );
     }
 }
