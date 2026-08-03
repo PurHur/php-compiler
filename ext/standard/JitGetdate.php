@@ -105,6 +105,174 @@ final class JitGetdate
     }
 
     /**
+     * UTC unix timestamp from civil fields (Howard Hinnant days_from_civil).
+     *
+     * Out-of-range {@see $day} overflows like php-src mktime/gmmktime (Feb 31 → Mar 2/3)
+     * via days_from_civil(y, m, 1) + (day - 1). Month may be outside 1..12; it is normalized
+     * into {@see $year} first (#27262).
+     */
+    public static function timestampFromCivilPublic(
+        Context $context,
+        Value $year,
+        Value $month,
+        Value $day,
+        Value $hour,
+        Value $minute,
+        Value $second
+    ): Value {
+        return self::timestampFromCivil($context, $year, $month, $day, $hour, $minute, $second);
+    }
+
+    /**
+     * UTC unix timestamp from civil fields (Howard Hinnant days_from_civil).
+     */
+    private static function timestampFromCivil(
+        Context $context,
+        Value $year,
+        Value $month,
+        Value $day,
+        Value $hour,
+        Value $minute,
+        Value $second
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $c12 = $i64->constInt(12, false);
+        $c1 = $i64->constInt(1, false);
+
+        // absMonth = year*12 + (month-1); normalize into year + month∈[1,12]
+        $absMonth = $context->builder->add(
+            $context->builder->mul($year, $c12),
+            $context->builder->sub($month, $c1)
+        );
+        $normYear = $context->builder->signedDiv($absMonth, $c12);
+        $normRem = $context->builder->signedRem($absMonth, $c12);
+        $remNeg = $context->builder->icmp(Builder::INT_SLT, $normRem, $i64->constInt(0, false));
+        $remAdj = BasicBlockHelper::append($context, 'gd_civ_rem_adj');
+        $remOk = BasicBlockHelper::append($context, 'gd_civ_rem_ok');
+        $remMerge = BasicBlockHelper::append($context, 'gd_civ_rem_merge');
+        $context->builder->branchIf($remNeg, $remAdj, $remOk);
+
+        $context->builder->positionAtEnd($remAdj);
+        $yearAdj = $context->builder->sub($normYear, $c1);
+        $remPlus = $context->builder->add($normRem, $c12);
+        $context->builder->branch($remMerge);
+        $context->builder->positionAtEnd($remOk);
+        $context->builder->branch($remMerge);
+        $context->builder->positionAtEnd($remMerge);
+        $yearPhi = $context->builder->phi($i64);
+        $yearPhi->addIncoming($yearAdj, $remAdj);
+        $yearPhi->addIncoming($normYear, $remOk);
+        $remPhi = $context->builder->phi($i64);
+        $remPhi->addIncoming($remPlus, $remAdj);
+        $remPhi->addIncoming($normRem, $remOk);
+        $monthNorm = $context->builder->add($remPhi, $c1);
+
+        $days = self::daysFromCivil($context, $yearPhi, $monthNorm, $c1);
+        $days = $context->builder->add($days, $context->builder->sub($day, $c1));
+
+        return $context->builder->add(
+            $context->builder->mul($days, $i64->constInt(86400, false)),
+            $context->builder->add(
+                $context->builder->mul($hour, $i64->constInt(3600, false)),
+                $context->builder->add(
+                    $context->builder->mul($minute, $i64->constInt(60, false)),
+                    $second
+                )
+            )
+        );
+    }
+
+    /**
+     * Howard Hinnant days_from_civil — day count since 1970-01-01 for civil y/m/d (m in 1..12).
+     */
+    private static function daysFromCivil(Context $context, Value $year, Value $month, Value $day): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $mLe2 = $context->builder->icmp(Builder::INT_SLE, $month, $i64->constInt(2, false));
+        $yAdjBlock = BasicBlockHelper::append($context, 'gd_dfc_y_adj');
+        $yKeepBlock = BasicBlockHelper::append($context, 'gd_dfc_y_keep');
+        $yMerge = BasicBlockHelper::append($context, 'gd_dfc_y_merge');
+        $context->builder->branchIf($mLe2, $yAdjBlock, $yKeepBlock);
+
+        $context->builder->positionAtEnd($yAdjBlock);
+        $yMinus = $context->builder->sub($year, $i64->constInt(1, false));
+        $context->builder->branch($yMerge);
+        $context->builder->positionAtEnd($yKeepBlock);
+        $context->builder->branch($yMerge);
+        $context->builder->positionAtEnd($yMerge);
+        $y = $context->builder->phi($i64);
+        $y->addIncoming($yMinus, $yAdjBlock);
+        $y->addIncoming($year, $yKeepBlock);
+
+        $yNeg = $context->builder->icmp(Builder::INT_SLT, $y, $i64->constInt(0, false));
+        $eraNeg = BasicBlockHelper::append($context, 'gd_dfc_era_neg');
+        $eraPos = BasicBlockHelper::append($context, 'gd_dfc_era_pos');
+        $eraMerge = BasicBlockHelper::append($context, 'gd_dfc_era_merge');
+        $context->builder->branchIf($yNeg, $eraNeg, $eraPos);
+
+        $context->builder->positionAtEnd($eraNeg);
+        $eraFromNeg = $context->builder->signedDiv(
+            $context->builder->sub($y, $i64->constInt(399, false)),
+            $i64->constInt(400, false)
+        );
+        $context->builder->branch($eraMerge);
+        $context->builder->positionAtEnd($eraPos);
+        $eraFromPos = $context->builder->signedDiv($y, $i64->constInt(400, false));
+        $context->builder->branch($eraMerge);
+        $context->builder->positionAtEnd($eraMerge);
+        $era = $context->builder->phi($i64);
+        $era->addIncoming($eraFromNeg, $eraNeg);
+        $era->addIncoming($eraFromPos, $eraPos);
+
+        $yoe = $context->builder->sub($y, $context->builder->mul($era, $i64->constInt(400, false)));
+
+        $mShiftThen = BasicBlockHelper::append($context, 'gd_dfc_m_then');
+        $mShiftElse = BasicBlockHelper::append($context, 'gd_dfc_m_else');
+        $mShiftMerge = BasicBlockHelper::append($context, 'gd_dfc_m_merge');
+        $mGt2 = $context->builder->icmp(Builder::INT_SGT, $month, $i64->constInt(2, false));
+        $context->builder->branchIf($mGt2, $mShiftThen, $mShiftElse);
+        $context->builder->positionAtEnd($mShiftThen);
+        $mA = $context->builder->sub($month, $i64->constInt(3, false));
+        $context->builder->branch($mShiftMerge);
+        $context->builder->positionAtEnd($mShiftElse);
+        $mB = $context->builder->add($month, $i64->constInt(9, false));
+        $context->builder->branch($mShiftMerge);
+        $context->builder->positionAtEnd($mShiftMerge);
+        $mShift = $context->builder->phi($i64);
+        $mShift->addIncoming($mA, $mShiftThen);
+        $mShift->addIncoming($mB, $mShiftElse);
+
+        $doy = $context->builder->add(
+            $context->builder->signedDiv(
+                $context->builder->add(
+                    $context->builder->mul($i64->constInt(153, false), $mShift),
+                    $i64->constInt(2, false)
+                ),
+                $i64->constInt(5, false)
+            ),
+            $context->builder->sub($day, $i64->constInt(1, false))
+        );
+        $doe = $context->builder->add(
+            $context->builder->add(
+                $context->builder->mul($yoe, $i64->constInt(365, false)),
+                $context->builder->sub(
+                    $context->builder->signedDiv($yoe, $i64->constInt(4, false)),
+                    $context->builder->signedDiv($yoe, $i64->constInt(100, false))
+                )
+            ),
+            $doy
+        );
+
+        return $context->builder->sub(
+            $context->builder->add(
+                $context->builder->mul($era, $i64->constInt(146097, false)),
+                $doe
+            ),
+            $i64->constInt(719468, false)
+        );
+    }
+
+    /**
      * UTC civil breakdown (Howard Hinnant days_from_civil inverse).
      *
      * @return array{year:Value,month:Value,day:Value,hour:Value,minute:Value,second:Value,wday:Value,yday:Value}

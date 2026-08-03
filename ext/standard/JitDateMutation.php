@@ -54,12 +54,13 @@ final class JitDateMutation
     }
 
     /**
-     * DateTime::modify() / DateTimeImmutable::modify() / date_modify() (#26789).
+     * DateTime::modify() / DateTimeImmutable::modify() / date_modify() (#26789, #27262).
      *
-     * Thin user-script AOT cannot NestedJIT {@see DateMutationRuntime} (missing
-     * {@see __nativearray__boundscheck}). Prefer compile-time {@see VmDateTimeNative::modifyRelative}
-     * when the receiver carries {@see JITVariable::$compileTimeLong} from construct; otherwise
-     * fixed-length unit deltas (+N day/hour/…) lower to pure LLVM add — no NestedJIT.
+     * Prefer compile-time {@see VmDateTimeNative::modifyRelative} when the receiver carries
+     * {@see JITVariable::$compileTimeLong} from construct. Fixed-length unit deltas (+N day/hour/…)
+     * lower to pure LLVM add. Month/year use UTC civil IR ({@see JitGetdate}) — thin AOT cannot
+     * NestedJIT {@see DateMutationRuntime} (missing {@see __nativearray__boundscheck} / empty
+     * gmmktime helper box, peer #27159).
      *
      * Mutable: in-place timestamp update. Immutable: allocate+copy (or constant allocate) so the
      * original stays unchanged (php-src zim_DateTimeImmutable_modify).
@@ -89,6 +90,10 @@ final class JitDateMutation
         // Fast path: construct left compileTimeLong on $this — resolve entirely at compile time.
         if (null !== $args[0]->compileTimeLong) {
             $tzName = $args[0]->compileTimeString ?? 'UTC';
+            // Timezone from construct; ignore leftover date-string stamps on receivers (#27309 peer).
+            if ('' === $tzName || 1 === preg_match('/^\d{4}-\d{2}-\d{2}/', $tzName)) {
+                $tzName = 'UTC';
+            }
             try {
                 $newTs = VmDateTimeNative::modifyRelative(
                     (int) $args[0]->compileTimeLong,
@@ -128,14 +133,9 @@ final class JitDateMutation
             return self::returnObjectArg($context, $args[0]);
         }
 
-        // Runtime receiver: fixed-length unit deltas without NestedJIT (#26789).
+        // Runtime receiver (#26789 day-units; #27262 month/year via modify_delta helper).
         $delta = self::parseModifyLiteral($modifierLit);
         $scale = self::fixedUnitScaleSeconds($delta['unit']);
-        if (null === $scale) {
-            throw new \LogicException(
-                $function.'(): month/year modifiers require a compile-time DateTime receiver in this build (#26789)'
-            );
-        }
 
         if ($immutable) {
             $receiver = ReflectionSetup::loadObjectFromArg($context, $args[0]);
@@ -161,8 +161,29 @@ final class JitDateMutation
 
         $ts = self::readLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY);
         $i64 = $context->getTypeFromString('int64');
-        $deltaSeconds = $delta['amount'] * $scale;
-        $newTs = $context->builder->add($ts, $i64->constInt($deltaSeconds, true));
+        if (null === $scale) {
+            // Month/year: UTC civil add + mktime-style day overflow (#27262).
+            $parts = JitGetdate::civilPartsPublic($context, $ts);
+            $year = $parts['year'];
+            $month = $parts['month'];
+            if (5 === $delta['unit']) {
+                $month = $context->builder->add($month, $i64->constInt($delta['amount'], true));
+            } else {
+                $year = $context->builder->add($year, $i64->constInt($delta['amount'], true));
+            }
+            $newTs = JitGetdate::timestampFromCivilPublic(
+                $context,
+                $year,
+                $month,
+                $parts['day'],
+                $parts['hour'],
+                $parts['minute'],
+                $parts['second']
+            );
+        } else {
+            $deltaSeconds = $delta['amount'] * $scale;
+            $newTs = $context->builder->add($ts, $i64->constInt($deltaSeconds, true));
+        }
         self::writeLongProp($context, $object, $dtObj, $layout, DateTimeSupport::TS_PROPERTY, $newTs);
 
         if ($immutable) {
