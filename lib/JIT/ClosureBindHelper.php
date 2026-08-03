@@ -391,7 +391,6 @@ final class ClosureBindHelper
         ?Call $inner = null
     ): Value {
         $classId = $context->type->object->lookup('Closure');
-        $srcObj = self::loadClosureObject($context, $source);
         $dest = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($dest);
 
@@ -401,6 +400,7 @@ final class ClosureBindHelper
         if (null !== $targetName) {
             ClosureHelper::storeInvokeTarget($context, $dest, $targetName);
         } else {
+            $srcObj = self::loadClosureObject($context, $source);
             $targetVar = $context->type->object->propertyFetch(
                 $srcObj,
                 'Closure',
@@ -425,28 +425,15 @@ final class ClosureBindHelper
             self::BOUND_SCOPE_PROPERTY,
             $boundScope
         );
-        $staticFlag = $context->type->object->propertyFetch(
-            $srcObj,
-            'Closure',
-            self::IS_STATIC_PROPERTY
-        );
-        $context->type->object->storeInstanceProperty(
-            $dest,
-            'Closure',
-            self::IS_STATIC_PROPERTY,
-            $staticFlag
-        );
-        $methodFlag = $context->type->object->propertyFetch(
-            $srcObj,
-            'Closure',
-            self::IS_METHOD_PROPERTY
-        );
-        $context->type->object->storeInstanceProperty(
-            $dest,
-            'Closure',
-            self::IS_METHOD_PROPERTY,
-            $methodFlag
-        );
+        // Do not propertyFetch/copy IS_STATIC / IS_METHOD from the source: free closures
+        // leave those slots uninitialized and the copy segfaults under thin AOT (#27219).
+        // Set flags from Variable metadata when present (method FCC / static closures).
+        if ($source->closureIsStatic) {
+            self::storeStaticClosureFlag($context, $dest);
+        }
+        if ($source->closureIsMethodFake) {
+            self::storeMethodFakeClosureFlag($context, $dest);
+        }
 
         return $dest;
     }
