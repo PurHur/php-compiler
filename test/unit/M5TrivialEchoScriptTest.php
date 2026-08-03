@@ -44,8 +44,22 @@ final class M5TrivialEchoScriptTest extends TestCase
     {
         require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
         $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile('<?php $a=1;', 't.php'));
-        $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo \'x\';', 't.php'));
         $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo 01;', 't.php'));
+        // Single-quoted echo is supported (#27426).
+        $sq = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild("<?php echo 'x';", 't.php');
+        $this->assertNotNull($sq);
+    }
+
+    public function testTryBuildSingleQuotedEcho(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $script = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild("<?php echo 'hi\\n';", 'sq.php');
+        $this->assertNotNull($script);
+        // Single-quoted \\n is literal backslash + n, not newline.
+        $block = \PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile("<?php echo 'ok';", 'sq.php');
+        $this->assertNotNull($block);
+        $esc = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild("<?php echo 'a\\\\b\\'c';", 'sq.php');
+        $this->assertNotNull($esc);
     }
 
     public function testTryBuildEchoIntLiteral(): void

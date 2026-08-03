@@ -186,4 +186,44 @@ if ! cmp -s "${ARITH_ZEND}" "${ARITH_NATIVE}"; then
   exit 1
 fi
 echo "bootstrap-gen0-driver-functional-smoke: OK — arith assign+plus+echo capability (#27426)"
+
+# Capability check (#27426): single-quoted echo must not stay parseAndCompile-null
+# while double-quoted echo alone is green (#27486 miss).
+SQ_SRC="${WORKDIR}/sq-${TOKEN}.php"
+SQ_OUT="${WORKDIR}/sq-${TOKEN}.bin"
+SQ_NATIVE="${WORKDIR}/sq-${TOKEN}.native.out"
+SQ_ZEND="${WORKDIR}/sq-${TOKEN}.zend.out"
+cat >"${SQ_SRC}" <<'EOF'
+<?php echo 'GEN0_SQ_OK';
+EOF
+rm -f "${SQ_OUT}" "${SQ_NATIVE}" "${SQ_ZEND}"
+set +e
+sq_log="$(
+  env PHP_COMPILER_REPO_ROOT="${ROOT}" "${DRIVER}" -o "${SQ_OUT}" "${SQ_SRC}" 2>&1
+)"
+sq_rc=$?
+set -e
+if [[ "${sq_rc}" -ne 0 || ! -x "${SQ_OUT}" ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — single-quote echo capability (#27426) driver exit ${sq_rc}" >&2
+  printf '%s\n' "${sq_log}" | tail -n 40 >&2
+  exit 1
+fi
+set +e
+php -d display_errors=0 "${SQ_SRC}" >"${SQ_ZEND}" 2>"${WORKDIR}/sq.zend.err"
+sq_zend_rc=$?
+"${SQ_OUT}" >"${SQ_NATIVE}" 2>"${WORKDIR}/sq.native.err"
+sq_run=$?
+set -e
+if [[ "${sq_zend_rc}" -ne 0 || "${sq_run}" -ne 0 ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — single-quote run zend=${sq_zend_rc} native=${sq_run}" >&2
+  cat "${WORKDIR}/sq.zend.err" "${WORKDIR}/sq.native.err" >&2 || true
+  exit 1
+fi
+if ! cmp -s "${SQ_ZEND}" "${SQ_NATIVE}"; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — single-quote stdout mismatch vs Zend" >&2
+  echo "  zend:   $(od -An -tx1 "${SQ_ZEND}" | head -c 80)" >&2
+  echo "  native: $(od -An -tx1 "${SQ_NATIVE}" | head -c 80)" >&2
+  exit 1
+fi
+echo "bootstrap-gen0-driver-functional-smoke: OK — single-quote echo capability (#27426)"
 exit 0

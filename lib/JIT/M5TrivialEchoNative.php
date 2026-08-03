@@ -14,6 +14,9 @@ use PHPLLVM\Value;
  *   echo "TOKEN\n";
  *
  *   <?php
+ *   echo 'TOKEN';     // single-quoted (#27426) — only \\ and \' escapes
+ *
+ *   <?php
  *   echo 42;            // decimal literal (#27426)
  *
  *   <?php
@@ -285,10 +288,15 @@ final class M5TrivialEchoNative
         $b->branchIf($past, $miss, $p6);
         $b->positionAtEnd($p6);
         $ch0 = $b->load($b->gep($chars, $i));
-        $isQ = $b->icmp(Builder::INT_EQ, $ch0, $i8->constInt(ord('"'), false));
+        $isDq = $b->icmp(Builder::INT_EQ, $ch0, $i8->constInt(ord('"'), false));
+        $isSq = $b->icmp(Builder::INT_EQ, $ch0, $i8->constInt(ord("'"), false));
         $p7 = $fn->appendBasicBlock('p7');
+        $sqStart = $fn->appendBasicBlock('sq_start');
         $echoIntTry = $fn->appendBasicBlock('echo_int_try');
-        $b->branchIf($isQ, $p7, $echoIntTry);
+        $notDq = $fn->appendBasicBlock('not_dq_quote');
+        $b->branchIf($isDq, $p7, $notDq);
+        $b->positionAtEnd($notDq);
+        $b->branchIf($isSq, $sqStart, $echoIntTry);
         // Not a string echo — try `echo <uint>;` before arith fallback (#27426).
         $b->positionAtEnd($echoIntTry);
         $echoIntPayload = $b->call($context->lookupFunction(self::ECHO_INT_EXTRACT_FN), $code);
@@ -310,7 +318,7 @@ final class M5TrivialEchoNative
         $endQ = $fn->appendBasicBlock('dec_endq');
         $esc = $fn->appendBasicBlock('dec_esc');
         $lit = $fn->appendBasicBlock('dec_lit');
-        $notDq = $fn->appendBasicBlock('dec_not_dq');
+        $notDqBody = $fn->appendBasicBlock('dec_not_dq');
         $after = $fn->appendBasicBlock('dec_after');
         $b->branch($loop);
 
@@ -322,9 +330,9 @@ final class M5TrivialEchoNative
         $b->positionAtEnd($body);
         $cch = $b->load($b->gep($chars, $ci));
         $isBs = $b->icmp(Builder::INT_EQ, $cch, $i8->constInt(ord('\\'), false));
-        $isDq = $b->icmp(Builder::INT_EQ, $cch, $i8->constInt(ord('"'), false));
-        $b->branchIf($isDq, $endQ, $notDq);
-        $b->positionAtEnd($notDq);
+        $isDqCh = $b->icmp(Builder::INT_EQ, $cch, $i8->constInt(ord('"'), false));
+        $b->branchIf($isDqCh, $endQ, $notDqBody);
+        $b->positionAtEnd($notDqBody);
         $b->branchIf($isBs, $esc, $lit);
 
         $b->positionAtEnd($esc);
@@ -368,6 +376,108 @@ final class M5TrivialEchoNative
         $b->positionAtEnd($endQ);
         $b->store($b->add($ci, $i64->constInt(1, false)), $idx);
         $b->branch($after);
+
+        // Single-quoted echo — only \\ and \' are escapes (#27426 / php-src).
+        $b->positionAtEnd($sqStart);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+        $sqBuf = $b->arrayAlloca($i8, $len);
+        $sqOutI = $b->alloca($i64);
+        $b->store($i64->constInt(0, false), $sqOutI);
+        $sqLoop = $fn->appendBasicBlock('sq_loop');
+        $sqBody = $fn->appendBasicBlock('sq_body');
+        $sqEnd = $fn->appendBasicBlock('sq_end');
+        $sqEsc = $fn->appendBasicBlock('sq_esc');
+        $sqLit = $fn->appendBasicBlock('sq_lit');
+        $sqNotEnd = $fn->appendBasicBlock('sq_not_end');
+        $sqAfter = $fn->appendBasicBlock('sq_after');
+        $b->branch($sqLoop);
+
+        $b->positionAtEnd($sqLoop);
+        $sqCi = $b->load($idx);
+        $sqInRange = $b->icmp(Builder::INT_ULT, $sqCi, $len);
+        $b->branchIf($sqInRange, $sqBody, $miss);
+
+        $b->positionAtEnd($sqBody);
+        $sqCh = $b->load($b->gep($chars, $sqCi));
+        $sqIsBs = $b->icmp(Builder::INT_EQ, $sqCh, $i8->constInt(ord('\\'), false));
+        $sqIsQ = $b->icmp(Builder::INT_EQ, $sqCh, $i8->constInt(ord("'"), false));
+        $b->branchIf($sqIsQ, $sqEnd, $sqNotEnd);
+        $b->positionAtEnd($sqNotEnd);
+        $b->branchIf($sqIsBs, $sqEsc, $sqLit);
+
+        $b->positionAtEnd($sqEsc);
+        $sqNi = $b->add($sqCi, $i64->constInt(1, false));
+        $sqEscPast = $b->icmp(Builder::INT_UGE, $sqNi, $len);
+        $sqEscOk = $fn->appendBasicBlock('sq_esc_ok');
+        $b->branchIf($sqEscPast, $miss, $sqEscOk);
+        $b->positionAtEnd($sqEscOk);
+        $sqNch = $b->load($b->gep($chars, $sqNi));
+        $sqIsBsEsc = $b->icmp(Builder::INT_EQ, $sqNch, $i8->constInt(ord('\\'), false));
+        $sqIsQEsc = $b->icmp(Builder::INT_EQ, $sqNch, $i8->constInt(ord("'"), false));
+        $sqMapped = $b->alloca($i8);
+        // Default: keep backslash + next as two literal chars (php-src single-quote).
+        $sqTwoChar = $fn->appendBasicBlock('sq_two_char');
+        $sqOneEsc = $fn->appendBasicBlock('sq_one_esc');
+        $sqEscDone = $fn->appendBasicBlock('sq_esc_done');
+        $sqAfterBsCheck = $fn->appendBasicBlock('sq_after_bs');
+        $b->branchIf($sqIsBsEsc, $sqOneEsc, $sqAfterBsCheck);
+        $b->positionAtEnd($sqAfterBsCheck);
+        $b->branchIf($sqIsQEsc, $sqOneEsc, $sqTwoChar);
+        $b->positionAtEnd($sqOneEsc);
+        $b->store($sqNch, $sqMapped);
+        $sqOi = $b->load($sqOutI);
+        $b->store($b->load($sqMapped), $b->gep($sqBuf, $sqOi));
+        $b->store($b->add($sqOi, $i64->constInt(1, false)), $sqOutI);
+        $b->store($b->add($sqCi, $i64->constInt(2, false)), $idx);
+        $b->branch($sqEscDone);
+        $b->positionAtEnd($sqTwoChar);
+        $sqOi2 = $b->load($sqOutI);
+        $b->store($i8->constInt(ord('\\'), false), $b->gep($sqBuf, $sqOi2));
+        $b->store($sqNch, $b->gep($sqBuf, $b->add($sqOi2, $i64->constInt(1, false))));
+        $b->store($b->add($sqOi2, $i64->constInt(2, false)), $sqOutI);
+        $b->store($b->add($sqCi, $i64->constInt(2, false)), $idx);
+        $b->branch($sqEscDone);
+        $b->positionAtEnd($sqEscDone);
+        $b->branch($sqLoop);
+
+        $b->positionAtEnd($sqLit);
+        $sqOiLit = $b->load($sqOutI);
+        $b->store($sqCh, $b->gep($sqBuf, $sqOiLit));
+        $b->store($b->add($sqOiLit, $i64->constInt(1, false)), $sqOutI);
+        $b->store($b->add($sqCi, $i64->constInt(1, false)), $idx);
+        $b->branch($sqLoop);
+
+        $b->positionAtEnd($sqEnd);
+        $b->store($b->add($sqCi, $i64->constInt(1, false)), $idx);
+        $b->branch($sqAfter);
+
+        $b->positionAtEnd($sqAfter);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'sq_ws3');
+        $sqTi = $b->load($idx);
+        $sqTailPast = $b->icmp(Builder::INT_UGE, $sqTi, $len);
+        $sqP8 = $fn->appendBasicBlock('sq_p8');
+        $b->branchIf($sqTailPast, $miss, $sqP8);
+        $b->positionAtEnd($sqP8);
+        $sqTch = $b->load($b->gep($chars, $sqTi));
+        $sqIsSemi = $b->icmp(Builder::INT_EQ, $sqTch, $i8->constInt(ord(';'), false));
+        $sqP9 = $fn->appendBasicBlock('sq_p9');
+        $b->branchIf($sqIsSemi, $sqP9, $miss);
+        $b->positionAtEnd($sqP9);
+        $b->store($b->add($sqTi, $i64->constInt(1, false)), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'sq_ws4');
+        $sqEndI = $b->load($idx);
+        $sqAtEnd = $b->icmp(Builder::INT_EQ, $sqEndI, $len);
+        $sqP10 = $fn->appendBasicBlock('sq_p10');
+        $b->branchIf($sqAtEnd, $sqP10, $miss);
+        $b->positionAtEnd($sqP10);
+        $sqOutLen = $b->load($sqOutI);
+        $sqPayload = $b->call(
+            $context->lookupFunction('__string__init'),
+            $sqOutLen,
+            $b->pointerCast($sqBuf, $context->getTypeFromString('char*'))
+        );
+        $b->store($sqPayload, $result);
+        $b->branch($done);
 
         $b->positionAtEnd($after);
         self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'ws3');
