@@ -289,6 +289,66 @@ PHP;
         self::assertStringContainsString('ok', $out);
     }
 
+    /**
+     * Issue #27344 — consecutive var_dump(array_filter($cv, fn)) must send the CV slot, not the
+     * prior var_dump EXEC_RETURN (null haystack TypeError).
+     */
+    public function testArrayFilterConsecutiveExprClosureUsesCvHaystackSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [1, 2, 3];
+$b = [1, 2, 3];
+var_dump(array_filter($a, static fn ($v): bool => $v > 5));
+var_dump(array_filter($b, static fn ($v): bool => $v > 1));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_filter_consecutive_expr_closure_27344.php');
+
+        $assignVarSlots = [];
+        $filterOrdinal = 0;
+        $secondFilterSends = [];
+        $captureSecond = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type) {
+                $assignVarSlots[] = $op->arg2;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $name = $block->constants[$op->arg1]->toString();
+                if ('array_filter' === $name) {
+                    ++$filterOrdinal;
+                    $captureSecond = (2 === $filterOrdinal);
+                    if ($captureSecond) {
+                        $secondFilterSends = [];
+                    }
+                } else {
+                    $captureSecond = false;
+                }
+            }
+            if ($captureSecond && OpCode::TYPE_ARG_SEND === $op->type) {
+                $secondFilterSends[] = $op->arg1;
+            }
+            if ($captureSecond && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $captureSecond = false;
+            }
+        }
+
+        self::assertCount(2, $assignVarSlots, 'expected $a and $b assigns');
+        self::assertCount(2, $secondFilterSends, 'second filter sends='.json_encode($secondFilterSends));
+        self::assertSame(
+            $assignVarSlots[1],
+            $secondFilterSends[0],
+            'second haystack must be $b CV, not prior var_dump result'
+        );
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('array(0)', $out);
+        self::assertStringContainsString('int(2)', $out);
+        self::assertStringContainsString('int(3)', $out);
+    }
+
     /** Issue #17950 — usort($a = explode(...), fn) wires assign result + closure, runtime by-ref Error. */
     public function testUsortInlineAssignByRefUsesAssignAndClosureSlots(): void
     {

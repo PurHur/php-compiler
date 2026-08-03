@@ -28666,6 +28666,9 @@ class Compiler {
 
     /**
      * array_filter(str_split(...), is_numeric(...)) — haystack FuncCall immediately before trailing FCC (#15490).
+     *
+     * Must not treat a prior sibling consumer (e.g. var_dump(...)) as the haystack when arg 0 is a
+     * named CV — that wires null/void into the second expression-position call (#27344, #17989).
      */
     private function trailingInlineFuncCallHaystackBeforeCfgCall(?Op $cfgCallOp, ?Block $block): ?Op\Expr
     {
@@ -28674,6 +28677,11 @@ class Compiler {
         }
         $funcName = $this->resolveInlineCallArgFuncName($cfgCallOp);
         if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+            return null;
+        }
+        $haystackArg = $cfgCallOp->args[0] ?? null;
+        if ($haystackArg instanceof Operand && $this->isNamedVariableOperand($haystackArg)) {
+            // array_filter($b, fn|/string) — real CV haystack, not a hoisted sibling FuncCall (#27344).
             return null;
         }
         $callIndex = null;
