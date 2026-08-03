@@ -61,20 +61,22 @@ final class JitMethodExists
             $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Value-box tags may include IS_REFCOUNTED; compare the low 7 bits (#27108).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false)
         );
 
         $nullBlock = BasicBlockHelper::append($context, 'method_exists_null');
@@ -208,6 +210,10 @@ final class JitMethodExists
     ): Value {
         $i1 = $context->getTypeFromString('int1');
         $object = $context->type->object;
+        // Ensure living Dom\Attr::rename is visible for method_exists (#27108).
+        if ('rename' === strtolower($method)) {
+            \PHPCompiler\ext\dom\JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+        }
         $exists = $i1->constInt(0, false);
         foreach ($object->allClassNamesById() as $id => $className) {
             $isClass = $context->builder->icmp(

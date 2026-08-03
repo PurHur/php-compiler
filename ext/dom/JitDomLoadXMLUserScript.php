@@ -28,6 +28,9 @@ final class JitDomLoadXMLUserScript
     /** True when loadXML used the compile-time user-script path (no DomLoadXMLRuntime tree). */
     private static bool $lastLoadWasPureUserScript = false;
 
+    /** Document class that owns PROP_DOCUMENT_ELEMENT for the last pure materialize (#27108). */
+    private static ?string $lastDocumentClass = null;
+
     public static function lastCompileTimeXml(): ?string
     {
         return self::$lastCompileTimeXml;
@@ -36,6 +39,11 @@ final class JitDomLoadXMLUserScript
     public static function lastLoadWasPureUserScript(): bool
     {
         return self::$lastLoadWasPureUserScript;
+    }
+
+    public static function lastDocumentClass(): ?string
+    {
+        return self::$lastDocumentClass;
     }
 
     /**
@@ -49,10 +57,16 @@ final class JitDomLoadXMLUserScript
         self::$lastLoadWasPureUserScript = true;
     }
 
-    public static function rememberCompileTimeXml(string $xml): void
+    public static function rememberCompileTimeXml(string $xml, string $documentClass = self::CLASS_DOCUMENT): void
     {
         self::$lastCompileTimeXml = $xml;
         self::$lastLoadWasPureUserScript = false;
+        self::$lastDocumentClass = $documentClass;
+    }
+
+    public static function rememberLivingDocumentClass(string $documentClass): void
+    {
+        self::$lastDocumentClass = $documentClass;
     }
 
     public static function shouldUse(Context $context): bool
@@ -99,6 +113,7 @@ final class JitDomLoadXMLUserScript
         }
 
         self::$lastCompileTimeXml = $lit;
+        self::$lastDocumentClass = self::CLASS_DOCUMENT;
         self::markLastLoadPureUserScript();
         // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips
         // dynamic-property deprecation (hasProperty does not walk DOMNode; #23251).

@@ -491,7 +491,8 @@ final class TryCatchHelper
         string $message,
         ?\PHPCompiler\JIT $jit = null,
         string $file = '',
-        int $line = 0
+        int $line = 0,
+        int $code = 0
     ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
@@ -537,6 +538,18 @@ final class TryCatchHelper
             $msgStr
         );
         $object->storeInstanceProperty($obj, $className, 'message', $msgVar);
+        if ($code !== 0) {
+            if (!$object->hasProperty($classId, ExceptionSupport::PROP_CODE)) {
+                $object->defineProperty($classId, ExceptionSupport::PROP_CODE, Variable::TYPE_NATIVE_LONG);
+            }
+            $codeVar = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger($code)
+            );
+            $object->storeInstanceProperty($obj, $className, ExceptionSupport::PROP_CODE, $codeVar);
+        }
 
         // Stamp file/line like zend_exception_get_props so getFile()/getLine() work (#24397).
         if ('' === $file) {

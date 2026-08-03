@@ -3518,6 +3518,22 @@ class Object_ extends Type {
             $this->defineProperty($id, 'tagName', Variable::TYPE_STRING);
             $this->defineProperty($id, 'attributes', Variable::TYPE_VALUE);
         }
+        if ('dom\\attr' === $lcname) {
+            // Living Dom\Attr for thin AOT method_exists / property layout (#27108).
+            foreach ([
+                'nodeName', 'name', 'value', 'nodeValue',
+                'namespaceURI', 'localName', 'prefix',
+            ] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_STRING);
+            }
+            $this->defineProperty($id, 'ownerElement', Variable::TYPE_VALUE);
+            $this->defineMethodVisibility($id, 'rename', \PHPCfg\Func::FLAG_PUBLIC);
+        }
+        if ('dom\\xmldocument' === $lcname) {
+            $this->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
+            $this->defineMethodVisibility($id, 'createfromstring', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
+            $this->defineMethodVisibility($id, 'createattribute', \PHPCfg\Func::FLAG_PUBLIC);
+        }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);

@@ -184,6 +184,25 @@ final class ObjectInstancePropertyLlvm
         if ([] === $candidates) {
             return null;
         }
+        // Living Dom\Attr::$value|nodeValue shares the name "value" with
+        // SensitiveParameterValue — multi-candidate dispatch returns a detached
+        // TYPE_VALUE box that cannot accept assigns (#27108). Prefer Dom\Attr
+        // declared slots when the user-script document is living Dom\*.
+        $propLc = strtolower($name);
+        if (\in_array($propLc, ['value', 'nodevalue'], true)
+            && null !== \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass()
+            && str_starts_with(
+                (string) \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastDocumentClass(),
+                'Dom\\'
+            )
+        ) {
+            foreach ($candidates as $id => $className) {
+                $classLc = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+                if ('dom\\attr' === $classLc || 'domattr' === $classLc) {
+                    return self::propertyFetchOrdinary($object, $obj, $className, $name, $id);
+                }
+            }
+        }
         if (1 === \count($candidates)) {
             $classId = array_key_first($candidates);
             $className = $candidates[$classId];
@@ -323,10 +342,11 @@ final class ObjectInstancePropertyLlvm
             return;
         }
         if (Variable::TYPE_STRING === $propertyType) {
+            // KIND_VALUE already holds `__string__*`; load() would pass `__string__` by value (#27108).
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
                 $destPtr,
-                $context->builder->load($fetched->value)
+                $context->helper->loadValue($fetched)
             );
 
             return;
@@ -335,7 +355,7 @@ final class ObjectInstancePropertyLlvm
             $context->builder->call(
                 $context->lookupFunction('__value__writeObject'),
                 $destPtr,
-                $context->builder->load($fetched->value)
+                $context->helper->loadValue($fetched)
             );
 
             return;

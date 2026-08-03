@@ -196,10 +196,22 @@ final class JitDomAttributeNodeNS
         }
         if (null !== $nameLit) {
             DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
+            $living = null !== JitDomLoadXMLUserScript::lastDocumentClass()
+                && str_starts_with(JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\');
+            if ($living) {
+                JitDomAttrRename::rememberOrphan();
+            }
 
             return self::boxObjectResult(
                 $context,
-                self::materializeAttrFromLiterals($context, '', $nameLit, '')
+                self::materializeAttrFromLiterals(
+                    $context,
+                    '',
+                    $nameLit,
+                    '',
+                    $living ? self::CLASS_LIVING_ATTR : self::CLASS_ATTR,
+                    $living
+                )
             );
         }
 
@@ -316,27 +328,57 @@ final class JitDomAttributeNodeNS
         Context $context,
         string $namespace,
         string $qualifiedName,
-        string $value
+        string $value,
+        string $className = self::CLASS_ATTR,
+        bool $livingNameIsQName = false
     ): Value {
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ATTR);
+        $classId = $objectType->lookup($className);
         self::ensureAttrPropertyLayout($objectType, $classId);
 
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
 
-        self::storeStringProperty($context, $obj, self::PROP_NODE_NAME, $qualifiedName);
-        // php-src ext/dom/attr.c: Attr.name is local name (#19754).
-        self::storeStringProperty($context, $obj, self::PROP_NAME, $localName);
-        self::storeStringProperty($context, $obj, self::PROP_VALUE, $value);
-        self::storeStringProperty($context, $obj, self::PROP_NODE_VALUE, $value);
-        self::storeStringProperty($context, $obj, self::PROP_NAMESPACE_URI, $namespace);
-        self::storeStringProperty($context, $obj, self::PROP_LOCAL_NAME, $localName);
-        self::storeStringProperty($context, $obj, self::PROP_PREFIX, $prefix);
-        self::storeNullProperty($context, $obj, self::PROP_OWNER_ELEMENT);
+        self::storeStringProperty($context, $obj, self::PROP_NODE_NAME, $qualifiedName, $className);
+        // php-src attr.c: legacy DOMAttr.name is local (#19754); living Attr.name is QName (#26024).
+        $nameProp = $livingNameIsQName ? $qualifiedName : $localName;
+        self::storeStringProperty($context, $obj, self::PROP_NAME, $nameProp, $className);
+        self::storeStringProperty($context, $obj, self::PROP_VALUE, $value, $className);
+        self::storeStringProperty($context, $obj, self::PROP_NODE_VALUE, $value, $className);
+        self::storeStringProperty($context, $obj, self::PROP_NAMESPACE_URI, $namespace, $className);
+        self::storeStringProperty($context, $obj, self::PROP_LOCAL_NAME, $localName, $className);
+        self::storeStringProperty($context, $obj, self::PROP_PREFIX, $prefix, $className);
+        self::storeNullProperty($context, $obj, self::PROP_OWNER_ELEMENT, $className);
 
         return $obj;
+    }
+
+    public const CLASS_LIVING_ATTR = 'Dom\\Attr';
+
+    /** Seed Dom\Attr::rename for method_exists under thin AOT (#27108). */
+    public static function ensureLivingAttrMethods(Context $context): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_LIVING_ATTR);
+        self::ensureAttrPropertyLayout($objectType, $classId);
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        if (!$objectType->hasMethod($classId, 'rename')) {
+            $objectType->defineMethodVisibility($classId, 'rename', $pub);
+        }
+        $elemId = $objectType->lookup('Dom\\Element');
+        foreach ([
+            'getattributenode', 'getattribute', 'hasattribute', 'getattributens',
+            'hasattributens', 'getattributenodens', 'setattribute',
+        ] as $method) {
+            if (!$objectType->hasMethod($elemId, $method)) {
+                $objectType->defineMethodVisibility($elemId, $method, $pub);
+            }
+        }
+        $docId = $objectType->lookup('Dom\\XMLDocument');
+        if (!$objectType->hasMethod($docId, 'createattribute')) {
+            $objectType->defineMethodVisibility($docId, 'createattribute', $pub);
+        }
     }
 
     private static function materializeAttrFromRuntime(
@@ -402,17 +444,19 @@ final class JitDomAttributeNodeNS
         Context $context,
         Value $obj,
         string $prop,
-        string $lit
+        string $lit,
+        string $className = self::CLASS_ATTR
     ): void {
         $str = $context->builder->load($context->constantStringFromString($lit));
-        self::storeStringPropertyValue($context, $obj, $prop, $str);
+        self::storeStringPropertyValue($context, $obj, $prop, $str, $className);
     }
 
     private static function storeStringPropertyValue(
         Context $context,
         Value $obj,
         string $prop,
-        Value $str
+        Value $str,
+        string $className = self::CLASS_ATTR
     ): void {
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
@@ -420,14 +464,18 @@ final class JitDomAttributeNodeNS
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, self::CLASS_ATTR, $prop),
+            $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_STRING
         );
     }
 
-    private static function storeNullProperty(Context $context, Value $obj, string $prop): void
-    {
+    private static function storeNullProperty(
+        Context $context,
+        Value $obj,
+        string $prop,
+        string $className = self::CLASS_ATTR
+    ): void {
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
@@ -435,7 +483,7 @@ final class JitDomAttributeNodeNS
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $context->type->object->propertyStore(
-            $context->type->object->propertySlotFor($obj, self::CLASS_ATTR, $prop),
+            $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_NULL
         );
@@ -663,7 +711,7 @@ final class JitDomAttributeNodeNS
     }
 
     /**
-     * DOMElement::getAttributeNode() — user-script AOT live Attr cache (#19281).
+     * DOMElement::getAttributeNode() — user-script AOT live Attr cache (#19281, #27108).
      */
     public static function invokeGetAttributeNode(Context $context, JITVariable ...$args): Value
     {
@@ -673,6 +721,8 @@ final class JitDomAttributeNodeNS
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrnode_cont');
         $nameLit = self::compileTimeStringArg($args[1]);
         if (null !== $nameLit) {
+            \PHPCompiler\ext\dom\JitDomAttrRename::rememberFetchedKey('', $nameLit);
+
             return self::boxNullableObjectResult(
                 $context,
                 DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit)
@@ -711,7 +761,9 @@ final class JitDomAttributeNodeNS
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objBlock);
-        $valueVar = $context->type->object->propertyFetch($attr, self::CLASS_ATTR, self::PROP_VALUE);
+        // Attr cache may hold Dom\Attr (living createFromString) or DOMAttr (#27108).
+        $attrClass = self::CLASS_LIVING_ATTR;
+        $valueVar = $context->type->object->propertyFetch($attr, $attrClass, self::PROP_VALUE);
         $str = $context->helper->loadValue($valueVar);
         $context->builder->store(self::boxStringResult($context, $str), $resultSlot);
         $context->builder->branch($doneBlock);
