@@ -91,7 +91,7 @@ final class PregAotFastPathTest extends TestCase
 
     public function testMatchAllLiteralStoresAll(): void
     {
-        $this->assertSame(2, PregAotFastPath::matchAllStore('/a/', 'bab', 0, 0));
+        $this->assertSame(2, PregAotFastPath::matchAllStore('/a/', 'aba', 0, 0));
         $this->assertSame('a', PregAotFastPath::matchAllPart(0));
         $this->assertSame('a', PregAotFastPath::matchAllPart(1));
     }

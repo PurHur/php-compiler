@@ -782,7 +782,6 @@ final class PregAotFastPath
         }
         $subLen = \strlen($subject);
         if ($offset < 0 || $offset > $subLen) {
-            // Past-end / invalid offset → 0 matches + empty $matches (#25313).
             return 0;
         }
         $kind = self::patternKind($pattern);
@@ -791,32 +790,40 @@ final class PregAotFastPath
         if (1 !== $kind && 2 !== $kind && 4 !== $kind && 6 !== $kind) {
             return -1;
         }
-        if (1 === $kind) {
-            return self::matchAllLiteralStore($pattern, $subject, $offset);
-        }
-        $charClass = 2;
-        if (4 === $kind) {
-            $charClass = 3;
-        } elseif (6 === $kind) {
-            $charClass = 4;
-        }
+        // Reuse NestedJIT-proven matchCount; advance past each hit (#27195).
         $cursor = $offset;
         $n = 0;
         while ($cursor < $subLen) {
-            if (!self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
-                ++$cursor;
-                continue;
+            $rc = self::matchCount($pattern, $subject, $cursor);
+            if ($rc < 0) {
+                return -1;
             }
-            $j = $cursor + 1;
-            while ($j < $subLen && self::charInClass(\substr($subject, $j, 1), $charClass)) {
-                ++$j;
+            if (0 === $rc) {
+                break;
+            }
+            $full = '' . self::lastCap(0);
+            $flen = \strlen($full);
+            if ($flen < 1) {
+                return -1;
+            }
+            $start = $cursor;
+            $found = 0;
+            while ($start + $flen <= $subLen) {
+                if (self::literalEqualsAt($subject, $start, $full, $flen)) {
+                    $found = 1;
+                    break;
+                }
+                ++$start;
+            }
+            if (0 === $found) {
+                return -1;
             }
             if ($n >= self::MAX_CAPS) {
                 return -1;
             }
-            self::storeMatchAllAt($n, '' . \substr($subject, $cursor, $j - $cursor));
+            self::storeMatchAllAt($n, $full);
             ++$n;
-            $cursor = $j;
+            $cursor = $start + $flen;
         }
         self::$matchAllCount = $n;
 
@@ -856,38 +863,6 @@ final class PregAotFastPath
         }
 
         return '';
-    }
-
-    private static function matchAllLiteralStore(string $pattern, string $subject, int $offset): int
-    {
-        $close = self::delimitedBodyClose($pattern);
-        if ($close < 1) {
-            return -1;
-        }
-        $body = \substr($pattern, 1, $close - 1);
-        $bodyLen = \strlen($body);
-        $subLen = \strlen($subject);
-        $cursor = $offset;
-        $n = 0;
-        if (0 === $bodyLen) {
-            // Empty literal body: Zend matches at every offset including end — thin skip.
-            return -1;
-        }
-        while ($cursor + $bodyLen <= $subLen) {
-            if (self::literalEqualsAt($subject, $cursor, $body, $bodyLen)) {
-                if ($n >= self::MAX_CAPS) {
-                    return -1;
-                }
-                self::storeMatchAllAt($n, '' . \substr($subject, $cursor, $bodyLen));
-                ++$n;
-                $cursor += $bodyLen;
-                continue;
-            }
-            ++$cursor;
-        }
-        self::$matchAllCount = $n;
-
-        return $n;
     }
 
     private static function storeMatchAllAt(int $index, string $value): void
