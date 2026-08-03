@@ -7,7 +7,9 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\NextafterJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** nextafter() JIT: always NextafterJitHelper via JitVmHelperLink — no thin libc fork (#15062, #20664). */
+/**
+ * nextafter() NestedJIT leaf is PHP-emitted IEEE bitcast — no libc nextafter(3) (#27496).
+ */
 final class NextafterRuntimeShrinkTest extends TestCase
 {
     public function testNextafterUsesJitHelperNotLibcLookup(): void
@@ -18,21 +20,32 @@ final class NextafterRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('invokeLibc', $builtin);
     }
 
-    public function testMathNextafterAlwaysUsesHelperBridge(): void
+    public function testMathNextafterKeepsNestedJitBitcastLeaf(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathNextafter.php');
         $this->assertStringContainsString('JitNextafterKernel', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('implementKernelBody', $source);
-        $this->assertStringNotContainsString('nextafter_kernel_entry', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('NextafterJitHelper', $source);
-        $this->assertStringNotContainsString('invokeLibcNextafter', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString("lookupFunction('nextafter')", $source);
-        $this->assertStringNotContainsString("addFunction('nextafter'", $source);
-        $this->assertStringNotContainsString('addFunction($abiName', $source);
+    }
+
+    public function testNextafterKernelIsBitcastNotLibc(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitNextafterKernel.php');
+        $this->assertStringContainsString('bitCast', $source);
+        $this->assertStringContainsString('VmMath::nextafter', $source);
+        $this->assertStringNotContainsString('LibcExtern', $source);
+        $this->assertStringNotContainsString("lookupFunction('nextafter')", $source);
+        $this->assertStringNotContainsString("lookupFunction(\"nextafter\")", $source);
+    }
+
+    public function testLibcExternNoLongerDeclaresNextafter(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'nextafter'", $source);
     }
 
     public function testNextafterJitHelperDelegatesToKernel(): void

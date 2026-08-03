@@ -11,7 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * @internal libc nextafter(3) kernel for NextafterJitHelper (#19259).
+ * @internal IEEE nextafter bitcast kernel for NextafterJitHelper (#19259, #27496).
+ * No libc nextafter(3) — LLVM bit walk matches {@see VmMath::nextafter}.
  */
 final class phpc_nextafter_kernel extends Internal
 {
@@ -39,7 +40,7 @@ final class phpc_nextafter_kernel extends Internal
             'next'
         );
         if (null !== $frame->returnVar) {
-            $frame->returnVar->float(\nextafter($num, $toward));
+            $frame->returnVar->float(VmMath::nextafter($num, $toward));
         }
     }
 
