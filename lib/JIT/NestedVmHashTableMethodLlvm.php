@@ -43,6 +43,8 @@ final class NestedVmHashTableMethodLlvm
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
         // NestedJIT-safe packed list shift for ArrayShiftJitHelper (#24025).
         'shiftfirst' => Call\HashTableShiftFirst::class,
+        // NestedJIT-safe packed list pop for ArrayPopJitHelper (#27214).
+        'poplast' => Call\HashTablePopLast::class,
         'find' => Call\HashTableFind::class,
         'findindex' => Call\HashTableFindIndex::class,
         // COW duplicate / array union for HashTableJitHelper NestedJIT (#23548).
