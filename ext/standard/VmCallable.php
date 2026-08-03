@@ -220,6 +220,24 @@ final class VmCallable
     }
 
     /**
+     * Zend zend_is_callable_ex — class-string form of a non-static method without a compatible $this (#27141).
+     *
+     * call_user_func* must TypeError (not bare Error) so catch (TypeError) matches php-src.
+     */
+    public static function nonStaticMethodCallbackTypeError(
+        string $function,
+        string $className,
+        string $methodName
+    ): string {
+        return sprintf(
+            '%s(): Argument #1 ($callback) must be a valid callback, non-static method %s::%s() cannot be called statically',
+            $function,
+            $className,
+            $methodName
+        );
+    }
+
+    /**
      * Zend zend_is_callable_ex — inaccessible private/protected method wording (#25709, #25712).
      *
      * array_map/array_filter use "a valid callback or null" (#25711); usort/call_user_func do not.
@@ -936,22 +954,24 @@ final class VmCallable
             $thisVar = null !== $scopeFrame
                 ? \PHPCompiler\VM\ClosureSupport::callerThis($scopeFrame)
                 : null;
+            $methodDisplay = $declaring->methodNames[$methodLc] ?? $methodName;
             if (null === $thisVar) {
-                throw new \Error(
-                    'Non-static method '.$declaring->name.'::'
-                    .($declaring->methodNames[$methodLc] ?? $methodName)
-                    .'() cannot be called statically'
-                );
+                // php-src: zend_is_callable_ex → TypeError via call_user_func* (#27141 / #27144)
+                throw new \TypeError(self::nonStaticMethodCallbackTypeError(
+                    $function,
+                    $declaring->name,
+                    $methodDisplay
+                ));
             }
             $object = $thisVar->resolveIndirect()->toObject();
             $namedLc = strtolower($resolved);
             $objectLc = strtolower($object->class->name);
             if (!self::objectInHierarchy($ctx, $objectLc, $namedLc)) {
-                throw new \Error(
-                    'Non-static method '.$declaring->name.'::'
-                    .($declaring->methodNames[$methodLc] ?? $methodName)
-                    .'() cannot be called statically'
-                );
+                throw new \TypeError(self::nonStaticMethodCallbackTypeError(
+                    $function,
+                    $declaring->name,
+                    $methodDisplay
+                ));
             }
             // Class-string form: inaccessible instance method + object __call (#25710).
             if (self::instanceMethodNeedsMagicCall(
