@@ -131,12 +131,9 @@ final class PregAotFastPath
         if ($plen < 3) {
             return 0;
         }
-        $delim = \substr($pattern, 0, 1);
-        if ('/' !== $delim && '#' !== $delim) {
-            return 0;
-        }
-        $close = \strrpos($pattern, $delim);
-        if (false === $close || $close < 1 || $close !== $plen - 1) {
+        // NestedJIT: avoid strrpos — closing delim must be last char (no flags) (#27119).
+        $close = self::delimitedBodyClose($pattern);
+        if ($close < 1) {
             return 0;
         }
         $body = \substr($pattern, 1, $close - 1);
@@ -153,6 +150,41 @@ final class PregAotFastPath
         }
 
         return 1;
+    }
+
+    /**
+     * Index of closing `/` or `#` when it is the final character (no modifiers).
+     * NestedJIT-safe substitute for strrpos (#27119 / peer #26888).
+     */
+    private static function delimitedBodyClose(string $pattern): int
+    {
+        $plen = \strlen($pattern);
+        if ($plen < 2) {
+            return -1;
+        }
+        $delim = \substr($pattern, 0, 1);
+        if ('/' !== $delim && '#' !== $delim) {
+            return -1;
+        }
+        if ($delim !== \substr($pattern, $plen - 1, 1)) {
+            return -1;
+        }
+
+        return $plen - 1;
+    }
+
+    /** Char-by-char equality — NestedJIT strncmp/substr-prefix compares miscompile (#27119). */
+    private static function literalEqualsAt(string $haystack, int $offset, string $needle, int $needleLen): bool
+    {
+        $i = 0;
+        while ($i < $needleLen) {
+            if (\substr($haystack, $offset + $i, 1) !== \substr($needle, $i, 1)) {
+                return false;
+            }
+            ++$i;
+        }
+
+        return true;
     }
 
     public static function replaceOrEmpty(string $pattern, string $replacement, string $subject, int $limit): string
@@ -451,9 +483,8 @@ final class PregAotFastPath
 
     private static function matchLiteral(string $pattern, string $subject, int $offset): int
     {
-        $delim = \substr($pattern, 0, 1);
-        $close = \strrpos($pattern, $delim);
-        if (false === $close || $close < 1) {
+        $close = self::delimitedBodyClose($pattern);
+        if ($close < 1) {
             return -2;
         }
         $body = \substr($pattern, 1, $close - 1);
@@ -466,7 +497,7 @@ final class PregAotFastPath
         }
         $i = $offset;
         while ($i + $bodyLen <= $subLen) {
-            if (0 === \strncmp(\substr($subject, $i), $body, $bodyLen)) {
+            if (self::literalEqualsAt($subject, $i, $body, $bodyLen)) {
                 self::storeCaps($body, false);
 
                 return 1;
@@ -506,9 +537,8 @@ final class PregAotFastPath
 
     private static function replaceLiteral(string $pattern, string $replacement, string $subject, int $limit): string
     {
-        $delim = \substr($pattern, 0, 1);
-        $close = \strrpos($pattern, $delim);
-        if (false === $close || $close < 1) {
+        $close = self::delimitedBodyClose($pattern);
+        if ($close < 1) {
             return '';
         }
         $body = \substr($pattern, 1, $close - 1);
@@ -533,7 +563,7 @@ final class PregAotFastPath
                 continue;
             }
             if ($cursor + $bodyLen <= $subLen
-                && 0 === \strncmp(\substr($subject, $cursor), $body, $bodyLen)) {
+                && self::literalEqualsAt($subject, $cursor, $body, $bodyLen)) {
                 $out .= $replacement;
                 $cursor += $bodyLen;
                 ++$n;
