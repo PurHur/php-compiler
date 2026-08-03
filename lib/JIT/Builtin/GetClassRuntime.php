@@ -118,6 +118,8 @@ PHP;
         foreach (['Throwable', 'Error', 'Exception', 'TypeError', 'ValueError'] as $name) {
             $object->lookup($name);
         }
+        // Trace redaction marker — catch get_class($e->getTrace()[0]['args'][0]) (#27333).
+        $object->lookup(\PHPCompiler\VM\SensitiveParamSupport::CLASS_NAME);
     }
 
     private static function emitSelectWalk(Context $context, Value $classId): Value
