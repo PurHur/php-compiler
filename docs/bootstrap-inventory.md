@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6929 |
-| Phase A inventory files (M2 ratio SSOT) | 6929 |
+| PHP files on vm.php path | 6930 |
+| Phase A inventory files (M2 ratio SSOT) | 6930 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22301 |
+| Source constructs flagged (warnings) | 22304 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5963,6 +5963,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableKeysLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableMutateNestedLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableNestedExportLlvm.php` | 0 | 1 |
+| `lib/JIT/HashTablePadLlvm.php` | 0 | 3 |
 | `lib/JIT/HashTablePopLastLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableReadLlvm.php` | 0 | 7 |
 | `lib/JIT/HashTableReplaceRecursiveLlvm.php` | 0 | 2 |
@@ -44749,7 +44750,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayPadRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/ArrayPadTypeJit.php`
 
@@ -49840,6 +49841,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/HashTablePadLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 226)
+- new Variable (line 445)
+- 10 class method(s)
 
 ### `lib/JIT/HashTablePopLastLlvm.php`
 

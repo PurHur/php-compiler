@@ -8,8 +8,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_pad() for compiled JIT/AOT modules (#12476, php-in-PHP).
+ * array_pad() for VM / NestedJIT helpers (#12476, php-in-PHP).
  *
+ * Thin AOT/JIT call sites use {@see \PHPCompiler\JIT\HashTablePadLlvm} (#26971).
  * SSOT: {@see VmArray::pad()}
  * php-src: ext/standard/array.c — php_array_pad()
  */
