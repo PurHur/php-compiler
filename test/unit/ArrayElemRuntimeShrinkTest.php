@@ -18,7 +18,9 @@ final class ArrayElemRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayElemRuntime::first', $source);
         $this->assertStringContainsString('ArrayElemRuntime::last', $source);
         $this->assertStringNotContainsString('elemAtEnd', $source);
+        $this->assertStringContainsString('ExceptionBridge::emitTypeErrorAndAbort', $source);
         $this->assertStringNotContainsString('TryCatchHelper', $source);
+        $this->assertStringNotContainsString('TypeErrorRaise::emitRaise', $source);
 
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayElemRuntime.php');
         $this->assertStringContainsString('ArrayElemJitHelper', $runtime);
