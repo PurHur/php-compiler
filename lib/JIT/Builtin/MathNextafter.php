@@ -15,7 +15,7 @@ use PHPLLVM\Value;
  *
  * Embed + thin standalone AOT: {@see NextafterJitHelper} via {@see JitVmHelperLink}
  * (Rename #20603 shape — no thin libc ABI fork; double results via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
- * Nested helper compile: libc leaf without re-entering NextafterJitHelper.
+ * Nested helper compile: IEEE bitcast leaf without re-entering NextafterJitHelper (#27496).
  * php-src: ext/standard/math.c — PHP_FUNCTION(nextafter)
  */
 final class MathNextafter

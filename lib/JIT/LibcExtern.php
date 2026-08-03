@@ -99,7 +99,6 @@ final class LibcExtern
             'fdatasync' => [$i32, false, [$i32]],
             'flock' => [$i32, false, [$i32, $i32]],
             'pow' => [$dbl, false, [$dbl, $dbl]],
-            'nextafter' => [$dbl, false, [$dbl, $dbl]],
             'hypot' => [$dbl, false, [$dbl, $dbl]],
             'fmod' => [$dbl, false, [$dbl, $dbl]],
             'ceil' => [$dbl, false, [$dbl]],
