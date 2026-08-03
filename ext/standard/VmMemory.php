@@ -125,7 +125,8 @@ final class VmMemory
      */
     private static function readRssBytes(): int
     {
-        if ('Linux' !== \PHP_OS_FAMILY || !is_readable('/proc/self/statm')) {
+        // Do not gate on is_readable() — thin AOT reports false while read works (#18897 / #27238).
+        if ('Linux' !== \PHP_OS_FAMILY) {
             return 0;
         }
         $statm = VmFsReadNative::read('/proc/self/statm');
