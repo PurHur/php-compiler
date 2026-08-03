@@ -83,16 +83,9 @@ final class JitDomDocumentElement
         Value $element,
         string $xml
     ): void {
-        $children = DomParseSimpleXmlJitHelper::directElementChildTags($xml);
+        // Include blank text / comments so childNodes->length matches Zend (#27260).
+        $children = DomParseSimpleXmlJitHelper::directChildNodesArgv($xml);
         if ([] === $children) {
-            $node = DomParseSimpleXmlJitHelper::firstChildNodeArgv($xml);
-            if (null === $node || 'comment' !== $node['kind']) {
-                return;
-            }
-            $child = JitDomCreateComment::materialize($context, $node['data']);
-            self::linkSingleChild($context, $element, $child);
-            self::storeChildNodesLength($context, $element, 1);
-
             return;
         }
 
@@ -100,8 +93,12 @@ final class JitDomDocumentElement
         $prev = null;
         $first = null;
         $last = null;
-        foreach ($children as $childTag) {
-            $child = JitDomCreateElement::materializeElementFromLiteral($context, $childTag);
+        foreach ($children as $node) {
+            $child = match ($node['kind']) {
+                'comment' => JitDomCreateComment::materialize($context, $node['data']),
+                'text' => JitDomCreateTextNode::materialize($context, $node['data']),
+                default => JitDomCreateElement::materializeElementFromLiteral($context, $node['data']),
+            };
             self::ensureLinkProps($context);
             $parentJit = new JITVariable(
                 $context,

@@ -140,10 +140,7 @@ final class JitDomXmlDocumentCreateFromString
         if (1 !== preg_match('/<([a-zA-Z_][\w:.-]*)/', $forParse)) {
             return null;
         }
-        // Inter-element blanks need full DomRegistry parse (peer loadXML).
-        if (JitDomLoadXMLUserScript::xmlContainsInterElementBlankText($forParse)) {
-            return null;
-        }
+        // Inter-element blanks are compile-time #text children (peer loadXML #27260).
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xml_cfs_us_materialize');
         JitDomLoadXMLUserScript::rememberCompileTimeXml($forParse, self::CLASS_DOCUMENT);

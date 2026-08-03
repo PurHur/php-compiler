@@ -437,19 +437,65 @@ final class DomParseSimpleXmlJitHelper
      */
     public static function directElementChildTags(string $xml): array
     {
+        $tags = [];
+        foreach (self::directChildNodesArgv($xml) as $node) {
+            if ('element' === $node['kind']) {
+                $tags[] = $node['data'];
+            }
+        }
+
+        return $tags;
+    }
+
+    /**
+     * Direct child nodes under the document element, including blank text (#27260).
+     *
+     * Compile-time only (host preg). Keeps inter-element whitespace so AOT
+     * {@code childNodes->length} matches Zend when preserveWhiteSpace is default.
+     *
+     * @return list<array{kind: 'comment'|'text'|'element', data: string}>
+     */
+    public static function directChildNodesArgv(string $xml): array
+    {
         $inner = self::rootInnerXmlArgv($xml);
         if ('' === $inner) {
             return [];
         }
-        $tags = [];
-        if (!preg_match_all('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?\/?>/', $inner, $matches)) {
-            return [];
-        }
-        foreach ($matches[1] as $tag) {
-            $tags[] = strtolower($tag);
+        $nodes = [];
+        $len = \strlen($inner);
+        $i = 0;
+        while ($i < $len) {
+            if (1 === preg_match('/\G<!--(.*?)-->/s', $inner, $comment, 0, $i)) {
+                $nodes[] = ['kind' => 'comment', 'data' => $comment[1]];
+                $i += \strlen($comment[0]);
+
+                continue;
+            }
+            if (1 === preg_match('/\G<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)(\/?)>/', $inner, $el, 0, $i)) {
+                $tag = $el[1];
+                $selfClosing = '/' === ($el[3] ?? '');
+                $i += \strlen($el[0]);
+                if (!$selfClosing) {
+                    $close = stripos($inner, '</'.$tag.'>', $i);
+                    if (false !== $close) {
+                        $i = $close + \strlen('</'.$tag.'>');
+                    }
+                }
+                $nodes[] = ['kind' => 'element', 'data' => strtolower($tag)];
+
+                continue;
+            }
+            if (1 === preg_match('/\G([^<]+)/', $inner, $text, 0, $i)) {
+                $nodes[] = ['kind' => 'text', 'data' => $text[1]];
+                $i += \strlen($text[1]);
+
+                continue;
+            }
+
+            break;
         }
 
-        return $tags;
+        return $nodes;
     }
 
     /**

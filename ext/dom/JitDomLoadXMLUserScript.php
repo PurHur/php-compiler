@@ -106,11 +106,9 @@ final class JitDomLoadXMLUserScript
         }
         $lit = $forParse;
 
-        // Inter-element blank text needs a real DomRegistry tree so preserveWhiteSpace=false
-        // / LIBXML_NOBLANKS can strip via VmDom::loadXML (#20476). Compact ID-map fixtures stay here.
-        if (self::xmlContainsInterElementBlankText($lit)) {
-            return null;
-        }
+        // Inter-element blank text is materialized as #text children at compile time (#27260).
+        // LIBXML_NOBLANKS / non-zero options already fall through above (#20476). NestedJIT
+        // DomLoadXMLRuntime cannot run VmDom::loadXML (no preg_match in lean helpers).
 
         self::$lastCompileTimeXml = $lit;
         self::$lastDocumentClass = self::CLASS_DOCUMENT;
