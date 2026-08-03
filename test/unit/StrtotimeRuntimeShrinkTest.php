@@ -34,4 +34,17 @@ final class StrtotimeRuntimeShrinkTest extends TestCase
         $falseTag = StrtotimeJitHelper::strtotimeArgv('not-a-date-xxx', 0, 0);
         $this->assertSame(StrtotimeJitHelper::TAG_FALSE, $falseTag);
     }
+
+    /** Bridge declares i64 hasBase; call site must match (#27091). */
+    public function testStringStrtotimeBridgeDeclaresI64HasBase(): void
+    {
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrtotime.php');
+        $this->assertMatchesRegularExpression(
+            '/functionType\(\$voidTy,\s*false,\s*\$strPtr,\s*\$i64,\s*\$i64,\s*\$valuePtr\)/',
+            $bridge
+        );
+        $call = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrtotime.php');
+        $this->assertStringContainsString('i64->constInt($hasBaseFlag ? 1 : 0, false)', $call);
+        $this->assertStringNotContainsString('constantFromBool(2 === $argc', $call);
+    }
 }
