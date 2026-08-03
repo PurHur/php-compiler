@@ -36,7 +36,7 @@ final class StringZlibJit
     private const DEFLATE_BYTES_HELPER = '__phpc_zc_deflate_bytes';
     private const INFLATE_BYTES_HELPER = '__phpc_zc_inflate_bytes';
 
-    private const Z_STREAM_SIZE = 120;
+    private const Z_STREAM_SIZE = 112;
     private const Z_NEXT_IN_OFFSET = 0;
     private const Z_AVAIL_IN_OFFSET = 8;
     private const Z_NEXT_OUT_OFFSET = 24;
