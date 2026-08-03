@@ -3390,7 +3390,10 @@ class Object_ extends Type {
             $this->defineMethodVisibility($id, '__tostring', $pub, '__toString');
         }
         if ('reflectionenum' === $lcname) {
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #27314).
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#27314 / #27303 / #26772).
+            $this->markHasConstructor($id);
         }
         if ('reflectionenumunitcase' === $lcname) {
             // Zend public surface: $name then $class (#22505; was internal-only enumClass).
@@ -6651,7 +6654,14 @@ class Object_ extends Type {
         if ($this->isEnumClassId($classId) && EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc)) {
             return ObjectEnumCasePropertyLlvm::enumCasePropertyFetch($this, $obj, $classId, $nameLc);
         }
-        if (EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc) && [] !== ($enumIds = $this->registeredEnumClassIds())) {
+        // Enum-case runtime dispatch aborts when class_id is not an enum (#27314). Skip it
+        // when the static class already declares `$name`/`$value` (ReflectionEnum::$name,
+        // ReflectionClass::$name, …) — those are ordinary properties, not case singletons.
+        if (
+            EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc)
+            && !$this->hasProperty($classId, $name)
+            && [] !== ($enumIds = $this->registeredEnumClassIds())
+        ) {
             return ObjectEnumCasePropertyLlvm::propertyFetchEnumCaseRuntimeDispatch($this, $obj, $nameLc, $enumIds);
         }
 
