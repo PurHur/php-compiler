@@ -3622,6 +3622,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #24626 */
+    public function testBcMathNumberConstructStubNamedParamsResolve(): void
+    {
+        $ctor = BuiltinParamNames::forClassMethod('bcmath\\number::__construct');
+        self::assertSame(['num'], $ctor);
+        self::assertSame(
+            ['num'],
+            BuiltinParamNames::paramNamesForInternalFunction('BcMath\\Number::__construct')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ctor, 'num', 'BcMath\\Number::__construct'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'value', 'BcMath\\Number::__construct'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('BcMath\\Number', '__construct'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('BcMath\\Number', '__construct'));
+        self::assertSame(
+            'string|int',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('bcmath\\number', '__construct', 0)
+        );
+    }
+
     /** @covers issue #23409 */
     public function testNumberFormatterCurrencyStubNamedParamsResolve(): void
     {

@@ -252,6 +252,8 @@ final class BuiltinParamNames
             'finfo::set_flags' => ['flags'],
             // php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo still says options/magic_file (#26181)
             'finfo::__construct' => ['flags=', 'magic_database='],
+            // php-src ext/bcmath/bcmath.stub.php — InternalArgInfo empty (#24626)
+            'bcmath\\number::__construct' => ['num'],
             // php-src Zend/zend_fibers.stub.php — InternalArgInfo empty (#24592)
             'fiber::__construct' => ['callback'],
             // php-src Zend/zend_weakrefs.stub.php — InternalArgInfo empty (#24592)
