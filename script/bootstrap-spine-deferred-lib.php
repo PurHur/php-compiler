@@ -19,6 +19,11 @@ function bootstrap_spine_native_link_deferred(): array
         // literal spine require alongside the full unit fatals under Zend (redeclare)
         // and would emit duplicate symbols on a full spine AOT link.
         'ext/standard/PregJitHelperThinAot.php',
+        // NestedJIT-safe getprotobyname()/getservbyname() (#27060 / #27098) — same FQCN
+        // as NetworkServicesNameLookupJitHelper.php. ThinAot avoids VmNetworkServices
+        // static ?array caches (NestedJIT cannot boxed-store __hashtable__*); full
+        // helper stays on the spine for VM/MCJIT. Literal require alongside fatals.
+        'ext/standard/NetworkServicesNameLookupThinAot.php',
     ];
 }
 

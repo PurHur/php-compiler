@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6832 |
-| Phase A inventory files (M2 ratio SSOT) | 6832 |
+| PHP files on vm.php path | 6835 |
+| Phase A inventory files (M2 ratio SSOT) | 6835 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22070 |
+| Source constructs flagged (warnings) | 22076 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2709,7 +2709,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitIteratorWalk.php` | 0 | 2 |
 | `ext/standard/JitJsonDecode.php` | 0 | 1 |
 | `ext/standard/JitJsonEncode.php` | 0 | 1 |
-| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 2 |
+| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 4 |
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
 | `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitJsonValidate.php` | 0 | 1 |
@@ -3016,6 +3016,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/NetInterfacesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesNameLookupJitHelper.php` | 0 | 1 |
+| `ext/standard/NetworkServicesNameLookupThinAot.php` | 0 | 1 |
 | `ext/standard/NextafterJitHelper.php` | 0 | 1 |
 | `ext/standard/Nl2brJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerJitHelper.php` | 0 | 1 |
@@ -5262,7 +5263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PowIntRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
@@ -26991,11 +26992,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 256)
-- new ArgumentCountError (line 259)
-- new ArgumentCountError (line 289)
-- new ArgumentCountError (line 292)
-- 14 class method(s)
+- new ArgumentCountError (line 257)
+- new ArgumentCountError (line 260)
+- new ArgumentCountError (line 348)
+- new ArgumentCountError (line 351)
+- 16 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
 
@@ -28053,8 +28054,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitJsonEncodeCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 45)
-- 3 class method(s)
+- new JsonException (line 58)
+- new VmVariable (line 113)
+- new VmVariable (line 248)
+- 8 class method(s)
 
 ### `ext/standard/JitJsonLastError.php`
 
@@ -29235,7 +29238,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStrtotime.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/JitStrtr.php`
 
@@ -30522,6 +30525,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/NetworkServicesNameLookupThinAot.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/NextafterJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30676,7 +30684,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregAotFastPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 22 class method(s)
 
 ### `ext/standard/PregCallbackInvokeJitHelper.php`
 
@@ -30701,12 +30709,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/PregJitHelperThinAot.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/PregQuoteJitHelper.php`
 
@@ -37608,7 +37616,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_split.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/prev.php`
 
@@ -45673,8 +45681,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 357)
-- 16 class method(s)
+- new Variable (line 363)
+- new Variable (line 637)
+- 17 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php`
