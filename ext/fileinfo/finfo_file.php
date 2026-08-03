@@ -55,6 +55,6 @@ final class finfo_file extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('finfo_file() is not implemented for JIT in this compiler build (issue #3366)');
+        return JitFinfoFile::invokeProcedural($context, ...$args);
     }
 }
