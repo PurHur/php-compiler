@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ArrayCountRecursiveRuntime;
 use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -22,6 +23,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -132,14 +134,11 @@ final class array_count extends Internal
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
             return ArrayCountRuntime::numElements($context, $args[0]);
         }
-        // Boxed values may hold Countable objects (SplFixedArray::fromArray result; #26793).
+        // Boxed values may hold arrays OR Countable objects (SplFixedArray::fromArray; #26793).
+        // Must branch on the value-box type tag — unconditional Countable dispatch treats
+        // plain arrays as SplFixedArray and aborts under thin AOT (#27294 / re-#26793).
         if (JITVariable::TYPE_VALUE === $args[0]->type || JitValueBox::isValueOperand($args[0])) {
-            $countable = $this->tryCompileCountableCount($context, $args[0]);
-            if (null !== $countable) {
-                return $countable;
-            }
-
-            return ArrayCountRuntime::numElements($context, $args[0]);
+            return $this->countBoxedValue($context, $args[0]);
         }
         if (JITVariable::TYPE_OBJECT === $args[0]->type) {
             $countable = $this->tryCompileCountableCount($context, $args[0]);
@@ -150,6 +149,65 @@ final class array_count extends Internal
         $this->emitCountTypeError($context, $args[0]);
 
         return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    /**
+     * count() on a `__value__*` slot — array HT vs Countable object (#26793, #27294).
+     */
+    private function countBoxedValue(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $htTag = $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false);
+        $objTag = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $isHt = $context->builder->icmp(Builder::INT_EQ, $kind, $htTag);
+        $isObj = $context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+
+        $htBlock = BasicBlockHelper::append($context, 'count_box_ht');
+        $afterHt = BasicBlockHelper::append($context, 'count_box_after_ht');
+        $objBlock = BasicBlockHelper::append($context, 'count_box_obj');
+        $errBlock = BasicBlockHelper::append($context, 'count_box_err');
+        $merge = BasicBlockHelper::append($context, 'count_box_merge');
+        $context->builder->branchIf($isHt, $htBlock, $afterHt);
+
+        $context->builder->positionAtEnd($htBlock);
+        $htCount = ArrayCountRuntime::numElements($context, $arg);
+        $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($afterHt);
+        $context->builder->branchIf($isObj, $objBlock, $errBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $countable = $this->tryCompileCountableCount($context, $arg);
+        $objCount = null !== $countable
+            ? $countable
+            : $i64->constInt(0, false);
+        if (null === $countable) {
+            $this->emitCountTypeError($context, $arg);
+        }
+        $objEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($errBlock);
+        $this->emitCountTypeError($context, $arg);
+        $errCount = $i64->constInt(0, false);
+        $errEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i64, 'count_box_phi');
+        $phi->addIncoming($htCount, $htEnd);
+        $phi->addIncoming($objCount, $objEnd);
+        $phi->addIncoming($errCount, $errEnd);
+
+        return $phi;
     }
 
     /**

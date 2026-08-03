@@ -46,9 +46,24 @@ final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
 
         $vm = VmSys::getLoadavg();
         $this->assertIsArray($vm);
+        SysGetloadavgJitHelper::resetForTest();
+        $this->assertSame(1, SysGetloadavgJitHelper::resolveOk());
+        $this->assertSame((float) $vm[0], SysGetloadavgJitHelper::loadAt(0));
+        $this->assertSame((float) $vm[1], SysGetloadavgJitHelper::loadAt(1));
+        $this->assertSame((float) $vm[2], SysGetloadavgJitHelper::loadAt(2));
         $ht = SysGetloadavgJitHelper::resolve();
         $this->assertNotNull($ht);
         $this->assertSame(3, $ht->getNumElements());
+    }
+
+    public function testSysGetloadavgRuntimeMaterializesHtFromScalars(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SysGetloadavgRuntime.php');
+        $this->assertStringContainsString('resolveOk', $source);
+        $this->assertStringContainsString('loadAt', $source);
+        $this->assertStringContainsString('__hashtable__setDoubleAt', $source);
+        $this->assertStringNotContainsString('SysGetloadavgJitHelper::resolve)', $source);
+        $this->assertStringNotContainsString("self::RESOLVE_HELPER", $source);
     }
 
     public function testNativeGetLoadavgShapeOnLinux(): void

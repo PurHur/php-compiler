@@ -60,6 +60,8 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'reflection_constant_get_name_value.phpt',
         'phptoken_tokenize_gettokenname.phpt',
         'fdiv_inf_nan_is_nan.phpt',
+        'sys_getloadavg_count.phpt',
+        'count_array_literal.phpt',
     ];
 
     /**
