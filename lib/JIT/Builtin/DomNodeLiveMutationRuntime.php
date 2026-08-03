@@ -256,6 +256,8 @@ final class DomNodeLiveMutationRuntime
             // saveXML($node) must emit element children, not only textContent (#26765).
             // Concat onto loadXML-seeded markup so appendChild keeps prior children (#26757).
             self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+            // Held `$node->childNodes` must observe length after append/prepend (#27044).
+            self::bumpChildNodesLengthSlot($context, $receiver, $extraArgCount, $kind);
 
             return self::nullValuePtr($context);
         }
@@ -471,6 +473,73 @@ final class DomNodeLiveMutationRuntime
             $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_CHILD_NODES),
             $listJit,
             Variable::TYPE_VALUE
+        );
+    }
+
+    /**
+     * Increment in-place length on the existing childNodes DOMNodeList (#27044).
+     *
+     * Replacing the list object would leave held `$list = $node->childNodes` references
+     * at the pre-mutation length; php-src nodelist.c updates the live collection.
+     */
+    private static function bumpChildNodesLengthSlot(
+        Context $context,
+        Variable $receiver,
+        int $delta,
+        string $kind
+    ): void {
+        if ($delta <= 0 || 'replacechildren' === $kind) {
+            return;
+        }
+        $objectType = $context->type->object;
+        $nodeClassId = $objectType->lookup('DOMNode');
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
+            // loadXML may have defined childNodes as TYPE_OBJECT (#23251).
+            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, Variable::TYPE_OBJECT);
+        }
+        if (!$objectType->hasProperty($listClassId, 'length')) {
+            $objectType->defineProperty($listClassId, 'length', Variable::TYPE_NATIVE_LONG);
+        }
+
+        $receiverObj = self::receiverObject($context, $receiver);
+        $listVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $receiverObj,
+            'DOMNode',
+            VmDom::PROP_CHILD_NODES,
+            $nodeClassId
+        );
+        $listObj = null;
+        if (Variable::TYPE_OBJECT === $listVar->type) {
+            $listObj = $context->helper->loadValue($listVar);
+        } elseif (Variable::TYPE_VALUE === $listVar->type) {
+            $listObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $listVar)
+            );
+        }
+        if (null === $listObj) {
+            self::syncChildNodesLengthSlot($context, $receiver, $delta);
+
+            return;
+        }
+
+        $lengthVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $listObj,
+            'DOMNodeList',
+            'length',
+            $listClassId
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $current = $context->helper->loadValue($lengthVar);
+        $next = $context->builder->add($current, $i64->constInt($delta, false));
+        $nextJit = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $next);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($listObj, 'DOMNodeList', 'length'),
+            $nextJit,
+            Variable::TYPE_NATIVE_LONG
         );
     }
 
