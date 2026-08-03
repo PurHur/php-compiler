@@ -19,6 +19,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 
 use PHPLLVM\Value;
@@ -112,9 +113,21 @@ class Native implements Call {
         // CallArgv: parameter-index order with defaults for skipped named optionals (#24948).
         // Keep $args sparse for RECV / LLVM binding; only the func_* snapshot is densified.
         $sentArgs = $this->densifyCallArgvArgs($args);
+        /** @var list<Variable>|null $byRefVariadicCallers */
+        $byRefVariadicCallers = null;
+        $byRefVariadicPacked = null;
+        if (
+            null !== $this->variadicArgIndex
+            && isset($this->paramByRefByArg[$this->variadicArgIndex])
+        ) {
+            $byRefVariadicCallers = $this->collectByRefVariadicCallerArgs($args);
+        }
         if (null !== $this->variadicArgIndex) {
             $this->enforceVariadicTrailingArgs($context, $args);
             $args = $this->packVariadicCallArgs($context, $args);
+            if (null !== $byRefVariadicCallers && isset($args[$this->variadicArgIndex])) {
+                $byRefVariadicPacked = $args[$this->variadicArgIndex];
+            }
         }
         if ($this->emitCallArgv) {
             // Store call-site argv for func_get_args/func_num_args (issue #197).
@@ -168,10 +181,17 @@ class Native implements Call {
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
         }
-        return $context->builder->call(
+        $result = $context->builder->call(
             $this->function,
             ...$argValues
         );
+        // Pack copies values into the HT; sync element writes back to by-ref callers
+        // after return (AOT script globals / #27407, Zend SEND_REF variadic).
+        if (null !== $byRefVariadicCallers && null !== $byRefVariadicPacked) {
+            $this->syncByRefVariadicCallers($context, $byRefVariadicPacked, $byRefVariadicCallers);
+        }
+
+        return $result;
     }
 
     /**
@@ -730,6 +750,63 @@ class Native implements Call {
         }
 
         return [...$fixed, $packed];
+    }
+
+    /**
+     * Trailing by-ref variadic callers before pack (ZEND_SEND_REF … / #27407).
+     *
+     * @param array<int, Variable> $args
+     *
+     * @return list<Variable>
+     */
+    private function collectByRefVariadicCallerArgs(array $args): array
+    {
+        $start = $this->variadicArgIndex;
+        assert(null !== $start);
+        $end = \count($args) - 1;
+        if (null !== $this->namedArgsVariadicIndex) {
+            $trailing = \count($this->paramNames) - $this->namedArgsVariadicIndex - 1;
+            if ($trailing > 0) {
+                $end = \count($args) - $trailing - 1;
+            }
+        }
+        $out = [];
+        for ($idx = $start; $idx <= $end; ++$idx) {
+            if (isset($args[$idx])) {
+                $out[] = $args[$idx];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Copy packed HT slots back into by-ref caller lvalues after the callee returns (#27407).
+     *
+     * @param list<Variable> $callers
+     */
+    private function syncByRefVariadicCallers(
+        Context $context,
+        Variable $packedHt,
+        array $callers
+    ): void {
+        if ([] === $callers) {
+            return;
+        }
+        $ht = $context->helper->loadValue($packedHt);
+        $i64 = $context->getTypeFromString('int64');
+        foreach ($callers as $i => $caller) {
+            $boxed = HashTableHelper::readIndexedToValueBox(
+                $context,
+                $ht,
+                $i64->constInt((int) $i, false)
+            );
+            JitValueBox::assignToPointer(
+                $context,
+                JitValueBox::valuePtrFromVariable($context, $caller),
+                $boxed
+            );
+        }
     }
 
     private function missingCallArg(Context $context, \PHPLLVM\Type $llvmType): Variable

@@ -4155,11 +4155,15 @@ class JIT {
         ) {
             return $this->context->getTypeFromString('__value__*');
         }
-        if ($param->byRef) {
-            return $this->context->getTypeFromString('__value__*');
-        }
+        // Variadic formals are always a packed HT — including `&...$args`, where by-ref
+        // applies to *elements*, not the array slot (Zend zend_compile / #27407). Checking
+        // byRef first made AOT declare `__value__*` while the Variable stayed TYPE_HASHTABLE,
+        // so `__value__writeHashtable` saw a value box where a hashtable pointer was required.
         if ($param->variadic) {
             return $this->context->getTypeFromString('__hashtable__*');
+        }
+        if ($param->byRef) {
+            return $this->context->getTypeFromString('__value__*');
         }
         if ($this->cfgParamDeclaredTypeUsesDnfShape($param)) {
             return $this->context->getTypeFromString('__value__*');
@@ -7843,7 +7847,15 @@ class JIT {
                     $argIdx = $thisParamOffset + $idx;
                     if ($param->variadic) {
                         $remaining = array_slice($args, $argIdx);
-                        if (isset($block->paramByRef[$idx])) {
+                        // AOT/Native already pass one packed HT at the variadic slot
+                        // (including `&...$args`). Re-capturing that HT and packing it again
+                        // nested the array and broke dim write-back (#27407).
+                        if (
+                            1 === \count($remaining)
+                            && Variable::TYPE_HASHTABLE === $remaining[0]->type
+                        ) {
+                            $packed = $remaining[0];
+                        } elseif (isset($block->paramByRef[$idx])) {
                             $refRemaining = [];
                             foreach ($remaining as $arg) {
                                 $refRemaining[] = JIT\ClosureHelper::referenceCapture($this->context, $arg);
