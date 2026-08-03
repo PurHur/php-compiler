@@ -5,49 +5,48 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Call\HashTableUnshiftPrepend;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_unshift() via ArrayUnshiftJitHelper PHP (#12717, #22818).
+ * JIT/AOT link for array_unshift() (#12717, #22818, #27226).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayPush #22801).
- * Standalone AOT compiles {@see ArrayUnshiftJitHelper} via nested JIT bridges (#14316, #17580).
- * SSOT: {@see \PHPCompiler\ext\standard\array_unshift}
+ * Avoid NestedJIT of ArrayUnshiftJitHelper::unshiftFromList
+ * (`foreach ($ht->iterate())` → ObjectPropertyForeach null slot, #27226).
+ * Call-site prepend via HashTableUnshiftPrepend. VM still uses the PHP helper.
+ *
+ * SSOT (VM): {@see \PHPCompiler\ext\standard\array_unshift}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_unshift)
  */
 final class ArrayUnshiftRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ArrayUnshiftJitHelper.php';
-
-    private const COUNT_HELPER = 'PHPCompiler\\ext\\standard\\ArrayUnshiftJitHelper::countElements';
-
-    private const PREPEND_HELPER = 'PHPCompiler\\ext\\standard\\ArrayUnshiftJitHelper::unshiftFromList';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COUNT_HELPER,
-        self::PREPEND_HELPER,
-    ];
-
     public static function unshift(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $native = ArrayBuiltinHelper::isNativeArray($array->type);
+        $htVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            $ht
+        );
         if (0 === \count($values)) {
-            $count = self::callCount($context, $ht);
+            $count = ArrayBuiltinHelper::getNumElements($context, $ht);
         } else {
-            $valuesHt = HashTableHelper::alloc($context);
-            foreach ($values as $value) {
-                ArrayBuiltinHelper::appendElement($context, $valuesHt, $value);
-            }
-            $count = self::callPrepend($context, $ht, $valuesHt);
+            $countRaw = (new HashTableUnshiftPrepend())->call($context, $htVar, ...$values);
+            $count = JitNestedHelperCoerce::coerceBridgeResult(
+                $context,
+                $countRaw,
+                $context->getTypeFromString('int64')
+            );
         }
         if ($native) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
@@ -81,7 +80,6 @@ final class ArrayUnshiftRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__array_unshift__count', self::implementCountBridge(...));
         self::implementIfMissing($context, '__array_unshift__prepend', self::implementPrependBridge(...));
         self::registerLinkedRuntime($context);
@@ -93,9 +91,7 @@ final class ArrayUnshiftRuntime
         }
     }
 
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
+    /** @param callable(Context, LlvmFunction): void $emit */
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
@@ -116,7 +112,6 @@ final class ArrayUnshiftRuntime
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
-            // fall through
         }
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -140,61 +135,93 @@ final class ArrayUnshiftRuntime
     {
         $entry = $fn->appendBasicBlock('array_unshift_count_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $countRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::COUNT_HELPER),
-            [$fn->getParam(0)]
+        $context->builder->returnValue(
+            ArrayBuiltinHelper::getNumElements($context, $fn->getParam(0))
         );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceBridgeResult($context, $countRaw, $context->getTypeFromString('int64')));
     }
 
     private static function implementPrependBridge(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('array_unshift_prepend_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $countRaw = JitNestedHelperCoerce::callHelper(
+        $dest = $fn->getParam(0);
+        $valuesHt = $fn->getParam(1);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $k = $context->builder->truncOrBitCast(
+            ArrayBuiltinHelper::getNumElements($context, $valuesHt),
+            $sizeT
+        );
+        $n = $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $dest);
+
+        $isEmptyValues = $context->builder->icmp(Builder::INT_EQ, $k, $zero);
+        $retBb = BasicBlockHelper::append($context, 'array_unshift_prepend_ret');
+        $workBb = BasicBlockHelper::append($context, 'array_unshift_prepend_work');
+        $context->builder->branchIf($isEmptyValues, $retBb, $workBb);
+
+        $context->builder->positionAtEnd($workBb);
+        $need = $context->builder->addNoSignedWrap($n, $k);
+        $context->builder->call($context->lookupFunction('__hashtable__grow'), $dest, $need);
+
+        $indexSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($context->builder->subNoSignedWrap($n, $one), $indexSlot);
+        $sHead = BasicBlockHelper::append($context, 'array_unshift_prepend_shift_head');
+        $sBody = BasicBlockHelper::append($context, 'array_unshift_prepend_shift_body');
+        $sDone = BasicBlockHelper::append($context, 'array_unshift_prepend_shift_done');
+        $skipShift = $context->builder->icmp(Builder::INT_EQ, $n, $zero);
+        $context->builder->branchIf($skipShift, $sDone, $sHead);
+
+        $context->builder->positionAtEnd($sHead);
+        $idx = $context->builder->load($indexSlot);
+        $past = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
+        $context->builder->branchIf($past, $sDone, $sBody);
+        $context->builder->positionAtEnd($sBody);
+        $srcVal = HashTableHelper::readIndexedToValueBox($context, $dest, $idx);
+        HashTableHelper::setAtIndex(
             $context,
-            self::helperFunction($context, self::PREPEND_HELPER),
-            [$fn->getParam(0), $fn->getParam(1)]
+            $dest,
+            $context->builder->addNoSignedWrap($idx, $k),
+            $srcVal
         );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceBridgeResult($context, $countRaw, $context->getTypeFromString('int64')));
-    }
+        $context->builder->store($context->builder->subNoSignedWrap($idx, $one), $indexSlot);
+        $context->builder->branch($sHead);
 
-    private static function callCount(Context $context, Value $ht): Value
-    {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_unshift__count'),
-            $ht
-        );
-    }
-
-    private static function callPrepend(Context $context, Value $ht, Value $valuesHt): Value
-    {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_unshift__prepend'),
-            $ht,
-            $valuesHt
-        );
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#22818');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
+        $context->builder->positionAtEnd($sDone);
+        $wIdx = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $wIdx);
+        $wHead = BasicBlockHelper::append($context, 'array_unshift_prepend_write_head');
+        $wBody = BasicBlockHelper::append($context, 'array_unshift_prepend_write_body');
+        $context->builder->branch($wHead);
+        $context->builder->positionAtEnd($wHead);
+        $wi = $context->builder->load($wIdx);
+        $wDone = $context->builder->icmp(Builder::INT_SGE, $wi, $k);
+        $context->builder->branchIf($wDone, $retBb, $wBody);
+        $context->builder->positionAtEnd($wBody);
+        HashTableHelper::setAtIndex(
             $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22818'
+            $dest,
+            $wi,
+            HashTableHelper::readIndexedToValueBox($context, $valuesHt, $wi)
+        );
+        $context->builder->store($context->builder->addNoSignedWrap($wi, $one), $wIdx);
+        $context->builder->branch($wHead);
+
+        $context->builder->positionAtEnd($retBb);
+        $map = $context->structFieldMap['__hashtable__'];
+        $finalN = $context->builder->addNoSignedWrap($n, $k);
+        $context->builder->store($finalN, $context->builder->structGep($dest, $map['nextFreeElement']));
+        $context->builder->store($finalN, $context->builder->structGep($dest, $map['numElements']));
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::i64ToScalar(
+                $context,
+                JitNestedHelperCoerce::scalarToI64(
+                    $context,
+                    $finalN,
+                    $context->getTypeFromString('int64')
+                ),
+                $context->getTypeFromString('int64')
+            )
         );
     }
 

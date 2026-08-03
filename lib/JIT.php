@@ -13776,6 +13776,28 @@ class JIT {
 
                 return;
             }
+            // HashTable::iterate() returns the receiver HT for IteratorHelper foreach.
+            // CFG often types the Traversable temp as PHPCompiler\VM\Variable (element
+            // type leak); keep TYPE_HASHTABLE so ObjectPropertyForeach does not win (#27226).
+            if (
+                $this->context->scope->toCall instanceof JIT\Call\HashTableIterate
+                && '__hashtable__*' === $llvmTy
+            ) {
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $this->context->setVariableOp(
+                    $result,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_HASHTABLE,
+                        Variable::KIND_VALUE,
+                        $llvmResult
+                    )
+                );
+
+                return;
+            }
             // WeakReference::get() returns an owning __value__ box. Promote to an entry
             // alloca KIND_VARIABLE so freeDeadVariables at ternary/branch edges can
             // valueDelref (KIND_VALUE free is a no-op and would keep the referent) (#27118).

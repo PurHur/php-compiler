@@ -5,55 +5,40 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_push() via ArrayPushJitHelper PHP (#12719, #22801).
+ * JIT/AOT link for array_push() (#12719, #22801, #27226).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
- * Standalone AOT compiles {@see ArrayPushJitHelper} via nested JIT bridges (#14303, #17580).
- * SSOT: {@see \PHPCompiler\ext\standard\array_push}
+ * Thin AOT NestedJIT of ArrayPushJitHelper::pushFromList died on
+ * foreach ($ht->iterate()) (CFG types Traversable as Variable ->
+ * ObjectPropertyForeach null slot, #27226). Append at the call site with
+ * ArrayBuiltinHelper::appendElement instead. VM still uses ArrayPushJitHelper.
+ *
+ * SSOT (VM): {@see \PHPCompiler\ext\standard\array_push}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_push)
  */
 final class ArrayPushRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ArrayPushJitHelper.php';
-
-    private const COUNT_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPushJitHelper::countElements';
-
-    private const APPEND_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPushJitHelper::pushFromList';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COUNT_HELPER,
-        self::APPEND_HELPER,
-    ];
-
     public static function push(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $native = ArrayBuiltinHelper::isNativeArray($array->type);
-        if (0 === \count($values)) {
-            $count = self::callCount($context, $ht);
-        } else {
-            $valuesHt = HashTableHelper::alloc($context);
-            foreach ($values as $value) {
-                ArrayBuiltinHelper::appendElement($context, $valuesHt, $value);
-            }
-            $count = self::callAppend($context, $ht, $valuesHt);
+        foreach ($values as $value) {
+            ArrayBuiltinHelper::appendElement($context, $ht, $value);
         }
         if ($native) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
 
-        return $count;
+        return ArrayBuiltinHelper::getNumElements($context, $ht);
     }
 
     public static function ensureLinked(Context $context): void
@@ -81,7 +66,6 @@ final class ArrayPushRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__array_push__count', self::implementCountBridge(...));
         self::implementIfMissing($context, '__array_push__append', self::implementAppendBridge(...));
         self::registerLinkedRuntime($context);
@@ -93,9 +77,7 @@ final class ArrayPushRuntime
         }
     }
 
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
+    /** @param callable(Context, LlvmFunction): void $emit */
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
@@ -116,7 +98,6 @@ final class ArrayPushRuntime
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
-            // fall through
         }
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -140,62 +121,44 @@ final class ArrayPushRuntime
     {
         $entry = $fn->appendBasicBlock('array_push_count_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $countRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::COUNT_HELPER),
-            [$fn->getParam(0)]
+        $context->builder->returnValue(
+            ArrayBuiltinHelper::getNumElements($context, $fn->getParam(0))
         );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceBridgeResult($context, $countRaw, $context->getTypeFromString('int64')));
     }
 
     private static function implementAppendBridge(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('array_push_append_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $countRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::APPEND_HELPER),
-            [$fn->getParam(0), $fn->getParam(1)]
+        $dest = $fn->getParam(0);
+        $valuesHt = $fn->getParam(1);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->builder->truncOrBitCast(
+            ArrayBuiltinHelper::getNumElements($context, $valuesHt),
+            $sizeT
         );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceBridgeResult($context, $countRaw, $context->getTypeFromString('int64')));
-    }
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_push_append_head');
+        $body = BasicBlockHelper::append($context, 'array_push_append_body');
+        $done = BasicBlockHelper::append($context, 'array_push_append_done');
+        $context->builder->branch($head);
 
-    private static function callCount(Context $context, Value $ht): Value
-    {
-        self::ensureLinked($context);
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
 
-        return $context->builder->call(
-            $context->lookupFunction('__array_push__count'),
-            $ht
-        );
-    }
+        $context->builder->positionAtEnd($body);
+        $value = HashTableHelper::readIndexedToValueBox($context, $valuesHt, $idx);
+        ArrayBuiltinHelper::appendElement($context, $dest, $value);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
 
-    private static function callAppend(Context $context, Value $ht, Value $valuesHt): Value
-    {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_push__append'),
-            $ht,
-            $valuesHt
-        );
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#22801');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22801'
-        );
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnValue(ArrayBuiltinHelper::getNumElements($context, $dest));
     }
 
     private static function registerLinkedRuntime(Context $context): void
