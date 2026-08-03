@@ -842,6 +842,27 @@ restart:
                 );
                 goto return_bool;
             }
+            // NestedJIT string-offset fetch is TYPE_VALUE; `$ch < '0'` is STRING?VALUE (#27239).
+            if (self::isOrderedCompareOpcode($opcode->type)) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $leftValue
+                );
+                $cmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::pointer($this->context, $tmp),
+                    JitValueBox::valuePtrFromVariable($this->context, $right)
+                );
+                $result = JitValueCompare::boolFromSpaceshipCmp(
+                    $this->context,
+                    $opcode->type,
+                    $cmp
+                );
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
@@ -857,6 +878,27 @@ restart:
                 $result = $this->context->builder->xor(
                     $same,
                     $this->context->getTypeFromString('int1')->constInt(1, false)
+                );
+                goto return_bool;
+            }
+            // VALUE < STRING — e.g. `$date[$i] < '0'` after offset fetch (#27239 Strptime emit).
+            if (self::isOrderedCompareOpcode($opcode->type)) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $rightValue
+                );
+                $cmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::valuePtrFromVariable($this->context, $left),
+                    JitValueBox::pointer($this->context, $tmp)
+                );
+                $result = JitValueCompare::boolFromSpaceshipCmp(
+                    $this->context,
+                    $opcode->type,
+                    $cmp
                 );
                 goto return_bool;
             }
