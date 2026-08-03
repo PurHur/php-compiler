@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -192,12 +193,14 @@ final class JitArrayKey
         }
     }
 
+    /**
+     * Catchable under AOT try/catch; fatal when uncaught (#27472 / #27474).
+     * Bare TypeErrorRaise + abort aborts exit 134 inside try — use ExceptionBridge.
+     */
     private static function emitErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'array_key_te_cont');
     }
 
     private static function keyAtEnd(Context $context, JITVariable $array, bool $first): Value
