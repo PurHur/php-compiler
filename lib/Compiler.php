@@ -10384,6 +10384,14 @@ class Compiler {
 
             return $v;
         }
+        // M_PI / M_E / … — same map as VM\Context::constantFetch (#27249).
+        $stdlibFloat = \PHPCompiler\ext\standard\StdlibConstants::CORE_FLOAT_BY_NAME[$lc] ?? null;
+        if (null !== $stdlibFloat) {
+            $v = new Variable(Variable::TYPE_FLOAT);
+            $v->float($stdlibFloat);
+
+            return $v;
+        }
         $dateStr = \PHPCompiler\ext\standard\DateConstants::CORE_STRING_BY_NAME[$lc] ?? null;
         if (null !== $dateStr) {
             $v = new Variable(Variable::TYPE_STRING);

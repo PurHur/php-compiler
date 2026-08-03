@@ -16,6 +16,7 @@ final class RoundRuntimeShrinkTest extends TestCase
     {
         $jitRound = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRound.php');
         $this->assertStringContainsString('MathRound::invoke', $jitRound);
+        $this->assertStringContainsString('tryFoldCompileTime', $jitRound);
         $this->assertStringNotContainsString('JitRoundLowering', $jitRound);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRound.php');
