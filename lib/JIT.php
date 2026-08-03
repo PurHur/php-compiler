@@ -12023,6 +12023,12 @@ class JIT {
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } elseif ($classOp instanceof Operand\Literal
+                                && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionEnum')
+                            ) {
+                                // Thin AOT: wire __construct like ReflectionClass (#27314).
+                                $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionenum::__construct');
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif ($classOp instanceof Operand\Literal
                                 && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'SimpleXMLElement')
                                 && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
                                     || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
