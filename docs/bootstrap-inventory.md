@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6874 |
-| Phase A inventory files (M2 ratio SSOT) | 6874 |
+| PHP files on vm.php path | 6876 |
+| Phase A inventory files (M2 ratio SSOT) | 6876 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22165 |
+| Source constructs flagged (warnings) | 22163 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3233,7 +3233,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmAssert.php` | 0 | 2 |
 | `ext/standard/VmAssertState.php` | 0 | 1 |
 | `ext/standard/VmBrowser.php` | 0 | 1 |
-| `ext/standard/VmCallable.php` | 0 | 18 |
+| `ext/standard/VmCallable.php` | 0 | 16 |
 | `ext/standard/VmCallableInvoke.php` | 0 | 4 |
 | `ext/standard/VmChdirNative.php` | 0 | 1 |
 | `ext/standard/VmChdirPure.php` | 0 | 1 |
@@ -5762,7 +5762,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableGetNumElements.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableIsPackedList.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableIterate.php` | 0 | 1 |
-| `lib/JIT/Call/HashTableKeysCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableKeysCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableKeysMatchingCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableMergeStringKeysFrom.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableMutateNested.php` | 0 | 1 |
@@ -5776,7 +5776,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableUnionCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableUnshiftPrepend.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableUpdateIndex.php` | 0 | 1 |
-| `lib/JIT/Call/HashTableValuesCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableValuesCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableWriteNested.php` | 0 | 2 |
 | `lib/JIT/Call/IncludePathResolverResolve.php` | 0 | 1 |
 | `lib/JIT/Call/LimitIteratorConstruct.php` | 0 | 5 |
@@ -5909,6 +5909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableChunkLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableCowLlvm.php` | 0 | 3 |
 | `lib/JIT/HashTableHelper.php` | 0 | 10 |
+| `lib/JIT/HashTableKeysLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableMutateNestedLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableNestedExportLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableReadLlvm.php` | 0 | 7 |
@@ -5917,6 +5918,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableShiftLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableSliceLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableSpliceLlvm.php` | 0 | 1 |
+| `lib/JIT/HashTableValuesLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableWriteLlvm.php` | 0 | 16 |
 | `lib/JIT/HeaderCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/Helper.php` | 0 | 7 |
@@ -31899,22 +31901,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 146)
 - new Variable (line 190)
-- new Variable (line 266)
-- new Variable (line 268)
-- new Variable (line 460)
-- new Variable (line 462)
-- new Variable (line 652)
-- new Variable (line 658)
-- new Variable (line 675)
-- new Variable (line 677)
-- new Error (line 940)
-- new Error (line 950)
-- new Variable (line 971)
-- new Variable (line 1283)
+- new Variable (line 284)
+- new Variable (line 286)
+- new Variable (line 478)
+- new Variable (line 480)
+- new Variable (line 670)
+- new Variable (line 676)
+- new Variable (line 693)
+- new Variable (line 695)
+- new Variable (line 991)
 - new Variable (line 1303)
-- new Variable (line 1320)
-- new Variable (line 1325)
-- 37 class method(s)
+- new Variable (line 1323)
+- new Variable (line 1340)
+- new Variable (line 1345)
+- 38 class method(s)
 
 ### `ext/standard/VmCallableInvoke.php`
 
@@ -44176,88 +44176,88 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeVariableFunction (line 11159)
 - new Variable (line 11361)
 - new Variable (line 11375)
-- new VM\Variable (line 11660)
-- new VM (line 11666)
-- new VM\Variable (line 11679)
-- new Variable (line 11912)
-- new Type (line 11919)
-- new Variable (line 11943)
-- new Type (line 11951)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11956)
-- new Variable (line 11991)
-- new Type (line 12002)
-- new Variable (line 12250)
-- new Variable (line 12271)
-- new Operand\Literal (line 12363)
-- new Variable (line 13732)
-- new Variable (line 13753)
-- new Variable (line 13784)
-- new Variable (line 13818)
-- new Variable (line 13839)
-- new CompileError (line 14628)
-- new CompileError (line 14757)
-- new Variable (line 14814)
-- new Variable (line 14848)
-- new Variable (line 15310)
-- new Variable (line 15330)
-- new Variable (line 15351)
-- new Variable (line 15441)
-- new Variable (line 15482)
-- new Variable (line 15592)
-- new Variable (line 15616)
-- new Variable (line 15626)
-- new Variable (line 15811)
-- new Variable (line 15829)
-- new Variable (line 15887)
-- new Variable (line 15914)
-- new Variable (line 15940)
-- new Variable (line 16279)
-- new Variable (line 16653)
-- new Variable (line 16683)
-- new Variable (line 16702)
-- new Variable (line 16732)
-- new Variable (line 16769)
-- new Variable (line 16817)
-- new Variable (line 16860)
-- new VM\Variable (line 17335)
-- new Variable (line 17369)
-- new Variable (line 17421)
-- new Variable (line 17439)
-- new Variable (line 17458)
-- new Variable (line 17465)
-- new OpCode (line 17487)
-- new Variable (line 17488)
-- new Variable (line 17748)
-- new Variable (line 17804)
-- new Variable (line 17842)
-- new OpCode (line 17856)
-- new Variable (line 17857)
-- new Variable (line 17916)
-- new OpCode (line 17937)
-- new Variable (line 17938)
-- new Variable (line 18037)
-- new Variable (line 18059)
-- new Variable (line 18127)
-- new Operand\Literal (line 18136)
-- new Variable (line 18151)
-- new Variable (line 18466)
-- new VM\PropertyIsInitializedHandler (line 18563)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18619)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18988)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19200)
-- new JIT\Call\VmCoerceVariableToString (line 19327)
-- new JIT\Call\NoOpConstruct (line 19499)
-- new JIT\Call\IncludePathResolverResolve (line 19669)
-- new Operand\Literal (line 19756)
-- new Operand\Literal (line 19759)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19802)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 19949)
-- new VM (line 21047)
-- new VM\Variable (line 21056)
-- new Variable (line 21077)
-- new Variable (line 21123)
-- new Variable (line 21831)
-- 418 class method(s)
+- new VM\Variable (line 11661)
+- new VM (line 11667)
+- new VM\Variable (line 11680)
+- new Variable (line 11913)
+- new Type (line 11920)
+- new Variable (line 11944)
+- new Type (line 11952)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 11957)
+- new Variable (line 11992)
+- new Type (line 12003)
+- new Variable (line 12251)
+- new Variable (line 12272)
+- new Operand\Literal (line 12364)
+- new Variable (line 13733)
+- new Variable (line 13754)
+- new Variable (line 13785)
+- new Variable (line 13819)
+- new Variable (line 13840)
+- new CompileError (line 14629)
+- new CompileError (line 14758)
+- new Variable (line 14815)
+- new Variable (line 14849)
+- new Variable (line 15311)
+- new Variable (line 15331)
+- new Variable (line 15352)
+- new Variable (line 15472)
+- new Variable (line 15513)
+- new Variable (line 15623)
+- new Variable (line 15647)
+- new Variable (line 15657)
+- new Variable (line 15842)
+- new Variable (line 15860)
+- new Variable (line 15918)
+- new Variable (line 15945)
+- new Variable (line 15971)
+- new Variable (line 16310)
+- new Variable (line 16684)
+- new Variable (line 16714)
+- new Variable (line 16733)
+- new Variable (line 16763)
+- new Variable (line 16800)
+- new Variable (line 16848)
+- new Variable (line 16891)
+- new VM\Variable (line 17366)
+- new Variable (line 17400)
+- new Variable (line 17452)
+- new Variable (line 17470)
+- new Variable (line 17489)
+- new Variable (line 17496)
+- new OpCode (line 17518)
+- new Variable (line 17519)
+- new Variable (line 17779)
+- new Variable (line 17835)
+- new Variable (line 17873)
+- new OpCode (line 17887)
+- new Variable (line 17888)
+- new Variable (line 17947)
+- new OpCode (line 17968)
+- new Variable (line 17969)
+- new Variable (line 18068)
+- new Variable (line 18090)
+- new Variable (line 18158)
+- new Operand\Literal (line 18167)
+- new Variable (line 18182)
+- new Variable (line 18497)
+- new VM\PropertyIsInitializedHandler (line 18594)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18650)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19019)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19231)
+- new JIT\Call\VmCoerceVariableToString (line 19358)
+- new JIT\Call\NoOpConstruct (line 19530)
+- new JIT\Call\IncludePathResolverResolve (line 19700)
+- new Operand\Literal (line 19787)
+- new Operand\Literal (line 19790)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19833)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 19980)
+- new VM (line 21078)
+- new VM\Variable (line 21087)
+- new Variable (line 21108)
+- new Variable (line 21154)
+- new Variable (line 21862)
+- 419 class method(s)
 - 20 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -44498,7 +44498,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayKeysRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/ArrayMapRuntime.php`
 
@@ -44622,7 +44622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayValuesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayWalkRuntime.php`
 
@@ -48361,8 +48361,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/HashTableKeysCopy.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/HashTableKeysMatchingCopy.php`
 
@@ -48437,8 +48436,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/HashTableValuesCopy.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/HashTableWriteNested.php`
 
@@ -49002,25 +49000,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClosureWithBinding (line 89)
 - new ClosureWithBinding (line 98)
 - new Call\RuntimeIndirectClosureCall (line 118)
-- new Variable (line 219)
-- new ClosureWithBinding (line 220)
-- new ClosureWithBinding (line 251)
-- new Variable (line 421)
-- new Variable (line 437)
-- new Variable (line 471)
-- new Variable (line 549)
-- new Variable (line 563)
-- new Variable (line 578)
-- new Variable (line 596)
+- new Variable (line 228)
+- new ClosureWithBinding (line 229)
+- new ClosureWithBinding (line 283)
+- new Variable (line 463)
+- new Variable (line 479)
+- new Variable (line 513)
+- new Variable (line 591)
 - new Variable (line 605)
-- new Variable (line 625)
-- new Variable (line 641)
-- 43 class method(s)
+- new Variable (line 620)
+- new Variable (line 638)
+- new Variable (line 647)
+- new Variable (line 667)
+- new Variable (line 683)
+- 45 class method(s)
 
 ### `lib/JIT/ClosureHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/CoalesceHelper.php`
 
@@ -49443,6 +49441,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 490)
 - 43 class method(s)
 
+### `lib/JIT/HashTableKeysLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/HashTableMutateNestedLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49489,6 +49492,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `lib/JIT/HashTableValuesLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/HashTableWriteLlvm.php`
 
@@ -49929,8 +49937,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 80)
-- new Call\HashTableMutateNested (line 82)
+- new Call\HashTableWriteNested (line 77)
+- new Call\HashTableMutateNested (line 79)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
