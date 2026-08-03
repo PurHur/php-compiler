@@ -32,6 +32,10 @@ final class JitRound
             return $folded;
         }
 
+        // Link before lowering args so NestedJIT of RoundJitHelper cannot orphan the
+        // first call site's operand IR (#27248 peer strpos/strtok).
+        MathRound::ensureLinked($context);
+
         $number = self::coerceDouble($context, $args[0]);
         $precision = isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])
             ? self::lowerPrecisionArg($context, $args[1])
@@ -66,6 +70,8 @@ final class JitRound
         if (null !== $folded) {
             return $folded;
         }
+
+        MathRound::ensureLinked($context);
 
         $number = self::coerceDouble($context, $num);
         $prec = null !== $precision
