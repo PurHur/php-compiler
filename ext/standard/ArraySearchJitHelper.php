@@ -8,9 +8,11 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_search() for compiled JIT/AOT modules (#12514, php-in-PHP).
+ * array_search() host/VM helper (#12514, php-in-PHP).
  *
- * SSOT: {@see VmArray::searchKey()}
+ * JIT/AOT user-script emission uses {@see \PHPCompiler\JIT\ArraySearchLlvm} (NestedJIT of this
+ * class → {@see VmArray::searchKey} was an external stub under thin AOT — #27133 / #579).
+ * SSOT for VM execute() and unit tests: {@see VmArray::searchKey()}.
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_search)
  */
 final class ArraySearchJitHelper
