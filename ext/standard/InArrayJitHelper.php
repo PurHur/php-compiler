@@ -8,9 +8,11 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * in_array() for compiled JIT/AOT modules (#12503, php-in-PHP).
+ * in_array() host/VM helper (#12503, php-in-PHP).
  *
- * SSOT: {@see VmArray::contains()}
+ * JIT/AOT user-script emission uses {@see \PHPCompiler\JIT\InArrayLlvm} (NestedJIT of this
+ * class → {@see VmArray::contains} was an external stub under thin AOT — #27120 / #579).
+ * SSOT for VM execute() and unit tests: {@see VmArray::contains()}.
  * php-src: ext/standard/array.c — PHP_FUNCTION(in_array)
  */
 final class InArrayJitHelper
