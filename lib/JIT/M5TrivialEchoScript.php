@@ -16,21 +16,25 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * Hand-build PHPCfg Script + PHPCompiler Block for the gen-0 functional-smoke shape
+ * Hand-build PHPCfg Script + PHPCompiler Block for gen-0 M5 argv limited shapes
  * (#26756 / re-#23468 / #27426):
  *
  *   <?php
  *   echo "TOKEN\n";
  *
+ *   <?php
+ *   $a = 1 + 2; echo $a;
+ *
  * Also accepts a leading preamble of declare(...);, line comments, and block comments
- * (examples/000-HelloWorld/example.php) — still a single double-quoted echo body.
+ * (examples/000-HelloWorld/example.php) — still a single double-quoted echo body, or the
+ * assign-plus-echo shape above (folded to a literal echo of the sum).
  * Avoids NestedJIT of PHPCfg\Parser / Compiler::compileEmitSmoke (mid-BB verify /
- * optimize fatals). Host-verified Block matches compileEmitSmoke output for this shape.
+ * optimize fatals). Host-verified Block matches compileEmitSmoke output for these shapes.
  */
 final class M5TrivialEchoScript
 {
     /**
-     * @return Script|null null when source is not a single echo of a double-quoted string
+     * @return Script|null null when source is not a supported M5 limited shape
      */
     public static function tryBuild(string $code, string $filename): ?Script
     {
@@ -40,6 +44,19 @@ final class M5TrivialEchoScript
             return null;
         }
         $rest = self::stripLeadingPreamble(ltrim(substr($trimmed, 5)));
+        $echo = self::tryBuildEchoBody($rest, $filename);
+        if (null !== $echo) {
+            return $echo;
+        }
+
+        return self::tryBuildAssignPlusEchoBody($rest, $filename);
+    }
+
+    /**
+     * Single `echo "…";` body (after preamble strip).
+     */
+    private static function tryBuildEchoBody(string $rest, string $filename): ?Script
+    {
         if (!str_starts_with($rest, 'echo')) {
             return null;
         }
@@ -79,6 +96,138 @@ final class M5TrivialEchoScript
         if ($tail !== ';') {
             return null;
         }
+
+        return self::scriptEchoingLiteral($value, $filename);
+    }
+
+    /**
+     * `$name = <int> + <int>; echo $name;` — fold to literal echo of the sum (#27426 arith).
+     * No preg — NestedJIT-safe (#26756).
+     */
+    private static function tryBuildAssignPlusEchoBody(string $rest, string $filename): ?Script
+    {
+        if ($rest === '' || $rest[0] !== '$') {
+            return null;
+        }
+        $i = 1;
+        $len = strlen($rest);
+        $name = self::scanIdent($rest, $i);
+        if (null === $name) {
+            return null;
+        }
+        $i = self::skipWs($rest, $i);
+        if ($i >= $len || $rest[$i] !== '=') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 1);
+        $left = self::scanUnsignedInt($rest, $i);
+        if (null === $left) {
+            return null;
+        }
+        $i = self::skipWs($rest, $i);
+        if ($i >= $len || $rest[$i] !== '+') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 1);
+        $right = self::scanUnsignedInt($rest, $i);
+        if (null === $right) {
+            return null;
+        }
+        $i = self::skipWs($rest, $i);
+        if ($i >= $len || $rest[$i] !== ';') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 1);
+        if ($i + 4 > $len || substr($rest, $i, 4) !== 'echo') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 4);
+        if ($i >= $len || $rest[$i] !== '$') {
+            return null;
+        }
+        ++$i;
+        $echoName = self::scanIdent($rest, $i);
+        if (null === $echoName || $echoName !== $name) {
+            return null;
+        }
+        $i = self::skipWs($rest, $i);
+        if ($i >= $len || $rest[$i] !== ';') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 1);
+        if ($i !== $len) {
+            return null;
+        }
+        // Fold at match time — same literal-echo Block path as trivial echo (#27426).
+        return self::scriptEchoingLiteral((string) ($left + $right), $filename);
+    }
+
+    /** @param-out int $i */
+    private static function scanIdent(string $s, int &$i): ?string
+    {
+        $len = strlen($s);
+        if ($i >= $len) {
+            return null;
+        }
+        $c0 = $s[$i];
+        if (!(($c0 >= 'a' && $c0 <= 'z') || ($c0 >= 'A' && $c0 <= 'Z') || $c0 === '_')) {
+            return null;
+        }
+        $start = $i;
+        ++$i;
+        while ($i < $len) {
+            $c = $s[$i];
+            if (($c >= 'a' && $c <= 'z') || ($c >= 'A' && $c <= 'Z')
+                || ($c >= '0' && $c <= '9') || $c === '_') {
+                ++$i;
+                continue;
+            }
+            break;
+        }
+
+        return substr($s, $start, $i - $start);
+    }
+
+    /** @param-out int $i */
+    private static function scanUnsignedInt(string $s, int &$i): ?int
+    {
+        $len = strlen($s);
+        if ($i >= $len || $s[$i] < '0' || $s[$i] > '9') {
+            return null;
+        }
+        $start = $i;
+        while ($i < $len && $s[$i] >= '0' && $s[$i] <= '9') {
+            ++$i;
+        }
+        // Reject leading-zero multi-digit (keep scanner strict / NestedJIT-simple).
+        $raw = substr($s, $start, $i - $start);
+        if (strlen($raw) > 1 && $raw[0] === '0') {
+            return null;
+        }
+        if (strlen($raw) > 18) {
+            return null;
+        }
+
+        return (int) $raw;
+    }
+
+    private static function skipWs(string $s, int $i): int
+    {
+        $len = strlen($s);
+        while ($i < $len) {
+            $c = $s[$i];
+            if ($c === ' ' || $c === "\t" || $c === "\n" || $c === "\r") {
+                ++$i;
+                continue;
+            }
+            break;
+        }
+
+        return $i;
+    }
+
+    private static function scriptEchoingLiteral(string $value, string $filename): Script
+    {
         $script = new Script();
         $script->functions = [];
         $script->main = new Func('{main}', 0, new Void_(), null);

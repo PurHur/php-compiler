@@ -8,12 +8,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure C-floor parseAndCompile + standalone emit for gen-0 functional smoke (#26756 / #27426):
+ * Pure C-floor parseAndCompile + standalone emit for gen-0 M5 limited shapes (#26756 / #27426):
  *
  *   <?php
  *   echo "TOKEN\n";
  *
- * examples/000-HelloWorld/example.php uses this shape so the committed argv driver can
+ *   <?php
+ *   $a = 1 + 2; echo $a;   // folded to printf payload "3"
+ *
+ * examples/000-HelloWorld/example.php uses the echo shape so the committed argv driver can
  * compile it without PHPCfg\Parser NestedJIT. NestedJIT of
  * {@see M5TrivialEchoScript::parseAndCompile} hangs at runtime in the argv driver; this
  * path never NestedJITs that helper — LLVM scans the source, returns a module sentinel as
@@ -26,6 +29,7 @@ final class M5TrivialEchoNative
     private const SENTINEL_GLOBAL = '__m5_te_sentinel_byte';
     private const PAYLOAD_GLOBAL = '__m5_te_payload';
     private const EXTRACT_FN = '__m5_te_try_extract';
+    private const ARITH_EXTRACT_FN = '__m5_te_try_extract_arith';
     private const EMIT_FN = '__m5_te_emit_to_path';
 
     /**
@@ -183,6 +187,7 @@ final class M5TrivialEchoNative
     /** __m5_te_try_extract(__string__* code) -> __string__* payload|null */
     private static function ensureExtractHelper(Context $context): void
     {
+        self::ensureArithExtractHelper($context);
         if (null !== $context->module->getNamedFunction(self::EXTRACT_FN)) {
             $context->registerFunction(self::EXTRACT_FN, $context->module->getNamedFunction(self::EXTRACT_FN));
 
@@ -242,7 +247,9 @@ final class M5TrivialEchoNative
         $needEcho = $i64->constInt(4, false);
         $echoShort = $b->icmp(Builder::INT_ULT, $rem, $needEcho);
         $p4 = $fn->appendBasicBlock('p4');
-        $b->branchIf($echoShort, $miss, $p4);
+        $arithTry = $fn->appendBasicBlock('arith_try');
+        // Too short for "echo" — still try `$a = N + M; echo $a;` (#27426).
+        $b->branchIf($echoShort, $arithTry, $p4);
         $b->positionAtEnd($p4);
         $echoLit = $b->pointerCast($context->constantFromString('echo'), $i8p);
         $echoCmp = $b->call(
@@ -253,7 +260,16 @@ final class M5TrivialEchoNative
         );
         $echoOk = $b->icmp(Builder::INT_EQ, $echoCmp, $i32->constInt(0, false));
         $p5 = $fn->appendBasicBlock('p5');
-        $b->branchIf($echoOk, $p5, $miss);
+        $b->branchIf($echoOk, $p5, $arithTry);
+        // Echo body missed — try assign+plus+echo (#27426 arith capability).
+        $b->positionAtEnd($arithTry);
+        $arithPayload = $b->call($context->lookupFunction(self::ARITH_EXTRACT_FN), $code);
+        $arithNull = $b->icmp(Builder::INT_EQ, $arithPayload, $strPtr->constNull());
+        $arithHit = $fn->appendBasicBlock('arith_hit');
+        $b->branchIf($arithNull, $miss, $arithHit);
+        $b->positionAtEnd($arithHit);
+        $b->store($arithPayload, $result);
+        $b->branch($done);
         $b->positionAtEnd($p5);
         $b->store($b->add($i, $needEcho), $idx);
         self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'ws2');
@@ -378,6 +394,376 @@ final class M5TrivialEchoNative
         $context->builder->clearInsertionPosition();
         $context->builder = $saved;
         $context->registerFunction(self::EXTRACT_FN, $fn);
+    }
+
+
+    /**
+     * `__m5_te_try_extract_arith(__string__* code) -> __string__* payload|null`
+     *
+     * Matches `$name = <uint> + <uint>; echo $name;` after `<?php` (optional ws),
+     * folds to a decimal string payload for the printf emit path (#27426).
+     * Identifiers are compared in-place (no name buffer) to avoid alloca footguns.
+     */
+    private static function ensureArithExtractHelper(Context $context): void
+    {
+        if (null !== $context->module->getNamedFunction(self::ARITH_EXTRACT_FN)) {
+            $context->registerFunction(
+                self::ARITH_EXTRACT_FN,
+                $context->module->getNamedFunction(self::ARITH_EXTRACT_FN)
+            );
+
+            return;
+        }
+
+        LibcExtern::register($context);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $strMap = $context->structFieldMap['__string__'];
+
+        $fn = $context->module->addFunction(
+            self::ARITH_EXTRACT_FN,
+            $context->context->functionType($strPtr, false, $strPtr)
+        );
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $b = $context->builder;
+        $entry = $fn->appendBasicBlock('a_entry');
+        $miss = $fn->appendBasicBlock('a_miss');
+        $done = $fn->appendBasicBlock('a_done');
+        $b->positionAtEnd($entry);
+
+        $result = $b->alloca($strPtr);
+        $b->store($strPtr->constNull(), $result);
+
+        $code = $fn->getParam(0);
+        $codeNull = $b->icmp(Builder::INT_EQ, $code, $strPtr->constNull());
+        $p1 = $fn->appendBasicBlock('a_p1');
+        $b->branchIf($codeNull, $miss, $p1);
+        $b->positionAtEnd($p1);
+
+        $len = $b->load($b->structGep($code, $strMap['length']));
+        $chars = $b->pointerCast($b->structGep($code, $strMap['value']), $i8p);
+        $needPhp = $i64->constInt(5, false);
+        $short = $b->icmp(Builder::INT_ULT, $len, $needPhp);
+        $p2 = $fn->appendBasicBlock('a_p2');
+        $b->branchIf($short, $miss, $p2);
+        $b->positionAtEnd($p2);
+
+        $phpTag = $b->pointerCast($context->constantFromString('<?php'), $i8p);
+        $tagCmp = $b->call($context->lookupFunction('strncmp'), $chars, $phpTag, $b->zExt($needPhp, $sizeT));
+        $tagOk = $b->icmp(Builder::INT_EQ, $tagCmp, $i32->constInt(0, false));
+        $p3 = $fn->appendBasicBlock('a_p3');
+        $b->branchIf($tagOk, $p3, $miss);
+        $b->positionAtEnd($p3);
+
+        $idx = $b->alloca($i64);
+        $b->store($needPhp, $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws0');
+
+        // '$'
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p4 = $fn->appendBasicBlock('a_p4');
+        $b->branchIf($past, $miss, $p4);
+        $b->positionAtEnd($p4);
+        $isDollar = $b->icmp(
+            Builder::INT_EQ,
+            $b->load($b->gep($chars, $i)),
+            $i8->constInt(ord('$'), false)
+        );
+        $p5 = $fn->appendBasicBlock('a_p5');
+        $b->branchIf($isDollar, $p5, $miss);
+        $b->positionAtEnd($p5);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+
+        // First ident: record start+len in-place
+        $nameStart = $b->alloca($i64);
+        $nameLen = $b->alloca($i64);
+        self::emitScanIdentSpan($fn, $context, $chars, $len, $idx, $nameStart, $nameLen, 'a_id1', $miss);
+
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws1');
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p6 = $fn->appendBasicBlock('a_p6');
+        $b->branchIf($past, $miss, $p6);
+        $b->positionAtEnd($p6);
+        $isEq = $b->icmp(Builder::INT_EQ, $b->load($b->gep($chars, $i)), $i8->constInt(ord('='), false));
+        $p7 = $fn->appendBasicBlock('a_p7');
+        $b->branchIf($isEq, $p7, $miss);
+        $b->positionAtEnd($p7);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws2');
+
+        $left = self::emitScanUint($fn, $context, $chars, $len, $idx, 'a_left', $miss);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws3');
+
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p8 = $fn->appendBasicBlock('a_p8');
+        $b->branchIf($past, $miss, $p8);
+        $b->positionAtEnd($p8);
+        $isPlus = $b->icmp(Builder::INT_EQ, $b->load($b->gep($chars, $i)), $i8->constInt(ord('+'), false));
+        $p9 = $fn->appendBasicBlock('a_p9');
+        $b->branchIf($isPlus, $p9, $miss);
+        $b->positionAtEnd($p9);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws4');
+
+        $right = self::emitScanUint($fn, $context, $chars, $len, $idx, 'a_right', $miss);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws5');
+
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p10 = $fn->appendBasicBlock('a_p10');
+        $b->branchIf($past, $miss, $p10);
+        $b->positionAtEnd($p10);
+        $isSemi = $b->icmp(Builder::INT_EQ, $b->load($b->gep($chars, $i)), $i8->constInt(ord(';'), false));
+        $p11 = $fn->appendBasicBlock('a_p11');
+        $b->branchIf($isSemi, $p11, $miss);
+        $b->positionAtEnd($p11);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws6');
+
+        // echo
+        $i = $b->load($idx);
+        $rem = $b->sub($len, $i);
+        $needEcho = $i64->constInt(4, false);
+        $echoShort = $b->icmp(Builder::INT_ULT, $rem, $needEcho);
+        $p12 = $fn->appendBasicBlock('a_p12');
+        $b->branchIf($echoShort, $miss, $p12);
+        $b->positionAtEnd($p12);
+        $echoLit = $b->pointerCast($context->constantFromString('echo'), $i8p);
+        $echoCmp = $b->call(
+            $context->lookupFunction('strncmp'),
+            $b->gep($chars, $i),
+            $echoLit,
+            $b->zExt($needEcho, $sizeT)
+        );
+        $echoOk = $b->icmp(Builder::INT_EQ, $echoCmp, $i32->constInt(0, false));
+        $p13 = $fn->appendBasicBlock('a_p13');
+        $b->branchIf($echoOk, $p13, $miss);
+        $b->positionAtEnd($p13);
+        $b->store($b->add($i, $needEcho), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws7');
+
+        // $name again
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p14 = $fn->appendBasicBlock('a_p14');
+        $b->branchIf($past, $miss, $p14);
+        $b->positionAtEnd($p14);
+        $isD2 = $b->icmp(Builder::INT_EQ, $b->load($b->gep($chars, $i)), $i8->constInt(ord('$'), false));
+        $p15 = $fn->appendBasicBlock('a_p15');
+        $b->branchIf($isD2, $p15, $miss);
+        $b->positionAtEnd($p15);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+
+        $echoStart = $b->alloca($i64);
+        $echoLen = $b->alloca($i64);
+        self::emitScanIdentSpan($fn, $context, $chars, $len, $idx, $echoStart, $echoLen, 'a_id2', $miss);
+
+        $nl = $b->load($nameLen);
+        $el = $b->load($echoLen);
+        $lenEq = $b->icmp(Builder::INT_EQ, $nl, $el);
+        $p16 = $fn->appendBasicBlock('a_p16');
+        $b->branchIf($lenEq, $p16, $miss);
+        $b->positionAtEnd($p16);
+        $nameCmp = $b->call(
+            $context->lookupFunction('strncmp'),
+            $b->gep($chars, $b->load($nameStart)),
+            $b->gep($chars, $b->load($echoStart)),
+            $b->zExt($nl, $sizeT)
+        );
+        $nameOk = $b->icmp(Builder::INT_EQ, $nameCmp, $i32->constInt(0, false));
+        $p17 = $fn->appendBasicBlock('a_p17');
+        $b->branchIf($nameOk, $p17, $miss);
+        $b->positionAtEnd($p17);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws8');
+
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p18 = $fn->appendBasicBlock('a_p18');
+        $b->branchIf($past, $miss, $p18);
+        $b->positionAtEnd($p18);
+        $isSemi2 = $b->icmp(Builder::INT_EQ, $b->load($b->gep($chars, $i)), $i8->constInt(ord(';'), false));
+        $p19 = $fn->appendBasicBlock('a_p19');
+        $b->branchIf($isSemi2, $p19, $miss);
+        $b->positionAtEnd($p19);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'a_ws9');
+        $atEnd = $b->icmp(Builder::INT_EQ, $b->load($idx), $len);
+        $p20 = $fn->appendBasicBlock('a_p20');
+        $b->branchIf($atEnd, $p20, $miss);
+        $b->positionAtEnd($p20);
+
+        $sum = $b->add($left, $right);
+        $numBuf = $b->arrayAlloca($i8, $i64->constInt(32, false));
+        $fmt = $b->pointerCast($context->constantFromString('%ld'), $i8p);
+        $nwritten = $b->call(
+            $context->lookupFunction('snprintf'),
+            $numBuf,
+            $b->zExt($i64->constInt(32, false), $sizeT),
+            $fmt,
+            $sum
+        );
+        $nwOk = $b->icmp(Builder::INT_SGT, $nwritten, $i32->constInt(0, false));
+        $p21 = $fn->appendBasicBlock('a_p21');
+        $b->branchIf($nwOk, $p21, $miss);
+        $b->positionAtEnd($p21);
+        $payload = $b->call(
+            $context->lookupFunction('__string__init'),
+            $b->zExt($nwritten, $i64),
+            $b->pointerCast($numBuf, $context->getTypeFromString('char*'))
+        );
+        $b->store($payload, $result);
+        $b->branch($done);
+
+        $b->positionAtEnd($miss);
+        $b->store($strPtr->constNull(), $result);
+        $b->branch($done);
+
+        $b->positionAtEnd($done);
+        $b->returnValue($b->load($result));
+
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->registerFunction(self::ARITH_EXTRACT_FN, $fn);
+    }
+
+    /**
+     * Scan ident; store start index + length. Builder ends on success block.
+     */
+    private static function emitScanIdentSpan(
+        Value $fn,
+        Context $context,
+        Value $chars,
+        Value $len,
+        Value $idxAlloca,
+        Value $startAlloca,
+        Value $lenAlloca,
+        string $tag,
+        \PHPLLVM\BasicBlock $miss
+    ): void {
+        $b = $context->builder;
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+
+        $i = $b->load($idxAlloca);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $ok0 = $fn->appendBasicBlock($tag.'_ok0');
+        $b->branchIf($past, $miss, $ok0);
+        $b->positionAtEnd($ok0);
+        $c0 = $b->load($b->gep($chars, $i));
+        $isAz = $b->and(
+            $b->icmp(Builder::INT_UGE, $c0, $i8->constInt(ord('a'), false)),
+            $b->icmp(Builder::INT_ULE, $c0, $i8->constInt(ord('z'), false))
+        );
+        $isAZ = $b->and(
+            $b->icmp(Builder::INT_UGE, $c0, $i8->constInt(ord('A'), false)),
+            $b->icmp(Builder::INT_ULE, $c0, $i8->constInt(ord('Z'), false))
+        );
+        $isUs = $b->icmp(Builder::INT_EQ, $c0, $i8->constInt(ord('_'), false));
+        $startOk = $b->or($b->or($isAz, $isAZ), $isUs);
+        $ok1 = $fn->appendBasicBlock($tag.'_ok1');
+        $b->branchIf($startOk, $ok1, $miss);
+        $b->positionAtEnd($ok1);
+        $b->store($i, $startAlloca);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idxAlloca);
+
+        $loop = $fn->appendBasicBlock($tag.'_loop');
+        $body = $fn->appendBasicBlock($tag.'_body');
+        $done = $fn->appendBasicBlock($tag.'_done');
+        $b->branch($loop);
+        $b->positionAtEnd($loop);
+        $ci = $b->load($idxAlloca);
+        $in = $b->icmp(Builder::INT_ULT, $ci, $len);
+        $b->branchIf($in, $body, $done);
+        $b->positionAtEnd($body);
+        $ch = $b->load($b->gep($chars, $ci));
+        $isAz2 = $b->and(
+            $b->icmp(Builder::INT_UGE, $ch, $i8->constInt(ord('a'), false)),
+            $b->icmp(Builder::INT_ULE, $ch, $i8->constInt(ord('z'), false))
+        );
+        $isAZ2 = $b->and(
+            $b->icmp(Builder::INT_UGE, $ch, $i8->constInt(ord('A'), false)),
+            $b->icmp(Builder::INT_ULE, $ch, $i8->constInt(ord('Z'), false))
+        );
+        $isDig = $b->and(
+            $b->icmp(Builder::INT_UGE, $ch, $i8->constInt(ord('0'), false)),
+            $b->icmp(Builder::INT_ULE, $ch, $i8->constInt(ord('9'), false))
+        );
+        $isUs2 = $b->icmp(Builder::INT_EQ, $ch, $i8->constInt(ord('_'), false));
+        $okCh = $b->or($b->or($isAz2, $isAZ2), $b->or($isDig, $isUs2));
+        $adv = $fn->appendBasicBlock($tag.'_adv');
+        $b->branchIf($okCh, $adv, $done);
+        $b->positionAtEnd($adv);
+        $b->store($b->add($ci, $i64->constInt(1, false)), $idxAlloca);
+        $b->branch($loop);
+        $b->positionAtEnd($done);
+        $endI = $b->load($idxAlloca);
+        $b->store($b->sub($endI, $b->load($startAlloca)), $lenAlloca);
+    }
+
+    /**
+     * Parse unsigned int at idx (no leading-zero multi-digit). Returns i64 value.
+     * Builder ends on success block; branches to $miss on failure.
+     */
+    private static function emitScanUint(
+        Value $fn,
+        Context $context,
+        Value $chars,
+        Value $len,
+        Value $idxAlloca,
+        string $tag,
+        \PHPLLVM\BasicBlock $miss
+    ): Value {
+        $b = $context->builder;
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        $i = $b->load($idxAlloca);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $ok0 = $fn->appendBasicBlock($tag.'_ok0');
+        $b->branchIf($past, $miss, $ok0);
+        $b->positionAtEnd($ok0);
+        $ptr = $b->gep($chars, $i);
+        $end = $b->alloca($i8p);
+        $val = $b->call(
+            $context->lookupFunction('strtol'),
+            $ptr,
+            $end,
+            $i32->constInt(10, false)
+        );
+        $endV = $b->load($end);
+        $advanced = $b->icmp(Builder::INT_NE, $endV, $ptr);
+        $ok1 = $fn->appendBasicBlock($tag.'_ok1');
+        $b->branchIf($advanced, $ok1, $miss);
+        $b->positionAtEnd($ok1);
+        $first = $b->load($ptr);
+        $isDigit = $b->and(
+            $b->icmp(Builder::INT_UGE, $first, $i8->constInt(ord('0'), false)),
+            $b->icmp(Builder::INT_ULE, $first, $i8->constInt(ord('9'), false))
+        );
+        $ok2 = $fn->appendBasicBlock($tag.'_ok2');
+        $b->branchIf($isDigit, $ok2, $miss);
+        $b->positionAtEnd($ok2);
+        $digLen = $b->sub($b->ptrtoint($endV, $i64), $b->ptrtoint($ptr, $i64));
+        $multi = $b->icmp(Builder::INT_UGT, $digLen, $i64->constInt(1, false));
+        $leadZero = $b->icmp(Builder::INT_EQ, $first, $i8->constInt(ord('0'), false));
+        $bad = $b->and($multi, $leadZero);
+        $ok3 = $fn->appendBasicBlock($tag.'_ok3');
+        $b->branchIf($bad, $miss, $ok3);
+        $b->positionAtEnd($ok3);
+        $b->store($b->add($i, $digLen), $idxAlloca);
+
+        return $val;
     }
 
     private static function emitSkipWsIn(

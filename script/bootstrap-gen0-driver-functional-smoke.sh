@@ -146,4 +146,44 @@ if ! grep -qxF 'Hello World' "${HW_NATIVE}"; then
   exit 1
 fi
 echo "bootstrap-gen0-driver-functional-smoke: OK — HelloWorld capability (#27426)"
+
+# Capability check (#27426): `$a = 1 + 2; echo $a;` must not stay parseAndCompile-null
+# while never-seen echo alone is green (same cheap-green class as pre-HelloWorld).
+ARITH_SRC="${WORKDIR}/arith-${TOKEN}.php"
+ARITH_OUT="${WORKDIR}/arith-${TOKEN}.bin"
+ARITH_NATIVE="${WORKDIR}/arith-${TOKEN}.native.out"
+ARITH_ZEND="${WORKDIR}/arith-${TOKEN}.zend.out"
+cat >"${ARITH_SRC}" <<'EOF'
+<?php $a = 1 + 2; echo $a;
+EOF
+rm -f "${ARITH_OUT}" "${ARITH_NATIVE}" "${ARITH_ZEND}"
+set +e
+arith_log="$(
+  env PHP_COMPILER_REPO_ROOT="${ROOT}" "${DRIVER}" -o "${ARITH_OUT}" "${ARITH_SRC}" 2>&1
+)"
+arith_rc=$?
+set -e
+if [[ "${arith_rc}" -ne 0 || ! -x "${ARITH_OUT}" ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — arith capability (#27426) driver exit ${arith_rc}" >&2
+  printf '%s\n' "${arith_log}" | tail -n 40 >&2
+  exit 1
+fi
+set +e
+php -d display_errors=0 "${ARITH_SRC}" >"${ARITH_ZEND}" 2>"${WORKDIR}/arith.zend.err"
+arith_zend_rc=$?
+"${ARITH_OUT}" >"${ARITH_NATIVE}" 2>"${WORKDIR}/arith.native.err"
+arith_run=$?
+set -e
+if [[ "${arith_zend_rc}" -ne 0 || "${arith_run}" -ne 0 ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — arith run zend=${arith_zend_rc} native=${arith_run}" >&2
+  cat "${WORKDIR}/arith.zend.err" "${WORKDIR}/arith.native.err" >&2 || true
+  exit 1
+fi
+if ! cmp -s "${ARITH_ZEND}" "${ARITH_NATIVE}"; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — arith stdout mismatch vs Zend (want '3')" >&2
+  echo "  zend:   $(od -An -tx1 "${ARITH_ZEND}" | head -c 80)" >&2
+  echo "  native: $(od -An -tx1 "${ARITH_NATIVE}" | head -c 80)" >&2
+  exit 1
+fi
+echo "bootstrap-gen0-driver-functional-smoke: OK — arith assign+plus+echo capability (#27426)"
 exit 0
