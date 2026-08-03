@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6897 |
-| Phase A inventory files (M2 ratio SSOT) | 6897 |
+| PHP files on vm.php path | 6898 |
+| Phase A inventory files (M2 ratio SSOT) | 6898 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22228 |
+| Source constructs flagged (warnings) | 22232 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2532,7 +2532,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDateIntervalCreateFromDateString.php` | 0 | 6 |
 | `ext/standard/JitDateIntervalFormat.php` | 0 | 1 |
 | `ext/standard/JitDateMicrosecond.php` | 0 | 3 |
-| `ext/standard/JitDateMutation.php` | 0 | 8 |
+| `ext/standard/JitDateMutation.php` | 0 | 9 |
 | `ext/standard/JitDateOffsetGet.php` | 0 | 2 |
 | `ext/standard/JitDateParse.php` | 0 | 1 |
 | `ext/standard/JitDateParseMaterializer.php` | 0 | 1 |
@@ -5679,6 +5679,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DateTimeConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeCreateFromFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeCreateFromTimestamp.php` | 0 | 1 |
+| `lib/JIT/Call/DateTimeDiff.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeGetMicrosecond.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeImmutableConstruct.php` | 0 | 1 |
@@ -5900,7 +5901,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 130 |
+| `lib/JIT/Context.php` | 0 | 132 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 62 |
@@ -27147,7 +27148,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 26)
 - new JITVariable (line 42)
 - new JITVariable (line 59)
-- new JITVariable (line 65)
+- new JITVariable (line 70)
 - 2 class method(s)
 
 ### `ext/standard/JitDateIntervalCreateFromDateString.php`
@@ -27177,12 +27178,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 50)
 - new ArgumentCountError (line 241)
-- new ArgumentCountError (line 322)
-- new JITVariable (line 432)
-- new JITVariable (line 443)
-- new JITVariable (line 453)
-- new JITVariable (line 655)
-- 22 class method(s)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 380)
+- new JITVariable (line 490)
+- new JITVariable (line 501)
+- new JITVariable (line 518)
+- new JITVariable (line 715)
+- 26 class method(s)
 
 ### `ext/standard/JitDateOffsetGet.php`
 
@@ -47716,25 +47718,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2558)
 - new Variable (line 2571)
 - new Variable (line 2770)
-- new VMVariable (line 3996)
-- new VMVariable (line 4016)
-- new VMVariable (line 4026)
-- new VMVariable (line 4046)
-- new ReflectionClassConstant (line 5737)
-- new Variable (line 6156)
-- new Variable (line 6182)
-- new Variable (line 6190)
-- new Variable (line 6213)
-- new Variable (line 6239)
-- new Variable (line 6247)
-- new Variable (line 6321)
-- new Literal (line 6338)
-- new Literal (line 6343)
-- new Literal (line 6348)
-- new Variable (line 6359)
-- new Variable (line 6392)
-- new Variable (line 6415)
-- new Variable (line 6779)
+- new VMVariable (line 4000)
+- new VMVariable (line 4020)
+- new VMVariable (line 4030)
+- new VMVariable (line 4050)
+- new ReflectionClassConstant (line 5741)
+- new Variable (line 6160)
+- new Variable (line 6186)
+- new Variable (line 6194)
+- new Variable (line 6217)
+- new Variable (line 6243)
+- new Variable (line 6251)
+- new Variable (line 6325)
+- new Literal (line 6342)
+- new Literal (line 6347)
+- new Literal (line 6352)
+- new Variable (line 6363)
+- new Variable (line 6396)
+- new Variable (line 6419)
+- new Variable (line 6783)
 - 291 class method(s)
 - 8 closure(s)
 
@@ -47976,6 +47978,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/DateTimeCreateFromTimestamp.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DateTimeDiff.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -49309,23 +49316,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeSetTimezone (line 1233)
 - new Call\DateTimeModify (line 1237)
 - new Call\DateTimeModify (line 1238)
-- new Call\DateTimeZoneGetTransitions (line 1240)
-- new Call\DateTimeZoneGetName (line 1242)
-- new Call\DateTimeZoneGetOffset (line 1244)
-- new Call\DomXmlDocumentCreateFromString (line 1249)
-- new Result (line 1616)
-- new Result (line 1638)
-- new Variable (line 2316)
-- new Variable (line 2453)
-- new Variable (line 2707)
-- new Variable (line 2765)
-- new VMVariable (line 2927)
-- new VMVariable (line 2943)
-- new VMVariable (line 2949)
-- new VMVariable (line 2955)
-- new VMVariable (line 2966)
-- new Variable (line 2996)
-- new Variable (line 3041)
+- new Call\DateTimeDiff (line 1240)
+- new Call\DateTimeDiff (line 1241)
+- new Call\DateTimeZoneGetTransitions (line 1243)
+- new Call\DateTimeZoneGetName (line 1245)
+- new Call\DateTimeZoneGetOffset (line 1247)
+- new Call\DomXmlDocumentCreateFromString (line 1252)
+- new Result (line 1619)
+- new Result (line 1641)
+- new Variable (line 2319)
+- new Variable (line 2456)
+- new Variable (line 2710)
+- new Variable (line 2768)
+- new VMVariable (line 2930)
+- new VMVariable (line 2946)
+- new VMVariable (line 2952)
+- new VMVariable (line 2958)
+- new VMVariable (line 2969)
+- new Variable (line 2999)
+- new Variable (line 3044)
 - 106 class method(s)
 - 32 closure(s)
 

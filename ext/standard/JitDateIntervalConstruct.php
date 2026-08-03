@@ -59,16 +59,16 @@ final class JitDateIntervalConstruct
             new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $fSlot),
             JITVariable::TYPE_VALUE
         );
-        $i1 = $context->getTypeFromString('int1');
+        $daysSlot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $daysSlot,
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, self::CLASS_NAME, 'days'),
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_NATIVE_BOOL,
-                JITVariable::KIND_VALUE,
-                $i1->constInt(0, false)
-            ),
-            JITVariable::TYPE_NATIVE_BOOL
+            new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $daysSlot),
+            JITVariable::TYPE_VALUE
         );
         ReflectionSetup::markConstructed($context, $obj);
 
