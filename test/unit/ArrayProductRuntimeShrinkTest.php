@@ -9,22 +9,30 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_product() JIT routes all operands through ArrayProductJitHelper PHP not ArrayBuiltinHelper LLVM (#12591, #14359, #18141). */
+/**
+ * array_product() AOT emits via ArrayProductLlvm (caller-frame), not NestedJIT Variable ABI (#12591, #26968).
+ * VM execute() still uses ArrayProductJitHelper PHP.
+ */
 final class ArrayProductRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 6900;
 
-    public function testArrayProductRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayProductRuntimeUsesInlineLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayProductRuntime.php');
-        $this->assertStringContainsString('ArrayProductJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayProductLlvm::product', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('__array_product__fold', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayProduct', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_product.php');
         $this->assertStringContainsString('ArrayProductRuntime::product', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayProduct', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayProductLlvm.php');
+        $this->assertStringContainsString('ArrayProductJitHelper', $llvm);
+        $this->assertStringContainsString('#26968', $llvm);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterNativeProductLlvmDeletion(): void
