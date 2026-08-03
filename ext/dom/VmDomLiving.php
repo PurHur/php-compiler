@@ -1005,7 +1005,8 @@ final class VmDomLiving
         self::applyLivingLeafClassMap($state, self::CLASS_HTML_ELEMENT);
     }
 
-    private static function applyLivingXmlElementClassMap(DomNodeState $state): void
+    /** @internal used by DomXmlDocumentCreateFromStringJitHelper (#27108). */
+    public static function applyLivingXmlElementClassMap(DomNodeState $state): void
     {
         self::applyLivingLeafClassMap($state, self::CLASS_ELEMENT);
     }
@@ -1258,7 +1259,8 @@ final class VmDomLiving
     }
 
     /** php-src ext/dom/xml_document.c check_options_validity(). */
-    private static function assertValidXmlParseOptions(int $options, string $method): void
+    /** @internal used by DomXmlDocumentCreateFromStringJitHelper (#27108). */
+    public static function assertValidXmlParseOptions(int $options, string $method): void
     {
         $allowed = LibxmlConstants::LIBXML_RECOVER
             | LibxmlConstants::LIBXML_NOENT

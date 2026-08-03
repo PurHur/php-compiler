@@ -153,6 +153,24 @@ final class DomInstanceMethodJit
         'dom\\htmldocument::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
         'domimplementation::createdocumenttype' => true,
+        // Dom\Attr::rename / Dom\Element::rename — php-src @implementation-alias (#21083, #27108).
+        'dom\\attr::rename' => true,
+        'dom\\element::rename' => true,
+        'dom\\htmlelement::rename' => true,
+        // Living attribute APIs via VmDomInstanceInvoke DomRegistry path (#27108).
+        'dom\\element::hasattribute' => true,
+        'dom\\element::hasattributens' => true,
+        'dom\\element::getattribute' => true,
+        'dom\\element::getattributens' => true,
+        'dom\\element::getattributenode' => true,
+        'dom\\element::getattributenodens' => true,
+        'dom\\htmlelement::hasattribute' => true,
+        'dom\\htmlelement::getattribute' => true,
+        'dom\\htmlelement::getattributens' => true,
+        'dom\\htmlelement::getattributenode' => true,
+        'dom\\document::createattribute' => true,
+        'dom\\xmldocument::createattribute' => true,
+        'dom\\htmldocument::createattribute' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -494,6 +512,22 @@ final class DomInstanceMethodJit
                 || 'dom\\htmldocument::queryselectorall' === $lc
                 || 'dom\\htmldocument::getelementbyid' === $lc
                 || 'dom\\htmldocument::savehtml' === $lc
+                || 'dom\\attr::rename' === $lc
+                || 'dom\\element::rename' === $lc
+                || 'dom\\htmlelement::rename' === $lc
+                || 'dom\\element::hasattribute' === $lc
+                || 'dom\\element::hasattributens' === $lc
+                || 'dom\\element::getattribute' === $lc
+                || 'dom\\element::getattributens' === $lc
+                || 'dom\\element::getattributenode' === $lc
+                || 'dom\\element::getattributenodens' === $lc
+                || 'dom\\htmlelement::hasattribute' === $lc
+                || 'dom\\htmlelement::getattribute' === $lc
+                || 'dom\\htmlelement::getattributens' === $lc
+                || 'dom\\htmlelement::getattributenode' === $lc
+                || 'dom\\document::createattribute' === $lc
+                || 'dom\\xmldocument::createattribute' === $lc
+                || 'dom\\htmldocument::createattribute' === $lc
             ) {
                 if (!preg_match('/^(dom\\\\[a-z0-9_]+)::([a-z0-9_]+)$/', $lc, $livingMatches)) {
                     return;
@@ -655,6 +689,22 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
             self::ensureProxy($context, 'dom\\htmldocument::getelementbyid');
             self::ensureProxy($context, 'dom\\htmldocument::savehtml');
+            self::ensureProxy($context, 'dom\\attr::rename');
+            self::ensureProxy($context, 'dom\\element::rename');
+            self::ensureProxy($context, 'dom\\htmlelement::rename');
+            self::ensureProxy($context, 'dom\\element::hasattribute');
+            self::ensureProxy($context, 'dom\\element::hasattributens');
+            self::ensureProxy($context, 'dom\\element::getattribute');
+            self::ensureProxy($context, 'dom\\element::getattributens');
+            self::ensureProxy($context, 'dom\\element::getattributenode');
+            self::ensureProxy($context, 'dom\\element::getattributenodens');
+            self::ensureProxy($context, 'dom\\htmlelement::hasattribute');
+            self::ensureProxy($context, 'dom\\htmlelement::getattribute');
+            self::ensureProxy($context, 'dom\\htmlelement::getattributens');
+            self::ensureProxy($context, 'dom\\htmlelement::getattributenode');
+            self::ensureProxy($context, 'dom\\document::createattribute');
+            self::ensureProxy($context, 'dom\\xmldocument::createattribute');
+            self::ensureProxy($context, 'dom\\htmldocument::createattribute');
 
             return;
         }

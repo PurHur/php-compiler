@@ -30,6 +30,7 @@ use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
 use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
 use PHPCompiler\JIT\Builtin\DomXPathEvaluateRuntime;
 use PHPCompiler\JIT\Builtin\DomXPathQueryRuntime;
+use PHPCompiler\JIT\Builtin\DomXmlDocumentCreateFromStringRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
@@ -229,6 +230,23 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__object__*'),
             'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeArgv',
             '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    /** Dom\XMLDocument::createFromString() — thin AOT (#27108). */
+    public static function ensureXmlDocumentCreateFromStringBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomXmlDocumentCreateFromStringRuntime::ABI_NAME,
+            'dom_xml_document_create_from_string_user_script',
+            [
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromStringJitHelper::createFromStringArgv',
+            '/ext/dom/DomXmlDocumentCreateFromStringJitHelper.php'
         );
     }
 

@@ -63,6 +63,8 @@ final class VmDomInstanceInvoke
 
         return match ($methodLc) {
             'createelement' => VmDomJitDispatch::createElement($ctx, $self, $extra),
+            'createattribute' => VmDomJitDispatch::createAttribute($ctx, $self, $extra),
+            'createattributens' => VmDomJitDispatch::createAttributeNS($ctx, $self, $extra),
             'loadhtml' => VmDomJitDispatch::loadHTML($ctx, $self, $extra),
             'loadxml' => VmDomJitDispatch::loadXML($ctx, $self, $extra),
             'load' => VmDomJitDispatch::load($ctx, $self, $extra),
@@ -82,6 +84,8 @@ final class VmDomInstanceInvoke
             'adoptnode' => VmDomJitDispatch::adoptNode($ctx, $self, $extra),
             'getattribute' => VmDomJitDispatch::getAttribute($self, $extra),
             'getattributens' => VmDomJitDispatch::getAttributeNS($self, $extra),
+            'hasattribute' => VmDomJitDispatch::hasAttribute($self, $extra),
+            'hasattributens' => VmDomJitDispatch::hasAttributeNS($self, $extra),
             'getattributenode' => VmDomJitDispatch::getAttributeNode($ctx, $self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),
             'removeattribute' => VmDomJitDispatch::removeAttribute($ctx, $self, $extra),
@@ -117,6 +121,7 @@ final class VmDomInstanceInvoke
             'closest' => VmDomJitDispatch::closest($self, $extra),
             'matches' => VmDomJitDispatch::matches($self, $extra),
             'savehtml' => VmDomJitDispatch::saveHtml($self, $extra),
+            'rename' => VmDomJitDispatch::rename($ctx, $self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }

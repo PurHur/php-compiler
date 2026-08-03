@@ -1218,6 +1218,10 @@ class Context {
         $this->functionProxies['datetimezone::gettransitions'] = new Call\DateTimeZoneGetTransitions();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
+        // Dom\XMLDocument::createFromString — avoid ExternalMethod silent NULL (#27108).
+        if (CompilerVersion::supportsDomLivingStandardNamespace()) {
+            $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
+        }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
         }
