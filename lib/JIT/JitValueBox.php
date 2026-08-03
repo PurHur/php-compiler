@@ -823,6 +823,16 @@ final class JitValueBox
 
             return self::pointer($context, $slot);
         }
+        // Void LLVM returns (user __construct via RuntimeIndirectInstanceMethodCall) (#27302 / #27156).
+        if ('void' === $tyName) {
+            $slot = self::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                self::pointer($context, $slot)
+            );
+
+            return self::pointer($context, $slot);
+        }
 
         return self::normalizeValuePtr($context, $raw);
     }
