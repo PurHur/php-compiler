@@ -699,8 +699,6 @@ class Module extends ModuleAbstract
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
 
-            new phpc_deg2rad_kernel(),
-            new phpc_rad2deg_kernel(),
             new phpc_floor_kernel(),
             new phpc_is_finite_kernel(),
             new phpc_is_infinite_kernel(),

@@ -832,8 +832,6 @@ class Context {
             'phpc_log_kernel',
             'phpc_log10_kernel',
 
-            'phpc_deg2rad_kernel',
-            'phpc_rad2deg_kernel',
             'phpc_floor_kernel',
             'phpc_is_finite_kernel',
             'phpc_is_infinite_kernel',
