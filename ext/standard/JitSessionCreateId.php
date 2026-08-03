@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\SessionCreateIdRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
@@ -15,7 +16,7 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** PHP lowering for session_create_id() — {@see __phpc_session_create_id_apply} (#6002). */
+/** PHP lowering for session_create_id() — {@see __phpc_session_create_id_apply} (#6002, #27258). */
 final class JitSessionCreateId
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -24,6 +25,13 @@ final class JitSessionCreateId
         if ($argc > 1) {
             throw new \LogicException('session_create_id() accepts at most one argument in this compiler build');
         }
+
+        // Thin STANDALONE/EMBED AOT skips Type::initialize eager SessionCreateIdRuntime
+        // link (#12910 / #21109) — declare-only `__phpc_session_create_id_apply` then
+        // fails at ld. Lazy-link on first use (peer JitSessionStart / #27258).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        SessionCreateIdRuntime::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
