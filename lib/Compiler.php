@@ -42610,10 +42610,13 @@ class Compiler {
 
 
     /**
-     * Lower Closure::fromCallable(constant) to TYPE_FROM_CALLABLE — same as FCC (#26788).
+     * Lower Closure::fromCallable(constant|[$obj,'m']) to TYPE_FROM_CALLABLE — same as FCC (#26788).
      *
      * Marks {@see OpCode::$fromCallableApi} so VM/JIT use Closure::fromCallable semantics
      * (bind `$this` for `[Class, instanceMethod]`, TypeError prefix) rather than FCC (#27138).
+     *
+     * Object-array form `[$this, 'method']` must not fold `$this` to class name `"this"`
+     * (#27137, #27143, #23688) — lower like bound-method FCC instead.
      *
      * @return OpCode[]|null
      */
@@ -42634,6 +42637,10 @@ class Compiler {
         if (1 !== \count($expr->args)) {
             return null;
         }
+        $boundArray = $this->tryCompileClosureFromCallableObjectArray($expr, $block);
+        if (null !== $boundArray) {
+            return $boundArray;
+        }
         $callableName = $this->literalCallableNameForFromCallable($expr->args[0], $block, $expr);
         if (null === $callableName) {
             return null;
@@ -42651,35 +42658,123 @@ class Compiler {
         return [$fromCallable];
     }
 
-    private function literalCallableNameForFromCallable(Operand $arg, Block $block, Op\Expr\StaticCall $callOp): ?string
+    /**
+     * Closure::fromCallable([$obj, 'method']) → INIT_ARRAY + TYPE_FROM_CALLABLE (#27137, #27143).
+     *
+     * Same shape as {@see compileBoundMethodFirstClassCallable}; keeps the object receiver
+     * instead of folding Variable(`this`) to the string class name `"this"`.
+     *
+     * @return OpCode[]|null
+     */
+    private function tryCompileClosureFromCallableObjectArray(Op\Expr\StaticCall $expr, Block $block): ?array
     {
-        $direct = $this->staticNameFromOperand($arg);
-        if (null !== $direct) {
-            return $direct;
+        $arrayExpr = $this->findFromCallableArrayExpr($expr->args[0], $block, $expr);
+        if (!$arrayExpr instanceof Op\Expr\Array_) {
+            return null;
         }
+        $values = $arrayExpr->values ?? [];
+        if (2 !== \count($values)) {
+            return null;
+        }
+        // Class-name string / Class::class → string callable path (#27138).
+        if (null !== $this->literalCallableArrayElementString($values[0], $block)) {
+            return null;
+        }
+        // Method name must be a compile-time string (literal or ::class-style).
+        $methodLiteral = $this->literalCallableArrayElementString($values[1], $block);
+        if (null === $methodLiteral) {
+            // php-cfg often wraps `'priv'` as Temporary — resolve Assign of string literal.
+            $methodLiteral = $this->literalStringAssignedToOperand($values[1], $block);
+        }
+        if (null === $methodLiteral) {
+            return null;
+        }
+
+        $result = $this->compileOperand($expr->result, $block, false);
+        $receiverSlot = $this->compileOperand($values[0], $block, true);
+        $methodSlot = $this->compileOperand(new Operand\Literal($methodLiteral), $block, true);
+        $fromCallable = new OpCode(
+            OpCode::TYPE_FROM_CALLABLE,
+            $result,
+            $result
+        );
+        $fromCallable->fromCallableApi = true;
+        $this->assignSourceMetadata($fromCallable, $expr);
+
+        return [
+            new OpCode(
+                OpCode::TYPE_INIT_ARRAY,
+                $result,
+                $receiverSlot,
+                $this->compileIntegerLiteralSlot(0, $block)
+            ),
+            new OpCode(
+                OpCode::TYPE_ADD_ARRAY_ELEMENT,
+                $result,
+                $methodSlot,
+                $this->compileIntegerLiteralSlot(1, $block)
+            ),
+            $fromCallable,
+        ];
+    }
+
+    private function findFromCallableArrayExpr(Operand $arg, Block $block, Op\Expr\StaticCall $callOp): ?Op\Expr\Array_
+    {
         if (null === $block->orig) {
             return null;
         }
-        $arrayExpr = null;
         foreach ($block->orig->children as $child) {
             if (
                 $child instanceof Op\Expr\Array_
                 && null !== $child->result
                 && $this->operandsReferToSameVariable($child->result, $arg)
             ) {
-                $arrayExpr = $child;
-                break;
+                return $child;
             }
         }
-        if (null === $arrayExpr) {
-            $callIndex = array_search($callOp, $block->orig->children, true);
-            if (\is_int($callIndex) && $callIndex > 0) {
-                $prev = $block->orig->children[$callIndex - 1] ?? null;
-                if ($prev instanceof Op\Expr\Array_) {
-                    $arrayExpr = $prev;
+        $callIndex = array_search($callOp, $block->orig->children, true);
+        if (\is_int($callIndex) && $callIndex > 0) {
+            $prev = $block->orig->children[$callIndex - 1] ?? null;
+            if ($prev instanceof Op\Expr\Array_) {
+                return $prev;
+            }
+        }
+
+        return null;
+    }
+
+    /** Resolve Temporary holding a string literal Assign (php-cfg array element shape). */
+    private function literalStringAssignedToOperand(Operand $op, Block $block): ?string
+    {
+        if ($op instanceof Operand\Literal && \is_string($op->value)) {
+            return $op->value;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\Assign
+                && null !== $child->var
+                && $this->operandsReferToSameVariable($child->var, $op)
+            ) {
+                $expr = $child->expr ?? null;
+                if ($expr instanceof Operand\Literal && \is_string($expr->value)) {
+                    return $expr->value;
                 }
             }
         }
+
+        return null;
+    }
+
+    private function literalCallableNameForFromCallable(Operand $arg, Block $block, Op\Expr\StaticCall $callOp): ?string
+    {
+        $direct = $this->staticNameFromOperand($arg);
+        if (null !== $direct) {
+            return $direct;
+        }
+        $arrayExpr = $this->findFromCallableArrayExpr($arg, $block, $callOp);
         if (!$arrayExpr instanceof Op\Expr\Array_) {
             return null;
         }
@@ -42688,7 +42783,8 @@ class Compiler {
             return null;
         }
         $classPart = $this->literalCallableArrayElementString($values[0], $block);
-        $methodPart = $this->literalCallableArrayElementString($values[1], $block);
+        $methodPart = $this->literalCallableArrayElementString($values[1], $block)
+            ?? $this->literalStringAssignedToOperand($values[1], $block);
         if (null === $classPart || null === $methodPart) {
             return null;
         }

@@ -384,11 +384,27 @@ final class VmFromCallable
             }
         }
         $proxyName = strtolower($className.'::'.$methodLc);
-        if (!$context->functionIsRegistered($proxyName)) {
-            throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
+        if ($context->functionIsRegistered($proxyName)) {
+            return $proxyName;
+        }
+        // Inherited instance methods: receiver class may be a subclass (#27143 AOT FCC/fromCallable).
+        $current = $declaringClassLc;
+        $visited = [];
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $parentLc = $context->type->object->parentClassLc($current);
+            if (null === $parentLc || '' === $parentLc) {
+                break;
+            }
+            $parentDisplay = $context->type->object->parentClassDisplayName($current) ?? $parentLc;
+            $proxyName = strtolower($parentDisplay.'::'.$methodLc);
+            if ($context->functionIsRegistered($proxyName)) {
+                return $proxyName;
+            }
+            $current = $parentLc;
         }
 
-        return $proxyName;
+        throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
     }
 
     private static function nonEmptyString(?string $value): ?string
