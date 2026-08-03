@@ -139,7 +139,10 @@ final class boolval extends Internal
     }
 
     /**
-     * Boxed scalar truthiness for boolval()/castToBool (standalone AOT literals; #15704).
+     * Boxed value truthiness for boolval()/castToBool (standalone AOT; #15704, #27410).
+     *
+     * Handles null/undefined/bool/int plus object/enum-case (zend_is_true). Object tags
+     * in value boxes use the JIT IS_REFCOUNTED bit — compare kind with {@code & 0x7f}.
      */
     public static function isBoxedBoolTypeTag(Context $context, Value $typeByte): Value
     {
@@ -186,10 +189,31 @@ final class boolval extends Internal
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
         $intTruthy = $context->builder->icmp(Builder::INT_NE, $longVal, $zeroI64);
 
+        // Objects (and enum cases) are truthy — zend_is_true / isTruthy() (#27410 AOT ternary).
+        // Value boxes store JIT tags with IS_REFCOUNTED (TYPE_OBJECT=133); compare kind bits (#15704).
+        $true = $context->constantFromBool(true);
+        $kindMask = $i8->constInt(0x7f, false);
+        $typeKind = $context->builder->and($typeByte, $kindMask);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $isEnum = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(Variable::TYPE_ENUM_CASE, false)
+        );
+        $objectTruthy = $context->builder->or($isObject, $isEnum);
+
         $typedTruthy = $context->builder->select(
             $isBool,
             $boolTruthy,
-            $context->builder->select($isInt, $intTruthy, $false)
+            $context->builder->select(
+                $isInt,
+                $intTruthy,
+                $context->builder->select($objectTruthy, $true, $false)
+            )
         );
 
         return $context->builder->select($falsy, $false, $typedTruthy);
