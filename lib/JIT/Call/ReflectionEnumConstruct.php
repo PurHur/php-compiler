@@ -10,9 +10,10 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Value;
 
-/** ReflectionEnum::__construct($enum) — JIT (#9892). */
+/** ReflectionEnum::__construct($enum) — JIT/AOT (#9892, #27314). */
 final class ReflectionEnumConstruct implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -29,13 +30,26 @@ final class ReflectionEnumConstruct implements Call
             throw new \LogicException('ReflectionEnum expects an enum class');
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        ReflectionSetup::emitSetStringPropertyFromVar(
-            $context,
-            $obj,
-            'ReflectionEnum',
-            \PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME,
-            $args[1]
-        );
+        if (null !== $literal) {
+            $i8p = $context->getTypeFromString('char*');
+            $sizeT = $context->getTypeFromString('size_t');
+            ReflectionSetup::emitSetStringPropertyFromCstr(
+                $context,
+                $obj,
+                'ReflectionEnum',
+                ReflectionSupport::PROP_CLASS_NAME,
+                $context->builder->pointerCast($context->constantFromString($literal), $i8p),
+                $sizeT->constInt(\strlen($literal), false)
+            );
+        } else {
+            ReflectionSetup::emitSetStringPropertyFromVar(
+                $context,
+                $obj,
+                'ReflectionEnum',
+                ReflectionSupport::PROP_CLASS_NAME,
+                $args[1]
+            );
+        }
         ReflectionSetup::markConstructed($context, $obj);
 
         $slot = JitValueBox::alloc($context);

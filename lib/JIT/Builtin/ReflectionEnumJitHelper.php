@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -104,6 +105,65 @@ final class ReflectionEnumJitHelper
             function (Context $context) use ($resultSlot, $merge, $i1): void {
                 JitValueBox::writeBool($context, $resultSlot, $i1->constInt(0, false));
                 $context->builder->branch($merge);
+            }
+        );
+
+        $context->builder->positionAtEnd($merge);
+
+        return $resultSlot;
+    }
+
+    /**
+     * ReflectionEnum::getCases(): array — materialize case wrappers (#4121 / #27314).
+     */
+    public static function emitGetCases(Context $context, Value $receiverObj): Value
+    {
+        $tag = 'getcases_'.(++self::$blockSeq);
+        $merge = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_merge');
+        $resultSlot = JitValueBox::alloc($context);
+        $enumNameStr = self::enumNameStringFromReceiver($context, $receiverObj);
+
+        self::dispatchDeclaredEnum(
+            $context,
+            $enumNameStr,
+            $tag,
+            function (Context $context, int $enumId, string $enumName) use ($resultSlot, $merge): void {
+                $object = $context->type->object;
+                $isBacked = $object->enumHasBacking($enumId);
+                $caseKeys = $object->enumCaseOrderForClass($enumId);
+                $ht = HashTableHelper::alloc($context);
+                $sizeT = $context->getTypeFromString('size_t');
+                $need = $sizeT->constInt(\max(1, \count($caseKeys)), false);
+                $context->builder->call($context->lookupFunction('__hashtable__grow'), $ht, $need);
+                foreach ($caseKeys as $i => $caseKey) {
+                    $canonical = $object->enumCaseCanonicalName($enumId, $caseKey);
+                    $caseObj = self::allocateReflectionEnumCase(
+                        $context,
+                        $enumName,
+                        $canonical,
+                        $isBacked
+                    );
+                    HashTableHelper::setAtIndex(
+                        $context,
+                        $ht,
+                        $sizeT->constInt($i, false),
+                        new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $caseObj)
+                    );
+                }
+                $context->refcount->addref($ht);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    JitValueBox::pointer($context, $resultSlot),
+                    $ht
+                );
+                $context->builder->branch($merge);
+            },
+            function (Context $context) use ($tag): void {
+                TryCatchHelper::emitCatchableClassError(
+                    $context,
+                    'ReflectionException',
+                    'ReflectionEnum refers to unknown enum in this compiler build'
+                );
             }
         );
 

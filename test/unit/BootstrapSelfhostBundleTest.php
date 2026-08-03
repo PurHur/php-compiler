@@ -480,6 +480,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/ReflectionEnumJitHelper.php',
         'lib/JIT/Call/ReflectionEnumConstruct.php',
         'lib/JIT/Call/ReflectionEnumGetCase.php',
+        'lib/JIT/Call/ReflectionEnumGetCases.php',
         'lib/JIT/Call/ReflectionEnumGetName.php',
         'lib/JIT/Call/ReflectionEnumHasCase.php',
         'lib/JIT/Call/ReflectionEnumIsBacked.php',
