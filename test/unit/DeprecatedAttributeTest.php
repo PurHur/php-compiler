@@ -137,6 +137,20 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertSame('use Other::X', $meta->message);
     }
 
+    public function testDeprecatedMethodAndConstantFormatMessages(): void
+    {
+        $meta = new DeprecatedMetadata('use g()', '8.4');
+        $this->assertTrue($meta->emitsRuntimeNotice());
+        $this->assertSame(
+            'Method C::f() is deprecated since 8.4, use g()',
+            $meta->formatMethod('C', 'f')
+        );
+        $this->assertSame(
+            'Constant C::A is deprecated since 8.4, use g()',
+            $meta->formatConstant('C', 'A')
+        );
+    }
+
     public function testBareDeprecatedMethodCallIsSilent(): void
     {
         $runtime = new Runtime();

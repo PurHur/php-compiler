@@ -65,6 +65,13 @@ class Context {
      */
     public array $noDiscardCalleeMessages = [];
 
+    /**
+     * Lowercase logical callee => #[\Deprecated] metadata for AOT/JIT call sites (#27331).
+     *
+     * @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata>
+     */
+    public array $deprecatedCalleeMeta = [];
+
     /** @var array<int, Call> lazy initializer proxies keyed by __object__.lazy_init_index (#4940, #5318) */
     public array $lazyInitProxies = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */

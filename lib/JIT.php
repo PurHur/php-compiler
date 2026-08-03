@@ -2431,6 +2431,7 @@ class JIT {
                     Block::usesFuncArgsIntrospection($block)
                 );
                 JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
+                JIT\DeprecatedCallGuard::registerCallee($this->context, $funcName, $block);
             }
             if ($returnsByRef) {
                 $this->markFunctionReturnsByRef($lcname, $funcName ?? '');
@@ -7365,6 +7366,7 @@ class JIT {
         );
         if (null !== $logicalName) {
             JIT\NoDiscardCallGuard::registerCallee($this->context, $logicalName, $block);
+            JIT\DeprecatedCallGuard::registerCallee($this->context, $logicalName, $block);
         }
 
         return $func;
@@ -14337,7 +14339,11 @@ class JIT {
                     $className = null !== $methodBlock && null !== $methodBlock->func && null !== $methodBlock->func->class
                         ? strtolower($methodBlock->func->class->value)
                         : $this->context->scope->className;
-                    $funcName = $className.'::'.$methodLc;
+                    $displayClass = $this->context->type->object->classNameForId($this->context->scope->classId);
+                    if ('' === $displayClass) {
+                        $displayClass = $className;
+                    }
+                    $funcName = $displayClass.'::'.$methodLc;
                     if (null !== $methodBlock) {
                         if ('__construct' === $methodLc) {
                             $this->context->type->object->markHasConstructor($this->context->scope->classId);
@@ -14392,6 +14398,11 @@ class JIT {
                         $name->value,
                         $op->classConstVisibilityFlags
                     );
+                    $this->context->type->object->defineClassConstDeprecated(
+                        $classId,
+                        $name->value,
+                        $op->deprecatedMetadata
+                    );
                     if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
                             ? strtolower(ltrim($this->context->scope->className, '\\'))
@@ -14428,6 +14439,11 @@ class JIT {
                     $classId,
                     $name->value,
                     $op->classConstVisibilityFlags
+                );
+                $this->context->type->object->defineClassConstDeprecated(
+                    $classId,
+                    $name->value,
+                    $op->deprecatedMetadata
                 );
                 if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
@@ -20218,6 +20234,7 @@ class JIT {
      */
     private function invokeJitCall(JIT\Call $toCall, array $callArgs): \PHPLLVM\Value
     {
+        JIT\DeprecatedCallGuard::emitBeforeCall($this->context, $toCall);
         if ($toCall instanceof JIT\Call\Native) {
             $result = $toCall->callWithArgMap($this->context, $callArgs);
         } else {
