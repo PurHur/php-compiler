@@ -441,7 +441,8 @@ class VM {
     /**
      * Run {@see $methodOwnerClass}::{@see $methodName} with late-static called-scope {@see $calledScopeClass}.
      *
-     * php-src forward_static_call*: lookup uses the callable class; EG called-scope stays the caller LSB (#20251).
+     * php-src forward_static_call*: lookup uses the callable class; EG called-scope is the caller LSB
+     * only when that LSB instanceof the callable calling_scope — otherwise the named class (#20251, #27140).
      */
     public function invokeDeclaredStaticWithCalledScope(
         string $methodOwnerClass,

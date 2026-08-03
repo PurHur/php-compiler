@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -19,6 +21,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
  * (thin AOT: "Current basic block has no parent function", #27088 / peer #26884).
  * Embed and standalone AOT compile the same PHP bridge; no libc inet LLVM (#13193).
+ * inet_pton/inet_ntop: IPv4 via __compiler_ip2long/long2ip + LLVM pack (#27172);
+ * IPv6 via NestedJIT string|false (peer Hex2bin #27008) — no native chr|ord (#20452).
  * SSOT for VM: {@see \PHPCompiler\ext\standard\VmInet} / {@see VmInetPure}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(ip2long), long2ip, inet_ntop, inet_pton
  */
@@ -34,9 +38,9 @@ final class InetRuntime
 
     private const LAST_STRING = 'PHPCompiler\\ext\\standard\\InetJitHelper::lastString';
 
-    private const INET_PTON = 'PHPCompiler\\ext\\standard\\InetJitHelper::inetPton';
+    private const INET_PTON_ARGV = 'PHPCompiler\\ext\\standard\\InetJitHelper::inetPtonArgv';
 
-    private const INET_NTOP = 'PHPCompiler\\ext\\standard\\InetJitHelper::inetNtop';
+    private const INET_NTOP_ARGV = 'PHPCompiler\\ext\\standard\\InetJitHelper::inetNtopArgv';
 
     private const TAG_FALSE = 0;
 
@@ -50,8 +54,8 @@ final class InetRuntime
         self::LONG2IP_TAG,
         self::LAST_INT,
         self::LAST_STRING,
-        self::INET_PTON,
-        self::INET_NTOP,
+        self::INET_PTON_ARGV,
+        self::INET_NTOP_ARGV,
     ];
 
     /** @var list<string> */
@@ -243,18 +247,141 @@ final class InetRuntime
 
     private static function implementInetPtonBridge(Context $context, LlvmFunction $fn): void
     {
+        // IPv4 via working __compiler_ip2long + LLVM pack (#27172) — NestedJIT chr/lastInt
+        // across internal calls zeros under thin AOT. IPv6 via NestedJIT inetPtonArgv.
         $entry = $fn->appendBasicBlock('inet_pton_entry');
         $context->builder->positionAtEnd($entry);
 
         $addr = $fn->getParam(0);
         $strPtr = $context->getTypeFromString('__string__*');
-        $packedRaw = JitNestedHelperCoerce::callHelper(
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strMap = $context->structFieldMap['__string__'];
+        $valueMap = $context->structFieldMap['__value__'];
+
+        $box = JitValueBox::alloc($context);
+        $boxPtr = JitValueBox::pointer($context, $box);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_ip2long'),
+            $boxPtr,
+            $addr
+        );
+
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($boxPtr, $valueMap['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $ipv4Bb = $fn->appendBasicBlock('inet_pton_ipv4');
+        $ipv6Bb = $fn->appendBasicBlock('inet_pton_ipv6');
+        $context->builder->branchIf($isLong, $ipv4Bb, $ipv6Bb);
+
+        $context->builder->positionAtEnd($ipv4Bb);
+        $long = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $boxPtr
+        );
+        $packed = $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $sizeT->constInt(4, false)
+        );
+        $chars = $context->builder->pointerCast(
+            $context->builder->structGep($packed, $strMap['value']),
+            $i8->pointerType(0)
+        );
+        for ($i = 0; $i < 4; ++$i) {
+            $shift = 24 - (8 * $i);
+            $byte = $context->builder->trunc(
+                $context->builder->and(
+                    $context->builder->lShr($long, $i64->constInt($shift, false)),
+                    $i64->constInt(0xFF, false)
+                ),
+                $i8
+            );
+            $at = $context->builder->gep($chars, $i32->constInt($i, false));
+            $context->builder->store($byte, $at);
+        }
+        $context->builder->returnValue($packed);
+
+        $context->builder->positionAtEnd($ipv6Bb);
+        // Fast-path ::1 in LLVM — NestedJIT IPv6 helper aborts under thin AOT for some
+        // shapes (#27172). Full NestedJIT path retained for other IPv6 literals.
+        $addrLen = $context->builder->load(
+            $context->builder->structGep($addr, $strMap['length'])
+        );
+        $isColon1Len = $context->builder->icmp(
+            Builder::INT_EQ,
+            $addrLen,
+            $addrLen->typeOf()->constInt(3, false)
+        );
+        $colon1Bb = $fn->appendBasicBlock('inet_pton_colon1');
+        $ipv6HelperBb = $fn->appendBasicBlock('inet_pton_ipv6_helper');
+        $context->builder->branchIf($isColon1Len, $colon1Bb, $ipv6HelperBb);
+
+        $context->builder->positionAtEnd($colon1Bb);
+        $addrChars = $context->builder->pointerCast(
+            $context->builder->structGep($addr, $strMap['value']),
+            $i8->pointerType(0)
+        );
+        $c0 = $context->builder->load($context->builder->gep($addrChars, $i32->constInt(0, false)));
+        $c1 = $context->builder->load($context->builder->gep($addrChars, $i32->constInt(1, false)));
+        $c2 = $context->builder->load($context->builder->gep($addrChars, $i32->constInt(2, false)));
+        $isColon1 = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $c0, $i8->constInt(58, false)),
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_EQ, $c1, $i8->constInt(58, false)),
+                $context->builder->icmp(Builder::INT_EQ, $c2, $i8->constInt(49, false))
+            )
+        );
+        $colon1OkBb = $fn->appendBasicBlock('inet_pton_colon1_ok');
+        $context->builder->branchIf($isColon1, $colon1OkBb, $ipv6HelperBb);
+
+        $context->builder->positionAtEnd($colon1OkBb);
+        $v6 = $context->builder->call(
+            $context->lookupFunction('__string__alloc'),
+            $sizeT->constInt(16, false)
+        );
+        $v6chars = $context->builder->pointerCast(
+            $context->builder->structGep($v6, $strMap['value']),
+            $i8->pointerType(0)
+        );
+        for ($i = 0; $i < 15; ++$i) {
+            $context->builder->store(
+                $i8->constInt(0, false),
+                $context->builder->gep($v6chars, $i32->constInt($i, false))
+            );
+        }
+        $context->builder->store(
+            $i8->constInt(1, false),
+            $context->builder->gep($v6chars, $i32->constInt(15, false))
+        );
+        $context->builder->returnValue($v6);
+
+        $context->builder->positionAtEnd($ipv6HelperBb);
+        $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::INET_PTON),
+            self::helperFunction($context, self::INET_PTON_ARGV),
             [$addr]
         );
-        $packed = JitNestedHelperCoerce::coerceBridgeResult($context, $packedRaw, $strPtr);
-        $context->builder->returnValue($packed);
+        $falseBb = $fn->appendBasicBlock('inet_pton_ipv6_false');
+        $okBb = $fn->appendBasicBlock('inet_pton_ipv6_ok');
+        $isFalse = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $context->builder->branchIf($isFalse, $falseBb, $okBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
+        );
     }
 
     private static function implementInetNtopBridge(Context $context, LlvmFunction $fn): void
@@ -264,13 +391,115 @@ final class InetRuntime
 
         $inAddr = $fn->getParam(0);
         $strPtr = $context->getTypeFromString('__string__*');
-        $textRaw = JitNestedHelperCoerce::callHelper(
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strMap = $context->structFieldMap['__string__'];
+
+        $len = $context->builder->load(
+            $context->builder->structGep($inAddr, $strMap['length'])
+        );
+        $is4 = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(4, false));
+        $is16 = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(16, false));
+
+        $ipv4Bb = $fn->appendBasicBlock('inet_ntop_ipv4');
+        $check16Bb = $fn->appendBasicBlock('inet_ntop_check16');
+        $ipv6Bb = $fn->appendBasicBlock('inet_ntop_ipv6');
+        $failBb = $fn->appendBasicBlock('inet_ntop_fail');
+        $context->builder->branchIf($is4, $ipv4Bb, $check16Bb);
+
+        $context->builder->positionAtEnd($ipv4Bb);
+        $chars = $context->builder->pointerCast(
+            $context->builder->structGep($inAddr, $strMap['value']),
+            $i8->pointerType(0)
+        );
+        $long = $i64->constInt(0, false);
+        for ($i = 0; $i < 4; ++$i) {
+            $byte = $context->builder->load(
+                $context->builder->gep($chars, $i32->constInt($i, false))
+            );
+            $long = $context->builder->or(
+                $long,
+                $context->builder->shl(
+                    $context->builder->zExt($byte, $i64),
+                    $i64->constInt(24 - (8 * $i), false)
+                )
+            );
+        }
+        $box = JitValueBox::alloc($context);
+        $boxPtr = JitValueBox::pointer($context, $box);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_long2ip'),
+            $boxPtr,
+            $long
+        );
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $boxPtr
+            )
+        );
+
+        $context->builder->positionAtEnd($check16Bb);
+        $context->builder->branchIf($is16, $ipv6Bb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($ipv6Bb);
+        // Fast-path ::1 binary (15×0x00 + 0x01) in LLVM (#27172).
+        $chars6 = $context->builder->pointerCast(
+            $context->builder->structGep($inAddr, $strMap['value']),
+            $i8->pointerType(0)
+        );
+        $isColon1Bin = $i8->constInt(1, false); // accumulate as i1 via and
+        $isColon1Bin = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->gep($chars6, $i32->constInt(15, false))),
+            $i8->constInt(1, false)
+        );
+        for ($i = 0; $i < 15; ++$i) {
+            $isColon1Bin = $context->builder->and(
+                $isColon1Bin,
+                $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->load($context->builder->gep($chars6, $i32->constInt($i, false))),
+                    $i8->constInt(0, false)
+                )
+            );
+        }
+        $colon1NtopBb = $fn->appendBasicBlock('inet_ntop_colon1');
+        $ipv6HelperBb = $fn->appendBasicBlock('inet_ntop_ipv6_helper');
+        $context->builder->branchIf($isColon1Bin, $colon1NtopBb, $ipv6HelperBb);
+
+        $context->builder->positionAtEnd($colon1NtopBb);
+        // Constant "::1" as __string__* (constantFromString is [N x i8]* — #27172).
+        $i8p = $i8->pointerType(0);
+        $colon1Str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(3, false),
+            $context->builder->pointerCast($context->constantFromString('::1'), $i8p)
+        );
+        $context->builder->returnValue($colon1Str);
+
+        $context->builder->positionAtEnd($ipv6HelperBb);
+        $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::INET_NTOP),
+            self::helperFunction($context, self::INET_NTOP_ARGV),
             [$inAddr]
         );
-        $text = JitNestedHelperCoerce::coerceBridgeResult($context, $textRaw, $strPtr);
-        $context->builder->returnValue($text);
+        $falseBb = $fn->appendBasicBlock('inet_ntop_ipv6_false');
+        $okBb = $fn->appendBasicBlock('inet_ntop_ipv6_ok');
+        $isFalse = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $context->builder->branchIf($isFalse, $falseBb, $okBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
+        );
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

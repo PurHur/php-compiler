@@ -11644,6 +11644,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateDatePeriodCreateFromISO8601CompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->propagateSimpleXmlXpathCompileTime(
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
@@ -11932,7 +11936,10 @@ class JIT {
                                 $classVar,
                                 $classOp
                             );
-                            $objVal = $this->context->type->object->allocateForRuntimeClassId($classIdVal);
+                            $objVal = $this->context->type->object->allocateForRuntimeClassId(
+                                $classIdVal,
+                                $this
+                            );
                             $obj = new Variable(
                                 $this->context,
                                 Variable::TYPE_OBJECT,
@@ -11942,12 +11949,24 @@ class JIT {
                             $resultOp = $block->getOperand($op->arg1);
                             $this->assignOperand($resultOp, $obj, true);
                             $resultOp->type = new Type(Type::TYPE_OBJECT);
-                            $this->context->type->object->markObjectConstructed(
-                                $this->context->helper->loadValue($obj)
-                            );
-                            $this->context->scope->preserveNewResultOnNullCall = true;
-                            $this->context->scope->toCall = null;
-                            $this->context->scope->args = [];
+                            $resultVar = $this->context->getVariableFromOp($resultOp);
+                            // Runtime classname: dispatch __construct by class_id (#27156).
+                            $ctorCandidates = $this->buildRuntimeNewConstructCandidatesByClassId();
+                            if ([] !== $ctorCandidates) {
+                                $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
+                                    $resultVar,
+                                    '__construct',
+                                    $ctorCandidates
+                                );
+                                $this->context->scope->args = [$resultVar];
+                            } else {
+                                $this->context->type->object->markObjectConstructed(
+                                    $this->context->helper->loadValue($obj)
+                                );
+                                $this->context->scope->preserveNewResultOnNullCall = true;
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                            }
                         } else {
                             $classId = $this->context->type->object->resolveClassId($classOp);
                             $resolvedName = $this->context->type->object->classNameForId($classId);
@@ -13546,6 +13565,31 @@ class JIT {
             $resolved = $this->context->resolveRefAliasName($name);
             if (isset($this->context->namedVariableBindings[$resolved])) {
                 $this->context->namedVariableBindings[$resolved]->compileTimeBcmathNumber = $ct;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /** Thin-AOT DatePeriod::createFromISO8601String() foreach snapshot (#26937). */
+    private function propagateDatePeriodCreateFromISO8601CompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!($toCall instanceof JIT\Call\DatePeriodCreateFromISO8601String)) {
+            return;
+        }
+        $timestamps = $toCall->lastCompileTimeDatePeriodTimestamps;
+        if (null === $timestamps || !$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        $var->compileTimeDatePeriodTimestamps = $timestamps;
+        $var->compileTimeDatePeriodTimezone = $toCall->lastCompileTimeDatePeriodTimezone ?? 'UTC';
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                $bound = $this->context->namedVariableBindings[$resolved];
+                $bound->compileTimeDatePeriodTimestamps = $timestamps;
+                $bound->compileTimeDatePeriodTimezone = $var->compileTimeDatePeriodTimezone;
             }
             $this->context->bindVariableByName($resolved, $var);
         }
@@ -17127,6 +17171,17 @@ class JIT {
         if ($toCall instanceof JIT\Call\ExceptionConstruct) {
             return true;
         }
+        if (
+            $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
+            && '__construct' === $toCall->methodLc
+        ) {
+            return true;
+        }
+        if (
+            $toCall instanceof JIT\Call\NoOpConstruct
+        ) {
+            return true;
+        }
         if ($toCall instanceof JIT\Call\ReflectionClassConstruct
             || $toCall instanceof JIT\Call\ReflectionObjectConstruct
             || $toCall instanceof JIT\Call\ReflectionFunctionConstruct
@@ -17173,6 +17228,26 @@ class JIT {
     private function markNewObjectConstructedAfterCall(?JIT\Call $toCall, array $callArgs): void
     {
         if (null === $toCall) {
+            return;
+        }
+        if (
+            $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
+            && '__construct' === $toCall->methodLc
+        ) {
+            if ([] === $callArgs) {
+                return;
+            }
+            $first = $callArgs[0];
+            if (is_array($first)) {
+                $first = $first['unpack'] ?? null;
+            }
+            if (!$first instanceof JIT\Variable || Variable::TYPE_OBJECT !== $first->type) {
+                return;
+            }
+            $this->context->type->object->markObjectConstructed(
+                $this->context->helper->loadValue($first)
+            );
+
             return;
         }
         if ($toCall instanceof JIT\Call\Native) {
@@ -19388,6 +19463,46 @@ class JIT {
         }
 
         return $candidates;
+    }
+
+    /**
+     * Safe `__construct` candidates for `new $class` (#27156).
+     *
+     * Custom Call proxies (LimitIteratorConstruct, …) validate PHP arg counts while
+     * emitting every switch arm — skip those. Classes without a constructor get
+     * {@see JIT\Call\NoOpConstruct} so stdClass does not abort when Exception is also present.
+     *
+     * @return array<int, JIT\Call>
+     */
+    private function buildRuntimeNewConstructCandidatesByClassId(): array
+    {
+        $object = $this->context->type->object;
+        $candidates = [];
+        foreach ($object->allClassNamesById() as $classId => $className) {
+            if (null !== JIT\InstantiableClassJitGuard::userInstantiationErrorMessage($object, $classId)) {
+                continue;
+            }
+            $classLc = strtolower(ltrim($className, '\\'));
+            $proxyName = $this->resolveJitInstanceMethodProxyName($classLc, '__construct');
+            if ($this->context->functionIsRegistered($proxyName)) {
+                $proxy = $this->context->resolveFunctionProxy($proxyName);
+                if ($this->isSafeRuntimeNewConstructProxy($proxy)) {
+                    $candidates[$classId] = $proxy;
+                    continue;
+                }
+            }
+            $candidates[$classId] = new JIT\Call\NoOpConstruct();
+        }
+
+        return $candidates;
+    }
+
+    private function isSafeRuntimeNewConstructProxy(JIT\Call $proxy): bool
+    {
+        return $proxy instanceof JIT\Call\Native
+            || $proxy instanceof JIT\Call\ExceptionConstruct
+            || $proxy instanceof JIT\Call\Vararg
+            || $proxy instanceof CoreFunc\Internal;
     }
 
     /**

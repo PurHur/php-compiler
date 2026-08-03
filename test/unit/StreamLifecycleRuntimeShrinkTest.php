@@ -50,14 +50,16 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('StreamLifecycleJitHelper', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('StreamGlobalsJit::implementThinIsResource', $source);
+        $this->assertStringContainsString('JitMemoryStreamHelper.php', $source);
         $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
         $this->assertStringNotContainsString('implementDeferredStubs', $source);
         $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
         $this->assertStringNotContainsString('implementStandalone', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void
@@ -108,8 +110,11 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
 
     public function testStreamIoStandaloneLlvmDeletedForUserScriptAot(): void
     {
-        // NestedJIT StreamIoJitHelper for user-script AOT (#20943) — libc kernel deleted.
-        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
+        // #20943 NestedJIT-only path regressed thin AOT; #26929 restored libc kernel.
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
+        $io = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoRuntime.php');
+        $this->assertStringContainsString('JitStreamIoKernel::implementForUserScriptLowering', $io);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $io);
     }
 }

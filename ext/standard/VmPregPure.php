@@ -178,10 +178,9 @@ final class VmPregPure
             $out = [];
             $totalCount = 0;
             foreach ($subject as $key => $item) {
+                // php-src convert_to_string on array subject values (#27164).
                 if (!\is_string($item)) {
-                    throw new \LogicException(
-                        'preg_replace() array subject values must be strings in this compiler build'
-                    );
+                    $item = (string) $item;
                 }
                 $elemCount = 0;
                 $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit, $elemCount);
@@ -375,10 +374,9 @@ final class VmPregPure
         if (\is_array($subject)) {
             $out = [];
             foreach ($subject as $key => $item) {
+                // php-src convert_to_string on array subject values (#27164).
                 if (!\is_string($item)) {
-                    throw new \LogicException(
-                        'preg_filter() array subject values must be strings in this compiler build'
-                    );
+                    $item = (string) $item;
                 }
                 if (1 === self::pregMatch($pattern, $item)) {
                     $itemCount = 0;

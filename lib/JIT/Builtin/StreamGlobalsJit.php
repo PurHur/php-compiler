@@ -73,7 +73,7 @@ final class StreamGlobalsJit
         }
     }
 
-    private static function ensureLibcStdio(Context $context): void
+    public static function ensureLibcStdio(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
         foreach (['stdout', 'stderr'] as $name) {
@@ -165,6 +165,66 @@ final class StreamGlobalsJit
 
         $context->builder->positionAtEnd($nullBb);
         $context->builder->returnValue($nullPtr);
+        $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Thin standalone AOT {@see __compiler_is_resource} — probe phpc_stream_handles (#27186).
+     *
+     * Same slots {@see \PHPCompiler\ext\standard\JitStreamIoKernel} fopen fills; NestedJIT
+     * StreamLifecycleJitHelper never sees those LLVM globals.
+     */
+    public static function implementThinIsResource(Context $context): void
+    {
+        $abiName = '__compiler_is_resource';
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($i32, false, $i64);
+
+        self::ensureGlobals($context);
+
+        $fn = $context->module->getNamedFunction($abiName);
+        if (null === $fn) {
+            $fn = $context->module->addFunction($abiName, $ft);
+        } elseif ($fn->countBasicBlocks() > 0) {
+            foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+        }
+
+        $entry = $fn->appendBasicBlock('is_resource_thin_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $zeroI64 = $i64->constInt(0, false);
+        $max = $i64->constInt(self::MAX_HANDLES, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+        $nullPtr = $i8p->constNull();
+
+        $inRange = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGT, $handle, $zeroI64),
+            $context->builder->icmp(Builder::INT_SLT, $handle, $max)
+        );
+        $lookupBb = $fn->appendBasicBlock('is_resource_thin_lookup');
+        $falseBb = $fn->appendBasicBlock('is_resource_thin_false');
+        $context->builder->branchIf($inRange, $lookupBb, $falseBb);
+
+        $context->builder->positionAtEnd($lookupBb);
+        $handles = $context->module->getNamedGlobal(self::GLOBAL_HANDLES);
+        $slot = $context->builder->gep($handles, $zeroI64, $handle);
+        $loaded = $context->builder->load($context->builder->bitcast($slot, $i8p->pointerType(0)));
+        $hasFp = $context->builder->icmp(Builder::INT_NE, $loaded, $nullPtr);
+        $trueBb = $fn->appendBasicBlock('is_resource_thin_true');
+        $context->builder->branchIf($hasFp, $trueBb, $falseBb);
+
+        $context->builder->positionAtEnd($trueBb);
+        $context->builder->returnValue($oneI32);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->returnValue($zeroI32);
+        $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
 }

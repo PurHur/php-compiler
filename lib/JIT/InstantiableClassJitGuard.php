@@ -49,7 +49,8 @@ final class InstantiableClassJitGuard
 
         $context->builder->positionAtEnd($failBlock);
         if ([] !== $context->tryCatch->handlerStack) {
-            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            // allocateForRuntimeClassId may omit $jit; emitCatchableClassError accepts null (#27156).
+            TryCatchHelper::emitCatchableClassError($context, 'Error', $message, $jit);
         } else {
             ErrorRaise::emitRaise($context, $message);
             self::returnAfterPendingError($context, $fn);

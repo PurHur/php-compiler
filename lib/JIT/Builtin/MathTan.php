@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitTanKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for tan() via TanJitHelper PHP (#15088).
+ * JIT/AOT link for tan() via TanJitHelper PHP (#15088, #27048).
  *
- * Replaces libc `tan` LLVM lookup in ext/standard/tan.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see TanJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering TanJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(tan)
  */
 final class MathTan
@@ -28,6 +31,8 @@ final class MathTan
         self::TAN_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'tan_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathTan
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitTanKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathTan
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_TAN);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_TAN, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_TAN,
-            'tan_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::TAN_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15088'
+            '#27048'
         );
     }
 }

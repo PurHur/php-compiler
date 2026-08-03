@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for preg_grep() via __compiler_preg_match (issue #1180). */
+/** LLVM lowering for preg_grep() via __compiler_preg_match (issue #1180, coerce #27164). */
 final class JitPregGrep
 {
   private static int $blockSerial = 0;
@@ -63,6 +63,7 @@ final class JitPregGrep
     $i64 = $context->getTypeFromString('int64');
     $errorSentinel = $i64->constInt(-1, true);
     $htPtr = $context->getTypeFromString('__hashtable__*');
+    $strval = new strval();
 
     $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
     $emptyBlock = BasicBlockHelper::append($context, 'preg_grep_empty');
@@ -102,25 +103,9 @@ final class JitPregGrep
     $context->builder->branchIf($isSet, $matchBlock, $skipUnset);
 
     $context->builder->positionAtEnd($matchBlock);
-    $entry = self::listEntryAt($context, $src, $srcIdx);
-    $valueMap = $context->structFieldMap['__value__'];
-    $typeByte = $context->builder->load(
-      $context->builder->structGep($entry, $valueMap['type'])
-    );
-    $i8 = $context->getTypeFromString('int8');
-    $isString = $context->builder->icmp(
-      Builder::INT_EQ,
-      $typeByte,
-      $i8->constInt(Variable::TYPE_STRING & 0xff, false)
-    );
-    $pregBlock = BasicBlockHelper::append($context, 'preg_grep_preg');
-    $context->builder->branchIf($isString, $pregBlock, $skipUnset);
-
-    $context->builder->positionAtEnd($pregBlock);
-    $subject = $context->builder->call(
-      $context->lookupFunction('__value__readString'),
-      $entry
-    );
+    // php-src convert_to_string per element; keep original zval on match (#27164).
+    $entryBox = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+    $subject = $strval->valueToString($context, JitValueBox::pointer($context, $entryBox->value));
     $raw = $context->builder->call(
       $context->lookupFunction('__compiler_preg_match'),
       $pattern,
@@ -135,7 +120,7 @@ final class JitPregGrep
     $context->builder->branchIf($keep, $skipNoMatch, $skipUnset);
 
     $context->builder->positionAtEnd($skipNoMatch);
-    self::copyListEntry($context, $src, $srcIdx, $dest, $srcIdx);
+    HashTableHelper::setAtIndex($context, $dest, $srcIdx, $entryBox);
     $context->builder->branch($advance);
 
     $context->builder->positionAtEnd($skipUnset);
@@ -158,53 +143,5 @@ final class JitPregGrep
     $phi->addIncoming($htPtr->constNull(), $errorBlock);
 
     return $phi;
-  }
-
-  private static function listEntryAt(Context $context, Value $ht, Value $index): Value
-  {
-    $map = $context->structFieldMap['__hashtable__'];
-    $values = $context->builder->load(
-      $context->builder->structGep($ht, $map['values'])
-    );
-
-    return $context->builder->inBoundsGep($values, $index);
-  }
-
-  private static function copyListEntry(
-    Context $context,
-    Value $src,
-    Value $srcIndex,
-    Value $dest,
-    Value $destIndex
-  ): void {
-    $valueMap = $context->structFieldMap['__value__'];
-    $srcEntry = self::listEntryAt($context, $src, $srcIndex);
-    $typeByte = $context->builder->load(
-      $context->builder->structGep($srcEntry, $valueMap['type'])
-    );
-    $i8 = $context->getTypeFromString('int8');
-    $isString = $context->builder->icmp(
-      Builder::INT_EQ,
-      $typeByte,
-      $i8->constInt(Variable::TYPE_STRING & 0xff, false)
-    );
-    $stringBlock = BasicBlockHelper::append($context, 'preg_grep_copy_str');
-    $skipBlock = BasicBlockHelper::append($context, 'preg_grep_copy_skip');
-    $done = BasicBlockHelper::append($context, 'preg_grep_copy_done');
-    $context->builder->branchIf($isString, $stringBlock, $skipBlock);
-
-    $context->builder->positionAtEnd($stringBlock);
-    $context->builder->call(
-      $context->lookupFunction('__hashtable__setStringAt'),
-      $dest,
-      $destIndex,
-      $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
-    );
-    $context->builder->branch($done);
-
-    $context->builder->positionAtEnd($skipBlock);
-    $context->builder->branch($done);
-
-    $context->builder->positionAtEnd($done);
   }
 }

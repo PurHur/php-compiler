@@ -29,8 +29,35 @@ final class JitDatePeriodCreateFromISO8601String
 
     private const CLASS_DATETIME = 'DateTimeImmutable';
 
+    /** @var list<int>|null Thin-AOT foreach snapshot from last successful invoke (#26937). */
+    private static ?array $lastCompileTimeTimestamps = null;
+
+    private static ?string $lastCompileTimeTimezone = null;
+
+    /**
+     * @return array{timestamps: list<int>, timezone: string}|null
+     */
+    public static function takeLastCompileTimeForeachSnapshot(): ?array
+    {
+        $timestamps = self::$lastCompileTimeTimestamps;
+        $timezone = self::$lastCompileTimeTimezone;
+        self::$lastCompileTimeTimestamps = null;
+        self::$lastCompileTimeTimezone = null;
+        if (null === $timestamps) {
+            return null;
+        }
+
+        return [
+            'timestamps' => $timestamps,
+            'timezone' => $timezone ?? 'UTC',
+        ];
+    }
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        self::$lastCompileTimeTimestamps = null;
+        self::$lastCompileTimeTimezone = null;
+
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {
             throw new \ArgumentCountError(\sprintf(
@@ -81,7 +108,32 @@ final class JitDatePeriodCreateFromISO8601String
             return $slot;
         }
 
+        self::stampCompileTimeForeachSnapshot($period);
+
         return self::materializeDatePeriod($context, $period);
+    }
+
+    /**
+     * Walk the VM period with the Iterator SSOT and stamp timestamps for thin-AOT foreach (#26937).
+     */
+    private static function stampCompileTimeForeachSnapshot(ObjectEntry $period): void
+    {
+        $timestamps = [];
+        $timezone = 'UTC';
+        DatePeriodSupport::iteratorRewind($period);
+        $guard = 0;
+        while (DatePeriodSupport::iteratorValid($period) && $guard < 100000) {
+            ++$guard;
+            $current = DatePeriodSupport::iteratorCurrent($period);
+            if (null === $current) {
+                break;
+            }
+            $timestamps[] = $current->getProperty(DateTimeSupport::TS_PROPERTY)->resolveIndirect()->toInt();
+            $timezone = $current->getProperty(DateTimeSupport::TZ_PROPERTY)->resolveIndirect()->toString();
+            DatePeriodSupport::iteratorNext($period);
+        }
+        self::$lastCompileTimeTimestamps = $timestamps;
+        self::$lastCompileTimeTimezone = $timezone;
     }
 
     private static function compileTimeStringArg(JITVariable $arg): ?string

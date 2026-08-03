@@ -636,8 +636,10 @@ class Object_ extends Type {
         return $this->context->builder->load($resultSlot);
     }
 
-    public function allocateForRuntimeClassId(PHPLLVM\Value $classIdVal): PHPLLVM\Value
-    {
+    public function allocateForRuntimeClassId(
+        PHPLLVM\Value $classIdVal,
+        ?\PHPCompiler\JIT $jit = null
+    ): PHPLLVM\Value {
         $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
         $entry = $this->context->builder->getInsertBlock();
         $done = $fn->appendBasicBlock('new_runtime_class_done');
@@ -659,8 +661,27 @@ class Object_ extends Type {
             $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
             $this->context->builder->branchIf($isId, $caseBlock, $nextCheck);
             $this->context->builder->positionAtEnd($caseBlock);
-            if (null !== \PHPCompiler\JIT\InstantiableClassJitGuard::userInstantiationErrorMessage($this, $id)) {
-                \PHPCompiler\JIT\InstantiableClassJitGuard::emitBeforeAllocate($this, null, null, $id);
+            $nonInstantiable = \PHPCompiler\JIT\InstantiableClassJitGuard::userInstantiationErrorMessage(
+                $this,
+                $id
+            );
+            if (null !== $nonInstantiable) {
+                // Do not use emitBeforeAllocate here: outside try it returnVoid()s from the
+                // enclosing function and poisons later TYPE_NEW / try regions (#27156).
+                if ([] !== $this->context->tryCatch->handlerStack) {
+                    \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+                        $this->context,
+                        'Error',
+                        $nonInstantiable,
+                        $jit
+                    );
+                } else {
+                    \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                    \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise($this->context, $nonInstantiable);
+                    $this->context->builder->call($this->context->lookupFunction('abort'));
+                }
+                $checkBlock = $nextCheck;
+                continue;
             }
             $obj = $this->allocate($id);
             $this->context->builder->store($obj, $resultSlot);
@@ -674,9 +695,20 @@ class Object_ extends Type {
             $this->context->builder->branch($fail);
         }
         $this->context->builder->positionAtEnd($fail);
-        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
-        \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise($this->context, 'Class not found');
-        $this->context->builder->call($this->context->lookupFunction('abort'));
+        // Unknown runtime classname — catchable Error when inside try (#27156 / #4242).
+        $notFound = 'Class not found';
+        if ([] !== $this->context->tryCatch->handlerStack) {
+            \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+                $this->context,
+                'Error',
+                $notFound,
+                $jit
+            );
+        } else {
+            \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise($this->context, $notFound);
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+        }
         $this->context->builder->positionAtEnd($done);
 
         return $this->context->builder->load($resultSlot);

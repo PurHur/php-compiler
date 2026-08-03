@@ -73,15 +73,11 @@ final class preg_filter extends Internal
         } elseif (Variable::TYPE_ARRAY === $subjectVar->type) {
             $host = [];
             foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
-                if (Variable::TYPE_STRING !== $value->type) {
-                    throw new \LogicException(
-                        'preg_filter() array values must be strings in this compiler build'
-                    );
-                }
+                // php-src php_pcre_filter: convert_to_string per array subject (#27164).
                 $hostKey = Variable::TYPE_INTEGER === $key->type
                     ? $key->toInt()
                     : $key->toString();
-                $host[$hostKey] = $value->toString();
+                $host[$hostKey] = $value->resolveIndirect()->toString(null, $frame);
             }
             $result = VmPreg::pregFilter($pattern, $replacement, $host, $limit, $count);
         }

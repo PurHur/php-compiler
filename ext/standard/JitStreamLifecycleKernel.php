@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
+use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Builtin\StreamLibcHandleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -19,9 +20,11 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT embed + thin standalone link for stream lifecycle via StreamLifecycleJitHelper PHP (#9442, #20966).
  *
- * Always NestedJIT {@see StreamLifecycleJitHelper} / {@see StreamLibcHandleJitHelper}
- * (StreamIo #20943 / PendingHeaders #20930 shape — no constant-0 / deferred stub fork).
- * SSOT: {@see VmFs}, {@see StreamLifecycleJitHelper}
+ * Embed: NestedJIT {@see StreamLifecycleJitHelper} / {@see StreamLibcHandleJitHelper}.
+ * Thin user-script AOT: {@see __compiler_is_resource} probes LLVM {@see StreamGlobalsJit}
+ * handle table (same slots {@see JitStreamIoKernel} fopen fills) — NestedJIT helpers never
+ * see those slots (#27186).
+ * SSOT: {@see VmFs}, {@see StreamLifecycleJitHelper}, {@see StreamGlobalsJit}
  * php-src: ext/standard/streamsfuncs.c
  */
 final class JitStreamLifecycleKernel
@@ -30,10 +33,12 @@ final class JitStreamLifecycleKernel
 
     /**
      * Share NestedJIT registry with StreamIoJitHelper (#23777).
+     * JitMemoryStreamHelper must be in the same bundle as JitOpenStreamHandles (#25299).
      *
      * @var list<string>
      */
     private const HELPER_BUNDLE = [
+        '/ext/standard/JitMemoryStreamHelper.php',
         '/ext/standard/JitOpenStreamHandles.php',
         self::HELPER_PATH,
     ];
@@ -107,6 +112,12 @@ final class JitStreamLifecycleKernel
         NestedVmActiveContextLlvm::ensureMethod($context);
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
 
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinStandaloneBridges($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_is_resource');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -115,6 +126,35 @@ final class JitStreamLifecycleKernel
         }
 
         self::implementRealBridges($context);
+    }
+
+    /**
+     * Thin AOT: is_resource reads {@see StreamGlobalsJit} slots; other lifecycle ABI still NestedJIT.
+     */
+    private static function implementThinStandaloneBridges(Context $context): void
+    {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
+        StreamGlobalsJit::implementThinIsResource($context);
+
+        self::ensureJitHelperCompiled($context);
+        foreach (self::ABI_TO_HELPER as $abi => $helper) {
+            if ('__compiler_is_resource' === $abi) {
+                continue;
+            }
+            if ('__compiler_fclose' === $abi || '__compiler_pclose' === $abi) {
+                self::implementCloseBridge($context, $abi, $helper);
+                continue;
+            }
+            self::implementIfMissing($context, $abi, $helper);
+        }
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementRealBridges(Context $context): void

@@ -6,14 +6,18 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitLogKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for log() via LogJitHelper PHP (#15117, #21980).
+ * JIT/AOT link for log() via LogJitHelper PHP (#15117, #21980, #27047).
  *
- * One-arg uses LogJitHelper; optional `$base` is pure LLVM on phpc_log / phpc_log10
- * (avoids NestedJIT of a second helper during MathLog link).
+ * Embed + thin standalone AOT: {@see LogJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering LogJitHelper.
+ * Optional `$base` is pure LLVM on phpc_log / phpc_log10.
  * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * php-src: ext/standard/math.c — PHP_FUNCTION(log)
  */
@@ -30,6 +34,8 @@ final class MathLog
         self::LOG_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'log_bridge_entry';
+
     private static int $seq = 0;
 
     public static function ensureLinked(Context $context): void
@@ -44,6 +50,10 @@ final class MathLog
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitLogKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -97,17 +107,28 @@ final class MathLog
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_LOG);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_LOG, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_LOG,
-            'log_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::LOG_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15117'
+            '#27047'
         );
     }
 }

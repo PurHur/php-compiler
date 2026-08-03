@@ -52,6 +52,18 @@ PHP;
         $this->assertStringContainsString("} \n", $out);
     }
 
+    /** @covers issue #27156 — `$class` / get_class must not suppress embed bootstrap */
+    public function testInjectsBootstrapWhenOnlyClassVariableOrGetClass(): void
+    {
+        $var = '<?php $class = "stdClass"; echo get_class(new $class), "\n";';
+        $out = JitMcjitEmbed::prepareClassless($var);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+
+        $getClass = '<?php echo get_class(new stdClass), "\n";';
+        $out2 = JitMcjitEmbed::prepareClassless($getClass);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out2);
+    }
+
     /** @covers issue #17150 */
     public function testInjectsBootstrapAfterLeadingInlineHashComments(): void
     {

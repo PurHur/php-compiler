@@ -1,7 +1,7 @@
 --TEST--
-Language: final promoted ctor property `public final string $x` (#22451, Zend/zend_language_parser.y)
+Language: final promoted ctor property `public final string $x` (#22451, #27123, Zend/zend_language_parser.y)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 class FP {
@@ -32,7 +32,7 @@ $q = new FPProt(7);
 echo $q->getZ(), "\n";
 --EXPECT--
 a
-BLOCKED
+WROTE
 isFinal=true
 isPromoted=true
 secret

@@ -43,7 +43,10 @@ final class JitMcjitEmbed
         if (!preg_match('/^<\?php\s/', $code)) {
             return $code;
         }
-        if (!preg_match('/\b(class|interface|trait|enum)\b/i', $code)) {
+        // Require a declaration form — `$class` / `get_class` must not suppress the embed
+        // bootstrap (word-boundary `\bclass\b` matches those and forces a broken classless
+        // MCJIT path; #27156).
+        if (!preg_match('/\b(class|interface|trait|enum)\s+([a-zA-Z_\x80-\xff\\\\]|\{)/i', $code)) {
             return self::prependMcjitBootstrap($code);
         }
 

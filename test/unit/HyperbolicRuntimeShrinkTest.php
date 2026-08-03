@@ -35,6 +35,8 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSinh.php');
         $this->assertStringContainsString('SinhJitHelper', $bridge);
         $this->assertStringContainsString('phpc_sinh', $bridge);
+        $this->assertStringContainsString('JitSinhKernel', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
     }
 
     public function testTanhUsesJitHelperNotLibcLookup(): void
@@ -46,6 +48,8 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathTanh.php');
         $this->assertStringContainsString('TanhJitHelper', $bridge);
         $this->assertStringContainsString('phpc_tanh', $bridge);
+        $this->assertStringContainsString('JitTanhKernel', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
     }
 
     public function testCoshJitHelperDelegatesToKernel(): void
@@ -64,10 +68,38 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertSame(VmMath::cosh(1.0), CoshJitHelper::coshArgv(1.0));
     }
 
-    public function testSinhTanhJitHelpersDelegateToVmMath(): void
+    public function testTanhJitHelperDelegatesToKernel(): void
     {
-        $this->assertSame(VmMath::sinh(1.0), SinhJitHelper::sinhArgv(1.0));
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/TanhJitHelper.php');
+        $this->assertStringContainsString('phpc_tanh_kernel', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function tanhArgv\(.*?\{[^}]*VmMath::tanh/s',
+            $source
+        );
+
+        if (!\function_exists('phpc_tanh_kernel')) {
+            $this->markTestSkipped('phpc_tanh_kernel requires compiler runtime');
+        }
+        $this->assertSame(VmMath::tanh(0.0), TanhJitHelper::tanhArgv(0.0));
+        $this->assertSame(VmMath::tanh(1.0), TanhJitHelper::tanhArgv(1.0));
         $this->assertSame(VmMath::tanh(2.0), TanhJitHelper::tanhArgv(2.0));
+    }
+
+    public function testSinhJitHelperDelegatesToKernel(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SinhJitHelper.php');
+        $this->assertStringContainsString('phpc_sinh_kernel', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function sinhArgv\(.*?\{[^}]*VmMath::sinh/s',
+            $source
+        );
+
+        if (!\function_exists('phpc_sinh_kernel')) {
+            $this->markTestSkipped('phpc_sinh_kernel requires compiler runtime');
+        }
+        $this->assertSame(VmMath::sinh(0.0), SinhJitHelper::sinhArgv(0.0));
+        $this->assertSame(VmMath::sinh(1.0), SinhJitHelper::sinhArgv(1.0));
+        $this->assertSame(VmMath::sinh(2.0), SinhJitHelper::sinhArgv(2.0));
     }
 
     public function testSpineBundleIncludesHyperbolicJitHelpers(): void
@@ -80,6 +112,16 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MathSinh.php', $spine);
         $this->assertStringContainsString('MathTanh.php', $spine);
         $this->assertStringContainsString('JitCoshKernel.php', $spine);
+        $this->assertStringContainsString('JitSinhKernel.php', $spine);
+        $this->assertStringContainsString('JitTanhKernel.php', $spine);
         $this->assertStringContainsString('phpc_cosh_kernel.php', $spine);
+        $this->assertStringContainsString('phpc_sinh_kernel.php', $spine);
+        $this->assertStringContainsString('phpc_tanh_kernel.php', $spine);
+        $this->assertStringContainsString('JitAcoshKernel.php', $spine);
+        $this->assertStringContainsString('JitAsinhKernel.php', $spine);
+        $this->assertStringContainsString('JitAtanhKernel.php', $spine);
+        $this->assertStringContainsString('phpc_acosh_kernel.php', $spine);
+        $this->assertStringContainsString('phpc_asinh_kernel.php', $spine);
+        $this->assertStringContainsString('phpc_atanh_kernel.php', $spine);
     }
 }

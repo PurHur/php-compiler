@@ -40,6 +40,16 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::matchCount('/abc/', 'xyz', 0));
     }
 
+    public function testSingleCharLiteralReplace(): void
+    {
+        // Issue #27119 — NestedJIT-safe /a/ (no strrpos/strncmp).
+        $this->assertSame(1, PregAotFastPath::patternKind('/a/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/a/', 'bab', 0));
+        $this->assertSame('bXb', PregAotFastPath::replaceOrEmpty('/a/', 'X', 'bab', -1));
+        $this->assertSame(1, PregAotFastPath::patternKind('#a#'));
+        $this->assertSame('bXb', PregAotFastPath::replaceOrEmpty('#a#', 'X', 'bab', -1));
+    }
+
     public function testLiteralCaptureGroups(): void
     {
         $this->assertSame(8, PregAotFastPath::patternKind('/(a)(b)/'));
