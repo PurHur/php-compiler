@@ -579,6 +579,10 @@ final class BuiltinInternalDefaultValues
         'sizeof' => [
             1 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/tokenizer/tokenizer.stub.php — int $flags = 0 (#26258)
+        'token_get_all' => [
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src Zend/zend_builtin_functions.stub.php — string|int $status = 0 (union does not infer) (#26056)
         'exit' => [
             0 => ['kind' => 'int', 'value' => 0],

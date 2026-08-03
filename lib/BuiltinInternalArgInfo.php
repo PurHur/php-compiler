@@ -606,6 +606,8 @@ final class BuiltinInternalArgInfo
                 5 => 'int',
                 default => null,
             },
+            // ext/tokenizer/tokenizer.stub.php — int $flags = 0; InternalArgInfo omits flags (#26258)
+            'token_get_all' => 1 === $index ? 'int' : null,
             // ext/standard/basic_functions.stub.php — ?array $options/$params = null (#25069)
             'stream_context_create' => match ($index) {
                 0, 1 => '?array',
