@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * round() for compiled JIT/AOT modules + NestedJIT-safe algorithm SSOT (#15211, #26800).
+ * round() for compiled JIT/AOT modules + NestedJIT-safe algorithm SSOT (#15211, #26800, #27248).
  *
  * Same-class only (peer AbsJitHelper). Avoid `\is_finite`/`\floor`/`\ceil`/`\abs`/`\fmod`
  * — NestedJIT re-enters *JitHelper bridges (gdb: isfiniteargv ↔ phpc_is_finite).
@@ -45,112 +45,110 @@ final class RoundJitHelper
         }
 
         $ap = $places < 0 ? -$places : $places;
-        $exponent = 1.0;
-        for ($i = 0; $i < $ap; ++$i) {
-            $exponent *= 10.0;
-        }
-
-        if ($num >= 0.0) {
-            $scaled = $places > 0 ? $num * $exponent : $num / $exponent;
-            $tmpValue = (float) (int) $scaled;
-            $tmpValue2 = $tmpValue + 1.0;
+        // NestedJIT-safe scale: pow10 table + places==0 kernel (#27248 / #27249).
+        // Avoid the old fmul/cast/applyMode body — cold thin AOT mis-rounded (3 / 3.1).
+        $exponent = self::pow10abs($ap);
+        if ($places > 0) {
+            $scaled = $num * $exponent;
         } else {
-            $scaled = $places > 0 ? $num * $exponent : $num / $exponent;
-            $asInt = (int) $scaled;
-            $asFloat = (float) $asInt;
-            if ($asFloat === $scaled) {
-                $tmpValue = $asFloat;
-            } else {
-                $tmpValue = (float) ($asInt - 1);
-            }
-            $tmpValue2 = $tmpValue - 1.0;
+            $scaled = $num / $exponent;
         }
-
-        $recon = $places > 0 ? $tmpValue2 / $exponent : $tmpValue2 * $exponent;
-        if ($recon === $num) {
-            $tmpValue = $tmpValue2;
-        }
-
-        $mag = $tmpValue < 0.0 ? -$tmpValue : $tmpValue;
+        $mag = $scaled < 0.0 ? -$scaled : $scaled;
         if ($mag >= 1.0e16) {
             return $num;
         }
-
-        $tmpValue = self::applyMode($tmpValue, $num, $exponent, $places, $mode);
-
+        $rounded = self::roundPlacesZero($scaled, $mode);
         if ($places > 0) {
-            return $tmpValue / $exponent;
+            return $rounded / $exponent;
         }
 
-        return $tmpValue * $exponent;
+        return $rounded * $exponent;
     }
 
-    private static function applyMode(
-        float $integral,
-        float $value,
-        float $exponent,
-        int $places,
-        int $mode
-    ): float {
-        $valueAbs = $value < 0.0 ? -$value : $value;
-        $half = $value >= 0.0 ? 0.5 : -0.5;
-        $edge = $places > 0
-            ? (($integral + $half) / $exponent)
-            : (($integral + $half) * $exponent);
-        if ($edge < 0.0) {
-            $edge = -$edge;
+    /**
+     * 10**n for NestedJIT — no for-loop; no int `===` (cold AOT mis-matches, #27248).
+     *
+     * Use `$n < k` ladders only — NestedJIT int equality on the places abs value is unreliable.
+     */
+    private static function pow10abs(int $n): float
+    {
+        if ($n < 1) {
+            return 1.0;
         }
-        $zeroEdge = $places > 0 ? ($integral / $exponent) : ($integral * $exponent);
-        if ($zeroEdge < 0.0) {
-            $zeroEdge = -$zeroEdge;
+        if ($n < 2) {
+            return 10.0;
         }
-        $step = $value >= 0.0 ? 1.0 : -1.0;
+        if ($n < 3) {
+            return 100.0;
+        }
+        if ($n < 4) {
+            return 1000.0;
+        }
+        if ($n < 5) {
+            return 10000.0;
+        }
+        if ($n < 6) {
+            return 100000.0;
+        }
+        if ($n < 7) {
+            return 1000000.0;
+        }
+        if ($n < 8) {
+            return 10000000.0;
+        }
+        if ($n < 9) {
+            return 100000000.0;
+        }
+        if ($n < 10) {
+            return 1000000000.0;
+        }
+        if ($n < 11) {
+            return 10000000000.0;
+        }
+        if ($n < 12) {
+            return 100000000000.0;
+        }
+        if ($n < 13) {
+            return 1000000000000.0;
+        }
+        if ($n < 14) {
+            return 10000000000000.0;
+        }
+        if ($n < 15) {
+            return 100000000000000.0;
+        }
+        if ($n < 16) {
+            return 1.0e15;
+        }
+        if ($n < 17) {
+            return 1.0e16;
+        }
+        if ($n < 18) {
+            return 1.0e17;
+        }
+        if ($n < 19) {
+            return 1.0e18;
+        }
+        if ($n < 20) {
+            return 1.0e19;
+        }
+        if ($n < 21) {
+            return 1.0e20;
+        }
+        if ($n < 22) {
+            return 1.0e21;
+        }
+        if ($n < 23) {
+            return 1.0e22;
+        }
+        $exponent = 1.0e22;
+        $left = $n - 22;
+        while ($left > 0) {
+            $exponent *= 10.0;
+            $left = $left - 1;
+        }
 
-        // Literals — PHP_ROUND_* (ext/standard/php_math_round_mode.h)
-        if (2 === $mode) { // HALF_DOWN
-            return $valueAbs > $edge ? $integral + $step : $integral;
-        }
-        if (3 === $mode) { // HALF_EVEN
-            if ($valueAbs > $edge) {
-                return $integral + $step;
-            }
-            if ($valueAbs === $edge) {
-                $parity = (int) $integral;
-                if (0 !== ($parity % 2)) {
-                    return $integral + $step;
-                }
-            }
-
-            return $integral;
-        }
-        if (4 === $mode) { // HALF_ODD
-            if ($valueAbs > $edge) {
-                return $integral + $step;
-            }
-            if ($valueAbs === $edge) {
-                $parity = (int) $integral;
-                if (0 === ($parity % 2)) {
-                    return $integral + $step;
-                }
-            }
-
-            return $integral;
-        }
-        if (5 === $mode) { // CEILING
-            return ($value > 0.0 && $valueAbs > $zeroEdge) ? $integral + 1.0 : $integral;
-        }
-        if (6 === $mode) { // FLOOR
-            return ($value < 0.0 && $valueAbs > $zeroEdge) ? $integral - 1.0 : $integral;
-        }
-        if (7 === $mode) { // TOWARD_ZERO
-            return $integral;
-        }
-        if (8 === $mode) { // AWAY_FROM_ZERO
-            return $valueAbs > $zeroEdge ? $integral + $step : $integral;
-        }
-
-        // HALF_UP (1) and unknown modes — php-src default
-        return ($valueAbs > $edge || $valueAbs === $edge) ? $integral + $step : $integral;
+        return $exponent;
     }
 
     /**

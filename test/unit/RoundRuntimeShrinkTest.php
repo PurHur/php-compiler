@@ -35,8 +35,15 @@ final class RoundRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RoundJitHelper.php');
         $this->assertStringContainsString('roundPlacesZero', $source);
+        $this->assertStringContainsString('pow10abs', $source);
         $this->assertStringContainsString('1.0e+308', $source);
         $this->assertStringContainsString('26800', $source);
+        $this->assertStringContainsString('27248', $source);
+        $this->assertEqualsWithDelta(
+            3.14159,
+            RoundJitHelper::roundArgv(3.1415926535898, 5, StdlibConstants::PHP_ROUND_HALF_UP),
+            1e-12
+        );
 
         $this->assertSame(
             VmRound::mathRound(1.5, 0, StdlibConstants::PHP_ROUND_HALF_UP),
