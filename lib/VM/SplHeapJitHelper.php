@@ -90,6 +90,97 @@ final class SplHeapJitHelper
         return $slot;
     }
 
+    /**
+     * SplHeap::extract() — return + remove heap top (#27276, ext/spl/spl_heap.c).
+     *
+     * Empty heap: Zend throws RuntimeException; thin AOT returns null (same trade-off as
+     * SplDllistJitHelper::compilePop — empty throw stays VM-covered).
+     */
+    public static function compileExtract(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $class = self::classNameFromObject($context, $obj);
+        $ht = self::heapPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $out = JitValueBox::alloc($context);
+        $emptyBb = BasicBlockHelper::append($context, 'splheap_extract_method_empty');
+        $bodyBb = BasicBlockHelper::append($context, 'splheap_extract_method_body');
+        $doneBb = BasicBlockHelper::append($context, 'splheap_extract_method_done');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyBb, $bodyBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $fetched = HashTableHelper::readIndexedToValueBox(
+            $context,
+            $ht,
+            $sizeT->constInt(0, false)
+        );
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $fetched)
+        );
+        self::extractTop($context, $obj, $class);
+        self::storeLongProperty($context, $obj, $class, self::PROP_ITER_POS, -1);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $out;
+    }
+
+    /**
+     * SplHeap::top() — peek heap top without removing (#27276).
+     * Empty: thin AOT returns null (Zend throws; VM covers throw).
+     */
+    public static function compileTop(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::heapPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $out = JitValueBox::alloc($context);
+        $emptyBb = BasicBlockHelper::append($context, 'splheap_top_empty');
+        $readBb = BasicBlockHelper::append($context, 'splheap_top_read');
+        $doneBb = BasicBlockHelper::append($context, 'splheap_top_done');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyBb, $readBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $fetched = HashTableHelper::readIndexedToValueBox(
+            $context,
+            $ht,
+            $sizeT->constInt(0, false)
+        );
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $fetched)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $out;
+    }
+
     public static function compileRewind(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
@@ -238,6 +329,8 @@ final class SplHeapJitHelper
         $context->builder->branchIf($onlyOne, $shrinkBb, $moveBb);
 
         $context->builder->positionAtEnd($moveBb);
+        // Deep-copy last before mutating HT — readIndexed copies to a stack box; setAtIndex
+        // then writes by value into index 0 (#27276 MinHeap / sortPacked hole).
         $last = HashTableHelper::readIndexedToValueBox($context, $ht, $lastIdx);
         HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt(0, false), $last);
         $context->builder->branch($shrinkBb);
@@ -248,9 +341,16 @@ final class SplHeapJitHelper
             $ht,
             $lastIdx
         );
-        // Re-establish top at index 0 after pop (same sort as insert).
+        // unsetLongAt nulls the slot and decrements numElements but leaves nextFreeElement
+        // stale. sortPacked/sortPackedReverse iterate nextFreeElement, so a trailing NULL
+        // was sorted into index 0 under ascending (MinHeap) while reverse (MaxHeap) left
+        // the real value on top (#27276).
         $nAfter = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
-        $needSort = $context->builder->icmp(Builder::INT_UGT, $nAfter, $sizeT->constInt(0, false));
+        $context->builder->store(
+            $nAfter,
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $needSort = $context->builder->icmp(Builder::INT_UGT, $nAfter, $sizeT->constInt(1, false));
         $sortBb = BasicBlockHelper::append($context, 'splheap_extract_sort');
         $context->builder->branchIf($needSort, $sortBb, $doneBb);
 
