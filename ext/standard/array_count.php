@@ -19,6 +19,7 @@ use PHPCompiler\JIT\Builtin\ArrayCountRecursiveRuntime;
 use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -90,10 +91,12 @@ final class array_count extends Internal
         $argc = \count($args);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             // php-src 8.0+: always TypeError on null (#21914).
-            TypeErrorRaise::emitRaise(
+            // Catchable under AOT try/catch — bare emitRaise returns 0 with no throw (#27446).
+            ExceptionBridge::emitTypeErrorAndAbort(
                 $context,
                 $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
             );
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'count_null_te_cont');
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -153,6 +156,7 @@ final class array_count extends Internal
 
     /**
      * count() on a `__value__*` slot — array HT vs Countable object (#26793, #27294).
+     * Boxed null (try/catch SSA) must TypeError with "null given", not "mixed" (#27446).
      */
     private function countBoxedValue(Context $context, JITVariable $arg): Value
     {
@@ -166,12 +170,16 @@ final class array_count extends Internal
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $htTag = $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false);
         $objTag = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $nullTag = $i8->constInt(Variable::TYPE_NULL & 0x7f, false);
         $isHt = $context->builder->icmp(Builder::INT_EQ, $kind, $htTag);
         $isObj = $context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $kind, $nullTag);
 
         $htBlock = BasicBlockHelper::append($context, 'count_box_ht');
         $afterHt = BasicBlockHelper::append($context, 'count_box_after_ht');
         $objBlock = BasicBlockHelper::append($context, 'count_box_obj');
+        $afterObj = BasicBlockHelper::append($context, 'count_box_after_obj');
+        $nullBlock = BasicBlockHelper::append($context, 'count_box_null');
         $errBlock = BasicBlockHelper::append($context, 'count_box_err');
         $merge = BasicBlockHelper::append($context, 'count_box_merge');
         $context->builder->branchIf($isHt, $htBlock, $afterHt);
@@ -182,7 +190,7 @@ final class array_count extends Internal
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($afterHt);
-        $context->builder->branchIf($isObj, $objBlock, $errBlock);
+        $context->builder->branchIf($isObj, $objBlock, $afterObj);
 
         $context->builder->positionAtEnd($objBlock);
         $countable = $this->tryCompileCountableCount($context, $arg);
@@ -195,6 +203,19 @@ final class array_count extends Internal
         $objEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
 
+        $context->builder->positionAtEnd($afterObj);
+        $context->builder->branchIf($isNull, $nullBlock, $errBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
+        );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'count_box_null_te_cont');
+        $nullCount = $i64->constInt(0, false);
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($merge);
+
         $context->builder->positionAtEnd($errBlock);
         $this->emitCountTypeError($context, $arg);
         $errCount = $i64->constInt(0, false);
@@ -205,6 +226,7 @@ final class array_count extends Internal
         $phi = $context->builder->phi($i64, 'count_box_phi');
         $phi->addIncoming($htCount, $htEnd);
         $phi->addIncoming($objCount, $objEnd);
+        $phi->addIncoming($nullCount, $nullEnd);
         $phi->addIncoming($errCount, $errEnd);
 
         return $phi;
@@ -270,11 +292,13 @@ final class array_count extends Internal
 
     private function emitCountTypeError(Context $context, JITVariable $arg): void
     {
-        TypeErrorRaise::emitRaise(
+        // Catchable under AOT try/catch (#27446); abort when uncaught.
+        ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             $this->name.'(): Argument #1 ($value) must be of type Countable|array, '
             .$this->jitArgTypeLabel($arg).' given'
         );
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'count_te_cont');
     }
 
     private function jitArgTypeLabel(JITVariable $arg): string
