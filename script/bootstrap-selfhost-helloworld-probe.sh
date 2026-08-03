@@ -124,8 +124,8 @@ ci_apply_llvm_memory_env
 # Skip-bundle + HELPER_RUNTIME_O fixes phpc_str_replace, but IncludeHelper of the
 # Runtime transitive closure still OOMs at 24GiB (measured). Floor 16GiB for residual
 # peak; host: PHP_COMPILER_DOCKER_MEM=16g … PHP_COMPILER_CI_RAM_GB=0.
-# When compile_driver sidecar is fingerprint-stale, prefer gen-0 argv driver as emit
-# helper (#22178) instead of cold inventory AOT — see helloworld_try_gen0_argv_as_emit_helper.
+# Prefer gen-0 argv as emit helper (#22178 / #27509) before compile_driver sidecar;
+# only cold-link inventory AOT when both are absent — see helloworld_try_gen0_argv_as_emit_helper.
 # shellcheck source=ci-resource-limits.sh
 source "$(dirname "$0")/ci-resource-limits.sh"
 export PHP_COMPILER_CI_RAM_GB=0
@@ -258,25 +258,28 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
     m3_emit_source="${ENTRY}"
   fi
-  # Fast path: skip cold LLVM inventory emit link when committed prelinked sidecar is valid (#9704).
+  # Prefer capable gen-0 argv as emit helper (#22178 / #23970 / #27509) before the
+  # committed .m3_compile_driver_aot_blob. That blob can still be a tiny Jul-era stub
+  # that fails parseAndCompile while argv already compiles HelloWorld (#27426) —
+  # selecting the stub first forced DEGRADED HelloWorld blob COPY (#21860).
   bootstrap_gen0_seed_prelinked_m3_sidecars || true
   m3_emit_helper_from_prelinked=0
   if [[ "${BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
     && [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]] \
-    && bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}" "${m3_emit_source}"; then
-    m3_emit_helper_from_prelinked=1
-    m3_link_code=0
-    m3_link_out="bootstrap-selfhost-helloworld-probe: prelinked sidecar emit (${EMIT_HELPER}, #9704)"
-    echo "bootstrap-selfhost-helloworld-probe: native emit helper from prelinked sidecar (${EMIT_HELPER}, ${m3_link_mode}, #9704)"
-  elif [[ "${BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
-    && [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]] \
     && helloworld_try_gen0_argv_as_emit_helper; then
-    # Stale compile_driver sidecar refusal would otherwise cold-link inventory and OOM (#23970).
     m3_emit_helper_from_prelinked=0
     m3_link_code=0
     m3_link_mode="gen-0 argv driver (#22178, #23970)"
     m3_link_out="bootstrap-selfhost-helloworld-probe: gen-0 argv emit helper (${EMIT_HELPER})"
     echo "bootstrap-selfhost-helloworld-probe: native emit helper from gen-0 argv driver (${EMIT_HELPER}, ${m3_link_mode})"
+  elif [[ "${BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
+    && [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]] \
+    && bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}" "${m3_emit_source}"; then
+    # Argv absent — use compile_driver sidecar only as last prelinked resort (#9704).
+    m3_emit_helper_from_prelinked=1
+    m3_link_code=0
+    m3_link_out="bootstrap-selfhost-helloworld-probe: prelinked sidecar emit (${EMIT_HELPER}, #9704)"
+    echo "bootstrap-selfhost-helloworld-probe: native emit helper from prelinked sidecar (${EMIT_HELPER}, ${m3_link_mode}, #9704)"
   else
     set +e
     echo "bootstrap-selfhost-helloworld-probe: linking native emit helper (${m3_link_mode})..."

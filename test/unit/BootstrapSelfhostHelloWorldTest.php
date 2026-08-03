@@ -503,6 +503,12 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('helloworld_try_gen0_argv_as_emit_helper', $script);
         $this->assertStringContainsString('using gen-0 argv driver as emit helper', $script);
         $this->assertStringContainsString('avoid cold inventory compile_driver OOM', $script);
+        // #27509: argv before .m3_compile_driver_aot_blob — stub sidecar must not win first.
+        $argvPos = strpos($script, 'helloworld_try_gen0_argv_as_emit_helper; then');
+        $sidecarPos = strpos($script, 'bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}"');
+        $this->assertNotFalse($argvPos, 'argv emit-helper branch');
+        $this->assertNotFalse($sidecarPos, 'compile_driver sidecar emit-helper branch');
+        $this->assertLessThan($sidecarPos, $argvPos, 'prefer gen-0 argv before compile_driver sidecar (#27509)');
         $this->assertStringContainsString('helloworld_try_prelinked_smoke_probe', $script);
         $this->assertStringContainsString('using prelinked smoke main as probe', $script);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
