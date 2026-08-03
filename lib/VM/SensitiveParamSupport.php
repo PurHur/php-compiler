@@ -21,6 +21,10 @@ final class SensitiveParamSupport
 
     public const PROP_VALUE = 'value';
 
+    /**
+     * Legacy flat-string token — kept for JIT helper ABI / unit SSOT only.
+     * debug_print_backtrace and getTraceAsString print Object(SensitiveParameterValue) (#27124).
+     */
     public const TRACE_ARG_LABEL = '[Sensitive Parameter]';
 
     /** Mirrors {@see \PHPCompiler\ext\standard\VmDebugBacktrace::IGNORE_ARGS}. */
@@ -158,7 +162,7 @@ final class SensitiveParamSupport
      * Format one trace argument for Throwable::getTraceAsString() (Zend zend_exceptions.c).
      *
      * SensitiveParameterValue markers format as Object(SensitiveParameterValue) — same as any
-     * object — not the debug_print_backtrace flat label {@see TRACE_ARG_LABEL} (#21524).
+     * object (debug_print_backtrace + getTraceAsString; #21524, #27124).
      *
      * String args use single quotes, smart_str_append_escaped + zend.exception_string_param_max_len
      * truncation (#21999). getTrace() raw values are unchanged.

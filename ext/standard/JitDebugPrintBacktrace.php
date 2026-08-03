@@ -102,7 +102,8 @@ final class JitDebugPrintBacktrace
         foreach ($block->paramNames as $paramIdx => $name) {
             unset($name);
             if (\PHPCompiler\VM\SensitiveParamSupport::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
-                $parts[] = \PHPCompiler\VM\SensitiveParamJitHelper::traceArgLabel();
+                // Zend debug_print_backtrace: Object(SensitiveParameterValue) (#27124).
+                $parts[] = 'Object('.\PHPCompiler\VM\SensitiveParamJitHelper::markerClassName().')';
 
                 continue;
             }
