@@ -13,13 +13,41 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ArrayObject — `__spl_ht` storage (#26823, ext/spl/spl_array.c).
+ * Thin-AOT ArrayObject — `__spl_ht` storage (#26823, #27286, ext/spl/spl_array.c).
  */
 final class ArrayObjectJitHelper
 {
     public const PROP_HT = '__spl_ht';
 
     public const CLASS_NAME = 'ArrayObject';
+
+    /**
+     * Classes whose `$obj[] =` must append into object `__spl_ht`, not overwrite the
+     * value-box as a bare hashtable (#27286 — reserveAppendSlot on the object clobbers it).
+     */
+    public static function supportsEmptyDimAppend(?string $containerUserType): bool
+    {
+        if (null === $containerUserType || '' === $containerUserType) {
+            return false;
+        }
+        $ut = strtolower(ltrim($containerUserType, '\\'));
+
+        return 'arrayobject' === $ut
+            || 'arrayiterator' === $ut
+            || 'recursivearrayiterator' === $ut;
+    }
+
+    /**
+     * Resolve `__spl_ht` for empty-dim append (`$o[] =`) from TYPE_OBJECT or boxed TYPE_VALUE.
+     */
+    public static function backingHashtableForAppend(Context $context, JITVariable $receiver): JITVariable
+    {
+        $obj = self::loadObject($context, $receiver);
+
+        return $context->type->object->splBackingHashtable(
+            new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $obj)
+        );
+    }
 
     public static function compileCount(Context $context, JITVariable $receiver): Value
     {
@@ -34,6 +62,16 @@ final class ArrayObjectJitHelper
         );
 
         return $slot;
+    }
+
+    /** php-src spl_array_method_append — next numeric index into storage. */
+    public static function compileAppend(Context $context, JITVariable $receiver, JITVariable $value): Value
+    {
+        $ht = self::htPtr($context, self::loadObject($context, $receiver));
+        $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
+        HashTableHelper::addElement($context, $htVar, $value, null);
+
+        return self::voidResult($context);
     }
 
     public static function compileGetArrayCopy(Context $context, JITVariable $receiver): Value
@@ -76,6 +114,43 @@ final class ArrayObjectJitHelper
         JITVariable $value
     ): Value {
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
+        $htVar = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $ht);
+        // php-src: null offset → append (zend_hash_next_index_insert); do not coerce to '' (#27286).
+        if (JITVariable::TYPE_NULL === $key->type || ($key->isNullConstant ?? false)) {
+            HashTableHelper::addElement($context, $htVar, $value, null);
+
+            return self::voidResult($context);
+        }
+        if (JITVariable::TYPE_VALUE === $key->type || JitValueBox::isValueOperand($key)) {
+            $valPtr = \PHPCompiler\JIT\HashTableReadLlvm::valuePtrFromDim($context, $key);
+            $valueMap = $context->structFieldMap['__value__'];
+            $i8 = $context->getTypeFromString('int8');
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($valPtr, $valueMap['type'])
+            );
+            $fn = $context->builder->getInsertBlock()->getParent();
+            $nullBb = $fn->appendBasicBlock('ao_offsetset_null_append');
+            $keyedBb = $fn->appendBasicBlock('ao_offsetset_keyed');
+            $doneBb = $fn->appendBasicBlock('ao_offsetset_done');
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    \PHPLLVM\Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(JITVariable::TYPE_NULL, false)
+                ),
+                $nullBb,
+                $keyedBb
+            );
+            $context->builder->positionAtEnd($nullBb);
+            HashTableHelper::addElement($context, $htVar, $value, null);
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($keyedBb);
+            HashTableHelper::setValueBoxKey($context, $ht, $key, $value);
+            $context->builder->branch($doneBb);
+            $context->builder->positionAtEnd($doneBb);
+
+            return self::voidResult($context);
+        }
         HashTableHelper::setValueBoxKey($context, $ht, self::asValueBoxKey($context, $key), $value);
 
         return self::voidResult($context);
