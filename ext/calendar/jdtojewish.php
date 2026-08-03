@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** jdtojewish() — Julian day to Jewish calendar string (php-src ext/calendar/calendar.c; #11875). */
+/** jdtojewish() — Julian day to Jewish calendar string (php-src ext/calendar/calendar.c; #11875 / #27368). */
 final class jdtojewish extends Internal
 {
     public function __construct()
@@ -47,6 +47,13 @@ final class jdtojewish extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('jdtojewish() is not implemented for JIT in this compiler build (issue #11875)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'jdtojewish() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitJdtojewish::invoke($context, ...$args);
     }
 }
