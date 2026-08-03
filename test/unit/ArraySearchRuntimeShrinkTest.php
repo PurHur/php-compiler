@@ -9,20 +9,32 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_search() JIT routes all operands through ArraySearchJitHelper PHP not ArrayBuiltinHelper LLVM (#12514, #18153). */
+/**
+ * array_search() AOT emits via ArraySearchLlvm (caller-frame), not NestedJIT VmArray stub (#12514, #27133).
+ * VM execute() still uses ArraySearchJitHelper → VmArray::searchKey.
+ */
 final class ArraySearchRuntimeShrinkTest extends TestCase
 {
-    public function testArraySearchRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArraySearchRuntimeUsesInlineLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArraySearchRuntime.php');
-        $this->assertStringContainsString('ArraySearchJitHelper', $runtime);
+        $this->assertStringContainsString('ArraySearchLlvm::searchKey', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('__array_search__key', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySearch', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_search.php');
         $this->assertStringContainsString('ArraySearchRuntime::search', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySearch', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArraySearchLlvm.php');
+        $this->assertStringContainsString('ArraySearchJitHelper', $llvm);
+        $this->assertStringContainsString('#27133', $llvm);
+        $this->assertStringContainsString('VmValueCompare::identicalValueToValue', $llvm);
+        $this->assertStringContainsString('__value__writeLong', $llvm);
+        $this->assertStringContainsString('__value__writeBool', $llvm);
     }
 
     public function testArraySearchJitHelperLooseMatch(): void
