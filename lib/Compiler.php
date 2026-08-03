@@ -28707,14 +28707,16 @@ class Compiler {
                 continue;
             }
             if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                // First FuncCall after skipping the callback only — inline haystack (#15490).
+                // Named CV haystacks already returned null above (#27344).
                 return $prev;
             }
             if ($prev instanceof Op\Expr\Assign) {
                 return null;
             }
-            if (!$this->isInlineExprCallArgProducer($prev)) {
-                return null;
-            }
+            // Array_ / other producers: haystack is not a trailing FuncCall — stop. Falling through
+            // would skip past the real haystack Array_ to an older var_dump (#27344, #27347).
+            return null;
         }
 
         return null;
@@ -37142,24 +37144,24 @@ class Compiler {
         $producerOps = [];
         $cfgChildren = $block->orig->children;
         $haystackIndex = array_search($haystackProducer, $cfgChildren, true);
-        $haystackSlot = \is_int($haystackIndex)
-            ? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex($block, $haystackIndex, $cfgChildren)
-            : null;
-        if (null === $haystackSlot) {
-            $haystackSlot = $block->slotForOperand($haystackProducer->result);
-        }
+        // Prefer the producer's bound EXEC_RETURN / compile it. Do not use CFG-index ordinal
+        // lookup here — with prior filter+var_dump in the same block it steals the wrong
+        // EXEC_RETURN (#27344 / #15490).
+        $haystackSlot = $block->slotForOperand($haystackProducer->result);
         if (null === $haystackSlot) {
             foreach ($this->compileExpr($haystackProducer, $block) as $op) {
                 $producerOps[] = $op;
             }
-            if (\is_int($haystackIndex)) {
-                $haystackSlot = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
-                    $block,
-                    $haystackIndex,
-                    $cfgChildren
-                );
-            }
-            $haystackSlot ??= $block->slotForOperand($haystackProducer->result)
+            $haystackSlot = $block->slotForOperand($haystackProducer->result)
+                ?? (
+                    \is_int($haystackIndex)
+                        ? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                            $block,
+                            $haystackIndex,
+                            $cfgChildren
+                        )
+                        : null
+                )
                 ?? $this->slotForLastInlineFuncCallExecReturn($block, $producerOps);
         }
         if (null === $haystackSlot) {
@@ -56142,6 +56144,36 @@ class Compiler {
                 // array_map(intval(...), str_split(str_repeat(...))) — keep FCC slot, not haystack EXEC_RETURN (#16279).
                 ++$argIndex;
                 continue;
+            }
+            if (
+                0 === $argIndex
+                && 1 === $callbackArgIndex
+                && 2 === \count($cfgCallOp->args ?? [])
+            ) {
+                $trailingHaystack = $this->trailingInlineFuncCallHaystackBeforeCfgCall($cfgCallOp, $block);
+                if (
+                    $trailingHaystack instanceof Op\Expr\FuncCall
+                    || $trailingHaystack instanceof Op\Expr\NsFuncCall
+                ) {
+                    // array_filter(str_split(...), …) after a prior filter+var_dump — bind haystack
+                    // EXEC_RETURN explicitly; sibling ordinal steals var_dump (#27344 / #15490).
+                    $haystackSlot = $block->slotForOperand($trailingHaystack->result);
+                    if (null === $haystackSlot) {
+                        $haystackIndex = array_search($trailingHaystack, $cfgChildren, true);
+                        $haystackSlot = \is_int($haystackIndex)
+                            ? $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
+                                $block,
+                                $haystackIndex,
+                                $cfgChildren
+                            )
+                            : null;
+                    }
+                    if (null !== $haystackSlot) {
+                        $send->arg1 = (string) $haystackSlot;
+                    }
+                    ++$argIndex;
+                    continue;
+                }
             }
             $hoistedPrelude = $this->hoistedPreludeProducerForCallArgIndex($cfgCallOp, $argIndex, $block);
             if (

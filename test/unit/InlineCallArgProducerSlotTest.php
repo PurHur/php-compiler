@@ -52,6 +52,95 @@ PHP;
         self::assertSame([$propSlot, $staticSlot, $fSlot], $sendSlots, 'fcall='.json_encode($fcallReturnSlots));
     }
 
+
+    /** Issue #27347 — consecutive array_any with inline Array_ + arrow must not steal prior var_dump. */
+    public function testConsecutiveArrayAnyInlineLiteralArrowRuns(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $code = <<<'PHP'
+<?php
+var_dump(array_any([1, 2, 3], fn($v) => $v > 5));
+var_dump(array_any([1, 2, 3], fn($v) => $v > 1));
+var_dump(array_all([1, 2, 3], fn($v) => $v > 0));
+var_dump(array_find([1, 2, 3], fn($v) => $v === 2));
+PHP;
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'array_any_consecutive_inline.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+            self::assertSame("bool(false)\nbool(true)\nbool(true)\nint(2)\n", $out);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #27347 — consecutive array_filter inline Array_ + arrow (no PROFILE gate). */
+    public function testConsecutiveArrayFilterInlineLiteralArrowRuns(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_dump(array_filter([1, 2, 3], fn($v) => $v > 5));
+var_dump(array_filter([1, 2, 3], fn($v) => $v > 1));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_filter_consecutive_inline.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('int(2)', $out);
+        self::assertStringContainsString('int(3)', $out);
+        self::assertStringNotContainsString('TypeError', $out);
+    }
+
+    /** Issue #27347 / #15490 — consecutive FuncCall haystacks must keep str_split EXEC, not prior var_dump. */
+    public function testConsecutiveArrayFilterFuncCallHaystackUsesProducerExecSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_dump(array_filter(explode(',', 'a,b'), static fn($x) => true));
+var_dump(array_filter(str_split('12a'), is_numeric(...)));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_filter_consecutive_funcall.php');
+
+        $strSplitExec = null;
+        $filterHaystacks = [];
+        $pending = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $pending = isset($block->constants[$op->arg1])
+                    ? strtolower($block->constants[$op->arg1]->toString())
+                    : '';
+                continue;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && 'str_split' === $pending) {
+                $strSplitExec = (string) $op->arg1;
+                $pending = null;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && 'array_filter' === $pending) {
+                $filterHaystacks[] = (string) $op->arg1;
+                $pending = null;
+            }
+        }
+        self::assertNotNull($strSplitExec);
+        self::assertCount(2, $filterHaystacks);
+        self::assertSame($strSplitExec, $filterHaystacks[1], 'haystacks='.json_encode($filterHaystacks));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('string(1) "a"', $out);
+        self::assertStringContainsString('string(1) "1"', $out);
+        self::assertStringNotContainsString('TypeError', $out);
+    }
+
     /** Issue #9074 — by-ref builtin then read mutated named local after return capture. */
     public function testByRefBuiltinThenVarDumpNamedLocalUsesArraySlot(): void
     {
