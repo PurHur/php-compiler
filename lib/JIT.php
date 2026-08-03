@@ -9680,24 +9680,32 @@ class JIT {
                                     $this->context->bindVariableByName($resolvedUnset, $nullVar);
                                     break;
                                 }
+                                // {main} / $GLOBALS symbols are KIND_VALUE functionStaticGlobal
+                                // boxes (__value__**), not stack KIND_VARIABLE allocas (#27118).
                                 if (
-                                    Variable::KIND_VARIABLE === $bound->kind
+                                    Variable::TYPE_VALUE === $bound->type
                                     && (
-                                        Variable::TYPE_VALUE === $bound->type
-                                        || Variable::TYPE_OBJECT === $bound->type
+                                        Variable::KIND_VARIABLE === $bound->kind
+                                        || $bound->functionStaticGlobal
+                                        || Variable::KIND_VALUE === $bound->kind
                                     )
                                 ) {
-                                    if (Variable::TYPE_VALUE === $bound->type) {
-                                        $this->jitWriteNullForUnset($bound->value);
-                                    } else {
-                                        // Native __object__* locals: delref then null the slot (#26795 / #4096 AOT unset).
-                                        $obj = $this->context->builder->load($bound->value);
-                                        $this->context->refcount->delref($obj);
-                                        $this->context->builder->store(
-                                            $this->context->getTypeFromString('__object__*')->constNull(),
-                                            $bound->value
-                                        );
-                                    }
+                                    $this->jitWriteNullForUnset(
+                                        JIT\JitValueBox::valuePtrFromVariable($this->context, $bound)
+                                    );
+                                    break;
+                                }
+                                if (
+                                    Variable::KIND_VARIABLE === $bound->kind
+                                    && Variable::TYPE_OBJECT === $bound->type
+                                ) {
+                                    // Native __object__* locals: delref then null the slot (#26795 / #4096 AOT unset).
+                                    $obj = $this->context->builder->load($bound->value);
+                                    $this->context->refcount->delref($obj);
+                                    $this->context->builder->store(
+                                        $this->context->getTypeFromString('__object__*')->constNull(),
+                                        $bound->value
+                                    );
                                     break;
                                 }
                             }
@@ -9736,10 +9744,16 @@ class JIT {
                                 break;
                             }
                             if (
-                                Variable::KIND_VARIABLE === $target->kind
-                                && Variable::TYPE_VALUE === $target->type
+                                Variable::TYPE_VALUE === $target->type
+                                && (
+                                    Variable::KIND_VARIABLE === $target->kind
+                                    || $target->functionStaticGlobal
+                                    || Variable::KIND_VALUE === $target->kind
+                                )
                             ) {
-                                $this->jitWriteNullForUnset($target->value);
+                                $this->jitWriteNullForUnset(
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $target)
+                                );
                                 break;
                             }
                             $target->free();
@@ -10256,6 +10270,7 @@ class JIT {
                     }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $binLeftOp = $this->binaryOpLeftOperand($block, $op);
+                    $binRightOp = $this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right');
                     $binDestOp = $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result');
                     $binLeft = $this->variableFromOpForRuntimeRead($binLeftOp);
                     if (
@@ -10277,9 +10292,20 @@ class JIT {
                         $this->compileBinaryOp(
                             $op,
                             $binLeft,
-                            $this->variableFromOpForRuntimeRead($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
+                            $this->variableFromOpForRuntimeRead($binRightOp)
                         )
                     );
+                    if (
+                        OpCode::TYPE_IDENTICAL === $op->type
+                        || OpCode::TYPE_NOT_IDENTICAL === $op->type
+                    ) {
+                        // Identical/not-identical only need the bool result. Release Temporary
+                        // object boxes now (Zend statement-end) so WeakReference::get() temps do
+                        // not outlive a following unset in the same CFG block (#27118).
+                        $this->jitReleaseTempValueBoxAfterCompare($block, $binLeftOp);
+                        $this->jitReleaseTempValueBoxAfterCompare($block, $binRightOp);
+                        $this->jitReleasePendingWeakReferenceGetResult();
+                    }
                     break;
                 case OpCode::TYPE_EQUAL:
                 case OpCode::TYPE_NOT_EQUAL:
@@ -10704,6 +10730,8 @@ class JIT {
                         $builder->positionAtEnd($branchBlock);
                         if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
+                            $this->jitReleaseJumpIfAnonValueBoxes($block, $op);
+                            $this->jitReleasePendingWeakReferenceGetResult();
                         }
                         $builder->branchIf($condition, $ifEntry, $elseEntry);
                         if (null !== $ternaryMergeReturn) {
@@ -10731,6 +10759,8 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
+                        $this->jitReleaseJumpIfAnonValueBoxes($block, $op);
+                        $this->jitReleasePendingWeakReferenceGetResult();
                     }
                     $builder->branchIf($condition, $ifEntry, $elseEntry);
                     if (null !== $ternaryMergeReturn) {
@@ -13657,6 +13687,42 @@ class JIT {
 
                 return;
             }
+            // WeakReference::get() returns an owning __value__ box. Promote to an entry
+            // alloca KIND_VARIABLE so freeDeadVariables at ternary/branch edges can
+            // valueDelref (KIND_VALUE free is a no-op and would keep the referent) (#27118).
+            if ($this->context->scope->toCall instanceof JIT\Call\WeakReferenceGet) {
+                $ptr = '__value__*' === $llvmTy
+                    ? JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult)
+                    : JIT\JitValueBox::pointer($this->context, $llvmResult);
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                // Drop the call-local owning box; the entry alloca holds the strong ref.
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    $ptr
+                );
+                $resultVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $this->context->setVariableOp($result, $resultVar);
+                $this->context->pendingWeakReferenceGetResult = $result;
+
+                return;
+            }
+            if ($this->context->scope->toCall instanceof JIT\Call\WeakReferenceCreate) {
+                $this->assignOperandValue($result, $llvmResult, true);
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->classUserType = 'WeakReference';
+                }
+
+                return;
+            }
             if (
                 $this->context->hasVariableOp($result)
                 && ('__value__*' === $llvmTy || '__value__' === $llvmTy)
@@ -14776,6 +14842,7 @@ class JIT {
         );
         JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
+        $this->syncCompileTimeString($globalVar, $value, false);
         $this->syncCompileTimeBcmathNumber($globalVar, $value, false);
         $this->syncCompileTimeDomTagName($globalVar, $value, false);
         $this->syncCompileTimeDatePeriod($globalVar, $value, false);
@@ -18481,6 +18548,18 @@ class JIT {
         }
         $methodLc = strtolower($methodName);
 
+        // Prefer typed WeakReference::get when create() tagged the receiver (#27118).
+        if (
+            'get' === $methodLc
+            && 'WeakReference' === ($receiverVar->classUserType ?? '')
+            && $this->context->functionIsRegistered('weakreference::get')
+        ) {
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy('weakreference::get');
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
+
         if ('object' === $declaringClassLc) {
             if ('getname' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::getname')) {
                 $className = 'ReflectionAttribute';
@@ -21097,6 +21176,167 @@ class JIT {
             $this->context->lookupFunction('__value__writeNull'),
             $valueBoxPtr
         );
+    }
+
+    /**
+     * After === / !==, drop anonymous Temporary value boxes (call results). Named
+     * locals stay; freeDeadVariables at block edges is too late for unset (#27118).
+     */
+    private function jitReleaseTempValueBoxAfterCompare(Block $block, Operand $op): void
+    {
+        $this->context->aliasVariableOpFromSlot($block, $op);
+        if (!$this->context->hasVariableOp($op) && !$this->context->scope->variables->contains($op)) {
+            $slot = $block->slotForOperand($op);
+            if (null === $slot) {
+                return;
+            }
+            $scoped = $block->operandForScopeSlot($slot);
+            if (null === $scoped) {
+                return;
+            }
+            $op = $scoped;
+        }
+        if (!$this->context->hasVariableOp($op) && !$this->context->scope->variables->contains($op)) {
+            return;
+        }
+        $var = $this->context->hasVariableOp($op)
+            ? $this->context->getVariableFromOp($op)
+            : $this->context->scope->variables[$op];
+        $name = JIT\OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])) {
+                return;
+            }
+        }
+        if (
+            Variable::TYPE_VALUE !== $var->type
+            || $var->functionStaticGlobal
+            || $var->borrowedValueEntry
+            || null !== $var->superglobalName
+            || null !== $var->valueBoxAliasPtr
+        ) {
+            return;
+        }
+        if (
+            Variable::KIND_VARIABLE !== $var->kind
+            && Variable::KIND_VALUE !== $var->kind
+        ) {
+            return;
+        }
+        $this->jitWriteNullForUnset(
+            JIT\JitValueBox::valuePtrFromVariable($this->context, $var)
+        );
+        if ($this->context->scope->variables->contains($op)) {
+            $this->context->scope->variables->detach($op);
+        }
+    }
+
+    private function jitReleasePendingWeakReferenceGetResult(): void
+    {
+        $op = $this->context->pendingWeakReferenceGetResult;
+        $this->context->pendingWeakReferenceGetResult = null;
+        if (null === $op) {
+            return;
+        }
+        if (!$this->context->hasVariableOp($op) && !$this->context->scope->variables->contains($op)) {
+            return;
+        }
+        $var = $this->context->hasVariableOp($op)
+            ? $this->context->getVariableFromOp($op)
+            : $this->context->scope->variables[$op];
+        if (
+            Variable::TYPE_VALUE !== $var->type
+            || $var->functionStaticGlobal
+            || $var->borrowedValueEntry
+        ) {
+            return;
+        }
+        $this->jitWriteNullForUnset(
+            JIT\JitValueBox::valuePtrFromVariable($this->context, $var)
+        );
+        if ($this->context->scope->variables->contains($op)) {
+            $this->context->scope->variables->detach($op);
+        }
+    }
+
+    /**
+     * VM releaseVmJumpIfCondTemps (#14103) for JIT: drop anonymous TYPE_VALUE boxes
+     * that die in this block before branching so WeakReference::get() results do not
+     * keep referents across unset in a ternary-echo merge block (#27118).
+     *
+     * Only considers {@see Block::$orig} deadOperands for this block — after successor
+     * arms are compiled, scope also holds merge-block bindings that must not be freed here.
+     */
+    private function jitReleaseJumpIfAnonValueBoxes(Block $block, OpCode $jumpIf): void
+    {
+        $keepOps = new \SplObjectStorage();
+        if (null !== $jumpIf->arg1) {
+            $condOp = $this->operandAt($block, $jumpIf->arg1, 'branch condition');
+            $keepOps[$condOp] = true;
+        }
+        foreach ($this->context->coalesceAssignTargets as $mergeOp) {
+            $keepOps[$mergeOp] = true;
+        }
+        $toFree = [];
+        $seen = new \SplObjectStorage();
+        foreach ($block->orig->deadOperands as $deadOp) {
+            $candidates = [$deadOp];
+            $slot = $block->slotForOperand($deadOp);
+            if (null !== $slot) {
+                $scoped = $block->operandForScopeSlot($slot);
+                if (null !== $scoped) {
+                    $candidates[] = $scoped;
+                }
+            }
+            foreach ($candidates as $op) {
+                if ($seen->contains($op)) {
+                    continue;
+                }
+                $seen[$op] = true;
+                if ($keepOps->contains($op)) {
+                    continue;
+                }
+                $name = JIT\OperandName::resolve($op);
+                if (null !== $name && '' !== $name) {
+                    $resolved = $this->context->resolveRefAliasName($name);
+                    if (isset($this->context->namedVariableBindings[$resolved])) {
+                        continue;
+                    }
+                }
+                if (!$this->context->scope->variables->contains($op) && !$this->context->hasVariableOp($op)) {
+                    continue;
+                }
+                $var = $this->context->hasVariableOp($op)
+                    ? $this->context->getVariableFromOp($op)
+                    : $this->context->scope->variables[$op];
+                if (
+                    Variable::TYPE_VALUE !== $var->type
+                    || $var->functionStaticGlobal
+                    || $var->borrowedValueEntry
+                    || null !== $var->superglobalName
+                    || null !== $var->valueBoxAliasPtr
+                    || (
+                        Variable::KIND_VARIABLE !== $var->kind
+                        && Variable::KIND_VALUE !== $var->kind
+                    )
+                ) {
+                    continue;
+                }
+                $toFree[] = $op;
+            }
+        }
+        foreach ($toFree as $op) {
+            $var = $this->context->hasVariableOp($op)
+                ? $this->context->getVariableFromOp($op)
+                : $this->context->scope->variables[$op];
+            $this->jitWriteNullForUnset(
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $var)
+            );
+            if ($this->context->scope->variables->contains($op)) {
+                $this->context->scope->variables->detach($op);
+            }
+        }
     }
 
     /** Zend emalloc parity: drop tracked bytes when unset frees a string (#7310). */
