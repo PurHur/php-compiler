@@ -18716,9 +18716,47 @@ class JIT {
         }
 
         if ('object' === $declaringClassLc) {
-            if ('getname' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::getname')) {
-                $className = 'ReflectionAttribute';
-                $declaringClassLc = 'reflectionattribute';
+            // Untyped `$obj->getName()` used to always bind ReflectionAttribute (#27303): that
+            // steals ReflectionConstant/ReflectionClass/… and yields empty/segfault under AOT.
+            $receiverHint = (string) ($receiverVar->classUserType ?? $receiverVar->compileTimeString ?? '');
+            $receiverHintLc = strtolower(ltrim($receiverHint, '\\'));
+            if ('getname' === $methodLc) {
+                if (
+                    'reflectionconstant' === $receiverHintLc
+                    && $this->context->functionIsRegistered('reflectionconstant::getname')
+                ) {
+                    $className = 'ReflectionConstant';
+                    $declaringClassLc = 'reflectionconstant';
+                } elseif (
+                    'reflectionclass' === $receiverHintLc
+                    && $this->context->functionIsRegistered('reflectionclass::getname')
+                ) {
+                    $className = 'ReflectionClass';
+                    $declaringClassLc = 'reflectionclass';
+                } elseif (
+                    'reflectionfunction' === $receiverHintLc
+                    && $this->context->functionIsRegistered('reflectionfunction::getname')
+                ) {
+                    $className = 'ReflectionFunction';
+                    $declaringClassLc = 'reflectionfunction';
+                } elseif (
+                    'reflectionenum' === $receiverHintLc
+                    && $this->context->functionIsRegistered('reflectionenum::getname')
+                ) {
+                    $className = 'ReflectionEnum';
+                    $declaringClassLc = 'reflectionenum';
+                } elseif ($this->context->functionIsRegistered('reflectionattribute::getname')) {
+                    $className = 'ReflectionAttribute';
+                    $declaringClassLc = 'reflectionattribute';
+                }
+            } elseif ('getvalue' === $methodLc) {
+                if (
+                    'reflectionconstant' === $receiverHintLc
+                    && $this->context->functionIsRegistered('reflectionconstant::getvalue')
+                ) {
+                    $className = 'ReflectionConstant';
+                    $declaringClassLc = 'reflectionconstant';
+                }
             } elseif ('newinstance' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::newinstance')) {
                 $className = 'ReflectionAttribute';
                 $declaringClassLc = 'reflectionattribute';

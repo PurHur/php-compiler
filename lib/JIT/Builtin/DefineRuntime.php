@@ -165,13 +165,32 @@ final class DefineRuntime
     private static function seedCompileTimeUserConstants(Context $context, Value $ht): void
     {
         $vmContext = $context->runtime->vmContext;
-        if (null === $vmContext || [] === $vmContext->constants) {
+        if (null === $vmContext) {
             return;
         }
         foreach ($vmContext->constants as $name => $vmVar) {
             $resolved = $vmVar->resolveIndirect();
             $key = $context->builder->load($context->constantStringFromString($name));
             $element = self::jitVariableFromVm($context, $resolved);
+            if (null === $element) {
+                continue;
+            }
+            HashTableHelper::setAtStringKey($context, $ht, $key, $element);
+        }
+        // Core/engine globals so runtime constant($name) / ReflectionConstant::getValue
+        // resolve under AOT when the name is not a compile-time literal (#27303).
+        foreach ([
+            'PHP_VERSION_ID', 'PHP_VERSION', 'PHP_MAJOR_VERSION', 'PHP_MINOR_VERSION',
+            'PHP_RELEASE_VERSION', 'PHP_INT_MAX', 'PHP_INT_MIN', 'PHP_INT_SIZE',
+            'PHP_FLOAT_MAX', 'PHP_FLOAT_MIN', 'PHP_EOL', 'DIRECTORY_SEPARATOR', 'PATH_SEPARATOR',
+            'PHP_OS', 'PHP_OS_FAMILY', 'PHP_SAPI',
+        ] as $coreName) {
+            $phpVar = $vmContext->constantFetchBuiltin($coreName);
+            if (null === $phpVar) {
+                continue;
+            }
+            $key = $context->builder->load($context->constantStringFromString($coreName));
+            $element = self::jitVariableFromVm($context, $phpVar->resolveIndirect());
             if (null === $element) {
                 continue;
             }

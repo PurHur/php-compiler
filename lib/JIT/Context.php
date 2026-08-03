@@ -1135,6 +1135,8 @@ class Context {
         $this->functionProxies['reflectionproperty::isfinal'] = new Call\ReflectionPropertyIsFinal();
 
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
+        $this->functionProxies['reflectionconstant::getname'] = new Call\ReflectionConstantGetName();
+        $this->functionProxies['reflectionconstant::getvalue'] = new Call\ReflectionConstantGetValue();
         $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         // ReflectionClassConstant::$class+$name layout — not ReflectionConstant::$name+$constant (#25963).
         $this->functionProxies['reflectionclassconstant::getattributes'] = new Call\ReflectionClassConstantGetAttributes();
