@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * strstr()/stristr() for compiled JIT/AOT modules (#14778, php-in-PHP).
+ * strstr()/stristr() algorithm peer for unit tests (#14778, #27185).
  *
- * SSOT: {@see VmString::strstr()} / {@see VmString::stristr()}
+ * AOT/JIT call sites use {@see \PHPCompiler\JIT\Builtin\StringStrstr}
+ * (`phpc_strstr_scan` / `phpc_stristr_scan`) — NestedJIT helpers mis-materialize
+ * nullable {@see __string__*} under thin AOT. VM SSOT remains {@see VmString::strstr()} /
+ * {@see VmString::stristr()}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(strstr), PHP_FUNCTION(stristr)
  */
 final class StrstrJitHelper
