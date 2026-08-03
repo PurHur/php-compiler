@@ -5365,6 +5365,7 @@
         "lib/JIT/Builtin/PendingHeaders.php",
         "lib/JIT/Builtin/PendingHeadersJitBridge.php",
         "lib/JIT/Builtin/PendingHeadersRuntime.php",
+        "lib/JIT/Builtin/PhpTokenRuntime.php",
         "lib/JIT/Builtin/PosixCtermidRuntime.php",
         "lib/JIT/Builtin/PosixSessionRuntime.php",
         "lib/JIT/Builtin/PosixStrerrorRuntime.php",
@@ -5868,6 +5869,9 @@
         "lib/JIT/Call/NoOpConstruct.php",
         "lib/JIT/Call/ObjectCompareSpaceship.php",
         "lib/JIT/Call/ObjectNestedReceiver.php",
+        "lib/JIT/Call/PhpTokenConstruct.php",
+        "lib/JIT/Call/PhpTokenGetTokenName.php",
+        "lib/JIT/Call/PhpTokenTokenize.php",
         "lib/JIT/Call/RandomizerConstruct.php",
         "lib/JIT/Call/RandomizerGetBytesFromString.php",
         "lib/JIT/Call/RandomizerMt19937Construct.php",
@@ -7126,9 +7130,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6892,
+        "inventory_files": 6896,
         "excluded": 0,
-        "eligible": 6892,
+        "eligible": 6896,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
