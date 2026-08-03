@@ -34,7 +34,7 @@ final class JsonEncodeNestedJitHelper
         if (Variable::TYPE_STRING === $t) {
             return '"'.$value->toString().'"';
         }
-        if (Variable::TYPE_ARRAY === $t) {
+        if (Variable::TYPE_ARRAY === $t || 7 === $t) {
             return self::encodeHashtable($value->toArray(), $flags);
         }
 

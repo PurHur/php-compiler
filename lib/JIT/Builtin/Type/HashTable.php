@@ -1836,9 +1836,16 @@ class HashTable extends Type
         $value = $fn->getParam(0);
         $map = $this->context->structFieldMap['__value__'];
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $i8 = $this->context->getTypeFromString('int8');
         $typeByte = $this->context->builder->load($this->context->builder->structGep($value, $map['type']));
-        $expected = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_HASHTABLE, false);
-        $isHt = $this->context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
+        // Mask IS_REFCOUNTED — writers may store TYPE_HASHTABLE (135) or kind 7 (#26977 /
+        // JitValueBox copyFromPointer). Unmasked EQ missed kind 7 → null HT → NestedJIT abort.
+        $kind = $this->context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isHt = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
         $ok = $fn->appendBasicBlock('read_ht_ok');
         $empty = $fn->appendBasicBlock('read_ht_empty');
         $merge = $fn->appendBasicBlock('read_ht_merge');

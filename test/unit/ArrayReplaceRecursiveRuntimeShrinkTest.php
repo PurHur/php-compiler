@@ -94,8 +94,9 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertFileExists($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
         $llvm = file_get_contents($this->repoRoot.'/lib/JIT/HashTableReplaceRecursiveLlvm.php');
         $this->assertIsString($llvm);
-        $this->assertStringContainsString('HashTableDuplicateRuntime::duplicate', $llvm);
+        $this->assertStringContainsString('JitValueBox::copyFromPointer', $llvm);
         $this->assertStringContainsString('__hashtable__replaceRecursiveOverlay', $llvm);
         $this->assertStringContainsString('ensureOverlayFunction', $llvm);
+        $this->assertStringNotContainsString('HashTableDuplicateRuntime::duplicate', $llvm);
     }
 }

@@ -14,7 +14,7 @@ use PHPLLVM\Value;
  * HashTable::replaceRecursiveCopy() for NestedJIT (#26977).
  *
  * Must not NestedJIT-compile HashTable.php (#12910) — emit LLVM via
- * {@see HashTableReplaceRecursiveLlvm} (C overlay port + Cow duplicate).
+ * {@see HashTableReplaceRecursiveLlvm} (C overlay port + alloc/overlay copy).
  */
 final class HashTableReplaceRecursiveCopy implements Call
 {

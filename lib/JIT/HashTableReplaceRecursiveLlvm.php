@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -17,7 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * nested string-key merges mutate in place like php-src
  * {@see php_array_replace_recursive} — not a compile-time-inlined addMissing-only stub.
  *
- * Initial copy uses {@see HashTableCowLlvm::duplicate} (proven NestedJIT COW path).
+ * Initial copy: alloc + overlay (not CowLlvm::duplicate — Cow HTs are dim-OK but
+ * exportKeyValuePairs-empty for NestedJIT json_encode Done-when).
  *
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_recursive)
  */
@@ -40,19 +40,23 @@ final class HashTableReplaceRecursiveLlvm
         );
     }
 
-    /** NestedJIT / bridge: copy with zero overlays. */
+    /** NestedJIT / bridge: copy with zero overlays (alloc+overlay — exportable for json_encode). */
     public static function replaceSingle(Context $context, Value $ht): Value
     {
-        self::ensureOverlayFunction($context);
+        // Prefer alloc+overlay over CowLlvm::duplicate — Cow copies are dim-fetchable but
+        // exportKeyValuePairs-empty under NestedJIT json_encode (#26977 Done-when).
+        $overlay = self::ensureOverlayFunction($context);
+        $result = HashTableHelper::alloc($context);
+        $context->builder->call($overlay, $result, $ht);
 
-        return HashTableDuplicateRuntime::duplicate($context, $ht);
+        return $result;
     }
 
     /** NestedJIT / bridge: duplicate base then overlay one replacement (C overlay parity). */
     public static function replaceTwo(Context $context, Value $left, Value $right): Value
     {
         $overlay = self::ensureOverlayFunction($context);
-        $result = HashTableDuplicateRuntime::duplicate($context, $left);
+        $result = self::replaceSingle($context, $left);
         $context->builder->call($overlay, $result, $right);
 
         return $result;
@@ -64,7 +68,7 @@ final class HashTableReplaceRecursiveLlvm
     public static function arrayReplaceRecursive(Context $context, Variable $first, Variable ...$others): Value
     {
         $overlay = self::ensureOverlayFunction($context);
-        $result = HashTableDuplicateRuntime::duplicate(
+        $result = self::replaceSingle(
             $context,
             ArrayBuiltinHelper::loadHashTable($context, $first)
         );
@@ -304,14 +308,16 @@ final class HashTableReplaceRecursiveLlvm
         return $context->builder->inBoundsGep($values, $index);
     }
 
-    /** CowLlvm-style: TYPE_VALUE Variable over the node's embedded __value__ field. */
+    /** Copy node value into dest at string key (do not alias src node storage — #26977). */
     private static function storeNodeValueAtStringKey(
         Context $context,
         Value $dest,
         Value $keyStr,
         Value $valEntry
     ): void {
-        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valEntry);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $slot, $valEntry);
+        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         HashTableWriteLlvm::setAtStringKey($context, $dest, $keyStr, $elem);
     }
 }
