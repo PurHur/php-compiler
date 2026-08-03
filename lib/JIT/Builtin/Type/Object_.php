@@ -3969,10 +3969,22 @@ class Object_ extends Type {
             }
         }
         // M5ParserAstPeer method slots for NestedJIT under FORCE_PARSER (#27426).
+        // Include private helpers — parse() calls them; NestedJIT surface-only soft-failed.
         if ('phpcompiler\\jit\\m5parserastpeer' === $lcname || 'm5parserastpeer' === $lcname) {
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $priv = \PHPCfg\Func::FLAG_PRIVATE;
             foreach (['parse', 'traverse', 'addvisitor', 'begincompilationunit'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
+            }
+            foreach ([
+                'stripleadingpreamble',
+                'tryechostringast',
+                'tryassignplusechoast',
+                'scanident',
+                'scanunsignedint',
+                'skipws',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $priv | \PHPCfg\Func::FLAG_STATIC);
             }
         }
         if ('phpcfg\\func' === $lcname) {

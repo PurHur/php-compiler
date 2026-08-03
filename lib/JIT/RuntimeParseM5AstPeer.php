@@ -16,10 +16,15 @@ use PHPCfg\Operand;
  * C-floor wires M5ParserAstPeer for all three; without NestedJIT'd methods the call
  * aborts. Opt-in via the same PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT flag as
  * {@see RuntimeParseM5PhpCfgParser}.
+ *
+ * NestedJIT **every** class method (not only the public Parser surface): `parse()` calls
+ * private helpers (`stripLeadingPreamble`, `tryEchoStringAst`, …). Skipping those left
+ * call sites unresolved and made ensureMethods soft-fail (#27426 post-#27465).
  */
 final class RuntimeParseM5AstPeer
 {
-    private const METHODS = ['parse', 'traverse', 'addvisitor', 'begincompilationunit'];
+    /** Public surface that must be present for ensureMethods to count as success. */
+    private const REQUIRED_SURFACE = ['parse', 'traverse', 'addvisitor', 'begincompilationunit'];
 
     /**
      * @param callable(string):string                               $llvmInternalName
@@ -52,7 +57,7 @@ final class RuntimeParseM5AstPeer
             return false;
         }
 
-        $any = false;
+        $registered = [];
         $savedClassId = $context->scope->classId;
         $savedClassName = $context->scope->className;
         $context->scope->classId = $context->type->object->lookup(M5ParserAstPeer::class);
@@ -76,39 +81,48 @@ final class RuntimeParseM5AstPeer
                     if (!$bodyChild instanceof Op\Stmt\ClassMethod) {
                         continue;
                     }
-                    $methodLc = strtolower($bodyChild->func->name);
-                    if (!in_array($methodLc, self::METHODS, true)) {
-                        continue;
-                    }
                     if (null === $bodyChild->func->cfg) {
                         continue;
                     }
-                    $logical = M5ParserAstPeer::class.'::'.$bodyChild->func->name;
+                    $methodName = $bodyChild->func->name;
+                    $methodLc = strtolower($methodName);
+                    $logical = M5ParserAstPeer::class.'::'.$methodName;
                     $lc = strtolower($logical);
                     if (isset($context->functions[$lc])) {
-                        $any = true;
+                        $registered[$methodLc] = true;
                         continue;
                     }
-                    $compiled = $compileFunc($logical, $bodyChild->func);
-                    if ($compiled instanceof CoreFunc\PHP) {
-                        $nestedJitRun(static function () use ($compileBlock, $compiled, $logical): void {
-                            $compileBlock($compiled->block, $logical);
-                        });
+                    try {
+                        $compiled = $compileFunc($logical, $bodyChild->func);
+                        if ($compiled instanceof CoreFunc\PHP) {
+                            $nestedJitRun(static function () use ($compileBlock, $compiled, $logical): void {
+                                $compileBlock($compiled->block, $logical);
+                            });
+                        }
+                    } catch (\Throwable $e) {
+                        // Soft-fail one method; keep trying siblings (helpers may still land).
+                        continue;
                     }
                     if (isset($context->functions[$lc])) {
-                        $any = true;
+                        $registered[$methodLc] = true;
                     }
                 }
                 break;
             }
         } catch (\Throwable $e) {
-            return $any;
+            // fall through — return based on surface completeness
         } finally {
             $context->scope->classId = $savedClassId;
             $context->scope->className = $savedClassName;
         }
 
-        return $any;
+        foreach (self::REQUIRED_SURFACE as $need) {
+            if (!isset($registered[$need])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function peerPhpPath(): ?string
