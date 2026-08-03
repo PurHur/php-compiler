@@ -740,6 +740,152 @@ final class PregAotFastPath
 
     private static string $split7 = '';
 
+    private static int $matchAllCount = 0;
+
+    private static string $matchAll0 = '';
+
+    private static string $matchAll1 = '';
+
+    private static string $matchAll2 = '';
+
+    private static string $matchAll3 = '';
+
+    private static string $matchAll4 = '';
+
+    private static string $matchAll5 = '';
+
+    private static string $matchAll6 = '';
+
+    private static string $matchAll7 = '';
+
+    /**
+     * NestedJIT-safe preg_match_all — int return + full-match string slots (#27195).
+     *
+     * PREG_PATTERN_ORDER without capture groups only (flags==0). LLVM builds
+     * `$matches[0] = [m0, m1, …]` from {@see self::matchAllPart}.
+     *
+     * @return int match count, 0 if none, -1 unsupported/error
+     */
+    public static function matchAllStore(string $pattern, string $subject, int $flags, int $offset): int
+    {
+        self::$matchAllCount = 0;
+        self::$matchAll0 = '';
+        self::$matchAll1 = '';
+        self::$matchAll2 = '';
+        self::$matchAll3 = '';
+        self::$matchAll4 = '';
+        self::$matchAll5 = '';
+        self::$matchAll6 = '';
+        self::$matchAll7 = '';
+        if (0 !== $flags) {
+            return -1;
+        }
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            return 0;
+        }
+        $kind = self::patternKind($pattern);
+        // No-group class-plus (2/4/6) and plain literals (1). Grouped kinds need nested
+        // group rows — defer until thin slots expand.
+        if (1 !== $kind && 2 !== $kind && 4 !== $kind && 6 !== $kind) {
+            return -1;
+        }
+        // Reuse NestedJIT-proven matchCount; advance past each hit (#27195).
+        $cursor = $offset;
+        $n = 0;
+        while ($cursor < $subLen) {
+            $rc = self::matchCount($pattern, $subject, $cursor);
+            if ($rc < 0) {
+                return -1;
+            }
+            if (0 === $rc) {
+                break;
+            }
+            $full = '' . self::lastCap(0);
+            $flen = \strlen($full);
+            if ($flen < 1) {
+                return -1;
+            }
+            $start = $cursor;
+            $found = 0;
+            while ($start + $flen <= $subLen) {
+                if (self::literalEqualsAt($subject, $start, $full, $flen)) {
+                    $found = 1;
+                    break;
+                }
+                ++$start;
+            }
+            if (0 === $found) {
+                return -1;
+            }
+            if ($n >= self::MAX_CAPS) {
+                return -1;
+            }
+            self::storeMatchAllAt($n, $full);
+            ++$n;
+            $cursor = $start + $flen;
+        }
+        self::$matchAllCount = $n;
+
+        return $n;
+    }
+
+    public static function matchAllPartCount(): int
+    {
+        return self::$matchAllCount;
+    }
+
+    public static function matchAllPart(int $index): string
+    {
+        if (0 === $index) {
+            return '' . self::$matchAll0;
+        }
+        if (1 === $index) {
+            return '' . self::$matchAll1;
+        }
+        if (2 === $index) {
+            return '' . self::$matchAll2;
+        }
+        if (3 === $index) {
+            return '' . self::$matchAll3;
+        }
+        if (4 === $index) {
+            return '' . self::$matchAll4;
+        }
+        if (5 === $index) {
+            return '' . self::$matchAll5;
+        }
+        if (6 === $index) {
+            return '' . self::$matchAll6;
+        }
+        if (7 === $index) {
+            return '' . self::$matchAll7;
+        }
+
+        return '';
+    }
+
+    private static function storeMatchAllAt(int $index, string $value): void
+    {
+        if (0 === $index) {
+            self::$matchAll0 = $value;
+        } elseif (1 === $index) {
+            self::$matchAll1 = $value;
+        } elseif (2 === $index) {
+            self::$matchAll2 = $value;
+        } elseif (3 === $index) {
+            self::$matchAll3 = $value;
+        } elseif (4 === $index) {
+            self::$matchAll4 = $value;
+        } elseif (5 === $index) {
+            self::$matchAll5 = $value;
+        } elseif (6 === $index) {
+            self::$matchAll6 = $value;
+        } elseif (7 === $index) {
+            self::$matchAll7 = $value;
+        }
+    }
+
     /**
      * NestedJIT-safe preg_split — int return + static string slots only (no PHP arrays, #27080).
      *
