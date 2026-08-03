@@ -156,6 +156,23 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $peerForce = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5AstPeer.php');
         $this->assertStringContainsString('M5ParserAstPeer', $peerForce);
         $this->assertStringContainsString('ensureMethods', $peerForce);
+        $this->assertStringContainsString('REQUIRED_SURFACE', $peerForce);
+        // Must NestedJIT private helpers too — parse() calls tryEchoStringAst etc. (#27426).
+        $this->assertStringNotContainsString(
+            "private const METHODS = ['parse', 'traverse', 'addvisitor', 'begincompilationunit']",
+            $peerForce,
+            'Surface-only METHODS filter soft-failed NestedJIT of parse helpers'
+        );
+        $this->assertStringContainsString('tryechostringast', (string) file_get_contents(
+            $root.'/lib/JIT/Builtin/Type/Object_.php'
+        ));
+        $this->assertStringContainsString('REQUIRED_SURFACE', $peerForce);
+        $this->assertStringContainsString('stripLeadingPreamble', (string) file_get_contents($root.'/lib/JIT/M5ParserAstPeer.php'));
+        // NestedJIT every class method — private helpers are called from parse() (#27426).
+        $this->assertStringNotContainsString(
+            "private const METHODS = ['parse', 'traverse', 'addvisitor', 'begincompilationunit']",
+            $peerForce
+        );
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
         $this->assertStringContainsString('RuntimeParseM5Native.php', $jit);
         $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $jit);
