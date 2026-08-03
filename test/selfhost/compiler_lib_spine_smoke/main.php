@@ -5502,6 +5502,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomXPathQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetCode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetMessage.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetTrace.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetTraceAsString.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionToString.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ExceptionThrowToStringSeed.php';

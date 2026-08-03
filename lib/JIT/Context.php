@@ -1176,9 +1176,15 @@ class Context {
         $this->functionProxies['exception::getmessage'] = new Call\ExceptionGetMessage();
         $this->functionProxies['exception::getcode'] = new Call\ExceptionGetCode();
         $exceptionToString = new Call\ExceptionToString();
+        $exceptionGetTrace = new Call\ExceptionGetTrace();
         $exceptionGetTraceAsString = new Call\ExceptionGetTraceAsString();
         $this->functionProxies['exception::__tostring'] = $exceptionToString;
+        $this->functionProxies['exception::gettrace'] = $exceptionGetTrace;
         $this->functionProxies['exception::gettraceasstring'] = $exceptionGetTraceAsString;
+        // catch (Throwable $e) resolves methods on the interface name (#27333).
+        $this->functionProxies['throwable::__tostring'] = $exceptionToString;
+        $this->functionProxies['throwable::gettrace'] = $exceptionGetTrace;
+        $this->functionProxies['throwable::gettraceasstring'] = $exceptionGetTraceAsString;
         $exceptionCtor = new Call\ExceptionConstruct();
         foreach (\PHPCompiler\ext\standard\ThrowableManifest::registrationOrder() as $throwableName) {
             if (!\PHPCompiler\ext\standard\ThrowableManifest::isAdvertised($throwableName)) {
@@ -1186,14 +1192,16 @@ class Context {
             }
             $lc = \PHPCompiler\ext\standard\ThrowableManifest::lcKey($throwableName);
             $this->functionProxies[$lc.'::__construct'] = $exceptionCtor;
-            // Throwable::__toString / getTraceAsString — user-script AOT (#26796).
+            // Throwable::__toString / getTrace / getTraceAsString — user-script AOT (#26796, #27333).
             $this->functionProxies[$lc.'::__tostring'] = $exceptionToString;
+            $this->functionProxies[$lc.'::gettrace'] = $exceptionGetTrace;
             $this->functionProxies[$lc.'::gettraceasstring'] = $exceptionGetTraceAsString;
         }
         // Alias getMessage/getCode for Error family (same prop layout).
         $this->functionProxies['error::getmessage'] = $this->functionProxies['exception::getmessage'];
         $this->functionProxies['error::getcode'] = $this->functionProxies['exception::getcode'];
         $this->functionProxies['error::__tostring'] = $exceptionToString;
+        $this->functionProxies['error::gettrace'] = $exceptionGetTrace;
         $this->functionProxies['error::gettraceasstring'] = $exceptionGetTraceAsString;
 
         FiberHelper::registerJitMethods($this);
