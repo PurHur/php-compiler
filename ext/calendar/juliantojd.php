@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** juliantojd() — Julian calendar to Julian day number (php-src ext/calendar/calendar.c; #11875). */
+/** juliantojd() — Julian calendar to Julian day number (php-src ext/calendar/calendar.c; #11875 / #27384). */
 final class juliantojd extends Internal
 {
     public function __construct()
@@ -36,6 +36,12 @@ final class juliantojd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('juliantojd() is not implemented for JIT in this compiler build (issue #11875)');
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'juliantojd() expects exactly 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitJuliantojd::invoke($context, ...$args);
     }
 }
