@@ -376,6 +376,12 @@ class OpCode {
      */
     public ?string $fromCallableScope = null;
     /**
+     * TYPE_FROM_CALLABLE: lowered from Closure::fromCallable() (not FCC `$name(...)`) (#27138).
+     *
+     * Enables Zend bind-$this for `[Class, instanceMethod]` and TypeError message prefix.
+     */
+    public bool $fromCallableApi = false;
+    /**
      * TYPE_FUNCCALL_INIT: callee was a variable/expression, not a literal name (#23591).
      *
      * Zend ZEND_ACC_FORBIDDEN_WHEN_DYNAMIC — even when the name folds to a compile-time string.

@@ -6762,17 +6762,19 @@ restart:
                             $this->context,
                             $frame,
                             $callable,
-                            $op->fromCallableScope
+                            $op->fromCallableScope,
+                            $op->fromCallableApi
                         );
                         $frame->scope[$op->arg1]->object($entry);
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                    } catch (\TypeError $e) {
+                        // TypeError extends Error — must precede catch (\Error) (#27138).
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
@@ -20563,7 +20565,8 @@ restart:
                     $this->context,
                     $frame,
                     $callable,
-                    $op->fromCallableScope
+                    $op->fromCallableScope,
+                    $op->fromCallableApi
                 );
                 $frame->scope[$op->arg1]->object($entry);
                 break;
