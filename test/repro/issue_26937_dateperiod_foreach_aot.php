@@ -5,8 +5,7 @@
  *   PHP_COMPILER_HELPER_RUNTIME_O=0 ./phpc build -o /tmp/dp test/repro/issue_26937_dateperiod_foreach_aot.php
  *   /tmp/dp
  *
- * Note: DatePeriod::createFromISO8601String() foreach under PROFILE=8.4 remains a
- * separate thin-AOT snapshot gap (factory return lacks compileTimeDatePeriodTimestamps).
+ * ISO8601 factory foreach: test/repro/issue_26937_dateperiod_iso8601_foreach_aot.php (PROFILE=8.4).
  */
 $start = new DateTime('2024-01-01');
 $period = new DatePeriod($start, new DateInterval('P1D'), 2);
