@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArraySumRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -41,57 +42,28 @@ final class array_sum extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        ExceptionBridge::ensureLinked($context);
         TypeErrorRaise::ensureLinked($context);
         // php-src ext/standard/array.c — ArgumentCountError (#23165).
         if (!$this->requireExactJitArgCount($context, $args, 'array_sum', 1)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916/#21926, re-#4504).
-        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            JitArrayElem::requireArrayArg($context, $args[0], 'array_sum');
-
-            return $context->getTypeFromString('int64')->constInt(0, false);
-        }
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27479; re-#21926).
+        // Always via JitArrayElem → ExceptionBridge (not bare TypeErrorRaise::emitRaise).
+        JitArrayElem::requireArrayArg($context, $args[0], 'array_sum');
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_sum() argument #'.((int) $i + 1));
             }
         }
-        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
             return ArraySumRuntime::sum($context, $args[0]);
         }
-        if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            return ArraySumRuntime::sum($context, $args[0]);
-        }
-        if (JITVariable::TYPE_VALUE === $args[0]->type) {
-            JitArrayElem::requireArrayArg($context, $args[0], 'array_sum');
 
-            return ArraySumRuntime::sum($context, $args[0]);
-        }
-        TypeErrorRaise::emitRaise(
-            $context,
-            'array_sum(): Argument #1 ($array) must be of type array, '
-            .$this->jitArgTypeLabel($args[0]).' given'
-        );
-
+        // Static non-array types already raised above; poison return for SSA.
         return $context->getTypeFromString('int64')->constInt(0, false);
-    }
-
-    private function jitArgTypeLabel(JITVariable $arg): string
-    {
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return 'int';
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return 'float';
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return 'bool';
-            case JITVariable::TYPE_STRING:
-                return 'string';
-            case JITVariable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
     }
 }
