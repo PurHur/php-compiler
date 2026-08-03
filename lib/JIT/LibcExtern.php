@@ -46,6 +46,7 @@ final class LibcExtern
             'strchr' => [$i8p, false, [$i8p, $i32]],
             'strstr' => [$i8p, false, [$i8p, $i8p]],
             'strrchr' => [$i8p, false, [$i8p, $i32]],
+            'strpbrk' => [$i8p, false, [$i8p, $i8p]],
             'strncpy' => [$i8p, false, [$i8p, $i8p, $sizeT]],
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
             'strtod' => [$dbl, false, [$i8p, $i8pp]],

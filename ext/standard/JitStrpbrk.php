@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM lowering for strpbrk() via StringStrpbrk / StrpbrkJitHelper PHP (#14791).
+ * LLVM lowering for strpbrk() via StringStrpbrk length-bounded scan (#14791, #27055).
  */
 
 namespace PHPCompiler\ext\standard;
