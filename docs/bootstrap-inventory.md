@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6953 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22357 |
+| Source constructs flagged (warnings) | 22358 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2503,7 +2503,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitAddcslashes.php` | 0 | 1 |
 | `ext/standard/JitArgon2Kernel.php` | 0 | 1 |
 | `ext/standard/JitArrayChunk.php` | 0 | 1 |
-| `ext/standard/JitArrayElem.php` | 0 | 1 |
+| `ext/standard/JitArrayElem.php` | 0 | 2 |
 | `ext/standard/JitArrayFill.php` | 0 | 1 |
 | `ext/standard/JitArrayIsList.php` | 0 | 1 |
 | `ext/standard/JitArrayKey.php` | 0 | 1 |
@@ -27076,7 +27076,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitArrayElem.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 13 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/JitArrayFill.php`
 
@@ -34928,7 +34929,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_key_exists.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/array_key_first.php`
 
