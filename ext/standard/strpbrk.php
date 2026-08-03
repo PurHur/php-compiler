@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** strpbrk() for two strings — VM SSOT VmString; JIT via StrpbrkJitHelper PHP (#14791). */
+/** strpbrk() for two strings — VM SSOT VmString; JIT/AOT via StringStrpbrk LLVM (#14791, #27055). */
 final class strpbrk extends Internal
 {
     public function execute(Frame $frame): void
