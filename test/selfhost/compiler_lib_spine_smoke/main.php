@@ -1166,6 +1166,7 @@ require_once __DIR__.'/../../../ext/mbstring/JitMbStrcut.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbStrlen.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbStrwidth.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbTrim.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbUcfirstLcfirst.php';
 require_once __DIR__.'/../../../ext/mbstring/KanaConvert.php';
 require_once __DIR__.'/../../../ext/mbstring/MbNumericEntityJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbStrSplitJitHelper.php';

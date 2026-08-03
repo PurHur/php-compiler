@@ -48,6 +48,11 @@ final class mb_lcfirst extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('mb_lcfirst() is not lowered for JIT/AOT in this compiler build');
+        return JitMbUcfirstLcfirst::invoke(
+            $context,
+            'mb_lcfirst',
+            static fn (string $string, string $encoding): string => VmMbstring::lcfirst($string, $encoding),
+            $args
+        );
     }
 }

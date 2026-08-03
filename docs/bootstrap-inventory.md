@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6896 |
-| Phase A inventory files (M2 ratio SSOT) | 6896 |
+| PHP files on vm.php path | 6897 |
+| Phase A inventory files (M2 ratio SSOT) | 6897 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22227 |
+| Source constructs flagged (warnings) | 22228 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1306,6 +1306,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbStrlen.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrwidth.php` | 0 | 1 |
 | `ext/mbstring/JitMbTrim.php` | 0 | 1 |
+| `ext/mbstring/JitMbUcfirstLcfirst.php` | 0 | 1 |
 | `ext/mbstring/KanaConvert.php` | 0 | 1 |
 | `ext/mbstring/MbNumericEntityJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrSplitJitHelper.php` | 0 | 1 |
@@ -17108,6 +17109,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/mbstring/JitMbUcfirstLcfirst.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/mbstring/KanaConvert.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17491,7 +17497,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - 2 class method(s)
-- 1 closure(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_list_encodings.php`
 
@@ -17715,7 +17721,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - 2 class method(s)
-- 1 closure(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_ucwords.php`
 
