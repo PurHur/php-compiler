@@ -13,9 +13,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * array_count_values() for string or integer values (subset of PHP; issue #2356).
+ * array_count_values() for string or integer values (subset of PHP; issue #2356, #27213).
  *
- * VM: {@see VmArray::countValues()}; JIT/AOT: {@see ArrayCountValuesRuntime::countValues()}.
+ * VM: {@see VmArray::countValues()}; JIT/AOT: {@see ArrayCountValuesRuntime::countValues()}
+ * via call-site {@see \PHPCompiler\JIT\ArrayCountValuesLlvm} (not NestedJIT helper).
  */
 final class array_count_values extends Internal
 {

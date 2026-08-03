@@ -9,7 +9,11 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_count_values() for compiled JIT/AOT modules (#12331, php-in-PHP).
+ * array_count_values() PHP helper (#12331).
+ *
+ * Thin AOT NestedJIT of this helper aborts (#27213); JIT/AOT use
+ * {@see \PHPCompiler\JIT\ArrayCountValuesLlvm} via ArrayCountValuesRuntime.
+ * Kept as executable PHP SSOT for unit tests (peer ArrayFlipJitHelper / #26970).
  *
  * SSOT: {@see VmArray::countValues()}
  * php-src: ext/standard/array.c — php_array_count_values()
