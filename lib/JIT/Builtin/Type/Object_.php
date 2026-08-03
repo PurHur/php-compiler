@@ -126,6 +126,13 @@ class Object_ extends Type {
     /** @var array<int, array<string, int>> class id => const lc => visibility flags (#4651, #6664) */
     private array $constVisibility = [];
 
+    /**
+     * #[\Deprecated] on class constants — AOT/JIT fetch use-site (#27331).
+     *
+     * @var array<int, array<string, \PHPCompiler\Compiler\DeprecatedMetadata>>
+     */
+    private array $classConstDeprecated = [];
+
     /** @var array<int, array<string, string>> class id => const key lc => canonical display name */
     private array $classConstDisplayNames = [];
 
@@ -5015,6 +5022,22 @@ class Object_ extends Type {
         $this->constVisibility[$classId][\PHPCompiler\ClassConstName::key($name)] = ClassConstVisibility::mask($visibilityFlags);
     }
 
+    public function defineClassConstDeprecated(
+        int $classId,
+        string $name,
+        ?\PHPCompiler\Compiler\DeprecatedMetadata $meta
+    ): void {
+        if (null === $meta || !$meta->emitsRuntimeNotice()) {
+            return;
+        }
+        $this->classConstDeprecated[$classId][\PHPCompiler\ClassConstName::key($name)] = $meta;
+    }
+
+    public function classConstDeprecatedMeta(int $classId, string $name): ?\PHPCompiler\Compiler\DeprecatedMetadata
+    {
+        return $this->classConstDeprecated[$classId][\PHPCompiler\ClassConstName::key($name)] ?? null;
+    }
+
     public function constVisibility(int $classId, string $name): int
     {
         return $this->constVisibility[$classId][\PHPCompiler\ClassConstName::key($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -5303,6 +5326,9 @@ class Object_ extends Type {
                     if (isset($this->constVisibility[$ifaceId][$name])) {
                         $this->constVisibility[$classId][$name] = $this->constVisibility[$ifaceId][$name];
                     }
+                    if (isset($this->classConstDeprecated[$ifaceId][$name])) {
+                        $this->classConstDeprecated[$classId][$name] = $this->classConstDeprecated[$ifaceId][$name];
+                    }
                 }
             }
         }
@@ -5421,6 +5447,9 @@ class Object_ extends Type {
             }
             if (isset($this->constVisibility[$traitId][$name])) {
                 $this->constVisibility[$classId][$name] = $this->constVisibility[$traitId][$name];
+            }
+            if (isset($this->classConstDeprecated[$traitId][$name])) {
+                $this->classConstDeprecated[$classId][$name] = $this->classConstDeprecated[$traitId][$name];
             }
         }
     }
@@ -5691,6 +5720,18 @@ class Object_ extends Type {
 
         if ($this->isEnumClassId($resolvedId)) {
             return $this->jitEnumCaseFromBacking($resolvedId, $key);
+        }
+
+        $dep = $this->classConstDeprecated[$resolvedId][$key] ?? null;
+        if (null !== $dep) {
+            $displayClass = $this->classNameForId($resolvedId);
+            $displayConst = $this->classConstDisplayNames[$resolvedId][$key] ?? $constName;
+            \PHPCompiler\JIT\DeprecatedCallGuard::emitClassConstFetch(
+                $this->context,
+                $dep,
+                $displayClass,
+                $displayConst
+            );
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$resolvedId][$key]);

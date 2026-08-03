@@ -171,6 +171,9 @@ class Block {
     /** Optional message from `#[\NoDiscard(message: ...)]`. */
     public ?string $noDiscardMessage = null;
 
+    /** `#[\Deprecated]` on this function/method for JIT/AOT use-site notices (#27331). */
+    public ?\PHPCompiler\Compiler\DeprecatedMetadata $deprecated = null;
+
     /** Parameter scope slots with non-nullable type and `= null` default (Zend 8.2 implicit nullable, #4449). */
     public array $paramImplicitNullable = [];
 
@@ -971,6 +974,7 @@ class Block {
             $this->paramDefaultConstantNames = $parent->paramDefaultConstantNames;
             $this->noDiscard = $parent->noDiscard;
             $this->noDiscardMessage = $parent->noDiscardMessage;
+            $this->deprecated = $parent->deprecated;
         }
         $this->arrowAutoCapture = $parent->arrowAutoCapture;
     }

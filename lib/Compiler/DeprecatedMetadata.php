@@ -42,6 +42,20 @@ final class DeprecatedMetadata
     }
 
     /**
+     * Attach #[\Deprecated] to a function/method body block for JIT/AOT call-site emission (#27331).
+     *
+     * Mirrors {@see NoDiscardMetadata::applyToBlock}.
+     */
+    public static function applyToBlock(\PHPCompiler\Block $block, Op $op): void
+    {
+        $meta = self::fromOp($op);
+        if (null === $meta) {
+            return;
+        }
+        $block->deprecated = $meta;
+    }
+
+    /**
      * Recover @deprecated docblock on class constants (zend_compile.c, ext/reflection/php_reflection.c, #17647).
      */
     public static function fromOpDocComment(Op $op): ?self

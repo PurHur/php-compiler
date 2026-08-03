@@ -6611,6 +6611,7 @@ class Compiler {
         if (null !== $child->func->cfg) {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
             NoDiscardMetadata::applyToBlock($methodBlock, $child);
+            DeprecatedMetadata::applyToBlock($methodBlock, $child);
             $this->markGeneratorIfNeeded($child, $methodBlock);
             $declare->block1 = $methodBlock;
         }
@@ -11523,6 +11524,7 @@ class Compiler {
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
         NoDiscardMetadata::applyToBlock($funcBlock, $function);
+        DeprecatedMetadata::applyToBlock($funcBlock, $function);
         $this->markGeneratorIfNeeded($function, $funcBlock);
         $funcLc = strtolower($function->func->name);
         if ($this->funcDeclReturnTypeIsNever($function->func)) {
