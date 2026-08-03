@@ -5396,7 +5396,6 @@ require_once __DIR__.'/../../../lib/JIT/Call/ArrayIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ArrayObjectMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RecursiveIteratorIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/LimitIteratorConstruct.php';
-require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/AppendIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RegexIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
