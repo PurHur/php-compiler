@@ -35,7 +35,7 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         // Thin AOT NestedJIT cannot touch Context/runtime->vm (#27020) or VmJson::export.
         $this->assertStringContainsString('encodeHashtable', $source);
         $this->assertStringContainsString('exportKeyValuePairs', $source);
-        $this->assertStringContainsString("\$out = '['", $source);
+        $this->assertStringContainsString("\$out = \$packed ? '[' : '{'", $source);
         $this->assertStringNotContainsString('VmJson::export', $source);
         $this->assertStringNotContainsString('VmJsonFormat::encodeExported', $source);
         $this->assertStringNotContainsString('VmActiveContextJitHelper::resolve', $source);
@@ -70,6 +70,9 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitJsonEncodeCompileTime::tryEncode', $encode);
         $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
         $this->assertStringContainsString('jitJsonEncodeValueOperand', $jit);
+        $fold = (string) file_get_contents(__DIR__.'/../../ext/standard/JitJsonEncodeCompileTime.php');
+        $this->assertStringContainsString('tryCompileTimeArrayFromArrayReplaceRecursive', $fold);
+        $this->assertStringContainsString('array_replace_recursive', $fold);
     }
 
     public function testSpineBundleIncludesJsonEncodePhpJitPath(): void

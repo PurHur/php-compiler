@@ -8,10 +8,13 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Thin-standalone NestedJIT json_encode encoder (#27020, php-in-PHP).
+ * Thin-standalone NestedJIT json_encode encoder (#27020 / #26977, php-in-PHP).
  *
  * Context-free: no VmJson / runtime-vm. NestedJIT: $pair[0]/$pair[1] only.
- * Packed lists encode as `[…]` (was always `{…}` — broke AOT array_splice/sort, #27075).
+ * Packed lists → `[…]` via isPackedList(); else `{…}` (#26977 Done-when).
+ * Nested arrays recurse via encodeHashtable only — no encodeValue↔encodeHashtable
+ * mutual NestedJIT recursion (aborts under thin AOT, #27074). Numeric type codes
+ * — NestedJIT mis-types Variable::TYPE_* class constants (#27075 / #27020).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class JsonEncodeNestedJitHelper
@@ -34,7 +37,8 @@ final class JsonEncodeNestedJitHelper
         if (4 === $t) {
             return '"'.$value->toString().'"';
         }
-        if (7 === $t) {
+        // TYPE_ARRAY=6; kind 7 HT tags under NestedJIT / IS_REFCOUNTED (#26977).
+        if (6 === $t || 7 === $t) {
             return self::encodeHashtable($value->toArray(), $flags);
         }
 
@@ -43,51 +47,42 @@ final class JsonEncodeNestedJitHelper
 
     public static function encodeHashtable(HashTable $ht, int $flags): ?string
     {
-        // Single-pass NestedJIT-safe list form. Prior stub always emitted `{"":…}` because
-        // int-key toString() lowered empty under NestedJIT (#27075 / #27020).
-        // Inline nested-array handling here — do not call encodeValue() (mutual NestedJIT
-        // recursion with encodeHashtable aborts under thin AOT, #27074).
-        $out = '[';
+        $packed = $ht->isPackedList();
+        $out = $packed ? '[' : '{';
         $n = 0;
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
             if ($n > 0) {
                 $out .= ',';
             }
+            if (!$packed) {
+                $key = $pair[0];
+                $kt = $key->type & 0x7f;
+                if (1 === $kt) {
+                    $out .= '"'.$key->toInt().'":';
+                } else {
+                    $out .= '"'.$key->toString().'":';
+                }
+            }
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (6 === $t || 7 === $t) {
-                // Nested array: encode via foreach (NestedJIT-safe on Variable locals).
-                // Avoid encodeValue↔encodeHashtable mutual recursion and toArray() (#27074).
-                $inner = '[';
-                $m = 0;
-                foreach ($val as $elem) {
-                    if ($m > 0) {
-                        $inner .= ',';
-                    }
-                    $et = $elem->type & 0x7f;
-                    if (1 === $et) {
-                        $inner .= (string) $elem->toInt();
-                    } elseif (0 === $et) {
-                        $inner .= 'null';
-                    } elseif (6 === $et || 7 === $et) {
-                        $inner .= self::encodeHashtable($elem->toArray(), $flags) ?? 'null';
-                    } else {
-                        $inner .= (string) $elem->toInt();
-                    }
-                    ++$m;
-                }
-                $inner .= ']';
-                $out .= $inner;
+                $out .= self::encodeHashtable($val->toArray(), $flags) ?? 'null';
             } elseif (1 === $t) {
                 $out .= (string) $val->toInt();
             } elseif (0 === $t) {
                 $out .= 'null';
+            } elseif (3 === $t) {
+                $out .= $val->toBool() ? 'true' : 'false';
+            } elseif (2 === $t) {
+                $out .= (string) $val->toFloat();
+            } elseif (4 === $t) {
+                $out .= '"'.$val->toString().'"';
             } else {
                 $out .= (string) $val->toInt();
             }
             ++$n;
         }
-        $out .= ']';
+        $out .= $packed ? ']' : '}';
 
         return $out;
     }

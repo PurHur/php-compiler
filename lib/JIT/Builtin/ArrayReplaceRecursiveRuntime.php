@@ -6,178 +6,57 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableReplaceRecursiveLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_replace_recursive() via ArrayReplaceRecursiveJitHelper PHP (#12638, #24077).
+ * JIT/AOT link for array_replace_recursive() via call-site LLVM (#12638, #26977).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayReplace #23807 / MemoryRuntime #24058).
- * Standalone AOT compiles {@see ArrayReplaceRecursiveJitHelper} via nested JIT bridges (#14424); embed uses same PHP path.
- * SSOT: {@see \PHPCompiler\VM\HashTable::replaceRecursiveCopy()}
+ * Emits {@see HashTableReplaceRecursiveLlvm} at the call site (peer array_splice #27075 /
+ * HashTableSpliceLlvm). NestedJIT of ArrayReplaceRecursiveJitHelper returns a HT that
+ * thin-standalone json_encode cannot walk (exportKeyValuePairs abort) — call-site LLVM
+ * produces the same HT shape as array literals, so Done-when json_encode works (#26977).
+ *
+ * NestedJIT still registers {@see \PHPCompiler\JIT\Call\HashTableReplaceRecursiveCopy}
+ * for helpers that call HashTable::replaceRecursiveCopy().
+ *
+ * VM SSOT: {@see \PHPCompiler\VM\HashTable::replaceRecursiveCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_recursive)
  */
 final class ArrayReplaceRecursiveRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ArrayReplaceRecursiveJitHelper.php';
-
-    private const REPLACE_SINGLE = 'PHPCompiler\\ext\\standard\\ArrayReplaceRecursiveJitHelper::replaceSingleCopy';
-
-    private const REPLACE_TWO = 'PHPCompiler\\ext\\standard\\ArrayReplaceRecursiveJitHelper::replaceTwo';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::REPLACE_SINGLE,
-        self::REPLACE_TWO,
-    ];
-
     public static function replaceRecursive(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 1) {
             throw new \ArgumentCountError('array_replace_recursive() expects at least 1 argument, 0 given');
         }
-        self::ensureLinked($context);
 
-        $count = \count($args);
-        $firstHt = self::argToHashtable($context, $args[0]);
-        if (1 === $count) {
-            return self::callReplaceSingle($context, $firstHt);
+        $first = $args[0];
+        $others = \array_slice($args, 1);
+        if ([] === $others) {
+            return HashTableReplaceRecursiveLlvm::replaceSingle(
+                $context,
+                self::argToHashtable($context, $first)
+            );
         }
 
-        $result = self::callReplaceSingle($context, $firstHt);
-        for ($i = 1; $i < $count; ++$i) {
-            $nextHt = self::argToHashtable($context, $args[$i]);
-            $result = self::callReplaceTwo($context, $result, $nextHt);
-        }
-
-        return $result;
+        return HashTableReplaceRecursiveLlvm::arrayReplaceRecursive($context, $first, ...$others);
     }
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        HashTableReplaceRecursiveLlvm::ensureOverlayFunction($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::ensureLinked($context);
     }
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__array_replace_recursive__single');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__array_replace_recursive__single', self::implementReplaceSingleBridge(...));
-        self::implementIfMissing($context, '__array_replace_recursive__two', self::implementReplaceTwoBridge(...));
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return;
-        }
-
-        $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
-        $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function declareFunction(Context $context, string $name): LlvmFunction
-    {
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            // fall through
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-
-        return $context->module->addFunction(
-            $name,
-            $context->context->functionType(
-                $htPtr,
-                false,
-                ...match ($name) {
-                    '__array_replace_recursive__single' => [$htPtr],
-                    '__array_replace_recursive__two' => [$htPtr, $htPtr],
-                    default => throw new \LogicException('unknown array_replace_recursive bridge: '.$name),
-                }
-            )
-        );
-    }
-
-    private static function implementReplaceSingleBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_replace_recursive_single_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::REPLACE_SINGLE),
-            [$fn->getParam(0)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
-    }
-
-    private static function implementReplaceTwoBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_replace_recursive_two_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::REPLACE_TWO),
-            [$fn->getParam(0), $fn->getParam(1)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
-    }
-
-    private static function callReplaceSingle(Context $context, Value $ht): Value
-    {
         self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_replace_recursive__single'),
-            $ht
-        );
-    }
-
-    private static function callReplaceTwo(Context $context, Value $left, Value $right): Value
-    {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_replace_recursive__two'),
-            $left,
-            $right
-        );
     }
 
     private static function argToHashtable(Context $context, JITVariable $arg): Value
@@ -187,33 +66,5 @@ final class ArrayReplaceRecursiveRuntime
         }
 
         return ArrayBuiltinHelper::loadHashTable($context, $arg);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#24077');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#24077'
-        );
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (['__array_replace_recursive__single', '__array_replace_recursive__two'] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayReplaceRecursiveRuntime bridge (#12638)');
-            }
-            $context->registerFunction($name, $fn);
-        }
     }
 }

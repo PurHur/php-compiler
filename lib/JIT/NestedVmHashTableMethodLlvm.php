@@ -47,6 +47,8 @@ final class NestedVmHashTableMethodLlvm
         // COW duplicate / array union for HashTableJitHelper NestedJIT (#23548).
         'duplicate' => Call\HashTableDuplicate::class,
         'unioncopy' => Call\HashTableUnionCopy::class,
+        // array_replace_recursive NestedJIT (#26977) — LLVM, not HashTable.php.
+        'replacerecursivecopy' => Call\HashTableReplaceRecursiveCopy::class,
         // Writes share one NestedJIT proxy (#14601).
         'add' => Call\HashTableWriteNested::class,
         'addindex' => Call\HashTableWriteNested::class,

@@ -79,6 +79,9 @@ final class StringJsonEncode
         // NestedJIT HashTable::exportKeyValuePairs for encodeHashtable (#12908 / #27020).
         HashTableNestedExportLlvm::ensureLinked($context);
         NestedVmHashTableMethodLlvm::ensureMethod($context, 'findindex');
+        NestedVmHashTableMethodLlvm::ensureMethod($context, 'ispackedlist');
+        NestedVmHashTableMethodLlvm::ensureMethod($context, 'getnumelements');
+        NestedVmHashTableMethodLlvm::ensureMethod($context, 'find');
 
         $valueProbe = $context->module->getNamedFunction('__compiler_json_encode_value');
         $htProbe = $context->module->getNamedFunction('__compiler_json_encode_array');
