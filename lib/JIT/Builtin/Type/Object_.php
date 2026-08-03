@@ -3363,6 +3363,22 @@ class Object_ extends Type {
             // Thin user-script AOT must call __construct (not allocate-only) (#27303 / #26772).
             $this->markHasConstructor($id);
         }
+        if ('phptoken' === $lcname) {
+            // php-src PhpToken public $id/$text/$line/$pos (#27263 / #6794).
+            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_ID, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_TEXT, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_LINE, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\ext\tokenizer\VmPhpToken::PROP_POS, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
+            $this->defineMethodVisibility($id, '__construct', $pub);
+            $this->defineMethodVisibility($id, 'tokenize', $pubStatic);
+            $this->defineMethodVisibility($id, 'gettokenname', $pub, 'getTokenName');
+            $this->defineMethodVisibility($id, 'is', $pub);
+            $this->defineMethodVisibility($id, 'isignorable', $pub, 'isIgnorable');
+            $this->defineMethodVisibility($id, '__tostring', $pub, '__toString');
+        }
         if ('reflectionenum' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
         }

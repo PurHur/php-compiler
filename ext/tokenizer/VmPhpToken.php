@@ -76,10 +76,8 @@ final class VmPhpToken
             throw new \LogicException('PhpToken is not registered in this compiler build');
         }
 
-        $raw = LanguageScanner::tokenize($code, $flags);
-        $parts = self::normalizeTokensWithPositions($code, $raw);
         $out = [];
-        foreach ($parts as $part) {
+        foreach (self::tokenizeParts($code, $flags) as $part) {
             $out[] = self::createObject(
                 $class,
                 $part['id'],
@@ -90,6 +88,16 @@ final class VmPhpToken
         }
 
         return $out;
+    }
+
+    /**
+     * Token stream without ClassEntry — JIT/AOT materialization (#27263).
+     *
+     * @return list<array{id: int, text: string, line: int, pos: int}>
+     */
+    public static function tokenizeParts(string $code, int $flags = 0): array
+    {
+        return self::normalizeTokensWithPositions($code, LanguageScanner::tokenize($code, $flags));
     }
 
     public static function createObject(
