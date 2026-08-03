@@ -36,6 +36,12 @@ final class jewishtojd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('jewishtojd() is not implemented for JIT in this compiler build (issue #11875)');
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'jewishtojd() expects exactly 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitJewishtojd::invoke($context, ...$args);
     }
 }
