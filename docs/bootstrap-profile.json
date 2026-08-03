@@ -1309,6 +1309,7 @@
         "ext/mbstring/JitMbStrlen.php",
         "ext/mbstring/JitMbStrwidth.php",
         "ext/mbstring/JitMbTrim.php",
+        "ext/mbstring/JitMbUcfirstLcfirst.php",
         "ext/mbstring/KanaConvert.php",
         "ext/mbstring/MbNumericEntityJitHelper.php",
         "ext/mbstring/MbStrSplitJitHelper.php",
@@ -7131,9 +7132,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6897,
+        "inventory_files": 6898,
         "excluded": 0,
-        "eligible": 6897,
+        "eligible": 6898,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

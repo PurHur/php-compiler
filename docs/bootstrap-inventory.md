@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6897 |
-| Phase A inventory files (M2 ratio SSOT) | 6897 |
+| PHP files on vm.php path | 6898 |
+| Phase A inventory files (M2 ratio SSOT) | 6898 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22231 |
+| Source constructs flagged (warnings) | 22232 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1306,6 +1306,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/JitMbStrlen.php` | 0 | 1 |
 | `ext/mbstring/JitMbStrwidth.php` | 0 | 1 |
 | `ext/mbstring/JitMbTrim.php` | 0 | 1 |
+| `ext/mbstring/JitMbUcfirstLcfirst.php` | 0 | 1 |
 | `ext/mbstring/KanaConvert.php` | 0 | 1 |
 | `ext/mbstring/MbNumericEntityJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbStrSplitJitHelper.php` | 0 | 1 |
@@ -17109,6 +17110,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/mbstring/JitMbUcfirstLcfirst.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/mbstring/KanaConvert.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17492,7 +17498,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - 2 class method(s)
-- 1 closure(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_list_encodings.php`
 
@@ -17716,7 +17722,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - 2 class method(s)
-- 1 closure(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_ucwords.php`
 
@@ -47712,25 +47718,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2558)
 - new Variable (line 2571)
 - new Variable (line 2770)
-- new VMVariable (line 3997)
-- new VMVariable (line 4017)
-- new VMVariable (line 4027)
-- new VMVariable (line 4047)
-- new ReflectionClassConstant (line 5738)
-- new Variable (line 6157)
-- new Variable (line 6183)
-- new Variable (line 6191)
-- new Variable (line 6214)
-- new Variable (line 6240)
-- new Variable (line 6248)
-- new Variable (line 6322)
-- new Literal (line 6339)
-- new Literal (line 6344)
-- new Literal (line 6349)
-- new Variable (line 6360)
-- new Variable (line 6393)
-- new Variable (line 6416)
-- new Variable (line 6780)
+- new VMVariable (line 4000)
+- new VMVariable (line 4020)
+- new VMVariable (line 4030)
+- new VMVariable (line 4050)
+- new ReflectionClassConstant (line 5741)
+- new Variable (line 6160)
+- new Variable (line 6186)
+- new Variable (line 6194)
+- new Variable (line 6217)
+- new Variable (line 6243)
+- new Variable (line 6251)
+- new Variable (line 6325)
+- new Literal (line 6342)
+- new Literal (line 6347)
+- new Literal (line 6352)
+- new Variable (line 6363)
+- new Variable (line 6396)
+- new Variable (line 6419)
+- new Variable (line 6783)
 - 291 class method(s)
 - 8 closure(s)
 
