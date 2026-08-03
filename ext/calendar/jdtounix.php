@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** jdtounix() — Julian day to Unix timestamp (php-src ext/calendar/cal_unix.c; #6759). */
+/** jdtounix() — Julian day to Unix timestamp (php-src ext/calendar/cal_unix.c; #6759 / #27387). */
 final class jdtounix extends Internal
 {
     public function __construct()
@@ -34,6 +34,12 @@ final class jdtounix extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('jdtounix() is not implemented for JIT in this compiler build (issue #6759)');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'jdtounix() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitJdtounix::invoke($context, ...$args);
     }
 }
