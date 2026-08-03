@@ -9,10 +9,11 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for phpc_str_increment/phpc_str_decrement via StrIncdecJitHelper PHP (#14850).
+ * JIT/AOT link for phpc_str_increment/phpc_str_decrement via StrIncdecJitHelper PHP (#14850, #27345).
  *
  * Replaces ~448 LOC inline LLVM in JitStrIncdec.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * NestedJIT helper inlines the algorithm (no VmString call — thin AOT stub segfault #27345).
+ * VM SSOT remains {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_increment), PHP_FUNCTION(str_decrement)
  */
 final class StringStrIncdec
