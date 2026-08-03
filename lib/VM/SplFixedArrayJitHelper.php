@@ -112,7 +112,9 @@ final class SplFixedArrayJitHelper
         $obj = self::loadObject($context, $receiver);
         $ht = self::htPtr($context, $obj);
         $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        // Fixed size is nextFreeElement (slot count including null pads). numElements grows
+        // when setAtIndex overwrites a null pad (offsetIsSet is false for TYPE_NULL) (#27285).
+        $n = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong(
             $context,
@@ -158,7 +160,7 @@ final class SplFixedArrayJitHelper
         $obj = self::loadObject($context, $receiver);
         $ht = self::htPtr($context, $obj);
         $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $n = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $idx = self::coerceIndex($context, $index, 'SplFixedArray::offsetExists');
         $sizeT = $context->getTypeFromString('size_t');
         $inRange = $context->builder->icmp(Builder::INT_ULT, $idx, $n);
@@ -209,13 +211,13 @@ final class SplFixedArrayJitHelper
         return self::voidResult($context);
     }
 
-    /** Return numElements as int64 for count() builtin (#26793). */
+    /** Return fixed size as int64 for count() builtin (#26793 / #27285). */
     public static function countAsInt64(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);
         $ht = self::htPtr($context, $obj);
         $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $n = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
 
         return $context->builder->zExt(
             $context->builder->truncOrBitCast($n, $context->getTypeFromString('size_t')),
@@ -292,7 +294,8 @@ final class SplFixedArrayJitHelper
     private static function assertIndexInRange(Context $context, Value $ht, Value $idx, string $fn): void
     {
         $map = $context->structFieldMap['__hashtable__'];
-        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        // Bounds are the fixed slot count (nextFree), not numElements (#27285).
+        $n = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $ok = $context->builder->icmp(Builder::INT_ULT, $idx, $n);
         $badBb = BasicBlockHelper::append($context, 'sfa_oob');
         $okBb = BasicBlockHelper::append($context, 'sfa_oob_ok');
