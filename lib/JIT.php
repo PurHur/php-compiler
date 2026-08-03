@@ -11225,6 +11225,17 @@ class JIT {
                     } else {
                         $sendValue = $this->context->getVariableFromOp($sendOperand);
                         if (
+                            isset($block->constants[$sendSlot])
+                            && \PHPCompiler\VM\Variable::TYPE_FLOAT === $block->constants[$sendSlot]->type
+                        ) {
+                            // Always rematerialize float ConstFetch at ARG_SEND — AOT Instruction
+                            // loads are single-use; 2nd INF/NAN (or float after another float)
+                            // otherwise arrives as a consumed SSA value (#27021).
+                            $sendValue = JIT\VmConstantJit::toVariable(
+                                $this->context,
+                                $block->constants[$sendSlot]
+                            );
+                        } elseif (
                             null === $sendValue->compileTimeLong
                             && isset($block->constants[$sendSlot])
                             && (
