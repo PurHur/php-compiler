@@ -1,7 +1,7 @@
 --TEST--
-pdo_pgsql extension_loaded + PDO::pgsql* methods (#20566)
+pdo_pgsql extension_loaded + PDO::pgsql* methods (#20566 / #26140)
 --ENV--
-PHP_COMPILER_ENABLE_PGSQL=1
+PHP_COMPILER_ENABLE_PDO_PGSQL=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
@@ -24,4 +24,4 @@ pgsqlCopyFromArray=1
 pgsqlCopyToArray=1
 pgsqlGetNotify=1
 pgsqlGetPid=1
-has_pgsql_driver=0
+has_pgsql_driver=1

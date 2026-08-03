@@ -46,7 +46,10 @@ final class pdo_drivers extends Internal
             ));
         }
         $ht = VmPDO::availableDriversHashTable();
-        $cacheKey = 'pdo_drivers_'.(PdoExtensionPolicy::advertisesSqliteDriver() ? 'sqlite' : 'none');
+        $cacheKey = 'pdo_drivers_'
+            .(PdoExtensionPolicy::advertisesSqliteDriver() ? 'sqlite' : 'none')
+            .'_'
+            .(PdoExtensionPolicy::advertisesPgsqlDriver() ? 'pgsql' : 'none');
         $global = $context->constantArrayFromVmHashTable($cacheKey, $ht);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
