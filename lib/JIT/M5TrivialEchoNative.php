@@ -8,15 +8,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure C-floor parseAndCompile + standalone emit for gen-0 functional smoke (#26756):
+ * Pure C-floor parseAndCompile + standalone emit for gen-0 functional smoke (#26756 / #27426):
  *
  *   <?php
  *   echo "TOKEN\n";
  *
- * NestedJIT of {@see M5TrivialEchoScript::parseAndCompile} hangs at runtime in the argv
- * driver. This path never NestedJITs that helper — LLVM scans the source, returns a module
- * sentinel as Block*, and standalone writes a POSIX `printf` shebang script that prints the
- * payload (no host `cc` required; honest runnable artifact for never-seen functional smoke).
+ * examples/000-HelloWorld/example.php uses this shape so the committed argv driver can
+ * compile it without PHPCfg\Parser NestedJIT. NestedJIT of
+ * {@see M5TrivialEchoScript::parseAndCompile} hangs at runtime in the argv driver; this
+ * path never NestedJITs that helper — LLVM scans the source, returns a module sentinel as
+ * Block*, and standalone writes a POSIX `printf` shebang script that prints the payload.
  */
 final class M5TrivialEchoNative
 {

@@ -47,6 +47,27 @@ final class M5TrivialEchoScriptTest extends TestCase
         $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile('<?php $a=1;', 't.php'));
     }
 
+    public function testTryBuildAcceptsHelloWorldPreamble(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $hw = (string) file_get_contents(dirname(__DIR__, 2).'/examples/000-HelloWorld/example.php');
+        $script = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild($hw, 'example.php');
+        $this->assertNotNull($script, 'HelloWorld declare+docblock+echo must match (#27426)');
+        $echo = $script->main->cfg->children[0];
+        $this->assertInstanceOf(\PHPCfg\Op\Terminal\Echo_::class, $echo);
+        $this->assertInstanceOf(\PHPCfg\Operand\Literal::class, $echo->expr);
+        $this->assertSame("Hello World\n", $echo->expr->value);
+    }
+
+    public function testStripLeadingPreambleLeavesEcho(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $rest = \PHPCompiler\JIT\M5TrivialEchoScript::stripLeadingPreamble(
+            "declare(strict_types=1);\n\n/** doc */\n// line\necho \"x\\n\";"
+        );
+        $this->assertSame('echo "x\n";', $rest);
+    }
+
     public function testWiringPrefersTrivialEchoInParseAndCompileDefault(): void
     {
         $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/BootstrapCompileSmokeM3Emit.php');

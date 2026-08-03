@@ -17,13 +17,15 @@ use PHPLLVM\Value;
 
 /**
  * Hand-build PHPCfg Script + PHPCompiler Block for the gen-0 functional-smoke shape
- * (#26756 / re-#23468):
+ * (#26756 / re-#23468 / #27426):
  *
  *   <?php
  *   echo "TOKEN\n";
  *
- * Avoids NestedJIT of PHPCfg\Parser / Compiler::compileEmitSmoke (mid-BB verify / optimize
- * fatals). Host-verified Block matches compileEmitSmoke output for this shape.
+ * Also accepts a leading preamble of declare(...);, line comments, and block comments
+ * (examples/000-HelloWorld/example.php) — still a single double-quoted echo body.
+ * Avoids NestedJIT of PHPCfg\Parser / Compiler::compileEmitSmoke (mid-BB verify /
+ * optimize fatals). Host-verified Block matches compileEmitSmoke output for this shape.
  */
 final class M5TrivialEchoScript
 {
@@ -37,7 +39,7 @@ final class M5TrivialEchoScript
         if (!str_starts_with($trimmed, '<?php')) {
             return null;
         }
-        $rest = ltrim(substr($trimmed, 5));
+        $rest = self::stripLeadingPreamble(ltrim(substr($trimmed, 5)));
         if (!str_starts_with($rest, 'echo')) {
             return null;
         }
@@ -85,6 +87,58 @@ final class M5TrivialEchoScript
         $script->main->cfg->children[] = new Return_(null, $attrs);
 
         return $script;
+    }
+
+    /**
+     * Drop declare / comments before the single echo body (#27426 HelloWorld).
+     * No preg — NestedJIT-safe (#26756).
+     */
+    public static function stripLeadingPreamble(string $rest): string
+    {
+        while ($rest !== '') {
+            $rest = ltrim($rest);
+            if ($rest === '') {
+                break;
+            }
+            if (str_starts_with($rest, '//')) {
+                $nl = strpos($rest, "\n");
+                $rest = false === $nl ? '' : substr($rest, $nl + 1);
+                continue;
+            }
+            if (str_starts_with($rest, '#')) {
+                $nl = strpos($rest, "\n");
+                $rest = false === $nl ? '' : substr($rest, $nl + 1);
+                continue;
+            }
+            if (str_starts_with($rest, '/*')) {
+                $end = strpos($rest, '*/');
+                if (false === $end) {
+                    return '';
+                }
+                $rest = substr($rest, $end + 2);
+                continue;
+            }
+            // declare(strict_types=1); — case-insensitive keyword, then through ';'
+            if (strncasecmp($rest, 'declare', 7) === 0) {
+                $after = substr($rest, 7);
+                if ($after === '') {
+                    return '';
+                }
+                $c0 = $after[0];
+                if ($c0 !== '(' && $c0 !== ' ' && $c0 !== "\t" && $c0 !== "\n" && $c0 !== "\r") {
+                    break;
+                }
+                $semi = strpos($rest, ';');
+                if (false === $semi) {
+                    return '';
+                }
+                $rest = substr($rest, $semi + 1);
+                continue;
+            }
+            break;
+        }
+
+        return ltrim($rest);
     }
 
     /**
