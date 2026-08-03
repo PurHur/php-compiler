@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM bodies for gzcompress/gzuncompress/gzdeflate/gzinflate/gzencode/gzdecode (#3194, #6791, #9879).
+ * JIT LLVM bodies for gzcompress/gzuncompress/gzdeflate/gzinflate/gzencode/gzdecode (#3194, #6791, #9879, #26864).
  *
- * PHP lowering via {@see ZlibRuntime} → {@see \PHPCompiler\ext\standard\ZlibJitHelper} (#13347, #13858).
+ * Routes through {@see ZlibRuntime} → thin libz {@see StringZlibJit} (NestedJIT of VmZlibCore
+ * SEGV under thin AOT — #26864). VM SSOT: {@see \PHPCompiler\ext\standard\VmZlibCore}.
  */
 final class StringZlib
 {

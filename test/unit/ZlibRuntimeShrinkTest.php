@@ -7,30 +7,35 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * zlib JIT/AOT lowering routes through ZlibJitHelper PHP; NestedJIT via JitVmHelperLink (#9879, #13347, #23252).
+ * zlib JIT/AOT: thin libz for one-shot gz* (#26864); NestedJIT only for coding-type probe.
+ *
+ * VM SSOT remains VmZlibCore pure PHP. Do not NestedJIT the sdefl corpus under thin AOT.
  */
 final class ZlibRuntimeShrinkTest extends TestCase
 {
-    public function testStringZlibRoutesThroughRuntimeNotJitMonolith(): void
+    public function testStringZlibRoutesThroughRuntimeAndLibzJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringZlib.php');
         $this->assertStringContainsString('ZlibRuntime', $source);
-        $this->assertStringNotContainsString('StringZlibJit::implement', $source);
 
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ZlibRuntime.php');
-        $this->assertStringContainsString('ZlibJitHelper', $runtime);
+        $this->assertStringContainsString('StringZlibJit::implement', $runtime);
         $this->assertStringContainsString('VmZlibCore', $runtime);
+        $this->assertStringContainsString('ensureGetCodingTypeLinked', $runtime);
+        $this->assertStringContainsString('getCodingTypeArgv', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('parseAndCompile', $runtime);
         $this->assertStringNotContainsString('new JIT(', $runtime);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
-        $this->assertStringNotContainsString('deflateInit2_', $runtime);
-        $this->assertStringNotContainsString('StringZlibJit', $runtime);
+
+        $libz = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringZlibJit.php');
+        $this->assertStringContainsString('compress2', $libz);
+        $this->assertStringContainsString('deflateInit2_', $libz);
+        $this->assertStringContainsString('#26864', $libz);
 
         $this->assertFileExists(__DIR__.'/../../ext/standard/ZlibJitHelper.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringZlibJit.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringZlibJit.php');
     }
 
     public function testZlibJitHelperDelegatesToVmZlibCore(): void
