@@ -54,4 +54,15 @@ PHP;
             trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for token_name probe (#3171)'
         );
     }
+
+    /** Runtime token id from token_get_all() — VM path; AOT execute guard in TokenNameAot27278Test (#27278). */
+    public function testTokenNameRuntimeArgFromTokenGetAll(): void
+    {
+        $runtime = new Runtime();
+        $code = file_get_contents(dirname(__DIR__, 2).'/test/repro/aot_token_name_runtime_arg.php');
+        $this->assertNotFalse($code);
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'aot_token_name_runtime_arg.php'));
+        $this->assertSame("5\nT_ECHO\n", ob_get_clean());
+    }
 }
