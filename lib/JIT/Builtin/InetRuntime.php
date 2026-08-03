@@ -15,8 +15,11 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_ip2long/long2ip/inet_* via InetJitHelper PHP (#8969, #26010).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Ctype #22626 / Frexp #22575).
+ * InetJitHelper embeds IPv4 pure logic so thin NestedJIT is self-contained (#27088).
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT: "Current basic block has no parent function", #27088 / peer #26884).
  * Embed and standalone AOT compile the same PHP bridge; no libc inet LLVM (#13193).
- * SSOT: {@see \PHPCompiler\ext\standard\VmInet}.
+ * SSOT for VM: {@see \PHPCompiler\ext\standard\VmInet} / {@see VmInetPure}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(ip2long), long2ip, inet_ntop, inet_pton
  */
 final class InetRuntime
@@ -78,13 +81,19 @@ final class InetRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#27088).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_ip2long', self::implementIp2longBridge(...));
         self::implementIfMissing($context, '__compiler_long2ip', self::implementLong2ipBridge(...));
         self::implementIfMissing($context, '__compiler_inet_pton', self::implementInetPtonBridge(...));
         self::implementIfMissing($context, '__compiler_inet_ntop', self::implementInetNtopBridge(...));
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
@@ -152,9 +161,9 @@ final class InetRuntime
         );
         $tagI32 = $context->builder->trunc($tag, $i32);
 
-        $falseBb = BasicBlockHelper::append($context, 'inet_ip2long_false');
-        $intBb = BasicBlockHelper::append($context, 'inet_ip2long_int');
-        $doneBb = BasicBlockHelper::append($context, 'inet_ip2long_done');
+        $falseBb = $fn->appendBasicBlock('inet_ip2long_false');
+        $intBb = $fn->appendBasicBlock('inet_ip2long_int');
+        $doneBb = $fn->appendBasicBlock('inet_ip2long_done');
 
         $isFalse = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false));
         $context->builder->branchIf($isFalse, $falseBb, $intBb);
@@ -200,9 +209,9 @@ final class InetRuntime
         );
         $tagI32 = $context->builder->trunc($tag, $i32);
 
-        $falseBb = BasicBlockHelper::append($context, 'inet_long2ip_false');
-        $stringBb = BasicBlockHelper::append($context, 'inet_long2ip_string');
-        $doneBb = BasicBlockHelper::append($context, 'inet_long2ip_done');
+        $falseBb = $fn->appendBasicBlock('inet_long2ip_false');
+        $stringBb = $fn->appendBasicBlock('inet_long2ip_string');
+        $doneBb = $fn->appendBasicBlock('inet_long2ip_done');
 
         $isFalse = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false));
         $context->builder->branchIf($isFalse, $falseBb, $stringBb);
