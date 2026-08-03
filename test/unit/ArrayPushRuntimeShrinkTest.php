@@ -10,21 +10,20 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_push() NestedJIT via JitVmHelperLink::ensureCompiled (#22801 / peer #22519).
+ * array_push() call-site LLVM append (#27226) — NestedJIT pushFromList avoided.
  */
 final class ArrayPushRuntimeShrinkTest extends TestCase
 {
-    public function testArrayPushRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayPushRuntimeUsesCallSiteAppendNotNestedIterate(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPushRuntime.php');
-        $this->assertStringContainsString('ArrayPushJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::appendElement', $runtime);
         $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringContainsString('#27226', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('parseAndCompile', $runtime);
         $this->assertStringNotContainsString('new JIT(', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::push', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -35,6 +34,9 @@ final class ArrayPushRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_push.php');
         $this->assertStringContainsString('ArrayPushRuntime::push', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::push(', $builtin);
+
+        $jitHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayPushJitHelper.php');
+        $this->assertStringContainsString('function pushFromList', $jitHelper);
     }
 
     public function testArrayPushJitHelperAppendsValues(): void
