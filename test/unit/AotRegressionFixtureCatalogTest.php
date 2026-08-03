@@ -62,6 +62,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'fdiv_inf_nan_is_nan.phpt',
         'sys_getloadavg_count.phpt',
         'count_array_literal.phpt',
+        'mb_str_pad_pad_type_literal_forward_84.phpt',
     ];
 
     /**
