@@ -37,6 +37,8 @@ class Module extends ModuleAbstract
         return [
             new openssl_encrypt(),
             new openssl_decrypt(),
+            new phpc_openssl_cipher_encrypt(),
+            new phpc_openssl_cipher_decrypt(),
             new openssl_sign(),
             new openssl_verify(),
             new openssl_public_encrypt(),
