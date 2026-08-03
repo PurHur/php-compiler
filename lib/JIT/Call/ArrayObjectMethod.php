@@ -27,6 +27,13 @@ final class ArrayObjectMethod implements Call
                 $context,
                 $args[0] ?? throw new \LogicException('ArrayObject::count() called without $this')
             ),
+            'append' => ArrayObjectJitHelper::compileAppend(
+                $context,
+                $args[0] ?? throw new \LogicException('ArrayObject::append() called without $this'),
+                $args[1] ?? throw new \ArgumentCountError(
+                    'ArrayObject::append() expects exactly 1 argument, 0 given'
+                )
+            ),
             'getarraycopy' => ArrayObjectJitHelper::compileGetArrayCopy(
                 $context,
                 $args[0] ?? throw new \LogicException('ArrayObject::getArrayCopy() called without $this')

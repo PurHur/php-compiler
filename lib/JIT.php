@@ -8527,6 +8527,27 @@ class JIT {
                             );
                             break;
                         }
+                        // ArrayObject / ArrayIterator `$o[] =` → append into `__spl_ht`.
+                        // reserveAppendSlot on the object value-box clobbers it (#27286).
+                        $appendContainerOp = $block->getOperand($op->arg2);
+                        $appendUserType = $appendContainerOp->type->userType ?? '';
+                        if (
+                            \PHPCompiler\VM\ArrayObjectJitHelper::supportsEmptyDimAppend($appendUserType)
+                            && (
+                                Variable::TYPE_OBJECT === $value->type
+                                || Variable::TYPE_VALUE === $value->type
+                            )
+                        ) {
+                            $splHt = \PHPCompiler\VM\ArrayObjectJitHelper::backingHashtableForAppend(
+                                $this->context,
+                                $value
+                            );
+                            $this->context->setVariableOp(
+                                $resultOp,
+                                JIT\HashTableHelper::reserveAppendSlot($this->context, $splHt)
+                            );
+                            break;
+                        }
                         $this->context->setVariableOp(
                             $resultOp,
                             JIT\HashTableHelper::reserveAppendSlot($this->context, $value)

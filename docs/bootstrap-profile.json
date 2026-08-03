@@ -5089,6 +5089,7 @@
         "lib/JIT/ArrayProductLlvm.php",
         "lib/JIT/ArrayReduceCallbackPolicy.php",
         "lib/JIT/ArrayReduceLlvm.php",
+        "lib/JIT/ArraySearchLlvm.php",
         "lib/JIT/ArraySumLlvm.php",
         "lib/JIT/AsymmetricVisibilityGuard.php",
         "lib/JIT/BackedEnumDuplicateJitGuard.php",
@@ -5959,6 +5960,7 @@
         "lib/JIT/Call/SplFixedArrayMethod.php",
         "lib/JIT/Call/SplHeapMethod.php",
         "lib/JIT/Call/SplObjectStorageMethod.php",
+        "lib/JIT/Call/SplPriorityQueueMethod.php",
         "lib/JIT/Call/Vararg.php",
         "lib/JIT/Call/VariableCopyFrom.php",
         "lib/JIT/Call/VariableIsUndefined.php",
@@ -6843,6 +6845,7 @@
         "lib/VM/SplFixedArrayJitHelper.php",
         "lib/VM/SplHeapJitHelper.php",
         "lib/VM/SplOuterIteratorHt.php",
+        "lib/VM/SplPriorityQueueJitHelper.php",
         "lib/VM/StringOffsetJitHelper.php",
         "lib/VM/StringableSupport.php",
         "lib/VM/TickQueue.php",
@@ -7160,9 +7163,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6926,
+        "inventory_files": 6929,
         "excluded": 0,
-        "eligible": 6926,
+        "eligible": 6929,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
