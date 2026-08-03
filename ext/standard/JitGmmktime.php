@@ -23,10 +23,32 @@ final class JitGmmktime
         ?JITVariable $year,
         int $argc
     ): Value {
-        StringGmmktime::ensureLinked($context);
-
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
+
+        // Thin AOT: NestedJIT GmmktimeJitHelper returns an empty box (#27159).
+        // Fold compile-time int sextuples via host/VmDatePure at compile time.
+        $folded = self::tryFoldCompileTime($hour, $minute, $second, $month, $day, $year, $argc);
+        if (null !== $folded) {
+            if (false === $folded) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeBool'),
+                    $ptr,
+                    $context->getTypeFromString('int32')->constInt(0, false)
+                );
+            } else {
+                $i64 = $context->getTypeFromString('int64');
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $ptr,
+                    $i64->constInt((int) $folded, false)
+                );
+            }
+
+            return $ptr;
+        }
+
+        StringGmmktime::ensureLinked($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_gmmktime'),
             self::jitIntArg($context, $hour, 1),
@@ -40,6 +62,54 @@ final class JitGmmktime
         );
 
         return $ptr;
+    }
+
+    /**
+     * @return int|false|null null = not foldable at compile time
+     */
+    private static function tryFoldCompileTime(
+        JITVariable $hour,
+        ?JITVariable $minute,
+        ?JITVariable $second,
+        ?JITVariable $month,
+        ?JITVariable $day,
+        ?JITVariable $year,
+        int $argc
+    ): int|false|null {
+        if ($argc < 6) {
+            // Partial arity uses "current UTC" wall-clock — not foldable.
+            return null;
+        }
+        $h = self::compileTimeInt($hour);
+        $i = self::compileTimeInt($minute);
+        $s = self::compileTimeInt($second);
+        $m = self::compileTimeInt($month);
+        $d = self::compileTimeInt($day);
+        $y = self::compileTimeInt($year);
+        if (null === $h || null === $i || null === $s || null === $m || null === $d || null === $y) {
+            return null;
+        }
+
+        return VmDatePure::gmmktime($h, $i, $s, $m, $d, $y);
+    }
+
+    private static function compileTimeInt(?JITVariable $arg): ?int
+    {
+        if (null === $arg) {
+            return null;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return (int) $arg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            try {
+                return (int) $arg->value->getConstantValue();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     private static function jitIntArg(Context $context, JITVariable $arg, int $position): Value
