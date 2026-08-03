@@ -64,6 +64,12 @@ final class cal_to_jd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('cal_to_jd() is not implemented for JIT in this compiler build (issue #6759)');
+        if (4 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'cal_to_jd() expects exactly 4 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitCalToJd::invoke($context, ...$args);
     }
 }
