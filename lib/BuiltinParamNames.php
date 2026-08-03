@@ -712,6 +712,13 @@ final class BuiltinParamNames
             case 'shm_has_var':
             case 'shm_remove_var':
                 return ['shm', 'key'];
+            // php-src ext/mysqli/mysqli.stub.php — InternalArgInfo still link/resultmode/escapestr (#24664)
+            case 'mysqli_query':
+                return ['mysql', 'query', 'result_mode='];
+            case 'mysqli_prepare':
+                return ['mysql', 'query'];
+            case 'mysqli_real_escape_string':
+                return ['mysql', 'string'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still pathname/proj (#26117)
             case 'ftok':
                 return ['filename', 'project_id'];
