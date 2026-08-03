@@ -24,7 +24,7 @@ final class MathAsinh
 
     private const HELPER_PATH = '/ext/standard/AsinhJitHelper.php';
 
-    private const ASINH_HELPER = 'PHPCompiler\\ext\\standard\\AsinhJitHelper::aasinhArgv';
+    private const ASINH_HELPER = 'PHPCompiler\\ext\\standard\\AsinhJitHelper::asinhArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
