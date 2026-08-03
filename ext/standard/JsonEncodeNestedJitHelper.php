@@ -11,7 +11,10 @@ use PHPCompiler\VM\Variable;
  * Thin-standalone NestedJIT json_encode encoder (#27020 / #26977, php-in-PHP).
  *
  * Context-free: no VmJson / runtime-vm. NestedJIT: $pair[0]/$pair[1] only.
- * Packed lists → `[…]`; string keys → `{…}`; nested TYPE_ARRAY recurses.
+ * Packed lists → `[…]` via isPackedList(); else `{…}` (#26977 Done-when).
+ * Nested arrays recurse via encodeHashtable only — no encodeValue↔encodeHashtable
+ * mutual NestedJIT recursion (aborts under thin AOT, #27074). Numeric type codes
+ * — NestedJIT mis-types Variable::TYPE_* class constants (#27075 / #27020).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class JsonEncodeNestedJitHelper
@@ -19,22 +22,23 @@ final class JsonEncodeNestedJitHelper
     public static function encodeValue(Variable $value, int $flags): ?string
     {
         $t = $value->type & 0x7f;
-        if (Variable::TYPE_INTEGER === $t) {
+        if (1 === $t) {
             return (string) $value->toInt();
         }
-        if (Variable::TYPE_NULL === $t) {
+        if (0 === $t) {
             return 'null';
         }
-        if (Variable::TYPE_BOOLEAN === $t) {
+        if (3 === $t) {
             return $value->toBool() ? 'true' : 'false';
         }
-        if (Variable::TYPE_FLOAT === $t) {
+        if (2 === $t) {
             return (string) $value->toFloat();
         }
-        if (Variable::TYPE_STRING === $t) {
+        if (4 === $t) {
             return '"'.$value->toString().'"';
         }
-        if (Variable::TYPE_ARRAY === $t || 7 === $t) {
+        // TYPE_ARRAY=6; kind 7 HT tags under NestedJIT / IS_REFCOUNTED (#26977).
+        if (6 === $t || 7 === $t) {
             return self::encodeHashtable($value->toArray(), $flags);
         }
 
@@ -43,51 +47,43 @@ final class JsonEncodeNestedJitHelper
 
     public static function encodeHashtable(HashTable $ht, int $flags): ?string
     {
-        $packed = true;
-        $expect = 0;
-        foreach ($ht->exportKeyValuePairs(true) as $probe) {
-            $pk = $probe[0];
-            $pkt = $pk->type & 0x7f;
-            if (Variable::TYPE_INTEGER !== $pkt || $pk->toInt() !== $expect) {
-                $packed = false;
-                break;
-            }
-            ++$expect;
-        }
-
-        if ($packed) {
-            $out = '[';
-            $n = 0;
-            foreach ($ht->exportKeyValuePairs(true) as $pair) {
-                if ($n > 0) {
-                    $out .= ',';
-                }
-                $enc = self::encodeValue($pair[1], $flags);
-                $out .= null === $enc ? 'null' : $enc;
-                ++$n;
-            }
-
-            return $out.']';
-        }
-
-        $out = '{';
+        $packed = $ht->isPackedList();
+        $out = $packed ? '[' : '{';
         $n = 0;
         foreach ($ht->exportKeyValuePairs(true) as $pair) {
             if ($n > 0) {
                 $out .= ',';
             }
-            $key = $pair[0];
-            $kt = $key->type & 0x7f;
-            if (Variable::TYPE_INTEGER === $kt) {
-                $out .= '"'.$key->toInt().'":';
-            } else {
-                $out .= '"'.$key->toString().'":';
+            if (!$packed) {
+                $key = $pair[0];
+                $kt = $key->type & 0x7f;
+                if (1 === $kt) {
+                    $out .= '"'.$key->toInt().'":';
+                } else {
+                    $out .= '"'.$key->toString().'":';
+                }
             }
-            $enc = self::encodeValue($pair[1], $flags);
-            $out .= null === $enc ? 'null' : $enc;
+            $val = $pair[1];
+            $t = $val->type & 0x7f;
+            if (6 === $t || 7 === $t) {
+                $out .= self::encodeHashtable($val->toArray(), $flags) ?? 'null';
+            } elseif (1 === $t) {
+                $out .= (string) $val->toInt();
+            } elseif (0 === $t) {
+                $out .= 'null';
+            } elseif (3 === $t) {
+                $out .= $val->toBool() ? 'true' : 'false';
+            } elseif (2 === $t) {
+                $out .= (string) $val->toFloat();
+            } elseif (4 === $t) {
+                $out .= '"'.$val->toString().'"';
+            } else {
+                $out .= (string) $val->toInt();
+            }
             ++$n;
         }
+        $out .= $packed ? ']' : '}';
 
-        return $out.'}';
+        return $out;
     }
 }

@@ -32,6 +32,8 @@ final class NestedVmHashTableMethodLlvm
         // NestedJIT-safe: same pair-list materialization as exportKeyValuePairs (#23974 / #12908).
         'iteratekeyed' => Call\HashTableExportKeyValuePairs::class,
         'slicecopy' => Call\HashTableSliceCopy::class,
+        // NestedJIT-safe chunk for ArrayChunkJitHelper (#27074).
+        'chunkcopy' => Call\HashTableChunkCopy::class,
         // NestedJIT-safe reverse for ArrayReverseJitHelper (#27067).
         'reversecopy' => Call\HashTableReverseCopy::class,
         // NestedJIT-safe splice for ArraySpliceJitHelper (#27075).

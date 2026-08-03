@@ -11,6 +11,9 @@ use PHPCompiler\VM\HashTable;
  *
  * SSOT: {@see HashTable::chunkCopy()}
  * php-src: ext/standard/array.c — php_array_chunk()
+ *
+ * NestedJIT lowers `$ht->chunkCopy()` via {@see \PHPCompiler\JIT\Call\HashTableChunkCopy}
+ * (pure LLVM — must not re-enter ArrayChunkRuntime, #27074).
  */
 final class ArrayChunkJitHelper
 {
