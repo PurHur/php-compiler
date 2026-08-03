@@ -39,10 +39,11 @@ final class StrReplaceRuntimeShrinkTest extends TestCase
         $this->assertSame('heLLo', VmString::strReplace('l', 'L', 'hello', $ssotCount));
         $this->assertSame(2, $ssotCount);
 
-        $expectedCount = 0;
-        $expected = VmString::strIreplace('l', 'x', 'Hello', $expectedCount);
-        $this->assertSame($expected, StrReplaceJitHelper::ireplaceArgv('l', 'x', 'Hello'));
-        $this->assertSame($expectedCount, StrReplaceJitHelper::takeLastCount());
+        // NestedJIT path cannot track $count (same as replaceArgv — #23912 / #27079).
+        $this->assertSame('Hexxo', StrReplaceJitHelper::ireplaceArgv('l', 'x', 'Hello'));
+        $this->assertSame(0, StrReplaceJitHelper::takeLastCount());
+        $this->assertSame('bbb', StrReplaceJitHelper::ireplaceArgv('A', 'b', 'Aaa'));
+        $this->assertSame('heLLo', VmString::strIreplace('l', 'L', 'hello'));
     }
 
     public function testSpineBundleIncludesStrReplaceJitHelper(): void
