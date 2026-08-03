@@ -1331,6 +1331,7 @@ class Context {
     private function ensureMinimalUserStandaloneBodies(): void
     {
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
+        Builtin\HtmlEntitiesJit::ensureStandaloneBodies($this);
         Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
