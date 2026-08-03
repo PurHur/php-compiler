@@ -69,6 +69,12 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertSame(42, $echoInt[0]->exprs[0]->value);
         $this->assertNull($peer->parse('<?php echo 01;'));
         $this->assertNull($peer->parse('<?php function f($x){return $x;} echo f(1);'));
+        $sq = $peer->parse("<?php echo 'sq';");
+        $this->assertNotNull($sq);
+        $this->assertCount(1, $sq);
+        $this->assertInstanceOf(\PhpParser\Node\Stmt\Echo_::class, $sq[0]);
+        $this->assertInstanceOf(\PhpParser\Node\Scalar\String_::class, $sq[0]->exprs[0]);
+        $this->assertSame('sq', $sq[0]->exprs[0]->value);
         $this->assertSame($arithAst, $peer->traverse($arithAst));
         $peer->beginCompilationUnit('t.php');
         $peer->addVisitor(new \stdClass());

@@ -29,8 +29,8 @@ use PHPLLVM\Value;
  *   $a = 1 + 2; echo $a;
  *
  * Also accepts a leading preamble of declare(...);, line comments, and block comments
- * (examples/000-HelloWorld/example.php) — still a single double-quoted echo body, integer
- * echo, or the assign-plus-echo shape above (folded to a literal echo of the sum).
+ * (examples/000-HelloWorld/example.php) — still a single double- or single-quoted echo body,
+ * integer echo, or the assign-plus-echo shape above (folded to a literal echo of the sum).
  * Avoids NestedJIT of PHPCfg\Parser / Compiler::compileEmitSmoke (mid-BB verify /
  * optimize fatals). Host-verified Block matches compileEmitSmoke output for these shapes.
  */
@@ -60,7 +60,8 @@ final class M5TrivialEchoScript
     }
 
     /**
-     * Single `echo "…";` body (after preamble strip).
+     * Single `echo "…";` or `echo '…';` body (after preamble strip).
+     * Single-quoted escapes match php-src: only \\ and \' (#27426).
      */
     private static function tryBuildEchoBody(string $rest, string $filename): ?Script
     {
@@ -68,7 +69,11 @@ final class M5TrivialEchoScript
             return null;
         }
         $rest = ltrim(substr($rest, 4));
-        if ($rest === '' || $rest[0] !== '"') {
+        if ($rest === '') {
+            return null;
+        }
+        $quote = $rest[0];
+        if ($quote !== '"' && $quote !== "'") {
             return null;
         }
         $i = 1;
@@ -78,25 +83,34 @@ final class M5TrivialEchoScript
             $ch = $rest[$i];
             if ($ch === '\\' && $i + 1 < $len) {
                 $next = $rest[$i + 1];
-                if ($next === 'n') {
-                    $value .= "\n";
-                } elseif ($next === 't') {
-                    $value .= "\t";
-                } elseif ($next === '\\' || $next === '"') {
-                    $value .= $next;
+                if ($quote === '"') {
+                    if ($next === 'n') {
+                        $value .= "\n";
+                    } elseif ($next === 't') {
+                        $value .= "\t";
+                    } elseif ($next === '\\' || $next === '"') {
+                        $value .= $next;
+                    } else {
+                        $value .= $next;
+                    }
                 } else {
-                    $value .= $next;
+                    // Single-quoted: only \\ and \' are escapes; other \X is literal.
+                    if ($next === '\\' || $next === "'") {
+                        $value .= $next;
+                    } else {
+                        $value .= '\\'.$next;
+                    }
                 }
                 $i += 2;
                 continue;
             }
-            if ($ch === '"') {
+            if ($ch === $quote) {
                 break;
             }
             $value .= $ch;
             ++$i;
         }
-        if ($i >= $len || $rest[$i] !== '"') {
+        if ($i >= $len || $rest[$i] !== $quote) {
             return null;
         }
         $tail = trim(substr($rest, $i + 1));

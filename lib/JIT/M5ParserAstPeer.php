@@ -14,7 +14,7 @@ namespace PHPCompiler\JIT;
  * magic-resolver stubs so FORCE_PARSER NestedJIT can call through without null peers.
  *
  * {@see parse()} hand-builds PhpParser AST for:
- * - echo string / assign+plus+echo (same as {@see M5TrivialEchoScript})
+ * - echo string (double- or single-quoted) / assign+plus+echo (same as {@see M5TrivialEchoScript})
  * - `echo <unsigned-int>;` — also on {@see M5TrivialEchoNative} / Script (#27426);
  *   Zend peer→PHPCfg Script proves AST path; NestedJIT peer AST ctors still abort
  *
@@ -123,6 +123,8 @@ final class M5ParserAstPeer implements \PhpParser\Parser
     }
 
     /**
+     * `echo "…";` or `echo '…';` → Echo AST (#27426 single-quote).
+     *
      * @return list<\PhpParser\Node\Stmt>|null
      */
     private static function tryEchoStringAst(string $rest): ?array
@@ -131,7 +133,11 @@ final class M5ParserAstPeer implements \PhpParser\Parser
             return null;
         }
         $rest = ltrim(substr($rest, 4));
-        if ($rest === '' || $rest[0] !== '"') {
+        if ($rest === '') {
+            return null;
+        }
+        $quote = $rest[0];
+        if ($quote !== '"' && $quote !== "'") {
             return null;
         }
         $i = 1;
@@ -141,25 +147,33 @@ final class M5ParserAstPeer implements \PhpParser\Parser
             $ch = $rest[$i];
             if ($ch === '\\' && $i + 1 < $len) {
                 $next = $rest[$i + 1];
-                if ($next === 'n') {
-                    $value .= "\n";
-                } elseif ($next === 't') {
-                    $value .= "\t";
-                } elseif ($next === '\\' || $next === '"') {
-                    $value .= $next;
+                if ($quote === '"') {
+                    if ($next === 'n') {
+                        $value .= "\n";
+                    } elseif ($next === 't') {
+                        $value .= "\t";
+                    } elseif ($next === '\\' || $next === '"') {
+                        $value .= $next;
+                    } else {
+                        $value .= $next;
+                    }
                 } else {
-                    $value .= $next;
+                    if ($next === '\\' || $next === "'") {
+                        $value .= $next;
+                    } else {
+                        $value .= '\\'.$next;
+                    }
                 }
                 $i += 2;
                 continue;
             }
-            if ($ch === '"') {
+            if ($ch === $quote) {
                 break;
             }
             $value .= $ch;
             ++$i;
         }
-        if ($i >= $len || $rest[$i] !== '"') {
+        if ($i >= $len || $rest[$i] !== $quote) {
             return null;
         }
         $tail = trim(substr($rest, $i + 1));
