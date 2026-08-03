@@ -27,17 +27,21 @@ final class SessionCreateIdRuntime
 
     private const CREATE_ID = 'PHPCompiler\\ext\\standard\\SessionCreateIdJitHelper::createIdNullable';
 
+    private const CREATE_ID_WITH_PREFIX = 'PHPCompiler\\ext\\standard\\SessionCreateIdJitHelper::createIdWithPrefix';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::RANDOM_ID,
         self::CREATE_ID,
+        self::CREATE_ID_WITH_PREFIX,
     ];
 
     public static function ensureLinked(Context $context): void
     {
+        // Create-id ABI only — do not pull SessionLifecycleRuntime (session_start AOT
+        // NestedJIT still segfaults on master; create_id must link standalone) (#27258).
         SessionStorageGlobals::ensureGlobals($context);
-        SessionLifecycleRuntime::ensureLinked($context);
-        SessionStorageRuntime::ensureLinked($context);
+        StringRandomBytes::ensureLinked($context);
 
         $savedBlock = null;
         try {
@@ -55,6 +59,12 @@ final class SessionCreateIdRuntime
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    /** Thin user-script AOT: materialize ABI bodies on first use (#27258 / peer #12910). */
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
     }
 
     /** Random id ABI only — avoids SessionLifecycleRuntime ↔ CreateId ensureLinked cycle (#9446). */
@@ -129,9 +139,49 @@ final class SessionCreateIdRuntime
 
         $outPtr = $fn->getParam(0);
         $prefix = $fn->getParam(1);
+        $strPtr = $context->getTypeFromString('__string__*');
+
+        // NestedJIT `?string` param/return for createIdNullable segfaults under thin
+        // user-script AOT (#27258). Null/empty prefix → randomIdString(); non-empty
+        // prefix → createIdWithPrefix(string) (non-nullable ABI; peer #21900 / #26773).
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $prefix, $strPtr->constNull());
+        $bbNull = BasicBlockHelper::append($context, 'scid_apply_null');
+        $bbPrefix = BasicBlockHelper::append($context, 'scid_apply_prefix');
+        $context->builder->branchIf($isNull, $bbNull, $bbPrefix);
+
+        $context->builder->positionAtEnd($bbNull);
+        $nullResultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::RANDOM_ID),
+            []
+        );
+        $nullResult = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $nullResultRaw);
+        self::writeNullableStringResult($context, $fn, $outPtr, $nullResult, $nullResultRaw);
+
+        $context->builder->positionAtEnd($bbPrefix);
+        $len = $context->builder->call(
+            $context->lookupFunction('__string__strlen'),
+            $prefix
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+        $bbEmpty = BasicBlockHelper::append($context, 'scid_apply_empty');
+        $bbNonEmpty = BasicBlockHelper::append($context, 'scid_apply_nonempty');
+        $context->builder->branchIf($isEmpty, $bbEmpty, $bbNonEmpty);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $emptyResultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::RANDOM_ID),
+            []
+        );
+        $emptyResult = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $emptyResultRaw);
+        self::writeNullableStringResult($context, $fn, $outPtr, $emptyResult, $emptyResultRaw);
+
+        $context->builder->positionAtEnd($bbNonEmpty);
         $resultRaw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::CREATE_ID),
+            self::helperFunction($context, self::CREATE_ID_WITH_PREFIX),
             [$prefix]
         );
         $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);

@@ -33,23 +33,32 @@ final class SessionCreateIdJitHelper
     /** @return string|null null when php-src session_create_id() would return false */
     public static function createIdNullable(?string $prefix): ?string
     {
-        if (null !== $prefix && '' !== $prefix) {
-            if (\strlen($prefix) > VmSession::MAX_ID_LEN) {
-                throw new \ValueError(
-                    'session_create_id(): Argument #1 ($prefix) cannot be longer than '
-                    .VmSession::MAX_ID_LEN.' characters'
-                );
-            }
-            if ($prefix !== SessionFileStorage::sanitizeId($prefix)) {
-                return null;
-            }
-        }
-        $generated = self::generateId();
         if (null === $prefix || '' === $prefix) {
-            return $generated;
+            return self::generateId();
+        }
+        if (\strlen($prefix) > VmSession::MAX_ID_LEN) {
+            throw new \ValueError(
+                'session_create_id(): Argument #1 ($prefix) cannot be longer than '
+                .VmSession::MAX_ID_LEN.' characters'
+            );
+        }
+        // Host/VM/JIT: preg sanitize. Thin AOT NestedJIT must not call this (#27258).
+        if ($prefix !== SessionFileStorage::sanitizeId($prefix)) {
+            return null;
         }
 
-        return $prefix.$generated;
+        return self::createIdWithPrefix($prefix);
+    }
+
+    /**
+     * Concatenate a pre-validated prefix with the sid (non-nullable NestedJIT ABI).
+     *
+     * Thin user-script AOT (#27258 / #26773): call only after the LLVM bridge has
+     * rejected null/empty prefixes; do not NestedJIT preg_replace / char-class loops.
+     */
+    public static function createIdWithPrefix(string $prefix): string
+    {
+        return $prefix.self::generateId();
     }
 
     private static function generateId(): string
