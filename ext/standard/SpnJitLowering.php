@@ -10,7 +10,11 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** JIT lowering for strspn()/strcspn() via StringStrspn PHP bridge (#14700). */
+/**
+ * JIT lowering for strspn()/strcspn() via length-bounded LLVM (#14700, #27053, #27054).
+ *
+ * Compile-time literals fold through {@see VmString}; runtime uses {@see StringStrspn}.
+ */
 final class SpnJitLowering
 {
     /**
@@ -19,6 +23,11 @@ final class SpnJitLowering
     public static function extended(Context $context, array $args, bool $isStrspn, string $name): Value
     {
         $argc = \count($args);
+        $folded = self::tryCompileTimeFold($context, $args, $isStrspn);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         StringStrspn::ensureLinked($context);
 
         $i64 = $context->getTypeFromString('int64');
@@ -43,5 +52,37 @@ final class SpnJitLowering
             $lenIsNull,
             $mode
         );
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function tryCompileTimeFold(Context $context, array $args, bool $isStrspn): ?Value
+    {
+        $str = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        $mask = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $str || null === $mask) {
+            return null;
+        }
+        $argc = \count($args);
+        $offset = 0;
+        if ($argc >= 3) {
+            $offset = $args[2]->compileTimeLong;
+            if (null === $offset) {
+                return null;
+            }
+        }
+        $length = null;
+        if (4 === $argc) {
+            $length = $args[3]->compileTimeLong;
+            if (null === $length) {
+                return null;
+            }
+        }
+        $n = $isStrspn
+            ? VmString::strspn($str, $mask, (int) $offset, $length)
+            : VmString::strcspn($str, $mask, (int) $offset, $length);
+
+        return $context->getTypeFromString('int64')->constInt($n, true);
     }
 }

@@ -9,30 +9,29 @@ use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
 /**
- * StringStrspn NestedJIT via JitVmHelperLink::ensureCompiled (#24174 / peer #24094).
+ * StringStrspn length-bounded LLVM under thin AOT (#27053 / #27054; was NestedJIT #24174).
  */
 final class StrspnRuntimeShrinkTest extends TestCase
 {
-    public function testStringStrspnUsesJitHelperNotInlineLlvm(): void
+    public function testStringStrspnUsesLengthBoundedLlvmNotNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrspn.php');
-        $this->assertStringContainsString('StrspnJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('phpc_strspn_extended', $source);
+        $this->assertStringContainsString('emitExtendedBody', $source);
+        $this->assertStringContainsString('__string__strlen', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('StrspnJitHelper::', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrspn.php');
 
         $lowering = (string) file_get_contents(__DIR__.'/../../ext/standard/SpnJitLowering.php');
         $this->assertStringContainsString('phpc_strspn_extended', $lowering);
+        $this->assertStringContainsString('tryCompileTimeFold', $lowering);
         $this->assertStringNotContainsString('JitStrspn', $lowering);
     }
 
-    public function testStrspnJitHelperDelegatesToVmString(): void
+    public function testStrspnJitHelperStillDelegatesToVmStringForVm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StrspnJitHelper.php');
         $this->assertStringContainsString('VmString::strspn', $source);
@@ -46,7 +45,7 @@ final class StrspnRuntimeShrinkTest extends TestCase
         $this->assertSame(3, StrspnJitHelper::extendedArgvInt('abc123', 'abc', 0, 0, 1, 1));
     }
 
-    public function testSpineBundleIncludesStrspnJitHelper(): void
+    public function testSpineBundleIncludesStringStrspn(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringNotContainsString('JitStrspn.php', $spine);
