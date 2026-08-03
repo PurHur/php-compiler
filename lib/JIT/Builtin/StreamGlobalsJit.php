@@ -73,7 +73,7 @@ final class StreamGlobalsJit
         }
     }
 
-    private static function ensureLibcStdio(Context $context): void
+    public static function ensureLibcStdio(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
         foreach (['stdout', 'stderr'] as $name) {

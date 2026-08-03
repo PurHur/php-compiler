@@ -614,8 +614,13 @@ trait ClassConstFetchHelperTrait
         $context->builder->branchIf($isUnknown, $fail, $ok);
 
         $context->builder->positionAtEnd($fail);
-        ErrorRaise::emitRaise($context, 'Class not found');
-        $context->builder->call($context->lookupFunction('abort'));
+        // Catchable when `new $var` / class fetch is inside try (#27156, #4242).
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError($context, 'Error', 'Class not found', null);
+        } else {
+            ErrorRaise::emitRaise($context, 'Class not found');
+            $context->builder->call($context->lookupFunction('abort'));
+        }
 
         $context->builder->positionAtEnd($ok);
         $context->builder->branch($merge);
