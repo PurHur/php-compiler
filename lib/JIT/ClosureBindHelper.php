@@ -193,6 +193,10 @@ final class ClosureBindHelper
         self::ensureClosureBindingProperties($context);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
+        // Avoid stamping a prior bind's ClosureWithBinding onto a null/failed result (#27219).
+        if ($context->lastClosureCallProxy instanceof ClosureWithBinding) {
+            $context->lastClosureCallProxy = null;
+        }
 
         self::assertNullableObject($context, $newThis, ClosureBindJitHelper::thisArgLabel($errorContext));
         if (null !== $newScope) {
@@ -209,22 +213,50 @@ final class ClosureBindHelper
         if (self::emitStaticClosureInstanceBindFailure($context, $closure, $inner, $newThis)) {
             return self::nullResult($context);
         }
+        // Free-closure receivers often lose Variable::closureCall across assigns; mirror
+        // Closure::call single-candidate / lastClosureCallProxy recovery (#26872 / #27219).
+        if (null === $inner) {
+            $inner = self::resolveInnerCallFallback($context);
+        }
         if (null === $inner) {
             return self::nullResult($context);
         }
 
         $boundThis = self::materializeBoundThis($context, $newThis);
         $boundScope = self::materializeBoundScope($context, $closure, $newScope);
-        $boundObj = self::cloneClosureObject($context, $closure, $boundThis, $boundScope);
+        $boundObj = self::cloneClosureObject($context, $closure, $boundThis, $boundScope, $inner);
         $result = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $boundObj);
-        $result->closureCall = new ClosureWithBinding(
+        $boundCall = new ClosureWithBinding(
             $inner,
             $boundThis,
             $boundScope
         );
+        $result->closureCall = $boundCall;
         $result->closureIsStatic = $closure->closureIsStatic;
+        // boxReturn() returns only a Value; stash ClosureWithBinding for FUNCCALL_EXEC_RETURN (#27219).
+        $context->lastClosureCallProxy = $boundCall;
 
         return $result;
+    }
+
+    /**
+     * When bind/bindTo receiver metadata was dropped, recover the only {closure}_*
+     * candidate (or last allocated proxy) — same strategy as {@see invokeCall} (#27219).
+     */
+    private static function resolveInnerCallFallback(Context $context): ?Call
+    {
+        $candidates = ClosureHelper::closureCandidates($context);
+        if (1 === \count($candidates)) {
+            return self::unwrapInnerCall(\reset($candidates));
+        }
+        if (null !== $context->lastClosureCallProxy) {
+            $proxy = $context->lastClosureCallProxy;
+            if (!($proxy instanceof ClosureWithBinding)) {
+                return self::unwrapInnerCall($proxy);
+            }
+        }
+
+        return null;
     }
 
     public static function wrapCallWithBindingFromObject(
@@ -355,24 +387,32 @@ final class ClosureBindHelper
         Context $context,
         Variable $source,
         Variable $boundThis,
-        Variable $boundScope
+        Variable $boundScope,
+        ?Call $inner = null
     ): Value {
         $classId = $context->type->object->lookup('Closure');
         $srcObj = self::loadClosureObject($context, $source);
         $dest = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($dest);
 
-        $targetVar = $context->type->object->propertyFetch(
-            $srcObj,
-            'Closure',
-            ClosureHelper::TARGET_PROPERTY
-        );
-        $context->type->object->storeInstanceProperty(
-            $dest,
-            'Closure',
-            ClosureHelper::TARGET_PROPERTY,
-            $targetVar
-        );
+        // Prefer the resolved invoke name: fetch→store of __closure_target can leave TARGET
+        // empty so RuntimeIndirect aborts on mismatch (#27219).
+        $targetName = self::nativeInvokeTargetName($inner);
+        if (null !== $targetName) {
+            ClosureHelper::storeInvokeTarget($context, $dest, $targetName);
+        } else {
+            $targetVar = $context->type->object->propertyFetch(
+                $srcObj,
+                'Closure',
+                ClosureHelper::TARGET_PROPERTY
+            );
+            $context->type->object->storeInstanceProperty(
+                $dest,
+                'Closure',
+                ClosureHelper::TARGET_PROPERTY,
+                $targetVar
+            );
+        }
         $context->type->object->storeInstanceProperty(
             $dest,
             'Closure',
@@ -409,6 +449,21 @@ final class ClosureBindHelper
         );
 
         return $dest;
+    }
+
+    /** Lowercase {closure}_N name for RuntimeIndirect dispatch, if $inner is Native. */
+    private static function nativeInvokeTargetName(?Call $inner): ?string
+    {
+        if (null === $inner) {
+            return null;
+        }
+        $inner = self::unwrapInnerCall($inner);
+        if (!$inner instanceof Native) {
+            return null;
+        }
+        $name = strtolower($inner->name);
+
+        return str_starts_with($name, '{closure}_') ? $name : null;
     }
 
     public static function storeStaticClosureFlag(Context $context, Value $closureObj): void

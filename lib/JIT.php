@@ -11636,6 +11636,7 @@ class JIT {
                         $result,
                         $this->calleeReturnsByRef($this->context->scope->toCall)
                     );
+                    $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
                         $block->getOperand($op->arg1),
                         $callArgs
@@ -15385,6 +15386,36 @@ class JIT {
         if (null !== $resolved && '' !== $resolved) {
             $this->context->bindVariableByName($resolved, $result);
         }
+    }
+
+    /**
+     * Closure::bind / bindTo boxReturn() drops Variable::closureCall; reattach the
+     * ClosureWithBinding stashed on lastClosureCallProxy so `$b()` / immediate
+     * invoke use bound $this + scope instead of RuntimeIndirect abort (#27219).
+     */
+    private function attachBoundClosureInvokeMetadata(Block $block, OpCode $op): void
+    {
+        $toCall = $this->context->scope->toCall;
+        if (
+            !($toCall instanceof JIT\Call\ClosureBindTo)
+            && !($toCall instanceof JIT\Call\ClosureBind)
+        ) {
+            return;
+        }
+        $proxy = $this->context->lastClosureCallProxy;
+        if (!($proxy instanceof JIT\Call\ClosureWithBinding)) {
+            return;
+        }
+        $resultOp = $block->getOperand($op->arg1);
+        if ($this->context->hasVariableOp($resultOp)) {
+            $var = $this->context->getVariableFromOp($resultOp);
+            $var->closureCall = $proxy;
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $var);
+            }
+        }
+        $this->context->fccClosureCallByResultSlot[(int) $op->arg1] = $proxy;
     }
 
     /**

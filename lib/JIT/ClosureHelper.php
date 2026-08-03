@@ -103,4 +103,9 @@ final class ClosureHelper
     {
         return VmClosure::wrapCallWithCaptures($inner, $captures);
     }
+
+    public static function storeInvokeTarget(Context $context, Value $obj, string $targetLc): void
+    {
+        VmClosure::storeInvokeTarget($context, $obj, $targetLc);
+    }
 }
