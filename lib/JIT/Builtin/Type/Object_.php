@@ -3960,6 +3960,14 @@ class Object_ extends Type {
         if ('phpcfg\\script' === $lcname) {
             $this->defineProperty($id, 'main', Variable::TYPE_OBJECT);
         }
+        // M5 C-floor wires these onto Parser for FORCE_PARSER NestedJIT (#27426).
+        // Do not allocate PhpParser\Parser\Php7 here — that class lookup SEGVd argv rebuild
+        // at c:main_before_php; use a lightweight peer (see RuntimeInitParsePipeline).
+        if ('phpcfg\\parser' === $lcname) {
+            foreach (['astParser', 'astTraverser', 'magicStringResolver'] as $prop) {
+                $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
+            }
+        }
         if ('phpcfg\\func' === $lcname) {
             $this->defineProperty($id, 'cfg', Variable::TYPE_OBJECT);
             foreach ([
@@ -4231,6 +4239,11 @@ class Object_ extends Type {
             }
             if ('functions' === $lcName) {
                 return Variable::TYPE_HASHTABLE;
+            }
+        }
+        if (str_starts_with($lcClass, 'phpcfg\\parser')) {
+            if (in_array($lcName, ['astparser', 'asttraverser', 'magicstringresolver'], true)) {
+                return Variable::TYPE_OBJECT;
             }
         }
         if (str_starts_with($lcClass, 'phpcfg\\func')) {
