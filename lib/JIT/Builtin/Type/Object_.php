@@ -3357,8 +3357,11 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS, Variable::TYPE_STRING);
         }
         if ('reflectionconstant' === $lcname) {
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'constant', Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #27303).
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'constant', Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#27303 / #26772).
+            $this->markHasConstructor($id);
         }
         if ('reflectionenum' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
