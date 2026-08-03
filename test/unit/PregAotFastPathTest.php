@@ -17,6 +17,26 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::matchCount('/\d+/', 'no-digits', 0));
     }
 
+    /** Issue #27250 — bare /\d/ (no +) must match under thin AOT. */
+    public function testDigitOnceMatch(): void
+    {
+        $this->assertSame(10, PregAotFastPath::patternKind('/\d/'));
+        $this->assertSame(10, PregAotFastPath::patternKind('#\d#'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\d/', 'a1', 0));
+        $this->assertSame(1, PregAotFastPath::lastCapCount());
+        $this->assertSame('1', PregAotFastPath::lastCap(0));
+        $this->assertSame(0, PregAotFastPath::matchCount('/\d/', 'abc', 0));
+        $this->assertSame(11, PregAotFastPath::patternKind('/(\d)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(\d)/', 'x9y', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('9', PregAotFastPath::lastCap(0));
+        $this->assertSame('9', PregAotFastPath::lastCap(1));
+        $this->assertSame(12, PregAotFastPath::patternKind('/\s/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\s/', 'a b', 0));
+        $this->assertSame(14, PregAotFastPath::patternKind('/\w/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/\w/', '!a!', 0));
+    }
+
     public function testDigitCapturePatternKind(): void
     {
         $this->assertSame(3, PregAotFastPath::patternKind('/(\d+)/'));
