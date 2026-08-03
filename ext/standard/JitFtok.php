@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StringFsDir;
+use PHPCompiler\JIT\Builtin\FtokRuntime;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -16,7 +16,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for ftok() via __compiler_ftok (issue #6296, ext/standard/basic_functions.c). */
+/** LLVM lowering for ftok() via __compiler_ftok (issue #6296 / #27389, ext/standard/basic_functions.c). */
 final class JitFtok
 {
     private const EMPTY_PATH_ERROR = 'ftok(): Argument #1 ($filename) cannot be empty';
@@ -25,7 +25,8 @@ final class JitFtok
 
     public static function invoke(Context $context, JITVariable $pathArg, JITVariable $projArg): Value
     {
-        StringFsDir::ensureLinked($context);
+        // Only FtokRuntime — full StringFsDir pull NestedJITs ResolveSidecar (str_replace) (#27389).
+        FtokRuntime::ensureLinked($context);
 
         $pathStr = JitStringBuiltinArg::lower($context, $pathArg, 'ftok', 0, 'filename');
         $projStr = JitStringBuiltinArg::lower($context, $projArg, 'ftok', 1, 'project_id');
