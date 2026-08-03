@@ -350,15 +350,10 @@ final class VmRange
         return self::normalizeIntStepSign(ord($startChar), ord($endChar), $step);
     }
 
-    /** Int range list for JIT/AOT helpers (#13502). */
+    /** Int range list for JIT/AOT helpers (#13502) — SSOT {@see RangeIntJitHelper::intRangeCopy()}. */
     public static function intRangeTable(int $start, int $end, int $step): HashTable
     {
-        if (0 === $step) {
-            throw new \ValueError(self::STEP_RANGE_ERROR);
-        }
-        $step = self::normalizeIntStepSign($start, $end, $step);
-
-        return self::buildIntRange($start, $end, $step);
+        return RangeIntJitHelper::intRangeCopy($start, $end, $step);
     }
 
     /**
@@ -394,26 +389,7 @@ final class VmRange
 
     private static function buildIntRange(int $start, int $end, int $step): HashTable
     {
-        self::rejectOversizedIntStep($start, $end, $step);
-        $ht = new HashTable();
-        $index = 0;
-        if ($step > 0) {
-            for ($i = $start; $i <= $end; $i += $step) {
-                $stored = new Variable();
-                $stored->int($i);
-                $ht->addIndex($index, $stored);
-                ++$index;
-            }
-        } else {
-            for ($i = $start; $i >= $end; $i += $step) {
-                $stored = new Variable();
-                $stored->int($i);
-                $ht->addIndex($index, $stored);
-                ++$index;
-            }
-        }
-
-        return $ht;
+        return RangeIntJitHelper::buildIntRange($start, $end, $step);
     }
 
     private static function buildFloatRange(float $start, float $end, float $step): HashTable
