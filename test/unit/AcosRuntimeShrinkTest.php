@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\AcosJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** acos() JIT routes through AcosJitHelper PHP not libc LLVM (#15141). */
+/** acos() JIT: always AcosJitHelper via JitVmHelperLink + phpc_acos_kernel (#15141, #27048). */
 final class AcosRuntimeShrinkTest extends TestCase
 {
     public function testAcosUsesJitHelperNotLibcLookup(): void
@@ -20,13 +20,27 @@ final class AcosRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAcos.php');
         $this->assertStringContainsString('AcosJitHelper', $bridge);
         $this->assertStringContainsString('phpc_acos', $bridge);
+        $this->assertStringContainsString('JitAcosKernel', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
     }
 
-    public function testAcosJitHelperDelegatesToVmMath(): void
+    public function testAcosJitHelperDelegatesToKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/AcosJitHelper.php');
-        $this->assertStringContainsString('VmMath::acos', $source);
+        $this->assertStringContainsString('phpc_acos_kernel', $source);
+        $this->assertMatchesRegularExpression(
+            '/function acosArgv\(.*?\{[^}]*phpc_acos_kernel/s',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function acosArgv\(.*?\{[^}]*VmMath::acos/s',
+            $source
+        );
 
+        if (!\function_exists('phpc_acos_kernel')) {
+            $this->markTestSkipped('phpc_acos_kernel requires compiler runtime');
+        }
         $this->assertSame(
             VmMath::acos(1.0),
             AcosJitHelper::acosArgv(1.0)
@@ -37,10 +51,19 @@ final class AcosRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testContextAllowlistsAcosKernelForNestedJit(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('phpc_acos_kernel', $source);
+        $this->assertStringContainsString('phpc_ceil_kernel', $source);
+    }
+
     public function testSpineBundleIncludesAcosJitHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('AcosJitHelper.php', $spine);
         $this->assertStringContainsString('MathAcos.php', $spine);
+        $this->assertStringContainsString('JitAcosKernel.php', $spine);
+        $this->assertStringContainsString('phpc_acos_kernel.php', $spine);
     }
 }
