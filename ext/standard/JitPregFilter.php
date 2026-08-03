@@ -199,24 +199,11 @@ final class JitPregFilter
         $context->builder->branchIf($isSet, $matchBlock, $skipUnset);
 
         $context->builder->positionAtEnd($matchBlock);
-        $entry = self::listEntryAt($context, $src, $srcIdx);
-        $valueMap = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($entry, $valueMap['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
-        );
-        $pregBlock = BasicBlockHelper::append($context, 'preg_filter_preg_'.$id);
-        $context->builder->branchIf($isString, $pregBlock, $skipUnset);
-
-        $context->builder->positionAtEnd($pregBlock);
-        $subject = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $entry
+        // php-src convert_to_string per array subject value (#27164).
+        $entryBox = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+        $subject = (new strval())->valueToString(
+            $context,
+            JitValueBox::pointer($context, $entryBox->value)
         );
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_preg_match'),
@@ -281,15 +268,5 @@ final class JitPregFilter
         $phi->addIncoming($htPtr->constNull(), $errorBlock);
 
         return $phi;
-    }
-
-    private static function listEntryAt(Context $context, Value $ht, Value $index): Value
-    {
-        $map = $context->structFieldMap['__hashtable__'];
-        $values = $context->builder->load(
-            $context->builder->structGep($ht, $map['values'])
-        );
-
-        return $context->builder->inBoundsGep($values, $index);
     }
 }

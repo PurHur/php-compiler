@@ -51,8 +51,8 @@ final class preg_grep extends Internal
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
             $value = $value->resolveIndirect();
-            self::rejectNonStringHaystackValue($value);
-            $match = VmPreg::pregMatch($pattern, $value->toString());
+            // php-src php_preg_grep: convert_to_string per element; keep original zval (#27164).
+            $match = VmPreg::pregMatch($pattern, self::haystackValueAsString($value, $frame));
             if (false === $match) {
                 if (StdlibConstants::PREG_BAD_UTF8_ERROR === VmPreg::lastError()) {
                     continue;
@@ -77,9 +77,9 @@ final class preg_grep extends Internal
     }
 
     /**
-     * Zend php_preg_grep: haystack elements must convert to string (#5639).
+     * Zend php_preg_grep: haystack elements convert to string for matching (#5639, #27164).
      */
-    private static function rejectNonStringHaystackValue(Variable $value): void
+    private static function haystackValueAsString(Variable $value, Frame $frame): string
     {
         if (EnumCaseSupport::isEnumCaseVariable($value)) {
             $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
@@ -87,11 +87,8 @@ final class preg_grep extends Internal
                 'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
             );
         }
-        if (Variable::TYPE_STRING !== $value->type) {
-            throw new \LogicException(
-                'preg_grep() array values must be strings in this compiler build'
-            );
-        }
+
+        return $value->toString(null, $frame);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
