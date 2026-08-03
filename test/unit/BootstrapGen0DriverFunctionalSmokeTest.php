@@ -31,6 +31,8 @@ final class BootstrapGen0DriverFunctionalSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_REPO_ROOT="${ROOT}"', $body);
         $this->assertStringContainsString('examples/000-HelloWorld/example.php', $body);
         $this->assertStringContainsString('#27426', $body);
+        $this->assertStringContainsString('$a = 1 + 2; echo $a;', $body);
+        $this->assertStringContainsString('arith capability', $body);
     }
 
     public function testArgvDriverRefreshDoesNotClassifyBinCompileAsUserScriptAot(): void
