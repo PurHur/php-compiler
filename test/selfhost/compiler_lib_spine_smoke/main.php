@@ -182,6 +182,8 @@ require_once __DIR__.'/../../../ext/calendar/VmCalendar.php';
 require_once __DIR__.'/../../../ext/calendar/VmJewishFrenchCalendar.php';
 require_once __DIR__.'/../../../ext/calendar/CalDaysInMonthJitHelper.php';
 require_once __DIR__.'/../../../ext/calendar/JitCalDaysInMonth.php';
+require_once __DIR__.'/../../../ext/calendar/EasterDaysJitHelper.php';
+require_once __DIR__.'/../../../ext/calendar/JitEasterDays.php';
 require_once __DIR__.'/../../../ext/calendar/cal_days_in_month.php';
 require_once __DIR__.'/../../../ext/calendar/cal_from_jd.php';
 require_once __DIR__.'/../../../ext/calendar/cal_info.php';
@@ -4891,6 +4893,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DomStandaloneAotInitRuntime.php'
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomSyncElementIdMapRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomXPathEvaluateRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomXPathQueryRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/EasterDaysRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EmbedObEchoBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EmbedObOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EnumCasesRuntime.php';
