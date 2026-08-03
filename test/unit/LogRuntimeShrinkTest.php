@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\LogJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** log() JIT routes through LogJitHelper PHP not libc LLVM (#15117). */
+/** log() JIT: always LogJitHelper via JitVmHelperLink + phpc_log_kernel (#15117, #27047). */
 final class LogRuntimeShrinkTest extends TestCase
 {
     public function testLogUsesJitHelperNotLibcLookup(): void
@@ -20,13 +20,27 @@ final class LogRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog.php');
         $this->assertStringContainsString('LogJitHelper', $bridge);
         $this->assertStringContainsString('phpc_log', $bridge);
+        $this->assertStringContainsString('JitLogKernel', $bridge);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
     }
 
-    public function testLogJitHelperDelegatesToVmMath(): void
+    public function testLogJitHelperDelegatesToKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/LogJitHelper.php');
-        $this->assertStringContainsString('VmMath::log', $source);
+        $this->assertStringContainsString('phpc_log_kernel', $source);
+        $this->assertMatchesRegularExpression(
+            '/function logArgv\(.*?\{[^}]*phpc_log_kernel/s',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function logArgv\(.*?\{[^}]*VmMath::log/s',
+            $source
+        );
 
+        if (!\function_exists('phpc_log_kernel')) {
+            $this->markTestSkipped('phpc_log_kernel requires compiler runtime');
+        }
         $this->assertSame(
             VmMath::log(1.0),
             LogJitHelper::logArgv(1.0)
@@ -51,10 +65,19 @@ final class LogRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('logWithBase', $builtin);
     }
 
+    public function testContextAllowlistsLogKernelForNestedJit(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('phpc_log_kernel', $source);
+        $this->assertStringContainsString('phpc_ceil_kernel', $source);
+    }
+
     public function testSpineBundleIncludesLogJitHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('LogJitHelper.php', $spine);
         $this->assertStringContainsString('MathLog.php', $spine);
+        $this->assertStringContainsString('JitLogKernel.php', $spine);
+        $this->assertStringContainsString('phpc_log_kernel.php', $spine);
     }
 }
