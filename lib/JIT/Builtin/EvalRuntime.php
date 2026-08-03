@@ -15,6 +15,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\OpCode;
 use PHPCompiler\Runtime;
 
 /**
