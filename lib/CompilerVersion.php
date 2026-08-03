@@ -1490,6 +1490,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ `final` on constructor-promoted properties (RFC final_promotion, #27123).
+     *
+     * Plain `final` properties are 8.4+ ({@see supportsFinalProperties()}); promotion of
+     * `final` on a ctor parameter landed in 8.5. Zend ≤8.4 compiles
+     * `function __construct(public final string $x)` as
+     * {@code Cannot use the final modifier on a parameter}.
+     *
+     * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5}.
+     * php-src: Zend/zend_language_parser.y property_modifier; Zend/zend_compile.c.
+     */
+    public static function supportsFinalPromotedProperties(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ `static class` declarations (Zend/zend_language_parser.y, #24894, re-#6929).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile and

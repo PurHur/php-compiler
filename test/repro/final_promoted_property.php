@@ -1,5 +1,5 @@
 <?php
-// Issue #22451 — public final promoted ctor property on PROFILE=8.4.
+// Issue #22451 / #27123 — public final promoted ctor property on PROFILE=8.5.
 class FP {
   public function __construct(public final string $x) {}
 }

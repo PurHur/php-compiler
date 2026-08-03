@@ -7,11 +7,11 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Rewrite `final` on constructor-promoted properties for nikic/php-parser 4.x (#22451).
+ * Rewrite `final` on constructor-promoted properties for nikic/php-parser 4.x (#22451, #27123).
  *
  * php-src: Zend/zend_language_parser.y — promoted property_modifier includes `final`
- * (PHP 8.5+; gated here via {@see CompilerVersion::supportsFinalProperties()} / PROFILE=8.4
- * forward profile, matching sibling plain-final work).
+ * (PHP 8.5+ only; gated via {@see CompilerVersion::supportsFinalPromotedProperties()}).
+ * Zend ≤8.4: {@code Cannot use the final modifier on a parameter}.
  * Zend/zend_compile.c — promotion + ZEND_ACC_FINAL (inheritance only — writes still allowed).
  *
  * php-parser 4.x rejects `public final string $x` in a param list (`unexpected T_FINAL`).
@@ -25,28 +25,33 @@ final class FinalPromotedPropertyRewriter
     /** @internal Marker embedded in source for Param attribute recovery. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-promoted-final\s*\*\//i';
 
+    /** Zend ≤8.4 / PROFILE≤8.4 compile fatal (#27123, Zend/zend_compile.c). */
+    public const REFERENCE_PROFILE_FINAL_ON_PARAMETER = 'Cannot use the final modifier on a parameter';
+
     public static function containsFinalPromotedPropertySyntax(string $source): bool
     {
-        if (!preg_match('/\bfunction\s+__construct\s*\(/i', $source)) {
-            return false;
+        return null !== self::firstFinalPromotedOffset($source);
+    }
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $source): ?array
+    {
+        $offset = self::firstFinalPromotedOffset($source);
+        if (null === $offset) {
+            return null;
         }
 
-        $offset = 0;
-        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
-            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
-            $paramsText = self::extractBalancedParenContent($source, $openPos);
-            if (null !== $paramsText && self::paramsContainFinalPromoted($paramsText)) {
-                return true;
-            }
-            $offset = $openPos + 1;
-        }
-
-        return false;
+        return [
+            'line' => substr_count(substr($source, 0, $offset), "\n") + 1,
+            'message' => self::REFERENCE_PROFILE_FINAL_ON_PARAMETER,
+        ];
     }
 
     public static function rewrite(string $source): string
     {
-        if (!CompilerVersion::supportsFinalProperties()) {
+        if (!CompilerVersion::supportsFinalPromotedProperties()) {
             return $source;
         }
         if (!self::containsFinalPromotedPropertySyntax($source)) {
@@ -98,6 +103,45 @@ final class FinalPromotedPropertyRewriter
         }
 
         return false;
+    }
+
+    /**
+     * Byte offset of the first `final` token in a promoted ctor param, or null.
+     */
+    private static function firstFinalPromotedOffset(string $source): ?int
+    {
+        if (!preg_match('/\bfunction\s+__construct\s*\(/i', $source)) {
+            return null;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText && self::paramsContainFinalPromoted($paramsText)) {
+                $paramsStart = $openPos + 1;
+                foreach (self::splitTopLevelParams($paramsText) as $param) {
+                    if (!self::paramIsFinalPromoted($param)) {
+                        continue;
+                    }
+                    $foundAt = strpos($paramsText, $param);
+                    if (false === $foundAt) {
+                        return $paramsStart;
+                    }
+                    $head = substr($param, 0, (int) strpos($param, '$'));
+                    if (preg_match('/\bfinal\b/i', $head, $fm, PREG_OFFSET_CAPTURE)) {
+                        return $paramsStart + $foundAt + (int) $fm[0][1];
+                    }
+
+                    return $paramsStart + $foundAt;
+                }
+
+                return $paramsStart;
+            }
+            $offset = $openPos + 1;
+        }
+
+        return null;
     }
 
     private static function rewriteParams(string $paramsText): string

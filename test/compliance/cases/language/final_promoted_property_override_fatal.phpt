@@ -1,7 +1,7 @@
 --TEST--
-Language: final promoted property cannot be overridden (#22451, Zend/zend_inheritance.c)
+Language: final promoted property cannot be overridden (#22451, #27123, Zend/zend_inheritance.c)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 class ParentFP {
