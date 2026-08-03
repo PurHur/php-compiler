@@ -217,7 +217,9 @@ final class CallUnpackCompileTime
                 return null;
             }
             if (OpCode::TYPE_INIT_ARRAY === $op->type && $op->arg1 === $slot) {
+                // Slot reuse: a later INIT_ARRAY replaces the prior list (fold saw [1,2,3]×2 → #26977).
                 $foundInit = true;
+                $elements = [];
                 if (null !== $op->arg2) {
                     // null arg3 = list append (nextFreeElement); do not treat as missing key (#24144).
                     $key = null === $op->arg3 ? null : self::compileTimeKey($block, $op->arg3);

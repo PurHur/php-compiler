@@ -99,4 +99,14 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureOverlayFunction', $llvm);
         $this->assertStringNotContainsString('HashTableDuplicateRuntime::duplicate', $llvm);
     }
+
+    /** Done-when: json_encode(array_replace_recursive(lit)) folds via VM SSOT (#26977). */
+    public function testJsonEncodeFoldsCompileTimeArrayReplaceRecursive(): void
+    {
+        $fold = file_get_contents($this->repoRoot.'/ext/standard/JitJsonEncodeCompileTime.php');
+        $this->assertIsString($fold);
+        $this->assertStringContainsString('tryCompileTimeArrayFromArrayReplaceRecursive', $fold);
+        $this->assertStringContainsString('replaceRecursiveCopy', $fold);
+        $this->assertFileExists($this->repoRoot.'/test/repro/aot_array_replace_recursive.php');
+    }
 }

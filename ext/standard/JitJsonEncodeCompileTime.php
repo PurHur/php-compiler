@@ -17,8 +17,9 @@ use PHPLLVM\Value;
 /**
  * Compile-time json_encode() for inline array literals — avoids deferred AOT stubs (#14040).
  *
- * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080) — thin AOT
- * NestedJIT cannot yet materialize split hashtables for `__compiler_json_encode_array`.
+ * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080) and
+ * `json_encode(array_replace_recursive(lit…))` (#26977) — thin AOT NestedJIT cannot yet
+ * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
  * php-src: ext/json/php_json.c — php_json_encode
  */
@@ -36,6 +37,9 @@ final class JitJsonEncodeCompileTime
         $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromPregSplit($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayReplaceRecursive($block, $operand);
         }
         if (null === $vmArray) {
             $foldedFalse = self::tryEncodePregSplitFalse($context, $block, $operand, $flags);
@@ -112,6 +116,38 @@ final class JitJsonEncodeCompileTime
         $ht = VmPreg::splitPartsToHashTable($parts, self::$lastPregSplitFlags);
         $var = new VmVariable();
         $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_replace_recursive(…))` when all args are compile-time arrays (#26977).
+     *
+     * Uses VM {@see \PHPCompiler\VM\HashTable::replaceRecursiveCopy()} SSOT (php-src array.c).
+     */
+    private static function tryCompileTimeArrayFromArrayReplaceRecursive(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_replace_recursive');
+        if (null === $args || [] === $args) {
+            return null;
+        }
+        foreach ($args as $arg) {
+            if (VmVariable::TYPE_ARRAY !== $arg->type) {
+                return null;
+            }
+        }
+        $first = $args[0]->toArray();
+        $others = [];
+        for ($i = 1, $n = \count($args); $i < $n; ++$i) {
+            $others[] = $args[$i]->toArray();
+        }
+        $merged = $first->replaceRecursiveCopy(...$others);
+        $var = new VmVariable();
+        $var->array($merged);
 
         return $var;
     }
@@ -242,12 +278,25 @@ final class JitJsonEncodeCompileTime
             if (OpCode::TYPE_ARG_SEND !== $op->type) {
                 continue;
             }
-            if (null === $op->arg1 || !isset($block->constants[$op->arg1])) {
+            if (null === $op->arg1) {
                 return null;
             }
-            $copy = new VmVariable();
-            $copy->copyFrom($block->constants[$op->arg1]);
-            $args[] = $copy;
+            if (isset($block->constants[$op->arg1])) {
+                $copy = new VmVariable();
+                $copy->copyFrom($block->constants[$op->arg1]);
+                $args[] = $copy;
+                continue;
+            }
+            // INIT_ARRAY slots (inline array literals) — same recovery as json_encode(lit) (#26977).
+            $argOperand = $block->getOperand((int) $op->arg1);
+            if (null === $argOperand) {
+                return null;
+            }
+            $arr = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $argOperand);
+            if (null === $arr) {
+                return null;
+            }
+            $args[] = $arr;
         }
 
         return $args;
