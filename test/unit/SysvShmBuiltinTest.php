@@ -25,6 +25,9 @@ final class SysvShmBuiltinTest extends BaseTest
         $path = __DIR__.'/../compliance/cases/stdlib/shm_attach_roundtrip.phpt';
         yield 'shm_attach_roundtrip.phpt' => self::parsePHPT($path, 'shm_attach_roundtrip.phpt');
 
+        $reflectionPath = __DIR__.'/../compliance/cases/stdlib/shm_reflection_names_24640.phpt';
+        yield 'shm_reflection_names_24640.phpt' => self::parsePHPT($reflectionPath, 'shm_reflection_names_24640.phpt');
+
         if (!\function_exists('shmop_open')) {
             return;
         }

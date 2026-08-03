@@ -28,7 +28,8 @@ final class SysvShmArgs
                 '%s(): Argument #%d ($%s) must be of type int, %s given',
                 $fn,
                 $index + 1,
-                0 === $index ? 'key' : 'variable_key',
+                // php-src sysvshm.stub.php — $key for both attach key and var key (#24640)
+                'key',
                 VmStreamArg::debugTypeName($var)
             ));
         }

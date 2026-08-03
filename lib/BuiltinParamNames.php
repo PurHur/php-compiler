@@ -700,6 +700,18 @@ final class BuiltinParamNames
             case 'shmop_close':
             case 'shmop_delete':
                 return ['shmop'];
+            // php-src ext/sysvshm/sysvshm.stub.php — InternalArgInfo still memsize/perm/shm_identifier (#24640)
+            case 'shm_attach':
+                return ['key', 'size=', 'permissions='];
+            case 'shm_detach':
+            case 'shm_remove':
+                return ['shm'];
+            case 'shm_put_var':
+                return ['shm', 'key', 'value'];
+            case 'shm_get_var':
+            case 'shm_has_var':
+            case 'shm_remove_var':
+                return ['shm', 'key'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still pathname/proj (#26117)
             case 'ftok':
                 return ['filename', 'project_id'];
