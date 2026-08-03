@@ -49005,22 +49005,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 219)
 - new ClosureWithBinding (line 220)
 - new ClosureWithBinding (line 251)
-- new Variable (line 445)
-- new Variable (line 461)
-- new Variable (line 495)
-- new Variable (line 573)
-- new Variable (line 587)
-- new Variable (line 602)
-- new Variable (line 620)
-- new Variable (line 629)
-- new Variable (line 649)
-- new Variable (line 665)
-- 44 class method(s)
+- new Variable (line 421)
+- new Variable (line 437)
+- new Variable (line 471)
+- new Variable (line 549)
+- new Variable (line 563)
+- new Variable (line 578)
+- new Variable (line 596)
+- new Variable (line 605)
+- new Variable (line 625)
+- new Variable (line 641)
+- 43 class method(s)
 
 ### `lib/JIT/ClosureHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/CoalesceHelper.php`
 
