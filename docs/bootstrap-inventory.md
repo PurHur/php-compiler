@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6874 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22165 |
+| Source constructs flagged (warnings) | 22163 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3233,7 +3233,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmAssert.php` | 0 | 2 |
 | `ext/standard/VmAssertState.php` | 0 | 1 |
 | `ext/standard/VmBrowser.php` | 0 | 1 |
-| `ext/standard/VmCallable.php` | 0 | 18 |
+| `ext/standard/VmCallable.php` | 0 | 16 |
 | `ext/standard/VmCallableInvoke.php` | 0 | 4 |
 | `ext/standard/VmChdirNative.php` | 0 | 1 |
 | `ext/standard/VmChdirPure.php` | 0 | 1 |
@@ -31899,22 +31899,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 146)
 - new Variable (line 190)
-- new Variable (line 266)
-- new Variable (line 268)
-- new Variable (line 460)
-- new Variable (line 462)
-- new Variable (line 652)
-- new Variable (line 658)
-- new Variable (line 675)
-- new Variable (line 677)
-- new Error (line 940)
-- new Error (line 950)
-- new Variable (line 971)
-- new Variable (line 1283)
+- new Variable (line 284)
+- new Variable (line 286)
+- new Variable (line 478)
+- new Variable (line 480)
+- new Variable (line 670)
+- new Variable (line 676)
+- new Variable (line 693)
+- new Variable (line 695)
+- new Variable (line 991)
 - new Variable (line 1303)
-- new Variable (line 1320)
-- new Variable (line 1325)
-- 37 class method(s)
+- new Variable (line 1323)
+- new Variable (line 1340)
+- new Variable (line 1345)
+- 38 class method(s)
 
 ### `ext/standard/VmCallableInvoke.php`
 
