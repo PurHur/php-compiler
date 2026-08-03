@@ -5292,6 +5292,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringMkdir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMktime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompare.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetInterfacesJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServices.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServicesNameLookup.php';

@@ -7,114 +7,80 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for natsort()/natcasesort() via NaturalSortJitHelper PHP (#12753).
+ * JIT/AOT link for natsort()/natcasesort() via LLVM packed + string-key natural sorts (#26975).
  *
- * Standalone AOT compiles {@see NaturalSortJitHelper} via JitVmHelperLink bridge (#14529); native literal arrays materialize to hashtable then route through PHP (#18407).
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::natsortCopy()} /
+ * NestedJIT {@see \PHPCompiler\ext\standard\NaturalSortJitHelper} aborts under thin standalone
+ * AOT (VmArray / HashTable method stubs — same class as MultisortJitHelper, #26908 / #24010).
+ * Emit bubble sorts in {@see Type\HashTable} instead; compare via {@see StringNaturalCompare}.
+ *
+ * SSOT (VM): {@see \PHPCompiler\ext\standard\VmArray::natsortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::natcasesortCopy()}
  * php-src: ext/standard/array.c — php_natsort / php_natcasesort
  */
 final class NaturalSortRuntime
 {
-    private const ABI_NATSORT = '__natsort__by_value';
+    private const ABI_PACKED_NATURAL = '__hashtable__sortPackedNatural';
 
-    private const ABI_NATCASESORT = '__natcasesort__by_value';
+    private const ABI_PACKED_NATURAL_CASE = '__hashtable__sortPackedNaturalCase';
 
-    private const HELPER_PATH = '/ext/standard/NaturalSortJitHelper.php';
+    private const ABI_STRKEY_NATURAL = '__hashtable__sortStringKeyValuesNatural';
 
-    private const NATSORT_HELPER = 'PHPCompiler\\ext\\standard\\NaturalSortJitHelper::natsortByValue';
-
-    private const NATCASESORT_HELPER = 'PHPCompiler\\ext\\standard\\NaturalSortJitHelper::natcasesortByValue';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::NATSORT_HELPER,
-        self::NATCASESORT_HELPER,
-    ];
+    private const ABI_STRKEY_NATURAL_CASE = '__hashtable__sortStringKeyValuesNaturalCase';
 
     public static function natsortByValue(Context $context, JITVariable $array): void
     {
-        self::invokeNaturalSort($context, $array, self::ABI_NATSORT);
+        self::invokeNaturalSort($context, $array, false);
     }
 
     public static function natcasesortByValue(Context $context, JITVariable $array): void
     {
-        self::invokeNaturalSort($context, $array, self::ABI_NATCASESORT);
+        self::invokeNaturalSort($context, $array, true);
     }
 
-    private static function invokeNaturalSort(Context $context, JITVariable $array, string $abi): void
+    private static function invokeNaturalSort(Context $context, JITVariable $array, bool $caseInsensitive): void
     {
-        self::ensureLinked($context);
+        self::ensureLinked($context, $caseInsensitive);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call($context->lookupFunction($abi), $ht);
+        $packed = $caseInsensitive ? self::ABI_PACKED_NATURAL_CASE : self::ABI_PACKED_NATURAL;
+        $strKey = $caseInsensitive ? self::ABI_STRKEY_NATURAL_CASE : self::ABI_STRKEY_NATURAL;
+        // Packed lists (numeric 0..n-1) and string-key maps are distinct representations;
+        // each ABI no-ops when its structure is empty / too small (#26975).
+        $context->builder->call($context->lookupFunction($packed), $ht);
+        $context->builder->call($context->lookupFunction($strKey), $ht);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
     }
 
-    public static function ensureLinked(Context $context): void
+    public static function ensureLinked(Context $context, bool $caseInsensitive = false): void
     {
-        self::implement($context);
+        if ($caseInsensitive) {
+            StringNaturalCompare::ensureStrnatcasecmpLinked($context);
+        } else {
+            StringNaturalCompare::ensureStrnatcmpLinked($context);
+        }
+        self::assertAbi($context, $caseInsensitive ? self::ABI_PACKED_NATURAL_CASE : self::ABI_PACKED_NATURAL);
+        self::assertAbi($context, $caseInsensitive ? self::ABI_STRKEY_NATURAL_CASE : self::ABI_STRKEY_NATURAL);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        StringNaturalCompare::ensureStandaloneBodies($context);
+        self::assertAbi($context, self::ABI_PACKED_NATURAL);
+        self::assertAbi($context, self::ABI_PACKED_NATURAL_CASE);
+        self::assertAbi($context, self::ABI_STRKEY_NATURAL);
+        self::assertAbi($context, self::ABI_STRKEY_NATURAL_CASE);
     }
 
-    public static function implement(Context $context): void
+    private static function assertAbi(Context $context, string $name): void
     {
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException($name.' missing after HashTable type init (#26975)');
         }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $void = $context->getTypeFromString('void');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NATSORT,
-            'natsort_by_value_bridge_entry',
-            [$htPtr],
-            $void,
-            self::NATSORT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12753'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_NATCASESORT,
-            'natcasesort_by_value_bridge_entry',
-            [$htPtr],
-            $void,
-            self::NATCASESORT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12753'
-        );
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach ([self::ABI_NATSORT, self::ABI_NATCASESORT] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after NaturalSortRuntime bridge (#12753)');
-            }
-            $context->registerFunction($name, $fn);
-        }
+        $context->registerFunction($name, $fn);
     }
 }
