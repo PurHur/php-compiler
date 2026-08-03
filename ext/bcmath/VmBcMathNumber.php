@@ -12,6 +12,7 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -55,6 +56,10 @@ final class VmBcMathNumber
         $entry->constructor = new NumberConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        // php-src bcmath.stub.php — __construct(string|int $num); InternalArgInfo empty (#24626).
+        $entry->methodParameterMetadata['__construct'] = [
+            new ParameterMetadata('num', [], false, false, false, false, 'string|int', null),
+        ];
 
         // php-src has no Number::from() — constructor is the only factory (#24613, re-#16814).
         $methods = [

@@ -30,6 +30,11 @@ final class NumberConstruct extends BcMathNumberMethod
             throw new \TypeError('BcMath\\Number::__construct(): Argument #1 ($num) must be of type string|int, '
                 .EnumCaseSupport::typeNameForVariable($numVar).' given');
         }
+        // Stub is string|int only — reject objects (incl. Number) with Zend's union (#24626).
+        if (Variable::TYPE_OBJECT === $numVar->type) {
+            throw new \TypeError('BcMath\\Number::__construct(): Argument #1 ($num) must be of type string|int, '
+                .$numVar->toObject()->class->name.' given');
+        }
         $value = match ($numVar->type) {
             Variable::TYPE_INTEGER => (string) $numVar->toInt(),
             default => VmBcMathNumber::coerceOperand($frame->calledArgs[1], 'BcMath\\Number::__construct', 1, 'num'),
