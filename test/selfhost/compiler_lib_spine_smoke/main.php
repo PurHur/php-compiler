@@ -5438,6 +5438,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DateTimeFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeGetMicrosecond.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeCreateFromFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeCreateFromTimestamp.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DateTimeDiff.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeImmutableConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeModify.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeSetMicrosecond.php';

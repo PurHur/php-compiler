@@ -3482,7 +3482,8 @@ class Object_ extends Type {
                 $this->defineProperty($id, $prop, Variable::TYPE_NATIVE_LONG);
             }
             $this->defineProperty($id, 'f', Variable::TYPE_VALUE);
-            $this->defineProperty($id, 'days', Variable::TYPE_NATIVE_BOOL);
+            // php-src DateInterval::$days is int|false — VALUE slot holds either (#27309).
+            $this->defineProperty($id, 'days', Variable::TYPE_VALUE);
             // Thin user-script AOT must call __construct (not allocate-only) (#26772).
             $this->markHasConstructor($id);
         }

@@ -1236,6 +1236,9 @@ class Context {
         // Immutable allocate+copy is thin-AOT-safe after DatePeriod foreach (#26772).
         $this->functionProxies['datetime::modify'] = new Call\DateTimeModify(false);
         $this->functionProxies['datetimeimmutable::modify'] = new Call\DateTimeModify(true);
+        // DateTime::diff — compile-time DateInterval materialize (#27309).
+        $this->functionProxies['datetime::diff'] = new Call\DateTimeDiff();
+        $this->functionProxies['datetimeimmutable::diff'] = new Call\DateTimeDiff();
         // DateTimeZone::getTransitions — compile-time materialize (peer timezone_transitions_get) (#26799).
         $this->functionProxies['datetimezone::gettransitions'] = new Call\DateTimeZoneGetTransitions();
         // DateTimeZone::getName — avoid ExternalMethod silent NULL on thin AOT (#27307).

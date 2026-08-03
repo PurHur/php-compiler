@@ -5746,6 +5746,7 @@
         "lib/JIT/Call/DateTimeConstruct.php",
         "lib/JIT/Call/DateTimeCreateFromFormat.php",
         "lib/JIT/Call/DateTimeCreateFromTimestamp.php",
+        "lib/JIT/Call/DateTimeDiff.php",
         "lib/JIT/Call/DateTimeFormat.php",
         "lib/JIT/Call/DateTimeGetMicrosecond.php",
         "lib/JIT/Call/DateTimeImmutableConstruct.php",
@@ -7130,9 +7131,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6896,
+        "inventory_files": 6897,
         "excluded": 0,
-        "eligible": 6896,
+        "eligible": 6897,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

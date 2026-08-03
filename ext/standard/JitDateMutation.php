@@ -243,12 +243,31 @@ final class JitDateMutation
             );
         }
 
-        DateMutationRuntime::ensureLinked($context);
+        return self::lowerDiff($context, 'date_diff', ...$args);
+    }
 
-        $baseObj = self::requireDateTimeObject($context, $args[0], 'date_diff()');
-        $targetObj = self::requireDateTimeObject($context, $args[1], 'date_diff()', self::TARGET_TYPE_ERROR);
+    /**
+     * DateTime{,Immutable}::diff($this, $target, $absolute = false) — JIT/AOT (#27309).
+     */
+    public static function invokeDiffMethod(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                \sprintf('DateTime::diff() expects at least 1 argument, %d given', max(0, $argc - 1))
+            );
+        }
+
+        return self::lowerDiff($context, 'DateTime::diff', ...$args);
+    }
+
+    private static function lowerDiff(
+        Context $context,
+        string $function,
+        JITVariable ...$args
+    ): Value {
         $absolute = false;
-        if ($argc >= 3) {
+        if (\count($args) >= 3) {
             if (null !== $args[2]->compileTimeBool) {
                 $absolute = (bool) $args[2]->compileTimeBool;
             } elseif (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type) {
@@ -256,60 +275,99 @@ final class JitDateMutation
             }
         }
 
-        /** @var ObjectBuiltin $object */
-        $object = $context->type->object;
-        $baseTs = self::readLongProp($context, $object, $baseObj, 'DateTime', DateTimeSupport::TS_PROPERTY);
-        $baseUs = self::readLongProp($context, $object, $baseObj, 'DateTime', DateTimeSupport::MICROSECOND_PROPERTY);
-        $targetTs = self::readLongProp($context, $object, $targetObj, 'DateTime', DateTimeSupport::TS_PROPERTY);
-        $targetUs = self::readLongProp($context, $object, $targetObj, 'DateTime', DateTimeSupport::MICROSECOND_PROPERTY);
-        $tz = self::readStringProp($context, $object, $baseObj, 'DateTime', DateTimeSupport::TZ_PROPERTY);
-        $tzCstr = self::stringData($context, $tz);
+        $compileTime = self::tryCompileTimeDiff($context, $args[0], $args[1], $absolute);
+        if (null === $compileTime) {
+            throw new \LogicException(
+                $function.'() requires compile-time DateTime receivers in this compiler build (#27309)'
+            );
+        }
 
         $i64 = $context->getTypeFromString('int64');
         $dbl = $context->getTypeFromString('double');
-        $i1 = $context->getTypeFromString('int1');
-        $i64p = $context->getTypeFromString('int64*');
-        $outY = $context->builder->alloca($i64, 1, 'date_df_y');
-        $outM = $context->builder->alloca($i64, 1, 'date_df_m');
-        $outD = $context->builder->alloca($i64, 1, 'date_df_d');
-        $outH = $context->builder->alloca($i64, 1, 'date_df_h');
-        $outI = $context->builder->alloca($i64, 1, 'date_df_i');
-        $outS = $context->builder->alloca($i64, 1, 'date_df_s');
-        $outF = $context->builder->alloca($dbl, 1, 'date_df_f');
-        $outInvert = $context->builder->alloca($i64, 1, 'date_df_inv');
-        $outDays = $context->builder->alloca($i64, 1, 'date_df_days');
-
-        $context->builder->call(
-            $context->lookupFunction('__phpc_date_diff_scalars'),
-            $baseTs,
-            $baseUs,
-            $targetTs,
-            $targetUs,
-            $i1->constInt($absolute ? 1 : 0, false),
-            $tzCstr,
-            $outY,
-            $outM,
-            $outD,
-            $outH,
-            $outI,
-            $outS,
-            $outF,
-            $outInvert,
-            $outDays
-        );
 
         return self::materializeDateIntervalFromScalars(
             $context,
-            $context->builder->load($outY),
-            $context->builder->load($outM),
-            $context->builder->load($outD),
-            $context->builder->load($outH),
-            $context->builder->load($outI),
-            $context->builder->load($outS),
-            $context->builder->load($outF),
-            $context->builder->load($outInvert),
-            $context->builder->load($outDays)
+            $i64->constInt($compileTime['y'], true),
+            $i64->constInt($compileTime['m'], true),
+            $i64->constInt($compileTime['d'], true),
+            $i64->constInt($compileTime['h'], true),
+            $i64->constInt($compileTime['i'], true),
+            $i64->constInt($compileTime['s'], true),
+            $dbl->constReal($compileTime['f']),
+            $i64->constInt($compileTime['invert'], true),
+            $i64->constInt($compileTime['days'], true)
         );
+    }
+
+    /**
+     * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int, days: int}|null
+     */
+    private static function tryCompileTimeDiff(
+        Context $context,
+        JITVariable $base,
+        JITVariable $target,
+        bool $absolute
+    ): ?array {
+        $baseInstant = self::resolveCompileTimeInstant($context, $base);
+        $targetInstant = self::resolveCompileTimeInstant($context, $target);
+        if (null === $baseInstant || null === $targetInstant) {
+            return null;
+        }
+
+        return VmDateTimeNative::diffTimestamps(
+            $baseInstant['timestamp'],
+            $targetInstant['timestamp'],
+            $baseInstant['timezone'],
+            $absolute,
+            $baseInstant['microsecond'],
+            $targetInstant['microsecond']
+        );
+    }
+
+    /**
+     * Recover construct-time instant from a DateTime receiver / arg (#27309).
+     *
+     * Method `$this` is often TYPE_OBJECT without {@see JITVariable::$compileTimeLong};
+     * the time literal may still sit on {@see JITVariable::$compileTimeString}.
+     *
+     * @return array{timestamp: int, microsecond: int, timezone: string}|null
+     */
+    private static function resolveCompileTimeInstant(Context $context, JITVariable $arg): ?array
+    {
+        if (null !== $arg->compileTimeLong) {
+            $tz = $arg->compileTimeString;
+            // Timezone from construct; ignore leftover date-string stamps on receivers.
+            if (null === $tz || '' === $tz || 1 === preg_match('/^\d{4}-\d{2}-\d{2}/', $tz)) {
+                $tz = 'UTC';
+            }
+
+            return [
+                'timestamp' => (int) $arg->compileTimeLong,
+                'microsecond' => 0,
+                'timezone' => $tz,
+            ];
+        }
+
+        $timeLit = $arg->compileTimeString;
+        if (null === $timeLit || '' === $timeLit || 0 === preg_match('/^\d{4}-\d{2}-\d{2}/', $timeLit)) {
+            return null;
+        }
+
+        $vmCtx = $context->runtime->vmContext;
+        if (null === $vmCtx) {
+            return null;
+        }
+        $created = DateTimeSupport::tryNewDateTimeVariable($vmCtx, $timeLit, null);
+        if (null === $created) {
+            return null;
+        }
+        $obj = $created->toObject();
+
+        return [
+            'timestamp' => $obj->getProperty(DateTimeSupport::TS_PROPERTY)->resolveIndirect()->toInt(),
+            'microsecond' => $obj->getProperty(DateTimeSupport::MICROSECOND_PROPERTY)->resolveIndirect()->toInt(),
+            'timezone' => $obj->getProperty(DateTimeSupport::TZ_PROPERTY)->resolveIndirect()->toString(),
+        ];
     }
 
     private static function invokeIntervalMutation(
@@ -448,15 +506,17 @@ final class JitDateMutation
             ),
             JITVariable::TYPE_NATIVE_DOUBLE
         );
+        // days is TYPE_VALUE (int|false); write the int from date_diff (#27309).
+        $daysSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $daysSlot),
+            $days
+        );
         $objectType->propertyStore(
             $objectType->propertySlotFor($obj, 'DateInterval', 'days'),
-            new JITVariable(
-                $context,
-                JITVariable::TYPE_NATIVE_LONG,
-                JITVariable::KIND_VALUE,
-                $days
-            ),
-            JITVariable::TYPE_NATIVE_LONG
+            new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $daysSlot),
+            JITVariable::TYPE_VALUE
         );
 
         $slot = JitValueBox::alloc($context);
