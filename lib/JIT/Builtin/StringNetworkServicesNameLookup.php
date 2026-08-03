@@ -10,25 +10,20 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT bridges for getprotobyname()/getservbyname() via NetworkServicesNameLookupJitHelper PHP (#13441, #26247).
+ * JIT/AOT bridges for getprotobyname()/getservbyname() via NetworkServicesNameLookupThinAot (#13441, #26247, #27060).
  *
- * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (VmNetworkServices →
- * NameLookupJitHelper) in one NestedJIT scope (peer StringSscanfByRef #25691 / Gettext #26226).
+ * NestedJIT uses the thin helper (string/int only) — VmNetworkServices static `?array` caches
+ * cannot boxed-store `__hashtable__*` (#27060). VM still uses {@see \PHPCompiler\ext\standard\VmNetworkServices}.
  * php-src: ext/standard/network.c — PHP_FUNCTION(getprotobyname) / getservbyname
  */
 final class StringNetworkServicesNameLookup
 {
-    private const HELPER_PATH = '/ext/standard/NetworkServicesNameLookupJitHelper.php';
-
-    private const VM_NETWORK_PATH = '/ext/standard/VmNetworkServices.php';
+    private const HELPER_PATH = '/ext/standard/NetworkServicesNameLookupThinAot.php';
 
     /**
-     * Ordered NestedJIT sources — VmNetworkServices before NameLookupJitHelper (#26247).
-     *
      * @var list<string>
      */
     private const HELPER_BUNDLE = [
-        self::VM_NETWORK_PATH,
         self::HELPER_PATH,
     ];
 
@@ -50,8 +45,13 @@ final class StringNetworkServicesNameLookup
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__phpc_getprotobyname');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        // Do not early-return on a Type.php declaration (0 BBs) — still emit bridges (#27060).
+        $protoProbe = $context->module->getNamedFunction('__phpc_getprotobyname');
+        $servProbe = $context->module->getNamedFunction('__phpc_getservbyname');
+        if (
+            null !== $protoProbe && $protoProbe->countBasicBlocks() > 0
+            && null !== $servProbe && $servProbe->countBasicBlocks() > 0
+        ) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -79,12 +79,23 @@ final class StringNetworkServicesNameLookup
     private static function implementGetprotobynameBridge(Context $context): void
     {
         $abiName = '__phpc_getprotobyname';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($voidTy, false, $strPtr, $valuePtr)
+            );
 
         $entry = $fn->appendBasicBlock('getprotobyname_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -127,12 +138,23 @@ final class StringNetworkServicesNameLookup
     private static function implementGetservbynameBridge(Context $context): void
     {
         $abiName = '__phpc_getservbyname';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($voidTy, false, $strPtr, $strPtr, $valuePtr);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($voidTy, false, $strPtr, $strPtr, $valuePtr)
+            );
 
         $entry = $fn->appendBasicBlock('getservbyname_bridge_entry');
         $context->builder->positionAtEnd($entry);
