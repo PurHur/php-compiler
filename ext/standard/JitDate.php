@@ -348,6 +348,18 @@ final class JitDate
             'Y-m-d' => ['%04lld-%02lld-%02lld', ['year', 'month', 'day'], 16],
             'Ymd' => ['%04lld%02lld%02lld', ['year', 'month', 'day'], 12],
             'H:i:s' => ['%02lld:%02lld:%02lld', ['hour', 'minute', 'second'], 12],
+            // Composite literals — NestedJIT FormatDatetime segfaults (#27157).
+            'Y-m-d H:i:s' => [
+                '%04lld-%02lld-%02lld %02lld:%02lld:%02lld',
+                ['year', 'month', 'day', 'hour', 'minute', 'second'],
+                32,
+            ],
+            // gmdate('c') / date('c') under UTC — fixed +00:00 (#27157).
+            'c' => [
+                '%04lld-%02lld-%02lldT%02lld:%02lld:%02lld+00:00',
+                ['year', 'month', 'day', 'hour', 'minute', 'second'],
+                40,
+            ],
         ];
         if (!isset($specs[$fmtLit])) {
             return null;
