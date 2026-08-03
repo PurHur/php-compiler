@@ -20,18 +20,18 @@ use PHPLLVM\Value;
  */
 final class MathAcosh
 {
-    private const ABI_ACOSH = 'phpc_sinh';
+    private const ABI_ACOSH = 'phpc_acosh';
 
     private const HELPER_PATH = '/ext/standard/AcoshJitHelper.php';
 
-    private const ACOSH_HELPER = 'PHPCompiler\\ext\\standard\\AcoshJitHelper::sinhArgv';
+    private const ACOSH_HELPER = 'PHPCompiler\\ext\\standard\\AcoshJitHelper::acoshArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ACOSH_HELPER,
     ];
 
-    private const BRIDGE_ENTRY = 'sinh_bridge_entry';
+    private const BRIDGE_ENTRY = 'acosh_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {

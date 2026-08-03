@@ -20,18 +20,18 @@ use PHPLLVM\Value;
  */
 final class MathAsinh
 {
-    private const ABI_ASINH = 'phpc_sinh';
+    private const ABI_ASINH = 'phpc_asinh';
 
     private const HELPER_PATH = '/ext/standard/AsinhJitHelper.php';
 
-    private const ASINH_HELPER = 'PHPCompiler\\ext\\standard\\AsinhJitHelper::sinhArgv';
+    private const ASINH_HELPER = 'PHPCompiler\\ext\\standard\\AsinhJitHelper::aasinhArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ASINH_HELPER,
     ];
 
-    private const BRIDGE_ENTRY = 'sinh_bridge_entry';
+    private const BRIDGE_ENTRY = 'asinh_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {

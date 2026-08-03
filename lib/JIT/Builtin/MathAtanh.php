@@ -20,18 +20,18 @@ use PHPLLVM\Value;
  */
 final class MathAtanh
 {
-    private const ABI_ATANH = 'phpc_sinh';
+    private const ABI_ATANH = 'phpc_atanh';
 
     private const HELPER_PATH = '/ext/standard/AtanhJitHelper.php';
 
-    private const ATANH_HELPER = 'PHPCompiler\\ext\\standard\\AtanhJitHelper::sinhArgv';
+    private const ATANH_HELPER = 'PHPCompiler\\ext\\standard\\AtanhJitHelper::atanhArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ATANH_HELPER,
     ];
 
-    private const BRIDGE_ENTRY = 'sinh_bridge_entry';
+    private const BRIDGE_ENTRY = 'atanh_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
