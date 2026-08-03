@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\HtmlspecialcharsJitHelper;
 use PHPCompiler\ext\standard\VmString;
 
 /**
- * HtmlspecialcharsJitHelper stays NestedJIT-safe and matches VmString subset (#20487, #25345).
+ * HtmlspecialcharsJitHelper stays NestedJIT-safe and matches VmString subset (#20487, #25345, #27290).
  */
 final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
 {
@@ -18,6 +18,7 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HtmlspecialcharsJitHelper.php');
         $this->assertStringContainsString('&amp;', $source);
         $this->assertStringContainsString('escapeFrom', $source);
+        $this->assertStringContainsString('htmlspecialcharsEx', $source);
         $this->assertStringContainsString('isset($string[$i])', $source);
         $this->assertStringNotContainsString('return VmString::', $source);
         $this->assertStringNotContainsString('strlen(', $source);
@@ -33,6 +34,23 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
                 VmString::htmlspecialchars($s, $flags, 'UTF-8', true),
                 HtmlspecialcharsJitHelper::htmlspecialchars($s, $flags),
                 'mismatch for '.var_export($s, true)
+            );
+        }
+    }
+
+    public function testHtmlspecialcharsExDoubleEncodeFalseMatchesVmString(): void
+    {
+        $flags = ENT_QUOTES;
+        foreach (['&amp;', '&lt;', '&', 'Tom & Jerry', '&#38;', '&foo;', "<>&'\""] as $s) {
+            $this->assertSame(
+                VmString::htmlspecialchars($s, $flags, 'UTF-8', false),
+                HtmlspecialcharsJitHelper::htmlspecialcharsEx($s, $flags, 0),
+                'double_encode=false mismatch for '.var_export($s, true)
+            );
+            $this->assertSame(
+                VmString::htmlspecialchars($s, $flags, 'UTF-8', true),
+                HtmlspecialcharsJitHelper::htmlspecialcharsEx($s, $flags, 1),
+                'double_encode=true mismatch for '.var_export($s, true)
             );
         }
     }

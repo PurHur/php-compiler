@@ -13,7 +13,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringHtmlspecialchars;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -23,7 +25,7 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
 /**
- * htmlspecialchars() for strings (subset of PHP; JIT supports flags for ENT_QUOTES / ENT_COMPAT).
+ * htmlspecialchars() for strings (subset of PHP; JIT UTF-8 + flags + double_encode — #27290).
  */
 final class htmlspecialchars extends Internal
 {
@@ -79,12 +81,10 @@ final class htmlspecialchars extends Internal
             return $folded;
         }
 
-        $effectiveArgc = self::jitEffectiveArgc($argc, $args);
-        if ($effectiveArgc >= 3) {
-            throw new \LogicException(
-                'htmlspecialchars() JIT only supports string and optional flags in this compiler build'
-            );
-        }
+        self::assertJitUtf8Encoding($args, $argc);
+
+        $hasDoubleEncode = $argc >= 4;
+        $effectiveFlagsArgc = self::jitEffectiveFlagsArgc($argc, $args);
 
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
@@ -97,7 +97,7 @@ final class htmlspecialchars extends Internal
                 $literal = $maybeLiteral;
             }
         }
-        if (null !== $literal && 1 === $effectiveArgc) {
+        if (null !== $literal && 1 === $effectiveFlagsArgc && !$hasDoubleEncode) {
             return $context->builder->load(
                 $context->constantStringFromString(
                     VmString::htmlspecialchars($literal, self::DEFAULT_FLAGS, 'UTF-8', true)
@@ -105,13 +105,21 @@ final class htmlspecialchars extends Internal
             );
         }
 
+        StringHtmlspecialchars::ensureLinked($context);
+
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(self::DEFAULT_FLAGS, false);
-        if ($effectiveArgc >= 2) {
+        if ($effectiveFlagsArgc >= 2 || $argc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
         }
 
-        return JitHtmlspecialchars::escape($context, $str, $flags);
+        if (!$hasDoubleEncode) {
+            return JitHtmlspecialchars::escape($context, $str, $flags);
+        }
+
+        $doubleEncode = self::jitDoubleEncodeArg($context, $args[3]);
+
+        return JitHtmlspecialchars::escapeEx($context, $str, $flags, $doubleEncode);
     }
 
     /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21405). */
@@ -171,15 +179,49 @@ final class htmlspecialchars extends Internal
     }
 
     /**
+     * Argc for flags-only fast path: null encoding does not count (#27290).
+     *
      * @param list<JITVariable> $args
      */
-    private static function jitEffectiveArgc(int $argc, array $args): int
+    private static function jitEffectiveFlagsArgc(int $argc, array $args): int
     {
-        if ($argc >= 3 && self::encodingArgIsNull($args[2])) {
+        if ($argc >= 3 && self::encodingArgIsNull($args[2]) && $argc < 4) {
             return 2;
         }
 
-        return $argc;
+        return $argc >= 2 ? 2 : $argc;
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function assertJitUtf8Encoding(array $args, int $argc): void
+    {
+        if ($argc < 3 || self::encodingArgIsNull($args[2])) {
+            return;
+        }
+        $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+        if (null === $encodingLit) {
+            throw new \LogicException(
+                'htmlspecialchars() JIT encoding must be a compile-time string in this compiler build'
+            );
+        }
+        if (0 !== strcasecmp($encodingLit, 'UTF-8')) {
+            throw new \LogicException(
+                'htmlspecialchars() JIT only supports UTF-8 encoding in this compiler build'
+            );
+        }
+    }
+
+    private static function jitDoubleEncodeArg(Context $context, JITVariable $arg): Value
+    {
+        $folded = self::compileTimeBool($context, $arg);
+        if (null !== $folded) {
+            return $context->getTypeFromString('int64')->constInt($folded ? 1 : 0, false);
+        }
+        $bool = JitBoolArg::lower($context, $arg, 'htmlspecialchars() double_encode');
+
+        return $context->builder->zExt($bool, $context->getTypeFromString('int64'));
     }
 
     private static function encodingArgIsNull(JITVariable $var): bool
@@ -266,6 +308,9 @@ final class htmlspecialchars extends Internal
 
     private static function compileTimeLong(Context $context, JITVariable $var): ?int
     {
+        if (null !== $var->compileTimeLong) {
+            return (int) $var->compileTimeLong;
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $var->type
             && JITVariable::KIND_VALUE === $var->kind) {
             $lib = $context->llvm->lib;
@@ -285,6 +330,9 @@ final class htmlspecialchars extends Internal
 
     private static function compileTimeBool(Context $context, JITVariable $var): ?bool
     {
+        if (null !== $var->compileTimeLong) {
+            return 0 !== $var->compileTimeLong;
+        }
         if (JITVariable::TYPE_NATIVE_BOOL === $var->type
             && JITVariable::KIND_VALUE === $var->kind) {
             $lib = $context->llvm->lib;
@@ -292,8 +340,18 @@ final class htmlspecialchars extends Internal
                 return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
             }
         }
-        if (null !== $var->compileTimeConstantName && null !== $context->runtime->vmContext) {
-            $phpVar = $context->runtime->vmContext->constantFetch($var->compileTimeConstantName);
+        $name = $var->compileTimeConstantName ?? null;
+        if (null !== $name) {
+            $lc = strtolower($name);
+            if ('true' === $lc) {
+                return true;
+            }
+            if ('false' === $lc) {
+                return false;
+            }
+        }
+        if (null !== $name && null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($name);
             if (null !== $phpVar && VMVariable::TYPE_BOOLEAN === $phpVar->resolveIndirect()->type) {
                 return $phpVar->resolveIndirect()->toBool();
             }

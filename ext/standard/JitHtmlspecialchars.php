@@ -21,4 +21,15 @@ final class JitHtmlspecialchars
             $flags
         );
     }
+
+    /** UTF-8 + double_encode (int64 0/1) — #27290. */
+    public static function escapeEx(Context $context, Value $strPtr, Value $flags, Value $doubleEncode): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__string__htmlspecialchars_ex'),
+            $strPtr,
+            $flags,
+            $doubleEncode
+        );
+    }
 }
