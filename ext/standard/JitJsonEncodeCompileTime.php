@@ -17,8 +17,9 @@ use PHPLLVM\Value;
 /**
  * Compile-time json_encode() for inline array literals — avoids deferred AOT stubs (#14040).
  *
- * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080) and
- * `json_encode(array_replace_recursive(lit…))` (#26977) — thin AOT NestedJIT cannot yet
+ * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080),
+ * `json_encode(array_replace_recursive(lit…))` (#26977), and
+ * `json_encode(array_flip(lit…))` (#27072) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
  * php-src: ext/json/php_json.c — php_json_encode
@@ -40,6 +41,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayReplaceRecursive($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayFlip($block, $operand);
         }
         if (null === $vmArray) {
             $foldedFalse = self::tryEncodePregSplitFalse($context, $block, $operand, $flags);
@@ -148,6 +152,33 @@ final class JitJsonEncodeCompileTime
         $merged = $first->replaceRecursiveCopy(...$others);
         $var = new VmVariable();
         $var->array($merged);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_flip(…))` when the array arg is compile-time (#27072).
+     *
+     * Uses VM {@see VmArray::flip()} SSOT (php-src array.c). array_flip call-site LLVM
+     * already builds the flipped map (foreach/dim green); NestedJIT json_encode still
+     * exports string keys as empty (`{}`) without this fold.
+     */
+    private static function tryCompileTimeArrayFromArrayFlip(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_flip');
+        if (null === $args || 1 !== \count($args)) {
+            return null;
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[0]->type) {
+            return null;
+        }
+        $flipped = VmArray::flip($args[0]->toArray());
+        $var = new VmVariable();
+        $var->array($flipped);
 
         return $var;
     }
