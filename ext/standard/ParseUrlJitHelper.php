@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-
 /**
  * parse_url() for compiled JIT/AOT modules (#9358, php-in-PHP).
  *
  * SSOT: {@see VmString::parseUrl()}
  * php-src: ext/standard/url.c — php_parse_url()
+ *
+ * Thin AOT NestedJIT of PHP `array` returns mis-tags slots (#27078 peer #26943);
+ * assoc bridge uses parseUrlComponent + lastString/lastInt only.
  */
 final class ParseUrlJitHelper
 {
@@ -56,6 +58,8 @@ final class ParseUrlJitHelper
     }
 
     /**
+     * Host/PHPUnit path — not used by thin AOT NestedJIT (array returns unsafe, #27078).
+     *
      * @return array<string, int|string>|null null when parse_url() returns false
      */
     public static function parseUrlAssoc(string $url): ?array

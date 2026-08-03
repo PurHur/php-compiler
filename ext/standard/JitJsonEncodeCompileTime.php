@@ -18,8 +18,9 @@ use PHPLLVM\Value;
  * Compile-time json_encode() for inline array literals — avoids deferred AOT stubs (#14040).
  *
  * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080),
- * `json_encode(array_replace_recursive(lit…))` (#26977), and
- * `json_encode(array_flip(lit…))` (#27072) — thin AOT NestedJIT cannot yet
+ * `json_encode(array_replace_recursive(lit…))` (#26977),
+ * `json_encode(array_flip(lit…))` (#27072), and
+ * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
  * php-src: ext/json/php_json.c — php_json_encode
@@ -46,9 +47,16 @@ final class JitJsonEncodeCompileTime
             $vmArray = self::tryCompileTimeArrayFromArrayFlip($block, $operand);
         }
         if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromParseUrl($block, $operand);
+        }
+        if (null === $vmArray) {
             $foldedFalse = self::tryEncodePregSplitFalse($context, $block, $operand, $flags);
             if (null !== $foldedFalse) {
                 return $foldedFalse;
+            }
+            $foldedParseUrlFalse = self::tryEncodeParseUrlFalse($context, $block, $operand, $flags);
+            if (null !== $foldedParseUrlFalse) {
+                return $foldedParseUrlFalse;
             }
 
             return null;
@@ -181,6 +189,87 @@ final class JitJsonEncodeCompileTime
         $var->array($flipped);
 
         return $var;
+    }
+
+    /**
+     * Resolve `json_encode(parse_url(…))` when URL(/component) are compile-time (#27078).
+     *
+     * Uses {@see VmString::parseUrl()} SSOT (php-src url.c). parse_url call-site LLVM
+     * builds a correct foreach/dim HT; NestedJIT json_encode still exports string keys
+     * as empty / zeros without this fold (peer #27072 / #26977).
+     */
+    private static function tryCompileTimeArrayFromParseUrl(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $parsed = self::evalCompileTimeParseUrl($block, $operand);
+        if (null === $parsed || false === $parsed || !\is_array($parsed)) {
+            return null;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($parsed as $key => $value) {
+            $v = new VmVariable();
+            if (\is_int($value)) {
+                $v->int($value);
+            } else {
+                $v->string((string) $value);
+            }
+            $ht->add((string) $key, $v);
+        }
+        $var = new VmVariable();
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * When parse_url constexpr-fails (false), json_encode soft-encodes boolean false.
+     *
+     * @return Value|null
+     */
+    private static function tryEncodeParseUrlFalse(
+        Context $context,
+        Block $block,
+        Operand $operand,
+        int $flags
+    ): ?Value {
+        $parsed = self::evalCompileTimeParseUrl($block, $operand);
+        if (false !== $parsed) {
+            return null;
+        }
+        $encoded = VmJsonFormat::encodeExported(false, $flags);
+        if (false === $encoded) {
+            return self::emitFalse($context);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * @return array<string, int|string>|string|int|null|false
+     *         null = not a foldable parse_url result
+     */
+    private static function evalCompileTimeParseUrl(Block $block, Operand $operand): array|string|int|null|false
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'parse_url');
+        if (null === $args || [] === $args || \count($args) > 2) {
+            return null;
+        }
+        if (VmVariable::TYPE_STRING !== $args[0]->type) {
+            return null;
+        }
+        $url = $args[0]->toString();
+        $component = -1;
+        if (2 === \count($args)) {
+            if (VmVariable::TYPE_INTEGER !== $args[1]->type) {
+                return null;
+            }
+            $component = VmParseUrl::normalizeRawComponentInt($args[1]->toInt());
+        }
+
+        return VmString::parseUrl($url, $component);
     }
 
     private static int $lastPregSplitFlags = 0;
@@ -318,6 +407,14 @@ final class JitJsonEncodeCompileTime
                 $args[] = $copy;
                 continue;
             }
+            // Concat / assign of string literals (parse_url URL from `"a"."b"`, #27078).
+            $foldedString = self::tryCompileTimeStringFromSlot($block, (int) $op->arg1);
+            if (null !== $foldedString) {
+                $copy = new VmVariable();
+                $copy->string($foldedString);
+                $args[] = $copy;
+                continue;
+            }
             // INIT_ARRAY slots (inline array literals) — same recovery as json_encode(lit) (#26977).
             $argOperand = $block->getOperand((int) $op->arg1);
             if (null === $argOperand) {
@@ -331,5 +428,47 @@ final class JitJsonEncodeCompileTime
         }
 
         return $args;
+    }
+
+    /**
+     * Fold CONCAT / ASSIGN chains of string constants (mirrors JIT resolveJitCompileTimeStringSlot).
+     *
+     * @param array<int, true> $visited
+     */
+    private static function tryCompileTimeStringFromSlot(Block $block, int $slot, array $visited = []): ?string
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        if (isset($block->constants[$slot]) && VmVariable::TYPE_STRING === $block->constants[$slot]->type) {
+            return $block->constants[$slot]->toString();
+        }
+        foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_CONCAT === $prior->type && $prior->arg1 === $slot) {
+                $left = self::tryCompileTimeStringFromSlot($block, (int) $prior->arg2, $visited);
+                $right = self::tryCompileTimeStringFromSlot($block, (int) $prior->arg3, $visited);
+                if (null !== $left && null !== $right) {
+                    return $left.$right;
+                }
+            }
+            if (OpCode::TYPE_ASSIGN === $prior->type && $prior->arg2 === $slot && null !== $prior->arg3) {
+                $resolved = self::tryCompileTimeStringFromSlot($block, (int) $prior->arg3, $visited);
+                if (null !== $resolved) {
+                    return $resolved;
+                }
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = self::tryCompileTimeStringFromSlot($parent, $slot, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
     }
 }

@@ -12,19 +12,16 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861).
+ * JIT/AOT link for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #22861, #27078).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathFrexp #22575).
- * Replaces {@see ParseUrlJit} LLVM (~1.2k LOC). SSOT: {@see \PHPCompiler\ext\standard\VmString}.
- * php-src: ext/standard/url.c — php_parse_url()
+ * Assoc HT: {@see ParseUrlAssocLlvm} (component + lastString/lastInt).
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}. php-src: ext/standard/url.c
  */
 final class ParseUrlRuntime
 {
     private const HELPER_PATH = '/ext/standard/ParseUrlJitHelper.php';
 
     private const COMPONENT_HELPER = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::parseUrlComponent';
-
-    private const ASSOC_HELPER = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::parseUrlAssoc';
 
     private const LAST_STRING = 'PHPCompiler\\ext\\standard\\ParseUrlJitHelper::lastString';
 
@@ -36,12 +33,9 @@ final class ParseUrlRuntime
 
     private const TAG_STRING = 2;
 
-    private const TAG_INT = 3;
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::COMPONENT_HELPER,
-        self::ASSOC_HELPER,
         self::LAST_STRING,
         self::LAST_INT,
     ];
@@ -73,8 +67,9 @@ final class ParseUrlRuntime
         }
 
         self::ensureJitHelperCompiled($context);
+        self::ensureHashtableHelpers($context);
         self::implementIfMissing($context, '__phpc_parse_url_component', self::implementComponentBridge(...));
-        self::implementIfMissing($context, '__phpc_parse_url_assoc', self::implementAssocBridge(...));
+        self::implementIfMissing($context, '__phpc_parse_url_assoc', ParseUrlAssocLlvm::implement(...));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -84,9 +79,7 @@ final class ParseUrlRuntime
         }
     }
 
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
+    /** @param callable(Context, LlvmFunction): void $emit */
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
@@ -95,7 +88,6 @@ final class ParseUrlRuntime
 
             return;
         }
-
         $fn = self::declareFunction($context, $name);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
@@ -104,7 +96,6 @@ final class ParseUrlRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
-        // Type.php predeclares empty __phpc_parse_url_* — reuse (ArrayPushRuntime pattern).
         try {
             return $context->lookupFunction($name);
         } catch (\Throwable) {
@@ -133,27 +124,29 @@ final class ParseUrlRuntime
         $nullOutBb = $fn->appendBasicBlock('puc_null_out');
         $bodyBb = $fn->appendBasicBlock('puc_body');
         $context->builder->positionAtEnd($entry);
-
         $url = $fn->getParam(0);
         $component = $fn->getParam(1);
         $out = $fn->getParam(2);
         $valuePtr = $context->getTypeFromString('__value__*');
-        $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
-        $context->builder->branchIf($nullOut, $nullOutBb, $bodyBb);
-
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull()),
+            $nullOutBb,
+            $bodyBb
+        );
         $context->builder->positionAtEnd($nullOutBb);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $tag = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::COMPONENT_HELPER),
-            [$url, $context->builder->trunc($component, $i32)]
+        $tagI32 = $context->builder->trunc(
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::COMPONENT_HELPER),
+                [$url, $context->builder->trunc($component, $i32)]
+            ),
+            $i32
         );
-        $tagI32 = $context->builder->trunc($tag, $i32);
-
         $falseBb = BasicBlockHelper::append($context, 'puc_tag_false');
         $nullTagBb = BasicBlockHelper::append($context, 'puc_tag_null');
         $stringBb = BasicBlockHelper::append($context, 'puc_tag_string');
@@ -161,106 +154,45 @@ final class ParseUrlRuntime
         $doneBb = BasicBlockHelper::append($context, 'puc_done');
         $checkNullBb = BasicBlockHelper::append($context, 'puc_check_null');
         $checkStringBb = BasicBlockHelper::append($context, 'puc_check_string');
-
-        $isFalse = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false));
-        $context->builder->branchIf($isFalse, $falseBb, $checkNullBb);
-
-        $context->builder->positionAtEnd($falseBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $i32->constInt(0, false)
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false)),
+            $falseBb,
+            $checkNullBb
         );
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
         $context->builder->branch($doneBb);
-
         $context->builder->positionAtEnd($checkNullBb);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_NULL, false));
-        $context->builder->branchIf($isNull, $nullTagBb, $checkStringBb);
-
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_NULL, false)),
+            $nullTagBb,
+            $checkStringBb
+        );
         $context->builder->positionAtEnd($nullTagBb);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
         $context->builder->branch($doneBb);
-
         $context->builder->positionAtEnd($checkStringBb);
-        $isString = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_STRING, false));
-        $context->builder->branchIf($isString, $stringBb, $intBb);
-
-        $context->builder->positionAtEnd($stringBb);
-        $strResult = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::LAST_STRING),
-            []
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_STRING, false)),
+            $stringBb,
+            $intBb
         );
+        $context->builder->positionAtEnd($stringBb);
+        $strRaw = JitNestedHelperCoerce::callHelper($context, self::helperFunction($context, self::LAST_STRING), []);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $out,
-            $strResult
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strRaw)
         );
         $context->builder->branch($doneBb);
-
         $context->builder->positionAtEnd($intBb);
-        $intResult = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::LAST_INT),
-            []
-        );
+        $intResult = JitNestedHelperCoerce::callHelper($context, self::helperFunction($context, self::LAST_INT), []);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $out,
             $context->builder->sext($context->builder->trunc($intResult, $i32), $i64)
         );
         $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-        $context->builder->returnVoid();
-    }
-
-    private static function implementAssocBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('pua_bridge_entry');
-        $nullOutBb = $fn->appendBasicBlock('pua_null_out');
-        $bodyBb = $fn->appendBasicBlock('pua_body');
-        $context->builder->positionAtEnd($entry);
-
-        $url = $fn->getParam(0);
-        $out = $fn->getParam(1);
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
-        $context->builder->branchIf($nullOut, $nullOutBb, $bodyBb);
-
-        $context->builder->positionAtEnd($nullOutBb);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($bodyBb);
-        $i32 = $context->getTypeFromString('int32');
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::ASSOC_HELPER),
-            [$url]
-        );
-        $htNull = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
-        $falseBb = BasicBlockHelper::append($context, 'pua_false');
-        $storeBb = BasicBlockHelper::append($context, 'pua_store');
-        $doneBb = BasicBlockHelper::append($context, 'pua_done');
-        $context->builder->branchIf($htNull, $falseBb, $storeBb);
-
-        $context->builder->positionAtEnd($falseBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $i32->constInt(0, false)
-        );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($storeBb);
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $out,
-            $ht
-        );
-        $context->builder->branch($doneBb);
-
         $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
     }
@@ -274,12 +206,35 @@ final class ParseUrlRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#22861');
+    }
+
+    private static function ensureHashtableHelpers(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $void = $context->getTypeFromString('void');
+        self::ensureExternal($context, '__hashtable__alloc', $context->context->functionType($htPtr, false));
+        self::ensureExternal(
             $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22861'
+            '__hashtable__setStringKeyLong',
+            $context->context->functionType($void, false, $htPtr, $strPtr, $i64)
         );
+        self::ensureExternal(
+            $context,
+            '__hashtable__setStringKeyString',
+            $context->context->functionType($void, false, $htPtr, $strPtr, $strPtr)
+        );
+    }
+
+    private static function ensureExternal(Context $context, string $name, $ft): void
+    {
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $context->registerFunction($name, $context->module->addFunction($name, $ft));
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void

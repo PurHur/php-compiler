@@ -76,6 +76,9 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('tryCompileTimeArrayFromArrayFlip', $fold);
         $this->assertStringContainsString("'array_flip'", $fold);
         $this->assertStringContainsString('VmArray::flip', $fold);
+        $this->assertStringContainsString('tryCompileTimeArrayFromParseUrl', $fold);
+        $this->assertStringContainsString("'parse_url'", $fold);
+        $this->assertStringContainsString('VmString::parseUrl', $fold);
     }
 
     public function testSpineBundleIncludesJsonEncodePhpJitPath(): void

@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\ParseUrlComponentJit;
 use PHPCompiler\JIT\Builtin\ParseUrlRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -61,7 +62,7 @@ final class JitParseUrl
             JitStringBuiltinArg::lowerTrimFamilyString($context, $url, 'parse_url', 0, 'url');
         }
         if (null === $component) {
-            $urlLiteral = $url->compileTimeString ?? null;
+            $urlLiteral = $url->compileTimeString ?? JitStringArg::compileTimeLiteral($url);
             if (
                 null === $urlLiteral
                 && (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
@@ -96,7 +97,7 @@ final class JitParseUrl
         $compConst = self::tryCompileTimeComponentInt($context, $component);
         if (null !== $compConst) {
             $comp = VmParseUrl::normalizeRawComponentInt($compConst);
-            $urlLiteral = $url->compileTimeString ?? null;
+            $urlLiteral = $url->compileTimeString ?? JitStringArg::compileTimeLiteral($url);
             if (
                 null === $urlLiteral
                 && (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
@@ -189,30 +190,44 @@ final class JitParseUrl
      */
     private static function materializeVmArray(Context $context, array $parts): Value
     {
-        $ht = HashTableHelper::alloc($context);
+        // Same INIT_ARRAY / addElement path as `["k"=>"v"]` literals (#27078).
+        $slot = JitValueBox::alloc($context);
+        $arrayVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VALUE,
+            $slot
+        );
+        $arrayVar->valueBoxHashtable = true;
+        HashTableHelper::initArray($context, $arrayVar);
         foreach ($parts as $key => $value) {
-            $keyStr = $context->builder->load($context->constantStringFromString((string) $key));
+            $keyVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString((string) $key))
+            );
+            $keyVar->compileTimeString = (string) $key;
             if (\is_int($value)) {
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyLong'),
-                    $ht,
-                    $keyStr,
+                $elem = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_LONG,
+                    JITVariable::KIND_VALUE,
                     $context->getTypeFromString('int64')->constInt($value, false)
                 );
-                continue;
+            } else {
+                $elem = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_STRING,
+                    JITVariable::KIND_VALUE,
+                    $context->builder->load($context->constantStringFromString((string) $value))
+                );
+                $elem->compileTimeString = (string) $value;
             }
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__setStringKeyString'),
-                $ht,
-                $keyStr,
-                $context->builder->load($context->constantStringFromString((string) $value))
-            );
+            HashTableHelper::addElement($context, $arrayVar, $elem, $keyVar);
         }
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
 
-        return $ptr;
+        return JitValueBox::pointer($context, $slot);
     }
 
     /** @return ?int null when component must be lowered at runtime */
