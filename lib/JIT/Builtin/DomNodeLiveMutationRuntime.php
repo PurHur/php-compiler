@@ -494,12 +494,21 @@ final class DomNodeLiveMutationRuntime
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
         $listClassId = $objectType->lookup('DOMNodeList');
-        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
-            // loadXML may have defined childNodes as TYPE_OBJECT (#23251).
-            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, Variable::TYPE_OBJECT);
+        $hadChildNodesProp = $objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES);
+        if (!$hadChildNodesProp) {
+            // Seed as VALUE so unset slots stay NULL-tagged (#27216). TYPE_OBJECT
+            // made loadValue return a garbage pointer and length stores segfaulted.
+            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, Variable::TYPE_VALUE);
         }
         if (!$objectType->hasProperty($listClassId, 'length')) {
             $objectType->defineProperty($listClassId, 'length', Variable::TYPE_NATIVE_LONG);
+        }
+
+        // First touch: no live list yet — allocate length=delta (createElement path).
+        if (!$hadChildNodesProp) {
+            self::syncChildNodesLengthSlot($context, $receiver, $delta);
+
+            return;
         }
 
         $receiverObj = self::receiverObject($context, $receiver);
@@ -510,21 +519,32 @@ final class DomNodeLiveMutationRuntime
             VmDom::PROP_CHILD_NODES,
             $nodeClassId
         );
-        $listObj = null;
+        // Only bump in-place for a concrete object list (#27044 held $list refs).
         if (Variable::TYPE_OBJECT === $listVar->type) {
-            $listObj = $context->helper->loadValue($listVar);
-        } elseif (Variable::TYPE_VALUE === $listVar->type) {
-            $listObj = $context->builder->call(
-                $context->lookupFunction('__value__readObject'),
-                JitValueBox::valuePtrFromVariable($context, $listVar)
+            self::bumpExistingChildNodesLength(
+                $context,
+                $objectType,
+                $listClassId,
+                $context->helper->loadValue($listVar),
+                $delta
             );
-        }
-        if (null === $listObj) {
-            self::syncChildNodesLengthSlot($context, $receiver, $delta);
 
             return;
         }
 
+        self::syncChildNodesLengthSlot($context, $receiver, $delta);
+    }
+
+    /**
+     * @param \PHPCompiler\JIT\Builtin\Type\Object_ $objectType
+     */
+    private static function bumpExistingChildNodesLength(
+        Context $context,
+        $objectType,
+        int $listClassId,
+        Value $listObj,
+        int $delta
+    ): void {
         $lengthVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $listObj,
