@@ -4798,6 +4798,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPadTypeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPointerRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPopRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayProductRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayProductLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPushRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayRandRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReduceRuntime.php';
