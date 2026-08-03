@@ -83,7 +83,9 @@ final class htmlentities extends Internal
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $maybeLiteral = $args[0]->compileTimeString ?? null;
-            if (null !== $maybeLiteral && JITVariable::KIND_VALUE === $args[0]->kind) {
+            // Fold proven compile-time strings: KIND_VALUE immediates and TYPE_STRING
+            // stack slots (peer htmlspecialchars #25345 / #26889).
+            if (null !== $maybeLiteral && self::isCompileTimeFoldableString($args[0])) {
                 $literal = $maybeLiteral;
             }
         }
@@ -104,6 +106,7 @@ final class htmlentities extends Internal
             );
         }
 
+        \PHPCompiler\JIT\Builtin\HtmlEntitiesJit::ensureLinked($context);
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
@@ -113,6 +116,22 @@ final class htmlentities extends Internal
         }
 
         return JitHtmlentities::escape($context, $str, $flagsLlvm);
+    }
+
+    /**
+     * Proven compile-time string for htmlentities fold (#26889 / peer #25345).
+     */
+    private static function isCompileTimeFoldableString(JITVariable $arg): bool
+    {
+        if (null === ($arg->compileTimeString ?? null)) {
+            return false;
+        }
+        if (JITVariable::KIND_VALUE === $arg->kind) {
+            return true;
+        }
+
+        return JITVariable::TYPE_STRING === $arg->type
+            && JITVariable::KIND_VARIABLE === $arg->kind;
     }
 
     /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21405). */
