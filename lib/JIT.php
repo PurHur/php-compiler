@@ -13804,9 +13804,7 @@ class JIT {
             // alloca KIND_VARIABLE so freeDeadVariables at ternary/branch edges can
             // valueDelref (KIND_VALUE free is a no-op and would keep the referent) (#27118).
             if ($this->context->scope->toCall instanceof JIT\Call\WeakReferenceGet) {
-                $ptr = '__value__*' === $llvmTy
-                    ? JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult)
-                    : JIT\JitValueBox::pointer($this->context, $llvmResult);
+                $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                 if ($this->context->hasVariableOp($result)) {
                     $this->context->getVariableFromOp($result)->free();
                 }
@@ -13843,9 +13841,7 @@ class JIT {
             ) {
                 $prior = $this->context->getVariableFromOp($result);
                 if (Variable::TYPE_VALUE !== $prior->type) {
-                    $ptr = '__value__*' === $llvmTy
-                        ? JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult)
-                        : JIT\JitValueBox::pointer($this->context, $llvmResult);
+                    $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
                     $prior->free();
                     $slot = JIT\JitValueBox::alloc($this->context);
                     JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
@@ -16801,9 +16797,9 @@ class JIT {
         $destTy = $this->context->getStringFromType($dest->value->typeOf());
         if (Variable::TYPE_NATIVE_BOOL === $dest->type) {
             if ('__value__' === $valueTy || '__value__*' === $valueTy) {
-                $valuePtr = '__value__*' === $valueTy
-                    ? JIT\JitValueBox::normalizeValuePtr($this->context, $value)
-                    : JIT\JitValueBox::pointer($this->context, $value);
+                // By-value `__value__` must be stored into an alloca first — pointer() on a
+                // struct yields illegal addrspacecast %__value__ → %__value__* (#27346).
+                $valuePtr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $value);
                 $dest->free();
                 $slot = JIT\JitValueBox::alloc($this->context);
                 JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
@@ -16838,9 +16834,9 @@ class JIT {
         }
         if (Variable::TYPE_NATIVE_LONG === $dest->type || Variable::TYPE_NATIVE_DOUBLE === $dest->type) {
             if ('__value__' === $valueTy || '__value__*' === $valueTy) {
-                $valuePtr = '__value__*' === $valueTy
-                    ? JIT\JitValueBox::normalizeValuePtr($this->context, $value)
-                    : JIT\JitValueBox::pointer($this->context, $value);
+                // Property-hook get returns by-value `__value__` into a typed int/float slot
+                // (PROFILE=8.4); coerce rather than pointerCast the struct (#27346).
+                $valuePtr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $value);
                 $dest->free();
                 $slot = JIT\JitValueBox::alloc($this->context);
                 JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
