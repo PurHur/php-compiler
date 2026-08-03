@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for gz*() — libz via ZlibRuntime → ZlibJitHelper (issues #3194, #6791, #9879). */
+/** LLVM helpers for gz*() — thin libz via ZlibRuntime → StringZlibJit (#3194, #6791, #9879, #26864). */
 final class JitZlib
 {
     private static int $blockSerial = 0;
@@ -110,7 +110,7 @@ final class JitZlib
 
     public static function getCodingType(Context $context): Value
     {
-        StringZlib::ensureLinked($context);
+        \PHPCompiler\JIT\Builtin\ZlibRuntime::ensureGetCodingTypeLinked($context);
 
         return self::stringOrFalse($context, $context->builder->call(
             $context->lookupFunction('__compiler_zlib_get_coding_type')
