@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6953 |
-| Phase A inventory files (M2 ratio SSOT) | 6953 |
+| PHP files on vm.php path | 6968 |
+| Phase A inventory files (M2 ratio SSOT) | 6968 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22358 |
+| Source constructs flagged (warnings) | 22389 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -121,38 +121,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bz2/bzread.php` | 0 | 1 |
 | `ext/bz2/bzwrite.php` | 0 | 1 |
 | `ext/calendar/CalDaysInMonthJitHelper.php` | 0 | 1 |
+| `ext/calendar/CalFromJdJitHelper.php` | 0 | 1 |
 | `ext/calendar/CalInfoJitHelper.php` | 0 | 1 |
 | `ext/calendar/CalToJdJitHelper.php` | 0 | 1 |
 | `ext/calendar/CalendarArgs.php` | 0 | 1 |
 | `ext/calendar/CalendarConstants.php` | 0 | 1 |
 | `ext/calendar/CalendarFunction.php` | 0 | 1 |
 | `ext/calendar/CalendarTables.php` | 0 | 1 |
+| `ext/calendar/EasterDateJitHelper.php` | 0 | 1 |
 | `ext/calendar/EasterDaysJitHelper.php` | 0 | 1 |
 | `ext/calendar/FrenchtojdJitHelper.php` | 0 | 1 |
 | `ext/calendar/GregoriantojdJitHelper.php` | 0 | 1 |
+| `ext/calendar/JdmonthnameJitHelper.php` | 0 | 1 |
 | `ext/calendar/JdtofrenchJitHelper.php` | 0 | 1 |
 | `ext/calendar/JdtogregorianJitHelper.php` | 0 | 1 |
+| `ext/calendar/JdtojewishJitHelper.php` | 0 | 1 |
 | `ext/calendar/JdtojulianJitHelper.php` | 0 | 1 |
 | `ext/calendar/JdtounixJitHelper.php` | 0 | 1 |
 | `ext/calendar/JewishtojdJitHelper.php` | 0 | 1 |
 | `ext/calendar/JitCalDaysInMonth.php` | 0 | 1 |
+| `ext/calendar/JitCalFromJd.php` | 0 | 2 |
 | `ext/calendar/JitCalInfo.php` | 0 | 2 |
 | `ext/calendar/JitCalToJd.php` | 0 | 2 |
+| `ext/calendar/JitEasterDate.php` | 0 | 2 |
 | `ext/calendar/JitEasterDays.php` | 0 | 2 |
 | `ext/calendar/JitFrenchtojd.php` | 0 | 2 |
 | `ext/calendar/JitGregoriantojd.php` | 0 | 2 |
+| `ext/calendar/JitJdmonthname.php` | 0 | 2 |
 | `ext/calendar/JitJdtofrench.php` | 0 | 2 |
 | `ext/calendar/JitJdtogregorian.php` | 0 | 2 |
+| `ext/calendar/JitJdtojewish.php` | 0 | 2 |
 | `ext/calendar/JitJdtojulian.php` | 0 | 2 |
 | `ext/calendar/JitJdtounix.php` | 0 | 2 |
 | `ext/calendar/JitJewishtojd.php` | 0 | 2 |
 | `ext/calendar/JitJuliantojd.php` | 0 | 2 |
+| `ext/calendar/JitUnixtojd.php` | 0 | 2 |
 | `ext/calendar/JuliantojdJitHelper.php` | 0 | 1 |
 | `ext/calendar/Module.php` | 0 | 20 |
+| `ext/calendar/UnixtojdJitHelper.php` | 0 | 1 |
 | `ext/calendar/VmCalendar.php` | 0 | 11 |
 | `ext/calendar/VmJewishFrenchCalendar.php` | 0 | 1 |
 | `ext/calendar/cal_days_in_month.php` | 0 | 3 |
-| `ext/calendar/cal_from_jd.php` | 0 | 2 |
+| `ext/calendar/cal_from_jd.php` | 0 | 3 |
 | `ext/calendar/cal_info.php` | 0 | 3 |
 | `ext/calendar/cal_to_jd.php` | 0 | 3 |
 | `ext/calendar/easter_date.php` | 0 | 2 |
@@ -160,15 +170,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/calendar/frenchtojd.php` | 0 | 3 |
 | `ext/calendar/gregoriantojd.php` | 0 | 3 |
 | `ext/calendar/jddayofweek.php` | 0 | 2 |
-| `ext/calendar/jdmonthname.php` | 0 | 2 |
+| `ext/calendar/jdmonthname.php` | 0 | 3 |
 | `ext/calendar/jdtofrench.php` | 0 | 3 |
 | `ext/calendar/jdtogregorian.php` | 0 | 3 |
-| `ext/calendar/jdtojewish.php` | 0 | 2 |
+| `ext/calendar/jdtojewish.php` | 0 | 3 |
 | `ext/calendar/jdtojulian.php` | 0 | 3 |
 | `ext/calendar/jdtounix.php` | 0 | 3 |
 | `ext/calendar/jewishtojd.php` | 0 | 3 |
 | `ext/calendar/juliantojd.php` | 0 | 3 |
-| `ext/calendar/unixtojd.php` | 0 | 2 |
+| `ext/calendar/unixtojd.php` | 0 | 3 |
 | `ext/ctype/CtypeFunction.php` | 0 | 1 |
 | `ext/ctype/CtypeJitHelper.php` | 0 | 1 |
 | `ext/ctype/JitCtype.php` | 0 | 1 |
@@ -1683,7 +1693,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/PdoSerializeDeny.php` | 0 | 3 |
-| `ext/pdo/VmPDO.php` | 0 | 89 |
+| `ext/pdo/VmPDO.php` | 0 | 96 |
 | `ext/pdo/VmPDORow.php` | 0 | 5 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 67 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
@@ -5106,6 +5116,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bz2StreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bz2StreamRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/CalDaysInMonthRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/CalFromJdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CalInfoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CalToJdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
@@ -5159,6 +5170,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomXPathEvaluateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXPathQueryRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXmlDocumentCreateFromStringRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/EasterDateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EasterDaysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
@@ -5233,8 +5245,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Internal.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsAnonymousClassRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsNullFn.php` | 0 | 2 |
+| `lib/JIT/Builtin/JdmonthnameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdtofrenchRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdtogregorianRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/JdtojewishRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdtojulianRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JdtounixRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/JewishtojdRuntime.php` | 0 | 1 |
@@ -5687,6 +5701,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/UndefinedGlobalVariableRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UndefinedVariableRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/UnixtojdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UnpackJitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UploadTempJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/UsortRuntime.php` | 0 | 1 |
@@ -7514,6 +7529,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/calendar/CalFromJdJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/calendar/CalInfoJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7544,6 +7564,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/calendar/EasterDateJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/calendar/EasterDaysJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7559,12 +7584,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/calendar/JdmonthnameJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/calendar/JdtofrenchJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/calendar/JdtogregorianJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/calendar/JdtojewishJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -7589,6 +7624,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/calendar/JitCalFromJd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 3 class method(s)
+
 ### `ext/calendar/JitCalInfo.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7599,6 +7640,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- 4 class method(s)
+
+### `ext/calendar/JitEasterDate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
 - 4 class method(s)
 
 ### `ext/calendar/JitEasterDays.php`
@@ -7619,6 +7666,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 4 class method(s)
 
+### `ext/calendar/JitJdmonthname.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 4 class method(s)
+
 ### `ext/calendar/JitJdtofrench.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7630,6 +7683,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
 - 4 class method(s)
+
+### `ext/calendar/JitJdtojewish.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 6 class method(s)
 
 ### `ext/calendar/JitJdtojulian.php`
 
@@ -7653,6 +7712,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- 4 class method(s)
+
+### `ext/calendar/JitUnixtojd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
 - 4 class method(s)
 
 ### `ext/calendar/JuliantojdJitHelper.php`
@@ -7683,6 +7748,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new unixtojd (line 47)
 - new jdtounix (line 48)
 - 2 class method(s)
+
+### `ext/calendar/UnixtojdJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/calendar/VmCalendar.php`
 
@@ -7715,6 +7785,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
+- new ArgumentCountError (line 43)
 - 2 class method(s)
 
 ### `ext/calendar/cal_info.php`
@@ -7767,6 +7838,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
+- new ArgumentCountError (line 41)
 - 2 class method(s)
 
 ### `ext/calendar/jdtofrench.php`
@@ -7787,6 +7859,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
+- new ArgumentCountError (line 52)
 - 2 class method(s)
 
 ### `ext/calendar/jdtojulian.php`
@@ -7821,6 +7894,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
+- new ArgumentCountError (line 40)
 - 2 class method(s)
 
 ### `ext/ctype/CtypeFunction.php`
@@ -20151,7 +20225,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new pdo_drivers (line 67)
+- new pdo_drivers (line 68)
 - 5 class method(s)
 
 ### `ext/pdo/PdoClassMethod.php`
@@ -20162,7 +20236,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/PdoExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/pdo/PdoSerializeDeny.php`
 
@@ -20174,95 +20248,102 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/VmPDO.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 56)
-- new Variable (line 60)
-- new Variable (line 63)
-- new PDOConstruct (line 71)
-- new PDOExec (line 77)
-- new PDOPrepare (line 78)
-- new PDOQuery (line 79)
-- new PDOSetAttribute (line 80)
-- new PDOGetAttribute (line 81)
-- new PDOGetAvailableDrivers (line 82)
-- new PDOLastInsertId (line 83)
-- new PDOQuote (line 84)
-- new PDOBeginTransaction (line 85)
-- new PDOCommit (line 86)
-- new PDORollBack (line 87)
-- new PDOInTransaction (line 88)
-- new PDOErrorCode (line 89)
-- new PDOErrorInfo (line 90)
-- new PDOConnect (line 94)
-- new PDOSqliteCreateFunction (line 141)
-- new PDOSqliteCreateAggregate (line 142)
-- new PDOSqliteCreateCollation (line 143)
-- new PDOPgsqlCopyFromArrayLegacy (line 186)
-- new PDOPgsqlCopyFromFileLegacy (line 187)
-- new PDOPgsqlCopyToArrayLegacy (line 188)
-- new PDOPgsqlCopyToFileLegacy (line 189)
-- new PDOPgsqlLobCreateLegacy (line 190)
-- new PDOPgsqlLobOpenLegacy (line 191)
-- new PDOPgsqlLobUnlinkLegacy (line 192)
-- new PDOPgsqlGetNotifyLegacy (line 193)
-- new PDOPgsqlGetPidLegacy (line 194)
-- new ClassEntry (line 234)
-- new PDOSqliteCreateFunction (line 247)
-- new PDOSqliteCreateAggregate (line 248)
-- new PDOSqliteCreateCollation (line 249)
-- new ClassEntry (line 291)
-- new Variable (line 296)
-- new PDOMysqlGetWarningCount (line 308)
-- new ClassEntry (line 347)
-- new Variable (line 352)
-- new PDOPgsqlEscapeIdentifier (line 365)
-- new PDOPgsqlCopyFromArray (line 366)
-- new PDOPgsqlCopyFromFile (line 367)
-- new PDOPgsqlCopyToArray (line 368)
-- new PDOPgsqlCopyToFile (line 369)
-- new PDOPgsqlLobCreate (line 370)
-- new PDOPgsqlLobOpen (line 371)
-- new PDOPgsqlLobUnlink (line 372)
-- new PDOPgsqlGetNotify (line 373)
-- new PDOPgsqlGetPid (line 374)
-- new PDOPgsqlSetNoticeCallback (line 375)
-- new PDOException (line 478)
-- new ObjectEntry (line 485)
-- new HashTable (line 507)
-- new Variable (line 509)
-- new PDOException (line 530)
-- new PDOException (line 533)
-- new PDOException (line 539)
-- new PdoState (line 541)
-- new PDOException (line 563)
-- new PDOException (line 572)
-- new PDOException (line 599)
-- new HashTable (line 670)
-- new Variable (line 672)
-- new ArgumentCountError (line 759)
-- new ArgumentCountError (line 798)
-- new ArgumentCountError (line 826)
-- new ArgumentCountError (line 863)
-- new ArgumentCountError (line 900)
-- new ArgumentCountError (line 952)
-- new ArgumentCountError (line 988)
-- new ArgumentCountError (line 1071)
-- new HashTable (line 1220)
-- new Variable (line 1221)
-- new Variable (line 1224)
-- new Variable (line 1231)
-- new ArgumentCountError (line 1254)
-- new ArgumentCountError (line 1307)
-- new ArgumentCountError (line 1367)
-- new PDOException (line 1411)
-- new PDOException (line 1436)
-- new ArgumentCountError (line 1541)
-- new ArgumentCountError (line 1570)
-- new PDOException (line 1576)
-- new ArgumentCountError (line 1647)
-- new PDOException (line 1659)
-- new ArgumentCountError (line 1676)
-- new PDOException (line 1682)
-- 54 class method(s)
+- new ClassEntry (line 57)
+- new Variable (line 61)
+- new Variable (line 64)
+- new PDOConstruct (line 72)
+- new PDOExec (line 78)
+- new PDOPrepare (line 79)
+- new PDOQuery (line 80)
+- new PDOSetAttribute (line 81)
+- new PDOGetAttribute (line 82)
+- new PDOGetAvailableDrivers (line 83)
+- new PDOLastInsertId (line 84)
+- new PDOQuote (line 85)
+- new PDOBeginTransaction (line 86)
+- new PDOCommit (line 87)
+- new PDORollBack (line 88)
+- new PDOInTransaction (line 89)
+- new PDOErrorCode (line 90)
+- new PDOErrorInfo (line 91)
+- new PDOConnect (line 95)
+- new PDOSqliteCreateFunction (line 142)
+- new PDOSqliteCreateAggregate (line 143)
+- new PDOSqliteCreateCollation (line 144)
+- new PDOPgsqlCopyFromArrayLegacy (line 190)
+- new PDOPgsqlCopyFromFileLegacy (line 191)
+- new PDOPgsqlCopyToArrayLegacy (line 192)
+- new PDOPgsqlCopyToFileLegacy (line 193)
+- new PDOPgsqlLobCreateLegacy (line 194)
+- new PDOPgsqlLobOpenLegacy (line 195)
+- new PDOPgsqlLobUnlinkLegacy (line 196)
+- new PDOPgsqlGetNotifyLegacy (line 197)
+- new PDOPgsqlGetPidLegacy (line 198)
+- new ClassEntry (line 238)
+- new PDOSqliteCreateFunction (line 251)
+- new PDOSqliteCreateAggregate (line 252)
+- new PDOSqliteCreateCollation (line 253)
+- new ClassEntry (line 295)
+- new Variable (line 300)
+- new PDOMysqlGetWarningCount (line 312)
+- new ClassEntry (line 351)
+- new Variable (line 356)
+- new PDOPgsqlEscapeIdentifier (line 369)
+- new PDOPgsqlCopyFromArray (line 370)
+- new PDOPgsqlCopyFromFile (line 371)
+- new PDOPgsqlCopyToArray (line 372)
+- new PDOPgsqlCopyToFile (line 373)
+- new PDOPgsqlLobCreate (line 374)
+- new PDOPgsqlLobOpen (line 375)
+- new PDOPgsqlLobUnlink (line 376)
+- new PDOPgsqlGetNotify (line 377)
+- new PDOPgsqlGetPid (line 378)
+- new PDOPgsqlSetNoticeCallback (line 379)
+- new PDOException (line 482)
+- new ObjectEntry (line 489)
+- new ObjectEntry (line 499)
+- new HashTable (line 521)
+- new Variable (line 524)
+- new Variable (line 530)
+- new PDOException (line 551)
+- new PDOException (line 554)
+- new PDOException (line 560)
+- new PdoState (line 562)
+- new PDOException (line 585)
+- new PDOException (line 588)
+- new PDOException (line 600)
+- new PdoState (line 602)
+- new PDOException (line 621)
+- new PDOException (line 657)
+- new PDOException (line 666)
+- new PDOException (line 693)
+- new HashTable (line 764)
+- new Variable (line 766)
+- new ArgumentCountError (line 859)
+- new ArgumentCountError (line 918)
+- new ArgumentCountError (line 960)
+- new ArgumentCountError (line 997)
+- new ArgumentCountError (line 1034)
+- new ArgumentCountError (line 1086)
+- new ArgumentCountError (line 1122)
+- new ArgumentCountError (line 1205)
+- new HashTable (line 1354)
+- new Variable (line 1355)
+- new Variable (line 1358)
+- new Variable (line 1365)
+- new ArgumentCountError (line 1388)
+- new ArgumentCountError (line 1441)
+- new ArgumentCountError (line 1501)
+- new PDOException (line 1545)
+- new PDOException (line 1570)
+- new ArgumentCountError (line 1675)
+- new ArgumentCountError (line 1704)
+- new PDOException (line 1710)
+- new ArgumentCountError (line 1781)
+- new PDOException (line 1793)
+- new ArgumentCountError (line 1810)
+- new PDOException (line 1816)
+- 56 class method(s)
 
 ### `ext/pdo/VmPDORow.php`
 
@@ -31152,7 +31233,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregAotFastPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 32 class method(s)
+- 36 class method(s)
 
 ### `ext/standard/PregCallbackInvokeJitHelper.php`
 
@@ -35098,7 +35179,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_sum.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/array_udiff.php`
 
@@ -45057,6 +45138,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/CalFromJdRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/CalInfoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -45348,6 +45434,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/Builtin/EasterDateRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/EasterDaysRuntime.php`
 
@@ -45735,12 +45826,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new is_type (line 20)
 - 1 class method(s)
 
+### `lib/JIT/Builtin/JdmonthnameRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/JdtofrenchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/JdtogregorianRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `lib/JIT/Builtin/JdtojewishRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
@@ -48110,6 +48211,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/UnixtojdRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/UnpackJitRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50399,22 +50505,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/M5TrivialEchoNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 94)
+- new Call\Native (line 97)
 - 15 class method(s)
 
 ### `lib/JIT/M5TrivialEchoScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new Script (line 263)
-- new Func (line 265)
-- new Void_ (line 265)
-- new Echo_ (line 267)
-- new Literal (line 267)
-- new Return_ (line 268)
-- new Block (line 330)
-- new Variable (line 332)
-- new OpCode (line 335)
-- new OpCode (line 336)
+- new Script (line 277)
+- new Func (line 279)
+- new Void_ (line 279)
+- new Echo_ (line 281)
+- new Literal (line 281)
+- new Return_ (line 282)
+- new Block (line 344)
+- new Variable (line 346)
+- new OpCode (line 349)
+- new OpCode (line 350)
 - 14 class method(s)
 
 ### `lib/JIT/MagicMethodDispatch.php`
