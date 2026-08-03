@@ -153,6 +153,26 @@ final class DomInstanceMethodJit
         'dom\\htmldocument::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
         'domimplementation::createdocumenttype' => true,
+        // Dom\Attr::rename / Dom\Element::rename — php-src @implementation-alias (#21083, #27108).
+        'dom\\attr::rename' => true,
+        'dom\\element::rename' => true,
+        'dom\\htmlelement::rename' => true,
+        // Living attribute APIs via LLVM user-script path (#27108).
+        'domelement::hasattribute' => true,
+        'domelement::getattributens' => true,
+        'dom\\element::hasattribute' => true,
+        'dom\\element::hasattributens' => true,
+        'dom\\element::getattribute' => true,
+        'dom\\element::getattributens' => true,
+        'dom\\element::getattributenode' => true,
+        'dom\\element::getattributenodens' => true,
+        'dom\\htmlelement::hasattribute' => true,
+        'dom\\htmlelement::getattribute' => true,
+        'dom\\htmlelement::getattributens' => true,
+        'dom\\htmlelement::getattributenode' => true,
+        'dom\\document::createattribute' => true,
+        'dom\\xmldocument::createattribute' => true,
+        'dom\\htmldocument::createattribute' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -222,6 +242,58 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::getattributenode' === $lc
+                || 'dom\\element::getattributenode' === $lc
+                || 'dom\\htmlelement::getattributenode' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNode();
+
+                return;
+            }
+            if ('domelement::getattribute' === $lc
+                || 'domnode::getattribute' === $lc
+                || 'dom\\element::getattribute' === $lc
+                || 'dom\\htmlelement::getattribute' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttribute();
+
+                return;
+            }
+            if ('domelement::getattributens' === $lc
+                || 'dom\\element::getattributens' === $lc
+                || 'dom\\htmlelement::getattributens' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNS();
+
+                return;
+            }
+            if ('domelement::hasattribute' === $lc
+                || 'dom\\element::hasattribute' === $lc
+                || 'dom\\htmlelement::hasattribute' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomElementHasAttribute();
+
+                return;
+            }
+            if ('dom\\attr::rename' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomAttrRename();
+
+                return;
+            }
+            if ('domdocument::createattribute' === $lc
+                || 'dom\\xmldocument::createattribute' === $lc
+                || 'dom\\document::createattribute' === $lc
+                || 'dom\\htmldocument::createattribute' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateAttribute();
+
+                return;
+            }
+            if ('domelement::getattributenode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNode();
+
+                return;
+            }
             if ('domelement::getattribute' === $lc || 'domnode::getattribute' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementGetAttribute();
 
@@ -234,11 +306,6 @@ final class DomInstanceMethodJit
             }
             if ('domelement::removeattribute' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementRemoveAttribute();
-
-                return;
-            }
-            if ('domelement::getattributenode' === $lc) {
-                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNode();
 
                 return;
             }
@@ -494,6 +561,11 @@ final class DomInstanceMethodJit
                 || 'dom\\htmldocument::queryselectorall' === $lc
                 || 'dom\\htmldocument::getelementbyid' === $lc
                 || 'dom\\htmldocument::savehtml' === $lc
+                || 'dom\\element::rename' === $lc
+                || 'dom\\htmlelement::rename' === $lc
+                || 'dom\\element::hasattributens' === $lc
+                || 'dom\\element::getattributenodens' === $lc
+                || 'dom\\htmlelement::getattributenodens' === $lc
             ) {
                 if (!preg_match('/^(dom\\\\[a-z0-9_]+)::([a-z0-9_]+)$/', $lc, $livingMatches)) {
                     return;
@@ -638,6 +710,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\htmldocument::importnode');
             self::ensureProxy($context, 'domelement::getattribute');
             self::ensureProxy($context, 'domnode::getattribute');
+            self::ensureProxy($context, 'domelement::hasattribute');
+            self::ensureProxy($context, 'domelement::getattributens');
             self::ensureProxy($context, 'domelement::setattribute');
             self::ensureProxy($context, 'domelement::removeattribute');
             self::ensureProxy($context, 'domelement::getattributenode');
@@ -655,6 +729,22 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
             self::ensureProxy($context, 'dom\\htmldocument::getelementbyid');
             self::ensureProxy($context, 'dom\\htmldocument::savehtml');
+            self::ensureProxy($context, 'dom\\attr::rename');
+            self::ensureProxy($context, 'dom\\element::rename');
+            self::ensureProxy($context, 'dom\\htmlelement::rename');
+            self::ensureProxy($context, 'dom\\element::hasattribute');
+            self::ensureProxy($context, 'dom\\element::hasattributens');
+            self::ensureProxy($context, 'dom\\element::getattribute');
+            self::ensureProxy($context, 'dom\\element::getattributens');
+            self::ensureProxy($context, 'dom\\element::getattributenode');
+            self::ensureProxy($context, 'dom\\element::getattributenodens');
+            self::ensureProxy($context, 'dom\\htmlelement::hasattribute');
+            self::ensureProxy($context, 'dom\\htmlelement::getattribute');
+            self::ensureProxy($context, 'dom\\htmlelement::getattributens');
+            self::ensureProxy($context, 'dom\\htmlelement::getattributenode');
+            self::ensureProxy($context, 'dom\\document::createattribute');
+            self::ensureProxy($context, 'dom\\xmldocument::createattribute');
+            self::ensureProxy($context, 'dom\\htmldocument::createattribute');
 
             return;
         }

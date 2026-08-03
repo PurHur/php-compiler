@@ -12,10 +12,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument::$documentElement in user-script AOT (#18478, #19455, #23251). */
+/** LLVM lowering for DOMDocument / Dom\XMLDocument::$documentElement (#18478, #19455, #23251, #27108). */
 final class JitDomDocumentElement
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
+
+    private const CLASS_XML_DOCUMENT = 'Dom\\XMLDocument';
 
     private const CLASS_ELEMENT = 'DOMElement';
 
@@ -23,8 +25,11 @@ final class JitDomDocumentElement
 
     public static function isDomDocumentElement(string $classLc, string $propLc): bool
     {
-        return 'domdocument' === strtolower($classLc)
-            && 'documentelement' === strtolower($propLc);
+        $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
+        $propLc = strtolower($propLc);
+
+        return ('domdocument' === $classLc || 'dom\\xmldocument' === $classLc)
+            && 'documentelement' === $propLc;
     }
 
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
@@ -38,13 +43,12 @@ final class JitDomDocumentElement
             );
         }
 
-        // Prefer the documentElement pinned at loadXML (pure path) or DomRegistry (#26757).
-        // Rematerializing a fresh shallow element each fetch dropped saveXML children and
-        // made appendChild mutate a throwaway object.
+        // Prefer the documentElement pinned at loadXML / createFromString (#26757, #27108).
         if (null !== JitDomLoadXMLUserScript::lastCompileTimeXml()
             || !JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
         ) {
-            $docClassId = $objectType->lookup(self::CLASS_DOCUMENT);
+            $docClass = JitDomLoadXMLUserScript::lastDocumentClass() ?? self::CLASS_DOCUMENT;
+            $docClassId = $objectType->lookup($docClass);
             if (!$objectType->hasProperty($docClassId, self::PROP_DOCUMENT_ELEMENT)) {
                 $objectType->defineProperty($docClassId, self::PROP_DOCUMENT_ELEMENT, JITVariable::TYPE_OBJECT);
             }
@@ -52,7 +56,7 @@ final class JitDomDocumentElement
             return ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
                 $objectType,
                 $obj,
-                self::CLASS_DOCUMENT,
+                $docClass,
                 self::PROP_DOCUMENT_ELEMENT,
                 $docClassId
             );

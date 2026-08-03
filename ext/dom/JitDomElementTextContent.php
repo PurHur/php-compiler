@@ -85,10 +85,11 @@ final class JitDomElementTextContent
 
     public static function isDomElementTextContent(string $classLc, string $propLc): bool
     {
-        if (!\in_array(strtolower($propLc), ['textcontent', 'nodevalue'], true)) {
+        $propLc = strtolower($propLc);
+        $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
+        if (!\in_array($propLc, ['textcontent', 'nodevalue'], true)) {
             return false;
         }
-        $classLc = strtolower($classLc);
         if ('domelement' === $classLc) {
             return true;
         }
@@ -103,6 +104,25 @@ final class JitDomElementTextContent
         return false;
     }
 
+    /** Dom\Attr / DOMAttr::$value|nodeValue — sync TYPE_STRING slots (#27108). */
+    public static function isDomAttrValueProperty(string $classLc, string $propLc): bool
+    {
+        $propLc = strtolower($propLc);
+        $classLc = strtolower(str_replace('/', '\\', ltrim($classLc, '\\')));
+        if (\in_array($classLc, ['dom\\attr', 'domattr'], true)
+            && \in_array($propLc, ['value', 'nodevalue'], true)
+        ) {
+            return true;
+        }
+        // Temps often lose Dom\Attr as CFG `object`. Prefer `$value` only — `$nodeValue` on
+        // `object` still belongs to the DOMElement textContent bridge (#23251).
+        return 'value' === $propLc
+            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+            && null !== JitDomLoadXMLUserScript::lastDocumentClass()
+            && str_starts_with((string) JitDomLoadXMLUserScript::lastDocumentClass(), 'Dom\\')
+            && \in_array($classLc, ['object', 'stdclass', ''], true);
+    }
+
     /**
      * @return bool true when the store was handled (caller must skip propertyStore)
      */
@@ -110,15 +130,45 @@ final class JitDomElementTextContent
     {
         $prop = $lvalue->objectPropertyName ?? '';
         $class = $lvalue->objectPropertyClassName ?? '';
-        if (!self::isDomElementTextContent(strtolower($class), strtolower($prop))) {
-            return false;
-        }
+        $propLc = strtolower($prop);
+        $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
         if (null === $lvalue->objectPropertyReceiver) {
             return false;
         }
 
-        $str = self::loadStringValue($context, $value);
         $receiver = $lvalue->objectPropertyReceiver;
+
+        // Living / classic Attr value|nodeValue — direct TYPE_STRING slot write (#27108).
+        // Must run before isDomElementTextContent so Attr::$nodeValue is not treated as Element.
+        if (self::isDomAttrValueProperty($classLc, $propLc)) {
+            $str = self::loadStringValue($context, $value);
+            $attrClass = ('domattr' === $classLc) ? 'DOMAttr' : 'Dom\\Attr';
+            JitDomAttributeNodeNS::ensureLivingAttrMethods($context);
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $str
+            );
+            foreach (['value', 'nodeValue'] as $syncProp) {
+                $context->type->object->propertyStore(
+                    $context->type->object->propertySlotFor($receiver, $attrClass, $syncProp),
+                    new JITVariable(
+                        $context,
+                        JITVariable::TYPE_STRING,
+                        JITVariable::KIND_VALUE,
+                        $owned
+                    ),
+                    JITVariable::TYPE_STRING
+                );
+            }
+
+            return true;
+        }
+
+        if (!self::isDomElementTextContent($classLc, $propLc)) {
+            return false;
+        }
+
+        $str = self::loadStringValue($context, $value);
 
         if (JitDomDocumentMethodKernel::shouldUse($context)
             && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
@@ -141,7 +191,7 @@ final class JitDomElementTextContent
         }
 
         DomElementTextContentRuntime::ensureWriteLinked($context);
-        $abi = 'nodevalue' === strtolower($prop)
+        $abi = 'nodevalue' === $propLc
             ? DomElementTextContentRuntime::ABI_WRITE_NODE_VALUE
             : DomElementTextContentRuntime::ABI_WRITE_TEXT_CONTENT;
         $context->builder->call(

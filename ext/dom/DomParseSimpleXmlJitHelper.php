@@ -330,6 +330,37 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Root open-tag attributes for user-script AOT createFromString / loadXML (#27108).
+     *
+     * @return list<array{qname: string, value: string}>
+     */
+    public static function rootAttributesArgv(string $xml): array
+    {
+        if (!preg_match('/<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $xml, $root)) {
+            return [];
+        }
+        $attrs = $root[2] ?? '';
+        if ('' === trim($attrs)) {
+            return [];
+        }
+        $out = [];
+        if (!preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)
+            && !preg_match_all("/([A-Za-z_][\w:.-]*)\s*=\s*'([^']*)'/", $attrs, $pairs, PREG_SET_ORDER)
+        ) {
+            return [];
+        }
+        foreach ($pairs as $pair) {
+            $qname = $pair[1];
+            if (0 === stripos($qname, 'xmlns')) {
+                continue;
+            }
+            $out[] = ['qname' => $qname, 'value' => $pair[2]];
+        }
+
+        return $out;
+    }
+
+    /**
      * Document-element textContent for user-script AOT (#25475).
      *
      * Concatenates descendant character data (tags stripped) — matches Zend

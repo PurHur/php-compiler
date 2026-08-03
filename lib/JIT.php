@@ -18958,6 +18958,31 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\namednodemap::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\dtdnamednodemap::'.$methodLc);
                 }
+                // getAttributeNode / documentElement temps lower as :object — bind living rename (#27108).
+                if ('rename' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\attr::rename');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\element::rename');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmlelement::rename');
+                }
+                if (
+                    'hasattribute' === $methodLc
+                    || 'hasattributens' === $methodLc
+                    || 'getattribute' === $methodLc
+                    || 'getattributens' === $methodLc
+                    || 'getattributenode' === $methodLc
+                    || 'getattributenodens' === $methodLc
+                ) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\element::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmlelement::'.$methodLc);
+                    if ('hasattribute' !== $methodLc && 'hasattributens' !== $methodLc) {
+                        JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domelement::'.$methodLc);
+                    }
+                }
+                if ('createattribute' === $methodLc || 'createattributens' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\xmldocument::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
+                }
                 $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
                 if ([] !== $runtimeCandidates) {
                     $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
@@ -18983,6 +19008,48 @@ class JIT {
                 ) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy(
                         'domnamednodemap::'.$methodLc
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                // Living Dom\* may be omitted from allClassNamesById — bind rename bridge (#27108).
+                // DomInstanceMethod only ships methodLc; VmDomJitDispatch::rename selects Attr/Element.
+                if (
+                    'rename' === $methodLc
+                    && $this->context->functionIsRegistered('dom\\attr::rename')
+                ) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'dom\\attr::rename'
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if (
+                    (
+                        'hasattribute' === $methodLc
+                        || 'hasattributens' === $methodLc
+                        || 'getattribute' === $methodLc
+                        || 'getattributens' === $methodLc
+                        || 'getattributenode' === $methodLc
+                        || 'getattributenodens' === $methodLc
+                    )
+                    && $this->context->functionIsRegistered('dom\\element::'.$methodLc)
+                ) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'dom\\element::'.$methodLc
+                    );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                if (
+                    ('createattribute' === $methodLc || 'createattributens' === $methodLc)
+                    && $this->context->functionIsRegistered('dom\\xmldocument::'.$methodLc)
+                ) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'dom\\xmldocument::'.$methodLc
                     );
                     $this->context->scope->args = [$receiverVar];
 

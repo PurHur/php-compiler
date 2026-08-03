@@ -142,34 +142,38 @@ final class JitDomCreateElement
         return $arg->compileTimeString;
     }
 
-    public static function materializeElementFromLiteral(Context $context, string $nameLit): Value
-    {
+    public static function materializeElementFromLiteral(
+        Context $context,
+        string $nameLit,
+        string $className = self::CLASS_ELEMENT
+    ): Value {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         self::ensureElementPropertyLayout($objectType, $classId);
 
         $obj = $objectType->allocate($classId);
         $objectType->markObjectConstructed($obj);
 
         $nameStr = $context->builder->load($context->constantStringFromString($nameLit));
-        self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_NODE_NAME, $nameStr);
-        self::storeStringProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_TAG_NAME, $nameStr);
-        self::storeNullProperty($context, $obj, self::CLASS_ELEMENT, self::PROP_ATTRIBUTES);
+        self::storeStringProperty($context, $obj, $className, self::PROP_NODE_NAME, $nameStr);
+        self::storeStringProperty($context, $obj, $className, self::PROP_TAG_NAME, $nameStr);
+        self::storeNullProperty($context, $obj, $className, self::PROP_ATTRIBUTES);
         // Always seed textContent/nodeValue — defineProperty alone leaves a null
         // __string__* and pure-user-script fetches segfault (#25475 / re-#23251).
-        self::storeTextContentSlots($context, $obj, '');
+        self::storeTextContentSlots($context, $obj, '', $className);
 
         return $obj;
     }
 
-    /** User-script AOT: materialize DOMElement with textContent (#18493, #25475). */
+    /** User-script AOT: materialize DOMElement / Dom\Element with textContent (#18493, #25475, #27108). */
     public static function materializeElementWithTextContent(
         Context $context,
         string $tag,
-        string $textContent
+        string $textContent,
+        string $className = self::CLASS_ELEMENT
     ): Value {
-        $obj = self::materializeElementFromLiteral($context, $tag);
-        self::storeTextContentSlots($context, $obj, $textContent);
+        $obj = self::materializeElementFromLiteral($context, $tag, $className);
+        self::storeTextContentSlots($context, $obj, $textContent, $className);
 
         return $obj;
     }
@@ -178,10 +182,11 @@ final class JitDomCreateElement
     public static function storeTextContentSlots(
         Context $context,
         Value $element,
-        string $textContent
+        string $textContent,
+        string $className = self::CLASS_ELEMENT
     ): void {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         foreach ([self::PROP_TEXT_CONTENT, 'nodeValue', VmDom::PROP_USER_SCRIPT_INNER_XML] as $prop) {
             if (!$objectType->hasProperty($classId, $prop)) {
                 $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
@@ -195,23 +200,24 @@ final class JitDomCreateElement
             );
             $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
             $objectType->propertyStore(
-                $objectType->propertySlotFor($element, self::CLASS_ELEMENT, $prop),
+                $objectType->propertySlotFor($element, $className, $prop),
                 $propVar,
                 JITVariable::TYPE_STRING
             );
         }
         // Default empty; loadXML seeds real child markup via storeUserScriptInnerXml (#26757).
-        self::storeUserScriptInnerXml($context, $element, '');
+        self::storeUserScriptInnerXml($context, $element, '', $className);
     }
 
     /** Seed/replace {@see VmDom::PROP_USER_SCRIPT_INNER_XML} for AOT saveXML (#26757 / #26765). */
     public static function storeUserScriptInnerXml(
         Context $context,
         Value $element,
-        string $innerXml
+        string $innerXml,
+        string $className = self::CLASS_ELEMENT
     ): void {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         if (!$objectType->hasProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML)) {
             $objectType->defineProperty($classId, VmDom::PROP_USER_SCRIPT_INNER_XML, JITVariable::TYPE_STRING);
         }
@@ -222,7 +228,7 @@ final class JitDomCreateElement
         );
         $innerVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $ownedInner);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, VmDom::PROP_USER_SCRIPT_INNER_XML),
+            $objectType->propertySlotFor($element, $className, VmDom::PROP_USER_SCRIPT_INNER_XML),
             $innerVar,
             JITVariable::TYPE_STRING
         );

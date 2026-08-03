@@ -12,56 +12,133 @@ use PHPLLVM\Value;
  *
  * Each compile-time (namespace, localName) pair maps to a module global holding
  * a DOMAttr*. Avoids DomRegistry bridges that segfault in standalone AOT.
+ *
+ * State is keyed by LLVM module id so NestedJIT module switches do not wipe
+ * the main-module present/value maps (#27108 rename dup check).
  */
 final class DomUserScriptAttributeCacheLlvm
 {
-    /** @var array<string, Value> */
-    private static array $slotByKey = [];
-
-    /** @var object|null */
-    private static $moduleIdentity = null;
-
-    private static ?string $lastCreateNamespace = null;
-
-    private static ?string $lastCreateLocalName = null;
+    /**
+     * @var array<int, array{
+     *   slotByKey: array<string, Value>,
+     *   presentByKey: array<string, true>,
+     *   valueByKey: array<string, string>,
+     *   lastCreateNamespace: ?string,
+     *   lastCreateLocalName: ?string
+     * }>
+     */
+    private static array $byModule = [];
 
     public static function rememberCreate(string $namespace, string $qualifiedName): void
     {
+        // rememberCreate is compile-time only; bind to whatever module is current later via store.
         $pos = strpos($qualifiedName, ':');
         $local = false === $pos ? $qualifiedName : substr($qualifiedName, $pos + 1);
-        self::$lastCreateNamespace = $namespace;
-        self::$lastCreateLocalName = $local;
+        self::$pendingCreate = [$namespace, $local];
     }
+
+    /** @var null|array{0: string, 1: string} */
+    private static ?array $pendingCreate = null;
 
     public static function lastCreateNamespace(): ?string
     {
-        return self::$lastCreateNamespace;
+        return self::$pendingCreate[0] ?? null;
     }
 
     public static function lastCreateLocalName(): ?string
     {
-        return self::$lastCreateLocalName;
+        return self::$pendingCreate[1] ?? null;
     }
 
-    /** Compile-time cache presence check for getAttribute dispatch (#19281). */
+    /** Compile-time cache presence check for getAttribute / hasAttribute (#19281, #27108). */
     public static function hasLiteralKey(string $namespace, string $localName): bool
     {
-        $key = $namespace."\0".$localName;
+        foreach (self::$byModule as $state) {
+            $key = $namespace."\0".$localName;
+            if (isset($state['presentByKey'][$key]) || isset($state['slotByKey'][$key])) {
+                return true;
+            }
+        }
 
-        return isset(self::$slotByKey[$key]);
+        return false;
+    }
+
+    /** True when a non-null Attr was stored for this key this module (#27108). */
+    public static function hasPresentLiteral(string $namespace, string $localName): bool
+    {
+        foreach (self::$byModule as $state) {
+            if (isset($state['presentByKey'][$namespace."\0".$localName])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function literalValue(string $namespace, string $localName): ?string
+    {
+        $key = $namespace."\0".$localName;
+        foreach (self::$byModule as $state) {
+            if (isset($state['valueByKey'][$key])) {
+                return $state['valueByKey'][$key];
+            }
+        }
+
+        return null;
     }
 
     public static function storeLiteral(
         Context $context,
         string $namespace,
         string $localName,
-        Value $attr
+        Value $attr,
+        ?string $value = null
     ): Value {
+        $state = &self::state($context);
+        if (null !== self::$pendingCreate) {
+            $state['lastCreateNamespace'] = self::$pendingCreate[0];
+            $state['lastCreateLocalName'] = self::$pendingCreate[1];
+        }
         $global = self::slotGlobal($context, $namespace, $localName);
         $prev = $context->builder->load($global);
         $context->builder->store($attr, $global);
+        $key = $namespace."\0".$localName;
+        $state['presentByKey'][$key] = true;
+        if (null !== $value) {
+            $state['valueByKey'][$key] = $value;
+        }
 
         return $prev;
+    }
+
+    public static function rekeyLiteral(
+        Context $context,
+        string $oldNamespace,
+        string $oldLocalName,
+        string $newNamespace,
+        string $newLocalName,
+        Value $attr
+    ): void {
+        $state = &self::state($context);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $oldGlobal = self::slotGlobal($context, $oldNamespace, $oldLocalName);
+        $context->builder->store($objPtr->constNull(), $oldGlobal);
+        $oldKey = $oldNamespace."\0".$oldLocalName;
+        $value = $state['valueByKey'][$oldKey] ?? null;
+        unset($state['presentByKey'][$oldKey], $state['valueByKey'][$oldKey]);
+        self::storeLiteral($context, $newNamespace, $newLocalName, $attr, $value);
+    }
+
+    public static function clearLiteral(
+        Context $context,
+        string $namespace,
+        string $localName
+    ): void {
+        $state = &self::state($context);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $global = self::slotGlobal($context, $namespace, $localName);
+        $context->builder->store($objPtr->constNull(), $global);
+        unset($state['presentByKey'][$namespace."\0".$localName], $state['valueByKey'][$namespace."\0".$localName]);
     }
 
     public static function lookupLiteral(
@@ -74,33 +151,44 @@ final class DomUserScriptAttributeCacheLlvm
         return $context->builder->load($global);
     }
 
+    /** @return array{slotByKey: array<string, Value>, presentByKey: array<string, true>, valueByKey: array<string, string>, lastCreateNamespace: ?string, lastCreateLocalName: ?string} */
+    private static function &state(Context $context): array
+    {
+        $id = spl_object_id($context->module);
+        if (!isset(self::$byModule[$id])) {
+            self::$byModule[$id] = [
+                'slotByKey' => [],
+                'presentByKey' => [],
+                'valueByKey' => [],
+                'lastCreateNamespace' => null,
+                'lastCreateLocalName' => null,
+            ];
+        }
+
+        return self::$byModule[$id];
+    }
+
     private static function slotGlobal(Context $context, string $namespace, string $localName): Value
     {
-        $module = $context->module;
-        if (self::$moduleIdentity !== $module) {
-            self::$moduleIdentity = $module;
-            self::$slotByKey = [];
-            self::$lastCreateNamespace = null;
-            self::$lastCreateLocalName = null;
-        }
-
+        $state = &self::state($context);
         $key = $namespace."\0".$localName;
-        if (isset(self::$slotByKey[$key])) {
-            return self::$slotByKey[$key];
+        if (isset($state['slotByKey'][$key])) {
+            return $state['slotByKey'][$key];
         }
 
+        $module = $context->module;
         $objPtr = $context->getTypeFromString('__object__*');
         $globalName = '__phpc_dom_us_attr_'.substr(hash('crc32b', $key), 0, 8);
         $existing = $module->getNamedGlobal($globalName);
         if (null !== $existing) {
-            self::$slotByKey[$key] = $existing;
+            $state['slotByKey'][$key] = $existing;
 
             return $existing;
         }
 
         $global = $module->addGlobal($objPtr, $globalName);
         $global->setInitializer($objPtr->constNull());
-        self::$slotByKey[$key] = $global;
+        $state['slotByKey'][$key] = $global;
 
         return $global;
     }

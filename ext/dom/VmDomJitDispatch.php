@@ -247,6 +247,35 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function createAttribute(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $name = self::stringArg($extra[0] ?? self::missingArg('createAttribute', 0), 'createAttribute', 0);
+
+        return VmDom::createAttribute($ctx, $name, $document);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function createAttributeNS(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $namespace = self::nullableStringArg(
+            $extra[0] ?? self::missingArg('createAttributeNS', 0),
+            'createAttributeNS',
+            0
+        );
+        $qualifiedName = self::stringArg(
+            $extra[1] ?? self::missingArg('createAttributeNS', 1),
+            'createAttributeNS',
+            1
+        );
+
+        return VmDom::createAttributeNS($ctx, $namespace, $qualifiedName, $document);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function normalize(VmContext $ctx, ObjectEntry $node, array $extra): Variable
     {
         if (\count($extra) > 0) {
@@ -486,6 +515,39 @@ final class VmDomJitDispatch
             : '';
 
         return VmDom::createDocumentType($ctx, $qualifiedName, $publicId, $systemId);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function hasAttribute(ObjectEntry $element, array $extra): Variable
+    {
+        $name = self::stringArg($extra[0] ?? self::missingArg('hasAttribute', 0), 'hasAttribute', 0);
+        $var = new Variable();
+        $var->bool(VmDom::hasAttribute($element, $name));
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function hasAttributeNS(ObjectEntry $element, array $extra): Variable
+    {
+        $namespace = self::nullableStringArg(
+            $extra[0] ?? self::missingArg('hasAttributeNS', 0),
+            'hasAttributeNS',
+            0
+        );
+        $localName = self::stringArg(
+            $extra[1] ?? self::missingArg('hasAttributeNS', 1),
+            'hasAttributeNS',
+            1
+        );
+        $var = new Variable();
+        $var->bool(VmDom::hasAttributeNS($element, $namespace, $localName));
+
+        return $var;
     }
 
     /**
@@ -896,6 +958,36 @@ final class VmDomJitDispatch
         $result->bool(VmDom::contains($node, $other));
 
         return $result;
+    }
+
+    /**
+     * Dom\Attr::rename / Dom\Element::rename — php-src element.c (#21083, #27108).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function rename(VmContext $ctx, ObjectEntry $receiver, array $extra): Variable
+    {
+        if (\count($extra) !== 2) {
+            $label = VmDom::isAttr($receiver) ? 'Dom\\Attr::rename()' : 'Dom\\Element::rename()';
+            throw new \ArgumentCountError(sprintf(
+                '%s expects exactly 2 arguments, %d given',
+                $label,
+                \count($extra)
+            ));
+        }
+        $namespaceUri = self::nullableStringArg($extra[0], 'rename', 0);
+        $qualifiedName = self::stringArg($extra[1], 'rename', 1);
+        if (VmDom::isAttr($receiver)) {
+            VmDomLiving::renameAttr($ctx, $receiver, $namespaceUri, $qualifiedName);
+        } elseif (VmDom::isElement($receiver)) {
+            VmDomLiving::renameElement($receiver, $namespaceUri, $qualifiedName);
+        } else {
+            throw new \Error('Call to undefined method '.$receiver->class->name.'::rename()');
+        }
+        $null = new Variable();
+        $null->null();
+
+        return $null;
     }
 
     /**

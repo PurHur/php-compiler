@@ -18,6 +18,20 @@ final class DomInstanceMethodJitTest extends TestCase
         $this->assertFalse(DomInstanceMethodJit::isDomInstanceMethodProxy('splobjectstorage::attach'));
     }
 
+    public function testRecognizesLivingAttrRenameProxyUnderUserScriptAot(): void
+    {
+        // USER_SCRIPT_DIRECT_METHODS path (UserScriptAotEnv) — #27108.
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        try {
+            $this->assertTrue(DomInstanceMethodJit::shouldDeferToVmClassMethodLowering());
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('dom\\attr::rename'));
+            $this->assertTrue(DomInstanceMethodJit::isDomInstanceMethodProxy('dom\\element::rename'));
+            $this->assertFalse(DomInstanceMethodJit::isDomInstanceMethodProxy('object::rename'));
+        } finally {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        }
+    }
+
     public function testEnsureProxyRegistersCallableLowering(): void
     {
         $this->markTestSkipped('loadJitContext() is too heavy for default unit gate (#17130)');
