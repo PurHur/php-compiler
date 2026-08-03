@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ArrayElemRuntime;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -84,16 +84,25 @@ final class JitArrayElem
 
             return;
         }
-        if (JITVariable::TYPE_VALUE === $array->type) {
+        if (JITVariable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
             $loaded = JitValueBox::valuePtrFromVariable($context, $array);
             $isArray = self::valueBoxIsArray($context, $loaded);
             $okBlock = BasicBlockHelper::append($context, 'array_elem_req_ok');
             $errBlock = BasicBlockHelper::append($context, 'array_elem_req_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            self::emitErrorAndAbort(
+            // Boxed null under try/catch SSA must say "null given", not "mixed" (#27448 / #27446).
+            $typeField = $context->structFieldMap['__value__']['type'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($loaded, $typeField)
+            );
+            self::emitBoxedNonArrayTypeErrorParam(
                 $context,
-                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'mixed')
+                $fn,
+                $argNum,
+                $paramName,
+                $expectedType,
+                $typeByte
             );
             $context->builder->positionAtEnd($okBlock);
 
@@ -179,9 +188,52 @@ final class JitArrayElem
         int $argNum,
         Value $typeByte
     ): void {
+        self::emitBoxedNonArrayTypeError(
+            $context,
+            $typeByte,
+            static function (string $given) use ($context, $fn, $argNum): void {
+                self::emitArgNumErrorAndAbort($context, $fn, $argNum, $given);
+            },
+            'array_argnum_req'
+        );
+    }
+
+    /**
+     * Named-param TypeError for boxed non-array (#27448 — in_array/array_key_exists haystack).
+     */
+    private static function emitBoxedNonArrayTypeErrorParam(
+        Context $context,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType,
+        Value $typeByte
+    ): void {
+        self::emitBoxedNonArrayTypeError(
+            $context,
+            $typeByte,
+            static function (string $given) use ($context, $fn, $argNum, $paramName, $expectedType): void {
+                self::emitErrorAndAbort(
+                    $context,
+                    \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, $given)
+                );
+            },
+            'array_param_req'
+        );
+    }
+
+    /**
+     * @param callable(string):void $emitGiven
+     */
+    private static function emitBoxedNonArrayTypeError(
+        Context $context,
+        Value $typeByte,
+        callable $emitGiven,
+        string $prefix
+    ): void {
         $i8 = $context->getTypeFromString('int8');
-        $nullBlock = BasicBlockHelper::append($context, 'array_argnum_req_null');
-        $afterNull = BasicBlockHelper::append($context, 'array_argnum_req_after_null');
+        $nullBlock = BasicBlockHelper::append($context, $prefix.'_null');
+        $afterNull = BasicBlockHelper::append($context, $prefix.'_after_null');
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
@@ -189,10 +241,10 @@ final class JitArrayElem
         );
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
         $context->builder->positionAtEnd($nullBlock);
-        self::emitArgNumErrorAndAbort($context, $fn, $argNum, 'null');
+        $emitGiven('null');
 
-        $stringBlock = BasicBlockHelper::append($context, 'array_argnum_req_string');
-        $afterString = BasicBlockHelper::append($context, 'array_argnum_req_after_string');
+        $stringBlock = BasicBlockHelper::append($context, $prefix.'_string');
+        $afterString = BasicBlockHelper::append($context, $prefix.'_after_string');
         $context->builder->positionAtEnd($afterNull);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
@@ -201,10 +253,10 @@ final class JitArrayElem
         );
         $context->builder->branchIf($isString, $stringBlock, $afterString);
         $context->builder->positionAtEnd($stringBlock);
-        self::emitArgNumErrorAndAbort($context, $fn, $argNum, 'string');
+        $emitGiven('string');
 
-        $intBlock = BasicBlockHelper::append($context, 'array_argnum_req_int');
-        $afterInt = BasicBlockHelper::append($context, 'array_argnum_req_after_int');
+        $intBlock = BasicBlockHelper::append($context, $prefix.'_int');
+        $afterInt = BasicBlockHelper::append($context, $prefix.'_after_int');
         $context->builder->positionAtEnd($afterString);
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
@@ -213,10 +265,10 @@ final class JitArrayElem
         );
         $context->builder->branchIf($isInt, $intBlock, $afterInt);
         $context->builder->positionAtEnd($intBlock);
-        self::emitArgNumErrorAndAbort($context, $fn, $argNum, 'int');
+        $emitGiven('int');
 
-        $floatBlock = BasicBlockHelper::append($context, 'array_argnum_req_float');
-        $afterFloat = BasicBlockHelper::append($context, 'array_argnum_req_after_float');
+        $floatBlock = BasicBlockHelper::append($context, $prefix.'_float');
+        $afterFloat = BasicBlockHelper::append($context, $prefix.'_after_float');
         $context->builder->positionAtEnd($afterInt);
         $isFloat = $context->builder->icmp(
             Builder::INT_EQ,
@@ -225,10 +277,10 @@ final class JitArrayElem
         );
         $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
         $context->builder->positionAtEnd($floatBlock);
-        self::emitArgNumErrorAndAbort($context, $fn, $argNum, 'float');
+        $emitGiven('float');
 
-        $boolBlock = BasicBlockHelper::append($context, 'array_argnum_req_bool');
-        $mixedBlock = BasicBlockHelper::append($context, 'array_argnum_req_mixed');
+        $boolBlock = BasicBlockHelper::append($context, $prefix.'_bool');
+        $mixedBlock = BasicBlockHelper::append($context, $prefix.'_mixed');
         $context->builder->positionAtEnd($afterFloat);
         $isBool = $context->builder->icmp(
             Builder::INT_EQ,
@@ -237,9 +289,9 @@ final class JitArrayElem
         );
         $context->builder->branchIf($isBool, $boolBlock, $mixedBlock);
         $context->builder->positionAtEnd($boolBlock);
-        self::emitArgNumErrorAndAbort($context, $fn, $argNum, 'bool');
+        $emitGiven('bool');
         $context->builder->positionAtEnd($mixedBlock);
-        self::emitArgNumErrorAndAbort($context, $fn, $argNum, 'mixed');
+        $emitGiven('mixed');
     }
 
     private static function emitArgNumErrorAndAbort(Context $context, string $fn, int $argNum, string $given): void
@@ -250,12 +302,14 @@ final class JitArrayElem
         );
     }
 
+    /**
+     * Catchable under AOT try/catch; fatal when uncaught (#27448 / #27446).
+     * Bare pending-raise + abort aborts exit 134 inside try — use ExceptionBridge.
+     */
     private static function emitErrorAndAbort(Context $context, string $message): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitTypeErrorAndAbort($context, $message);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'array_elem_te_cont');
     }
 
     private static function jitTypeLabel(int $type): string
