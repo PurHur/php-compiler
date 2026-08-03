@@ -5,36 +5,32 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTablePadLlvm;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_pad() via ArrayPadJitHelper PHP (#12476, #18121).
+ * JIT/AOT link for array_pad() (#12476, #18121, #26971).
  *
- * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#18121).
- * SSOT: {@see \PHPCompiler\VM\HashTable::padCopy()}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayPadJitHelper} returned a PHP
+ * HashTable that is not a native `__hashtable__` — implode/foreach segfault or count 0
+ * (#26971). Call-site LLVM via {@see HashTablePadLlvm} (peer ArrayReverseRuntime / #27067).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray::pad()} /
+ * {@see \PHPCompiler\ext\standard\ArrayPadJitHelper}
  * php-src: ext/standard/array.c — php_array_pad()
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayPadRuntime
 {
     private const ABI_PAD = '__array_pad__copy';
 
     private const ABI_PAD_TYPED = '__array_pad__copy_typed';
-
-    private const HELPER_PATH = '/ext/standard/ArrayPadJitHelper.php';
-
-    private const PAD_LEGACY_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPadJitHelper::padCopyLegacy';
-
-    private const PAD_TYPED_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPadJitHelper::padCopyTyped';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::PAD_LEGACY_HELPER,
-        self::PAD_TYPED_HELPER,
-    ];
 
     public static function pad(
         Context $context,
@@ -103,44 +99,68 @@ final class ArrayPadRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i64 = $context->getTypeFromString('int64');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_PAD,
-            'array_pad_bridge_entry',
-            [$htPtr, $i64, $valuePtr],
-            $htPtr,
-            self::PAD_LEGACY_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12476'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_PAD_TYPED,
-            'array_pad_typed_bridge_entry',
-            [$htPtr, $i64, $valuePtr, $i64],
-            $htPtr,
-            self::PAD_TYPED_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14993'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitPadBridge($context);
+        self::emitPadTypedBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitPadBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $probe = $context->module->getNamedFunction(self::ABI_PAD);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_PAD,
+                $context->context->functionType($htPtr, false, $htPtr, $i64, $valuePtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_pad_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $padded = HashTablePadLlvm::pad(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
+        );
+        $context->builder->returnValue($padded);
+        $context->registerFunction(self::ABI_PAD, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitPadTypedBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $probe = $context->module->getNamedFunction(self::ABI_PAD_TYPED);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_PAD_TYPED,
+                $context->context->functionType($htPtr, false, $htPtr, $i64, $valuePtr, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('array_pad_typed_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $padded = HashTablePadLlvm::padWithType(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3)
+        );
+        $context->builder->returnValue($padded);
+        $context->registerFunction(self::ABI_PAD_TYPED, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -148,7 +168,7 @@ final class ArrayPadRuntime
         foreach ([self::ABI_PAD, self::ABI_PAD_TYPED] as $abi) {
             $fn = $context->module->getNamedFunction($abi);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($abi.' missing after ArrayPadRuntime bridge (#12476)');
+                throw new \LogicException($abi.' missing after ArrayPadRuntime bridge (#26971)');
             }
             $context->registerFunction($abi, $fn);
         }

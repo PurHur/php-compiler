@@ -9,20 +9,25 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_pad() JIT routes all operands through ArrayPadJitHelper PHP not ArrayBuiltinHelper LLVM (#12476, #14286, #18121). */
+/** array_pad() JIT uses HashTablePadLlvm call-site (not NestedJIT HashTable return) (#12476, #26971). */
 final class ArrayPadRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 8230;
 
-    public function testArrayPadRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayPadRuntimeUsesHashTablePadLlvmNotNestedJitHelper(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPadRuntime.php');
-        $this->assertStringContainsString('ArrayPadJitHelper', $runtime);
+        $this->assertStringContainsString('HashTablePadLlvm', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
-        $this->assertStringContainsString('padCopyLegacy', $runtime);
-        $this->assertStringContainsString('padCopyTyped', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('ensureBridge', $runtime);
+        $this->assertDoesNotMatchRegularExpression('/padCopyLegacy|padCopyTyped/', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::pad', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $padLlvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTablePadLlvm.php');
+        $this->assertStringContainsString('HashTableCowLlvm::duplicate', $padLlvm);
+        $this->assertStringContainsString('ARRAY_PAD_MAX_PAD_SIZE', $padLlvm);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pad.php');
         $this->assertStringContainsString('ArrayPadRuntime::pad', $builtin);
