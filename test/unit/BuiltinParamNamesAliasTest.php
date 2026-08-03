@@ -565,6 +565,49 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #24640 — php-src ext/sysvshm/sysvshm.stub.php */
+    public function testShmAttachPutVarZendStubNamedParams(): void
+    {
+        $attach = BuiltinParamNames::forFunction('shm_attach');
+        self::assertSame(['key', 'size=', 'permissions='], $attach);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($attach, 'key', 'shm_attach'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($attach, 'size', 'shm_attach'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($attach, 'permissions', 'shm_attach'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($attach, 'memsize', 'shm_attach'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($attach, 'perm', 'shm_attach'));
+        self::assertSame(
+            ['key', 'size=', 'permissions='],
+            BuiltinParamNames::paramNamesForInternalFunction('shm_attach')
+        );
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('shm_attach'));
+
+        $put = BuiltinParamNames::forFunction('shm_put_var');
+        self::assertSame(['shm', 'key', 'value'], $put);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($put, 'shm', 'shm_put_var'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($put, 'key', 'shm_put_var'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($put, 'value', 'shm_put_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($put, 'shm_identifier', 'shm_put_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($put, 'variable_key', 'shm_put_var'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($put, 'variable', 'shm_put_var'));
+
+        foreach (['shm_detach', 'shm_remove'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['shm'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'shm', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'shm_identifier', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'id', $fn), $fn);
+        }
+
+        foreach (['shm_get_var', 'shm_has_var', 'shm_remove_var'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['shm', 'key'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'shm', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'key', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'id', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'variable_key', $fn), $fn);
+        }
+    }
+
     /** @covers issue #24391 — php-src ext/shmop/shmop.stub.php */
     public function testShmopOpenReadWriteZendStubNamedParams(): void
     {
