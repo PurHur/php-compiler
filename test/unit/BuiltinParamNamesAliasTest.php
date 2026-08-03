@@ -1744,13 +1744,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($raw, 'expires', 'setrawcookie'));
     }
 
-    /** @covers issue #17370 */
+    /** @covers issue #17370 / #26258 */
     public function testTokenGetAllFlagsNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('token_get_all');
-        self::assertSame(['code', 'flags'], $names);
+        self::assertSame(['code', 'flags='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'code', 'token_get_all'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'token_get_all'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('token_get_all'));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('token_get_all', 1));
+        $info = ['name' => 'flags', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('token_get_all', 1, $info, false));
+        $flags = new \PHPCompiler\VM\Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($flags, 'token_get_all', 1, $info));
+        self::assertSame(0, $flags->toInt());
     }
 
     /** @covers issue #17090 */
