@@ -5414,6 +5414,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringVsprintf.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringWordwrap.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringXmlrpc.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringZlib.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringZlibJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringZstd.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StripWhitespace.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SuperglobalNameRuntime.php';
