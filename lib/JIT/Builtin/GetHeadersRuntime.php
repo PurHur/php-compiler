@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -13,6 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_get_headers via GetHeadersJitHelper PHP (#9212, #24633).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StreamFstat #24586 / StringQuotPrint #24620).
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT: "Current basic block has no parent function", #27317 / peer #27088).
  * SSOT {@see \PHPCompiler\ext\standard\VmHttpFetchNative} / {@see \PHPCompiler\ext\standard\VmHttpHeaders}.
  * php-src: ext/standard/head.c — PHP_FUNCTION(get_headers)
  */
@@ -43,10 +46,16 @@ final class GetHeadersRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#27317 / #27088).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementGetHeadersBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementGetHeadersBridge(Context $context): void

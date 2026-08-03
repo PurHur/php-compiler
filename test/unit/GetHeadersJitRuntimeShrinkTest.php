@@ -22,6 +22,7 @@ final class GetHeadersJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('GetHeadersJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
         $this->assertStringNotContainsString('VmHttpFetchPure::request', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
@@ -29,7 +30,7 @@ final class GetHeadersJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
 
         $lineCount = \substr_count($source, "\n");
-        $this->assertLessThan(120, $lineCount, 'GetHeadersRuntime must be a thin bridge');
+        $this->assertLessThan(130, $lineCount, 'GetHeadersRuntime must be a thin bridge');
     }
 
     public function testJitGetHeadersUsesCompilerGetHeadersAbi(): void
