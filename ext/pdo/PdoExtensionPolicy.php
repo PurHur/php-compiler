@@ -19,14 +19,13 @@ use PHPCompiler\CompilerVersion;
  *
  * PHP 8.4 {@see PDO::connect()} and driver subclasses ({@see Pdo\Sqlite}, {@see Pdo\Mysql},
  * {@see Pdo\Pgsql}) are advertised on language profile ≥ 8.4 (#20548, #22600, #22790).
- * They are not listed in getAvailableDrivers() until a real connection factory exists
- * (sqlite-style lib gate for mysql/pgsql); PDO::connect('mysql:…'/'pgsql:…') therefore
- * throws "could not find driver" like Zend when the driver module is absent.
  * {@see Pdo\Sqlite} additionally requires the sqlite driver gate ({@see advertisesSqliteSubclass()}).
  *
- * Logical {@code pdo_pgsql} follows the subclass advertise gate so
- * {@code extension_loaded('pdo_pgsql')} matches builds that ship the Pdo\Pgsql API
- * (#20566). Live COPY / LISTEN-NOTIFY / backend PID need libpq (#3741).
+ * Logical {@code pdo_pgsql} follows the host {@code extension_loaded('pdo_pgsql')} gate
+ * (sqlite-style; #26140) — not the PHP 8.4 {@see Pdo\Pgsql} subclass profile alone —
+ * so reference builds match Zend driver advertisement / {@code PDO::getAvailableDrivers()}.
+ * Enable via host module or {@code PHP_COMPILER_ENABLE_PDO_PGSQL=1} when libpq FFI is available.
+ * Live COPY / LISTEN-NOTIFY / backend PID still need a live libpq handle (#3741).
  */
 final class PdoExtensionPolicy
 {
@@ -61,14 +60,25 @@ final class PdoExtensionPolicy
     }
 
     /**
-     * Logical pdo_pgsql for extension_loaded() (#20566).
+     * Logical pdo_pgsql for extension_loaded() / getAvailableDrivers() (#26140).
      *
-     * Same gate as {@see advertisesPgsqlSubclass()} — not listed in
-     * getAvailableDrivers() until a libpq connection factory exists (#3741).
+     * Host Zend without pdo_pgsql must stay false even on PROFILE≥8.4 (subclass API
+     * remains separately gated). Mirror {@see advertisesSqliteDriver()}.
      */
     public static function advertisesPgsqlDriver(): bool
     {
-        return self::advertisesPgsqlSubclass();
+        if (!self::advertisesExtension()) {
+            return false;
+        }
+        if (\extension_loaded('pdo_pgsql')) {
+            return true;
+        }
+
+        if (!self::explicitPgsqlEnableRequested()) {
+            return false;
+        }
+
+        return \PHPCompiler\ext\pgsql\VmPgsqlNative::available();
     }
 
     /**
@@ -153,6 +163,19 @@ final class PdoExtensionPolicy
     private static function explicitSqliteEnableRequested(): bool
     {
         $raw = getenv('PHP_COMPILER_ENABLE_PDO_SQLITE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        $v = strtolower(trim($raw));
+
+        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
+    }
+
+    /** Explicit side-load / functional-test opt-in when host Zend lacks pdo_pgsql (#26140). */
+    private static function explicitPgsqlEnableRequested(): bool
+    {
+        $raw = getenv('PHP_COMPILER_ENABLE_PDO_PGSQL');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }

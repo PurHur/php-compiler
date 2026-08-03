@@ -13,7 +13,8 @@ use PHPCompiler\Runtime;
  * Also advertises logical {@code pdo_sqlite} when
  * {@see PdoExtensionPolicy::advertisesSqliteDriver()} (host pdo_sqlite or
  * PHP_COMPILER_ENABLE_PDO_SQLITE + libsqlite3; #24523), and {@code pdo_pgsql}
- * when the PHP 8.4 Pdo\Pgsql surface ships (#20566).
+ * when {@see PdoExtensionPolicy::advertisesPgsqlDriver()} (host pdo_pgsql or
+ * PHP_COMPILER_ENABLE_PDO_PGSQL + libpq; #26140).
  */
 class Module extends ModuleAbstract
 {

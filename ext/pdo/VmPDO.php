@@ -11,6 +11,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\pgsql\VmPgsqlNative;
 use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\sqlite3\VmSqlite3Native;
 use PHPCompiler\ext\sqlite3\VmSqlite3Udf;
@@ -154,14 +155,17 @@ final class VmPDO
     /**
      * Legacy PDO::pgsql* driver methods (php-src pgsql_driver.stub.php PDO_PGSql_Ext; #20566).
      *
-     * Registered on PDO when {@see PdoExtensionPolicy::advertisesPgsqlDriver()} so
-     * method_exists(PDO::class, 'pgsqlGetPid') matches the issue repro. Live libpq
+     * Registered on PDO when the pgsql driver is advertised ({@see PdoExtensionPolicy::advertisesPgsqlDriver()})
+     * or the PHP 8.4 {@see Pdo\Pgsql} surface ships ({@see PdoExtensionPolicy::advertisesPgsqlSubclass()})
+     * so method_exists(PDO::class, 'pgsqlGetPid') matches Zend / #20566. Live libpq
      * I/O remains #3741 — calls without a pgsql handle throw like the Pdo\Pgsql stubs.
      * Marked methodNotInherited so Pdo\Mysql / Pdo\Sqlite do not advertise them (#21552).
      */
     public static function registerPgsqlExtensionMethods(ClassEntry $entry): void
     {
-        if (!PdoExtensionPolicy::advertisesPgsqlDriver()) {
+        if (!PdoExtensionPolicy::advertisesPgsqlDriver()
+            && !PdoExtensionPolicy::advertisesPgsqlSubclass()
+        ) {
             return;
         }
         if (isset($entry->methods['pgsqlgetpid'])) {
@@ -465,17 +469,27 @@ final class VmPDO
     }
 
     /**
-     * Allocate and open a PDO (or driver subclass) handle from a DSN (#20529, #20548).
+     * Allocate and open a PDO (or driver subclass) handle from a DSN (#20529, #20548, #26140).
      *
-     * mysql:/pgsql: throw "could not find driver" until native factories land — subclasses
-     * still exist for class_exists / constants / method_exists.
+     * mysql: throws "could not find driver" until a native factory lands. pgsql: follows
+     * {@see PdoExtensionPolicy::advertisesPgsqlDriver()} — connection errors are OK when
+     * the driver is advertised; "could not find driver" only when withheld.
      */
-    public static function connect(Context $ctx, string $dsn): ObjectEntry
+    public static function connect(Context $ctx, string $dsn, ?string $user = null, ?string $password = null): ObjectEntry
     {
         $driver = self::dsnDriverPrefix($dsn);
-        if ('mysql' === $driver || 'pgsql' === $driver) {
-            // Driver subclass may be registered without a live factory (profile ≥ 8.4).
+        if ('mysql' === $driver) {
             throw new \PDOException('could not find driver');
+        }
+        if ('pgsql' === $driver) {
+            $class = $ctx->classes[self::PGSQL_CLASS_LC] ?? $ctx->classes[self::CLASS_LC] ?? null;
+            if (null === $class) {
+                throw new \LogicException('PDO is not registered in this compiler build');
+            }
+            $entry = new ObjectEntry($class);
+            self::initPgsqlObject($entry, $dsn, $user, $password);
+
+            return $entry;
         }
         $filename = self::parseSqliteDsn($dsn);
         $class = $ctx->classes[self::SQLITE_CLASS_LC] ?? $ctx->classes[self::CLASS_LC] ?? null;
@@ -500,15 +514,22 @@ final class VmPDO
     }
 
     /**
-     * Driver name list for PDO::getAvailableDrivers() / pdo_drivers() (php-src ext/pdo/pdo.c; #20239).
+     * Driver name list for PDO::getAvailableDrivers() / pdo_drivers() (php-src ext/pdo/pdo.c; #20239, #26140).
      */
     public static function availableDriversHashTable(): HashTable
     {
         $ht = new HashTable();
+        $i = 0;
         if (PdoExtensionPolicy::advertisesSqliteDriver()) {
             $slot = new Variable();
             $slot->string('sqlite');
-            $ht->add('0', $slot);
+            $ht->add((string) $i, $slot);
+            ++$i;
+        }
+        if (PdoExtensionPolicy::advertisesPgsqlDriver()) {
+            $slot = new Variable();
+            $slot->string('pgsql');
+            $ht->add((string) $i, $slot);
         }
 
         return $ht;
@@ -540,11 +561,84 @@ final class VmPDO
         }
         $state = new PdoState();
         $state->db = $db;
+        $state->driver = 'sqlite';
         $state->filename = $filename;
         $state->errMode = PdoConstants::ERRMODE_EXCEPTION;
         $state->fetchMode = PdoConstants::FETCH_BOTH;
         self::$store[$entry->id] = $state;
         $entry->constructed = true;
+    }
+
+    /**
+     * Open a pgsql DSN via libpq when the driver is advertised (#26140).
+     *
+     * Connection refused / auth errors match Zend (not "could not find driver").
+     * A successful connect stores the PGconn for later driver work (#3741).
+     */
+    public static function initPgsqlObject(
+        ObjectEntry $entry,
+        string $dsn,
+        ?string $user = null,
+        ?string $password = null
+    ): void {
+        if (!PdoExtensionPolicy::advertisesPgsqlDriver()) {
+            throw new \PDOException('could not find driver');
+        }
+        if (!VmPgsqlNative::available()) {
+            throw new \PDOException('SQLSTATE[08006] [7] could not connect to server');
+        }
+        $conninfo = self::pgsqlDsnToConninfo($dsn, $user, $password);
+        $conn = VmPgsqlNative::connect($conninfo);
+        if (null === $conn || VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($conn)) {
+            $msg = trim(VmPgsqlNative::errorMessage($conn));
+            if (null !== $conn) {
+                VmPgsqlNative::finish($conn);
+            }
+            if ('' === $msg) {
+                $msg = 'could not connect to server';
+            }
+            throw new \PDOException($msg);
+        }
+        $state = new PdoState();
+        $state->pgsql = $conn;
+        $state->driver = 'pgsql';
+        $state->filename = $dsn;
+        $state->errMode = PdoConstants::ERRMODE_EXCEPTION;
+        $state->fetchMode = PdoConstants::FETCH_BOTH;
+        self::$store[$entry->id] = $state;
+        $entry->constructed = true;
+    }
+
+    /**
+     * Convert PDO {@code pgsql:} DSN + user/password args to a libpq conninfo string.
+     *
+     * php-src ext/pdo_pgsql builds conninfo from DSN key=value pairs (semicolon-separated)
+     * plus constructor user/password.
+     */
+    public static function pgsqlDsnToConninfo(string $dsn, ?string $user, ?string $password): string
+    {
+        if (!str_starts_with(strtolower($dsn), 'pgsql:')) {
+            throw new \PDOException('could not find driver');
+        }
+        $params = substr($dsn, \strlen('pgsql:'));
+        $parts = [];
+        if ('' !== $params) {
+            foreach (explode(';', $params) as $pair) {
+                $pair = trim($pair);
+                if ('' === $pair) {
+                    continue;
+                }
+                $parts[] = $pair;
+            }
+        }
+        if (null !== $user && '' !== $user) {
+            $parts[] = 'user='.$user;
+        }
+        if (null !== $password && '' !== $password) {
+            $parts[] = 'password='.$password;
+        }
+
+        return implode(' ', $parts);
     }
 
     public static function state(ObjectEntry $entry): PdoState
@@ -702,6 +796,12 @@ final class PdoState
     /** @var \FFI\CData|null sqlite3* */
     public $db = null;
 
+    /** @var \FFI\CData|null PGconn* when driver is pgsql (#26140 / #3741). */
+    public $pgsql = null;
+
+    /** Active PDO driver name (`sqlite` / `pgsql`). */
+    public string $driver = 'sqlite';
+
     public string $filename = '';
 
     public int $errMode = PdoConstants::ERRMODE_EXCEPTION;
@@ -766,6 +866,26 @@ final class PDOConstruct extends PdoClassMethod
             throw new \LogicException('PDO object already initialized');
         }
         $dsn = $this->stringArg($frame->calledArgs[1], 'PDO::__construct', 0, 'dsn');
+        $user = null;
+        $password = null;
+        if (\count($frame->calledArgs) >= 3) {
+            $userVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $userVar->type) {
+                $user = $this->stringArg($frame->calledArgs[2], 'PDO::__construct', 1, 'username');
+            }
+        }
+        if (\count($frame->calledArgs) >= 4) {
+            $passVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $passVar->type) {
+                $password = $this->stringArg($frame->calledArgs[3], 'PDO::__construct', 2, 'password');
+            }
+        }
+        $driver = VmPDO::dsnDriverPrefix($dsn);
+        if ('pgsql' === $driver) {
+            VmPDO::initPgsqlObject($receiver, $dsn, $user, $password);
+
+            return;
+        }
         // username/password/options ignored for sqlite subset.
         $filename = VmPDO::parseSqliteDsn($dsn);
         VmPDO::initObject($receiver, $filename);
@@ -807,8 +927,22 @@ final class PDOConnect extends PdoClassMethod
             throw new \LogicException('PDO::connect() requires a VM context');
         }
         $dsn = $this->stringArg($frame->calledArgs[$argOffset], 'PDO::connect', 0, 'dsn');
-        // username/password/options ignored for sqlite subset (same as __construct).
-        $frame->returnVar->object(VmPDO::connect($ctx, $dsn));
+        $user = null;
+        $password = null;
+        if ($userArgc >= 2) {
+            $userVar = $frame->calledArgs[$argOffset + 1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $userVar->type) {
+                $user = $this->stringArg($frame->calledArgs[$argOffset + 1], 'PDO::connect', 1, 'username');
+            }
+        }
+        if ($userArgc >= 3) {
+            $passVar = $frame->calledArgs[$argOffset + 2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $passVar->type) {
+                $password = $this->stringArg($frame->calledArgs[$argOffset + 2], 'PDO::connect', 2, 'password');
+            }
+        }
+        // options ignored for sqlite/pgsql subset (same as __construct).
+        $frame->returnVar->object(VmPDO::connect($ctx, $dsn, $user, $password));
     }
 }
 
