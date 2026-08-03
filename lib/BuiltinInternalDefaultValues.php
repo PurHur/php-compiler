@@ -113,6 +113,11 @@ final class BuiltinInternalDefaultValues
         'highlight_file' => [
             1 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src ext/sodium/sodium_*.stub.php — key="" / length=SODIUM_CRYPTO_GENERICHASH_BYTES (#24490)
+        'sodium_crypto_generichash' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            2 => ['kind' => 'int', 'value' => 32],
+        ],
         'show_source' => [
             1 => ['kind' => 'bool', 'value' => false],
         ],

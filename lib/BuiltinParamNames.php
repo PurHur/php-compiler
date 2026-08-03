@@ -1839,6 +1839,17 @@ final class BuiltinParamNames
             // php-src ext/sodium/sodium.stub.php — missing from InternalArgInfo (#23605)
             case 'sodium_memzero':
                 return ['&string'];
+            // php-src ext/sodium/sodium_*.stub.php — Reflection empty without this map (#24490)
+            case 'sodium_crypto_generichash':
+                return ['message', 'key=', 'length='];
+            case 'sodium_crypto_secretbox':
+                return ['message', 'nonce', 'key'];
+            case 'sodium_crypto_box':
+                return ['message', 'nonce', 'key_pair'];
+            case 'sodium_crypto_sign':
+                return ['message', 'secret_key'];
+            case 'sodium_crypto_pwhash_str':
+                return ['password', 'opslimit', 'memlimit'];
             // php-src ext/exif/exif.stub.php — InternalArgInfo still says filename/sections_needed/sub_arrays (#23605)
             case 'exif_read_data':
                 return ['file', 'required_sections=', 'as_arrays=', 'read_thumbnail='];

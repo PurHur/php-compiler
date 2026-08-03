@@ -138,6 +138,12 @@ final class BuiltinInternalArgInfo
             'hash_pbkdf2' => 'string',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits the function (#25845)
             'hash_hkdf' => 'string',
+            // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
+            'sodium_crypto_generichash',
+            'sodium_crypto_secretbox',
+            'sodium_crypto_box',
+            'sodium_crypto_sign',
+            'sodium_crypto_pwhash_str' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
@@ -455,6 +461,25 @@ final class BuiltinInternalArgInfo
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => match ($index) {
                 0, 1 => 'string',
+                default => null,
+            },
+            // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
+            'sodium_crypto_generichash' => match ($index) {
+                0, 1 => 'string',
+                2 => 'int',
+                default => null,
+            },
+            'sodium_crypto_secretbox', 'sodium_crypto_box' => match ($index) {
+                0, 1, 2 => 'string',
+                default => null,
+            },
+            'sodium_crypto_sign' => match ($index) {
+                0, 1 => 'string',
+                default => null,
+            },
+            'sodium_crypto_pwhash_str' => match ($index) {
+                0 => 'string',
+                1, 2 => 'int',
                 default => null,
             },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
