@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * jdmonthname() — month name for a Julian day (php-src ext/calendar/calendar.c; #7252).
+ * jdmonthname() — month name for a Julian day (php-src ext/calendar/calendar.c; #7252 / #27360).
  */
 final class jdmonthname extends Internal
 {
@@ -37,6 +37,12 @@ final class jdmonthname extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('jdmonthname() is not implemented for JIT in this compiler build (issue #7252)');
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'jdmonthname() expects exactly 2 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitJdmonthname::invoke($context, ...$args);
     }
 }
