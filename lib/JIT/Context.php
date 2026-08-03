@@ -824,6 +824,7 @@ class Context {
             'phpc_tan_kernel',
             'phpc_tanh_kernel',
             'phpc_acos_kernel',
+            'phpc_asin_kernel',
             'phpc_acosh_kernel',
             'phpc_asinh_kernel',
             'phpc_atanh_kernel',
