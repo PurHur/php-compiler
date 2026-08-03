@@ -7,15 +7,24 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\RangeIntJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** range() int JIT routes through RangeIntJitHelper PHP not HashTableHelper LLVM (#13502, #14298). */
+/**
+ * range() int: VM SSOT in RangeIntJitHelper; AOT/JIT bridge builds __hashtable__ in LLVM
+ * (NestedJIT array returns hang/segfault under thin AOT — #26956 / peer #26910).
+ */
 final class RangeIntRuntimeShrinkTest extends TestCase
 {
-    public function testRangeIntRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testRangeIntRuntimeBuildsHtViaSetLongAtNotNestedJitHelper(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/RangeIntRuntime.php');
-        $this->assertStringContainsString('RangeIntJitHelper', $runtime);
+        $this->assertStringContainsString('__hashtable__setLongAt', $runtime);
+        $this->assertStringContainsString('HashTableHelper::alloc', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('HashTableHelper::buildIntegerRange', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/RangeIntJitHelper.php');
+        $this->assertStringContainsString('buildIntRange', $helper);
+        $this->assertStringNotContainsString('VmRange::', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/range.php');
         $this->assertStringContainsString('RangeIntRuntime::intRange', $builtin);

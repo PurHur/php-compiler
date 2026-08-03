@@ -16,6 +16,28 @@ final class JitMbSearch
     /**
      * @param JITVariable[] $args
      */
+    public static function tryStrposFold(Context $context, array $args): ?Value
+    {
+        $hay = self::compileTimeString($args, 0);
+        $needle = self::compileTimeString($args, 1);
+        if (null === $hay || null === $needle) {
+            return null;
+        }
+        $offset = self::compileTimeOffset($context, $args, 2);
+        if (null === $offset) {
+            return null;
+        }
+        $encoding = self::compileTimeEncoding($args, 3);
+        if (null === $encoding) {
+            return null;
+        }
+
+        return self::intOrFalse($context, VmMbstring::strpos($hay, $needle, $offset, $encoding));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function tryStriposFold(Context $context, array $args): ?Value
     {
         $hay = self::compileTimeString($args, 0);
@@ -23,7 +45,7 @@ final class JitMbSearch
         if (null === $hay || null === $needle) {
             return null;
         }
-        $offset = self::compileTimeOffset($args, 2);
+        $offset = self::compileTimeOffset($context, $args, 2);
         if (null === $offset) {
             return null;
         }
@@ -45,7 +67,7 @@ final class JitMbSearch
         if (null === $hay || null === $needle) {
             return null;
         }
-        $offset = self::compileTimeOffset($args, 2);
+        $offset = self::compileTimeOffset($context, $args, 2);
         if (null === $offset) {
             return null;
         }
@@ -127,7 +149,7 @@ final class JitMbSearch
         if (null === $hay || null === $needle) {
             return null;
         }
-        $offset = self::compileTimeOffset($args, 2);
+        $offset = self::compileTimeOffset($context, $args, 2);
         if (null === $offset) {
             return null;
         }
@@ -184,20 +206,22 @@ final class JitMbSearch
     /**
      * @param JITVariable[] $args
      */
-    private static function compileTimeOffset(array $args, int $index): ?int
+    private static function compileTimeOffset(Context $context, array $args, int $index): ?int
     {
         if (!isset($args[$index])) {
             return 0;
         }
         $arg = $args[$index];
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
-            $const = $arg->value;
-            if ($const instanceof Value && $const->isConstant()) {
-                return (int) $const->constInt();
-            }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+        // Prefer LLVMIsAConstantInt — Value::isConstant()/constInt() miss some AOT i64 literals (#27187).
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($arg->value->value)) {
+            return null;
         }
 
-        return null;
+        return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
     }
 
     /**

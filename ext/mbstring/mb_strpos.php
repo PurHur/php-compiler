@@ -14,7 +14,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_strpos() — multibyte forward search (php-src ext/mbstring/mbstring.c; #3239).
+ * mb_strpos() — multibyte forward search (php-src ext/mbstring/mbstring.c; #3239, #27187).
+ *
+ * JIT/AOT: compile-time fold via {@see JitMbSearch} (peer mb_stripos #7015).
  */
 final class mb_strpos extends Internal
 {
@@ -62,6 +64,15 @@ final class mb_strpos extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('mb_strpos() requires two to four arguments');
+        }
+        $folded = JitMbSearch::tryStrposFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         throw new \LogicException('mb_strpos() is not lowered for JIT/AOT in this compiler build');
     }
 }

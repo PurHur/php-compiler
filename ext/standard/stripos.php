@@ -57,10 +57,7 @@ final class stripos extends Internal
         if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
             $pos = VmString::stripos($hayLit, $needleLit, $offsetLit);
 
-            return $context->constantFromInteger(
-                false === $pos ? StringStrpos::NOT_FOUND : $pos,
-                'int64'
-            );
+            return StringStrpos::boxIntOrFalse($context, $pos);
         }
 
         StringStrpos::ensureLinked($context);
