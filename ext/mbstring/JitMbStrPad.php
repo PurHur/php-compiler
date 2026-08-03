@@ -29,16 +29,13 @@ final class JitMbStrPad
         $inputLit = $nullInput ? null : ($args[0]->compileTimeString ?? null);
         $lengthLit = self::compileTimeInt($context, $args[1]);
         $padLit = $argc >= 3 ? ($args[2]->compileTimeString ?? ' ') : ' ';
+        // Default STR_PAD_RIGHT; null when argc>=4 but pad_type is not foldable yet (#27435).
         $padTypeLit = 1;
         if ($argc >= 4) {
-            $padTypeLiteral = PadTypeJit::compileTimePadType($context, $args[3]);
-            if (null === $padTypeLiteral) {
-                throw new \LogicException('mb_str_pad() pad type must be a compile-time constant in this compiler build');
-            }
-            $padTypeLit = $padTypeLiteral;
+            $padTypeLit = PadTypeJit::compileTimePadType($context, $args[3]);
         }
         $encLit = $argc >= 5 ? ($args[4]->compileTimeString ?? 'UTF-8') : 'UTF-8';
-        if (null !== $inputLit && null !== $lengthLit && null !== $encLit) {
+        if (null !== $inputLit && null !== $lengthLit && null !== $encLit && null !== $padTypeLit) {
             return self::materializeString(
                 $context,
                 VmMbstring::strPad($inputLit, $lengthLit, $padLit, $padTypeLit, $encLit)
