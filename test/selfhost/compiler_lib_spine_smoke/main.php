@@ -87,6 +87,9 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+require_once __DIR__.'/../../../lib/FinalPromotedPropertySyntaxRejector.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableReplaceRecursiveCopy.php';
+require_once __DIR__.'/../../../lib/JIT/HashTableReplaceRecursiveLlvm.php';
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
