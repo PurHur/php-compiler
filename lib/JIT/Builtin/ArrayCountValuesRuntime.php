@@ -5,41 +5,36 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayCountValuesLlvm;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_count_values() via ArrayCountValuesJitHelper PHP (#12331).
+ * JIT/AOT link for array_count_values() (#12331, #27213).
  *
- * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#14485, #18232).
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::countValues()}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayCountValuesJitHelper}
+ * aborts in the helper body (peer array_flip #26970). Call-site LLVM via
+ * {@see ArrayCountValuesLlvm}.
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray::countValues()}
  * php-src: ext/standard/array.c — php_array_count_values()
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayCountValuesRuntime
 {
     private const ABI_COUNT = '__array_count_values__count';
 
-    private const HELPER_PATH = '/ext/standard/ArrayCountValuesJitHelper.php';
-
-    private const COUNT_HELPER = 'PHPCompiler\\ext\\standard\\ArrayCountValuesJitHelper::countValues';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COUNT_HELPER,
-    ];
-
     public static function countValues(Context $context, JITVariable $array): Value
     {
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::isNativeArray($array->type)
-            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
-            : ArrayBuiltinHelper::loadHashTable($context, $array);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_COUNT),
-            $ht
+            ArrayBuiltinHelper::loadHashTable($context, $array)
         );
     }
 
@@ -62,38 +57,41 @@ final class ArrayCountValuesRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COUNT,
-            'array_count_values_bridge_entry',
-            [$htPtr],
-            $htPtr,
-            self::COUNT_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12331'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitCountBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitCountBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction(self::ABI_COUNT);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_COUNT,
+                $context->context->functionType($htPtr, false, $htPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_count_values_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $counts = ArrayCountValuesLlvm::countValuesHashTable($context, $src);
+        $context->builder->returnValue($counts);
+        $context->registerFunction(self::ABI_COUNT, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_COUNT);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_COUNT.' missing after ArrayCountValuesRuntime bridge (#12331)');
+            throw new \LogicException(self::ABI_COUNT.' missing after ArrayCountValuesRuntime bridge (#27213)');
         }
         $context->registerFunction(self::ABI_COUNT, $fn);
     }

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6899 |
-| Phase A inventory files (M2 ratio SSOT) | 6899 |
+| PHP files on vm.php path | 6901 |
+| Phase A inventory files (M2 ratio SSOT) | 6901 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22233 |
+| Source constructs flagged (warnings) | 22240 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4996,6 +4996,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 6 |
 | `lib/JIT/ArrayColumnLlvm.php` | 0 | 3 |
+| `lib/JIT/ArrayCountValuesLlvm.php` | 0 | 2 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
@@ -5140,7 +5141,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ExceptionHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ExceptionThrowToStringSeed.php` | 0 | 2 |
+| `lib/JIT/Builtin/ExceptionThrowToStringSeed.php` | 0 | 5 |
 | `lib/JIT/Builtin/ExecutionLimitsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputTypeJit.php` | 0 | 1 |
@@ -5746,6 +5747,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ExceptionConstruct.php` | 0 | 6 |
 | `lib/JIT/Call/ExceptionGetCode.php` | 0 | 1 |
 | `lib/JIT/Call/ExceptionGetMessage.php` | 0 | 1 |
+| `lib/JIT/Call/ExceptionGetTrace.php` | 0 | 1 |
 | `lib/JIT/Call/ExceptionGetTraceAsString.php` | 0 | 1 |
 | `lib/JIT/Call/ExceptionToString.php` | 0 | 1 |
 | `lib/JIT/Call/ExternalMethod.php` | 0 | 1 |
@@ -5901,7 +5903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 132 |
+| `lib/JIT/Context.php` | 0 | 133 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -25689,9 +25691,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArrayCountValuesJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 24)
-- new Variable (line 35)
-- new Variable (line 48)
+- new HashTable (line 28)
+- new Variable (line 39)
+- new Variable (line 52)
 - 2 class method(s)
 
 ### `ext/standard/ArrayDiffAssocJitHelper.php`
@@ -44385,6 +44387,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 184)
 - 4 class method(s)
 
+### `lib/JIT/ArrayCountValuesLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 103)
+- 5 class method(s)
+
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -44521,7 +44529,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayCountValuesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayDiffAssocRuntime.php`
 
@@ -45164,8 +45172,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ExceptionThrowToStringSeed.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 62)
-- 2 class method(s)
+- new Variable (line 76)
+- new Variable (line 126)
+- new Variable (line 135)
+- new Variable (line 150)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ExecutionLimitsRuntime.php`
 
@@ -48324,6 +48335,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/ExceptionGetTrace.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/Call/ExceptionGetTraceAsString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49293,49 +49309,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ExceptionGetMessage (line 1176)
 - new Call\ExceptionGetCode (line 1177)
 - new Call\ExceptionToString (line 1178)
-- new Call\ExceptionGetTraceAsString (line 1179)
-- new Call\ExceptionConstruct (line 1182)
-- new Call\DateTimeConstruct (line 1203)
-- new Call\DateTimeImmutableConstruct (line 1204)
-- new Call\DateTimeZoneConstruct (line 1205)
-- new Call\DateIntervalConstruct (line 1206)
-- new Call\DatePeriodConstruct (line 1207)
-- new Call\DatePeriodCreateFromISO8601String (line 1209)
-- new Call\DatePeriodIteratorMethod (line 1211)
-- new Call\DateTimeFormat (line 1214)
-- new Call\DateTimeFormat (line 1215)
-- new Call\DateTimeCreateFromFormat (line 1217)
-- new Call\DateTimeCreateFromFormat (line 1218)
-- new Call\DateTimeCreateFromTimestamp (line 1221)
-- new Call\DateTimeCreateFromTimestamp (line 1222)
-- new Call\DateTimeGetMicrosecond (line 1226)
-- new Call\DateTimeGetMicrosecond (line 1227)
-- new Call\DateTimeSetMicrosecond (line 1228)
-- new Call\DateTimeSetMicrosecond (line 1229)
-- new Call\DateIntervalCreateFromDateString (line 1232)
-- new Call\DateTimeSetTimezone (line 1234)
-- new Call\DateTimeSetTimezone (line 1240)
-- new Call\DateTimeModify (line 1244)
-- new Call\DateTimeModify (line 1245)
-- new Call\DateTimeDiff (line 1247)
-- new Call\DateTimeDiff (line 1248)
-- new Call\DateTimeZoneGetTransitions (line 1250)
-- new Call\DateTimeZoneGetName (line 1252)
-- new Call\DateTimeZoneGetOffset (line 1254)
-- new Call\DomXmlDocumentCreateFromString (line 1259)
-- new Result (line 1626)
-- new Result (line 1648)
-- new Variable (line 2326)
-- new Variable (line 2463)
-- new Variable (line 2717)
-- new Variable (line 2775)
-- new VMVariable (line 2937)
-- new VMVariable (line 2953)
-- new VMVariable (line 2959)
-- new VMVariable (line 2965)
-- new VMVariable (line 2976)
-- new Variable (line 3006)
-- new Variable (line 3051)
+- new Call\ExceptionGetTrace (line 1179)
+- new Call\ExceptionGetTraceAsString (line 1180)
+- new Call\ExceptionConstruct (line 1188)
+- new Call\DateTimeConstruct (line 1211)
+- new Call\DateTimeImmutableConstruct (line 1212)
+- new Call\DateTimeZoneConstruct (line 1213)
+- new Call\DateIntervalConstruct (line 1214)
+- new Call\DatePeriodConstruct (line 1215)
+- new Call\DatePeriodCreateFromISO8601String (line 1217)
+- new Call\DatePeriodIteratorMethod (line 1219)
+- new Call\DateTimeFormat (line 1222)
+- new Call\DateTimeFormat (line 1223)
+- new Call\DateTimeCreateFromFormat (line 1225)
+- new Call\DateTimeCreateFromFormat (line 1226)
+- new Call\DateTimeCreateFromTimestamp (line 1229)
+- new Call\DateTimeCreateFromTimestamp (line 1230)
+- new Call\DateTimeGetMicrosecond (line 1234)
+- new Call\DateTimeGetMicrosecond (line 1235)
+- new Call\DateTimeSetMicrosecond (line 1236)
+- new Call\DateTimeSetMicrosecond (line 1237)
+- new Call\DateIntervalCreateFromDateString (line 1240)
+- new Call\DateTimeSetTimezone (line 1242)
+- new Call\DateTimeSetTimezone (line 1248)
+- new Call\DateTimeModify (line 1252)
+- new Call\DateTimeModify (line 1253)
+- new Call\DateTimeDiff (line 1255)
+- new Call\DateTimeDiff (line 1256)
+- new Call\DateTimeZoneGetTransitions (line 1258)
+- new Call\DateTimeZoneGetName (line 1260)
+- new Call\DateTimeZoneGetOffset (line 1262)
+- new Call\DomXmlDocumentCreateFromString (line 1267)
+- new Result (line 1634)
+- new Result (line 1656)
+- new Variable (line 2334)
+- new Variable (line 2471)
+- new Variable (line 2725)
+- new Variable (line 2783)
+- new VMVariable (line 2945)
+- new VMVariable (line 2961)
+- new VMVariable (line 2967)
+- new VMVariable (line 2973)
+- new VMVariable (line 2984)
+- new Variable (line 3014)
+- new Variable (line 3059)
 - 106 class method(s)
 - 32 closure(s)
 
