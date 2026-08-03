@@ -8,22 +8,56 @@ use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectType;
 use PHPLLVM\Value;
 
 /**
- * C-floor Runtime::initParsePipeline for M5 argv / gen-0 seed (#26756).
+ * C-floor Runtime::initParsePipeline for M5 argv / gen-0 seed (#26756 / #27426).
  *
  * Host-lowering the PHP CFG NestedJITs every visitor ctor and hung Zend rebuilds
  * for hours. Mirror {@see RuntimeInitCompiler}: allocate + markConstructed for
  * parse-spine fields without NestedJIT of Runtime.php.
+ *
+ * PHPCfg\Parser::parse (FORCE_PARSER NestedJIT) reads `$this->astParser`. A bare
+ * allocConstructed Parser left that null and SIGABRT'd (#27426). Prior attempt to
+ * allocate PhpParser\Parser\Php7 peers SEGVd the M5 argv rebuild at
+ * c:main_before_php — Php7 is a 177KB generated parser; class registration during
+ * emit poisons later includes. Wire a lightweight {@see M5ParserAstPeer} instead so
+ * the property is a real object; NestedJIT of real PhpParser remains follow-up.
  */
 final class RuntimeInitParsePipeline
 {
     public static function emit(Context $context, ObjectType $object, Value $runtimeThis): void
     {
+        $parser = self::allocConstructed($object, 'PHPCfg\\Parser');
+        // Lightweight peers — not PhpParser\Parser\Php7 (#27426 SEGV bisect).
+        self::storeClassProp(
+            $context,
+            $object,
+            $parser,
+            'PHPCfg\\Parser',
+            'astParser',
+            self::allocConstructed($object, M5ParserAstPeer::class)
+        );
+        self::storeClassProp(
+            $context,
+            $object,
+            $parser,
+            'PHPCfg\\Parser',
+            'astTraverser',
+            self::allocConstructed($object, M5ParserAstPeer::class)
+        );
+        self::storeClassProp(
+            $context,
+            $object,
+            $parser,
+            'PHPCfg\\Parser',
+            'magicStringResolver',
+            self::allocConstructed($object, M5ParserAstPeer::class)
+        );
+
         self::storeObjectProp(
             $context,
             $object,
             $runtimeThis,
             'parser',
-            self::allocConstructed($object, 'PHPCfg\\Parser')
+            $parser
         );
         self::storeObjectProp(
             $context,
@@ -100,8 +134,30 @@ final class RuntimeInitParsePipeline
         string $prop,
         Value $value
     ): void {
+        self::storeClassProp($context, $object, $runtimeThis, 'PHPCompiler\\Runtime', $prop, $value);
+    }
+
+    private static function storeClassProp(
+        Context $context,
+        ObjectType $object,
+        Value $receiver,
+        string $class,
+        string $prop,
+        Value $value
+    ): void {
         $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $value);
-        $slot = $object->propertyFetch($runtimeThis, 'PHPCompiler\\Runtime', $prop);
+        $slot = $object->propertyFetch($receiver, $class, $prop);
         $object->propertyStore($slot->objectPropertySlot, $var, Variable::TYPE_OBJECT);
     }
+}
+
+/**
+ * Placeholder object for PHPCfg\Parser::$astParser / $astTraverser peers (#27426).
+ *
+ * Allocated by C-floor initParsePipeline so FORCE_PARSER NestedJIT of Parser::parse
+ * does not null-deref the property. Not a real PhpParser — NestedJIT of Php7 remains
+ * required before astParser->parse() can produce an AST.
+ */
+final class M5ParserAstPeer
+{
 }

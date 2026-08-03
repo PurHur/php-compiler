@@ -21,6 +21,11 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('markObjectConstructed', $source);
         $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $source);
         $this->assertStringContainsString('#26756', $source);
+        // Lightweight astParser peers — not PhpParser\Parser\Php7 (#27426 SEGV).
+        $this->assertStringContainsString('astParser', $source);
+        $this->assertStringContainsString('M5ParserAstPeer', $source);
+        $this->assertStringNotContainsString("PhpParser\\\\Parser\\\\Php7", $source);
+        $this->assertStringContainsString('final class M5ParserAstPeer', $source);
     }
 
     public function testM5DriverHostDefinesRuntimeParseSpineProps(): void
@@ -40,6 +45,10 @@ final class RuntimeInitParsePipelineTest extends TestCase
             '/M5_DRIVER_HOST.*!\\$m5Host|!\\$m5Host.*SELFHOST_AOT|&&\\s*!\\$m5Host/s',
             $chunk
         );
+        // PHPCfg\Parser peer slots for C-floor wiring (#27426).
+        $this->assertStringContainsString("'phpcfg\\\\parser'", $source);
+        $this->assertStringContainsString("'astParser'", $source);
+        $this->assertStringContainsString('astparser', $source);
     }
 
     public function testPrepareIdentityAvoidsStringSeparate(): void
