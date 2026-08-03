@@ -60,6 +60,10 @@ final class PregMatchRuntime
 
     private const TAKE_MATCH_ALL_EX_HT = 'PHPCompiler\\ext\\standard\\PregJitHelper::takeLastMatchAllExHashTable';
 
+    private const THIN_MATCH_ALL_PART_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllPartCount';
+
+    private const THIN_MATCH_ALL_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchAllPart';
+
     private const REPLACE_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceArgv';
 
     private const REPLACE_FIND_NEXT = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceFindNext';
@@ -91,6 +95,8 @@ final class PregMatchRuntime
         self::THIN_SPLIT_PART,
         self::MATCH_ALL_EX_HELPER,
         self::TAKE_MATCH_ALL_EX_HT,
+        self::THIN_MATCH_ALL_PART_COUNT,
+        self::THIN_MATCH_ALL_PART,
         self::REPLACE_HELPER,
         self::REPLACE_FIND_NEXT,
         self::TAKE_LAST_REPLACE_POS,
@@ -152,8 +158,8 @@ final class PregMatchRuntime
         self::implementLastErrorMsgBridge($context);
         self::implementI64PairBridge($context, '__compiler_preg_match', self::MATCH_HELPER);
         self::implementI64PairBridge($context, '__compiler_preg_match_all', self::MATCH_ALL_HELPER);
-        self::implementMatchExBridge($context, '__compiler_preg_match_ex', self::MATCH_EX_HELPER, self::TAKE_MATCH_EX_HT);
-        self::implementMatchExBridge($context, '__compiler_preg_match_all_ex', self::MATCH_ALL_EX_HELPER, self::TAKE_MATCH_ALL_EX_HT);
+        self::implementMatchExBridge($context, '__compiler_preg_match_ex', self::MATCH_EX_HELPER, self::TAKE_MATCH_EX_HT, false);
+        self::implementMatchExBridge($context, '__compiler_preg_match_all_ex', self::MATCH_ALL_EX_HELPER, self::TAKE_MATCH_ALL_EX_HT, true);
         self::implementReplaceBridge($context);
         self::implementReplaceCallbackBridge($context);
         self::implementSplitBridge($context);
@@ -246,7 +252,8 @@ final class PregMatchRuntime
         Context $context,
         string $abiName,
         string $matchHelper,
-        string $takeHtHelper
+        string $takeHtHelper,
+        bool $thinMatchAll
     ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -310,8 +317,11 @@ final class PregMatchRuntime
         $context->builder->branchIf($htNull, $emptyBb, $writeBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        // Thin AOT: takeLastMatchExHashTable is always null; fill from string caps (#24115).
-        $filledHt = self::emitThinMatchExHashtableFromCaps($context, $fn);
+        // Thin AOT: takeLastMatch*HashTable is always null; fill from string slots.
+        // match_all: nested `$matches[0]=[…]` (#27195); match: flat caps (#24115).
+        $filledHt = $thinMatchAll
+            ? self::emitThinMatchAllHashtableFromParts($context, $fn)
+            : self::emitThinMatchExHashtableFromCaps($context, $fn);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $fn->getParam(2),
@@ -385,6 +395,75 @@ final class PregMatchRuntime
         $context->builder->positionAtEnd($doneBb);
 
         return $ht;
+    }
+
+    /**
+     * Build preg_match_all $matches (PREG_PATTERN_ORDER, no groups) from thinMatchAllPart*.
+     * Shape: `$matches[0] = [m0, m1, …]` when count>0; empty HT when none (#27195).
+     */
+    private static function emitThinMatchAllHashtableFromParts(Context $context, LlvmFunction $fn): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $outer = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $partCountRaw = $context->builder->call(
+            self::helperFunction($context, self::THIN_MATCH_ALL_PART_COUNT)
+        );
+        $partCount = JitNestedHelperCoerce::scalarToI64(
+            $context,
+            $partCountRaw,
+            $partCountRaw->typeOf()
+        );
+        $hasParts = $context->builder->icmp(
+            Builder::INT_SGT,
+            $partCount,
+            $i64->constInt(0, true)
+        );
+        $fillBb = $fn->appendBasicBlock('preg_match_all_thin_fill');
+        $doneBb = $fn->appendBasicBlock('preg_match_all_thin_done');
+        $context->builder->branchIf($hasParts, $fillBb, $doneBb);
+
+        $context->builder->positionAtEnd($fillBb);
+        $inner = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $max = 8;
+        for ($i = 0; $i < $max; ++$i) {
+            $idxBb = $fn->appendBasicBlock('preg_match_all_thin_part_'.$i);
+            $skipBb = $fn->appendBasicBlock('preg_match_all_thin_skip_'.$i);
+            $need = $context->builder->icmp(
+                Builder::INT_SGT,
+                $partCount,
+                $i64->constInt($i, true)
+            );
+            $context->builder->branchIf($need, $idxBb, $skipBb);
+
+            $context->builder->positionAtEnd($idxBb);
+            $partRaw = $context->builder->call(
+                self::helperFunction($context, self::THIN_MATCH_ALL_PART),
+                $i64->constInt($i, true)
+            );
+            $partStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $partRaw);
+            $slot = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $partStr
+            );
+            HashTableHelper::setAtIndex($context, $inner, $sizeT->constInt($i, false), $slot);
+            $context->builder->branch($skipBb);
+            $context->builder->positionAtEnd($skipBb);
+        }
+        $row0 = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $inner
+        );
+        HashTableHelper::setAtIndex($context, $outer, $sizeT->constInt(0, false), $row0);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $outer;
     }
 
     private static function implementReplaceBridge(Context $context): void

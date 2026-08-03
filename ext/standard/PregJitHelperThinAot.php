@@ -52,7 +52,15 @@ final class PregJitHelper
 
     public static function matchAllArgv(string $pattern, string $subject): int
     {
-        return self::matchArgv($pattern, $subject);
+        self::$lastError = 0;
+        $n = PregAotFastPath::matchAllStore($pattern, $subject, 0, 0);
+        if ($n < 0) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+
+        return $n;
     }
 
     public static function matchExArgv(string $pattern, string $subject, int $flags, int $offset): int
@@ -95,12 +103,32 @@ final class PregJitHelper
 
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
-        return self::matchExArgv($pattern, $subject, $flags, $offset);
+        self::$lastError = 0;
+        self::$lastMatchAllExHt = null;
+        $n = PregAotFastPath::matchAllStore($pattern, $subject, $flags, $offset);
+        if ($n < 0) {
+            self::$lastError = 1;
+
+            return -1;
+        }
+
+        return $n;
     }
 
+    /** Always null — HT filled from matchAllPart* in PregMatchRuntime (#27195). */
     public static function takeLastMatchAllExHashTable(): ?HashTable
     {
         return null;
+    }
+
+    public static function thinMatchAllPartCount(): int
+    {
+        return PregAotFastPath::matchAllPartCount();
+    }
+
+    public static function thinMatchAllPart(int $index): string
+    {
+        return '' . PregAotFastPath::matchAllPart($index);
     }
 
     /**

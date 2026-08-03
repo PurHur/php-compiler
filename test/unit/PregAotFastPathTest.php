@@ -75,4 +75,24 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(1, PregAotFastPath::matchCount('/^b/', 'baz', 0));
         $this->assertSame(0, PregAotFastPath::patternKind('/^b$/'));
     }
+
+    public function testMatchAllWordPlusStoresAll(): void
+    {
+        // Issue #27195 — thin AOT preg_match_all /\w+/ "a b c" → a,b,c
+        $this->assertSame(3, PregAotFastPath::matchAllStore('/\w+/', 'a b c', 0, 0));
+        $this->assertSame(3, PregAotFastPath::matchAllPartCount());
+        $this->assertSame('a', PregAotFastPath::matchAllPart(0));
+        $this->assertSame('b', PregAotFastPath::matchAllPart(1));
+        $this->assertSame('c', PregAotFastPath::matchAllPart(2));
+        $this->assertSame(0, PregAotFastPath::matchAllStore('/\w+/', '   ', 0, 0));
+        $this->assertSame(-1, PregAotFastPath::matchAllStore('/(\w+)/', 'a b', 0, 0));
+        $this->assertSame(-1, PregAotFastPath::matchAllStore('/\w+/', 'a b', PREG_SET_ORDER, 0));
+    }
+
+    public function testMatchAllLiteralStoresAll(): void
+    {
+        $this->assertSame(2, PregAotFastPath::matchAllStore('/a/', 'bab', 0, 0));
+        $this->assertSame('a', PregAotFastPath::matchAllPart(0));
+        $this->assertSame('a', PregAotFastPath::matchAllPart(1));
+    }
 }

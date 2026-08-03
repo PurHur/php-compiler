@@ -740,6 +740,177 @@ final class PregAotFastPath
 
     private static string $split7 = '';
 
+    private static int $matchAllCount = 0;
+
+    private static string $matchAll0 = '';
+
+    private static string $matchAll1 = '';
+
+    private static string $matchAll2 = '';
+
+    private static string $matchAll3 = '';
+
+    private static string $matchAll4 = '';
+
+    private static string $matchAll5 = '';
+
+    private static string $matchAll6 = '';
+
+    private static string $matchAll7 = '';
+
+    /**
+     * NestedJIT-safe preg_match_all — int return + full-match string slots (#27195).
+     *
+     * PREG_PATTERN_ORDER without capture groups only (flags==0). LLVM builds
+     * `$matches[0] = [m0, m1, …]` from {@see self::matchAllPart}.
+     *
+     * @return int match count, 0 if none, -1 unsupported/error
+     */
+    public static function matchAllStore(string $pattern, string $subject, int $flags, int $offset): int
+    {
+        self::$matchAllCount = 0;
+        self::$matchAll0 = '';
+        self::$matchAll1 = '';
+        self::$matchAll2 = '';
+        self::$matchAll3 = '';
+        self::$matchAll4 = '';
+        self::$matchAll5 = '';
+        self::$matchAll6 = '';
+        self::$matchAll7 = '';
+        if (0 !== $flags) {
+            return -1;
+        }
+        $subLen = \strlen($subject);
+        if ($offset < 0 || $offset > $subLen) {
+            // Past-end / invalid offset → 0 matches + empty $matches (#25313).
+            return 0;
+        }
+        $kind = self::patternKind($pattern);
+        // No-group class-plus (2/4/6) and plain literals (1). Grouped kinds need nested
+        // group rows — defer until thin slots expand.
+        if (1 !== $kind && 2 !== $kind && 4 !== $kind && 6 !== $kind) {
+            return -1;
+        }
+        if (1 === $kind) {
+            return self::matchAllLiteralStore($pattern, $subject, $offset);
+        }
+        $charClass = 2;
+        if (4 === $kind) {
+            $charClass = 3;
+        } elseif (6 === $kind) {
+            $charClass = 4;
+        }
+        $cursor = $offset;
+        $n = 0;
+        while ($cursor < $subLen) {
+            if (!self::charInClass(\substr($subject, $cursor, 1), $charClass)) {
+                ++$cursor;
+                continue;
+            }
+            $j = $cursor + 1;
+            while ($j < $subLen && self::charInClass(\substr($subject, $j, 1), $charClass)) {
+                ++$j;
+            }
+            if ($n >= self::MAX_CAPS) {
+                return -1;
+            }
+            self::storeMatchAllAt($n, '' . \substr($subject, $cursor, $j - $cursor));
+            ++$n;
+            $cursor = $j;
+        }
+        self::$matchAllCount = $n;
+
+        return $n;
+    }
+
+    public static function matchAllPartCount(): int
+    {
+        return self::$matchAllCount;
+    }
+
+    public static function matchAllPart(int $index): string
+    {
+        if (0 === $index) {
+            return '' . self::$matchAll0;
+        }
+        if (1 === $index) {
+            return '' . self::$matchAll1;
+        }
+        if (2 === $index) {
+            return '' . self::$matchAll2;
+        }
+        if (3 === $index) {
+            return '' . self::$matchAll3;
+        }
+        if (4 === $index) {
+            return '' . self::$matchAll4;
+        }
+        if (5 === $index) {
+            return '' . self::$matchAll5;
+        }
+        if (6 === $index) {
+            return '' . self::$matchAll6;
+        }
+        if (7 === $index) {
+            return '' . self::$matchAll7;
+        }
+
+        return '';
+    }
+
+    private static function matchAllLiteralStore(string $pattern, string $subject, int $offset): int
+    {
+        $close = self::delimitedBodyClose($pattern);
+        if ($close < 1) {
+            return -1;
+        }
+        $body = \substr($pattern, 1, $close - 1);
+        $bodyLen = \strlen($body);
+        $subLen = \strlen($subject);
+        $cursor = $offset;
+        $n = 0;
+        if (0 === $bodyLen) {
+            // Empty literal body: Zend matches at every offset including end — thin skip.
+            return -1;
+        }
+        while ($cursor + $bodyLen <= $subLen) {
+            if (self::literalEqualsAt($subject, $cursor, $body, $bodyLen)) {
+                if ($n >= self::MAX_CAPS) {
+                    return -1;
+                }
+                self::storeMatchAllAt($n, '' . \substr($subject, $cursor, $bodyLen));
+                ++$n;
+                $cursor += $bodyLen;
+                continue;
+            }
+            ++$cursor;
+        }
+        self::$matchAllCount = $n;
+
+        return $n;
+    }
+
+    private static function storeMatchAllAt(int $index, string $value): void
+    {
+        if (0 === $index) {
+            self::$matchAll0 = $value;
+        } elseif (1 === $index) {
+            self::$matchAll1 = $value;
+        } elseif (2 === $index) {
+            self::$matchAll2 = $value;
+        } elseif (3 === $index) {
+            self::$matchAll3 = $value;
+        } elseif (4 === $index) {
+            self::$matchAll4 = $value;
+        } elseif (5 === $index) {
+            self::$matchAll5 = $value;
+        } elseif (6 === $index) {
+            self::$matchAll6 = $value;
+        } elseif (7 === $index) {
+            self::$matchAll7 = $value;
+        }
+    }
+
     /**
      * NestedJIT-safe preg_split — int return + static string slots only (no PHP arrays, #27080).
      *
