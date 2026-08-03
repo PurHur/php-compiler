@@ -16,8 +16,10 @@ require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/RuntimeInitParsePipeline.php';
+require_once __DIR__.'/JIT/M5ParserAstPeer.php';
 require_once __DIR__.'/JIT/RuntimeParseM5Native.php';
 require_once __DIR__.'/JIT/RuntimeParseM5PhpCfgParser.php';
+require_once __DIR__.'/JIT/RuntimeParseM5AstPeer.php';
 require_once __DIR__.'/JIT/M5TrivialEchoScript.php';
 require_once __DIR__.'/JIT/M5TrivialEchoNative.php';
 require_once __DIR__.'/JIT/RuntimePrepareSpineIdentity.php';
@@ -1532,6 +1534,27 @@ class JIT {
     }
 
     /**
+     * NestedJIT of M5ParserAstPeer::parse under M5 argv (#27426).
+     * Typed string $code must stay __string__* for Parser::parse call sites.
+     */
+    private function isM5NestedJitM5ParserAstPeerParse(?string $logicalName): bool
+    {
+        if (null === $logicalName
+            || !$this->shouldUseM5DriverHostCompile()
+            || !JIT\NestedJitCompileScope::isActive()
+        ) {
+            return false;
+        }
+        $lc = strtolower($logicalName);
+
+        return 'phpcompiler\\jit\\m5parserastpeer::parse' === $lc
+            || 'm5parserastpeer::parse' === $lc
+            || str_ends_with($lc, '\\m5parserastpeer::parse')
+            || 'phpcompiler_jit_m5parserastpeer__parse' === $lc
+            || str_ends_with($lc, '_m5parserastpeer__parse');
+    }
+
+    /**
      * Return-ABI string for the function currently being lowered.
      * Prefers the LLVM signature forced at create (Parser::parse → __object__*) over
      * untyped CFG default __value__ (#27426).
@@ -2396,6 +2419,11 @@ class JIT {
                 // PHPCfg\Parser::parse($code, $fileName) — no declared types in vendor;
                 // force __string__* so RuntimeParseM5Native call sites type-check (#27426).
                 if ($this->isM5NestedJitPhpCfgParserParse($logicalName)) {
+                    $type = $this->context->getTypeFromString('__string__*');
+                    $rawType = Type::string();
+                }
+                // M5ParserAstPeer::parse(string $code, …) — keep first formal as __string__* (#27426).
+                if ($this->isM5NestedJitM5ParserAstPeerParse($logicalName) && 0 === $idx) {
                     $type = $this->context->getTypeFromString('__string__*');
                     $rawType = Type::string();
                 }
@@ -4902,9 +4930,10 @@ class JIT {
             }
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
-        // M5: NestedJIT PHPCfg\Parser::parse first so C-floor Runtime::parse can call it (#26756).
+        // M5: NestedJIT peer methods then PHPCfg\Parser::parse so C-floor Runtime::parse
+        // can call astParser->parse (#26756 / #27426).
         if ($this->shouldUseM5DriverHostCompile()) {
-            JIT\RuntimeParseM5PhpCfgParser::ensureParse(
+            $m5ForceParserCbs = [
                 $this->context,
                 fn (string $n): string => $this->llvmInternalName($n),
                 function (callable $body): void {
@@ -4918,8 +4947,11 @@ class JIT {
                 },
                 function (string $code, string $path) {
                     return $this->context->runtime->parse($code, $path);
-                }
-            );
+                },
+            ];
+            // Peer parse/traverse/beginCompilationUnit before Parser::parse (#27426).
+            JIT\RuntimeParseM5AstPeer::ensureMethods(...$m5ForceParserCbs);
+            JIT\RuntimeParseM5PhpCfgParser::ensureParse(...$m5ForceParserCbs);
             // Pure C-floor M5TrivialEchoScript::parseAndCompile — NestedJIT of the PHP helper
             // hangs at runtime in the argv driver (#26756). Opt-in NestedJIT still available for
             // experiments via PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT=1 (overrides C-floor).

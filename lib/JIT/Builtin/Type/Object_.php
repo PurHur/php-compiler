@@ -3968,6 +3968,13 @@ class Object_ extends Type {
                 $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
             }
         }
+        // M5ParserAstPeer method slots for NestedJIT under FORCE_PARSER (#27426).
+        if ('phpcompiler\\jit\\m5parserastpeer' === $lcname || 'm5parserastpeer' === $lcname) {
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['parse', 'traverse', 'addvisitor', 'begincompilationunit'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('phpcfg\\func' === $lcname) {
             $this->defineProperty($id, 'cfg', Variable::TYPE_OBJECT);
             foreach ([

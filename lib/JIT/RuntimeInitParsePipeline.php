@@ -19,7 +19,8 @@ use PHPLLVM\Value;
  * allocate PhpParser\Parser\Php7 peers SEGVd the M5 argv rebuild at
  * c:main_before_php — Php7 is a 177KB generated parser; class registration during
  * emit poisons later includes. Wire a lightweight {@see M5ParserAstPeer} instead so
- * the property is a real object; NestedJIT of real PhpParser remains follow-up.
+ * the property is a real object with hand-built {@see M5ParserAstPeer::parse} for
+ * limited shapes; NestedJIT of real Php7 remains follow-up for full PHP.
  */
 final class RuntimeInitParsePipeline
 {
@@ -149,15 +150,4 @@ final class RuntimeInitParsePipeline
         $slot = $object->propertyFetch($receiver, $class, $prop);
         $object->propertyStore($slot->objectPropertySlot, $var, Variable::TYPE_OBJECT);
     }
-}
-
-/**
- * Placeholder object for PHPCfg\Parser::$astParser / $astTraverser peers (#27426).
- *
- * Allocated by C-floor initParsePipeline so FORCE_PARSER NestedJIT of Parser::parse
- * does not null-deref the property. Not a real PhpParser — NestedJIT of Php7 remains
- * required before astParser->parse() can produce an AST.
- */
-final class M5ParserAstPeer
-{
 }

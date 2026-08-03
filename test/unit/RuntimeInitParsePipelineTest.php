@@ -21,11 +21,63 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('markObjectConstructed', $source);
         $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $source);
         $this->assertStringContainsString('#26756', $source);
-        // Lightweight astParser peers — not PhpParser\Parser\Php7 (#27426 SEGV).
         $this->assertStringContainsString('astParser', $source);
         $this->assertStringContainsString('M5ParserAstPeer', $source);
         $this->assertStringNotContainsString("PhpParser\\\\Parser\\\\Php7", $source);
-        $this->assertStringContainsString('final class M5ParserAstPeer', $source);
+        $this->assertStringContainsString('M5ParserAstPeer::class', $source);
+        $objectType = (string) file_get_contents($root.'/lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('m5parserastpeer', $objectType);
+        $this->assertStringContainsString("'parse', 'traverse', 'addvisitor', 'begincompilationunit'", $objectType);
+        $peerPath = $root.'/lib/JIT/M5ParserAstPeer.php';
+        $this->assertFileExists($peerPath);
+        $peer = (string) file_get_contents($peerPath);
+        $this->assertStringContainsString('final class M5ParserAstPeer', $peer);
+        $this->assertStringContainsString('implements \\PhpParser\\Parser', $peer);
+        $this->assertStringContainsString('function parse(string $code', $peer);
+        $this->assertStringContainsString('function traverse(array $nodes)', $peer);
+        $this->assertStringContainsString('function beginCompilationUnit(string $fileName)', $peer);
+    }
+
+    public function testM5ParserAstPeerBuildsEchoAndArithAst(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5ParserAstPeer.php';
+        $peer = new \PHPCompiler\JIT\M5ParserAstPeer();
+        $echoAst = $peer->parse("<?php echo \"hi\\n\";");
+        $this->assertNotNull($echoAst);
+        $this->assertCount(1, $echoAst);
+        $this->assertInstanceOf(\PhpParser\Node\Stmt\Echo_::class, $echoAst[0]);
+        $this->assertInstanceOf(
+            \PhpParser\Node\Scalar\String_::class,
+            $echoAst[0]->exprs[0]
+        );
+        $this->assertSame("hi\n", $echoAst[0]->exprs[0]->value);
+
+        $arithAst = $peer->parse('<?php $a = 1 + 2; echo $a;');
+        $this->assertNotNull($arithAst);
+        $this->assertCount(2, $arithAst);
+        $this->assertInstanceOf(\PhpParser\Node\Stmt\Expression::class, $arithAst[0]);
+        $this->assertInstanceOf(\PhpParser\Node\Expr\Assign::class, $arithAst[0]->expr);
+        $this->assertInstanceOf(\PhpParser\Node\Stmt\Echo_::class, $arithAst[1]);
+        $this->assertNull($peer->parse('<?php function f($x){return $x;} echo f(1);'));
+        $this->assertSame($arithAst, $peer->traverse($arithAst));
+        $peer->beginCompilationUnit('t.php');
+        $peer->addVisitor(new \stdClass());
+    }
+
+    public function testM5ParserAstPeerFeedsPhpCfgParser(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5ParserAstPeer.php';
+        $peer = new \PHPCompiler\JIT\M5ParserAstPeer();
+        $cfgParser = new \PHPCfg\Parser($peer);
+        $script = $cfgParser->parse("<?php echo \"ok\\n\";", 'peer-echo.php');
+        $this->assertInstanceOf(\PHPCfg\Script::class, $script);
+        $this->assertNotEmpty($script->main->cfg->children);
+
+        $arith = $cfgParser->parse('<?php $a = 1 + 2; echo $a;', 'peer-arith.php');
+        $this->assertInstanceOf(\PHPCfg\Script::class, $arith);
+        $this->assertGreaterThanOrEqual(2, count($arith->main->cfg->children));
     }
 
     public function testM5DriverHostDefinesRuntimeParseSpineProps(): void
@@ -40,12 +92,10 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString("'parser'", $chunk);
         $this->assertStringContainsString("'confusableBuiltinTypeHintCheck'", $chunk);
         $this->assertStringContainsString('m5ArgvIdentityParsePrepare', $chunk);
-        // M5 host must not take the SELFHOST_AOT mode-only shortcut (#26756 SEGV).
         $this->assertMatchesRegularExpression(
             '/M5_DRIVER_HOST.*!\\$m5Host|!\\$m5Host.*SELFHOST_AOT|&&\\s*!\\$m5Host/s',
             $chunk
         );
-        // PHPCfg\Parser peer slots for C-floor wiring (#27426).
         $this->assertStringContainsString("'phpcfg\\\\parser'", $source);
         $this->assertStringContainsString("'astParser'", $source);
         $this->assertStringContainsString('astparser', $source);
@@ -102,21 +152,29 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $force = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5PhpCfgParser.php');
         $this->assertStringContainsString('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT', $force);
         $this->assertStringContainsString('PHPCfg\\Parser::parse', $force);
+        $this->assertFileExists($root.'/lib/JIT/RuntimeParseM5AstPeer.php');
+        $peerForce = (string) file_get_contents($root.'/lib/JIT/RuntimeParseM5AstPeer.php');
+        $this->assertStringContainsString('M5ParserAstPeer', $peerForce);
+        $this->assertStringContainsString('ensureMethods', $peerForce);
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
         $this->assertStringContainsString('RuntimeParseM5Native.php', $jit);
         $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $jit);
         $this->assertStringContainsString('RuntimeParseM5PhpCfgParser.php', $jit);
         $this->assertStringContainsString('RuntimeParseM5PhpCfgParser::ensureParse', $jit);
-        // Within compileM3EmitTuRuntimeSpineMethodsForRealLowering, force-include precedes C-floor.
+        $this->assertStringContainsString('RuntimeParseM5AstPeer.php', $jit);
+        $this->assertStringContainsString('RuntimeParseM5AstPeer::ensureMethods', $jit);
+        $this->assertStringContainsString('M5ParserAstPeer.php', $jit);
         $spineFn = strpos($jit, 'function compileM3EmitTuRuntimeSpineMethodsForRealLowering');
         $this->assertNotFalse($spineFn);
         $spineChunk = substr($jit, $spineFn, 8000);
+        $peerPos = strpos($spineChunk, 'RuntimeParseM5AstPeer::ensureMethods');
         $forcePos = strpos($spineChunk, 'RuntimeParseM5PhpCfgParser::ensureParse');
         $floorPos = strpos($spineChunk, 'RuntimeParseM5Native::emitFunction');
+        $this->assertNotFalse($peerPos, 'ensureMethods must be wired in spine real-lower');
         $this->assertNotFalse($forcePos, 'ensureParse must be wired in spine real-lower');
         $this->assertNotFalse($floorPos, 'C-floor emit must remain in spine real-lower');
+        $this->assertLessThan($forcePos, $peerPos, 'Peer NestedJIT must precede Parser NestedJIT');
         $this->assertLessThan($floorPos, $forcePos, 'Parser NestedJIT must precede C-floor parse emit');
-        // M5 must stub NestedJIT of parse and emit C-floor instead.
         $stubPos = strpos($jit, "\$emitHelperStubMethods = array_merge(\$emitHelperStubMethods, [\n                    'parse'");
         if (false === $stubPos) {
             $stubPos = strpos($jit, "'parse',\n                    'initparsepipeline'");
@@ -143,7 +201,6 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertNotFalse($m5Pos);
         $this->assertNotFalse($floorPos);
         $this->assertLessThan($floorPos, $m5Pos, 'M5 gate must wrap C-floor emit');
-        // M5 C-floor must be consulted before void-stub short-circuit (#26756).
         if (false !== $stubPos) {
             $this->assertLessThan($stubPos, $floorPos, 'M5 C-floor must run before void-stub gate');
         }
