@@ -59,9 +59,12 @@ final class JitIsResource
         } else {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'is_resource_filter_restore_cont');
         }
-        $isFilter = $context->builder->call(
-            $context->lookupFunction('__compiler_is_stream_filter_resource'),
-            $handleLong
+        // NestedJIT may skip stream filter/bucket ABI bodies (#27156).
+        $isFilter = self::callUnaryI32OrZero(
+            $context,
+            '__compiler_is_stream_filter_resource',
+            $handleLong,
+            $zeroI32
         );
         $filterOk = $context->builder->icmp(Builder::INT_NE, $isFilter, $zeroI32);
         $filterTrue = BasicBlockHelper::append($context, 'is_resource_filter_true');
@@ -72,9 +75,11 @@ final class JitIsResource
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($bucketProbe);
-        $isBucket = $context->builder->call(
-            $context->lookupFunction('__compiler_is_bucket_resource'),
-            $handleLong
+        $isBucket = self::callUnaryI32OrZero(
+            $context,
+            '__compiler_is_bucket_resource',
+            $handleLong,
+            $zeroI32
         );
         $bucketOk = $context->builder->icmp(Builder::INT_NE, $isBucket, $zeroI32);
         $brigadeProbe = BasicBlockHelper::append($context, 'is_resource_brigade_probe');
@@ -86,9 +91,11 @@ final class JitIsResource
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($brigadeProbe);
-        $isBrigade = $context->builder->call(
-            $context->lookupFunction('__compiler_is_brigade_resource'),
-            $handleLong
+        $isBrigade = self::callUnaryI32OrZero(
+            $context,
+            '__compiler_is_brigade_resource',
+            $handleLong,
+            $zeroI32
         );
         $brigadeOk = $context->builder->icmp(Builder::INT_NE, $isBrigade, $zeroI32);
         $brigadeTrue = BasicBlockHelper::append($context, 'is_resource_brigade_true');
@@ -99,9 +106,11 @@ final class JitIsResource
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($streamProbe);
-        $ret = $context->builder->call(
-            $context->lookupFunction('__compiler_is_resource'),
-            $handleLong
+        $ret = self::callUnaryI32OrZero(
+            $context,
+            '__compiler_is_resource',
+            $handleLong,
+            $zeroI32
         );
         $streamOk = $context->builder->icmp(Builder::INT_EQ, $ret, $oneI32);
         $streamResult = $context->builder->select($streamOk, $trueVal, $falseVal);
@@ -116,5 +125,20 @@ final class JitIsResource
         $phi->addIncoming($streamResult, $streamEnd);
 
         return $phi;
+    }
+
+    private static function callUnaryI32OrZero(
+        Context $context,
+        string $abiName,
+        Value $handleLong,
+        Value $zeroI32
+    ): Value {
+        $fn = $context->module->getNamedFunction($abiName);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            return $zeroI32;
+        }
+        $context->registerFunction($abiName, $fn);
+
+        return $context->builder->call($fn, $handleLong);
     }
 }

@@ -139,6 +139,8 @@ final class JitStreamLibcHandleKernel
         $context->builder->branchIf($isStdout, $stdoutBb, $afterStdout);
 
         $context->builder->positionAtEnd($stdoutBb);
+        // Nested helper compile can reach resolve before StreamGlobalsJit::implement (#27156).
+        StreamGlobalsJit::ensureLibcStdio($context);
         $stdoutGlobal = $context->module->getNamedGlobal('stdout');
         $stdoutPtr = $context->builder->load($context->builder->pointerCast($stdoutGlobal, $i8p->pointerType(0)));
         $context->builder->returnValue($stdoutPtr);
@@ -150,6 +152,7 @@ final class JitStreamLibcHandleKernel
         $context->builder->branchIf($isStderr, $stderrBb, $afterStderr);
 
         $context->builder->positionAtEnd($stderrBb);
+        StreamGlobalsJit::ensureLibcStdio($context);
         $stderrGlobal = $context->module->getNamedGlobal('stderr');
         $stderrPtr = $context->builder->load($context->builder->pointerCast($stderrGlobal, $i8p->pointerType(0)));
         $context->builder->returnValue($stderrPtr);
@@ -161,6 +164,7 @@ final class JitStreamLibcHandleKernel
         $context->builder->branchIf($isZero, $zeroBb, $tableBb);
 
         $context->builder->positionAtEnd($zeroBb);
+        StreamGlobalsJit::ensureLibcStdio($context);
         $zeroStderrGlobal = $context->module->getNamedGlobal('stderr');
         $zeroStderrPtr = $context->builder->load($context->builder->pointerCast($zeroStderrGlobal, $i8p->pointerType(0)));
         $context->builder->returnValue($zeroStderrPtr);

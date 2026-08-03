@@ -66,11 +66,13 @@ final class LateStaticBindingHelper
 
     public static function operandNeedsRuntimeClassResolution(Operand $classOp, Context $context): bool
     {
-        if (!self::useRuntimeLateStatic($context)) {
-            return false;
-        }
+        // Variable classname (`new $class`) needs runtime lookup in EMBED JIT and AOT (#27156).
         if (!$classOp instanceof Operand\Literal) {
             return true;
+        }
+        // self/static/parent literals only need runtime LSB under standalone/AOT.
+        if (!self::useRuntimeLateStatic($context)) {
+            return false;
         }
         $lc = strtolower(ltrim($classOp->value, '\\'));
 
