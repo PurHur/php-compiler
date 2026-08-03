@@ -1263,6 +1263,9 @@ class Context {
         $this->functionProxies['datetimezone::getoffset'] = new Call\DateTimeZoneGetOffset();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
+        // finfo::__construct / finfo::file — thin AOT MIME sniff (#27196, re-#3366).
+        $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
+        $this->functionProxies['finfo::file'] = new Call\FinfoFile();
         // Dom\XMLDocument::createFromString — avoid ExternalMethod silent NULL (#27108).
         if (CompilerVersion::supportsDomLivingStandardNamespace()) {
             $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();

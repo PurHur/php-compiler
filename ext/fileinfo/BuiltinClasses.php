@@ -6,12 +6,14 @@ namespace PHPCompiler\ext\fileinfo;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context as JitContext;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmString;
+use PHPLLVM\Value;
 
 /**
  * Register finfo builtin class (php-src ext/fileinfo/fileinfo.stub.php; #3366).
@@ -81,6 +83,11 @@ final class FinfoConstruct extends VmClassMethod
         $object->constructed = true;
         VmFinfo::bind($object, $flags);
     }
+
+    public function call(JitContext $context, JITVariable ...$args): Value
+    {
+        return (new \PHPCompiler\JIT\Call\FinfoConstruct())->call($context, ...$args);
+    }
 }
 
 final class FinfoFileMethod extends VmClassMethod
@@ -112,6 +119,11 @@ final class FinfoFileMethod extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+
+    public function call(JitContext $context, JITVariable ...$args): Value
+    {
+        return JitFinfoFile::invokeMethod($context, ...$args);
     }
 }
 

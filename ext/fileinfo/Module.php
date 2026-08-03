@@ -12,7 +12,7 @@ use PHPCompiler\VM;
  * fileinfo extension module entry (php-src ext/fileinfo/fileinfo.c; issue #3366).
  *
  * PHP-in-PHP MIME sniff via {@see VmFinfo} / {@see \PHPCompiler\ext\standard\VmMime}.
- * JIT/AOT deferred (VM-only v1); advertised as {@code fileinfo}.
+ * JIT/AOT: {@see JitFinfoFile} / {@see \PHPCompiler\ext\standard\JitMimeContentType} (#27196).
  */
 class Module extends ModuleAbstract
 {

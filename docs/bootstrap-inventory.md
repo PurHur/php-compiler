@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6912 |
-| Phase A inventory files (M2 ratio SSOT) | 6912 |
+| PHP files on vm.php path | 6917 |
+| Phase A inventory files (M2 ratio SSOT) | 6917 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22256 |
+| Source constructs flagged (warnings) | 22266 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -579,7 +579,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ffi/VmFFI.php` | 0 | 102 |
 | `ext/fileinfo/BuiltinClasses.php` | 0 | 7 |
 | `ext/fileinfo/FileinfoConstants.php` | 0 | 1 |
+| `ext/fileinfo/FinfoFileJitHelper.php` | 0 | 1 |
 | `ext/fileinfo/FinfoSerializeDeny.php` | 0 | 3 |
+| `ext/fileinfo/JitFinfoFile.php` | 0 | 3 |
 | `ext/fileinfo/Module.php` | 0 | 7 |
 | `ext/fileinfo/VmFinfo.php` | 0 | 3 |
 | `ext/fileinfo/finfo_buffer.php` | 0 | 3 |
@@ -5157,6 +5159,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FilterInputArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputTypeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterVarArrayRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/FinfoFileRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FputcsvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsDirRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsGlobVecRuntime.php` | 0 | 1 |
@@ -5772,6 +5775,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/FiberStart.php` | 0 | 1 |
 | `lib/JIT/Call/FiberSuspendStatic.php` | 0 | 1 |
 | `lib/JIT/Call/FiberThrow.php` | 0 | 1 |
+| `lib/JIT/Call/FinfoConstruct.php` | 0 | 2 |
+| `lib/JIT/Call/FinfoFile.php` | 0 | 1 |
 | `lib/JIT/Call/GeneratorCurrent.php` | 0 | 1 |
 | `lib/JIT/Call/GeneratorGetReturn.php` | 0 | 1 |
 | `lib/JIT/Call/GeneratorKey.php` | 0 | 1 |
@@ -5914,7 +5919,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 133 |
+| `lib/JIT/Context.php` | 0 | 135 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -8853,7 +8858,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 24 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -9445,7 +9450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomNodeListItemUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/dom/JitDomNodeListLength.php`
 
@@ -9530,10 +9535,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomXPathQueryUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 134)
-- new DOMDocument (line 183)
-- new DOMXPath (line 189)
-- 6 class method(s)
+- new JITVariable (line 148)
+- new DOMDocument (line 197)
+- new DOMXPath (line 203)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/JitDomXmlDocumentCreateFromString.php`
@@ -11123,18 +11128,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/fileinfo/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new FinfoConstruct (line 32)
-- new ArgumentCountError (line 66)
-- new ArgumentCountError (line 97)
-- new ArgumentCountError (line 129)
-- new ArgumentCountError (line 156)
-- 6 class method(s)
+- new ClassEntry (line 32)
+- new FinfoConstruct (line 34)
+- new ArgumentCountError (line 68)
+- new ArgumentCountError (line 104)
+- new ArgumentCountError (line 141)
+- new ArgumentCountError (line 168)
+- 8 class method(s)
 
 ### `ext/fileinfo/FileinfoConstants.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/fileinfo/FinfoFileJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/fileinfo/FinfoSerializeDeny.php`
 
@@ -11142,6 +11152,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 15)
 - new Exception (line 22)
 - 4 class method(s)
+
+### `ext/fileinfo/JitFinfoFile.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 57)
+- 3 class method(s)
 
 ### `ext/fileinfo/Module.php`
 
@@ -45269,6 +45286,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/FinfoFileRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/FputcsvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48477,6 +48499,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Call/FinfoConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 1 class method(s)
+
+### `lib/JIT/Call/FinfoFile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/GeneratorCurrent.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49410,20 +49443,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetTransitions (line 1259)
 - new Call\DateTimeZoneGetName (line 1261)
 - new Call\DateTimeZoneGetOffset (line 1263)
-- new Call\DomXmlDocumentCreateFromString (line 1268)
-- new Result (line 1635)
-- new Result (line 1657)
-- new Variable (line 2335)
-- new Variable (line 2472)
-- new Variable (line 2726)
-- new Variable (line 2784)
-- new VMVariable (line 2946)
-- new VMVariable (line 2962)
-- new VMVariable (line 2968)
-- new VMVariable (line 2974)
-- new VMVariable (line 2985)
-- new Variable (line 3015)
-- new Variable (line 3060)
+- new Call\FinfoConstruct (line 1267)
+- new Call\FinfoFile (line 1268)
+- new Call\DomXmlDocumentCreateFromString (line 1271)
+- new Result (line 1638)
+- new Result (line 1660)
+- new Variable (line 2338)
+- new Variable (line 2475)
+- new Variable (line 2729)
+- new Variable (line 2787)
+- new VMVariable (line 2949)
+- new VMVariable (line 2965)
+- new VMVariable (line 2971)
+- new VMVariable (line 2977)
+- new VMVariable (line 2988)
+- new Variable (line 3018)
+- new Variable (line 3063)
 - 106 class method(s)
 - 32 closure(s)
 
