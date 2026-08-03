@@ -806,6 +806,8 @@ class Context {
             'phpc_ceil_kernel',
             'phpc_cos_kernel',
             'phpc_cosh_kernel',
+            'phpc_deg2rad_kernel',
+            'phpc_rad2deg_kernel',
             'phpc_floor_kernel',
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',

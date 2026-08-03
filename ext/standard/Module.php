@@ -686,6 +686,8 @@ class Module extends ModuleAbstract
             new phpc_ceil_kernel(),
             new phpc_cos_kernel(),
             new phpc_cosh_kernel(),
+            new phpc_deg2rad_kernel(),
+            new phpc_rad2deg_kernel(),
             new phpc_floor_kernel(),
             new phpc_sqrt_kernel(),
             new sys_get_temp_dir(),
