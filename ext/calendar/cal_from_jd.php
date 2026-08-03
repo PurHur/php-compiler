@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * cal_from_jd() — Julian day to calendar breakdown (php-src ext/calendar/calendar.c; #7252).
+ * cal_from_jd() — Julian day to calendar breakdown (php-src ext/calendar/calendar.c; #7252 / #27359).
  */
 final class cal_from_jd extends Internal
 {
@@ -39,6 +39,12 @@ final class cal_from_jd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('cal_from_jd() is not implemented for JIT in this compiler build (issue #7252)');
+        if (2 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'cal_from_jd() expects exactly 2 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitCalFromJd::invoke($context, ...$args);
     }
 }
