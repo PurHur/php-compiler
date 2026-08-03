@@ -6,15 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitDeg2radKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for deg2rad() via Deg2radJitHelper PHP (#15143, #26996).
+ * JIT/AOT link for deg2rad() via Deg2radJitHelper PHP (#15143, #27400).
  *
- * Embed + thin standalone AOT: {@see Deg2radJitHelper} via {@see JitVmHelperLink}.
- * Nested helper compile: fmul leaf without re-entering Deg2radJitHelper / VmMath.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (Frexp #22575 / Modf #22519 shape).
+ * NestedJIT no longer needs a dedicated fmul kernel — helper inlines the VmMath formula.
  * php-src: ext/standard/math.c — PHP_FUNCTION(deg2rad)
  */
 final class MathDeg2rad
@@ -44,10 +42,6 @@ final class MathDeg2rad
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitDeg2radKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -58,10 +52,6 @@ final class MathDeg2rad
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_DEG2RAD);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_DEG2RAD, $probe);
@@ -79,7 +69,7 @@ final class MathDeg2rad
             self::DEG2RAD_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#26996'
+            '#27400'
         );
     }
 }
