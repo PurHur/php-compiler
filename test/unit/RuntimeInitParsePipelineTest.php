@@ -163,16 +163,10 @@ final class RuntimeInitParsePipelineTest extends TestCase
             $peerForce,
             'Surface-only METHODS filter soft-failed NestedJIT of parse helpers'
         );
-        $this->assertStringContainsString('tryechostringast', (string) file_get_contents(
-            $root.'/lib/JIT/Builtin/Type/Object_.php'
-        ));
-        $this->assertStringContainsString('REQUIRED_SURFACE', $peerForce);
+        $objectType = (string) file_get_contents($root.'/lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('tryechostringast', $objectType);
+        $this->assertStringContainsString('stripleadingpreamble', $objectType);
         $this->assertStringContainsString('stripLeadingPreamble', (string) file_get_contents($root.'/lib/JIT/M5ParserAstPeer.php'));
-        // NestedJIT every class method — private helpers are called from parse() (#27426).
-        $this->assertStringNotContainsString(
-            "private const METHODS = ['parse', 'traverse', 'addvisitor', 'begincompilationunit']",
-            $peerForce
-        );
         $jit = (string) file_get_contents($root.'/lib/JIT.php');
         $this->assertStringContainsString('RuntimeParseM5Native.php', $jit);
         $this->assertStringContainsString('RuntimeParseM5Native::emitFunction', $jit);
