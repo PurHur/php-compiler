@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6901 |
-| Phase A inventory files (M2 ratio SSOT) | 6901 |
+| PHP files on vm.php path | 6904 |
+| Phase A inventory files (M2 ratio SSOT) | 6904 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22240 |
+| Source constructs flagged (warnings) | 22244 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -120,14 +120,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bz2/bzopen.php` | 0 | 1 |
 | `ext/bz2/bzread.php` | 0 | 1 |
 | `ext/bz2/bzwrite.php` | 0 | 1 |
+| `ext/calendar/CalDaysInMonthJitHelper.php` | 0 | 1 |
 | `ext/calendar/CalendarArgs.php` | 0 | 1 |
 | `ext/calendar/CalendarConstants.php` | 0 | 1 |
 | `ext/calendar/CalendarFunction.php` | 0 | 1 |
 | `ext/calendar/CalendarTables.php` | 0 | 1 |
+| `ext/calendar/JitCalDaysInMonth.php` | 0 | 1 |
 | `ext/calendar/Module.php` | 0 | 20 |
 | `ext/calendar/VmCalendar.php` | 0 | 11 |
 | `ext/calendar/VmJewishFrenchCalendar.php` | 0 | 1 |
-| `ext/calendar/cal_days_in_month.php` | 0 | 2 |
+| `ext/calendar/cal_days_in_month.php` | 0 | 3 |
 | `ext/calendar/cal_from_jd.php` | 0 | 2 |
 | `ext/calendar/cal_info.php` | 0 | 2 |
 | `ext/calendar/cal_to_jd.php` | 0 | 2 |
@@ -5076,6 +5078,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bz2Runtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bz2StreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bz2StreamRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/CalDaysInMonthRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
@@ -7456,6 +7459,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/calendar/CalDaysInMonthJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/calendar/CalendarArgs.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7475,6 +7483,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/calendar/JitCalDaysInMonth.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/calendar/Module.php`
 
@@ -7524,6 +7537,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 72)
 - 4 class method(s)
 
 ### `ext/calendar/cal_from_jd.php`
@@ -40094,7 +40108,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/JitTokenName.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/tokenizer/LanguageScanner.php`
 
@@ -44286,72 +44300,72 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 13746)
 - new Variable (line 13767)
 - new Variable (line 13793)
-- new Variable (line 13820)
-- new Variable (line 13854)
-- new Variable (line 13875)
-- new CompileError (line 14678)
-- new CompileError (line 14807)
-- new Variable (line 14864)
-- new Variable (line 14898)
-- new Variable (line 15360)
-- new Variable (line 15380)
-- new Variable (line 15401)
-- new Variable (line 15521)
-- new Variable (line 15562)
-- new Variable (line 15672)
-- new Variable (line 15696)
-- new Variable (line 15706)
-- new Variable (line 15891)
-- new Variable (line 15909)
-- new Variable (line 15967)
-- new Variable (line 15994)
-- new Variable (line 16020)
-- new Variable (line 16359)
-- new Variable (line 16733)
-- new Variable (line 16763)
-- new Variable (line 16782)
-- new Variable (line 16812)
-- new Variable (line 16849)
-- new Variable (line 16897)
-- new Variable (line 16940)
-- new VM\Variable (line 17415)
-- new Variable (line 17449)
-- new Variable (line 17501)
-- new Variable (line 17519)
-- new Variable (line 17538)
-- new Variable (line 17545)
-- new OpCode (line 17567)
-- new Variable (line 17568)
-- new Variable (line 17828)
-- new Variable (line 17884)
-- new Variable (line 17922)
-- new OpCode (line 17936)
-- new Variable (line 17937)
-- new Variable (line 17996)
-- new OpCode (line 18017)
-- new Variable (line 18018)
-- new Variable (line 18117)
-- new Variable (line 18139)
-- new Variable (line 18207)
-- new Operand\Literal (line 18216)
-- new Variable (line 18231)
-- new Variable (line 18546)
-- new VM\PropertyIsInitializedHandler (line 18643)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18699)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19135)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19347)
-- new JIT\Call\VmCoerceVariableToString (line 19474)
-- new JIT\Call\NoOpConstruct (line 19646)
-- new JIT\Call\IncludePathResolverResolve (line 19816)
-- new Operand\Literal (line 19903)
-- new Operand\Literal (line 19906)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19949)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20096)
-- new VM (line 21195)
-- new VM\Variable (line 21204)
-- new Variable (line 21225)
-- new Variable (line 21271)
-- new Variable (line 21979)
+- new Variable (line 13818)
+- new Variable (line 13850)
+- new Variable (line 13871)
+- new CompileError (line 14674)
+- new CompileError (line 14803)
+- new Variable (line 14860)
+- new Variable (line 14894)
+- new Variable (line 15356)
+- new Variable (line 15376)
+- new Variable (line 15397)
+- new Variable (line 15517)
+- new Variable (line 15558)
+- new Variable (line 15668)
+- new Variable (line 15692)
+- new Variable (line 15702)
+- new Variable (line 15887)
+- new Variable (line 15905)
+- new Variable (line 15963)
+- new Variable (line 15990)
+- new Variable (line 16016)
+- new Variable (line 16355)
+- new Variable (line 16729)
+- new Variable (line 16759)
+- new Variable (line 16778)
+- new Variable (line 16808)
+- new Variable (line 16845)
+- new Variable (line 16893)
+- new Variable (line 16936)
+- new VM\Variable (line 17411)
+- new Variable (line 17445)
+- new Variable (line 17497)
+- new Variable (line 17515)
+- new Variable (line 17534)
+- new Variable (line 17541)
+- new OpCode (line 17563)
+- new Variable (line 17564)
+- new Variable (line 17824)
+- new Variable (line 17880)
+- new Variable (line 17918)
+- new OpCode (line 17932)
+- new Variable (line 17933)
+- new Variable (line 17992)
+- new OpCode (line 18013)
+- new Variable (line 18014)
+- new Variable (line 18113)
+- new Variable (line 18135)
+- new Variable (line 18203)
+- new Operand\Literal (line 18212)
+- new Variable (line 18227)
+- new Variable (line 18542)
+- new VM\PropertyIsInitializedHandler (line 18639)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18695)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19131)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19343)
+- new JIT\Call\VmCoerceVariableToString (line 19470)
+- new JIT\Call\NoOpConstruct (line 19642)
+- new JIT\Call\IncludePathResolverResolve (line 19812)
+- new Operand\Literal (line 19899)
+- new Operand\Literal (line 19902)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 19945)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20092)
+- new VM (line 21191)
+- new VM\Variable (line 21200)
+- new Variable (line 21221)
+- new Variable (line 21267)
+- new Variable (line 21975)
 - 419 class method(s)
 - 20 closure(s)
 
@@ -44810,6 +44824,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
 - 8 closure(s)
+
+### `lib/JIT/Builtin/CalDaysInMonthRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/CallArgv.php`
 
