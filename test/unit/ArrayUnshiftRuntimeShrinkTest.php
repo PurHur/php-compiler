@@ -10,21 +10,20 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_unshift() NestedJIT via JitVmHelperLink::ensureCompiled (#22818 / peer #22801).
+ * array_unshift() call-site HashTableUnshiftPrepend (#27226) — NestedJIT unshiftFromList avoided.
  */
 final class ArrayUnshiftRuntimeShrinkTest extends TestCase
 {
-    public function testArrayUnshiftRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayUnshiftRuntimeUsesCallSitePrependNotNestedIterate(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayUnshiftRuntime.php');
-        $this->assertStringContainsString('ArrayUnshiftJitHelper', $runtime);
+        $this->assertStringContainsString('HashTableUnshiftPrepend', $runtime);
         $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringContainsString('#27226', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('parseAndCompile', $runtime);
         $this->assertStringNotContainsString('new JIT(', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::unshift', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -35,6 +34,9 @@ final class ArrayUnshiftRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_unshift.php');
         $this->assertStringContainsString('ArrayUnshiftRuntime::unshift', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::unshift', $builtin);
+
+        $jitHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayUnshiftJitHelper.php');
+        $this->assertStringContainsString('function unshiftFromList', $jitHelper);
     }
 
     public function testArrayUnshiftJitHelperPrependsValues(): void

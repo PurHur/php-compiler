@@ -293,6 +293,22 @@ final class ObjectInstancePropertyLlvm
         $context = $object->jitContext();
         $destPtr = JitValueBox::pointer($context, $destSlot);
         if (Variable::TYPE_VALUE === $propertyType) {
+            // Already-boxed fetch (runtime class dispatch / empty-prop foreach dummy)
+            // has no objectPropertySlot — copy the __value__ rather than load_value_slot (#27226).
+            if (null === $fetched->objectPropertySlot) {
+                if (Variable::TYPE_VALUE === $fetched->type && null !== $fetched->value) {
+                    JitValueBox::copyFromPointer(
+                        $context,
+                        $destSlot,
+                        JitValueBox::valuePtrFromVariable($context, $fetched)
+                    );
+
+                    return;
+                }
+                throw new \LogicException(
+                    'boxFetchedPropertyIntoValue TYPE_VALUE without objectPropertySlot (#27226)'
+                );
+            }
             $context->builder->call(
                 $context->lookupFunction('__object__load_value_slot'),
                 $fetched->objectPropertySlot,

@@ -55,22 +55,31 @@ final class JitArrayPush
             $context->builder->structGep($loaded, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
-        $isArray = $context->builder->icmp(
+        // Mask IS_REFCOUNTED — HT/array boxes store TYPE_ARRAY|0x80 (#27226, peer HashTableReadLlvm).
+        // __value__writeHashtable tags TYPE_HASHTABLE (JIT), not VM TYPE_ARRAY (#27226).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isVmArray = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_ARRAY, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_ARRAY & 0x7f, false)
         );
+        $isJitHashtable = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isArray = $context->builder->or($isVmArray, $isJitHashtable);
         // Uninitialized boxed property slots (TYPE_UNDEFINED) and null may materialize arrays
         // like HashTableHelper::ensureHashtablePointer (#1086, bootstrap array_value_box).
         $isUndefined = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_UNDEFINED, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_UNDEFINED & 0x7f, false)
         );
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_NULL & 0x7f, false)
         );
         $canPush = $context->builder->or(
             $isArray,
