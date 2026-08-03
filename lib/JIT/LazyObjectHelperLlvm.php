@@ -97,14 +97,15 @@ final class LazyObjectHelperLlvm
         }
 
         $map = $context->structFieldMap['__object__'];
-        $i32 = $context->getTypeFromString('int32');
+        // Header flags are i8 (#27302) — icmp must not use i32 0 (module verify fails under AOT).
+        $i8 = $context->getTypeFromString('int8');
         $pending = $context->builder->load(
             $context->builder->structGep($obj, $map[VmLazyObject::FIELD_LAZY_PENDING])
         );
         $isPending = $context->builder->icmp(
             Builder::INT_NE,
             $pending,
-            $i32->constInt(0, false)
+            $i8->constInt(0, false)
         );
 
         $entry = $context->builder->getInsertBlock();
@@ -132,7 +133,7 @@ final class LazyObjectHelperLlvm
             $context->builder->structGep($obj, $map[VmLazyObject::FIELD_CLASS_ID])
         );
 
-        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
         $ghost = $context->builder->load(
             $context->builder->structGep($obj, $map[VmLazyObject::FIELD_LAZY_GHOST])
         );
@@ -160,7 +161,7 @@ final class LazyObjectHelperLlvm
             $isGhost = $context->builder->icmp(
                 Builder::INT_NE,
                 $ghost,
-                $i32->constInt(0, false)
+                $i8->constInt(0, false)
             );
             $ghostBlock = $fn->appendBasicBlock('lazy_init_ghost_'.$idx);
             $proxyBlock = $fn->appendBasicBlock('lazy_init_proxy_body_'.$idx);
@@ -169,12 +170,15 @@ final class LazyObjectHelperLlvm
             $context->builder->positionAtEnd($ghostBlock);
             $objectType->resetInstancePropertySlots($obj, $classIdVal);
             $objectType->applyLazyGhostPropertyDefaults($obj, $classIdVal);
+            // Detach before initializer so nested access cannot re-enter (#27302 / zend_lazy_objects.c).
+            self::emitDetachLazyFlags($context, $obj);
             $thisVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
             $thisVar->addref();
             $proxy->call($context, $thisVar);
             $context->builder->branch($done);
 
             $context->builder->positionAtEnd($proxyBlock);
+            self::emitDetachLazyFlags($context, $obj);
             $proxyThis = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
             $proxyThis->addref();
             $result = $proxy->call($context, $proxyThis);
@@ -203,10 +207,26 @@ final class LazyObjectHelperLlvm
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+        // Idempotent — already cleared before initializer; keep constructed bit.
         $context->builder->store(
             $context->getTypeFromString('int8')->constInt(0, false),
             $context->builder->structGep($obj, $map[VmLazyObject::FIELD_LAZY_PENDING])
         );
         $objectType->markObjectConstructed($obj);
+    }
+
+    /** Mark object non-lazy before calling the initializer (Zend detach semantics). */
+    private static function emitDetachLazyFlags(Context $context, Value $obj): void
+    {
+        $map = $context->structFieldMap['__object__'];
+        $i8 = $context->getTypeFromString('int8');
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->structGep($obj, $map[VmLazyObject::FIELD_LAZY_PENDING])
+        );
+        $context->builder->store(
+            $context->getTypeFromString('int32')->constInt(-1, true),
+            $context->builder->structGep($obj, $map[VmLazyObject::FIELD_LAZY_INIT_INDEX])
+        );
     }
 }

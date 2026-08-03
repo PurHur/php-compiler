@@ -56,6 +56,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'arrayobject_foreach.phpt',
         'spl_outer_iterators_ita.phpt',
         'weakreference_main_unset.phpt',
+        'reflection_new_lazy_ghost_property.phpt',
     ];
 
     /**

@@ -18962,14 +18962,30 @@ class JIT {
                 '__construct' === $methodLc
                 && $this->context->functionIsRegistered('exception::__construct')
             ) {
-                $ctorProxy = 'exception::__construct';
+                // Typed `object` receivers (e.g. lazy ghost initializer `$obj->__construct()`)
+                // must use runtime class-id dispatch — do not bind Exception::__construct (#27302).
+                $ctorProxy = null;
                 if (
                     '' !== $declaringClassLc
+                    && 'object' !== $declaringClassLc
                     && $this->context->functionIsRegistered($declaringClassLc.'::__construct')
                 ) {
                     $ctorProxy = $declaringClassLc.'::__construct';
                 } elseif (
                     '' !== $declaringClassLc
+                    && 'object' !== $declaringClassLc
+                    && (
+                        \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
+                            $declaringClassLc,
+                            \PHPCompiler\ext\standard\ThrowableManifest::LC_EXCEPTION
+                        )
+                        || \PHPCompiler\ext\standard\ThrowableManifest::LC_EXCEPTION === $declaringClassLc
+                    )
+                ) {
+                    $ctorProxy = 'exception::__construct';
+                } elseif (
+                    '' !== $declaringClassLc
+                    && 'object' !== $declaringClassLc
                     && (
                         \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
                             $declaringClassLc,
@@ -18981,10 +18997,12 @@ class JIT {
                 ) {
                     $ctorProxy = 'error::__construct';
                 }
-                $this->context->scope->toCall = $this->context->resolveFunctionProxy($ctorProxy);
-                $this->context->scope->args = [$receiverVar];
+                if (null !== $ctorProxy) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($ctorProxy);
+                    $this->context->scope->args = [$receiverVar];
 
-                return;
+                    return;
+                }
             }
             if ('object' === $declaringClassLc || '' === $declaringClassLc) {
                 // childNodes/attributes temps often lower as :object; ensure DOM list item() /
@@ -19025,7 +19043,11 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\document::'.$methodLc);
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::'.$methodLc);
                 }
-                $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
+                // `__construct` on typed object: use safe new-construct candidates only —
+                // LimitIteratorConstruct et al. throw while emitting every switch arm (#27302 / #27156).
+                $runtimeCandidates = ('__construct' === $methodLc)
+                    ? $this->buildRuntimeNewConstructCandidatesByClassId()
+                    : $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
                 if ([] !== $runtimeCandidates) {
                     $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
                         $receiverVar,
