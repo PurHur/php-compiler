@@ -2810,6 +2810,7 @@ require_once __DIR__.'/../../../ext/standard/NaturalSortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NetInterfacesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NetworkServicesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/NetworkServicesNameLookupJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/NetworkServicesNameLookupThinAot.php';
 require_once __DIR__.'/../../../ext/standard/NextafterJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Nl2brJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ObGzhandlerJitHelper.php';
