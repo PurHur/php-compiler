@@ -26992,11 +26992,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 256)
-- new ArgumentCountError (line 259)
-- new ArgumentCountError (line 289)
-- new ArgumentCountError (line 292)
-- 14 class method(s)
+- new ArgumentCountError (line 257)
+- new ArgumentCountError (line 260)
+- new ArgumentCountError (line 348)
+- new ArgumentCountError (line 351)
+- 16 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
 
@@ -29238,7 +29238,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStrtotime.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/JitStrtr.php`
 
