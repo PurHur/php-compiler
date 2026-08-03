@@ -18745,6 +18745,13 @@ class JIT {
                 ) {
                     $className = 'ReflectionEnum';
                     $declaringClassLc = 'reflectionenum';
+                } elseif (
+                    'datetimezone' === $receiverHintLc
+                    && $this->context->functionIsRegistered('datetimezone::getname')
+                ) {
+                    // Prefer DateTimeZone over ReflectionAttribute fallback (#27307).
+                    $className = 'DateTimeZone';
+                    $declaringClassLc = 'datetimezone';
                 } elseif ($this->context->functionIsRegistered('reflectionattribute::getname')) {
                     $className = 'ReflectionAttribute';
                     $declaringClassLc = 'reflectionattribute';
