@@ -108,4 +108,42 @@ fi
 
 echo "bootstrap-gen0-driver-functional-smoke: OK — committed driver compiled never-seen script; stdout matches Zend"
 echo "bootstrap-gen0-driver-functional-smoke: artifact=${OUT}"
+
+# Capability check (#27426): declare + docblock + echo (examples/000-HelloWorld) must work —
+# never-seen echo alone stayed green while HelloWorld failed parseAndCompile.
+HW_SRC="${ROOT}/examples/000-HelloWorld/example.php"
+HW_OUT="${WORKDIR}/helloworld-${TOKEN}.bin"
+HW_NATIVE="${WORKDIR}/helloworld-${TOKEN}.native.out"
+if [[ ! -f "${HW_SRC}" ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — missing ${HW_SRC}" >&2
+  exit 1
+fi
+rm -f "${HW_OUT}" "${HW_NATIVE}"
+set +e
+hw_log="$(
+  env PHP_COMPILER_REPO_ROOT="${ROOT}" "${DRIVER}" -o "${HW_OUT}" "${HW_SRC}" 2>&1
+)"
+hw_rc=$?
+set -e
+if [[ "${hw_rc}" -ne 0 || ! -x "${HW_OUT}" ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — HelloWorld capability (#27426) driver exit ${hw_rc}" >&2
+  printf '%s\n' "${hw_log}" | tail -n 40 >&2
+  exit 1
+fi
+set +e
+"${HW_OUT}" >"${HW_NATIVE}" 2>"${WORKDIR}/helloworld.native.err"
+hw_run=$?
+set -e
+if [[ "${hw_run}" -ne 0 ]]; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — HelloWorld binary exit ${hw_run}" >&2
+  cat "${WORKDIR}/helloworld.native.err" >&2 || true
+  exit 1
+fi
+if ! grep -qxF 'Hello World' "${HW_NATIVE}"; then
+  echo "bootstrap-gen0-driver-functional-smoke: FAILED — HelloWorld stdout mismatch (want 'Hello World')" >&2
+  od -An -tx1 "${HW_NATIVE}" | head -c 120 >&2 || true
+  echo >&2
+  exit 1
+fi
+echo "bootstrap-gen0-driver-functional-smoke: OK — HelloWorld capability (#27426)"
 exit 0

@@ -29,6 +29,8 @@ final class BootstrapGen0DriverFunctionalSmokeTest extends TestCase
         $this->assertTrue(is_executable($script), $script.' must be executable');
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('PHP_COMPILER_REPO_ROOT="${ROOT}"', $body);
+        $this->assertStringContainsString('examples/000-HelloWorld/example.php', $body);
+        $this->assertStringContainsString('#27426', $body);
     }
 
     public function testArgvDriverRefreshDoesNotClassifyBinCompileAsUserScriptAot(): void
