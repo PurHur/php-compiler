@@ -55,7 +55,7 @@ final class strpos extends Internal
     {
         $this->context = $context;
         if (!$this->requireArgCountRangeJit($context, $args, 'strpos', 2, 3)) {
-            return $context->getTypeFromString('int64')->constInt(0, false);
+            return StringStrpos::boxIntOrFalse($context, false);
         }
         $argc = count($args);
         $hayLit = JitStringArg::compileTimeLiteral($args[0]);
@@ -64,10 +64,7 @@ final class strpos extends Internal
         if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
             $pos = VmString::strpos($hayLit, $needleLit, $offsetLit);
 
-            return $context->constantFromInteger(
-                false === $pos ? StringStrpos::NOT_FOUND : $pos,
-                'int64'
-            );
+            return StringStrpos::boxIntOrFalse($context, $pos);
         }
 
         StringStrpos::ensureLinked($context);

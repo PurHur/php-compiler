@@ -22,5 +22,7 @@ final class JitStringSearchRuntimeShrinkTest extends TestCase
         $strpos = (string) file_get_contents(__DIR__.'/../../ext/standard/strpos.php');
         $this->assertStringContainsString('StringStrpos::invoke', $strpos);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrpos.php');
+        $builtin = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrpos.php');
+        $this->assertStringContainsString('VmStringCompare::findOffset', $builtin);
     }
 }

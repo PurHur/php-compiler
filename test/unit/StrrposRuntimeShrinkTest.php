@@ -14,11 +14,13 @@ final class StrrposRuntimeShrinkTest extends TestCase
     public function testStringStrrposUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrrpos.php');
-        $this->assertStringContainsString('StrrposJitHelper', $source);
+        $this->assertStringContainsString('VmStringCompare::findROffset', $source);
+        $this->assertStringContainsString('boxIntOrFalse', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrrpos.php');
 
         $strrpos = (string) file_get_contents(__DIR__.'/../../ext/standard/strrpos.php');
         $this->assertStringContainsString('StringStrrpos::invoke', $strrpos);
+        $this->assertStringContainsString('StringStrrpos::boxIntOrFalse', $strrpos);
         $this->assertStringNotContainsString('JitStrrpos::find', $strrpos);
 
         $strripos = (string) file_get_contents(__DIR__.'/../../ext/standard/strripos.php');
@@ -28,12 +30,13 @@ final class StrrposRuntimeShrinkTest extends TestCase
     public function testStrrposJitHelperDelegatesToVmString(): void
     {
         $this->assertSame(7, StrrposJitHelper::strrposArgv('hello world', 'o', 0));
-        $this->assertSame(0, StrrposJitHelper::strrposArgv('hello', 'z', 0));
+        $this->assertSame(StrrposJitHelper::NOT_FOUND, StrrposJitHelper::strrposArgv('hello', 'z', 0));
         $expected = VmString::strripos('Hello World', 'O', 0);
         $this->assertSame(
-            false === $expected ? 0 : $expected,
+            false === $expected ? StrrposJitHelper::NOT_FOUND : $expected,
             StrrposJitHelper::strriposArgv('Hello World', 'O', 0)
         );
+        $this->assertSame(0, StrrposJitHelper::strrposArgv('hello', 'h', 0));
     }
 
     public function testSpineBundleIncludesStrrposJitHelper(): void
