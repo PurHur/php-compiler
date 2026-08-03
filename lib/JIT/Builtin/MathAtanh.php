@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitAtanhKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for atanh() via AtanhJitHelper PHP (#15221).
+ * JIT/AOT link for atanh() via AtanhJitHelper PHP (#15221, #27058).
  *
- * Replaces libc `atanh` LLVM lookup in ext/standard/atanh.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see AtanhJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27005 cosh shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering AtanhJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(atanh)
  */
 final class MathAtanh
@@ -28,6 +31,8 @@ final class MathAtanh
         self::ATANH_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'atanh_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathAtanh
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitAtanhKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathAtanh
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_ATANH);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_ATANH, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_ATANH,
-            'atanh_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::ATANH_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15221'
+            '#27058'
         );
     }
 }

@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitAcoshKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for acosh() via AcoshJitHelper PHP (#15221).
+ * JIT/AOT link for acosh() via AcoshJitHelper PHP (#15221, #27058).
  *
- * Replaces libc `acosh` LLVM lookup in ext/standard/acosh.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see AcoshJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27005 cosh shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering AcoshJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(acosh)
  */
 final class MathAcosh
@@ -28,6 +31,8 @@ final class MathAcosh
         self::ACOSH_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'acosh_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathAcosh
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitAcoshKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathAcosh
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_ACOSH);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_ACOSH, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_ACOSH,
-            'acosh_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::ACOSH_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15221'
+            '#27058'
         );
     }
 }
