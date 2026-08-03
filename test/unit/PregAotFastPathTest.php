@@ -95,4 +95,21 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame('a', PregAotFastPath::matchAllPart(0));
         $this->assertSame('a', PregAotFastPath::matchAllPart(1));
     }
+
+    public function testSplitStoreWhitespaceParts(): void
+    {
+        // Host-side splitter (thin AOT uses LLVM replaceFindNext bridge, #27208).
+        $this->assertSame(3, PregAotFastPath::splitStore('/\s+/', 'a  b c', -1, 0));
+        $this->assertSame(3, PregAotFastPath::splitPartCount());
+        $this->assertSame('a', PregAotFastPath::splitPart(0));
+        $this->assertSame('b', PregAotFastPath::splitPart(1));
+        $this->assertSame('c', PregAotFastPath::splitPart(2));
+        $this->assertSame(2, PregAotFastPath::splitStore('/\s+/', 'a b', -1, 0));
+        $this->assertSame('a', PregAotFastPath::splitPart(0));
+        $this->assertSame('b', PregAotFastPath::splitPart(1));
+        $this->assertSame(1, PregAotFastPath::splitStore('/\s+/', 'a  b c', 1, 0));
+        $this->assertSame('a  b c', PregAotFastPath::splitPart(0));
+        $this->assertSame(0, PregAotFastPath::splitStore('/\s+/', '', -1, 0));
+        $this->assertSame(-1, PregAotFastPath::splitStore('/a/', 'xay', -1, 0));
+    }
 }

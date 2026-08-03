@@ -772,6 +772,19 @@ final class PregMatchRuntime
             return;
         }
 
+        // Thin standalone AOT: NestedJIT string-slot fill OOMs / empties (#27208).
+        // Int-find (replaceFindNext) + LLVM subject slices → HT (peer preg_replace #27181).
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinSplitBridge($context, $probe);
+            $built = $context->module->getNamedFunction($abiName);
+            if (null === $built) {
+                throw new \LogicException('__compiler_preg_split missing after thin bridge (#27208)');
+            }
+            $context->registerFunction($abiName, $built);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
@@ -794,37 +807,6 @@ final class PregMatchRuntime
         );
         $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
 
-        // Thin standalone AOT: splitArgv returns null + thinSplitPart* (#27080).
-        if ($context->isThinStandaloneAotMain()) {
-            $errRaw = $context->builder->call(
-                self::helperFunction($context, self::LAST_ERROR_HELPER)
-            );
-            $err = JitNestedHelperCoerce::scalarToI64($context, $errRaw, $errRaw->typeOf());
-            $hasErr = $context->builder->icmp(
-                Builder::INT_NE,
-                $err,
-                $i64->constInt(0, false)
-            );
-            $partCountRaw = $context->builder->call(
-                self::helperFunction($context, self::THIN_SPLIT_PART_COUNT)
-            );
-            $partCount = JitNestedHelperCoerce::scalarToI64(
-                $context,
-                $partCountRaw,
-                $partCountRaw->typeOf()
-            );
-            $thinBb = $fn->appendBasicBlock('preg_split_thin_fill');
-            $context->builder->branchIf($hasErr, $failBb, $thinBb);
-            $context->builder->positionAtEnd($failBb);
-            $context->builder->returnValue($htPtr->constNull());
-            $context->builder->positionAtEnd($thinBb);
-            $thinHt = self::emitThinSplitHashtableFromParts($context, $fn, $partCount);
-            $context->builder->returnValue($thinHt);
-            $context->registerFunction($abiName, $fn);
-
-            return;
-        }
-
         $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $context->builder->branchIf($isNull, $failBb, $okBb);
         $context->builder->positionAtEnd($failBb);
@@ -835,7 +817,191 @@ final class PregMatchRuntime
     }
 
     /**
+     * Thin AOT preg_split: NestedJIT finds delimiter offsets (ints); LLVM copies subject
+     * slices into a hashtable (#27208). Peer {@see implementThinReplaceBridge}.
+     *
+     * Signature: (pattern, subject, limit, flags) → __hashtable__* | null
+     */
+    private static function implementThinSplitBridge(Context $context, ?LlvmFunction $probe): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $map = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        // Ensure NestedJIT find helpers exist before emitting calls.
+        self::helperFunction($context, self::REPLACE_FIND_NEXT);
+        self::helperFunction($context, self::TAKE_LAST_REPLACE_POS);
+        self::helperFunction($context, self::TAKE_LAST_REPLACE_BODY_LEN);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                '__compiler_preg_split',
+                $context->context->functionType($htPtr, false, $strPtr, $strPtr, $i64, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('preg_split_thin_entry');
+        $initBb = $fn->appendBasicBlock('preg_split_thin_init');
+        $headBb = $fn->appendBasicBlock('preg_split_thin_head');
+        $findBb = $fn->appendBasicBlock('preg_split_thin_find');
+        $failBb = $fn->appendBasicBlock('preg_split_thin_fail');
+        $matchBb = $fn->appendBasicBlock('preg_split_thin_match');
+        $restBb = $fn->appendBasicBlock('preg_split_thin_rest');
+        $trailBb = $fn->appendBasicBlock('preg_split_thin_trail');
+        $doneBb = $fn->appendBasicBlock('preg_split_thin_done');
+
+        $context->builder->positionAtEnd($entry);
+        // flags != 0 unsupported on thin fast path (PREG_SPLIT_*).
+        $hasFlags = $context->builder->icmp(Builder::INT_NE, $fn->getParam(3), $zero);
+        $context->builder->branchIf($hasFlags, $failBb, $initBb);
+
+        $context->builder->positionAtEnd($initBb);
+        $offSlot = $context->builder->alloca($i64, 1, 'preg_split_off');
+        $nSlot = $context->builder->alloca($i64, 1, 'preg_split_n');
+        $htSlot = $context->builder->alloca($htPtr, 1, 'preg_split_ht');
+        $context->builder->store($zero, $offSlot);
+        $context->builder->store($zero, $nSlot);
+        $ht0 = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->store($ht0, $htSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $limit = $fn->getParam(2);
+        $n = $context->builder->load($nSlot);
+        $limitPos = $context->builder->icmp(Builder::INT_SGT, $limit, $zero);
+        $atLimit = $context->builder->icmp(
+            Builder::INT_SGE,
+            $context->builder->add($n, $one),
+            $limit
+        );
+        $stopLimit = $context->builder->and($limitPos, $atLimit);
+        $context->builder->branchIf($stopLimit, $restBb, $findBb);
+
+        $context->builder->positionAtEnd($findBb);
+        $off = $context->builder->load($offSlot);
+        // ABI: (pattern, subject, limit, flags) — subject is param 1.
+        $rcRaw = $context->builder->call(
+            self::helperFunction($context, self::REPLACE_FIND_NEXT),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $off
+        );
+        $rc = JitNestedHelperCoerce::coerceBridgeResult($context, $rcRaw, $i64);
+        $isErr = $context->builder->icmp(Builder::INT_SLT, $rc, $zero);
+        $isMatch = $context->builder->icmp(Builder::INT_EQ, $rc, $one);
+        $afterErr = $fn->appendBasicBlock('preg_split_thin_after_err');
+        $context->builder->branchIf($isErr, $failBb, $afterErr);
+        $context->builder->positionAtEnd($afterErr);
+        $context->builder->branchIf($isMatch, $matchBb, $restBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($htPtr->constNull());
+
+        $context->builder->positionAtEnd($matchBb);
+        $posRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_POS));
+        $blenRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_BODY_LEN));
+        $pos = JitNestedHelperCoerce::coerceBridgeResult($context, $posRaw, $i64);
+        $blen = JitNestedHelperCoerce::coerceBridgeResult($context, $blenRaw, $i64);
+        $subj = $fn->getParam(1);
+        $curOff = $context->builder->load($offSlot);
+        $partLen = $context->builder->sub($pos, $curOff);
+        $partStr = self::emitThinSplitSubjectSlice($context, $fn, $subj, $curOff, $partLen);
+        $ht = $context->builder->load($htSlot);
+        $nCur = $context->builder->load($nSlot);
+        $idx = $sizeT === $i64 ? $nCur : $context->builder->trunc($nCur, $sizeT);
+        $partVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $partStr
+        );
+        HashTableHelper::setAtIndex($context, $ht, $idx, $partVar);
+        $nextOff = $context->builder->add($pos, $blen);
+        $context->builder->store($nextOff, $offSlot);
+        $context->builder->store($context->builder->add($nCur, $one), $nSlot);
+        $subjLen = $context->builder->load($context->builder->structGep($subj, $map['length']));
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $nextOff, $subjLen);
+        $context->builder->branchIf($atEnd, $trailBb, $headBb);
+
+        $context->builder->positionAtEnd($trailBb);
+        $empty = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
+        $htT = $context->builder->load($htSlot);
+        $nT = $context->builder->load($nSlot);
+        $idxT = $sizeT === $i64 ? $nT : $context->builder->trunc($nT, $sizeT);
+        $emptyVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $empty
+        );
+        HashTableHelper::setAtIndex($context, $htT, $idxT, $emptyVar);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($restBb);
+        $subjR = $fn->getParam(1);
+        $offR = $context->builder->load($offSlot);
+        $subjLenR = $context->builder->load($context->builder->structGep($subjR, $map['length']));
+        $restLen = $context->builder->sub($subjLenR, $offR);
+        $restStr = self::emitThinSplitSubjectSlice($context, $fn, $subjR, $offR, $restLen);
+        $htR = $context->builder->load($htSlot);
+        $nR = $context->builder->load($nSlot);
+        $idxR = $sizeT === $i64 ? $nR : $context->builder->trunc($nR, $sizeT);
+        $restVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $restStr
+        );
+        HashTableHelper::setAtIndex($context, $htR, $idxR, $restVar);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnValue($context->builder->load($htSlot));
+    }
+
+    /** Copy subject[start, start+len) into a new __string__ (empty when len<=0). */
+    private static function emitThinSplitSubjectSlice(
+        Context $context,
+        LlvmFunction $fn,
+        Value $subj,
+        Value $start,
+        Value $sliceLen
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $map = $context->structFieldMap['__string__'];
+        $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
+        $emptyBb = $fn->appendBasicBlock('preg_split_slice_empty');
+        $copyBb = $fn->appendBasicBlock('preg_split_slice_copy');
+        $doneBb = $fn->appendBasicBlock('preg_split_slice_done');
+        $context->builder->branchIf($isEmpty, $emptyBb, $copyBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $emptyStr = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($copyBb);
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $sliceLen);
+        $context->intrinsic->builder = $context->builder;
+        $destChar = $context->builder->structGep($dest, $map['value']);
+        $subjChar = $context->builder->structGep($subj, $map['value']);
+        $src = $context->builder->gep($subjChar, $start);
+        $context->intrinsic->memcpy($destChar, $src, $sliceLen, false);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($dest->typeOf());
+        $phi->addIncoming($emptyStr, $emptyBb);
+        $phi->addIncoming($dest, $copyBb);
+
+        return $phi;
+    }
+
+    /**
      * Build split result from PregJitHelper::thinSplitPart* (NestedJIT-safe strings, #27080).
+     * Retained for embed/tests; thin AOT uses {@see implementThinSplitBridge} (#27208).
      */
     private static function emitThinSplitHashtableFromParts(
         Context $context,
