@@ -3348,8 +3348,11 @@ class Object_ extends Type {
         }
         if ('reflectionproperty' === $lcname) {
             // Zend public surface: $name then $class (#22504).
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME, Variable::TYPE_STRING);
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME, Variable::TYPE_STRING);
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#21551 / #27315).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME, Variable::TYPE_VALUE);
+            // Thin user-script AOT must call __construct (not allocate-only) (#27315 / #27303 / #26772).
+            $this->markHasConstructor($id);
         }
         if ('reflectionclassconstant' === $lcname) {
             // Zend public surface: $name then $class (#22503).

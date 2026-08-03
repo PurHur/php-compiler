@@ -9,7 +9,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for ReflectionProperty::isFinal() (#23845).
+ * JIT/AOT link for ReflectionProperty::isFinal() (#23845, #27315).
  *
  * Final flags live on Object_::finalPropertyNames (markPropertyFinal during DECLARE_PROPERTY),
  * not on thin-standalone VM ClassEntry — emit a strcmp table instead of NestedJIT+VM probe.
@@ -45,6 +45,8 @@ final class ReflectionPropertyIsFinalRuntime
         } catch (\Throwable) {
         }
 
+        StringCaseCompare::ensureStrcasecmpLinked($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
@@ -58,12 +60,16 @@ final class ReflectionPropertyIsFinalRuntime
         $context->builder->positionAtEnd($entry);
         $classArg = $fn->getParam(0);
         $propArg = $fn->getParam(1);
-        $classRaw = $context->builder->pointerCast($classArg, $i8p);
-        $propRaw = $context->builder->pointerCast($propArg, $i8p);
-        $classData = $context->builder->gep($classRaw, $context->constantFromInteger(16, 'size_t'));
-        $propData = $context->builder->gep($propRaw, $context->constantFromInteger(16, 'size_t'));
-        $classCstr = $context->builder->pointerCast($classData, $i8p);
-        $propCstr = $context->builder->pointerCast($propData, $i8p);
+        $strMap = $context->structFieldMap['__string__'];
+        // Use structGep — hardcoded gep+16 on i8* drifts with __ref__ layout (#27315).
+        $classCstr = $context->builder->pointerCast(
+            $context->builder->structGep($classArg, $strMap['value']),
+            $i8p
+        );
+        $propCstr = $context->builder->pointerCast(
+            $context->builder->structGep($propArg, $strMap['value']),
+            $i8p
+        );
 
         $pairs = self::collectFinalPairs($context);
         $trueBlock = $fn->appendBasicBlock('refl_prop_final_yes');
@@ -72,8 +78,17 @@ final class ReflectionPropertyIsFinalRuntime
         $n = \count($pairs);
         foreach ($pairs as $idx => [$className, $propName]) {
             $context->builder->positionAtEnd($checkBlock);
-            $wantClass = $context->builder->pointerCast($context->constantFromString($className), $i8p);
-            $wantProp = $context->builder->pointerCast($context->constantFromString($propName), $i8p);
+            // constantStringFromString → __string__* (same shape as runtime args), not raw [N x i8]*.
+            $wantClassStr = $context->builder->load($context->constantStringFromString($className));
+            $wantPropStr = $context->builder->load($context->constantStringFromString($propName));
+            $wantClass = $context->builder->pointerCast(
+                $context->builder->structGep($wantClassStr, $strMap['value']),
+                $i8p
+            );
+            $wantProp = $context->builder->pointerCast(
+                $context->builder->structGep($wantPropStr, $strMap['value']),
+                $i8p
+            );
             $classCmp = $context->builder->call(
                 $context->lookupFunction('strcasecmp'),
                 $classCstr,

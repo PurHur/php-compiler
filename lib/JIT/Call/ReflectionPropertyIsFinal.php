@@ -15,14 +15,14 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** ReflectionProperty::isFinal() — JIT/AOT (#23845, ext/reflection/php_reflection.c). */
+/** ReflectionProperty::isFinal() — JIT/AOT (#23845, #27315, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyIsFinal implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        // Construct stores heap __value__* via emitSetStringPropertyFromCstr; declared JIT type
-        // is TYPE_STRING so propertyFetch/loadValue would mis-cast (#21551 / #23845).
+        // Construct stores heap __value__* via emitSetStringPropertyFromCstr; slots are TYPE_VALUE
+        // (#27315 / #27303) so propertySlotFor + __value__readString matches the box layout.
         $classStr = self::readStoredStringBox($context, $obj, ReflectionSupport::PROP_DECLARING_CLASS_NAME);
         $propStr = self::readStoredStringBox($context, $obj, ReflectionSupport::PROP_PROPERTY_NAME);
         $isFinal = ReflectionPropertyIsFinalRuntime::invoke($context, $classStr, $propStr);
