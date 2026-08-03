@@ -60,6 +60,10 @@ final class PregAotFastPath
         if (9 === $kind) {
             return self::matchAnchoredLiteralPrefix($pattern, $subject, $offset);
         }
+        // Single class char \d/\s/\w (#27250) — NestedJIT cannot defer to host PCRE.
+        if ($kind >= 10 && $kind <= 15) {
+            return self::matchClassOnce($kind, $subject, $offset);
+        }
 
         return self::matchClassPlus($kind, $subject, $offset);
     }
@@ -103,6 +107,25 @@ final class PregAotFastPath
     public static function patternKind(string $pattern): int
     {
         // Full-pattern compares — NestedJIT body/substr classify missed metachar bodies.
+        // Single class char (no +) — issue #27250 silent wrong-0 under thin AOT.
+        if ('/\\d/' === $pattern || '#\\d#' === $pattern) {
+            return 10;
+        }
+        if ('/(\\d)/' === $pattern || '#(\\d)#' === $pattern) {
+            return 11;
+        }
+        if ('/\\s/' === $pattern || '#\\s#' === $pattern) {
+            return 12;
+        }
+        if ('/(\\s)/' === $pattern || '#(\\s)#' === $pattern) {
+            return 13;
+        }
+        if ('/\\w/' === $pattern || '#\\w#' === $pattern) {
+            return 14;
+        }
+        if ('/(\\w)/' === $pattern || '#(\\w)#' === $pattern) {
+            return 15;
+        }
         if ('/\\d+/' === $pattern || '#\\d+#' === $pattern) {
             return 2;
         }
@@ -200,6 +223,9 @@ final class PregAotFastPath
         if (1 === $kind) {
             return self::replaceLiteral($pattern, $replacement, $subject, $limit);
         }
+        if ($kind >= 10 && $kind <= 15) {
+            return self::replaceClassOnce($kind, $replacement, $subject, $limit);
+        }
 
         return self::replaceClassPlus($kind, $replacement, $subject, $limit);
     }
@@ -219,7 +245,11 @@ final class PregAotFastPath
             return -1;
         }
         if (1 !== $kind) {
-            // Class-plus: scan for first class run at/after offset.
+            // Class-plus / single class: scan for first hit at/after offset.
+            if ($kind >= 10 && $kind <= 15) {
+                return self::findClassOnce($kind, $subject, $offset);
+            }
+
             return self::findClassPlus($kind, $subject, $offset);
         }
         $close = self::delimitedBodyClose($pattern);
@@ -624,6 +654,89 @@ final class PregAotFastPath
         return 0;
     }
 
+    /** Single \d/\s/\w (kinds 10–15) — #27250. */
+    private static function classKindToCharClass(int $kind): int
+    {
+        if (12 === $kind || 13 === $kind || 4 === $kind || 5 === $kind) {
+            return 3;
+        }
+        if (14 === $kind || 15 === $kind || 6 === $kind || 7 === $kind) {
+            return 4;
+        }
+
+        return 2;
+    }
+
+    private static function matchClassOnce(int $kind, string $subject, int $offset): int
+    {
+        $charClass = self::classKindToCharClass($kind);
+        $hasGroup = (11 === $kind || 13 === $kind || 15 === $kind);
+        $subLen = \strlen($subject);
+        $i = $offset;
+        while ($i < $subLen) {
+            $ch = \substr($subject, $i, 1);
+            if (self::charInClass($ch, $charClass)) {
+                self::storeCaps($ch, $hasGroup);
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    private static function findClassOnce(int $kind, string $subject, int $offset): int
+    {
+        $charClass = self::classKindToCharClass($kind);
+        $subLen = \strlen($subject);
+        $i = $offset;
+        if ($i < 0) {
+            $i = 0;
+        }
+        while ($i < $subLen) {
+            if (self::charInClass(\substr($subject, $i, 1), $charClass)) {
+                self::$lastReplacePos = $i;
+                self::$lastReplaceBodyLen = 1;
+
+                return 1;
+            }
+            ++$i;
+        }
+
+        return 0;
+    }
+
+    private static function replaceClassOnce(int $kind, string $replacement, string $subject, int $limit): string
+    {
+        $charClass = self::classKindToCharClass($kind);
+        if (0 === $limit) {
+            return $subject;
+        }
+        $out = '';
+        $subLen = \strlen($subject);
+        $cursor = 0;
+        $n = 0;
+        while ($cursor < $subLen) {
+            if ($limit >= 0 && $n >= $limit) {
+                $out .= \substr($subject, $cursor);
+
+                return $out;
+            }
+            $ch = \substr($subject, $cursor, 1);
+            if (!self::charInClass($ch, $charClass)) {
+                $out .= $ch;
+                ++$cursor;
+                continue;
+            }
+            $out .= $replacement;
+            ++$cursor;
+            ++$n;
+        }
+
+        return $out;
+    }
+
     private static function replaceLiteral(string $pattern, string $replacement, string $subject, int $limit): string
     {
         $close = self::delimitedBodyClose($pattern);
@@ -785,9 +898,10 @@ final class PregAotFastPath
             return 0;
         }
         $kind = self::patternKind($pattern);
-        // No-group class-plus (2/4/6) and plain literals (1). Grouped kinds need nested
-        // group rows — defer until thin slots expand.
-        if (1 !== $kind && 2 !== $kind && 4 !== $kind && 6 !== $kind) {
+        // No-group class-plus (2/4/6), single class (10/12/14), and plain literals (1).
+        // Grouped kinds need nested group rows — defer until thin slots expand.
+        if (1 !== $kind && 2 !== $kind && 4 !== $kind && 6 !== $kind
+            && 10 !== $kind && 12 !== $kind && 14 !== $kind) {
             return -1;
         }
         // Reuse NestedJIT-proven matchCount; advance past each hit (#27195).
