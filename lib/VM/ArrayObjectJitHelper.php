@@ -65,7 +65,8 @@ final class ArrayObjectJitHelper
         $ht = self::htPtr($context, self::loadObject($context, $receiver));
         $boxedKey = self::asValueBoxKey($context, $key);
 
-        return HashTableReadLlvm::readValueBoxKeyToValueBox($context, $ht, $boxedKey)->value;
+        // Not a PHP superglobal — pass null (HashTableReadLlvm 4th arg; #27244 / NestedJIT).
+        return HashTableReadLlvm::readValueBoxKeyToValueBox($context, $ht, $boxedKey, null)->value;
     }
 
     public static function compileOffsetSet(
