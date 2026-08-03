@@ -27,6 +27,7 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('replaceCallbackArgv', $source);
         $this->assertStringContainsString('PregCallbackInvokeJitHelper', $source);
         $this->assertStringContainsString('PregJitHelperThinAot', $source);
+        $this->assertStringContainsString('replaceFindNext', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);

@@ -10,6 +10,7 @@ use PHPCompiler\JIT\CallUnpackHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCfg\Operand;
 use PHPLLVM\Value;
@@ -18,6 +19,7 @@ use PHPLLVM\Value;
  * Compile-time json_encode() for inline array literals — avoids deferred AOT stubs (#14040).
  *
  * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080),
+ * `json_encode(preg_filter(lit…))` / string-subject (#27181),
  * `json_encode(array_replace_recursive(lit…))` (#26977),
  * `json_encode(array_flip(lit…))` (#27072), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
@@ -41,6 +43,9 @@ final class JitJsonEncodeCompileTime
             $vmArray = self::tryCompileTimeArrayFromPregSplit($block, $operand);
         }
         if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromPregFilter($block, $operand);
+        }
+        if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayReplaceRecursive($block, $operand);
         }
         if (null === $vmArray) {
@@ -53,6 +58,10 @@ final class JitJsonEncodeCompileTime
             $foldedFalse = self::tryEncodePregSplitFalse($context, $block, $operand, $flags);
             if (null !== $foldedFalse) {
                 return $foldedFalse;
+            }
+            $foldedPregFilter = self::tryEncodePregFilterScalar($context, $block, $operand, $flags);
+            if (null !== $foldedPregFilter) {
+                return $foldedPregFilter;
             }
             $foldedParseUrlFalse = self::tryEncodeParseUrlFalse($context, $block, $operand, $flags);
             if (null !== $foldedParseUrlFalse) {
@@ -130,6 +139,124 @@ final class JitJsonEncodeCompileTime
         $var->array($ht);
 
         return $var;
+    }
+
+    /**
+     * Resolve `json_encode(preg_filter(…))` when args are literals and the subject is an array (#27181).
+     */
+    private static function tryCompileTimeArrayFromPregFilter(Block $block, Operand $operand): ?VmVariable
+    {
+        $result = self::evalCompileTimePregFilter($block, $operand);
+        if (null === $result || false === $result || !\is_array($result)) {
+            return null;
+        }
+        $ht = new HashTable();
+        foreach ($result as $key => $line) {
+            $keyVar = new VmVariable();
+            if (\is_int($key)) {
+                $keyVar->int($key);
+            } else {
+                $keyVar->string((string) $key);
+            }
+            $value = new VmVariable();
+            $value->string((string) $line);
+            array_map::appendKeyedCopy($ht, $keyVar, $value);
+        }
+        $var = new VmVariable();
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * Fold `json_encode(preg_filter(…))` when the host result is string/null/false (#27181).
+     */
+    private static function tryEncodePregFilterScalar(
+        Context $context,
+        Block $block,
+        Operand $operand,
+        int $flags
+    ): ?Value {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'preg_filter');
+        if (null === $args) {
+            return null;
+        }
+        $result = self::evalPregFilterFromLiteralArgs($args);
+        if (\is_array($result)) {
+            // Array results go through tryCompileTimeArrayFromPregFilter.
+            return null;
+        }
+        if (null === $result) {
+            // Host null only for string subject no-match; otherwise args were unusable.
+            if (!isset($args[2]) || VmVariable::TYPE_STRING !== $args[2]->type) {
+                return null;
+            }
+        }
+        // string | null | false
+        $encoded = VmJsonFormat::encodeExported($result, $flags);
+        if (false === $encoded) {
+            return self::emitFalse($context);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * @return array<int|string, string>|string|false|null
+     *         null = not foldable; false = PCRE error; array/string/null-as-exported via scalar path
+     */
+    private static function evalCompileTimePregFilter(Block $block, Operand $operand): array|string|false|null
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'preg_filter');
+        if (null === $args) {
+            return null;
+        }
+
+        return self::evalPregFilterFromLiteralArgs($args);
+    }
+
+    /**
+     * @param list<VmVariable> $args
+     *
+     * @return array<int|string, string>|string|false|null host preg_filter result, or null if args unusable
+     */
+    private static function evalPregFilterFromLiteralArgs(array $args): array|string|false|null
+    {
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 5) {
+            return null;
+        }
+        if (VmVariable::TYPE_STRING !== $args[0]->type || VmVariable::TYPE_STRING !== $args[1]->type) {
+            return null;
+        }
+        $pattern = $args[0]->toString();
+        $replacement = $args[1]->toString();
+        $limit = -1;
+        if ($argc >= 4) {
+            if (VmVariable::TYPE_INTEGER !== $args[3]->type) {
+                return null;
+            }
+            $limit = $args[3]->toInt();
+        }
+        if (VmVariable::TYPE_STRING === $args[2]->type) {
+            return \preg_filter($pattern, $replacement, $args[2]->toString(), $limit);
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[2]->type) {
+            return null;
+        }
+        $host = [];
+        foreach ($args[2]->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $hostKey = VmVariable::TYPE_INTEGER === $key->type
+                ? $key->toInt()
+                : $key->toString();
+            $host[$hostKey] = $value->resolveIndirect()->toString();
+        }
+
+        return \preg_filter($pattern, $replacement, $host, $limit);
     }
 
     /**

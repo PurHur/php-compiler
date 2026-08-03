@@ -130,6 +130,31 @@ final class preg_filter extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
+        $limitLit = $argc >= 4 ? self::compileTimeLimit($args[3]) : -1;
+        // Thin AOT: NestedJIT replace strings are corrupt — fold literal calls (#27181).
+        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+            $folded = JitPregReplaceCompileTime::tryFoldFilterString(
+                $context,
+                $args[0],
+                $args[1],
+                $args[2],
+                $limitLit
+            );
+            if (null !== $folded) {
+                return $folded;
+            }
+        } else {
+            $folded = JitPregReplaceCompileTime::tryFoldFilterArray(
+                $context,
+                $args[0],
+                $args[1],
+                $args[2],
+                $limitLit
+            );
+            if (null !== $folded) {
+                return $folded;
+            }
+        }
         // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
         $pattern = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_filter', 0, 'pattern')

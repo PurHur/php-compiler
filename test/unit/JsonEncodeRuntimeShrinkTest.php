@@ -79,6 +79,12 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('tryCompileTimeArrayFromParseUrl', $fold);
         $this->assertStringContainsString("'parse_url'", $fold);
         $this->assertStringContainsString('VmString::parseUrl', $fold);
+        // #27181 — json_encode(preg_filter(lit…)) fold (peer #27080 preg_split).
+        $this->assertStringContainsString('tryCompileTimeArrayFromPregFilter', $fold);
+        $this->assertStringContainsString('tryEncodePregFilterScalar', $fold);
+        $this->assertStringContainsString("'preg_filter'", $fold);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitPregReplaceCompileTime.php');
+        $this->assertFileExists(__DIR__.'/../../test/repro/issue_27181_aot_preg_filter.php');
     }
 
     public function testSpineBundleIncludesJsonEncodePhpJitPath(): void
