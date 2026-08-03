@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * easter_days() — days after March 21 until Easter (php-src ext/calendar/easter.c; #7252).
+ * easter_days() — days after March 21 until Easter (php-src ext/calendar/easter.c; #7252 / #27358).
  */
 final class easter_days extends Internal
 {
@@ -33,7 +33,7 @@ final class easter_days extends Internal
         }
         $year = self::resolveYear($frame);
         self::assertEasterYear($year);
-        $method = 1 === $argc
+        $method = $argc < 2
             ? CalendarConstants::CAL_EASTER_DEFAULT
             : CalendarArgs::requireInt($frame, 'easter_days', 2, 'mode');
         $frame->returnVar->int(VmCalendar::easterDays($year, $method));
@@ -41,7 +41,7 @@ final class easter_days extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('easter_days() is not implemented for JIT in this compiler build (issue #7252)');
+        return JitEasterDays::invoke($context, ...$args);
     }
 
     private static function assertEasterYear(int $year): void

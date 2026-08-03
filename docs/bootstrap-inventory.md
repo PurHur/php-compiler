@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6906 |
-| Phase A inventory files (M2 ratio SSOT) | 6906 |
+| PHP files on vm.php path | 6909 |
+| Phase A inventory files (M2 ratio SSOT) | 6909 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22247 |
+| Source constructs flagged (warnings) | 22251 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -125,7 +125,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/calendar/CalendarConstants.php` | 0 | 1 |
 | `ext/calendar/CalendarFunction.php` | 0 | 1 |
 | `ext/calendar/CalendarTables.php` | 0 | 1 |
+| `ext/calendar/EasterDaysJitHelper.php` | 0 | 1 |
 | `ext/calendar/JitCalDaysInMonth.php` | 0 | 1 |
+| `ext/calendar/JitEasterDays.php` | 0 | 2 |
 | `ext/calendar/Module.php` | 0 | 20 |
 | `ext/calendar/VmCalendar.php` | 0 | 11 |
 | `ext/calendar/VmJewishFrenchCalendar.php` | 0 | 1 |
@@ -5132,6 +5134,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomXPathEvaluateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXPathQueryRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXmlDocumentCreateFromStringRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/EasterDaysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
@@ -7486,9 +7489,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/calendar/EasterDaysJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/calendar/JitCalDaysInMonth.php`
 
 **Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/calendar/JitEasterDays.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
 - 4 class method(s)
 
 ### `ext/calendar/Module.php`
@@ -45124,6 +45138,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/Builtin/EasterDaysRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/EmbedObEchoBridge.php`
 
