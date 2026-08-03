@@ -42,6 +42,8 @@ final class SplHeapMethod implements Call
                     'SplHeap::insert() expects exactly 1 argument, 0 given'
                 )
             ),
+            'extract' => SplHeapJitHelper::compileExtract($context, $args[0]),
+            'top' => SplHeapJitHelper::compileTop($context, $args[0]),
             'count' => SplHeapJitHelper::compileCount($context, $args[0]),
             'rewind' => SplHeapJitHelper::compileRewind($context, $args[0]),
             'valid' => SplHeapJitHelper::compileValid($context, $args[0]),

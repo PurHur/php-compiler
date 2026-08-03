@@ -1077,7 +1077,10 @@ class Context {
             'splminheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MIN,
             'splheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_USER,
         ] as $heapLc => $heapKind) {
-            foreach (['__construct', 'insert', 'count', 'rewind', 'valid', 'current', 'key', 'next'] as $heapMethod) {
+            foreach ([
+                '__construct', 'insert', 'extract', 'top', 'count',
+                'rewind', 'valid', 'current', 'key', 'next',
+            ] as $heapMethod) {
                 $this->functionProxies[$heapLc.'::'.$heapMethod] = new Call\SplHeapMethod($heapMethod, $heapKind);
             }
         }
