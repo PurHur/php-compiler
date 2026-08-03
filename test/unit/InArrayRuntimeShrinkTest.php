@@ -9,17 +9,21 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** in_array() AOT routes through InArrayJitHelper PHP via JitVmHelperLink (#6229, #12503, #18990). */
+/**
+ * in_array() AOT emits via InArrayLlvm (caller-frame), not NestedJIT VmArray stub (#12503, #27120).
+ * VM execute() still uses InArrayJitHelper → VmArray::contains.
+ */
 final class InArrayRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 6200;
 
-    public function testInArrayRuntimeUsesJitHelperBridgeNotNativeLlvm(): void
+    public function testInArrayRuntimeUsesInlineLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InArrayRuntime.php');
-        $this->assertStringContainsString('InArrayJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringContainsString('InArrayLlvm::contains', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('__in_array__contains', $runtime);
         $this->assertStringNotContainsString('InArrayNativeLlvm', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::inArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -32,6 +36,11 @@ final class InArrayRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/in_array.php');
         $this->assertStringContainsString('InArrayRuntime::inArray', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::inArray', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/InArrayLlvm.php');
+        $this->assertStringContainsString('InArrayJitHelper', $llvm);
+        $this->assertStringContainsString('#27120', $llvm);
+        $this->assertStringContainsString('VmValueCompare::identicalValueToValue', $llvm);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterNativeInArrayLlvmDeletion(): void
