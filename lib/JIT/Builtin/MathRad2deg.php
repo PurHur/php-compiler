@@ -6,13 +6,15 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitRad2degKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for rad2deg() via Rad2degJitHelper PHP (#15143).
+ * JIT/AOT link for rad2deg() via Rad2degJitHelper PHP (#15143, #26996 / #27006).
  *
- * Replaces inline LLVM fMul constant lowering in ext/standard/rad2deg.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see Rad2degJitHelper} via {@see JitVmHelperLink}.
+ * Nested helper compile: fmul leaf without re-entering Rad2degJitHelper / VmMath.
  * php-src: ext/standard/math.c — PHP_FUNCTION(rad2deg)
  */
 final class MathRad2deg
@@ -28,6 +30,8 @@ final class MathRad2deg
         self::RAD2DEG_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'rad2deg_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +44,10 @@ final class MathRad2deg
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitRad2degKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +58,28 @@ final class MathRad2deg
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_RAD2DEG);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_RAD2DEG, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_RAD2DEG,
-            'rad2deg_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::RAD2DEG_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15143'
+            '#26996'
         );
     }
 }
