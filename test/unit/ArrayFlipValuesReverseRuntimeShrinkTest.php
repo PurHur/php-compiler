@@ -40,13 +40,16 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('storeFlipped', $llvm);
     }
 
-    public function testArrayValuesRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayValuesRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void
     {
+        // #27212: NestedJIT of ArrayValuesJitHelper returned empty under thin AOT; call-site HashTableValuesLlvm.
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayValuesRuntime.php');
-        $this->assertStringContainsString('ArrayValuesJitHelper', $runtime);
+        $this->assertStringContainsString('HashTableValuesLlvm', $runtime);
         $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('buildValuesArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ensureCompiled', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_values.php');
         $this->assertStringContainsString('ArrayValuesRuntime::values', $builtin);
@@ -56,6 +59,13 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function buildValuesArray', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildValuesFromNativeArray', $arrayBuiltin);
         $this->assertStringNotContainsString('function buildValuesFromHashTable', $arrayBuiltin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableValuesLlvm.php');
+        $this->assertStringContainsString('function values', $llvm);
+        $this->assertStringContainsString('valuesFromPairs', $llvm);
+
+        $nested = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedVmHashTableMethodLlvm.php');
+        $this->assertStringContainsString("'valuescopy'", $nested);
     }
 
     public function testArrayReverseRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void

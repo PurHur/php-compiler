@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\Builtin\ArrayValuesRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableValuesLlvm;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** HashTable::valuesCopy() for nested php-in-PHP JIT helpers (#14578 phase 2). */
+/**
+ * HashTable::valuesCopy() for nested php-in-PHP JIT helpers (#14578 phase 2, #27212).
+ *
+ * Pure LLVM via {@see HashTableValuesLlvm} — must not call ArrayValuesRuntime
+ * (NestedJIT of ArrayValuesJitHelper would recurse; peer #27211 keys / #27067 reverse).
+ */
 final class HashTableValuesCopy implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -18,17 +23,8 @@ final class HashTableValuesCopy implements Call
         if ([] === $args) {
             throw new \LogicException('valuesCopy() requires a HashTable receiver');
         }
+        $ht = HashTableNestedReceiver::hashtableFromReceiver($context, $args[0]);
 
-        return ArrayValuesRuntime::values($context, self::receiverVariable($context, $args[0]));
-    }
-
-    private static function receiverVariable(Context $context, Variable $receiver): Variable
-    {
-        if (Variable::TYPE_HASHTABLE === $receiver->type) {
-            return $receiver;
-        }
-        $htPtr = HashTableNestedReceiver::hashtableFromReceiver($context, $receiver);
-
-        return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $htPtr);
+        return HashTableValuesLlvm::values($context, $ht);
     }
 }

@@ -10,8 +10,8 @@ namespace PHPCompiler\JIT;
  * JitHelper PHP receives {@see __hashtable__*} bitcast as HashTable; method bodies must
  * lower to LLVM — not compile lib/VM/HashTable.php in nested scope (#12910 pattern).
  *
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20533 / #15417): skip keysCopy/valuesCopy
- * registration so ArrayKeys/ArrayValues NestedJIT is not pulled into user-script init.
+ * keysCopy / valuesCopy lower via {@see HashTableKeysLlvm} / {@see HashTableValuesLlvm}
+ * (peer reverse/slice) — not ArrayKeys/ArrayValues NestedJIT bridges (#27211 / #27212).
  *
  * COW: `duplicate` / `unionCopy` (#23548) lower via {@see HashTableCowLlvm} — not the
  * HashTable*Runtime bridges that NestedJIT-compile HashTableJitHelper (would recurse).
@@ -22,6 +22,7 @@ final class NestedVmHashTableMethodLlvm
     private const METHOD_HANDLERS = [
         'getnumelements' => Call\HashTableGetNumElements::class,
         'padcopy' => Call\HashTablePadCopy::class,
+        // NestedJIT-safe keys/values for ArrayKeys/ArrayValues (#27211 / #27212).
         'valuescopy' => Call\HashTableValuesCopy::class,
         'keyscopy' => Call\HashTableKeysCopy::class,
         'keysmatchingcopy' => Call\HashTableKeysMatchingCopy::class,
@@ -64,10 +65,6 @@ final class NestedVmHashTableMethodLlvm
 
     public static function ensureMethod(Context $context, string $methodLc): bool
     {
-        if ($context->isThinStandaloneAotMain()
-            && ('keyscopy' === $methodLc || 'valuescopy' === $methodLc)) {
-            return false;
-        }
         $handler = self::METHOD_HANDLERS[$methodLc] ?? null;
         if (null === $handler) {
             return false;

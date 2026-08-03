@@ -5,17 +5,24 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableKeysLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_keys() via ArrayKeysJitHelper PHP (#12340).
+ * JIT/AOT link for array_keys() (#12340, #27211).
  *
- * Standalone AOT and native literal arrays materialize to hashtable then route through PHP (#14387, #18287).
- * SSOT: {@see \PHPCompiler\VM\HashTable::keysCopy()}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayKeysJitHelper} returned
+ * empty hashtables because NestedVmHashTableMethodLlvm skipped keysCopy (#20533).
+ * Call-site LLVM via {@see HashTableKeysLlvm} (peer ArrayReverseRuntime / #27067).
+ *
+ * Filtered form (`search_value`) still NestedJIT-compiles ArrayKeysJitHelper::keysMatching.
+ *
+ * VM SSOT: {@see \PHPCompiler\VM\HashTable::keysCopy()} / {@see keysMatchingCopy()}
  * php-src: ext/standard/array.c — php_array_keys()
  */
 final class ArrayKeysRuntime
@@ -26,13 +33,10 @@ final class ArrayKeysRuntime
 
     private const HELPER_PATH = '/ext/standard/ArrayKeysJitHelper.php';
 
-    private const KEYS_HELPER = 'PHPCompiler\\ext\\standard\\ArrayKeysJitHelper::keysCopy';
-
     private const KEYS_MATCHING_HELPER = 'PHPCompiler\\ext\\standard\\ArrayKeysJitHelper::keysMatching';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::KEYS_HELPER,
         self::KEYS_MATCHING_HELPER,
     ];
 
@@ -88,22 +92,34 @@ final class ArrayKeysRuntime
             return;
         }
 
-        $savedBlock = self::saveInsertBlock($context);
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_KEYS,
-            'array_keys_bridge_entry',
-            [$htPtr],
-            $htPtr,
-            self::KEYS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12340'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitKeysBridge($context);
         self::registerLinked($context, self::ABI_KEYS);
-        self::restoreInsertBlock($context, $savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function emitKeysBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction(self::ABI_KEYS);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_KEYS,
+                $context->context->functionType($htPtr, false, $htPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_keys_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $keys = HashTableKeysLlvm::keys($context, $src);
+        $context->builder->returnValue($keys);
+        $context->registerFunction(self::ABI_KEYS, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementKeysFiltered(Context $context): void
@@ -115,7 +131,7 @@ final class ArrayKeysRuntime
             return;
         }
 
-        $savedBlock = self::saveInsertBlock($context);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -132,33 +148,19 @@ final class ArrayKeysRuntime
             '#12340'
         );
         self::registerLinked($context, self::ABI_KEYS_FILTERED);
-        self::restoreInsertBlock($context, $savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function registerLinked(Context $context, string $abiName): void
     {
         $fn = $context->module->getNamedFunction($abiName);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException($abiName.' missing after ArrayKeysRuntime bridge (#12340)');
+            throw new \LogicException($abiName.' missing after ArrayKeysRuntime bridge (#27211)');
         }
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function saveInsertBlock(Context $context): mixed
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, mixed $savedBlock): void
-    {
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }
