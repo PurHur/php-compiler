@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** unixtojd() — Unix timestamp to Julian day (php-src ext/calendar/cal_unix.c; #6759). */
+/** unixtojd() — Unix timestamp to Julian day (php-src ext/calendar/cal_unix.c; #6759 / #27367). */
 final class unixtojd extends Internal
 {
     public function __construct()
@@ -35,6 +35,13 @@ final class unixtojd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('unixtojd() is not implemented for JIT in this compiler build (issue #6759)');
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                'unixtojd() expects at most 1 argument, '.$argc.' given'
+            );
+        }
+
+        return JitUnixtojd::invoke($context, ...$args);
     }
 }
