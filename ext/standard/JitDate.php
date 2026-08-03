@@ -9,6 +9,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DefaultTimezoneRuntime;
 use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
+use PHPCompiler\JIT\Builtin\StringDateTime;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
@@ -258,9 +259,6 @@ final class JitDate
         if ($argc > 2) {
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
-        // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)
-        $format = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'format');
-        $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(
                 $context,
@@ -271,13 +269,74 @@ final class JitDate
                 self::time($context)
             )
             : self::time($context);
+
+        // Thin AOT: NestedJIT FormatDatetime segfaults; Y-m-d via UTC civil IR (#27091).
+        // Matches Zend when default timezone is UTC (CI / docker image default).
+        $fmtLit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if ('Y-m-d' === $fmtLit && ($gmt || self::defaultTimezoneIsUtc())) {
+            return self::formatYmdCivil($context, $timestamp);
+        }
+
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)
+        $format = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'format');
         $gmtI8 = $context->getTypeFromString('int8')->constInt($gmt ? 1 : 0, false);
+
+        StringDateTime::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_format_datetime'),
             $format,
             $timestamp,
             $gmtI8
+        );
+    }
+
+    private static function defaultTimezoneIsUtc(): bool
+    {
+        $tz = \date_default_timezone_get();
+
+        return 'UTC' === $tz || 'Etc/UTC' === $tz || 'Z' === $tz || 'GMT' === $tz;
+    }
+
+    /** Format timestamp as Y-m-d via {@see JitGetdate::civilPartsPublic} + snprintf (#27091). */
+    private static function formatYmdCivil(Context $context, Value $timestamp): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'date_ymd_civil');
+        $parts = JitGetdate::civilPartsPublic($context, $timestamp);
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $buf = $context->builder->alloca($i8, 16, 'ymd_buf');
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%04lld-%02lld-%02lld'), $charPtr);
+        if (null === $context->module->getNamedFunction('snprintf')) {
+            $context->module->addFunction(
+                'snprintf',
+                $context->context->functionType(
+                    $context->getTypeFromString('int32'),
+                    true,
+                    $charPtr,
+                    $sizeT,
+                    $charPtr
+                )
+            );
+        }
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $sizeT->constInt(16, false),
+            $fmt,
+            $parts['year'],
+            $parts['month'],
+            $parts['day']
+        );
+        $len = $context->builder->sext($written, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $bufChar
         );
     }
 
