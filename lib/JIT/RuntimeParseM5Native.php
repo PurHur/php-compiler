@@ -7,20 +7,22 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\Value;
 
 /**
- * C-floor Runtime::parse for M5 argv / gen-0 seed (#26756 / re-#23468).
+ * C-floor Runtime::parse for M5 argv / gen-0 seed (#26756 / re-#23468 / #27426).
  *
  * Why this exists:
  * - Host-lowering Runtime.php::parse reintroduces mid-BB terminators after master drift
  *   and the prepare-identity list-unpack SEGVs at runtime (c:main_before_php).
  * - C-floor initParsePipeline only allocates a shallow Parser shell; PHPCfg\Parser::parse
- *   is not in the argv driver today (nm shows no Parser symbols).
+ *   is not in the argv driver today (nm shows no Parser symbols) unless FORCE_PARSER.
  *
- * Prefer real Parser::parse when NestedJIT-registered ({@see RuntimeParseM5PhpCfgParser}).
- * Call ABI: parse(this __object__*, code __string__*, file __string__*) -> Script __object__*
- * (forced under M5 NestedJIT — #27426). Functional-smoke `echo "TOKEN"` is handled by
- * {@see M5TrivialEchoScript::parseAndCompile} when NestedJIT-registered (opt-in
- * PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT) via
- * {@see BootstrapCompileSmokeM3Emit::emitRuntimeParseAndCompileDefault}.
+ * FORCE_PARSER NestedJIT of PHPCfg\Parser::parse still SIGABRTs at runtime when invoked
+ * (#27426): NestedJIT'd {@see M5ParserAstPeer::parse} constructs PhpParser\Node objects
+ * that are not NestedJIT-safe, and parseAst(null) aborts on peer miss. Symbols are still
+ * NestedJIT'd for nm proof under PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT=1, but this C-floor
+ * does **not** call them unless PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT_CALL=1 (experimental).
+ *
+ * Default: return null Script — {@see M5TrivialEchoNative} handles limited shapes in
+ * parseAndCompile before this fallback. Functional-smoke stays on the trivial-echo path.
  */
 final class RuntimeParseM5Native
 {
@@ -44,14 +46,14 @@ final class RuntimeParseM5Native
             $llvmInternalName($internalName),
             $context->context->functionType($objectPtr, false, $objectPtr, $stringPtr, $stringPtr)
         );
-        $bb = $func->appendBasicBlock('m5_parse_null');
+        $bb = $func->appendBasicBlock('m5_parse');
         $saved = $context->builder;
         $context->builder = $context->context->builderCreate();
         $context->builder->positionAtEnd($bb);
 
-        // Prefer real Parser::parse when NestedJIT/force-include has registered it.
         $parserFn = self::lookupParserParse($context);
-        if (null !== $parserFn) {
+        $callNested = self::shouldCallNestedJitParser();
+        if (null !== $parserFn && $callNested) {
             $runtime = $func->getParam(0);
             $code = $func->getParam(1);
             $filename = $func->getParam(2);
@@ -62,6 +64,7 @@ final class RuntimeParseM5Native
             $script = $context->builder->call($parserFn, $parserObj, $code, $filename);
             $context->builder->returnValue($script);
         } else {
+            // Default / FORCE_PARSER-without-CALL: null Script (avoid SIGABRT — #27426).
             $context->builder->returnValue($objectPtr->constNull());
         }
 
@@ -77,6 +80,17 @@ final class RuntimeParseM5Native
         );
 
         return $func;
+    }
+
+    /**
+     * Opt-in runtime call into NestedJIT'd PHPCfg\Parser::parse (still SIGABRTs — #27426).
+     * Default off so TrivialEcho-miss returns null instead of aborting the argv driver.
+     */
+    private static function shouldCallNestedJitParser(): bool
+    {
+        $flag = getenv('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT_CALL');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
     private static function lookupParserParse(Context $context): ?Value

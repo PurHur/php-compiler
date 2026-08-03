@@ -59,6 +59,15 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertInstanceOf(\PhpParser\Node\Stmt\Expression::class, $arithAst[0]);
         $this->assertInstanceOf(\PhpParser\Node\Expr\Assign::class, $arithAst[0]->expr);
         $this->assertInstanceOf(\PhpParser\Node\Stmt\Echo_::class, $arithAst[1]);
+
+        // Peer + TrivialEcho both accept echo <int>; Zend peer→PHPCfg Script (#27426).
+        $echoInt = $peer->parse('<?php echo 42;');
+        $this->assertNotNull($echoInt);
+        $this->assertCount(1, $echoInt);
+        $this->assertInstanceOf(\PhpParser\Node\Stmt\Echo_::class, $echoInt[0]);
+        $this->assertInstanceOf(\PhpParser\Node\Scalar\LNumber::class, $echoInt[0]->exprs[0]);
+        $this->assertSame(42, $echoInt[0]->exprs[0]->value);
+        $this->assertNull($peer->parse('<?php echo 01;'));
         $this->assertNull($peer->parse('<?php function f($x){return $x;} echo f(1);'));
         $this->assertSame($arithAst, $peer->traverse($arithAst));
         $peer->beginCompilationUnit('t.php');
@@ -78,6 +87,11 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $arith = $cfgParser->parse('<?php $a = 1 + 2; echo $a;', 'peer-arith.php');
         $this->assertInstanceOf(\PHPCfg\Script::class, $arith);
         $this->assertGreaterThanOrEqual(2, count($arith->main->cfg->children));
+
+        // Integer echo → Script via peer AST (same shape as TrivialEcho C-floor).
+        $echoInt = $cfgParser->parse('<?php echo 42;', 'peer-echo-int.php');
+        $this->assertInstanceOf(\PHPCfg\Script::class, $echoInt);
+        $this->assertNotEmpty($echoInt->main->cfg->children);
     }
 
     public function testM5DriverHostDefinesRuntimeParseSpineProps(): void
@@ -166,7 +180,15 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('tryechostringast', (string) file_get_contents(
             $root.'/lib/JIT/Builtin/Type/Object_.php'
         ));
+        $this->assertStringContainsString('tryechointast', (string) file_get_contents(
+            $root.'/lib/JIT/Builtin/Type/Object_.php'
+        ));
+        $this->assertStringContainsString('tryEchoIntAst', (string) file_get_contents(
+            $root.'/lib/JIT/M5ParserAstPeer.php'
+        ));
         $this->assertStringContainsString('REQUIRED_SURFACE', $peerForce);
+        $this->assertStringContainsString('PHP_COMPILER_M5_FORCE_PARSER_NESTEDJIT_CALL', $floor);
+        $this->assertStringContainsString('shouldCallNestedJitParser', $floor);
         $this->assertStringContainsString('stripLeadingPreamble', (string) file_get_contents($root.'/lib/JIT/M5ParserAstPeer.php'));
         // NestedJIT every class method — private helpers are called from parse() (#27426).
         $this->assertStringNotContainsString(

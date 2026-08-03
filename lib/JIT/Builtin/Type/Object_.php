@@ -3979,6 +3979,7 @@ class Object_ extends Type {
             foreach ([
                 'stripleadingpreamble',
                 'tryechostringast',
+                'tryechointast',
                 'tryassignplusechoast',
                 'scanident',
                 'scanunsignedint',

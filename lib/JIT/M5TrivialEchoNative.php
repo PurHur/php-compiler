@@ -14,6 +14,9 @@ use PHPLLVM\Value;
  *   echo "TOKEN\n";
  *
  *   <?php
+ *   echo 42;            // decimal literal (#27426)
+ *
+ *   <?php
  *   $a = 1 + 2; echo $a;   // folded to printf payload "3"
  *
  * examples/000-HelloWorld/example.php uses the echo shape so the committed argv driver can
@@ -30,6 +33,7 @@ final class M5TrivialEchoNative
     private const PAYLOAD_GLOBAL = '__m5_te_payload';
     private const EXTRACT_FN = '__m5_te_try_extract';
     private const ARITH_EXTRACT_FN = '__m5_te_try_extract_arith';
+    private const ECHO_INT_EXTRACT_FN = '__m5_te_try_extract_echo_int';
     private const EMIT_FN = '__m5_te_emit_to_path';
 
     /**
@@ -188,6 +192,7 @@ final class M5TrivialEchoNative
     private static function ensureExtractHelper(Context $context): void
     {
         self::ensureArithExtractHelper($context);
+        self::ensureEchoIntExtractHelper($context);
         if (null !== $context->module->getNamedFunction(self::EXTRACT_FN)) {
             $context->registerFunction(self::EXTRACT_FN, $context->module->getNamedFunction(self::EXTRACT_FN));
 
@@ -282,7 +287,17 @@ final class M5TrivialEchoNative
         $ch0 = $b->load($b->gep($chars, $i));
         $isQ = $b->icmp(Builder::INT_EQ, $ch0, $i8->constInt(ord('"'), false));
         $p7 = $fn->appendBasicBlock('p7');
-        $b->branchIf($isQ, $p7, $miss);
+        $echoIntTry = $fn->appendBasicBlock('echo_int_try');
+        $b->branchIf($isQ, $p7, $echoIntTry);
+        // Not a string echo — try `echo <uint>;` before arith fallback (#27426).
+        $b->positionAtEnd($echoIntTry);
+        $echoIntPayload = $b->call($context->lookupFunction(self::ECHO_INT_EXTRACT_FN), $code);
+        $echoIntNull = $b->icmp(Builder::INT_EQ, $echoIntPayload, $strPtr->constNull());
+        $echoIntHit = $fn->appendBasicBlock('echo_int_hit');
+        $b->branchIf($echoIntNull, $arithTry, $echoIntHit);
+        $b->positionAtEnd($echoIntHit);
+        $b->store($echoIntPayload, $result);
+        $b->branch($done);
         $b->positionAtEnd($p7);
         $b->store($b->add($i, $i64->constInt(1, false)), $idx);
 
@@ -396,6 +411,146 @@ final class M5TrivialEchoNative
         $context->registerFunction(self::EXTRACT_FN, $fn);
     }
 
+
+    /**
+     * `__m5_te_try_extract_echo_int(__string__* code) -> __string__* payload|null`
+     *
+     * Matches `echo <uint>;` after `<?php` (optional ws) and returns a decimal string
+     * payload for the printf emit path (#27426). Rejects leading-zero multi-digit.
+     */
+    private static function ensureEchoIntExtractHelper(Context $context): void
+    {
+        if (null !== $context->module->getNamedFunction(self::ECHO_INT_EXTRACT_FN)) {
+            $context->registerFunction(
+                self::ECHO_INT_EXTRACT_FN,
+                $context->module->getNamedFunction(self::ECHO_INT_EXTRACT_FN)
+            );
+
+            return;
+        }
+
+        LibcExtern::register($context);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $strMap = $context->structFieldMap['__string__'];
+
+        $fn = $context->module->addFunction(
+            self::ECHO_INT_EXTRACT_FN,
+            $context->context->functionType($strPtr, false, $strPtr)
+        );
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $b = $context->builder;
+        $entry = $fn->appendBasicBlock('ei_entry');
+        $miss = $fn->appendBasicBlock('ei_miss');
+        $done = $fn->appendBasicBlock('ei_done');
+        $b->positionAtEnd($entry);
+
+        $result = $b->alloca($strPtr);
+        $b->store($strPtr->constNull(), $result);
+
+        $code = $fn->getParam(0);
+        $codeNull = $b->icmp(Builder::INT_EQ, $code, $strPtr->constNull());
+        $p1 = $fn->appendBasicBlock('ei_p1');
+        $b->branchIf($codeNull, $miss, $p1);
+        $b->positionAtEnd($p1);
+
+        $len = $b->load($b->structGep($code, $strMap['length']));
+        $chars = $b->pointerCast($b->structGep($code, $strMap['value']), $i8p);
+        $needPhp = $i64->constInt(5, false);
+        $short = $b->icmp(Builder::INT_ULT, $len, $needPhp);
+        $p2 = $fn->appendBasicBlock('ei_p2');
+        $b->branchIf($short, $miss, $p2);
+        $b->positionAtEnd($p2);
+
+        $phpTag = $b->pointerCast($context->constantFromString('<?php'), $i8p);
+        $tagCmp = $b->call($context->lookupFunction('strncmp'), $chars, $phpTag, $b->zExt($needPhp, $sizeT));
+        $tagOk = $b->icmp(Builder::INT_EQ, $tagCmp, $i32->constInt(0, false));
+        $p3 = $fn->appendBasicBlock('ei_p3');
+        $b->branchIf($tagOk, $p3, $miss);
+        $b->positionAtEnd($p3);
+
+        $idx = $b->alloca($i64);
+        $b->store($needPhp, $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'ei_ws0');
+
+        $i = $b->load($idx);
+        $rem = $b->sub($len, $i);
+        $needEcho = $i64->constInt(4, false);
+        $echoShort = $b->icmp(Builder::INT_ULT, $rem, $needEcho);
+        $p4 = $fn->appendBasicBlock('ei_p4');
+        $b->branchIf($echoShort, $miss, $p4);
+        $b->positionAtEnd($p4);
+        $echoLit = $b->pointerCast($context->constantFromString('echo'), $i8p);
+        $echoCmp = $b->call(
+            $context->lookupFunction('strncmp'),
+            $b->gep($chars, $i),
+            $echoLit,
+            $b->zExt($needEcho, $sizeT)
+        );
+        $echoOk = $b->icmp(Builder::INT_EQ, $echoCmp, $i32->constInt(0, false));
+        $p5 = $fn->appendBasicBlock('ei_p5');
+        $b->branchIf($echoOk, $p5, $miss);
+        $b->positionAtEnd($p5);
+        $b->store($b->add($i, $needEcho), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'ei_ws1');
+
+        $value = self::emitScanUint($fn, $context, $chars, $len, $idx, 'ei_uint', $miss);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'ei_ws2');
+
+        $i = $b->load($idx);
+        $past = $b->icmp(Builder::INT_UGE, $i, $len);
+        $p6 = $fn->appendBasicBlock('ei_p6');
+        $b->branchIf($past, $miss, $p6);
+        $b->positionAtEnd($p6);
+        $isSemi = $b->icmp(Builder::INT_EQ, $b->load($b->gep($chars, $i)), $i8->constInt(ord(';'), false));
+        $p7 = $fn->appendBasicBlock('ei_p7');
+        $b->branchIf($isSemi, $p7, $miss);
+        $b->positionAtEnd($p7);
+        $b->store($b->add($i, $i64->constInt(1, false)), $idx);
+        self::emitSkipWsIn($fn, $context, $chars, $len, $idx, 'ei_ws3');
+        $atEnd = $b->icmp(Builder::INT_EQ, $b->load($idx), $len);
+        $p8 = $fn->appendBasicBlock('ei_p8');
+        $b->branchIf($atEnd, $p8, $miss);
+        $b->positionAtEnd($p8);
+
+        $numBuf = $b->arrayAlloca($i8, $i64->constInt(32, false));
+        $fmt = $b->pointerCast($context->constantFromString('%ld'), $i8p);
+        $nwritten = $b->call(
+            $context->lookupFunction('snprintf'),
+            $numBuf,
+            $b->zExt($i64->constInt(32, false), $sizeT),
+            $fmt,
+            $value
+        );
+        $nwOk = $b->icmp(Builder::INT_SGT, $nwritten, $i32->constInt(0, false));
+        $p9 = $fn->appendBasicBlock('ei_p9');
+        $b->branchIf($nwOk, $p9, $miss);
+        $b->positionAtEnd($p9);
+        $payload = $b->call(
+            $context->lookupFunction('__string__init'),
+            $b->zExt($nwritten, $i64),
+            $b->pointerCast($numBuf, $context->getTypeFromString('char*'))
+        );
+        $b->store($payload, $result);
+        $b->branch($done);
+
+        $b->positionAtEnd($miss);
+        $b->store($strPtr->constNull(), $result);
+        $b->branch($done);
+
+        $b->positionAtEnd($done);
+        $b->returnValue($b->load($result));
+
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->registerFunction(self::ECHO_INT_EXTRACT_FN, $fn);
+    }
 
     /**
      * `__m5_te_try_extract_arith(__string__* code) -> __string__* payload|null`

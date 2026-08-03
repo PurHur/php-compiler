@@ -43,8 +43,23 @@ final class M5TrivialEchoScriptTest extends TestCase
     public function testTryBuildRejectsNonEcho(): void
     {
         require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
-        $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo 1;', 't.php'));
         $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile('<?php $a=1;', 't.php'));
+        $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo \'x\';', 't.php'));
+        $this->assertNull(\PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo 01;', 't.php'));
+    }
+
+    public function testTryBuildEchoIntLiteral(): void
+    {
+        require_once dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoScript.php';
+        $script = \PHPCompiler\JIT\M5TrivialEchoScript::tryBuild('<?php echo 42;', 'ei.php');
+        $this->assertNotNull($script, '#27426 echo <int> shape');
+        $echo = $script->main->cfg->children[0];
+        $this->assertInstanceOf(\PHPCfg\Op\Terminal\Echo_::class, $echo);
+        $this->assertInstanceOf(\PHPCfg\Operand\Literal::class, $echo->expr);
+        $this->assertSame('42', $echo->expr->value);
+        $block = \PHPCompiler\JIT\M5TrivialEchoScript::parseAndCompile('<?php echo 42;', 'ei.php');
+        $this->assertInstanceOf(\PHPCompiler\Block::class, $block);
+        $this->assertSame('42', $block->constants[0]->toString());
     }
 
     public function testTryBuildAssignPlusEchoFoldsSum(): void
@@ -110,6 +125,7 @@ final class M5TrivialEchoScriptTest extends TestCase
         $native = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/M5TrivialEchoNative.php');
         $this->assertStringContainsString('__m5_te_try_extract', $native);
         $this->assertStringContainsString('__m5_te_try_extract_arith', $native);
+        $this->assertStringContainsString('__m5_te_try_extract_echo_int', $native);
         $this->assertStringContainsString('__m5_te_emit_to_path', $native);
         $this->assertStringContainsString('#27426', $native);
     }

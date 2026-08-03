@@ -13,9 +13,13 @@ namespace PHPCompiler\JIT;
  * {@see \PhpParser\Parser} surface used by PHPCfg\Parser::parse plus identity traverser /
  * magic-resolver stubs so FORCE_PARSER NestedJIT can call through without null peers.
  *
- * {@see parse()} hand-builds PhpParser AST for the same limited shapes as
- * {@see M5TrivialEchoScript} (echo string / assign+plus+echo). Broader PHP still needs
- * NestedJIT of real Php7 (or an expanded hand-builder) — not emit-time Php7 allocation.
+ * {@see parse()} hand-builds PhpParser AST for:
+ * - echo string / assign+plus+echo (same as {@see M5TrivialEchoScript})
+ * - `echo <unsigned-int>;` — also on {@see M5TrivialEchoNative} / Script (#27426);
+ *   Zend peer→PHPCfg Script proves AST path; NestedJIT peer AST ctors still abort
+ *
+ * Broader PHP still needs NestedJIT of real Php7 (or an expanded hand-builder) —
+ * not emit-time Php7 allocation.
  */
 final class M5ParserAstPeer implements \PhpParser\Parser
 {
@@ -36,6 +40,10 @@ final class M5ParserAstPeer implements \PhpParser\Parser
         $echo = self::tryEchoStringAst($rest);
         if (null !== $echo) {
             return $echo;
+        }
+        $echoInt = self::tryEchoIntAst($rest);
+        if (null !== $echoInt) {
+            return $echoInt;
         }
 
         return self::tryAssignPlusEchoAst($rest);
@@ -162,6 +170,39 @@ final class M5ParserAstPeer implements \PhpParser\Parser
         return [
             new \PhpParser\Node\Stmt\Echo_([
                 new \PhpParser\Node\Scalar\String_($value),
+            ]),
+        ];
+    }
+
+    /**
+     * `echo <unsigned-int>;` → Echo AST (#27426). Same shape as
+     * {@see M5TrivialEchoScript::tryBuild} / Native extract — Zend peer proves
+     * PhpParser AST → PHPCfg\Script; NestedJIT of this body still aborts on Node ctors.
+     *
+     * @return list<\PhpParser\Node\Stmt>|null
+     */
+    private static function tryEchoIntAst(string $rest): ?array
+    {
+        if (!str_starts_with($rest, 'echo')) {
+            return null;
+        }
+        $i = self::skipWs($rest, 4);
+        $value = self::scanUnsignedInt($rest, $i);
+        if (null === $value) {
+            return null;
+        }
+        $i = self::skipWs($rest, $i);
+        if ($i >= strlen($rest) || $rest[$i] !== ';') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 1);
+        if ($i !== strlen($rest)) {
+            return null;
+        }
+
+        return [
+            new \PhpParser\Node\Stmt\Echo_([
+                new \PhpParser\Node\Scalar\LNumber($value),
             ]),
         ];
     }

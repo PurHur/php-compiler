@@ -23,11 +23,14 @@ use PHPLLVM\Value;
  *   echo "TOKEN\n";
  *
  *   <?php
+ *   echo 42;            // decimal literal echo (#27426 peer/native)
+ *
+ *   <?php
  *   $a = 1 + 2; echo $a;
  *
  * Also accepts a leading preamble of declare(...);, line comments, and block comments
- * (examples/000-HelloWorld/example.php) — still a single double-quoted echo body, or the
- * assign-plus-echo shape above (folded to a literal echo of the sum).
+ * (examples/000-HelloWorld/example.php) — still a single double-quoted echo body, integer
+ * echo, or the assign-plus-echo shape above (folded to a literal echo of the sum).
  * Avoids NestedJIT of PHPCfg\Parser / Compiler::compileEmitSmoke (mid-BB verify /
  * optimize fatals). Host-verified Block matches compileEmitSmoke output for these shapes.
  */
@@ -47,6 +50,10 @@ final class M5TrivialEchoScript
         $echo = self::tryBuildEchoBody($rest, $filename);
         if (null !== $echo) {
             return $echo;
+        }
+        $echoInt = self::tryBuildEchoIntBody($rest, $filename);
+        if (null !== $echoInt) {
+            return $echoInt;
         }
 
         return self::tryBuildAssignPlusEchoBody($rest, $filename);
@@ -98,6 +105,31 @@ final class M5TrivialEchoScript
         }
 
         return self::scriptEchoingLiteral($value, $filename);
+    }
+
+    /**
+     * `echo <unsigned-int>;` → literal echo of decimal digits (#27426).
+     */
+    private static function tryBuildEchoIntBody(string $rest, string $filename): ?Script
+    {
+        if (!str_starts_with($rest, 'echo')) {
+            return null;
+        }
+        $i = self::skipWs($rest, 4);
+        $value = self::scanUnsignedInt($rest, $i);
+        if (null === $value) {
+            return null;
+        }
+        $i = self::skipWs($rest, $i);
+        if ($i >= strlen($rest) || $rest[$i] !== ';') {
+            return null;
+        }
+        $i = self::skipWs($rest, $i + 1);
+        if ($i !== strlen($rest)) {
+            return null;
+        }
+
+        return self::scriptEchoingLiteral((string) $value, $filename);
     }
 
     /**
