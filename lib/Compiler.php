@@ -42620,6 +42620,9 @@ class Compiler {
     /**
      * Lower Closure::fromCallable(constant) to TYPE_FROM_CALLABLE — same as FCC (#26788).
      *
+     * Marks {@see OpCode::$fromCallableApi} so VM/JIT use Closure::fromCallable semantics
+     * (bind `$this` for `[Class, instanceMethod]`, TypeError prefix) rather than FCC (#27138).
+     *
      * @return OpCode[]|null
      */
     private function tryCompileClosureFromCallableAsFcc(Op\Expr\StaticCall $expr, Block $block): ?array
@@ -42650,6 +42653,7 @@ class Compiler {
             $result,
             $callableSlot
         );
+        $fromCallable->fromCallableApi = true;
         $this->assignSourceMetadata($fromCallable, $expr);
 
         return [$fromCallable];
@@ -42702,9 +42706,10 @@ class Compiler {
 
     private function literalCallableArrayElementString(Operand $op, Block $block): ?string
     {
-        $direct = $this->staticNameFromOperand($op);
-        if (null !== $direct) {
-            return $direct;
+        // Only true string literals — Variable(name) may be `$this` / `$obj` and must not
+        // fold to a class-name string for Closure::fromCallable (#27137, #27138, #23688).
+        if ($op instanceof Operand\Literal && \is_string($op->value)) {
+            return $op->value;
         }
         if (null === $block->orig) {
             return null;

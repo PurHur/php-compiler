@@ -12471,6 +12471,39 @@ class JIT {
                             $this->context->fccClosureCallByResultSlot[(int) $op->arg1] = $closureVar->closureCall;
                         }
                         $this->assignOperand($block->getOperand($op->arg1), $closureVar, true);
+                    } catch (\TypeError $e) {
+                        // Closure::fromCallable TypeError precedes Error (TypeError extends Error) (#27138).
+                        $file = '';
+                        $line = 0;
+                        if (null !== $op->sourceLocation) {
+                            $file = $op->sourceLocation->filename;
+                            $line = $op->sourceLocation->startLine;
+                        }
+                        if ('' === $file) {
+                            $file = $block->scriptPath();
+                            if ('' === $file) {
+                                $file = $this->context->jitAotEntryScriptPath;
+                            }
+                        }
+                        if ([] !== $this->context->tryCatch->handlerStack) {
+                            JIT\TryCatchHelper::emitCatchableClassError(
+                                $this->context,
+                                'TypeError',
+                                $e->getMessage(),
+                                $this,
+                                $file,
+                                $line
+                            );
+                        } else {
+                            JIT\TryCatchHelper::emitPendTypeErrorForCaller($this->context, $e->getMessage());
+                            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\TypeErrorRaise::emitRaise($this->context, $e->getMessage());
+                            JIT\Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this->context);
+                        }
+                        $this->context->builder->clearInsertionPosition();
+
+                        return $origBasicBlock;
                     } catch (\Error $e) {
                         // Compile-time FCC reject → catchable runtime Error at FCC site (#24397, #27106).
                         $file = '';

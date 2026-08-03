@@ -31,7 +31,12 @@ final class VmFromCallable
         if (isset($block->constants[$callableSlot])) {
             $const = $block->constants[$callableSlot];
             if (VmVariable::TYPE_STRING === $const->type) {
-                return self::fromStringCallable($context, $block, $const->toString());
+                return self::fromStringCallable(
+                    $context,
+                    $block,
+                    $const->toString(),
+                    $op->fromCallableApi
+                );
             }
         }
 
@@ -73,11 +78,15 @@ final class VmFromCallable
      */
     public static function fromCallableString(Context $context, string $name, ?Block $block = null): JitVariable
     {
-        return self::fromStringCallable($context, $block ?? new Block(), $name);
+        return self::fromStringCallable($context, $block ?? new Block(), $name, true);
     }
 
-    private static function fromStringCallable(Context $context, Block $block, string $name): JitVariable
-    {
+    private static function fromStringCallable(
+        Context $context,
+        Block $block,
+        string $name,
+        bool $fromCallableApi = false
+    ): JitVariable {
         // php-src compile-fatal for `new Class(...)` FCC on every version (#10130, #26188).
         if (str_starts_with($name, 'new ')) {
             throw new \LogicException('Cannot create Closure for new expression');
@@ -87,7 +96,33 @@ final class VmFromCallable
             [$className, $methodName] = explode('::', $name, 2);
             $declaringClassLc = strtolower($className);
             $methodLc = strtolower($methodName);
-            self::assertStaticMethodFcc($context, $declaringClassLc, $methodLc, $className, $methodName);
+            // Closure::fromCallable([Class, instanceMethod]) binds caller $this (#27138 / #23771).
+            if ($fromCallableApi && self::isKnownNonStaticMethod($context, $declaringClassLc, $methodLc)) {
+                if (self::blockIsStaticMethodContext($block)) {
+                    throw new \TypeError(
+                        'Failed to create closure from callable: non-static method '
+                        .$className.'::'.$methodName.'() cannot be called statically'
+                    );
+                }
+                $thisOp = new \PHPCfg\Operand\Variable(new \PHPCfg\Operand\Literal('this'));
+
+                return self::fromBoundMethodCallable(
+                    $context,
+                    $block,
+                    $thisOp,
+                    $methodLc,
+                    $className,
+                    false
+                );
+            }
+            self::assertStaticMethodFcc(
+                $context,
+                $declaringClassLc,
+                $methodLc,
+                $className,
+                $methodName,
+                $fromCallableApi
+            );
             $proxyName = self::resolveStaticProxyName($context, $block, $declaringClassLc, $methodLc, $className, $methodName);
             $proxy = $context->resolveFunctionProxy($proxyName);
 
@@ -181,6 +216,18 @@ final class VmFromCallable
         return $context->type->object->parentClassDisplayName($callerLc);
     }
 
+    private static function resolveSelfScopeClassName(Context $context, Block $block): ?string
+    {
+        $callerLc = self::resolveCallerScopeClassLc($context, $block);
+        if (null === $callerLc || '' === $callerLc) {
+            return null;
+        }
+
+        return $context->type->object->classNameForId(
+            $context->type->object->lookup($callerLc)
+        );
+    }
+
     private static function resolveParentScopeClassLc(Context $context, Block $block): ?string
     {
         $callerLc = self::resolveCallerScopeClassLc($context, $block);
@@ -209,7 +256,8 @@ final class VmFromCallable
         string $calledClassLc,
         string $methodLc,
         string $calledClassName,
-        string $methodDisplay
+        string $methodDisplay,
+        bool $fromCallableApi = false
     ): void {
         if ($context->type->object->isEnumClassLc(strtolower(ltrim($calledClassLc, '\\')))
             && 'cases' === $methodLc) {
@@ -225,6 +273,11 @@ final class VmFromCallable
                     $vis = $context->type->object->methodVisibility($classId, $methodLc);
                     if (0 === ($vis & \PHPCfg\Func::FLAG_STATIC)) {
                         $declaringName = $context->type->object->classNameForId($classId);
+                        $detail = 'non-static method '.$declaringName.'::'.$methodDisplay
+                            .'() cannot be called statically';
+                        if ($fromCallableApi) {
+                            throw new \TypeError('Failed to create closure from callable: '.$detail);
+                        }
                         throw new \Error(
                             'Non-static method '.$declaringName.'::'.$methodDisplay.'() cannot be called statically'
                         );
@@ -239,6 +292,43 @@ final class VmFromCallable
             }
             $current = $parent;
         }
+    }
+
+    private static function isKnownNonStaticMethod(
+        Context $context,
+        string $calledClassLc,
+        string $methodLc
+    ): bool {
+        $visited = [];
+        $current = strtolower(ltrim($calledClassLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            if ($context->type->object->hasDeclaredClass($current)) {
+                $classId = $context->type->object->lookup($current);
+                if ($context->type->object->hasMethod($classId, $methodLc)) {
+                    $vis = $context->type->object->methodVisibility($classId, $methodLc);
+
+                    return 0 === ($vis & \PHPCfg\Func::FLAG_STATIC);
+                }
+            }
+            $parent = $context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return false;
+    }
+
+    private static function blockIsStaticMethodContext(Block $block): bool
+    {
+        if (null === $block->func) {
+            return true;
+        }
+
+        return (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0
+            || null === $block->func->class;
     }
 
     private static function resolveStaticProxyName(
