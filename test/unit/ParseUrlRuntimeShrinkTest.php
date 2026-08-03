@@ -39,7 +39,12 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('emitParseParts', $source);
         $this->assertStringNotContainsString('__phpc_parse_url_strdup0', $source);
+        $this->assertStringContainsString('ParseUrlAssocLlvm', $source);
         $this->assertLessThan(300, \substr_count($source, "\n") + 1);
+        $assoc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlAssocLlvm.php');
+        $this->assertStringContainsString('setStringKeyString', $assoc);
+        $this->assertStringContainsString('lastString', $assoc);
+        $this->assertLessThan(220, \substr_count($assoc, "\n") + 1);
     }
 
     public function testParseUrlJitHelperMatchesVmString(): void
