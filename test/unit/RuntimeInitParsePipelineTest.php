@@ -61,6 +61,11 @@ final class RuntimeInitParsePipelineTest extends TestCase
         $this->assertStringContainsString('Type::string()', $jit);
         $pos = strpos($jit, 'M5 argv NestedJIT of Runtime::parse');
         $this->assertNotFalse($pos, 'ABI force comment for #26756 must remain');
+        $this->assertStringContainsString('isM5NestedJitPhpCfgParserParse', $jit);
+        $this->assertStringContainsString('effectiveReturnCallbackType', $jit);
+        $this->assertStringContainsString('PHPCfg\\Parser::parse', $jit);
+        $parserAbi = strpos($jit, 'M5 argv NestedJIT of PHPCfg\\Parser::parse');
+        $this->assertNotFalse($parserAbi, 'Parser::parse ABI force for #27426 must remain');
     }
 
     public function testPrepareSpineIdentityWiredBeforeVoidStubs(): void

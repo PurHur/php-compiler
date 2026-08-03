@@ -1499,6 +1499,56 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * NestedJIT of PHPCfg\Parser::parse under M5 argv host-compile (#27426 / #26756).
+     *
+     * Vendor parse() has no PHP type hints; CFG defaults to __value__ params/return while
+     * RuntimeParseM5Native calls (__object__*, __string__*, __string__*) -> __object__*.
+     */
+    private function isM5NestedJitPhpCfgParserParse(?string $logicalName): bool
+    {
+        if (null === $logicalName
+            || !$this->shouldUseM5DriverHostCompile()
+            || !JIT\NestedJitCompileScope::isActive()
+        ) {
+            return false;
+        }
+        $lc = strtolower($logicalName);
+        if ('phpcfg\\parser::parse' === $lc
+            || 'php\\cfg\\parser::parse' === $lc
+            || (str_ends_with($lc, '\\parser::parse') && str_contains($lc, 'cfg'))
+        ) {
+            return true;
+        }
+        // activeFunction / llvmInternalName may be mangled PHPCfg_Parser__parse
+        if ('phpcfg_parser__parse' === $lc) {
+            return true;
+        }
+        if (str_ends_with($lc, '_parser__parse') && str_contains($lc, 'cfg')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Return-ABI string for the function currently being lowered.
+     * Prefers the LLVM signature forced at create (Parser::parse → __object__*) over
+     * untyped CFG default __value__ (#27426).
+     */
+    private function effectiveReturnCallbackType(?\PHPCfg\Func $cfgFunc): ?string
+    {
+        if ($this->isM5NestedJitPhpCfgParserParse($this->context->activeFunction)) {
+            return '__object__*';
+        }
+        $expected = $this->cfgFunctionReturnCallbackType($cfgFunc);
+        if (null === $expected && null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
+        }
+
+        return $expected;
+    }
+
     /** Identity prepare/preprocess/rewrite stubs before parse host-lower (#26756 / #11809). */
     private function ensureM5ArgvPrepareSpineIdentityStubs(): void
     {
@@ -2300,6 +2350,12 @@ class JIT {
             ) {
                 $callbackType = 'void';
             }
+            // M5 argv NestedJIT of PHPCfg\Parser::parse: untyped CFG defaults to __value__
+            // return + mixed params, but RuntimeParseM5Native calls
+            // parse(__object__*, __string__*, __string__*) -> __object__* (Script) (#27426).
+            if ($this->isM5NestedJitPhpCfgParserParse($logicalName)) {
+                $callbackType = '__object__*';
+            }
             $returnType = $this->context->getTypeFromString($callbackType);
             $this->context->functionReturnType[strtolower($logicalName ?? $internalName)] = $callbackType;
 
@@ -2336,6 +2392,12 @@ class JIT {
                         $type = $this->context->getTypeFromString('__string__*');
                         $rawType = Type::string();
                     }
+                }
+                // PHPCfg\Parser::parse($code, $fileName) — no declared types in vendor;
+                // force __string__* so RuntimeParseM5Native call sites type-check (#27426).
+                if ($this->isM5NestedJitPhpCfgParserParse($logicalName)) {
+                    $type = $this->context->getTypeFromString('__string__*');
+                    $rawType = Type::string();
                 }
                 $callbackType .= $callbackSep . $this->context->getStringFromType($type);
                 $callbackSep = ', ';
@@ -10962,10 +11024,7 @@ class JIT {
                             return $origBasicBlock;
                         }
                         $retval = $this->context->helper->loadValue($return);
-                        $expected = $this->cfgFunctionReturnCallbackType($block->func);
-                        if (null === $expected && null !== $this->context->activeFunction) {
-                            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
-                        }
+                        $expected = $this->effectiveReturnCallbackType($block->func);
                         $retval = $this->coerceReturnValue($return, $retval, $expected);
                         $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
                         $this->context->builder->returnValue($retval);
@@ -12685,10 +12744,7 @@ class JIT {
         if (!$this->emitJitScalarReturnTypeCheck($block, $value)) {
             return;
         }
-        $expected = $this->cfgFunctionReturnCallbackType($block->func);
-        if (null === $expected && null !== $this->context->activeFunction) {
-            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
-        }
+        $expected = $this->effectiveReturnCallbackType($block->func);
         $retval = $this->coerceReturnValue($value, $this->context->helper->loadValue($value), $expected);
         $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
         $builder->returnValue($retval);
@@ -12755,6 +12811,13 @@ class JIT {
     {
         if ('__object__*' === $expected && Variable::TYPE_OBJECT === $return->type) {
             return $retval;
+        }
+        // Untyped CFG may box Script into __value__; M5 Parser::parse ABI wants __object__* (#27426).
+        if ('__object__*' === $expected && Variable::TYPE_VALUE === $return->type) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+            );
         }
         if ('__value__*' === $expected) {
             if (null !== $return->nestedHelperValueSlot) {
@@ -13071,6 +13134,22 @@ class JIT {
         }
         if ('__value__' === $wantStr && '__value__*' === $haveStr) {
             return $this->context->builder->load($retval);
+        }
+        // M5 Parser::parse: body may still emit __value__ while signature is __object__* (#27426).
+        if ('__object__*' === $wantStr && '__value__' === $haveStr) {
+            $tmp = $this->context->builder->alloca($have);
+            $this->context->builder->store($retval, $tmp);
+
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $tmp
+            );
+        }
+        if ('__object__*' === $wantStr && '__value__*' === $haveStr) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $retval
+            );
         }
         if ('__value__' === $wantStr && ('int64' === $haveStr || 'long long' === $haveStr)) {
             $slot = JIT\JitValueBox::alloc($this->context);

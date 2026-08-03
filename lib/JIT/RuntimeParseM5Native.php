@@ -16,8 +16,10 @@ use PHPLLVM\Value;
  *   is not in the argv driver today (nm shows no Parser symbols).
  *
  * Prefer real Parser::parse when NestedJIT-registered ({@see RuntimeParseM5PhpCfgParser}).
- * Functional-smoke `echo "TOKEN"` is handled by {@see M5TrivialEchoScript::parseAndCompile}
- * when NestedJIT-registered (opt-in PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT) via
+ * Call ABI: parse(this __object__*, code __string__*, file __string__*) -> Script __object__*
+ * (forced under M5 NestedJIT — #27426). Functional-smoke `echo "TOKEN"` is handled by
+ * {@see M5TrivialEchoScript::parseAndCompile} when NestedJIT-registered (opt-in
+ * PHP_COMPILER_M5_TRIVIAL_ECHO_NESTEDJIT) via
  * {@see BootstrapCompileSmokeM3Emit::emitRuntimeParseAndCompileDefault}.
  */
 final class RuntimeParseM5Native
