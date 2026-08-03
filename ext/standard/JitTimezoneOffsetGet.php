@@ -49,7 +49,6 @@ final class JitTimezoneOffsetGet
 
         return self::lower(
             $context,
-            'timezone_offset_get',
             self::ZONE_TYPE_ERROR,
             self::DATETIME_TYPE_ERROR,
             $args[0],
@@ -68,7 +67,6 @@ final class JitTimezoneOffsetGet
 
         return self::lower(
             $context,
-            'DateTimeZone::getOffset',
             self::METHOD_ZONE_TYPE_ERROR,
             self::METHOD_DATETIME_TYPE_ERROR,
             $args[0],
@@ -78,7 +76,6 @@ final class JitTimezoneOffsetGet
 
     private static function lower(
         Context $context,
-        string $function,
         string $zoneTypeError,
         string $datetimeTypeError,
         JITVariable $zoneArg,
