@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * gregoriantojd() — Gregorian serial day number (php-src ext/calendar/calendar.c; #7223).
+ * gregoriantojd() — Gregorian serial day number (php-src ext/calendar/calendar.c; #7223 / #27386).
  *
  * Z_PARAM_LONG args — null soft-null DEP+coerce via CalendarArgs (#24967).
  */
@@ -40,6 +40,12 @@ final class gregoriantojd extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gregoriantojd() is not implemented for JIT in this compiler build (issue #7223)');
+        if (3 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'gregoriantojd() expects exactly 3 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitGregoriantojd::invoke($context, ...$args);
     }
 }
