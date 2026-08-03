@@ -41,13 +41,15 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('getservbynameLookup', $nameLookup);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $nameLookup);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $nameLookup);
-        $this->assertStringContainsString('/ext/standard/VmNetworkServices.php', $nameLookup);
+        $this->assertStringContainsString('/ext/standard/NetworkServicesNameLookupThinAot.php', $nameLookup);
+        $this->assertStringNotContainsString('/ext/standard/VmNetworkServices.php', $nameLookup);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $nameLookup);
         $this->assertStringNotContainsString('parseAndCompile', $nameLookup);
         $this->assertStringNotContainsString('new JIT(', $nameLookup);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $nameLookup);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $nameLookup);
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesJit.php');
+        $this->assertFileExists($this->repoRoot.'/ext/standard/NetworkServicesNameLookupThinAot.php');
         $this->assertFileExists($this->repoRoot.'/ext/standard/NetworkServicesNameLookupJitHelper.php');
     }
 
