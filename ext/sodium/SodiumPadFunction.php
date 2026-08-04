@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -34,6 +35,12 @@ abstract class SodiumPadFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() JIT is not supported in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, $this->getName(), 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        $string = JitStringBuiltinArg::lower($context, $args[0], $this->getName(), 0, 'string');
+        $blockSize = $this->jitLong($context, $args[1], $this->getName().' block_size');
+
+        return JitSodium::invokePad($context, $this->getName(), $string, $blockSize);
     }
 }

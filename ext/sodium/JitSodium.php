@@ -87,6 +87,11 @@ final class JitSodium
         );
     }
 
+    public static function invokePad(Context $context, string $name, Value $string, Value $blockSize): Value
+    {
+        return StringSodium::invokePadHelper($context, $name, $string, $blockSize);
+    }
+
     public static function invokeStreamXor(
         Context $context,
         string $name,
