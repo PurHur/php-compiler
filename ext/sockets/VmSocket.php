@@ -263,6 +263,66 @@ final class VmSocket
         }
     }
 
+    /**
+     * socket_create() under JIT/AOT — owned BSD fd keyed by object address (#27394).
+     *
+     * @param int|null $domain AF_* family stored as php_sock->type
+     */
+    public static function registerJitOwnedFd(int $objAddr, int $fd, ?int $domain = null): void
+    {
+        if ($objAddr <= 0 || $fd < 0) {
+            return;
+        }
+        self::$hostSocketFds[$objAddr] = $fd;
+        self::$ownedFds[$objAddr] = true;
+        self::$jitHandleFds[$objAddr] = $fd;
+        if (null !== $domain) {
+            self::$domains[$objAddr] = $domain;
+        }
+    }
+
+    public static function ownedFdForLookupKey(int $key): ?int
+    {
+        if ($key <= 0 || !isset(self::$ownedFds[$key])) {
+            return null;
+        }
+
+        return self::$hostSocketFds[$key] ?? self::$jitHandleFds[$key] ?? null;
+    }
+
+    public static function releaseForLookupKey(int $key): void
+    {
+        if ($key <= 0) {
+            return;
+        }
+        unset(
+            self::$streamResources[$key],
+            self::$streamHandles[$key],
+            self::$hostSocketFds[$key],
+            self::$ownedFds[$key],
+            self::$domains[$key],
+            self::$jitHandleFds[$key]
+        );
+    }
+
+    public static function existingStreamHandleForLookupKey(int $key): ?int
+    {
+        if ($key <= 0) {
+            return null;
+        }
+        $handle = self::$streamHandles[$key] ?? null;
+        if (null === $handle) {
+            return null;
+        }
+        if (!VmFs::isValidHandle($handle)) {
+            unset(self::$streamHandles[$key]);
+
+            return null;
+        }
+
+        return $handle;
+    }
+
     public static function fdForLookupKey(int $key): ?int
     {
         if ($key <= 0) {

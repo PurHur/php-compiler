@@ -56,6 +56,11 @@ final class socket_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_create() JIT lowering not implemented (#19286)');
+        $argc = \count($args);
+        if (3 !== $argc) {
+            return JitSocketCreate::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSocketCreate::invoke($context, $args[0], $args[1], $args[2]);
     }
 }

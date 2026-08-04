@@ -1798,6 +1798,16 @@ require_once __DIR__.'/../../../ext/sockets/JitSocketExportStream.php';
 require_once __DIR__.'/../../../ext/sockets/JitSocketImportStream.php';
 require_once __DIR__.'/../../../ext/sockets/Module.php';
 require_once __DIR__.'/../../../ext/sockets/SocketAtmarkJitHelper.php';
+require_once __DIR__.'/../../../ext/sockets/JitSocketClose.php';
+require_once __DIR__.'/../../../ext/sockets/JitSocketCreate.php';
+require_once __DIR__.'/../../../ext/sockets/SocketCloseJitHelper.php';
+require_once __DIR__.'/../../../ext/sockets/SocketCreateJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SocketCloseRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SocketCreateRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketClose.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketCreate.php';
+require_once __DIR__.'/../../../lib/JIT/HashTableKeyFilterLlvm.php';
+
 require_once __DIR__.'/../../../ext/sockets/SocketConstants.php';
 require_once __DIR__.'/../../../ext/sockets/SocketExportStreamJitHelper.php';
 require_once __DIR__.'/../../../ext/sockets/SocketImportStreamJitHelper.php';
