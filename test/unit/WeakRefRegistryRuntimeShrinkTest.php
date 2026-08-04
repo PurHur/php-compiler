@@ -14,9 +14,10 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/WeakRefRegistryRuntime.php');
         $this->assertStringContainsString('WeakRefRegistryJitHelper', $source);
-        // Ref register/clear use LLVM globals for AOT standalone (#26795); maps stay on JitHelper.
-        $this->assertStringContainsString('WeakRefRegistryJitHelper::registerMap', $source);
+        // Ref + map register/clear use LLVM globals for AOT standalone (#26795, #27621).
         $this->assertStringContainsString('phpc_wr_ref_count', $source);
+        $this->assertStringContainsString('phpc_wr_map_count', $source);
+        $this->assertStringContainsString('emitClearMapLoop', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
@@ -30,9 +31,7 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('wr_reg_ref_bridge_check_max', $source);
         $this->assertStringNotContainsString('wr_reg_map_bridge_check_key', $source);
         $this->assertStringNotContainsString('emitClearRefLoop', $source);
-        $this->assertStringNotContainsString('emitClearMapLoop', $source);
         $this->assertStringNotContainsString('wr_clear_refs_do', $source);
-        $this->assertStringContainsString('sext($i, $i64)', $source);
     }
 
     public function testWeakRefRegistryJitHelperRegisterGuards(): void
