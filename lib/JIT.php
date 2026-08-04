@@ -7989,6 +7989,20 @@ class JIT {
                         $paramArg = $this->prepareNestedJitCalleeParamArgument($args[$argIdx]);
                         $this->assignOperand($param->result, $paramArg, true);
                     }
+                    // Ternary/branch arms use distinct SSA Operand objects for the same CV.
+                    // Without a name binding, ARG_SEND in an arm allocates a fresh null
+                    // `__value__` box (Temporary fallback) and count() sees null (#27624).
+                    $paramName = JIT\OperandName::resolve($param->result);
+                    if (
+                        null !== $paramName
+                        && '' !== $paramName
+                        && $this->context->hasVariableOp($param->result)
+                    ) {
+                        $this->context->bindVariableByName(
+                            $paramName,
+                            $this->context->getVariableFromOp($param->result)
+                        );
+                    }
                 }
                 $captureSlots = JIT\ClosureHelper::orderedCaptureSlots($block);
                 if ([] !== $captureSlots) {
@@ -21906,11 +21920,11 @@ class JIT {
                     continue;
                 }
                 $name = JIT\OperandName::resolve($op);
+                // Named CVs (params / locals) are never "anon" temps — nulling them at a
+                // JUMPIF edge clears live values still read in ternary/if arms (#27624:
+                // DNF `__value__*` param `$x` + `is_array($x) ? count($x) : …`).
                 if (null !== $name && '' !== $name) {
-                    $resolved = $this->context->resolveRefAliasName($name);
-                    if (isset($this->context->namedVariableBindings[$resolved])) {
-                        continue;
-                    }
+                    continue;
                 }
                 if (!$this->context->scope->variables->contains($op) && !$this->context->hasVariableOp($op)) {
                     continue;
@@ -21918,16 +21932,16 @@ class JIT {
                 $var = $this->context->hasVariableOp($op)
                     ? $this->context->getVariableFromOp($op)
                     : $this->context->scope->variables[$op];
+                // Only owned KIND_VARIABLE allocas. KIND_VALUE often aliases a live CV /
+                // caller `__value__*` (DNF/mixed params); writeNull would clear storage
+                // still read in ternary arms (#27624).
                 if (
                     Variable::TYPE_VALUE !== $var->type
+                    || Variable::KIND_VARIABLE !== $var->kind
                     || $var->functionStaticGlobal
                     || $var->borrowedValueEntry
                     || null !== $var->superglobalName
                     || null !== $var->valueBoxAliasPtr
-                    || (
-                        Variable::KIND_VARIABLE !== $var->kind
-                        && Variable::KIND_VALUE !== $var->kind
-                    )
                 ) {
                     continue;
                 }

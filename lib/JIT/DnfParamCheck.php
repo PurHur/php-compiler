@@ -476,8 +476,27 @@ final class DnfParamCheck
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $expectedTy = $i8->constInt($vmTy, false);
-        $isTy = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expectedTy);
+        // Value-box writers store JIT tags (TYPE_HASHTABLE=135, TYPE_OBJECT=133, …).
+        // Comparing raw VM TYPE_ARRAY (6) missed arrays and fell through to
+        // emitObjectFailureMessage → __value__readObject(null) → AOT segfault (#27624).
+        // Mask IS_REFCOUNTED like __value__readHashtable (#26977).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $jitTy = Variable::jitTypeByteFromVmType($vmTy);
+        $isTy = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt($jitTy & 0x7f, false)
+        );
+        // Some slots still carry bare VM TYPE_ARRAY (6); accept that for array arms too
+        // (peer ArrayColumnLlvm — #27624 / #26977).
+        if (\PHPCompiler\VM\Variable::TYPE_ARRAY === $vmTy) {
+            $isVmArray = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kind,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+            );
+            $isTy = $context->builder->or($isTy, $isVmArray);
+        }
 
         return new Variable(
             $context,
@@ -564,11 +583,79 @@ final class DnfParamCheck
         }
         $objectType = $context->type->object;
         assert($objectType instanceof ObjectType);
-        if (Variable::TYPE_OBJECT === $arg->type || Variable::TYPE_VALUE === $arg->type) {
+        if (Variable::TYPE_OBJECT === $arg->type) {
             self::emitObjectFailureMessage($context, $objectType, $arg, $kind, $expected);
 
             return;
         }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            // Do not assume TYPE_VALUE is an object — arrays/scalars use the same box
+            // and __value__readObject returns null → segfault (#27624).
+            self::emitValueBoxFailureMessage($context, $objectType, $arg, $kind, $expected);
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            sprintf('%s must be of type %s, mixed given', $kind, $expected)
+        );
+    }
+
+    private static function emitValueBoxFailureMessage(
+        Context $context,
+        ObjectType $objectType,
+        Variable $arg,
+        string $kind,
+        string $expected
+    ): void {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kindByte = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $check = $context->builder->getInsertBlock();
+        $labels = [
+            ['int', Variable::TYPE_NATIVE_LONG],
+            ['float', Variable::TYPE_NATIVE_DOUBLE],
+            ['bool', Variable::TYPE_NATIVE_BOOL],
+            ['string', Variable::TYPE_STRING & 0x7f],
+            ['null', Variable::TYPE_NULL],
+            ['array', Variable::TYPE_HASHTABLE & 0x7f],
+            ['array', \PHPCompiler\VM\Variable::TYPE_ARRAY],
+        ];
+        foreach ($labels as [$label, $ty]) {
+            $match = $fn->appendBasicBlock('dnf_fail_value_'.$label.'_'.$ty);
+            $next = $fn->appendBasicBlock('dnf_fail_value_try_'.$label.'_'.$ty);
+            $context->builder->positionAtEnd($check);
+            $isTy = $context->builder->icmp(
+                Builder::INT_EQ,
+                $kindByte,
+                $i8->constInt($ty, false)
+            );
+            $context->builder->branchIf($isTy, $match, $next);
+            $context->builder->positionAtEnd($match);
+            self::raiseTypeErrorAndAbort(
+                $context,
+                sprintf('%s must be of type %s, %s given', $kind, $expected, $label)
+            );
+            $check = $next;
+        }
+        $objectOk = $fn->appendBasicBlock('dnf_fail_value_as_object');
+        $notObject = $fn->appendBasicBlock('dnf_fail_value_mixed');
+        $context->builder->positionAtEnd($check);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kindByte,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf($isObject, $objectOk, $notObject);
+        $context->builder->positionAtEnd($objectOk);
+        self::emitObjectFailureMessage($context, $objectType, $arg, $kind, $expected);
+        $context->builder->positionAtEnd($notObject);
         self::raiseTypeErrorAndAbort(
             $context,
             sprintf('%s must be of type %s, mixed given', $kind, $expected)
