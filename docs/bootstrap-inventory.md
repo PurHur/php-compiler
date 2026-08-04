@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7004 |
-| Phase A inventory files (M2 ratio SSOT) | 7004 |
+| PHP files on vm.php path | 7005 |
+| Phase A inventory files (M2 ratio SSOT) | 7005 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22516 |
+| Source constructs flagged (warnings) | 22517 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4486,6 +4486,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/zlib_get_coding_type.php` | 0 | 2 |
 | `ext/stats/JitStats.php` | 0 | 2 |
 | `ext/stats/Module.php` | 0 | 4 |
+| `ext/stats/StatsExtensionPolicy.php` | 0 | 1 |
 | `ext/stats/StatsFunction.php` | 0 | 1 |
 | `ext/stats/StatsJitHelper.php` | 0 | 1 |
 | `ext/stats/VmStats.php` | 0 | 1 |
@@ -39901,10 +39902,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/stats/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new stats_standard_deviation (line 19)
-- new stats_variance (line 20)
-- new stats_covariance (line 21)
+- new stats_standard_deviation (line 25)
+- new stats_variance (line 26)
+- new stats_covariance (line 27)
 - 1 class method(s)
+
+### `ext/stats/StatsExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/stats/StatsFunction.php`
 

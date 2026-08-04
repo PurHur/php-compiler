@@ -1,5 +1,7 @@
 --TEST--
 stdlib stats_standard_deviation() — PECL stats parity (#5748, ext/stats)
+--ENV--
+PHP_COMPILER_ENABLE_STATS=1
 --FILE--
 <?php
 echo function_exists('stats_standard_deviation') ? "1" : "0";

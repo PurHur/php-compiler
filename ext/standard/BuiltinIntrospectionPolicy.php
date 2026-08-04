@@ -290,6 +290,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'mysqli_')) {
             return \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'stats_')) {
+            return \PHPCompiler\ext\stats\StatsExtensionPolicy::advertisesBuiltins();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -401,6 +404,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('ds' === $ext) {
             return \PHPCompiler\ext\ds\DsExtensionPolicy::advertisesExtension();
+        }
+        if ('stats' === $ext) {
+            return \PHPCompiler\ext\stats\StatsExtensionPolicy::advertisesExtension();
         }
 
         return true;
