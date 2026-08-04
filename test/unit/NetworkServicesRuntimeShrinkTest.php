@@ -30,6 +30,12 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NetworkServicesJitHelper', $stringReturn);
         $this->assertStringContainsString('buildJitTables', $stringReturn);
         $this->assertStringContainsString('emitGetprotobynumberBody', $stringReturn);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledFromSource', $stringReturn);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $stringReturn);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $stringReturn);
+        $this->assertStringNotContainsString('parseAndCompile', $stringReturn);
+        $this->assertStringNotContainsString('new JIT(', $stringReturn);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $stringReturn);
         $this->assertStringNotContainsString('ns_proto_num_match_', $stringReturn);
     }
 

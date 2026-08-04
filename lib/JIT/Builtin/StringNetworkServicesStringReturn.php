@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\VmNetworkServices;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT bridges for getprotobynumber()/getservbyport() via NetworkServicesJitHelper (#9777).
+ * JIT/AOT bridges for getprotobynumber()/getservbyport() via NetworkServicesJitHelper (#9777, #27523).
+ *
+ * Host-derived tables are NestedJIT'd from in-memory source via
+ * {@see JitVmHelperLink::ensureCompiledFromSource} (peer GetClass #24976 / NameLookup #26247).
+ * php-src: ext/standard/network.c — PHP_FUNCTION(getprotobynumber) / getservbyport
  */
 final class StringNetworkServicesStringReturn
 {
@@ -99,45 +103,24 @@ final class StringNetworkServicesStringReturn
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after NetworkServicesJitHelper compile (#9777)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27523');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
         $tables = VmNetworkServices::buildJitTables();
         $source = self::buildJitHelperSource(
             self::emitGetprotobynumberBody($tables['protoByNumber']),
             self::emitGetservbyportBody($tables['serviceByPort'])
         );
-        $block = $runtime->parseAndCompile($source, 'NetworkServicesJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('NetworkServicesJitHelper.php parseAndCompile failed (#9777)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9777)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledFromSource(
+            $context,
+            $source,
+            'NetworkServicesJitHelper.php',
+            self::COMPILED_HELPERS,
+            '#27523'
+        );
     }
 
     private static function buildJitHelperSource(string $protoBody, string $servBody): string
