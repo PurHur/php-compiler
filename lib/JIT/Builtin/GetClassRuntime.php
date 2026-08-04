@@ -115,10 +115,14 @@ PHP;
         $object = $context->type->object;
         // Catch handlers may lower get_class()/::class before the throw site registers
         // Error/Exception (#26854). Seed so the select-walk includes them.
+        // Cross-function throw (incl. never-return callees) compiles the catch walk
+        // before the callee's `new RuntimeException` registers the class (#27625).
         foreach ([
             'Throwable', 'Error', 'Exception', 'TypeError', 'ValueError',
             // EmptyIterator::current/key + peer SPL throws (#27582 / #24246).
             'BadMethodCallException', 'BadFunctionCallException', 'LogicException',
+            // never-typed / cross-function throw → catch get_class (#27625).
+            'RuntimeException',
         ] as $name) {
             $object->lookup($name);
         }
