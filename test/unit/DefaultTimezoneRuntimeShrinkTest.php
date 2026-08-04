@@ -24,6 +24,9 @@ final class DefaultTimezoneRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DefaultTimezoneRuntime.php');
         $this->assertStringContainsString('DefaultTimezoneJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
+        $this->assertStringContainsString('#27550', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -32,7 +35,7 @@ final class DefaultTimezoneRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_default_timezone_ptr', $source);
         $this->assertStringNotContainsString("lookupFunction('access')", $source);
         $this->assertStringNotContainsString('ZONEINFO_PREFIX', $source);
-        $this->assertLessThan(190, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
     }
 
     public function testDefaultTimezoneJitHelperSemanticsMatchVmDate(): void
