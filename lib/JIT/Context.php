@@ -1180,8 +1180,13 @@ class Context {
         $this->functionProxies['reflectionenum::getcase'] = new Call\ReflectionEnumGetCase();
         $this->functionProxies['reflectionenum::getcases'] = new Call\ReflectionEnumGetCases();
         $this->functionProxies['reflectionenum::isbacked'] = new Call\ReflectionEnumIsBacked();
+        $this->functionProxies['reflectionenum::getbackingtype'] = new Call\ReflectionEnumGetBackingType();
         $this->functionProxies['reflectionenumunitcase::getname'] = new Call\ReflectionEnumUnitCaseGetName();
         $this->functionProxies['reflectionenumbackedcase::getname'] = new Call\ReflectionEnumUnitCaseGetName();
+        $unitCaseGetValue = new Call\ReflectionEnumUnitCaseGetValue();
+        $this->functionProxies['reflectionenumunitcase::getvalue'] = $unitCaseGetValue;
+        $this->functionProxies['reflectionenumbackedcase::getvalue'] = $unitCaseGetValue;
+        $this->functionProxies['reflectionnamedtype::getname'] = new Call\ReflectionNamedTypeGetName();
         $this->functionProxies['exception::getmessage'] = new Call\ExceptionGetMessage();
         $this->functionProxies['exception::getcode'] = new Call\ExceptionGetCode();
         $exceptionToString = new Call\ExceptionToString();

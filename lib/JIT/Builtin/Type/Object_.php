@@ -3441,6 +3441,14 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CLASS_NAME, Variable::TYPE_STRING);
         }
+        if ('reflectionnamedtype' === $lcname) {
+            // TYPE_VALUE: emitSetStringPropertyFromCstr stores heap __value__* boxes (#27515).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_NAME, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_STRING, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_BUILTIN, Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_ALLOWS_NULL, Variable::TYPE_NATIVE_BOOL);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_TYPE_MEMBERS, Variable::TYPE_HASHTABLE);
+        }
         // HashContext JIT handle slot must exist before allocate() (ext/hash/JitHashContext.php, #3357).
         if ('hashcontext' === $lcname) {
             $this->defineProperty($id, '__hcId', Variable::TYPE_NATIVE_LONG);
