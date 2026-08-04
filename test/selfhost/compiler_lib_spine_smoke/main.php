@@ -5662,10 +5662,13 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassConstantGetAttribute
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumGetCase.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumGetCases.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumGetBackingType.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumHasCase.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumIsBacked.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumUnitCaseGetName.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionEnumUnitCaseGetValue.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionNamedTypeGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionFunctionIsVariadic.php';

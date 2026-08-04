@@ -195,6 +195,7 @@ final class ReflectionEnumJitHelper
                 $noCaseBlock = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_nocase');
                 $checkCaseBlock = $context->builder->getInsertBlock();
                 foreach ($caseKeys as $caseIdx => $caseKey) {
+                    $context->builder->positionAtEnd($checkCaseBlock);
                     $canonical = $object->enumCaseCanonicalName($enumId, $caseKey);
                     $candidate = $context->builder->load($context->constantStringFromString($canonical));
                     $candidateData = self::stringDataPtr($context, $candidate);
@@ -231,6 +232,210 @@ final class ReflectionEnumJitHelper
                     $context,
                     'ReflectionException',
                     'ReflectionEnum refers to unknown enum in this compiler build'
+                );
+            }
+        );
+
+        $context->builder->positionAtEnd($merge);
+
+        return $resultSlot;
+    }
+
+    /**
+     * ReflectionEnum::getBackingType(): ?ReflectionNamedType (#27515 / #9886).
+     */
+    public static function emitGetBackingType(Context $context, Value $receiverObj): Value
+    {
+        $tag = 'getbackingtype_'.(++self::$blockSeq);
+        $merge = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_merge');
+        $resultSlot = JitValueBox::alloc($context);
+        $enumNameStr = self::enumNameStringFromReceiver($context, $receiverObj);
+
+        self::dispatchDeclaredEnum(
+            $context,
+            $enumNameStr,
+            $tag,
+            function (Context $context, int $enumId, string $enumName) use ($resultSlot, $merge, $tag): void {
+                unset($enumName, $tag);
+                $object = $context->type->object;
+                $backed = $object->enumBackedTypeFor($enumId);
+                if (null === $backed || '' === $backed) {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($context, $resultSlot)
+                    );
+                    $context->builder->branch($merge);
+
+                    return;
+                }
+                $named = self::allocateReflectionNamedType($context, $backed);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    JitValueBox::pointer($context, $resultSlot),
+                    $named
+                );
+                $context->builder->branch($merge);
+            },
+            function (Context $context) use ($tag): void {
+                unset($tag);
+                TryCatchHelper::emitCatchableClassError(
+                    $context,
+                    'ReflectionException',
+                    'ReflectionEnum refers to unknown enum in this compiler build'
+                );
+            }
+        );
+
+        $context->builder->positionAtEnd($merge);
+
+        return $resultSlot;
+    }
+
+    /**
+     * Thin ReflectionNamedType for a builtin backing label (int/string/…).
+     */
+    public static function allocateReflectionNamedType(Context $context, string $typeName): Value
+    {
+        $classId = $context->type->object->lookup('ReflectionNamedType');
+        $obj = $context->type->object->allocate($classId);
+        ReflectionSetup::markConstructed($context, $obj);
+        $len = $context->constantFromInteger(\strlen($typeName), 'size_t');
+        $cstr = self::literalCstr($context, $typeName);
+        foreach (
+            [
+                ReflectionSupport::PROP_TYPE_NAME,
+                ReflectionSupport::PROP_TYPE_STRING,
+            ] as $prop
+        ) {
+            ReflectionSetup::emitSetStringPropertyFromCstr(
+                $context,
+                $obj,
+                'ReflectionNamedType',
+                $prop,
+                $cstr,
+                $len
+            );
+        }
+        $true = $context->getTypeFromString('int1')->constInt(1, false);
+        $false = $context->getTypeFromString('int1')->constInt(0, false);
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            'ReflectionNamedType',
+            ReflectionSupport::PROP_TYPE_BUILTIN,
+            new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $true)
+        );
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            'ReflectionNamedType',
+            ReflectionSupport::PROP_TYPE_ALLOWS_NULL,
+            new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $false)
+        );
+        $ht = HashTableHelper::alloc($context);
+        $context->refcount->addref($ht);
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            'ReflectionNamedType',
+            ReflectionSupport::PROP_TYPE_MEMBERS,
+            new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht)
+        );
+
+        return $obj;
+    }
+
+    /**
+     * ReflectionEnumUnitCase::getValue() / BackedCase — materialize the enum case object (#27515).
+     */
+    public static function emitGetValue(Context $context, Value $receiverObj): Value
+    {
+        $tag = 'casegetvalue_'.(++self::$blockSeq);
+        $merge = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_merge');
+        $resultSlot = JitValueBox::alloc($context);
+
+        [$caseCstr, $caseLen] = ReflectionSetup::stringPropertyAsCstr(
+            $context,
+            $receiverObj,
+            'ReflectionEnumUnitCase',
+            ReflectionSupport::PROP_CLASS_NAME
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $caseStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($caseLen, $i64),
+            $caseCstr
+        );
+        $caseData = self::stringDataPtr($context, $caseStr);
+
+        [$enumCstr, $enumLen] = ReflectionSetup::stringPropertyAsCstr(
+            $context,
+            $receiverObj,
+            'ReflectionEnumUnitCase',
+            ReflectionSupport::PROP_ENUM_CLASS_NAME
+        );
+        $enumNameStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($enumLen, $i64),
+            $enumCstr
+        );
+
+        self::dispatchDeclaredEnum(
+            $context,
+            $enumNameStr,
+            $tag,
+            function (Context $context, int $enumId, string $enumName) use (
+                $caseData,
+                $caseStr,
+                $resultSlot,
+                $merge,
+                $tag
+            ): void {
+                $object = $context->type->object;
+                $i32 = $context->getTypeFromString('int32');
+                $strcmpFn = $context->lookupFunction('strcmp');
+                $caseKeys = $object->enumCaseOrderForClass($enumId);
+                $lastCaseIdx = \count($caseKeys) - 1;
+                $noCaseBlock = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_nocase');
+                $checkCaseBlock = $context->builder->getInsertBlock();
+                foreach ($caseKeys as $caseIdx => $caseKey) {
+                    $context->builder->positionAtEnd($checkCaseBlock);
+                    $canonical = $object->enumCaseCanonicalName($enumId, $caseKey);
+                    $candidate = $context->builder->load($context->constantStringFromString($canonical));
+                    $candidateData = self::stringDataPtr($context, $candidate);
+                    $cmp = $context->builder->call($strcmpFn, $caseData, $candidateData);
+                    $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+                    $matchBlock = BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_match_'.$caseIdx);
+                    $nextCase = $caseIdx === $lastCaseIdx
+                        ? $noCaseBlock
+                        : BasicBlockHelper::append($context, 'refl_enum_'.$tag.'_next_'.$caseIdx);
+                    $context->builder->branchIf($match, $matchBlock, $nextCase);
+
+                    $context->builder->positionAtEnd($matchBlock);
+                    $globalName = $object->ensureEnumCaseSingletonGlobal($enumId, $caseKey);
+                    $global = $context->module->getNamedGlobal($globalName);
+                    if (null === $global) {
+                        throw new \LogicException("Missing enum case singleton global: {$globalName}");
+                    }
+                    $caseObj = $context->builder->load($global);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeObject'),
+                        JitValueBox::pointer($context, $resultSlot),
+                        $caseObj
+                    );
+                    $context->builder->branch($merge);
+                    $checkCaseBlock = $nextCase;
+                }
+                if ($checkCaseBlock !== $noCaseBlock) {
+                    $context->builder->positionAtEnd($checkCaseBlock);
+                    $context->builder->branch($noCaseBlock);
+                }
+                $context->builder->positionAtEnd($noCaseBlock);
+                self::emitEnumCaseNotFound($context, $enumName, $caseStr);
+            },
+            function (Context $context) use ($tag): void {
+                unset($tag);
+                TryCatchHelper::emitCatchableClassError(
+                    $context,
+                    'ReflectionException',
+                    'ReflectionEnumUnitCase refers to unknown enum in this compiler build'
                 );
             }
         );
