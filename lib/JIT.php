@@ -17471,6 +17471,8 @@ class JIT {
             || $toCall instanceof JIT\Call\RegexIteratorConstruct
             || ($toCall instanceof JIT\Call\AppendIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\SplHtPosIteratorMethod
+                && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplPriorityQueueMethod

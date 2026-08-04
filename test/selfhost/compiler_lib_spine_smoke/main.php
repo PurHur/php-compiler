@@ -5498,6 +5498,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/RecursiveIteratorIteratorConstruct.
 require_once __DIR__.'/../../../lib/JIT/Call/LimitIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/AppendIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RegexIteratorConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/SplHtPosIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureFromCallable.php';
@@ -6448,6 +6449,7 @@ require_once __DIR__.'/../../../lib/VM/DateIntervalSupport.php';
 require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SplHeapJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/DirectoryIteratorJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/SplHtPosIteratorJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SplDllistJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SplPriorityQueueJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SplFixedArrayJitHelper.php';
