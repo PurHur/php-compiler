@@ -833,9 +833,6 @@ class Context {
             'phpc_log10_kernel',
 
             'phpc_floor_kernel',
-            'phpc_is_finite_kernel',
-            'phpc_is_infinite_kernel',
-            'phpc_is_nan_kernel',
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',

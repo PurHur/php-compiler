@@ -119,9 +119,6 @@ final class LibcExtern
             'floor' => [$dbl, false, [$dbl]],
             'sqrt' => [$dbl, false, [$dbl]],
 
-            // VmFloatCompare NestedJIT (#21109 / #9976) — math.h
-            'isnan' => [$i32, false, [$dbl]],
-            'isinf' => [$i32, false, [$dbl]],
             // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
             'syscall' => [$i64, true, [$i64]],
             // Host aliases — custom names so MCJIT resolves via LLVMAddSymbol (#21124, #98).

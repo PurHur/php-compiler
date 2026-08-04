@@ -135,7 +135,6 @@ final class JitSpaceshipCompareKernel
         self::declareExternal($context, 'strcmp', $i32, [$i8p, $i8p]);
         self::declareExternal($context, 'strncasecmp', $i32, [$i8p, $i8p, $sizeT]);
         self::declareExternal($context, 'strtod', $dbl, [$i8p, $i8p->pointerType(0)]);
-        self::declareExternal($context, 'isnan', $i32, [$dbl]);
         self::declareExternal($context, '__object__prop_count', $i32, [$objPtr]);
     }
 

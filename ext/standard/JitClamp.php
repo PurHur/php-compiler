@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\MathClamp;
+use PHPCompiler\JIT\Builtin\MathIsNan;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\VmFloatCompare;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -155,7 +155,7 @@ final class JitClamp
         int $argNum,
         string $paramName
     ): void {
-        $isNan = $context->builder->call(VmFloatCompare::lookupOrDeclareIsNan($context), $bound);
+        $isNan = MathIsNan::invoke($context, $bound);
         $ok = $context->builder->not($isNan);
         TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
             $context,
