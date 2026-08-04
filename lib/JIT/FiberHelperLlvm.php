@@ -197,6 +197,9 @@ final class FiberHelperLlvm
         }
 
         $context->builder->positionAtEnd($doneBb);
+        // Fiber::throw()/resume after the last suspend lands here (resume_ip == n).
+        // Inject pending throw before running the post-suspend tail (#27622).
+        $doneEntry = self::emitPendingThrowGate($jit, $func, $stateParam, $doneBb);
         // Include last suspend STATICCALL_INIT so resume_argument is bound to Fiber::suspend() (#26801).
         $tailStart = [] === $points ? 0 : self::opcodeIndex($block, $points[count($points) - 1]['op']);
         $returnIdx = null;
@@ -209,10 +212,11 @@ final class FiberHelperLlvm
                 break;
             }
         }
+        $context->builder->positionAtEnd($doneEntry);
         if (null !== $returnIdx && $tailStart < $returnIdx) {
             $savedStorage = $context->scope->blockStorage;
             $context->scope->blockStorage = new \SplObjectStorage();
-            $exit = $jit->compileGeneratorResumePrefix($func, $block, $tailStart, $returnIdx, $doneBb);
+            $exit = $jit->compileGeneratorResumePrefix($func, $block, $tailStart, $returnIdx, $doneEntry);
             $context->builder->positionAtEnd($exit);
             $context->scope->blockStorage = $savedStorage;
             $retOp = $block->opCodes[$returnIdx];
@@ -463,7 +467,8 @@ final class FiberHelperLlvm
         $map = $context->structFieldMap['__fiber_state__'];
         $i64 = $context->getTypeFromString('int64');
         $status = $context->builder->call($resumeFn, $statePtr);
-        $suspended = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $status, $i64->constInt(0, false));
+        // status 1 = suspended; 0 = done; 2 = uncaught throw (Fiber::throw only) (#27622).
+        $suspended = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $status, $i64->constInt(1, false));
         $context->builder->store(
             $context->builder->zext($suspended, $context->getTypeFromString('int1')),
             $context->builder->structGep($statePtr, $map['suspended'])
@@ -567,25 +572,60 @@ final class FiberHelperLlvm
             $normalEntry
         );
         $context->builder->positionAtEnd($throwEntry);
-        JitThrow::registerDeclarations($context);
-        JitThrow::ensureLinked($context);
         $pendingField = $context->builder->structGep($stateParam, $map['pending_throw']);
         $excObj = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
             JitValueBox::pointer($context, $pendingField)
         );
-        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $pendingField)
-        );
         $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        $branchedToDispatch = false;
         if (null !== $handler && null !== $handler->dispatchBb) {
-            $context->builder->branch($handler->dispatchBb);
-        } else {
-            $context->builder->call($context->lookupFunction('abort'));
+            // Resume-function dispatchBbs are appended to $func during this compile —
+            // branch without sameLlvmFunction (wrapper identity can miss; #27518 / #27622).
+            if ($context->compilingFiberResume) {
+                JitThrow::registerDeclarations($context);
+                JitThrow::ensureLinked($context);
+                $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
+                $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $pendingField)
+                );
+                $context->builder->branch($handler->dispatchBb);
+                $branchedToDispatch = true;
+            } else {
+                $dispatchParent = $handler->dispatchBb->getParent();
+                $insert = $context->builder->getInsertBlock();
+                $parent = null !== $insert ? $insert->getParent() : null;
+                if (
+                    $parent instanceof \PHPLLVM\Value\Function_
+                    && $dispatchParent instanceof \PHPLLVM\Value\Function_
+                    && TryCatchHelper::sameLlvmFunction($parent, $dispatchParent)
+                ) {
+                    JitThrow::registerDeclarations($context);
+                    JitThrow::ensureLinked($context);
+                    $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
+                    $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($context, $pendingField)
+                    );
+                    $context->builder->branch($handler->dispatchBb);
+                    $branchedToDispatch = true;
+                }
+            }
         }
+        if (!$branchedToDispatch) {
+            // No in-fiber catch: status 2 → Fiber::throw() pends in caller IR (#27622).
+            // Keep pending_throw object alive for the caller; writeNull here frees it and
+            // leaves FiberThrow with a dangling $excObj (empty get_class / segfault).
+            $i64 = $context->getTypeFromString('int64');
+            $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
+            $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
+            $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['suspended']));
+            $context->builder->returnValue($i64->constInt(2, false));
+        }
+        $context->builder->positionAtEnd($normalEntry);
 
         return $normalEntry;
     }

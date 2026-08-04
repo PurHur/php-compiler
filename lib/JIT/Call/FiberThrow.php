@@ -15,9 +15,18 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** Fiber::throw(Throwable $exception): mixed — JIT (#4624, Zend/zend_fibers.c). */
+/**
+ * Fiber::throw(Throwable $exception): mixed — JIT (#4624, Zend/zend_fibers.c).
+ *
+ * Uncaught injected throws return resume status 2; this call site pends the exception
+ * and branches into the active try/catch (#27622).
+ */
 final class FiberThrow implements Call
 {
+    private const RESUME_SUSPENDED = 1;
+
+    private const RESUME_UNCAUGHT = 2;
+
     public function call(Context $context, Variable ...$args): Value
     {
         if (count($args) < 1) {
@@ -32,6 +41,7 @@ final class FiberThrow implements Call
         $statePtr = $fiberVar->fiberStatePtr ?? FiberHelper::loadStateFromFiberObject($context, $fiberVar);
         $map = $context->structFieldMap['__fiber_state__'];
         $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
         $doneField = $context->builder->structGep($statePtr, $map['done']);
         $startedField = $context->builder->structGep($statePtr, $map['started']);
         $suspendedField = $context->builder->structGep($statePtr, $map['suspended']);
@@ -85,23 +95,7 @@ final class FiberThrow implements Call
         );
 
         $context->builder->positionAtEnd($throwOk);
-        $excObj = $exception->value;
-        if (Variable::TYPE_OBJECT !== $exception->type) {
-            if (Variable::TYPE_VALUE === $exception->type) {
-                $excObj = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    JitValueBox::valuePtrFromVariable($context, $exception)
-                );
-            } else {
-                TryCatchHelper::emitCatchableClassError(
-                    $context,
-                    'TypeError',
-                    'Fiber::throw(): Argument #1 ($exception) must be of type Throwable, '
-                    .$this->jitTypeLabel($exception).' given'
-                );
-                $excObj = $context->getTypeFromString('__object__*')->constNull();
-            }
-        }
+        $excObj = $this->resolveThrowableObject($context, $exception);
 
         $pendingField = $context->builder->structGep($statePtr, $map['pending_throw']);
         $context->builder->call(
@@ -116,9 +110,85 @@ final class FiberThrow implements Call
             JitValueBox::pointer($context, $resumeArgField)
         );
 
-        $result = FiberHelper::runResumeAndBoxResult($context, $resumeName, $statePtr);
+        $resumeFn = $context->functions[strtolower($resumeName)] ?? null;
+        if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
+            throw new \LogicException("Fiber resume function missing: {$resumeName}");
+        }
+        $status = $context->builder->call($resumeFn, $statePtr);
 
-        return $result->value;
+        // Status 2 = uncaught: pend + branch into caller try/catch (#27622).
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $uncaughtBb = BasicBlockHelper::append($context, 'fiber_throw_uncaught');
+        $afterStatus = BasicBlockHelper::append($context, 'fiber_throw_after_status');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $status, $i64->constInt(self::RESUME_UNCAUGHT, false)),
+            $uncaughtBb,
+            $afterStatus
+        );
+        $context->builder->positionAtEnd($uncaughtBb);
+        // KIND_VARIABLE object slots are __object__**; set_throw_pending needs __object__*
+        // or get_class()/instanceof see an empty class (#27622).
+        $excForPend = Variable::TYPE_OBJECT === $exception->type
+            ? $context->helper->loadValue($exception)
+            : $excObj;
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excForPend);
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null !== $handler && null !== $handler->dispatchBb) {
+            $context->builder->branch($handler->dispatchBb);
+        } else {
+            $context->builder->branch($afterStatus);
+        }
+        $context->builder->positionAtEnd($afterStatus);
+
+        $isSuspended = $context->builder->icmp(
+            Builder::INT_EQ,
+            $status,
+            $i64->constInt(self::RESUME_SUSPENDED, false)
+        );
+        $context->builder->store(
+            $context->builder->zext($isSuspended, $i1),
+            $context->builder->structGep($statePtr, $map['suspended'])
+        );
+        $suspendSlot = JitValueBox::alloc($context);
+        $terminatedSlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer(
+            $context,
+            $suspendSlot,
+            $context->builder->structGep($statePtr, $map['suspend_return'])
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $terminatedSlot)
+        );
+        $resultPtr = $context->builder->select(
+            $isSuspended,
+            JitValueBox::pointer($context, $suspendSlot),
+            JitValueBox::pointer($context, $terminatedSlot)
+        );
+
+        return (new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $resultPtr))->value;
+    }
+
+    private function resolveThrowableObject(Context $context, Variable $exception): Value
+    {
+        if (Variable::TYPE_OBJECT === $exception->type) {
+            return $exception->value;
+        }
+        if (Variable::TYPE_VALUE === $exception->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $exception)
+            );
+        }
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'TypeError',
+            'Fiber::throw(): Argument #1 ($exception) must be of type Throwable, '
+            .$this->jitTypeLabel($exception).' given'
+        );
+
+        return $context->getTypeFromString('__object__*')->constNull();
     }
 
     private function jitTypeLabel(Variable $value): string
