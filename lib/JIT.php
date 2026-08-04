@@ -20447,6 +20447,8 @@ class JIT {
                 $argEntries,
                 $argOperands
             );
+            // Clear after rewrite — rewrite reads magicCallIsStatic (#27517).
+            $this->context->scope->magicCallIsStatic = false;
             if (null !== $rewritten) {
                 return $rewritten;
             }
