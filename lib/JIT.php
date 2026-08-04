@@ -12635,14 +12635,24 @@ class JIT {
                             && !$this->context->type->object->hasProperty($classId, $name->value)
                             && $this->context->type->object->allowsDynamicProperties($classId)
                         ) {
-                            // Non-null receiver: nullsafe still warns like plain -> (#23705).
-                            JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
-                                $this->context,
-                                $result,
-                                $declaringClass,
-                                $name->value
+                            // Generic "object"/stdClass receivers after ?-> + ?? must not warn
+                            // Undefined property: stdClass::$name when the runtime value is an
+                            // enum case — propertyFetch does class_id dispatch (#27666 / #26818).
+                            $propNameExact = $name->value;
+                            $skipDynamicUndef = (
+                                ('name' === $propNameExact || 'value' === $propNameExact)
+                                && [] !== $this->context->type->object->registeredEnumClassIds()
                             );
-                            break;
+                            if (!$skipDynamicUndef) {
+                                // Non-null receiver: nullsafe still warns like plain -> (#23705).
+                                JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
+                                    $this->context,
+                                    $result,
+                                    $declaringClass,
+                                    $name->value
+                                );
+                                break;
+                            }
                         }
                         JIT\LazyObjectHelper::emitEnsureInitialized(
                             $this->context,

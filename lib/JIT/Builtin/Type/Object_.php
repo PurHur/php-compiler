@@ -6909,15 +6909,23 @@ class Object_ extends Type {
         if ($this->isEnumClassId($classId) && EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc)) {
             return ObjectEnumCasePropertyLlvm::enumCasePropertyFetch($this, $obj, $classId, $nameLc);
         }
-        // Enum-case runtime dispatch aborts when class_id is not an enum (#27314). Skip it
-        // when the static class already declares `$name`/`$value` (ReflectionEnum::$name,
+        // Enum-case runtime dispatch: when class_id is not an enum, warn + null like
+        // ordinary undefined reads (stdClass in a TU that also defines enums) (#27666).
+        // Skip when the static class already declares `$name`/`$value` (ReflectionEnum::$name,
         // ReflectionClass::$name, …) — those are ordinary properties, not case singletons.
         if (
             EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc)
             && !$this->hasProperty($classId, $name)
             && [] !== ($enumIds = $this->registeredEnumClassIds())
         ) {
-            return ObjectEnumCasePropertyLlvm::propertyFetchEnumCaseRuntimeDispatch($this, $obj, $nameLc, $enumIds);
+            return ObjectEnumCasePropertyLlvm::propertyFetchEnumCaseRuntimeDispatch(
+                $this,
+                $obj,
+                $nameLc,
+                $enumIds,
+                '' !== $class ? $class : 'stdClass',
+                $name
+            );
         }
 
         return ObjectInstancePropertyLlvm::propertyFetchOrdinary($this, $obj, $class, $name, $classId);
@@ -6946,6 +6954,9 @@ class Object_ extends Type {
 
     /**
      * isset($obj->prop) for a literal property name (issue #3603, #4586).
+     *
+     * Enum case pseudo-properties name/value are not declared slots — handle before
+     * hasProperty so ?? / isset match Zend (#27666, #9890, zend_enum.c).
      */
     public function propertyIsSet(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
     {
@@ -6968,6 +6979,10 @@ class Object_ extends Type {
             $name
         )) {
             return $i1->constInt(0, false);
+        }
+        $enumIsset = ObjectEnumCasePropertyLlvm::tryPropertyIsSet($this, $obj, $classId, $name);
+        if (null !== $enumIsset) {
+            return $enumIsset;
         }
         if (!$this->hasProperty($classId, $name)) {
             return $i1->constInt(0, false);

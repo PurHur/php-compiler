@@ -15,9 +15,91 @@ use PHPLLVM\Value;
 
 /**
  * LLVM lowering for enum case ->name/->value property fetch (#9938).
+ *
+ * isset()/?? on those pseudo-properties: {@see tryPropertyIsSet} (#27666, #9890).
  */
 final class ObjectEnumCasePropertyLlvm
 {
+    /**
+     * isset($case->name) / isset($case->value) — Zend propertyExistsOnCase (#9890, #27666).
+     *
+     * Returns null when $classId is not an enum and $name is not a case-sensitive
+     * name/value probe (caller continues with ordinary hasProperty).
+     */
+    public static function tryPropertyIsSet(Object_ $object, Value $obj, int $classId, string $name): ?Value
+    {
+        $context = $object->jitContext();
+        $i1 = $context->getTypeFromString('int1');
+        if ($object->isEnumClassId($classId)) {
+            // Case-sensitive like Zend / EnumCaseSupport::propertyExistsOnCase (#23532).
+            if ('name' === $name) {
+                return $i1->constInt(1, false);
+            }
+            if ('value' === $name) {
+                return $i1->constInt($object->enumHasBacking($classId) ? 1 : 0, false);
+            }
+
+            return $i1->constInt(0, false);
+        }
+        // tryFrom()/from() results are often typed as generic object; resolve via class_id (#27666).
+        if ('name' !== $name && 'value' !== $name) {
+            return null;
+        }
+        $enumIds = $object->registeredEnumClassIds();
+        if ([] === $enumIds) {
+            return null;
+        }
+
+        return self::propertyIsSetEnumCaseRuntimeDispatch($object, $obj, $name, $enumIds);
+    }
+
+    /**
+     * @param list<int> $enumIds
+     */
+    private static function propertyIsSetEnumCaseRuntimeDispatch(
+        Object_ $object,
+        Value $obj,
+        string $name,
+        array $enumIds
+    ): Value {
+        $context = $object->jitContext();
+        $i1 = $context->getTypeFromString('int1');
+        $dest = BasicBlockHelper::entryAlloca($context, $i1);
+        $context->builder->store($i1->constInt(0, false), $dest);
+        $map = $context->structFieldMap['__object__'];
+        $runtimeClassId = $context->builder->load(
+            $context->builder->structGep($obj, $map['class_id'])
+        );
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('enum_case_prop_isset_done');
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $lastIdx = \count($enumIds) - 1;
+        foreach ($enumIds as $idx => $enumId) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($enumId, false)
+            );
+            $caseBlock = $fn->appendBasicBlock('enum_case_prop_isset_'.$enumId);
+            $nextBlock = $idx === $lastIdx
+                ? $done
+                : $fn->appendBasicBlock('enum_case_prop_isset_try_'.($idx + 1));
+            $context->builder->branchIf($match, $caseBlock, $nextBlock);
+            $context->builder->positionAtEnd($caseBlock);
+            $exists = ('name' === $name)
+                || ('value' === $name && $object->enumHasBacking($enumId));
+            $context->builder->store($i1->constInt($exists ? 1 : 0, false), $dest);
+            $context->builder->branch($done);
+            $checkBlock = $nextBlock;
+        }
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($dest);
+    }
+
     public static function enumCasePropertyFetch(Object_ $object, Value $obj, int $classId, string $nameLc): Variable
     {
         $context = $object->jitContext();
@@ -59,7 +141,9 @@ final class ObjectEnumCasePropertyLlvm
         Object_ $object,
         Value $obj,
         string $nameLc,
-        array $enumIds
+        array $enumIds,
+        string $fallbackClassName = 'stdClass',
+        string $propertyName = ''
     ): Variable {
         $context = $object->jitContext();
         $map = $context->structFieldMap['__object__'];
@@ -69,17 +153,10 @@ final class ObjectEnumCasePropertyLlvm
         $fn = BasicBlockHelper::parentFunction($context);
         $entry = $context->builder->getInsertBlock();
         $done = $fn->appendBasicBlock('enum_case_prop_fetch_done');
-        $exit = $fn->appendBasicBlock('enum_case_prop_fetch_exit');
         $fallback = $fn->appendBasicBlock('enum_case_prop_fetch_fallback');
-        $isName = 'name' === $nameLc;
-        if ($isName) {
-            $destSlot = BasicBlockHelper::entryAlloca(
-                $context,
-                $context->getTypeFromString('__string__*')
-            );
-        } else {
-            $destSlot = JitValueBox::alloc($context);
-        }
+        // Always box into __value__ so non-enum fallback can be real NULL (#27666).
+        $destSlot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $destSlot);
         $i64 = $context->getTypeFromString('int64');
         $checkBlock = $entry;
         $lastIdx = \count($enumIds) - 1;
@@ -97,10 +174,11 @@ final class ObjectEnumCasePropertyLlvm
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
             $fetched = self::enumCasePropertyFetch($object, $obj, $enumId, $nameLc);
-            if ($isName) {
-                $context->builder->store(
-                    $context->helper->loadValue($fetched),
-                    $destSlot
+            if ('name' === $nameLc) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $destPtr,
+                    $context->helper->loadValue($fetched)
                 );
             } else {
                 JitValueBox::copyFromPointer(
@@ -113,18 +191,20 @@ final class ObjectEnumCasePropertyLlvm
             $checkBlock = $nextBlock;
         }
         $context->builder->positionAtEnd($fallback);
-        $context->builder->call($context->lookupFunction('abort'));
+        // Non-enum receiver (e.g. stdClass in a TU that also defines enums): warn + null (#27666).
+        $warnClass = '' !== $fallbackClassName ? $fallbackClassName : 'stdClass';
+        $warnProp = '' !== $propertyName ? $propertyName : $nameLc;
+        \PHPCompiler\JIT\Builtin\UndefinedPropertyFetchRuntime::emitWarning(
+            $context,
+            $warnClass,
+            $warnProp
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $destPtr
+        );
+        $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
-        $context->builder->branch($exit);
-        $context->builder->positionAtEnd($exit);
-        if ($isName) {
-            return new Variable(
-                $context,
-                Variable::TYPE_STRING,
-                Variable::KIND_VALUE,
-                $context->builder->load($destSlot)
-            );
-        }
 
         return new Variable(
             $context,
