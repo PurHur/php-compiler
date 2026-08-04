@@ -66,8 +66,6 @@ final class iconv_mime_decode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'iconv_mime_decode() is not lowered for JIT/AOT in this compiler build'
-        );
+        return JitIconvMime::invoke($context, ...$args);
     }
 }

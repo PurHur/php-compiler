@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6988 |
-| Phase A inventory files (M2 ratio SSOT) | 6988 |
+| PHP files on vm.php path | 6991 |
+| Phase A inventory files (M2 ratio SSOT) | 6991 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22435 |
+| Source constructs flagged (warnings) | 22438 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -939,8 +939,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/iconv/IconvConstants.php` | 0 | 1 |
 | `ext/iconv/IconvEncodingState.php` | 0 | 3 |
 | `ext/iconv/IconvJitHelper.php` | 0 | 1 |
+| `ext/iconv/IconvMimeJitHelper.php` | 0 | 1 |
 | `ext/iconv/IconvStringFunction.php` | 0 | 2 |
 | `ext/iconv/JitIconv.php` | 0 | 1 |
+| `ext/iconv/JitIconvMime.php` | 0 | 1 |
 | `ext/iconv/JitIconvString.php` | 0 | 1 |
 | `ext/iconv/Module.php` | 0 | 12 |
 | `ext/iconv/VmIconv.php` | 0 | 1 |
@@ -5557,6 +5559,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringIconvMime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringImageTypeToExtension.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringIncludePathResolver.php` | 0 | 1 |
@@ -13625,6 +13628,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/iconv/IconvMimeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/iconv/IconvStringFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13635,6 +13643,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/iconv/JitIconvMime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/iconv/JitIconvString.php`
 
@@ -39677,9 +39690,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/uasort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 49)
-- new Variable (line 51)
-- new HashTable (line 75)
+- new Variable (line 50)
+- new Variable (line 52)
+- new HashTable (line 76)
 - 2 class method(s)
 
 ### `ext/standard/ucfirst.php`
@@ -39696,9 +39709,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/uksort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 50)
-- new HashTable (line 74)
+- new Variable (line 49)
+- new Variable (line 51)
+- new HashTable (line 75)
 - 2 class method(s)
 
 ### `ext/standard/umask_.php`
@@ -39770,7 +39783,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/usort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 58)
+- new Variable (line 59)
 - 2 class method(s)
 
 ### `ext/standard/utf8_decode.php`
@@ -47465,6 +47478,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `lib/JIT/Builtin/StringIconvMime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringIdate.php`
 
