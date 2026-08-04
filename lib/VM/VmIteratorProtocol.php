@@ -263,6 +263,14 @@ final class VmIteratorProtocol
             }
         }
         $candidates = self::methodCandidates($context, $methodLc);
+        // RuntimeIndirect compiles every candidate arm — Generator::* needs resume
+        // metadata that a value-box type switch does not have (#27634 / #26825).
+        if ([] === $context->generatorCreators) {
+            $candidates = array_filter(
+                $candidates,
+                static fn (Call $proxy): bool => !self::isGeneratorIteratorProxy($proxy)
+            );
+        }
         if (1 === \count($candidates)) {
             $only = reset($candidates);
             // Never treat Generator::* as the universal sole Iterator (#26825).
