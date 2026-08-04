@@ -87,9 +87,12 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
-require_once __DIR__.'/../../../lib/FinalPromotedPropertySyntaxRejector.php';
-require_once __DIR__.'/../../../lib/JIT/Call/HashTableReplaceRecursiveCopy.php';
-require_once __DIR__.'/../../../lib/JIT/HashTableReplaceRecursiveLlvm.php';
+
+
+
+
+
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -99,6 +102,9 @@ require_once __DIR__.'/../../../lib/JIT/Call.php';
 require_once __DIR__.'/../../../lib/Func/Internal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../ext/dom/DomClassMethod.php';
+require_once __DIR__.'/../../../lib/FinalPromotedPropertySyntaxRejector.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableReplaceRecursiveCopy.php';
+require_once __DIR__.'/../../../lib/JIT/HashTableReplaceRecursiveLlvm.php';
 require_once __DIR__.'/../../../bin/vm.php';
 require_once __DIR__.'/../../../ext/bcmath/BcMathNumberMethod.php';
 require_once __DIR__.'/../../../ext/bcmath/BcmathFunction.php';
@@ -1811,7 +1817,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketClose.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketCreate.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableKeyFilterLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTablePointerLlvm.php';
-
 require_once __DIR__.'/../../../ext/sockets/SocketConstants.php';
 require_once __DIR__.'/../../../ext/sockets/SocketExportStreamJitHelper.php';
 require_once __DIR__.'/../../../ext/sockets/SocketImportStreamJitHelper.php';
@@ -2727,7 +2732,6 @@ require_once __DIR__.'/../../../ext/standard/JitSha1.php';
 require_once __DIR__.'/../../../ext/standard/JitShellExec.php';
 require_once __DIR__.'/../../../ext/standard/JitSinKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitSinhKernel.php';
-
 require_once __DIR__.'/../../../ext/standard/JitSleep.php';
 require_once __DIR__.'/../../../ext/standard/JitSpaceshipCompareKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitSplAutoload.php';
@@ -2820,7 +2824,6 @@ require_once __DIR__.'/../../../ext/standard/JitSysGetloadavg.php';
 require_once __DIR__.'/../../../ext/standard/JitSyslog.php';
 require_once __DIR__.'/../../../ext/standard/JitTanKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitTanhKernel.php';
-
 require_once __DIR__.'/../../../ext/standard/JitTempnam.php';
 require_once __DIR__.'/../../../ext/standard/JitTempnamKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitTimezoneAbbreviationsList.php';
@@ -3996,7 +3999,6 @@ require_once __DIR__.'/../../../ext/standard/phpc_rename_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
 require_once __DIR__.'/../../../ext/standard/phpc_sin_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_sinh_kernel.php';
-
 require_once __DIR__.'/../../../ext/standard/phpc_sqrt_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_stat_mode_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_tan_kernel.php';
@@ -5164,6 +5166,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionSetup.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/RecursiveLeavesFlattenRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/RegexIteratorFilterRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/RecursiveTreeIteratorBuildRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/RequestParseBodyRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ResolveSidecarRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReturnPendingRuntime.php';
@@ -5500,6 +5503,9 @@ require_once __DIR__.'/../../../lib/JIT/Call/RegexIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SplHtPosIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/EmptyIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FilterIteratorMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ParentIteratorConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/MultipleIteratorMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/RecursiveTreeIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureFromCallable.php';
@@ -7088,6 +7094,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomNodeCompareDocumentPosition.php'
 require_once __DIR__.'/../../../ext/soap/JitIsSoapFault.php';
 require_once __DIR__.'/../../../ext/soap/JitUseSoapErrorHandler.php';
 require_once __DIR__.'/../../../ext/soap/UseSoapErrorHandlerJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/MultipleIteratorZipLlvm.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -7118,5 +7126,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

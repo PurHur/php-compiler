@@ -3782,6 +3782,51 @@ class Object_ extends Type {
             }
             $this->defineMethodVisibility($id, 'accept', $prot);
         }
+        if (
+            'parentiterator' === $lcname
+            || 'multipleiterator' === $lcname
+            || 'recursivetreeiterator' === $lcname
+        ) {
+            // Thin AOT: snapshot / filter into `__spl_ht` at construct (#27584).
+            // php-src ext/spl/spl_iterators.c — ParentIterator / MultipleIterator / RecursiveTreeIterator.
+            $this->ensureZendBuiltinInterfaces();
+            if ('multipleiterator' !== $lcname) {
+                $this->markInterfaceClass('OuterIterator');
+                $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
+                $ifaces = ['Iterator', 'Traversable', 'OuterIterator'];
+                if ('parentiterator' === $lcname) {
+                    $this->markInterfaceClass('RecursiveIterator');
+                    $this->setInterfaceExtends('RecursiveIterator', ['Iterator', 'Traversable']);
+                    $ifaces[] = 'RecursiveIterator';
+                }
+                $this->setClassInterfaces($displayName, $ifaces);
+            } else {
+                $this->setClassInterfaces($displayName, ['Iterator', 'Traversable']);
+            }
+            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            if ('multipleiterator' === $lcname) {
+                $this->defineProperty(
+                    $id,
+                    \PHPCompiler\JIT\Call\MultipleIteratorMethod::PROP_ATTACHED,
+                    Variable::TYPE_NATIVE_LONG
+                );
+                $this->seedExternalClassConstants($id, [
+                    'MIT_NEED_ANY' => 0,
+                    'MIT_NEED_ALL' => 1,
+                    'MIT_KEYS_NUMERIC' => 0,
+                    'MIT_KEYS_ASSOC' => 2,
+                ]);
+            }
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $methods = ['__construct'];
+            if ('multipleiterator' === $lcname) {
+                $methods[] = 'attachiterator';
+            }
+            foreach ($methods as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('norewinditerator' === $lcname || 'infiniteiterator' === $lcname) {
             // Thin AOT: snapshot `__spl_ht` + Iterator protocol via `__spl_iter_pos` (#27583).
             // Not SplOuterIteratorHt — foreach must call rewind (NoRewind = no-op).
