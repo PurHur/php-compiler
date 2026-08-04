@@ -125,6 +125,9 @@ final class HashTableSliceLlvm
         );
 
         $dest = HashTableHelper::alloc($context);
+        // Tracks int keys written under preserveKeys so grow-memset NULL holes can
+        // be marked UNDEFINED (foreach skips UNDEFINED, not NULL — #27581).
+        $written = HashTableHelper::alloc($context);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $outIdxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $zero = $sizeT->constInt(0, false);
@@ -170,7 +173,7 @@ final class HashTableSliceLlvm
         $context->builder->branchIf($preserve, $keepKeys, $reindex);
 
         $context->builder->positionAtEnd($keepKeys);
-        self::writeKeyed($context, $dest, $keyVar, $valVar);
+        self::writeKeyed($context, $dest, $written, $keyVar, $valVar);
         $context->builder->store($context->builder->addNoSignedWrap($outIdx, $one), $outIdxSlot);
         $context->builder->branch($advance);
 
@@ -184,12 +187,96 @@ final class HashTableSliceLlvm
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+        self::markUnwrittenNullHolesUndefined($context, $dest, $written, $preserve);
 
         return $dest;
     }
 
-    private static function writeKeyed(Context $context, Value $dest, Variable $keyVar, Variable $valVar): void
-    {
+    /**
+     * Grow memset zeroes new slots as TYPE_NULL; foreach treats NULL as a real
+     * element. Mark slots that preserveKeys never wrote as TYPE_UNDEFINED (#27581).
+     */
+    private static function markUnwrittenNullHolesUndefined(
+        Context $context,
+        Value $dest,
+        Value $written,
+        Value $preserve
+    ): void {
+        $tag = (string) self::nextSeq();
+        $skip = BasicBlockHelper::append($context, 'ht_slice_hole_skip_'.$tag);
+        $work = BasicBlockHelper::append($context, 'ht_slice_hole_work_'.$tag);
+        $context->builder->branchIf($preserve, $work, $skip);
+
+        $context->builder->positionAtEnd($work);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $map = $context->structFieldMap['__hashtable__'];
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nfe = $context->builder->load($context->builder->structGep($dest, $map['nextFreeElement']));
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+
+        $head = BasicBlockHelper::append($context, 'ht_slice_hole_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'ht_slice_hole_body_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_slice_hole_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $past = $context->builder->icmp(Builder::INT_UGE, $idx, $nfe);
+        $context->builder->branchIf($past, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $wasWritten = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $written,
+            $idx
+        );
+        $advance = BasicBlockHelper::append($context, 'ht_slice_hole_adv_'.$tag);
+        $maybeHole = BasicBlockHelper::append($context, 'ht_slice_hole_maybe_'.$tag);
+        $context->builder->branchIf($wasWritten, $advance, $maybeHole);
+
+        $context->builder->positionAtEnd($maybeHole);
+        $values = $context->builder->load($context->builder->structGep($dest, $map['values']));
+        $entry = $context->builder->inBoundsGep($values, $idx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $mark = BasicBlockHelper::append($context, 'ht_slice_hole_mark_'.$tag);
+        $context->builder->branchIf($isNull, $mark, $advance);
+
+        $context->builder->positionAtEnd($mark);
+        // VM TYPE_UNDEFINED = -1 → uint8 255 (foreach hole skip).
+        $context->builder->store(
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff, false),
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->branch($skip);
+
+        $context->builder->positionAtEnd($skip);
+    }
+
+    private static function writeKeyed(
+        Context $context,
+        Value $dest,
+        Value $written,
+        Variable $keyVar,
+        Variable $valVar
+    ): void {
         $keyPtr = JitValueBox::valuePtrFromVariable($context, $keyVar);
         $typeByte = $context->builder->load(
             $context->builder->structGep($keyPtr, $context->structFieldMap['__value__']['type'])
@@ -214,12 +301,20 @@ final class HashTableSliceLlvm
         $context->builder->positionAtEnd($intBb);
         $long = $context->builder->call($context->lookupFunction('__value__readLong'), $keyPtr);
         $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
         $idx = JitNestedHelperCoerce::i64ToScalar(
             $context,
-            JitNestedHelperCoerce::scalarToI64($context, $long, $context->getTypeFromString('int64')),
+            JitNestedHelperCoerce::scalarToI64($context, $long, $i64),
             $sizeT
         );
         HashTableHelper::setAtIndex($context, $dest, $idx, $valVar);
+        // Record written int key (value=1) so hole-fix keeps intentional NULLs.
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $written,
+            $idx,
+            $i64->constInt(1, false)
+        );
         $context->builder->branch($join);
 
         $context->builder->positionAtEnd($join);
