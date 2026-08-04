@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayPopRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -39,10 +40,13 @@ final class array_pop extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        ExceptionBridge::ensureLinked($context);
         // php-src ext/standard/array.c — ArgumentCountError (#23165).
         if (!$this->requireExactJitArgCount($context, $args, 'array_pop', 1)) {
             return $context->getTypeFromString('__value__*')->constNull();
         }
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27482).
+        // Always via JitArrayElem → ExceptionBridge (not bare TypeErrorRaise::emitRaise).
         JitArrayElem::requireArrayParam($context, $args[0], 'array_pop', 1, 'array');
 
         foreach ($args as $i => $arg) {
@@ -50,6 +54,14 @@ final class array_pop extends Internal
                 $this->jitString($context, $arg, 'array_pop() argument #'.((int) $i + 1));
             }
         }
-        return ArrayPopRuntime::pop($context, $args[0]);
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
+            return ArrayPopRuntime::pop($context, $args[0]);
+        }
+
+        // Static non-array types already raised above; poison return for SSA.
+        return $context->getTypeFromString('__value__*')->constNull();
     }
 }
