@@ -5500,6 +5500,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/LimitIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/AppendIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RegexIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SplHtPosIteratorMethod.php';
+require_once __DIR__.'/../../../lib/JIT/Call/EmptyIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureFromCallable.php';

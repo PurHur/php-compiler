@@ -115,7 +115,11 @@ PHP;
         $object = $context->type->object;
         // Catch handlers may lower get_class()/::class before the throw site registers
         // Error/Exception (#26854). Seed so the select-walk includes them.
-        foreach (['Throwable', 'Error', 'Exception', 'TypeError', 'ValueError'] as $name) {
+        foreach ([
+            'Throwable', 'Error', 'Exception', 'TypeError', 'ValueError',
+            // EmptyIterator::current/key + peer SPL throws (#27582 / #24246).
+            'BadMethodCallException', 'BadFunctionCallException', 'LogicException',
+        ] as $name) {
             $object->lookup($name);
         }
         // Trace redaction marker — catch get_class($e->getTrace()[0]['args'][0]) (#27333).

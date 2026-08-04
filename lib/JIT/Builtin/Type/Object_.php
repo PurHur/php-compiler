@@ -3781,6 +3781,20 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('emptyiterator' === $lcname) {
+            // Thin AOT: Iterator protocol; current/key throw BadMethodCallException (#27582).
+            // php-src ext/spl/spl_iterators.c — empty iterator.
+            $this->ensureZendBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, [
+                'Iterator',
+                'Traversable',
+            ]);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['__construct', 'rewind', 'valid', 'current', 'key', 'next'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('splfileinfo' === $lcname) {
             // Thin AOT: pathname/filename for getFilename (#27289 / #27422).
             $this->ensureTraversableBuiltinInterfaces();
