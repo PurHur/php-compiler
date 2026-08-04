@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6979 |
-| Phase A inventory files (M2 ratio SSOT) | 6979 |
+| PHP files on vm.php path | 6980 |
+| Phase A inventory files (M2 ratio SSOT) | 6980 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22426 |
+| Source constructs flagged (warnings) | 22427 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6010,6 +6010,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableMutateNestedLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableNestedExportLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTablePadLlvm.php` | 0 | 3 |
+| `lib/JIT/HashTablePointerLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTablePopLastLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableReadLlvm.php` | 0 | 7 |
 | `lib/JIT/HashTableReplaceRecursiveLlvm.php` | 0 | 2 |
@@ -35201,11 +35202,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_splice.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 35)
-- new ArgumentCountError (line 41)
-- new Variable (line 65)
-- new ArgumentCountError (line 83)
-- new ArgumentCountError (line 89)
+- new ArgumentCountError (line 36)
+- new ArgumentCountError (line 42)
+- new Variable (line 66)
+- new ArgumentCountError (line 85)
+- new ArgumentCountError (line 91)
 - 2 class method(s)
 
 ### `ext/standard/array_sum.php`
@@ -44990,7 +44991,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayPointerRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/ArrayPopRuntime.php`
 
@@ -50194,6 +50195,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 226)
 - new Variable (line 445)
 - 10 class method(s)
+
+### `lib/JIT/HashTablePointerLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 44 class method(s)
 
 ### `lib/JIT/HashTablePopLastLlvm.php`
 
