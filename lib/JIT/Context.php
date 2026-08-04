@@ -1092,6 +1092,15 @@ class Context {
                 $eiMethod
             );
         }
+        // FilterIterator — HT snapshot + accept() fetch for user subclasses (#27565).
+        $this->type->object->lookup('FilterIterator');
+        foreach ([
+            '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'accept', 'getinneriterator',
+        ] as $fiMethod) {
+            $this->functionProxies['filteriterator::'.strtolower($fiMethod)] = new Call\FilterIteratorMethod(
+                $fiMethod
+            );
+        }
         // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
