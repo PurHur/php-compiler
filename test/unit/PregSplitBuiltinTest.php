@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * preg_split() VM/AOT smoke (#1178).
+ * preg_split() VM/AOT smoke (#1178, #27647).
  */
 final class PregSplitBuiltinTest extends TestCase
 {
@@ -21,9 +21,25 @@ PHP;
 
     private const EXPECT = "3\none|two|three\nfalse\n";
 
+    /** Issue #27647 — PREG_SPLIT_OFFSET_CAPTURE must fold under thin AOT. */
+    private const OFFSET_CAPTURE_CODE = <<<'PHP'
+$parts = preg_split('/a/', 'xay', -1, PREG_SPLIT_OFFSET_CAPTURE);
+echo $parts[0][0], ':', $parts[0][1], '|', $parts[1][0], ':', $parts[1][1], "\n";
+PHP;
+
+    private const OFFSET_CAPTURE_EXPECT = "x:0|y:2\n";
+
     public function testVmMatchesPhpSubset(): void
     {
-        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
+        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
+    }
+
+    public function testVmOffsetCaptureMatchesPhpSubset(): void
+    {
+        $this->assertSame(
+            self::OFFSET_CAPTURE_EXPECT,
+            $this->runBin('bin/vm.php', self::OFFSET_CAPTURE_CODE)
+        );
     }
 
     /**
@@ -35,16 +51,31 @@ PHP;
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $this->assertSame(self::EXPECT, $this->runAotBinary());
+        $this->assertSame(self::EXPECT, $this->runAotBinary(self::CODE));
     }
 
-    private function runAotBinary(): string
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotOffsetCaptureMatchesPhpSubset(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertSame(
+            self::OFFSET_CAPTURE_EXPECT,
+            $this->runAotBinary(self::OFFSET_CAPTURE_CODE)
+        );
+    }
+
+    private function runAotBinary(string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_preg_split_');
         $out = $tmp . '_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . self::CODE);
+        file_put_contents($tmp, "<?php\n" . $code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
@@ -56,11 +87,12 @@ PHP;
         );
         $this->assertIsResource($compile);
         fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
         stream_get_contents($pipes[1]);
-        stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $this->assertSame(0, proc_close($compile));
+        $this->assertSame(0, proc_close($compile), $stderr);
+        $this->assertStringNotContainsString('compileTimeInt', $stderr);
 
         $run = proc_open(
             [$out],
@@ -79,12 +111,12 @@ PHP;
         return $stdout;
     }
 
-    private function runBin(string $bin): string
+    private function runBin(string $bin, string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_preg_split_');
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . self::CODE);
+        file_put_contents($tmp, "<?php\n" . $code);
         $proc = proc_open(
             ['php', $repo . '/' . $bin, $tmp],
             [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],

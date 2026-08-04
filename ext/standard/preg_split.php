@@ -63,13 +63,14 @@ final class preg_split extends Internal
         }
         $limitLit = null;
         $flagsLit = null;
-        if ($argc >= 3 && null !== $args[2]->compileTimeInt) {
-            $limitLit = (int) $args[2]->compileTimeInt;
+        if ($argc >= 3) {
+            $limitLit = self::compileTimeLong($context, $args[2]);
         }
-        if (4 === $argc && null !== $args[3]->compileTimeInt) {
-            $flagsLit = (int) $args[3]->compileTimeInt;
+        if (4 === $argc) {
+            $flagsLit = self::compileTimeLong($context, $args[3]);
         }
         // Literal fold — thin AOT NestedJIT split HT fill is unreliable (#27208 / peer #27181).
+        // Requires compileTimeLong (not the nonexistent compileTimeInt — #27647 / #27466 typo).
         if (
             (2 === $argc || null !== $limitLit)
             && (4 !== $argc || null !== $flagsLit)
@@ -113,5 +114,43 @@ final class preg_split extends Internal
             $limit,
             $flags
         );
+    }
+
+    /**
+     * Resolve a compile-time int operand for literal preg_split fold (#27647).
+     *
+     * Uses {@see JITVariable::$compileTimeLong} / const-fetch name / LLVM ConstantInt —
+     * not the nonexistent `$compileTimeInt` property introduced in #27466.
+     */
+    private static function compileTimeLong(Context $context, JITVariable $arg): ?int
+    {
+        if (null !== ($arg->compileTimeLong ?? null)) {
+            return (int) $arg->compileTimeLong;
+        }
+        $constName = $arg->compileTimeConstantName ?? null;
+        if (null !== $constName) {
+            $lookup = strtolower($constName);
+            if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            if (null !== $context->runtime->vmContext) {
+                $phpVar = $context->runtime->vmContext->constantFetch($constName);
+                if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
+                    return $phpVar->toInt();
+                }
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type || JITVariable::KIND_VALUE !== $arg->kind) {
+            return null;
+        }
+        if (null === $arg->value) {
+            return null;
+        }
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($arg->value->value)) {
+            return null;
+        }
+
+        return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
     }
 }
