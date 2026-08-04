@@ -5,34 +5,34 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableKeyFilterLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_diff_key() via ArrayDiffKeyJitHelper PHP (#12553, #23787).
+ * JIT/AOT link for array_diff_key() (#12553, #27522).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayDiff #23116).
- * Standalone AOT compiles {@see ArrayDiffKeyJitHelper} via nested JIT bridges (#14422); embed uses same PHP path.
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayDiffKeyJitHelper}
+ * returned empty hashtables (#27522 — peer array_keys #27211 / intersect_key #27521).
+ * Call-site LLVM via {@see HashTableKeyFilterLlvm}.
+ *
+ * Fresh ABI names (`__copy` / `__filter`) avoid colliding with helper-runtime-cached
+ * NestedJIT bodies for the old `__single` / `__two` symbols (#15889).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_diff_key)
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayDiffKeyRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ArrayDiffKeyJitHelper.php';
+    private const ABI_SINGLE = '__array_diff_key__copy';
 
-    private const DIFF_KEY_SINGLE = 'PHPCompiler\\ext\\standard\\ArrayDiffKeyJitHelper::diffKeySingleCopy';
-
-    private const DIFF_KEY_TWO = 'PHPCompiler\\ext\\standard\\ArrayDiffKeyJitHelper::diffKeyTwo';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::DIFF_KEY_SINGLE,
-        self::DIFF_KEY_TWO,
-    ];
+    private const ABI_TWO = '__array_diff_key__filter';
 
     public static function ensureLinked(Context $context): void
     {
@@ -46,16 +46,21 @@ final class ArrayDiffKeyRuntime
 
     public static function diffKey(Context $context, JITVariable $first, JITVariable ...$others): Value
     {
+        // Load all operand HTs before bridge emit (#27522 / peer #27521).
+        $firstHt = self::argToHashtable($context, $first);
+        $otherHts = [];
+        foreach ($others as $other) {
+            $otherHts[] = self::argToHashtable($context, $other);
+        }
+
         self::ensureLinked($context);
 
-        $firstHt = self::argToHashtable($context, $first);
-        if ([] === $others) {
+        if ([] === $otherHts) {
             return self::callDiffKeySingle($context, $firstHt);
         }
 
         $result = self::callDiffKeySingle($context, $firstHt);
-        foreach ($others as $other) {
-            $nextHt = self::argToHashtable($context, $other);
+        foreach ($otherHts as $nextHt) {
             $result = self::callDiffKeyTwo($context, $result, $nextHt);
         }
 
@@ -64,55 +69,55 @@ final class ArrayDiffKeyRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__array_diff_key__single');
+        $probe = $context->module->getNamedFunction(self::ABI_SINGLE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__array_diff_key__single', self::implementDiffKeySingleBridge(...));
-        self::implementIfMissing($context, '__array_diff_key__two', self::implementDiffKeyTwoBridge(...));
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitSingleBridge($context);
+        self::emitTwoBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
     }
 
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
+    private static function emitSingleBridge(Context $context): void
     {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
+        $fn = self::declareFunction($context, self::ABI_SINGLE);
+        $entry = $fn->appendBasicBlock('array_diff_key_copy_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $copied = HashTableKeyFilterLlvm::copy($context, $fn->getParam(0));
+        $context->builder->returnValue($copied);
+        $context->registerFunction(self::ABI_SINGLE, $fn);
+        $context->builder->clearInsertionPosition();
+    }
 
-            return;
-        }
-
-        $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
-        $context->registerFunction($name, $fn);
+    private static function emitTwoBridge(Context $context): void
+    {
+        $fn = self::declareFunction($context, self::ABI_TWO);
+        $entry = $fn->appendBasicBlock('array_diff_key_filter_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $filtered = HashTableKeyFilterLlvm::diffKey(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($filtered);
+        $context->registerFunction(self::ABI_TWO, $fn);
         $context->builder->clearInsertionPosition();
     }
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            // fall through
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            return $probe;
         }
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -123,36 +128,12 @@ final class ArrayDiffKeyRuntime
                 $htPtr,
                 false,
                 ...match ($name) {
-                    '__array_diff_key__single' => [$htPtr],
-                    '__array_diff_key__two' => [$htPtr, $htPtr],
+                    self::ABI_SINGLE => [$htPtr],
+                    self::ABI_TWO => [$htPtr, $htPtr],
                     default => throw new \LogicException('unknown array_diff_key bridge: '.$name),
                 }
             )
         );
-    }
-
-    private static function implementDiffKeySingleBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_diff_key_single_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::DIFF_KEY_SINGLE),
-            [$fn->getParam(0)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
-    }
-
-    private static function implementDiffKeyTwoBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_diff_key_two_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::DIFF_KEY_TWO),
-            [$fn->getParam(0), $fn->getParam(1)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
     }
 
     private static function callDiffKeySingle(Context $context, Value $ht): Value
@@ -160,7 +141,7 @@ final class ArrayDiffKeyRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_diff_key__single'),
+            $context->lookupFunction(self::ABI_SINGLE),
             $ht
         );
     }
@@ -170,7 +151,7 @@ final class ArrayDiffKeyRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_diff_key__two'),
+            $context->lookupFunction(self::ABI_TWO),
             $left,
             $right
         );
@@ -185,29 +166,12 @@ final class ArrayDiffKeyRuntime
         return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#23787');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#23787'
-        );
-    }
-
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__array_diff_key__single', '__array_diff_key__two'] as $name) {
+        foreach ([self::ABI_SINGLE, self::ABI_TWO] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayDiffKeyRuntime bridge (#12553)');
+                throw new \LogicException($name.' missing after ArrayDiffKeyRuntime bridge (#27522)');
             }
             $context->registerFunction($name, $fn);
         }
