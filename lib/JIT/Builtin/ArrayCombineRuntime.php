@@ -5,34 +5,36 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableCombineLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_combine() via ArrayCombineJitHelper PHP (#12502).
+ * JIT/AOT link for array_combine() (#12502, #27132).
  *
- * Standalone AOT compiles {@see ArrayCombineJitHelper} via JitVmHelperLink bridge (#14437); native literal arrays materialize to hashtable then route through PHP (#18013).
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::combine()}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayCombineJitHelper} returned a
+ * PHP HashTable that is not a native `__hashtable__` — json_encode segfaults after
+ * `c:main_before_php` (#27132). Call-site LLVM via {@see HashTableCombineLlvm}
+ * (peer ArrayReverseRuntime / #27067, ArrayPadRuntime / #26971, ArrayFlipRuntime / #26970).
+ *
+ * Native literal arrays materialize via {@see ArrayBuiltinHelper::nativeListToHashTable()}
+ * then route through call-site LLVM (#18013).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray::combine()} /
+ * {@see \PHPCompiler\ext\standard\ArrayCombineJitHelper}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_combine)
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayCombineRuntime
 {
     private const ABI_COMBINE = '__array_combine__copy';
 
-    private const HELPER_PATH = '/ext/standard/ArrayCombineJitHelper.php';
-
-    private const COMBINE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayCombineJitHelper::combineCopy';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::COMBINE_HELPER,
-    ];
-
     public static function combine(Context $context, JITVariable $keys, JITVariable $values): Value
     {
-        // JitVmHelperLink bridge does not propagate PHP throws from VmArray::combine (#16080).
         ArrayBuiltinHelper::guardCombinePackedListLengthMismatch($context, $keys, $values, 'bridge');
 
         self::ensureLinked($context);
@@ -72,38 +74,44 @@ final class ArrayCombineRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_COMBINE,
-            'array_combine_bridge_entry',
-            [$htPtr, $htPtr],
-            $htPtr,
-            self::COMBINE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12502'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitCombineBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitCombineBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction(self::ABI_COMBINE);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_COMBINE,
+                $context->context->functionType($htPtr, false, $htPtr, $htPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_combine_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $combined = HashTableCombineLlvm::combine(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($combined);
+        $context->registerFunction(self::ABI_COMBINE, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_COMBINE);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_COMBINE.' missing after ArrayCombineRuntime bridge (#12502)');
+            throw new \LogicException(self::ABI_COMBINE.' missing after ArrayCombineRuntime bridge (#27132)');
         }
         $context->registerFunction(self::ABI_COMBINE, $fn);
     }
