@@ -32,6 +32,17 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * Empty packed hashtable for builtins that return [] (array_merge arity 0,
+     * AOT realpath_cache_get empty snapshot, …).
+     *
+     * php-src: zend_array_dup / empty HashTable — {@see HashTableHelper::alloc()}.
+     */
+    public static function emptyArray(Context $context): Value
+    {
+        return HashTableHelper::alloc($context);
+    }
+
+    /**
      * Array union (`$a + $b`) for hashtable / value-boxed / native-list operands.
      *
      * php-src: Zend/zend_operators.c — add_function; left-hand keys win (#3690, #10533).
