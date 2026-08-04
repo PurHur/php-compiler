@@ -3758,6 +3758,30 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('filteriterator' === $lcname) {
+            // Thin AOT: snapshot `__spl_ht` + Iterator protocol; accept() filters (#27565).
+            // Not SplOuterIteratorHt — foreach must call rewind/next so accept runs.
+            // php-src ext/spl/spl_iterators.c — spl_FilterIterator / dual_it_fetch.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('OuterIterator');
+            $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'Iterator',
+                'Traversable',
+                'OuterIterator',
+            ]);
+            $this->defineProperty($id, \PHPCompiler\VM\FilterIteratorJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\FilterIteratorJitHelper::PROP_POS, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $prot = \PHPCfg\Func::FLAG_PROTECTED;
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'getinneriterator',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+            $this->defineMethodVisibility($id, 'accept', $prot);
+        }
         if ('norewinditerator' === $lcname || 'infiniteiterator' === $lcname) {
             // Thin AOT: snapshot `__spl_ht` + Iterator protocol via `__spl_iter_pos` (#27583).
             // Not SplOuterIteratorHt — foreach must call rewind (NoRewind = no-op).
@@ -4675,6 +4699,35 @@ class Object_ extends Type {
         if (null !== $grandparent) {
             $this->inheritMethodVisibilityFromParent($childId, $parentLc);
         }
+    }
+
+    /**
+     * Copy parent instance property slots onto $childId so allocate() reserves them (#27565).
+     *
+     * Thin-AOT internals (`__spl_ht`, …) live on the parent ClassEntry; user subclasses
+     * previously allocated with zero slots and parent property stores aborted (rc=134).
+     * Grandparents first so slot order matches the parent chain.
+     */
+    public function inheritParentInstanceProperties(int $childId, string $parentLc): void
+    {
+        $parentLc = strtolower(ltrim($parentLc, '\\'));
+        if (!isset($this->classes[$parentLc])) {
+            return;
+        }
+        $grandparent = $this->parentClassLc($parentLc);
+        if (null !== $grandparent) {
+            $this->inheritParentInstanceProperties($childId, $grandparent);
+        }
+        $parentId = $this->classes[$parentLc];
+        foreach ($this->properties[$parentId] ?? [] as $propset) {
+            $name = $propset[1];
+            if ($this->hasProperty($childId, $name)) {
+                continue;
+            }
+            $this->defineProperty($childId, $name, $propset[2]);
+        }
+        // Do not markHasConstructor on the child — that makes `new Child` look for
+        // child::__construct (missing) and skip inheritedConstructorProxyLc (#27565).
     }
 
     public function markHasConstructor(int $classId): void

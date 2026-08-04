@@ -12027,6 +12027,12 @@ class JIT {
                         $parentOp = $block->getOperand($op->arg2);
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
+                        // Before compileClass: user subclass methods / nested `new` need parent
+                        // thin-AOT slots (`__spl_ht`, …) already on the child (#27565).
+                        $this->context->type->object->inheritParentInstanceProperties(
+                            $this->context->scope->classId,
+                            strtolower(ltrim($parentOp->value, '\\'))
+                        );
                     }
                     if ([] !== $op->attributeNames || [] !== $op->attributeEntries) {
                         $attrNames = [];
@@ -17493,6 +17499,8 @@ class JIT {
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\EmptyIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\FilterIteratorMethod
+                && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplPriorityQueueMethod
@@ -18892,15 +18900,17 @@ class JIT {
             $methodLcEarly = strtolower($methodName);
             // #27044 / #19208: stored `$root = $doc->documentElement` often loses TYPE_OBJECT.
             // RuntimeIndirect(appendChild) only has Document/Node candidates — Element class_id
-            // misses and aborts. Route through ParentNode::append before building RI.
+            // misses and aborts. Prefer DomNodeAppendChild (live slots + returns the child);
+            // do not use ParentNode::append alone — it returns null and breaks
+            // `$a = $el->appendChild(...)` (#27480).
             if (
                 'appendchild' === $methodLcEarly
                 && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
             ) {
-                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::append');
-                if ($this->context->functionIsRegistered('domnode::append')) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
+                if ($this->context->functionIsRegistered('domnode::appendchild')) {
                     $receiverVar = $this->context->getVariableFromOp($receiverOp);
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::append');
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::appendchild');
                     $this->context->scope->args = [$receiverVar];
 
                     return;
@@ -19131,30 +19141,30 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $proxyName = $this->resolveDomSubclassInstanceMethodProxy($declaringClassLc, $methodLc, $proxyName);
-        // Thin AOT: Element/Node appendChild → ParentNode::append for live NodeList (#19208).
+        // Thin AOT: Element/Node appendChild → DomNodeAppendChild (live NodeList + return
+        // child) (#19208, #27044, #27480). Never remap to ParentNode::append alone — that
+        // returns null and makes `$a = $el->appendChild(...)` NULL under AOT (#27480).
         // DOMDocument must keep DomDocumentAppendChild (documentElement + parentNode); the
         // append remap corrupts child tagName after an intervening echo (#24973).
-        // DomNodeAppendChild also delegates to the same mutation path (#27044) when remap
-        // does not fire (stored $root = $doc->documentElement receivers).
         if (
             'appendchild' === $methodLc
             && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
         ) {
-            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::append');
-            if ($this->context->functionIsRegistered('domnode::append')) {
-                $docAppendClasses = [
-                    'domdocument' => true,
-                    'dom\\document' => true,
-                    'dom\\xmldocument' => true,
-                    'dom\\htmldocument' => true,
-                ];
-                if (!isset($docAppendClasses[$declaringClassLc])) {
-                    $proxyName = 'domnode::append';
-                } else {
-                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::appendchild');
-                    if ($this->context->functionIsRegistered('domdocument::appendchild')) {
-                        $proxyName = 'domdocument::appendchild';
-                    }
+            $docAppendClasses = [
+                'domdocument' => true,
+                'dom\\document' => true,
+                'dom\\xmldocument' => true,
+                'dom\\htmldocument' => true,
+            ];
+            if (!isset($docAppendClasses[$declaringClassLc])) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
+                if ($this->context->functionIsRegistered('domnode::appendchild')) {
+                    $proxyName = 'domnode::appendchild';
+                }
+            } else {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::appendchild');
+                if ($this->context->functionIsRegistered('domdocument::appendchild')) {
+                    $proxyName = 'domdocument::appendchild';
                 }
             }
         }
@@ -19546,8 +19556,15 @@ class JIT {
 
             return;
         }
+        // Legacy: appendChild was briefly remapped to ParentNode::append (#19208). Keep the
+        // early-return shape but force DomNodeAppendChild so the child is returned (#27480).
         if ('appendchild' === $methodLc && 'domnode::append' === $proxyName) {
-            $this->context->scope->toCall = $staticProxy;
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
+            if ($this->context->functionIsRegistered('domnode::appendchild')) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::appendchild');
+            } else {
+                $this->context->scope->toCall = $staticProxy;
+            }
             $this->context->scope->args = [$receiverVar];
 
             return;

@@ -683,7 +683,6 @@ class Module extends ModuleAbstract
             new phpc_nextafter_kernel(),
             new phpc_hypot_kernel(),
             new phpc_fmod_kernel(),
-            new phpc_ceil_kernel(),
             new phpc_cos_kernel(),
             new phpc_cosh_kernel(),
             new phpc_sin_kernel(),
@@ -699,7 +698,6 @@ class Module extends ModuleAbstract
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
 
-            new phpc_floor_kernel(),
             new phpc_sqrt_kernel(),
             new sys_get_temp_dir(),
             new sys_getloadavg(),
@@ -1237,7 +1235,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'acosh', 'asinh', 'atanh', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
+        foreach (['round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'acosh', 'asinh', 'atanh', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
