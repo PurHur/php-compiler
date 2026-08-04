@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7005 |
-| Phase A inventory files (M2 ratio SSOT) | 7005 |
+| PHP files on vm.php path | 7006 |
+| Phase A inventory files (M2 ratio SSOT) | 7006 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22517 |
+| Source constructs flagged (warnings) | 22524 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2081,6 +2081,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumOneStringBoolFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumOneStringFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPadFunction.php` | 0 | 2 |
+| `ext/sodium/SodiumPadJitHelper.php` | 0 | 7 |
 | `ext/sodium/SodiumPwhashFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPwhashScryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrFunction.php` | 0 | 3 |
@@ -23832,7 +23833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/JitSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/sodium/Module.php`
 
@@ -24098,6 +24099,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 - 1 closure(s)
+
+### `ext/sodium/SodiumPadJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new SodiumException (line 13)
+- new SodiumException (line 31)
+- new SodiumException (line 35)
+- new SodiumException (line 38)
+- new SodiumException (line 46)
+- new SodiumException (line 50)
+- 2 class method(s)
 
 ### `ext/sodium/SodiumPwhashFunction.php`
 
@@ -47808,7 +47820,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/Builtin/StringSoundex.php`
 
