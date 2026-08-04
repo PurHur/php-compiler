@@ -55,6 +55,10 @@ final class is_callable extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitIsCallable::invoke($context, ...$args);
+        // Standalone AOT: bare int1 from runtime array probes mis-lowers in ?: (#15704 / #27173).
+        return $this->boxStandaloneBoolJitResult(
+            $context,
+            JitIsCallable::invoke($context, ...$args)
+        );
     }
 }
