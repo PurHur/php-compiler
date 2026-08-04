@@ -5,34 +5,35 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableMergeLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_merge() via ArrayMergeJitHelper PHP (#10183, #22954).
+ * JIT/AOT link for array_merge() (#10183, #22954, #27546).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayPush #22801).
- * Standalone AOT compiles {@see ArrayMergeJitHelper} via nested JIT bridges (#14276); embed uses same PHP path.
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMergeJitHelper} returned a
+ * PHP HashTable that is not a native `__hashtable__` — implode segfaults after
+ * `c:main_before_php` (#27546). Call-site LLVM via {@see HashTableMergeLlvm}
+ * (peer ArrayCombineRuntime / #27132, ArrayReverseRuntime / #27067, ArrayPadRuntime / #26971).
+ *
+ * Native literal arrays materialize via {@see ArrayBuiltinHelper::nativeListToHashTable()}
+ * then route through call-site LLVM.
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray::merge()} /
+ * {@see \PHPCompiler\ext\standard\ArrayMergeJitHelper}
  * php-src: ext/standard/array.c — php_array_merge()
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayMergeRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ArrayMergeJitHelper.php';
+    private const ABI_SINGLE = '__array_merge__single';
 
-    private const MERGE_SINGLE = 'PHPCompiler\\ext\\standard\\ArrayMergeJitHelper::mergeSingleCopy';
-
-    private const MERGE_TWO = 'PHPCompiler\\ext\\standard\\ArrayMergeJitHelper::mergeTwo';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::MERGE_SINGLE,
-        self::MERGE_TWO,
-    ];
+    private const ABI_TWO = '__array_merge__two';
 
     public static function ensureLinked(Context $context): void
     {
@@ -55,13 +56,23 @@ final class ArrayMergeRuntime
 
         $firstHt = self::argToHashtable($context, $args[0]);
         if (1 === $count) {
-            return self::callMergeSingle($context, $firstHt);
+            return $context->builder->call(
+                $context->lookupFunction(self::ABI_SINGLE),
+                $firstHt
+            );
         }
 
-        $result = self::callMergeSingle($context, $firstHt);
+        $result = $context->builder->call(
+            $context->lookupFunction(self::ABI_SINGLE),
+            $firstHt
+        );
         for ($i = 1; $i < $count; ++$i) {
             $nextHt = self::argToHashtable($context, $args[$i]);
-            $result = self::callMergeTwo($context, $result, $nextHt);
+            $result = $context->builder->call(
+                $context->lookupFunction(self::ABI_TWO),
+                $result,
+                $nextHt
+            );
         }
 
         return $result;
@@ -69,116 +80,22 @@ final class ArrayMergeRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__array_merge__single');
+        $probe = $context->module->getNamedFunction(self::ABI_SINGLE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__array_merge__single', self::implementMergeSingleBridge(...));
-        self::implementIfMissing($context, '__array_merge__two', self::implementMergeTwoBridge(...));
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitSingleBridge($context);
+        self::emitTwoBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
-    }
-
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return;
-        }
-
-        $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
-        $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function declareFunction(Context $context, string $name): LlvmFunction
-    {
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            // fall through
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-
-        return $context->module->addFunction(
-            $name,
-            $context->context->functionType(
-                $htPtr,
-                false,
-                ...match ($name) {
-                    '__array_merge__single' => [$htPtr],
-                    '__array_merge__two' => [$htPtr, $htPtr],
-                    default => throw new \LogicException('unknown array_merge bridge: '.$name),
-                }
-            )
-        );
-    }
-
-    private static function implementMergeSingleBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_merge_single_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::MERGE_SINGLE),
-            [$fn->getParam(0)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
-    }
-
-    private static function implementMergeTwoBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_merge_two_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::MERGE_TWO),
-            [$fn->getParam(0), $fn->getParam(1)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
-    }
-
-    private static function callMergeSingle(Context $context, Value $ht): Value
-    {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_merge__single'),
-            $ht
-        );
-    }
-
-    private static function callMergeTwo(Context $context, Value $left, Value $right): Value
-    {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction('__array_merge__two'),
-            $left,
-            $right
-        );
     }
 
     private static function argToHashtable(Context $context, JITVariable $arg): Value
@@ -190,29 +107,54 @@ final class ArrayMergeRuntime
         return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function emitSingleBridge(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction(self::ABI_SINGLE);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_SINGLE,
+                $context->context->functionType($htPtr, false, $htPtr)
+            );
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#22954');
+        $entry = $fn->appendBasicBlock('array_merge_single_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $merged = HashTableMergeLlvm::mergeSingle($context, $fn->getParam(0));
+        $context->builder->returnValue($merged);
+        $context->registerFunction(self::ABI_SINGLE, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function emitTwoBridge(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $probe = $context->module->getNamedFunction(self::ABI_TWO);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_TWO,
+                $context->context->functionType($htPtr, false, $htPtr, $htPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_merge_two_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $merged = HashTableMergeLlvm::mergeTwo(
             $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22954'
+            $fn->getParam(0),
+            $fn->getParam(1)
         );
+        $context->builder->returnValue($merged);
+        $context->registerFunction(self::ABI_TWO, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__array_merge__single', '__array_merge__two'] as $name) {
+        foreach ([self::ABI_SINGLE, self::ABI_TWO] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayMergeRuntime bridge (#10183)');
+                throw new \LogicException($name.' missing after ArrayMergeRuntime bridge (#27546)');
             }
             $context->registerFunction($name, $fn);
         }

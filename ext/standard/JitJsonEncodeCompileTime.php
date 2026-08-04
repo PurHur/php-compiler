@@ -23,7 +23,8 @@ use PHPLLVM\Value;
  * `json_encode(preg_filter(lit…))` / string-subject (#27181),
  * `json_encode(array_replace_recursive(lit…))` (#26977),
  * `json_encode(array_flip(lit…))` (#27072),
- * `json_encode(array_combine(lit, lit))` (#27132), and
+ * `json_encode(array_combine(lit, lit))` (#27132),
+ * `json_encode(array_merge(lit…))` (#27546), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
@@ -58,6 +59,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayCombine($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayMerge($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromParseUrl($block, $operand);
@@ -421,6 +425,40 @@ final class JitJsonEncodeCompileTime
         }
         $var = new VmVariable();
         $var->array($combined);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_merge(…))` when all args are compile-time arrays (#27546).
+     *
+     * Uses VM {@see VmArray::merge()} SSOT (php-src array.c). Call-site
+     * {@see \PHPCompiler\JIT\HashTableMergeLlvm} builds a dim/count/implode-green HT;
+     * NestedJIT json_encode still cannot export those runtime tables (peer #27132 / #27072).
+     */
+    private static function tryCompileTimeArrayFromArrayMerge(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_merge');
+        if (null === $args || [] === $args) {
+            return null;
+        }
+        foreach ($args as $arg) {
+            if (VmVariable::TYPE_ARRAY !== $arg->type) {
+                return null;
+            }
+        }
+        $first = $args[0]->toArray();
+        $others = [];
+        for ($i = 1, $n = \count($args); $i < $n; ++$i) {
+            $others[] = $args[$i]->toArray();
+        }
+        $merged = VmArray::merge($first, ...$others);
+        $var = new VmVariable();
+        $var->array($merged);
 
         return $var;
     }
