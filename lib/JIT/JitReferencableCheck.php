@@ -57,7 +57,9 @@ final class JitReferencableCheck
         ));
     }
 
-    /** @return bool false when a pending Error was registered (caller should not mutate) */
+    /**
+     * @return bool false when a pending Error was registered (caller should not mutate)
+     */
     public static function guardArrayMutatorByRefArg(Context $context, string $fn, Variable $array): bool
     {
         if (!self::isEphemeralArrayArg($array)) {
@@ -67,11 +69,16 @@ final class JitReferencableCheck
             return true;
         }
         // Call/method return temps: adaptByRefCallArgsForInternal already emitted E_NOTICE (#25815).
-        // Inline literals are Error+abort there before this runs — remaining ephemerals may mutate.
         if (
             \PHPCompiler\VM\ReferencableCheck::isArrayInternalPointerMutatorBuiltin($fn)
             && !empty($array->nonVariableByRefTempAllowed)
         ) {
+            return true;
+        }
+        // Pointer mutators (reset/next/prev/end): named TYPE_VALUE locals are over-classified as
+        // ephemeral by isEphemeralArrayArg (#27484). True inline literals already Error+abort in
+        // adaptByRefCallArgsForInternal — do not emit a second abort here (that poisoned $a lvalues).
+        if (\PHPCompiler\VM\ReferencableCheck::isArrayInternalPointerMutatorBuiltin($fn)) {
             return true;
         }
         self::emitByRefError($context, $fn, 0);

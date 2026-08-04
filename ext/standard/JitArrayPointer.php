@@ -10,9 +10,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for array internal pointer builtins (ext/standard/array.c; #4967, #5504).
+ * LLVM lowering for array internal pointer builtins (ext/standard/array.c; #4967, #5504, #27484).
  *
- * Operand walks route through compiled {@see ArrayPointerJitHelper} PHP, not inline LLVM.
+ * Call-site via {@see ArrayPointerRuntime} → {@see \PHPCompiler\JIT\HashTablePointerLlvm}.
  * php-src: {@see https://github.com/php/php-src/blob/master/ext/standard/array.c}
  */
 final class JitArrayPointer
