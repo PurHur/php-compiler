@@ -11224,6 +11224,8 @@ class JIT {
                     }
                     throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
+                    // Nested inline arg call must not clobber outer pending callee (#15217 VM / #27242 AOT).
+                    $this->saveJitPendingOutboundCall();
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
                         $lcname = strtolower($nameOp->value);
@@ -11410,6 +11412,7 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
+                    try {
                     if (is_null($this->context->scope->toCall)) {
                         // short circuit (incl. Fiber::suspend() discard in resume fn, #26801)
                         $this->context->scope->fiberSuspendResultPending = false;
@@ -11483,7 +11486,12 @@ class JIT {
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
+                    } finally {
+                        $this->clearJitOutgoingCallState();
+                        $this->restoreJitPendingOutboundCall();
+                    }
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
+                    try {
                     if (is_null($this->context->scope->toCall)) {
                         // Self-host stub/short-circuit (eg runtime variable function): represent as null.
                         $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
@@ -11800,6 +11808,11 @@ class JIT {
                         $this->context->scope->toCall
                     );
                     break;
+                    } finally {
+                        // Peer VM clearOutgoingCallState + restorePendingOutboundCall (#15217 / #27242).
+                        $this->clearJitOutgoingCallState();
+                        $this->restoreJitPendingOutboundCall();
+                    }
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
@@ -20405,6 +20418,40 @@ class JIT {
         }
 
         return JIT\NamedOptionalCallArgs::densifyForSpread($this->context, $callArgs, \count($paramNames));
+    }
+
+    /**
+     * Save outer FUNCCALL_INIT state before a nested INIT overwrites it (VM #15217; AOT #27242).
+     */
+    private function saveJitPendingOutboundCall(): void
+    {
+        if (null === $this->context->scope->toCall) {
+            return;
+        }
+        $this->context->scope->pendingOutboundCallRestore = [
+            'toCall' => $this->context->scope->toCall,
+            'args' => $this->context->scope->args,
+            'argOperands' => $this->context->scope->argOperands,
+        ];
+    }
+
+    private function clearJitOutgoingCallState(): void
+    {
+        $this->context->scope->toCall = null;
+        $this->context->scope->args = [];
+        $this->context->scope->argOperands = [];
+    }
+
+    private function restoreJitPendingOutboundCall(): void
+    {
+        $saved = $this->context->scope->pendingOutboundCallRestore;
+        if (null === $saved) {
+            return;
+        }
+        $this->context->scope->toCall = $saved['toCall'];
+        $this->context->scope->args = $saved['args'];
+        $this->context->scope->argOperands = $saved['argOperands'];
+        $this->context->scope->pendingOutboundCallRestore = null;
     }
 
     /**

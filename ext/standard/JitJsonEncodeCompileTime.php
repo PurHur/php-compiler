@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * Compile-time json_encode() for inline array literals — avoids deferred AOT stubs (#14040).
  *
  * Also folds `json_encode(preg_split(lit…))` when args are compile-time (#27080),
+ * `json_encode(mb_str_split(lit…))` (#27242),
  * `json_encode(preg_filter(lit…))` / string-subject (#27181),
  * `json_encode(array_replace_recursive(lit…))` (#26977),
  * `json_encode(array_flip(lit…))` (#27072), and
@@ -41,6 +42,9 @@ final class JitJsonEncodeCompileTime
         $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromPregSplit($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromMbStrSplit($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromPregFilter($block, $operand);
@@ -139,6 +143,73 @@ final class JitJsonEncodeCompileTime
         $var->array($ht);
 
         return $var;
+    }
+
+    /**
+     * Resolve `json_encode(mb_str_split(…))` when string(/length/encoding) are literals (#27242).
+     *
+     * Peer {@see tryCompileTimeArrayFromPregSplit}: thin AOT `__compiler_json_encode_array`
+     * cannot export the NestedJIT HT from {@see \PHPCompiler\ext\mbstring\JitMbStrSplit}.
+     */
+    private static function tryCompileTimeArrayFromMbStrSplit(Block $block, Operand $operand): ?VmVariable
+    {
+        $parts = self::evalCompileTimeMbStrSplit($block, $operand);
+        if (null === $parts) {
+            return null;
+        }
+        $ht = new HashTable();
+        foreach ($parts as $piece) {
+            $value = new VmVariable();
+            $value->string($piece);
+            $ht->append($value);
+        }
+        $var = new VmVariable();
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * @return list<string>|null null = not a foldable mb_str_split result
+     */
+    private static function evalCompileTimeMbStrSplit(Block $block, Operand $operand): ?array
+    {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'mb_str_split');
+        if (null === $args) {
+            return null;
+        }
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            return null;
+        }
+        if (VmVariable::TYPE_STRING !== $args[0]->type) {
+            return null;
+        }
+        $string = $args[0]->toString();
+        $length = 1;
+        if ($argc >= 2) {
+            if (VmVariable::TYPE_INTEGER !== $args[1]->type) {
+                return null;
+            }
+            $length = $args[1]->toInt();
+            if ($length <= 0) {
+                return null;
+            }
+        }
+        $encoding = 'UTF-8';
+        if ($argc >= 3) {
+            if (VmVariable::TYPE_STRING !== $args[2]->type) {
+                return null;
+            }
+            $encoding = $args[2]->toString();
+        }
+        try {
+            return \PHPCompiler\ext\mbstring\VmMbstring::strSplit($string, $length, $encoding);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
