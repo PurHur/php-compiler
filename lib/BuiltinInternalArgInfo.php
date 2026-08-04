@@ -86,6 +86,9 @@ final class BuiltinInternalArgInfo
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits / empty (#25623)
             'preg_last_error_msg' => 'string',
             'error_clear_last' => 'void',
+            // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324)
+            'preg_grep' => 'array|false',
+            'preg_match_all' => 'int|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#26104)
             'memory_reset_peak_usage' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
