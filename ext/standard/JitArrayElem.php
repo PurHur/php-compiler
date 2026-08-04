@@ -303,6 +303,39 @@ final class JitArrayElem
     }
 
     /**
+     * array_multisort() array operand — php-src "must be an array or a sort flag" (#27511).
+     *
+     * Unlike {@see requireArrayParam}, Zend's message omits the given-type suffix.
+     */
+    public static function requireMultisortArrayArg(Context $context, JITVariable $array, int $argIndex): void
+    {
+        $message = VmArraySort::multisortOperandTypeError($argIndex);
+        if (JITVariable::TYPE_HASHTABLE === $array->type
+            || ($array->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return;
+        }
+        if (JITVariable::TYPE_NULL === $array->type || ($array->isNullConstant ?? false)) {
+            self::emitErrorAndAbort($context, $message);
+
+            return;
+        }
+        if (JITVariable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
+            $loaded = JitValueBox::valuePtrFromVariable($context, $array);
+            $isArray = self::valueBoxIsArray($context, $loaded);
+            $okBlock = BasicBlockHelper::append($context, 'multisort_arr_ok');
+            $errBlock = BasicBlockHelper::append($context, 'multisort_arr_err');
+            $context->builder->branchIf($isArray, $okBlock, $errBlock);
+            $context->builder->positionAtEnd($errBlock);
+            self::emitErrorAndAbort($context, $message);
+            $context->builder->positionAtEnd($okBlock);
+
+            return;
+        }
+        self::emitErrorAndAbort($context, $message);
+    }
+
+    /**
      * Catchable under AOT try/catch; fatal when uncaught (#27448 / #27446).
      * Bare pending-raise + abort aborts exit 134 inside try — use ExceptionBridge.
      */

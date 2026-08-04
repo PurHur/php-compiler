@@ -10,6 +10,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\MultisortRuntime;
 use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ReferencableCheck;
@@ -108,9 +109,28 @@ final class array_multisort extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // php-src array|sort-flag TypeError — catchable under AOT try/catch (#27511).
+        ExceptionBridge::ensureLinked($context);
         $entries = self::parseJitMultisortEntries($context, $args);
-        if (1 === \count($entries)) {
-            $entry = $entries[0];
+        foreach ($entries as $entry) {
+            JitArrayElem::requireMultisortArrayArg($context, $entry['array'], $entry['argIndex']);
+        }
+        $sortable = [];
+        foreach ($entries as $entry) {
+            $arg = $entry['array'];
+            if ($arg->type & JITVariable::IS_NATIVE_ARRAY
+                || JITVariable::TYPE_HASHTABLE === $arg->type
+                || JITVariable::TYPE_VALUE === $arg->type
+            ) {
+                $sortable[] = $entry;
+            }
+        }
+        if ([] === $sortable) {
+            // Static non-array types already raised above; poison bool return for SSA.
+            return $context->getTypeFromString('int1')->constInt(1, false);
+        }
+        if (1 === \count($sortable)) {
+            $entry = $sortable[0];
             if (StdlibConstants::SORT_DESC === $entry['sortOrder']) {
                 SortRuntime::sortPackedReverse($context, $entry['array']);
             } else {
@@ -120,8 +140,8 @@ final class array_multisort extends Internal
             return $context->getTypeFromString('int1')->constInt(1, false);
         }
 
-        $arrays = array_column($entries, 'array');
-        $descending = StdlibConstants::SORT_DESC === $entries[0]['sortOrder'];
+        $arrays = array_column($sortable, 'array');
+        $descending = StdlibConstants::SORT_DESC === $sortable[0]['sortOrder'];
         MultisortRuntime::multisortPacked($context, $arrays, $descending);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
@@ -346,7 +366,7 @@ final class array_multisort extends Internal
     /**
      * @param list<JITVariable> $args
      *
-     * @return list<array{array: JITVariable, sortOrder: int, sortType: int}>
+     * @return list<array{array: JITVariable, sortOrder: int, sortType: int, argIndex: int}>
      */
     private static function parseJitMultisortEntries(Context $context, array $args): array
     {
@@ -373,6 +393,7 @@ final class array_multisort extends Internal
                     'array' => $arg,
                     'sortOrder' => StdlibConstants::SORT_ASC,
                     'sortType' => StdlibConstants::SORT_REGULAR,
+                    'argIndex' => $i,
                 ];
                 $sortOrder = StdlibConstants::SORT_ASC;
                 $sortType = StdlibConstants::SORT_REGULAR;
@@ -383,7 +404,20 @@ final class array_multisort extends Internal
 
             $flag = self::tryResolveJitMultisortFlag($context, $arg);
             if (null === $flag) {
-                throw new \TypeError(VmArraySort::multisortOperandTypeError($i));
+                // Defer to ExceptionBridge so AOT try/catch can catch (#27511).
+                // PHP throw here aborts compile of `try { array_multisort(null); }`.
+                if ($i > 0 && \count($entries) > 0) {
+                    $last = \count($entries) - 1;
+                    $entries[$last]['sortOrder'] = $sortOrder;
+                    $entries[$last]['sortType'] = $sortType;
+                }
+                $entries[] = [
+                    'array' => $arg,
+                    'sortOrder' => StdlibConstants::SORT_ASC,
+                    'sortType' => StdlibConstants::SORT_REGULAR,
+                    'argIndex' => $i,
+                ];
+                break;
             }
 
             $masked = $flag & ~StdlibConstants::SORT_FLAG_CASE;
