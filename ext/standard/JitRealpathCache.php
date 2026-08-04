@@ -10,9 +10,10 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for realpath cache introspection (#3463).
+ * LLVM lowering for realpath cache introspection (#3463, #27665).
  *
  * JIT/AOT realpath() uses libc directly without PHP cache bookkeeping — return empty snapshot.
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(realpath_cache_get)
  */
 final class JitRealpathCache
 {

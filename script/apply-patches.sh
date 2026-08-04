@@ -172,6 +172,10 @@ patch_already_applied() {
     php-types-get-declared-functions.patch)
       grep -q "'get_declared_functions' => \['array'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-realpath-cache-get-array.patch)
+      # php-src basic_functions.stub.php — realpath_cache_get(): array (#27665)
+      grep -qF "'realpath_cache_get' => ['array']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-get-declared-exclude-deprecated.patch)
       grep -q "'get_declared_classes' => \['array', 'exclude_deprecated=" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -6951,6 +6955,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-error-get-last-null.patch"
   apply_patch "$PATCH_DIR/php-types-crc32-int.patch"
   apply_patch "$PATCH_DIR/php-types-get-declared-functions.patch"
+  apply_patch "$PATCH_DIR/php-types-realpath-cache-get-array.patch"
   apply_patch "$PATCH_DIR/php-types-get-declared-exclude-deprecated.patch"
   apply_patch "$PATCH_DIR/php-types-gettimeofday-float.patch"
   apply_patch "$PATCH_DIR/php-types-round-float.patch"
