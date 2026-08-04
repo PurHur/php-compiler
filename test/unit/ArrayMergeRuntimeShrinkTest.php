@@ -10,16 +10,17 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_merge() NestedJIT via JitVmHelperLink::ensureCompiled (#22954 / peer #22801).
+ * array_merge() call-site LLVM via HashTableMergeLlvm (#27546; was NestedJIT #22954).
  */
 final class ArrayMergeRuntimeShrinkTest extends TestCase
 {
-    public function testArrayMergeRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayMergeRuntimeUsesCallSiteLlvmNotNestedJit(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayMergeRuntime.php');
-        $this->assertStringContainsString('ArrayMergeJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringContainsString('HashTableMergeLlvm::mergeSingle', $runtime);
+        $this->assertStringContainsString('HashTableMergeLlvm::mergeTwo', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::lookupCompiled', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('parseAndCompile', $runtime);
         $this->assertStringNotContainsString('new JIT(', $runtime);
@@ -31,6 +32,11 @@ final class ArrayMergeRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_merge.php');
         $this->assertStringContainsString('ArrayMergeRuntime::merge', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::merge', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableMergeLlvm.php');
+        $this->assertStringContainsString('appendPackedEntries', $llvm);
+        $this->assertStringContainsString('HashTableHelper::setAtStringKey', $llvm);
+        $this->assertStringNotContainsString('exportPairsForSlice', $llvm);
     }
 
     public function testArrayMergeJitHelperMatchesVmArraySemantics(): void
