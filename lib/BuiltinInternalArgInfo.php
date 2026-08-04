@@ -804,6 +804,13 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — int|float $timestamp (PHP 8.4+; missing from InternalArgInfo) (#26097)
             'datetime::createfromtimestamp',
             'datetimeimmutable::createfromtimestamp' => 0 === $index ? 'int|float' : null,
+            // ext/pdo/pdo_dbh.stub.php — PHP 8.4+ connect (absent from InternalArgInfo) (#26223)
+            'pdo::connect' => match ($index) {
+                0 => 'string',
+                1, 2 => '?string',
+                3 => '?array',
+                default => null,
+            },
             // ext/dom/php_dom.stub.php — string $source / int $options = 0 / ?string $overrideEncoding = null (#26080)
             'dom\\htmldocument::createfromstring',
             'dom\\xmldocument::createfromstring' => match ($index) {

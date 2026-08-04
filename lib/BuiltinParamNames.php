@@ -35,6 +35,8 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — PHP 8.4+ createFromTimestamp(int|float $timestamp): static (#26097)
             'datetime::createfromtimestamp',
             'datetimeimmutable::createfromtimestamp' => ['timestamp'],
+            // php-src ext/pdo/pdo_dbh.stub.php — PHP 8.4+; missing from InternalArgInfo (#26223)
+            'pdo::connect' => ['dsn', 'username=', 'password=', 'options='],
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
