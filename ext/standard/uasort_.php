@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -92,6 +93,16 @@ final class uasort_ extends Internal
         if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
-        return UsortRuntime::uasortValues($context, $args[0], $args[1]);
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27510 peer).
+        ExceptionBridge::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'uasort', 1, 'array');
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
+            return UsortRuntime::uasortValues($context, $args[0], $args[1]);
+        }
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
     }
 }

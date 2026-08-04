@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -88,6 +89,16 @@ final class uksort_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('uksort() requires exactly two arguments');
         }
-        return UsortRuntime::uksortKeys($context, $args[0], $args[1]);
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27510 peer).
+        ExceptionBridge::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'uksort', 1, 'array');
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
+            return UsortRuntime::uksortKeys($context, $args[0], $args[1]);
+        }
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
     }
 }
