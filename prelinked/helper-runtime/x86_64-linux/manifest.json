@@ -1,13 +1,13 @@
 {
-    "version": 1,
-    "generated_at": "2026-08-04T02:25:31+00:00",
-    "arch": "x86_64-linux",
-    "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
-    "core_fingerprint": "b61cb91617d413c31a57",
-    "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
-    "unit_count": 366,
-    "published_fresh": 366,
-    "kept_live_unpublished": 0,
-    "total_bytes": 486918340,
-    "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)"
+  "version": 1,
+  "generated_at": "2026-08-04T03:08:51+00:00",
+  "arch": "x86_64-linux",
+  "role": "committed per-arch split-compilation helper units (#15889) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
+  "core_fingerprint": "b61cb91617d413c31a57",
+  "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
+  "unit_count": 367,
+  "published_fresh": 367,
+  "kept_live_unpublished": 0,
+  "total_bytes": 488861417,
+  "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)"
 }
