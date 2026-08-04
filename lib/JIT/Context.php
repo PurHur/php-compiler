@@ -1066,6 +1066,23 @@ class Context {
         $this->functionProxies['appenditerator::__construct'] = new Call\AppendIteratorMethod('__construct');
         $this->functionProxies['appenditerator::append'] = new Call\AppendIteratorMethod('append');
         $this->functionProxies['regexiterator::__construct'] = new Call\RegexIteratorConstruct();
+        // NoRewindIterator / InfiniteIterator — HT snapshot + Iterator protocol (#27583 / #27568).
+        $this->type->object->lookup('NoRewindIterator');
+        $this->type->object->lookup('InfiniteIterator');
+        foreach (['__construct', 'rewind', 'valid', 'current', 'key', 'next'] as $nrMethod) {
+            $this->functionProxies['norewinditerator::'.strtolower($nrMethod)] = new Call\SplHtPosIteratorMethod(
+                $nrMethod,
+                'NoRewindIterator',
+                \PHPCompiler\VM\SplHtPosIteratorJitHelper::REWIND_NOOP,
+                \PHPCompiler\VM\SplHtPosIteratorJitHelper::NEXT_STOP
+            );
+            $this->functionProxies['infiniteiterator::'.strtolower($nrMethod)] = new Call\SplHtPosIteratorMethod(
+                $nrMethod,
+                'InfiniteIterator',
+                \PHPCompiler\VM\SplHtPosIteratorJitHelper::REWIND_RESET,
+                \PHPCompiler\VM\SplHtPosIteratorJitHelper::NEXT_WRAP
+            );
+        }
         // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');

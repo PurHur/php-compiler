@@ -36,6 +36,9 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('fast path probe failed', $script);
         $this->assertStringContainsString('fast_probe_failed', $script);
         $this->assertStringContainsString('bootstrap_vm_driver_execute_probe_llvm_env', $script);
+        // Fast gate must not fall into multi-hour Zend spine without FULL_LINK=1 (#10533).
+        $this->assertStringContainsString('refusing multi-hour Zend spine fallback', $script);
+        $this->assertStringContainsString('bootstrap-refresh-gen0-sidecar.sh', $script);
     }
 
     public function testSpineEntryDocumentsVmDriverExecutePath(): void
