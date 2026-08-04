@@ -1152,6 +1152,7 @@ class Context {
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         $this->functionProxies['reflectionproperty::isfinal'] = new Call\ReflectionPropertyIsFinal();
+        $this->functionProxies['reflectionproperty::isvirtual'] = new Call\ReflectionPropertyIsVirtual();
 
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
         $this->functionProxies['reflectionconstant::getname'] = new Call\ReflectionConstantGetName();

@@ -14259,6 +14259,7 @@ class JIT {
                     if ($op->propertyFinal ?? false) {
                         $this->context->type->object->markPropertyFinal($classId, $name->value);
                     }
+                    $this->markJitPropertyVirtualFromHookRegistry($className, $classId, $name->value);
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
@@ -14346,6 +14347,7 @@ class JIT {
                     if ($op->propertyFinal ?? false) {
                         $this->context->type->object->markPropertyFinal($classId, $name->value);
                     }
+                    $this->markJitPropertyVirtualFromHookRegistry($className, $classId, $name->value);
                     if (
                         null !== $op->arg2
                         && isset($block->constants[$op->arg2])
@@ -14648,6 +14650,25 @@ class JIT {
             $classId,
             $this->context->scope->className ?? ''
         );
+    }
+
+    /**
+     * Record ZEND_ACC_VIRTUAL from PropertyHooks registry for AOT isVirtual() (#27516).
+     */
+    private function markJitPropertyVirtualFromHookRegistry(string $className, int $classId, string $propName): void
+    {
+        $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+        if ('' === $lcClass) {
+            return;
+        }
+        $registry = $this->context->runtime->vmContext->propertyHookRegistry[$lcClass] ?? null;
+        if (!is_array($registry)) {
+            return;
+        }
+        $meta = $registry[$propName] ?? $registry[strtolower($propName)] ?? null;
+        if (is_array($meta) && !empty($meta['virtual'])) {
+            $this->context->type->object->markPropertyVirtual($classId, $propName);
+        }
     }
 
     /**

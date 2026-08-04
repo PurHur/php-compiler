@@ -230,6 +230,13 @@ class Object_ extends Type {
     /** @var array<int, array<string, true>> class id => property lc => true (#22451, #22450) */
     private array $finalPropertyNames = [];
 
+    /**
+     * PHP 8.4 ZEND_ACC_VIRTUAL property hooks — no backing store (#27516, ReflectionProperty::isVirtual).
+     *
+     * @var array<int, array<string, true>> class id => property lc => true
+     */
+    private array $virtualPropertyNames = [];
+
     /** @var array<int, PHPLLVM\Value> property slot handle => owning __object__* */
     private array $slotReceivers = [];
 
@@ -1288,6 +1295,11 @@ class Object_ extends Type {
                 $this->finalPropertyNames[$childId][$propLc] = true;
             }
         }
+        if (isset($this->virtualPropertyNames[$parentId])) {
+            foreach ($this->virtualPropertyNames[$parentId] as $propLc => $_) {
+                $this->virtualPropertyNames[$childId][$propLc] = true;
+            }
+        }
     }
 
     public function hasReadonlyClasses(): bool
@@ -1346,6 +1358,29 @@ class Object_ extends Type {
         }
 
         return array_keys($this->finalPropertyNames[$classId]);
+    }
+
+    /** Mark ZEND_ACC_VIRTUAL hook property for AOT ReflectionProperty::isVirtual (#27516). */
+    public function markPropertyVirtual(int $classId, string $name): void
+    {
+        $this->virtualPropertyNames[$classId][strtolower($name)] = true;
+    }
+
+    public function isPropertyVirtual(int $classId, string $name): bool
+    {
+        return isset($this->virtualPropertyNames[$classId][strtolower($name)]);
+    }
+
+    /**
+     * @return list<string> lowercased virtual property names on $classId (#27516)
+     */
+    public function virtualPropertyNamesForClassId(int $classId): array
+    {
+        if (!isset($this->virtualPropertyNames[$classId])) {
+            return [];
+        }
+
+        return array_keys($this->virtualPropertyNames[$classId]);
     }
 
     /**
@@ -1416,7 +1451,8 @@ class Object_ extends Type {
         return [] !== $this->readonlyClassIds
             || [] !== $this->readonlyPropertyNames
             || [] !== $this->writeRejectPropertyNames
-            || [] !== $this->finalPropertyNames;
+            || [] !== $this->finalPropertyNames
+            || [] !== $this->virtualPropertyNames;
     }
 
     public function markObjectConstructed(PHPLLVM\Value $obj): void

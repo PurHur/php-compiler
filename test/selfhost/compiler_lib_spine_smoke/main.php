@@ -5140,6 +5140,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReadonlyRaise.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Refcount.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassIsFinalRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionPropertyIsFinalRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionPropertyIsVirtualRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassIsIterateableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionEnumJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php';
@@ -5676,6 +5677,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsSensitiveParam
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyGetAttributes.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyIsFinal.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyIsVirtual.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectStaticMethodCall.php';
