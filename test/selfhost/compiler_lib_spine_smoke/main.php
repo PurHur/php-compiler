@@ -1807,6 +1807,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/SocketCreateRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketClose.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketCreate.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableKeyFilterLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/HashTablePointerLlvm.php';
 
 require_once __DIR__.'/../../../ext/sockets/SocketConstants.php';
 require_once __DIR__.'/../../../ext/sockets/SocketExportStreamJitHelper.php';
