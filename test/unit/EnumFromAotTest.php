@@ -78,7 +78,12 @@ PHP);
         }
     }
 
-    /** Invalid from() ValueError is catchable under thin AOT (#24219). */
+    /**
+     * Invalid from() ValueError is catchable under thin AOT (#24219, #27667).
+     *
+     * Regression: #27518 sameLlvmFunction missed php-llvm LLVMValueRef::equals(), so the
+     * after-call pending-throw check dropped the try handler and aborted as uncaught.
+     */
     public function testAotBackedEnumFromValueErrorIsCatchable(): void
     {
         if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
@@ -88,6 +93,7 @@ PHP);
         $src = $this->writeScript($root, <<<'PHP'
 <?php
 enum S: string { case A = 'a'; case B = 'b'; }
+enum E: int { case A = 1; }
 try {
     S::from('zz');
     echo "no throw\n";
@@ -98,6 +104,12 @@ try {
     S::from('zz');
 } catch (\Throwable $e) {
     echo "throwable\n";
+}
+try {
+    E::from(9);
+    echo "NO";
+} catch (\Throwable $e) {
+    echo get_class($e), "\n";
 }
 PHP);
         $bin = sys_get_temp_dir().'/phpc_enum_from_ve_24219_'.getmypid().'.bin';
@@ -112,7 +124,7 @@ PHP);
                 exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
                 $this->assertSame(0, $runRc, implode("\n", $runOut));
                 $this->assertSame(
-                    "caught: \"zz\" is not a valid backing value for enum S\nthrowable\n",
+                    "caught: \"zz\" is not a valid backing value for enum S\nthrowable\nValueError\n",
                     implode("\n", $runOut)."\n"
                 );
             }

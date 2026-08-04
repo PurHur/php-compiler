@@ -804,7 +804,15 @@ final class TryCatchHelper
         return $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
     }
 
-    /** True when two Function_ wrappers refer to the same LLVM function (#24105, #27518). */
+    /**
+     * True when two Function_ wrappers refer to the same LLVM function (#24105, #27518).
+     *
+     * Distinct PHPLLVM wrappers around the same {@see \llvm\LLVMValueRef} must compare equal —
+     * otherwise {@see emitCheckPendingThrowAfterCall} drops a same-function try handler and
+     * Enum::from() ValueError becomes an uncaught fatal again (#27667 / re-#24219). php-llvm's
+     * FFI binding keeps the pointer in private {@code $data} (use {@see \llvm\LLVMValueRef::equals}),
+     * not a public {@code $cdata} property.
+     */
     public static function sameLlvmFunction(Function_ $a, Function_ $b): bool
     {
         if ($a === $b) {
@@ -817,6 +825,10 @@ final class TryCatchHelper
             if ($va === $vb) {
                 return true;
             }
+            if ($va instanceof \llvm\LLVMValueRef && $vb instanceof \llvm\LLVMValueRef) {
+                return $va->equals($vb);
+            }
+            // Legacy / alternate FFI shapes that expose a public cdata slot.
             if (is_object($va) && is_object($vb) && isset($va->cdata, $vb->cdata)) {
                 return $va->cdata === $vb->cdata;
             }
