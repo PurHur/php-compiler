@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6990 |
-| Phase A inventory files (M2 ratio SSOT) | 6990 |
+| PHP files on vm.php path | 6993 |
+| Phase A inventory files (M2 ratio SSOT) | 6993 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22451 |
+| Source constructs flagged (warnings) | 22458 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5395,6 +5395,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ReflectionNative.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionPropertyIsFinalRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionPropertyIsVirtualRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ReflectionPropertyRawValueRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ReflectionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionSetup.php` | 0 | 2 |
 | `lib/JIT/Builtin/RegexIteratorFilterRuntime.php` | 0 | 1 |
@@ -5927,8 +5928,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionPropertyConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionPropertyGetAttributes.php` | 0 | 2 |
+| `lib/JIT/Call/ReflectionPropertyGetRawValue.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionPropertyIsFinal.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionPropertyIsVirtual.php` | 0 | 1 |
+| `lib/JIT/Call/ReflectionPropertySetRawValue.php` | 0 | 1 |
 | `lib/JIT/Call/RegexIteratorConstruct.php` | 0 | 5 |
 | `lib/JIT/Call/RuntimeIndirectClosureCall.php` | 0 | 1 |
 | `lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php` | 0 | 2 |
@@ -5984,7 +5987,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 143 |
+| `lib/JIT/Context.php` | 0 | 145 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -43380,7 +43383,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 983)
+- new InternalArgInfo (line 990)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -43396,8 +43399,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2217)
-- new ArgumentCountError (line 2228)
+- new ArgumentCountError (line 2219)
+- new ArgumentCountError (line 2230)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -46660,6 +46663,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/ReflectionPropertyRawValueRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 176)
+- 8 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/ReflectionRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49461,12 +49471,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 90)
 - 1 class method(s)
 
+### `lib/JIT/Call/ReflectionPropertyGetRawValue.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `lib/JIT/Call/ReflectionPropertyIsFinal.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `lib/JIT/Call/ReflectionPropertyIsVirtual.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Call/ReflectionPropertySetRawValue.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -49877,81 +49897,83 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionPropertyGetAttributes (line 1170)
 - new Call\ReflectionPropertyIsFinal (line 1171)
 - new Call\ReflectionPropertyIsVirtual (line 1172)
-- new Call\ReflectionConstantConstruct (line 1174)
-- new Call\ReflectionConstantGetName (line 1175)
-- new Call\ReflectionConstantGetValue (line 1176)
-- new Call\ReflectionConstantGetAttributes (line 1177)
-- new Call\ReflectionClassConstantGetAttributes (line 1179)
-- new Call\ReflectionMethodGetAttributes (line 1180)
-- new Call\ReflectionFunctionConstruct (line 1181)
-- new Call\ReflectionFunctionGetName (line 1182)
-- new Call\ReflectionFunctionIsVariadic (line 1183)
-- new Call\ReflectionParameterIsSensitiveParameter (line 1185)
-- new Call\ReflectionFunctionGetNamedArguments (line 1188)
-- new Call\ReflectionMethodGetNamedArguments (line 1189)
-- new Call\ReflectionAttributeGetName (line 1191)
-- new Call\ReflectionAttributeGetTarget (line 1192)
-- new Call\ReflectionAttributeNewInstance (line 1193)
-- new Call\ReflectionEnumConstruct (line 1194)
-- new Call\ReflectionEnumGetName (line 1195)
-- new Call\ReflectionEnumHasCase (line 1196)
-- new Call\ReflectionEnumGetCase (line 1197)
-- new Call\ReflectionEnumGetCases (line 1198)
-- new Call\ReflectionEnumIsBacked (line 1199)
-- new Call\ReflectionEnumGetBackingType (line 1200)
-- new Call\ReflectionEnumUnitCaseGetName (line 1201)
-- new Call\ReflectionEnumUnitCaseGetName (line 1202)
-- new Call\ReflectionEnumUnitCaseGetValue (line 1203)
-- new Call\ReflectionNamedTypeGetName (line 1206)
-- new Call\ExceptionGetMessage (line 1207)
-- new Call\ExceptionGetCode (line 1208)
-- new Call\ExceptionToString (line 1209)
-- new Call\ExceptionGetTrace (line 1210)
-- new Call\ExceptionGetTraceAsString (line 1211)
-- new Call\ExceptionConstruct (line 1219)
-- new Call\DateTimeConstruct (line 1242)
-- new Call\DateTimeImmutableConstruct (line 1243)
-- new Call\DateTimeZoneConstruct (line 1244)
-- new Call\DateIntervalConstruct (line 1245)
-- new Call\DatePeriodConstruct (line 1246)
-- new Call\DatePeriodCreateFromISO8601String (line 1248)
-- new Call\DatePeriodIteratorMethod (line 1250)
-- new Call\DateTimeFormat (line 1253)
-- new Call\DateTimeFormat (line 1254)
-- new Call\DateTimeCreateFromFormat (line 1256)
-- new Call\DateTimeCreateFromFormat (line 1257)
-- new Call\DateTimeCreateFromTimestamp (line 1260)
-- new Call\DateTimeCreateFromTimestamp (line 1261)
-- new Call\DateTimeGetMicrosecond (line 1265)
-- new Call\DateTimeGetMicrosecond (line 1266)
-- new Call\DateTimeSetMicrosecond (line 1267)
-- new Call\DateTimeSetMicrosecond (line 1268)
-- new Call\DateIntervalCreateFromDateString (line 1271)
-- new Call\DateTimeSetTimezone (line 1273)
-- new Call\DateTimeSetTimezone (line 1279)
-- new Call\DateTimeModify (line 1283)
-- new Call\DateTimeModify (line 1284)
-- new Call\DateTimeDiff (line 1286)
-- new Call\DateTimeDiff (line 1287)
-- new Call\DateTimeZoneGetTransitions (line 1289)
-- new Call\DateTimeZoneGetName (line 1291)
-- new Call\DateTimeZoneGetOffset (line 1293)
-- new Call\FinfoConstruct (line 1297)
-- new Call\FinfoFile (line 1298)
-- new Call\DomXmlDocumentCreateFromString (line 1301)
-- new Result (line 1669)
-- new Result (line 1691)
-- new Variable (line 2369)
-- new Variable (line 2506)
-- new Variable (line 2760)
-- new Variable (line 2818)
-- new VMVariable (line 2980)
-- new VMVariable (line 2996)
-- new VMVariable (line 3002)
-- new VMVariable (line 3008)
-- new VMVariable (line 3019)
-- new Variable (line 3049)
-- new Variable (line 3094)
+- new Call\ReflectionPropertyGetRawValue (line 1173)
+- new Call\ReflectionPropertySetRawValue (line 1174)
+- new Call\ReflectionConstantConstruct (line 1176)
+- new Call\ReflectionConstantGetName (line 1177)
+- new Call\ReflectionConstantGetValue (line 1178)
+- new Call\ReflectionConstantGetAttributes (line 1179)
+- new Call\ReflectionClassConstantGetAttributes (line 1181)
+- new Call\ReflectionMethodGetAttributes (line 1182)
+- new Call\ReflectionFunctionConstruct (line 1183)
+- new Call\ReflectionFunctionGetName (line 1184)
+- new Call\ReflectionFunctionIsVariadic (line 1185)
+- new Call\ReflectionParameterIsSensitiveParameter (line 1187)
+- new Call\ReflectionFunctionGetNamedArguments (line 1190)
+- new Call\ReflectionMethodGetNamedArguments (line 1191)
+- new Call\ReflectionAttributeGetName (line 1193)
+- new Call\ReflectionAttributeGetTarget (line 1194)
+- new Call\ReflectionAttributeNewInstance (line 1195)
+- new Call\ReflectionEnumConstruct (line 1196)
+- new Call\ReflectionEnumGetName (line 1197)
+- new Call\ReflectionEnumHasCase (line 1198)
+- new Call\ReflectionEnumGetCase (line 1199)
+- new Call\ReflectionEnumGetCases (line 1200)
+- new Call\ReflectionEnumIsBacked (line 1201)
+- new Call\ReflectionEnumGetBackingType (line 1202)
+- new Call\ReflectionEnumUnitCaseGetName (line 1203)
+- new Call\ReflectionEnumUnitCaseGetName (line 1204)
+- new Call\ReflectionEnumUnitCaseGetValue (line 1205)
+- new Call\ReflectionNamedTypeGetName (line 1208)
+- new Call\ExceptionGetMessage (line 1209)
+- new Call\ExceptionGetCode (line 1210)
+- new Call\ExceptionToString (line 1211)
+- new Call\ExceptionGetTrace (line 1212)
+- new Call\ExceptionGetTraceAsString (line 1213)
+- new Call\ExceptionConstruct (line 1221)
+- new Call\DateTimeConstruct (line 1244)
+- new Call\DateTimeImmutableConstruct (line 1245)
+- new Call\DateTimeZoneConstruct (line 1246)
+- new Call\DateIntervalConstruct (line 1247)
+- new Call\DatePeriodConstruct (line 1248)
+- new Call\DatePeriodCreateFromISO8601String (line 1250)
+- new Call\DatePeriodIteratorMethod (line 1252)
+- new Call\DateTimeFormat (line 1255)
+- new Call\DateTimeFormat (line 1256)
+- new Call\DateTimeCreateFromFormat (line 1258)
+- new Call\DateTimeCreateFromFormat (line 1259)
+- new Call\DateTimeCreateFromTimestamp (line 1262)
+- new Call\DateTimeCreateFromTimestamp (line 1263)
+- new Call\DateTimeGetMicrosecond (line 1267)
+- new Call\DateTimeGetMicrosecond (line 1268)
+- new Call\DateTimeSetMicrosecond (line 1269)
+- new Call\DateTimeSetMicrosecond (line 1270)
+- new Call\DateIntervalCreateFromDateString (line 1273)
+- new Call\DateTimeSetTimezone (line 1275)
+- new Call\DateTimeSetTimezone (line 1281)
+- new Call\DateTimeModify (line 1285)
+- new Call\DateTimeModify (line 1286)
+- new Call\DateTimeDiff (line 1288)
+- new Call\DateTimeDiff (line 1289)
+- new Call\DateTimeZoneGetTransitions (line 1291)
+- new Call\DateTimeZoneGetName (line 1293)
+- new Call\DateTimeZoneGetOffset (line 1295)
+- new Call\FinfoConstruct (line 1299)
+- new Call\FinfoFile (line 1300)
+- new Call\DomXmlDocumentCreateFromString (line 1303)
+- new Result (line 1671)
+- new Result (line 1693)
+- new Variable (line 2371)
+- new Variable (line 2508)
+- new Variable (line 2762)
+- new Variable (line 2820)
+- new VMVariable (line 2982)
+- new VMVariable (line 2998)
+- new VMVariable (line 3004)
+- new VMVariable (line 3010)
+- new VMVariable (line 3021)
+- new Variable (line 3051)
+- new Variable (line 3096)
 - 106 class method(s)
 - 32 closure(s)
 
@@ -56102,23 +56124,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2532)
 - new ParameterMetadata (line 2538)
 - new CfgType\Nullable (line 2639)
-- new Variable (line 3605)
-- new Variable (line 3653)
-- new Variable (line 3712)
-- new ObjectEntry (line 3971)
-- new SourceLocation (line 3999)
-- new ParameterMetadata (line 4475)
-- new ObjectEntry (line 4547)
-- new ObjectEntry (line 4564)
-- new ObjectEntry (line 4789)
-- new ObjectEntry (line 4802)
-- new Variable (line 4882)
-- new ObjectEntry (line 5004)
-- new ObjectEntry (line 5024)
-- new Variable (line 5232)
-- new Variable (line 5430)
+- new Variable (line 3613)
+- new Variable (line 3661)
+- new Variable (line 3720)
+- new ObjectEntry (line 3979)
+- new SourceLocation (line 4007)
+- new ParameterMetadata (line 4483)
+- new ObjectEntry (line 4555)
+- new ObjectEntry (line 4572)
+- new ObjectEntry (line 4797)
+- new ObjectEntry (line 4810)
+- new Variable (line 4890)
+- new ObjectEntry (line 5012)
+- new ObjectEntry (line 5032)
+- new Variable (line 5240)
+- new Variable (line 5438)
 - 267 class method(s)
-- 3 closure(s)
+- 4 closure(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`
 
