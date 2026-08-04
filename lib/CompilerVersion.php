@@ -2224,12 +2224,24 @@ final class CompilerVersion
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev / PROFILE=8.2 matches Zend 8.2
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      *
-     * Note: getMangledName / isDefaultValueAvailable are never registered — not php-src ReflectionProperty APIs
-     * (parameter side uses isDefaultValueAvailable; property side uses hasDefaultValue).
+     * Note: isDefaultValueAvailable stays unregistered on ReflectionProperty (parameter API only;
+     * property side uses hasDefaultValue). getMangledName arrives in 8.5 — see
+     * {@see supportsReflectionPropertyGetMangledName()}.
      */
     public static function supportsReflectionPropertyPhp84RawValueApis(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ ReflectionProperty::getMangledName(): string (ext/reflection/php_reflection.stub.php, #27592).
+     *
+     * Withheld on ≤8.4 (reference + PROFILE=8.4) so method_exists matches Zend. Enable via stable
+     * 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` (#27592; php-src 8.5 NEWS).
+     */
+    public static function supportsReflectionPropertyGetMangledName(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**

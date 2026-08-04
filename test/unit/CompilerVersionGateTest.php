@@ -694,6 +694,27 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsReflectionPropertyPhp84RawValueApis());
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyGetMangledName());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsReflectionPropertyGetMangledNameFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyGetMangledName());
+    }
+
+    public function testSupportsReflectionPropertyGetMangledNameTrueOnForwardProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyGetMangledName());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

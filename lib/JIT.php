@@ -18989,6 +18989,13 @@ class JIT {
                     $className = 'ReflectionAttribute';
                     $declaringClassLc = 'reflectionattribute';
                 }
+            } elseif (
+                'getmangledname' === $methodLc
+                && $this->context->functionIsRegistered('reflectionproperty::getmangledname')
+            ) {
+                // foreach (ReflectionClass::getProperties()) loses ReflectionProperty userType (#27592).
+                $className = 'ReflectionProperty';
+                $declaringClassLc = 'reflectionproperty';
             } elseif ('getvalue' === $methodLc) {
                 if (
                     'reflectionconstant' === $receiverHintLc
