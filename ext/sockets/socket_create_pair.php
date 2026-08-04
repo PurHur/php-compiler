@@ -69,6 +69,11 @@ final class socket_create_pair extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_create_pair() JIT lowering not implemented (#6563)');
+        $argc = \count($args);
+        if (4 !== $argc) {
+            return JitSocketCreatePair::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSocketCreatePair::invoke($context, $args[0], $args[1], $args[2], $args[3]);
     }
 }

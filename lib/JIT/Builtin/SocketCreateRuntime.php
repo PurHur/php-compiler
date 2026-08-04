@@ -25,6 +25,11 @@ final class SocketCreateRuntime
     private const COMPILED_HELPERS = [
         self::H.'::createFdArgv',
         self::H.'::registerOwnedArgv',
+        // Same NestedJIT unit as #27423 — compile pair/io too if create runs first.
+        self::H.'::createAndRegisterArgv',
+        self::H.'::writeArgv',
+        self::H.'::readArgv',
+        self::H.'::readFailedArgv',
     ];
 
     /** @var list<string> */
