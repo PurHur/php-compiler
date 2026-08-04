@@ -120,6 +120,7 @@ final class JitFsGlob
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
+        $failTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($buildBlock);
         $ht = self::buildHashtableFromItems($context, $itemsSlot, $count, $tag);
@@ -132,7 +133,7 @@ final class JitFsGlob
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
-        $result->addIncoming($falsePtr, $failBlock);
+        $result->addIncoming($falsePtr, $failTail);
         $result->addIncoming($okPtr, $okTail);
 
         return $result;
