@@ -4718,4 +4718,58 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('?array', BuiltinInternalArgInfo::paramInfoForFunction('stream_context_get_default', 0)['type']);
     }
 
+    /** @covers issue #24665 — php-src ext/ldap/ldap.stub.php names (not InternalArgInfo link/host/base_dn) */
+    public function testLdapBindSearchConnectNamedParamsMatchZendStub(): void
+    {
+        $bind = BuiltinParamNames::forFunction('ldap_bind');
+        self::assertSame(['ldap', 'dn=', 'password='], $bind);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($bind, 'ldap', 'ldap_bind'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($bind, 'dn', 'ldap_bind'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($bind, 'password', 'ldap_bind'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bind, 'link', 'ldap_bind'));
+        self::assertSame(
+            ['ldap', 'dn=', 'password='],
+            BuiltinParamNames::paramNamesForInternalFunction('ldap_bind')
+        );
+
+        $search = BuiltinParamNames::forFunction('ldap_search');
+        self::assertSame(
+            [
+                'ldap',
+                'base',
+                'filter',
+                'attributes=',
+                'attributes_only=',
+                'sizelimit=',
+                'timelimit=',
+                'deref=',
+                'controls=',
+            ],
+            $search
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($search, 'ldap', 'ldap_search'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($search, 'base', 'ldap_search'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($search, 'attributes', 'ldap_search'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($search, 'attributes_only', 'ldap_search'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($search, 'link', 'ldap_search'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($search, 'base_dn', 'ldap_search'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($search, 'attrs', 'ldap_search'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($search, 'attrsonly', 'ldap_search'));
+        self::assertSame($search, BuiltinParamNames::forFunction('ldap_list'));
+        self::assertSame($search, BuiltinParamNames::forFunction('ldap_read'));
+
+        $connect = BuiltinParamNames::forFunction('ldap_connect');
+        self::assertSame(['uri=', 'port='], $connect);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($connect, 'uri', 'ldap_connect'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($connect, 'port', 'ldap_connect'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($connect, 'host', 'ldap_connect'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($connect, 'wallet', 'ldap_connect'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($connect, 'wallet_passwd', 'ldap_connect'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($connect, 'authmode', 'ldap_connect'));
+        self::assertSame(
+            ['uri=', 'port='],
+            BuiltinParamNames::paramNamesForInternalFunction('ldap_connect')
+        );
+    }
+
 }
