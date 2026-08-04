@@ -7,7 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionPropertyHookSupport;
 
-/** ReflectionProperty::getMangledName() — VM (#7295, ext/reflection/php_reflection.c). */
+/** ReflectionProperty::getMangledName() — VM (PHP 8.5+, #27592; ext/reflection/php_reflection.c). */
 final class ReflectionPropertyGetMangledName extends VmClassMethod
 {
     public function __construct()

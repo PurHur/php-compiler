@@ -387,6 +387,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasType;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHooks;
@@ -1158,8 +1159,9 @@ final class BuiltinClasses
         $rp->methodVisibility['setvalue'] = $pub;
         $rp->methods['setaccessible'] = new ReflectionPropertySetAccessible();
         $rp->methodVisibility['setaccessible'] = $pub;
-        // getRawValue/setRawValue are PHP 8.4+ only (#22601; re-#6451). Never register getMangledName /
-        // isDefaultValueAvailable — not php-src ReflectionProperty methods (#22601; re-#11442/#7295).
+        // getRawValue/setRawValue are PHP 8.4+ only (#22601; re-#6451).
+        // isDefaultValueAvailable is never a ReflectionProperty method (#22601; re-#11442/#7295).
+        // getMangledName is PHP 8.5+ only (#27592).
         if (CompilerVersion::supportsReflectionPropertyPhp84RawValueApis()) {
             $rp->methods['setrawvalue'] = new ReflectionPropertySetRawValue();
             $rp->methodVisibility['setrawvalue'] = $pub;
@@ -1170,6 +1172,14 @@ final class BuiltinClasses
             $voidRet = ReflectionTypeSupport::cfgTypeFromLabel('void');
             if (null !== $voidRet) {
                 $rp->methodReturnDeclaredTypes['setrawvalue'] = $voidRet;
+            }
+        }
+        if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
+            $rp->methods['getmangledname'] = new ReflectionPropertyGetMangledName();
+            $rp->methodVisibility['getmangledname'] = $pub;
+            $stringRet = ReflectionTypeSupport::cfgTypeFromLabel('string');
+            if (null !== $stringRet) {
+                $rp->methodReturnDeclaredTypes['getmangledname'] = $stringRet;
             }
         }
         $rp->methods['getattributes'] = new ReflectionPropertyGetAttributes();

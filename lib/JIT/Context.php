@@ -1172,6 +1172,9 @@ class Context {
         $this->functionProxies['reflectionproperty::isvirtual'] = new Call\ReflectionPropertyIsVirtual();
         $this->functionProxies['reflectionproperty::getrawvalue'] = new Call\ReflectionPropertyGetRawValue();
         $this->functionProxies['reflectionproperty::setrawvalue'] = new Call\ReflectionPropertySetRawValue();
+        if (CompilerVersion::supportsReflectionPropertyGetMangledName()) {
+            $this->functionProxies['reflectionproperty::getmangledname'] = new Call\ReflectionPropertyGetMangledName();
+        }
 
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
         $this->functionProxies['reflectionconstant::getname'] = new Call\ReflectionConstantGetName();
