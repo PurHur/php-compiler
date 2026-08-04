@@ -9,7 +9,10 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array pointer JIT routes through ArrayPointerJitHelper PHP not JitArrayPointer LLVM. */
+/**
+ * array pointer JIT/AOT uses call-site {@see \PHPCompiler\JIT\HashTablePointerLlvm}
+ * (peer ArrayPop / #27484); VM SSOT stays ArrayPointerJitHelper / HashTable.
+ */
 final class ArrayPointerRuntimeShrinkTest extends TestCase
 {
     private const JIT_ARRAY_POINTER_MAX_LINES = 80;
@@ -24,13 +27,14 @@ final class ArrayPointerRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('branchPackedVsString', $source);
 
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPointerRuntime.php');
-        $this->assertStringContainsString('ArrayPointerJitHelper', $runtime);
+        $this->assertStringContainsString('HashTablePointerLlvm', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
 
         $loc = substr_count($source, "\n") + 1;
         $this->assertLessThan(
             self::JIT_ARRAY_POINTER_MAX_LINES,
             $loc,
-            'JitArrayPointer.php must stay a thin delegate after PHP bridge migration'
+            'JitArrayPointer.php must stay a thin delegate'
         );
     }
 
