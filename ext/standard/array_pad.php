@@ -11,6 +11,8 @@ use PHPCompiler\JIT\Builtin\ArrayPadRuntime;
 use PHPCompiler\JIT\Builtin\ArrayPadTypeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -77,8 +79,18 @@ final class array_pad extends Internal
                 $argc
             ));
         }
+        ExceptionBridge::ensureLinked($context);
         TypeErrorRaise::ensureLinked($context);
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27485).
+        // Always via JitArrayElem → ExceptionBridge (not bare TypeErrorRaise::emitRaise).
         JitArrayElem::requireArrayParam($context, $args[0], 'array_pad', 1, 'array');
+        if (!($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
+            && JITVariable::TYPE_HASHTABLE !== $args[0]->type
+            && JITVariable::TYPE_VALUE !== $args[0]->type
+        ) {
+            // Static non-array types already raised above; poison return for SSA.
+            return HashTableHelper::emptyVariable($context)->value;
+        }
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_pad() argument #'.((int) $i + 1));
