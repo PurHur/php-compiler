@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -41,13 +40,12 @@ final class JitIterableArg
         string $given,
         bool $allowArray = true
     ): void {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise(
+        // Catchable under AOT try/catch; fatal when uncaught (#27633 / peer #27511).
+        ExceptionBridge::emitTypeErrorAndAbort(
             $context,
             self::iterableTypeErrorMessage($function, $argIndex, $paramName, $given, $allowArray)
         );
-        $context->builder->call($context->lookupFunction('abort'));
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'iterable_arg_te_cont');
     }
 
     /**
