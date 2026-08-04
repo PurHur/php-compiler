@@ -55,7 +55,7 @@ final class ExpRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('phpc_exp_kernel', $source);
-        $this->assertStringContainsString('phpc_ceil_kernel', $source);
+        $this->assertStringContainsString('phpc_sqrt_kernel', $source);
     }
 
     public function testSpineBundleIncludesExpJitHelper(): void

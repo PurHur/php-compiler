@@ -816,7 +816,6 @@ class Context {
             'phpc_nextafter_kernel',
             'phpc_hypot_kernel',
             'phpc_fmod_kernel',
-            'phpc_ceil_kernel',
             'phpc_cos_kernel',
             'phpc_cosh_kernel',
             'phpc_sin_kernel',
@@ -832,7 +831,6 @@ class Context {
             'phpc_log_kernel',
             'phpc_log10_kernel',
 
-            'phpc_floor_kernel',
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',
