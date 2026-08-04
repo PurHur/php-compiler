@@ -830,6 +830,34 @@ final class VmSockets
         unset(self::$socketErrors[$object->id]);
     }
 
+    /** socket_close() for JIT/AOT object handles (ptrToInt) — peer {@see close()} (#27394). */
+    public static function closeForLookupKey(int $key): void
+    {
+        if ($key <= 0) {
+            return;
+        }
+        $exportHandle = VmSocket::existingStreamHandleForLookupKey($key);
+        if (null !== $exportHandle) {
+            VmFs::fclose($exportHandle);
+            VmSocket::releaseForLookupKey($key);
+            unset(self::$socketErrors[$key]);
+
+            return;
+        }
+        $fd = VmSocket::ownedFdForLookupKey($key);
+        if (null !== $fd) {
+            SocketsLibcThinAbi::close($fd);
+        }
+        VmSocket::releaseForLookupKey($key);
+        unset(self::$socketErrors[$key]);
+    }
+
+    /** Record libc errno after a failed socket(2) under NestedJIT (#27394). */
+    public static function recordLibcErrno(?ObjectEntry $object = null): void
+    {
+        self::recordError($object, SocketsLibcThinAbi::readErrno());
+    }
+
     public static function lastError(?ObjectEntry $object = null): int
     {
         if (null !== $object) {

@@ -43,6 +43,11 @@ final class socket_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_close() JIT lowering not implemented (#19286)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitSocketClose::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSocketClose::invoke($context, $args[0]);
     }
 }
