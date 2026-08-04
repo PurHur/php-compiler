@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayMergeRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -23,6 +24,8 @@ use PHPLLVM\Value;
 
 /**
  * array_merge() for packed lists and string-key maps (subset of PHP; JIT via ArrayBuiltinHelper).
+ *
+ * php-src: ext/standard/array.c — PHP_FUNCTION(array_merge) / Z_PARAM_VARIADIC('a')
  */
 final class array_merge extends Internal
 {
@@ -58,23 +61,18 @@ final class array_merge extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        ExceptionBridge::ensureLinked($context);
         if (\count($args) < 1) {
             return HashTableHelper::emptyVariable($context)->value;
         }
 
-        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-                JitArrayElem::requireArrayArgNum($context, $arg, 'array_merge', $i + 1);
-
-                return HashTableHelper::emptyVariable($context)->value;
-            }
-        }
-
+        // php-src Z_PARAM_VARIADIC('a') — catchable TypeError under AOT try/catch (#27478; re-#21916).
+        // Always via JitArrayElem → ExceptionBridge (not bare static-null early return).
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_merge() argument #'.((int) $i + 1));
             }
+            JitArrayElem::requireArrayArgNum($context, $arg, 'array_merge', $i + 1);
         }
 
         return ArrayMergeRuntime::merge($context, ...$args);
