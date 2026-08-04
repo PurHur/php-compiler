@@ -1300,6 +1300,29 @@ final class BuiltinParamNames
             // php-src ext/json/json.stub.php — missing from InternalArgInfo (#23876)
             case 'json_validate':
                 return ['json', 'depth=', 'flags='];
+            // php-src ext/ldap/ldap.stub.php — InternalArgInfo still link/host/base_dn/attrs (#24665)
+            case 'ldap_connect':
+                return ['uri=', 'port='];
+            case 'ldap_connect_wallet':
+                return ['uri=', 'wallet', 'password', 'auth_mode='];
+            case 'ldap_bind':
+                return ['ldap', 'dn=', 'password='];
+            case 'ldap_bind_ext':
+                return ['ldap', 'dn=', 'password=', 'controls='];
+            case 'ldap_search':
+            case 'ldap_list':
+            case 'ldap_read':
+                return [
+                    'ldap',
+                    'base',
+                    'filter',
+                    'attributes=',
+                    'attributes_only=',
+                    'sizelimit=',
+                    'timelimit=',
+                    'deref=',
+                    'controls=',
+                ];
             // php-src ext/filter/filter.stub.php — filter=FILTER_DEFAULT, options=0 (#25046)
             case 'filter_var':
                 return ['value', 'filter=', 'options='];
