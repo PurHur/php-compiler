@@ -3758,6 +3758,29 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('norewinditerator' === $lcname || 'infiniteiterator' === $lcname) {
+            // Thin AOT: snapshot `__spl_ht` + Iterator protocol via `__spl_iter_pos` (#27583).
+            // Not SplOuterIteratorHt — foreach must call rewind (NoRewind = no-op).
+            // php-src ext/spl/spl_iterators.c — spl_norewind_it_* / InfiniteIterator.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('OuterIterator');
+            $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'Iterator',
+                'Traversable',
+                'OuterIterator',
+            ]);
+            // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
+            $this->defineProperty($id, \PHPCompiler\VM\SplHtPosIteratorJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplHtPosIteratorJitHelper::PROP_POS, Variable::TYPE_NATIVE_LONG);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'getinneriterator',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('splfileinfo' === $lcname) {
             // Thin AOT: pathname/filename for getFilename (#27289 / #27422).
             $this->ensureTraversableBuiltinInterfaces();
