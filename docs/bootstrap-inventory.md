@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6992 |
-| Phase A inventory files (M2 ratio SSOT) | 6992 |
+| PHP files on vm.php path | 6993 |
+| Phase A inventory files (M2 ratio SSOT) | 6993 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22454 |
+| Source constructs flagged (warnings) | 22457 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2770,7 +2770,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitIteratorWalk.php` | 0 | 2 |
 | `ext/standard/JitJsonDecode.php` | 0 | 1 |
 | `ext/standard/JitJsonEncode.php` | 0 | 1 |
-| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 16 |
+| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 17 |
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
 | `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitJsonValidate.php` | 0 | 1 |
@@ -6015,6 +6015,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/GeneratorHelper.php` | 0 | 10 |
 | `lib/JIT/GlobalsTableInit.php` | 0 | 1 |
 | `lib/JIT/HashTableChunkLlvm.php` | 0 | 2 |
+| `lib/JIT/HashTableCombineLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableCowLlvm.php` | 0 | 3 |
 | `lib/JIT/HashTableHelper.php` | 0 | 10 |
 | `lib/JIT/HashTableKeyFilterLlvm.php` | 0 | 1 |
@@ -28605,22 +28606,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitJsonEncodeCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 87)
-- new VmVariable (line 142)
-- new HashTable (line 160)
-- new VmVariable (line 162)
+- new JsonException (line 91)
+- new VmVariable (line 146)
+- new HashTable (line 164)
 - new VmVariable (line 166)
-- new HashTable (line 224)
-- new VmVariable (line 226)
-- new VmVariable (line 232)
+- new VmVariable (line 170)
+- new HashTable (line 228)
+- new VmVariable (line 230)
 - new VmVariable (line 236)
-- new VmVariable (line 359)
-- new VmVariable (line 386)
-- new VmVariable (line 409)
-- new VmVariable (line 417)
-- new VmVariable (line 603)
-- new VmVariable (line 611)
-- 20 class method(s)
+- new VmVariable (line 240)
+- new VmVariable (line 363)
+- new VmVariable (line 390)
+- new VmVariable (line 422)
+- new VmVariable (line 445)
+- new VmVariable (line 453)
+- new VmVariable (line 639)
+- new VmVariable (line 647)
+- 21 class method(s)
 
 ### `ext/standard/JitJsonLastError.php`
 
@@ -38440,7 +38442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/range.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/rawurldecode.php`
 
@@ -44930,7 +44932,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php`
 
@@ -46602,7 +46604,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/RangeIntRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/ReadonlyRaise.php`
 
@@ -50234,6 +50236,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 151)
 - 6 class method(s)
+
+### `lib/JIT/HashTableCombineLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 296)
+- 9 class method(s)
 
 ### `lib/JIT/HashTableCowLlvm.php`
 

@@ -22,7 +22,8 @@ use PHPLLVM\Value;
  * `json_encode(mb_str_split(lit…))` (#27242),
  * `json_encode(preg_filter(lit…))` / string-subject (#27181),
  * `json_encode(array_replace_recursive(lit…))` (#26977),
- * `json_encode(array_flip(lit…))` (#27072), and
+ * `json_encode(array_flip(lit…))` (#27072),
+ * `json_encode(array_combine(lit, lit))` (#27132), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
@@ -54,6 +55,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayFlip($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayCombine($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromParseUrl($block, $operand);
@@ -385,6 +389,38 @@ final class JitJsonEncodeCompileTime
         $flipped = VmArray::flip($args[0]->toArray());
         $var = new VmVariable();
         $var->array($flipped);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_combine(…))` when both args are compile-time arrays (#27132).
+     *
+     * Uses VM {@see VmArray::combine()} SSOT (php-src array.c). Call-site
+     * {@see \PHPCompiler\JIT\HashTableCombineLlvm} builds a dim/count-green HT; NestedJIT
+     * json_encode still cannot export runtime string-key tables (peer #27072 / #26977).
+     */
+    private static function tryCompileTimeArrayFromArrayCombine(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_combine');
+        if (null === $args || 2 !== \count($args)) {
+            return null;
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[0]->type || VmVariable::TYPE_ARRAY !== $args[1]->type) {
+            return null;
+        }
+        try {
+            $combined = VmArray::combine($args[0]->toArray(), $args[1]->toArray());
+        } catch (\ValueError) {
+            // Length mismatch — leave to runtime ValueError path (#16080).
+            return null;
+        }
+        $var = new VmVariable();
+        $var->array($combined);
 
         return $var;
     }
