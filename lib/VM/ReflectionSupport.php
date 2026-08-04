@@ -2952,7 +2952,7 @@ final class ReflectionSupport
             return $required;
         }
 
-        return BuiltinInternalArgInfo::requiredParamCountForClassMethod($className, $methodName) ?? 0;
+        return BuiltinParamNames::requiredParamCountForInternalMethod($className, $methodName) ?? 0;
     }
 
     /**
@@ -2975,7 +2975,15 @@ final class ReflectionSupport
         $qualified = strtolower($className).'::'.strtolower($methodName);
         $override = BuiltinParamNames::forClassMethod($qualified);
         if (null !== $override) {
-            return $override;
+            // Strip by-ref / variadic / optional markers — dump and synthesize use bare names (#26223).
+            return array_map(static function (string $name): string {
+                $n = ltrim($name, '&');
+                if (str_starts_with($n, '...')) {
+                    $n = substr($n, 3);
+                }
+
+                return rtrim($n, '=');
+            }, $override);
         }
         $count = BuiltinInternalArgInfo::paramCountForClassMethod($className, $methodName) ?? 0;
         $names = [];

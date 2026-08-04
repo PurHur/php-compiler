@@ -1354,6 +1354,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('DateTimeImmutable', 'createFromTimestamp'));
     }
 
+    /** @covers issue #26223 */
+    public function testPdoConnectNamedParameters(): void
+    {
+        $qual = 'PDO::connect';
+        $names = BuiltinParamNames::forClassMethod($qual);
+        self::assertSame(['dsn', 'username=', 'password=', 'options='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'dsn', $qual));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'username', $qual));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'password', $qual));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', $qual));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('PDO', 'connect'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('PDO', 'connect'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'connect', 0));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'connect', 1));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'connect', 2));
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'connect', 3));
+    }
+
     /** @covers issue #26080 */
     public function testDomCreateFromStringNamedParameters(): void
     {
