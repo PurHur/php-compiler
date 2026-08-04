@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * array_rand() — random key(s) from an array (issue #2321, #4460).
  *
  * VM: returns actual keys (string or int); MT19937 via {@see VmMt19937} (php-src php_array_pick_keys).
- * JIT/AOT: {@see \PHPCompiler\JIT\Builtin\ArrayRandRuntime::call()} via {@see ArrayRandJitHelper}.
+ * JIT/AOT: {@see \PHPCompiler\JIT\Builtin\ArrayRandRuntime::call()} via {@see \PHPCompiler\JIT\ArrayRandLlvm}.
  */
 final class array_rand extends Internal
 {
