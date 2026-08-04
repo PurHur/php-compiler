@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
@@ -13,6 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for date_default_timezone_get/set via DefaultTimezoneJitHelper PHP (#9243, #24962).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer TimezoneLocation #24801).
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT: "Current basic block has no parent function", #27550 / peer #27088).
  * Replaces phpc_default_timezone_* LLVM globals + zoneinfo access walk.
  * SSOT: {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_default_timezone_get/set)
@@ -48,12 +51,18 @@ final class DefaultTimezoneRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#27550 / #27088).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringTriggerError::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementGetBridge($context);
         self::implementSetBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementGetBridge(Context $context): void
