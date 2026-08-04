@@ -79,6 +79,44 @@ PHP);
     }
 
     /**
+     * Issue repro: tryFrom + nullsafe/?? must print A|null under AOT (#27666).
+     * Root cause: isset() on enum name/value ignored pseudo-properties (hasProperty only).
+     */
+    public function testAotBackedEnumTryFromNullsafeCoalesce(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $this->writeScript($root, <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+echo E::tryFrom(1)?->name ?? "null";
+echo "|";
+echo E::tryFrom(9)?->name ?? "null";
+echo "\n";
+echo isset(E::A->name) ? "Y" : "N", "|", isset(E::A->value) ? "Y" : "N", "\n";
+PHP);
+        $bin = sys_get_temp_dir().'/phpc_enum_tryfrom_27666_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            for ($i = 0; $i < 5; ++$i) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+                $this->assertSame(0, $runRc, 'run '.($i + 1).': '.implode("\n", $runOut));
+                $this->assertSame("A|null\nY|Y\n", implode("\n", $runOut)."\n");
+            }
+        } finally {
+            @unlink($src);
+            @unlink($bin);
+        }
+    }
+
+    /**
      * Invalid from() ValueError is catchable under thin AOT (#24219, #27667).
      *
      * Regression: #27518 sameLlvmFunction missed php-llvm LLVMValueRef::equals(), so the

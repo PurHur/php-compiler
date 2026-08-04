@@ -124,19 +124,33 @@ final class IssetHelperLlvm
             return self::compileHashTableOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
         }
         if (Variable::TYPE_VALUE === $container->type) {
+            if ($issetOnProperty) {
+                return self::compileValueBoxPropertyIsSet(
+                    $context,
+                    $container,
+                    $dim,
+                    $dimOp,
+                    $containerOp
+                );
+            }
             $htVar = self::hashtableFromValueBox($context, $container);
 
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
         }
         if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
             $propName = VmIsset::literalStringKey($dimOp);
+            // Enum tryFrom()/from() temps may lack a precise userType; still probe name/value (#27666).
+            $hasObjectType = null !== $containerOp
+                && null !== $containerOp->type
+                && Type::TYPE_OBJECT === $containerOp->type->type;
             if (
                 null !== $propName
-                && null !== $containerOp
-                && null !== $containerOp->type
-                && Type::TYPE_OBJECT === $containerOp->type->type
+                && (
+                    $hasObjectType
+                    || \PHPCompiler\VM\EnumCasePropertyJitHelper::isBuiltinPropertyName(strtolower($propName))
+                )
             ) {
-                $class = $containerOp->type->userType ?? '';
+                $class = $hasObjectType ? ($containerOp->type->userType ?? '') : '';
                 $objPtr = Variable::KIND_VALUE === $container->kind
                     ? $container->value
                     : $context->builder->load($container->value);
@@ -180,6 +194,79 @@ final class IssetHelperLlvm
         }
 
         return $context->getTypeFromString('int1')->constInt(0, false);
+    }
+
+    /**
+     * isset($boxedObj->prop) when the receiver is a {@see __value__} slot (#27666).
+     *
+     * Thin AOT class-const / tryFrom results are often TYPE_VALUE rather than TYPE_OBJECT;
+     * the hashtable offset path would always yield false for enum name/value.
+     */
+    private static function compileValueBoxPropertyIsSet(
+        Context $context,
+        Variable $container,
+        Variable $dim,
+        ?Operand $dimOp,
+        ?Operand $containerOp
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $propName = VmIsset::literalStringKey($dimOp);
+        if (null === $propName) {
+            // Dynamic property name on a value-box object: not supported for AOT yet.
+            return $i1->constInt(0, false);
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        // Also accept VM TYPE_ENUM_CASE (9) when present in a boxed slot.
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE & 0x7f, false)
+        );
+        $isObjectLike = $context->builder->or($isObject, $isEnumCase);
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $objBlock = $fn->appendBasicBlock('isset_value_box_obj');
+        $missBlock = $fn->appendBasicBlock('isset_value_box_miss');
+        $doneBlock = $fn->appendBasicBlock('isset_value_box_done');
+        $context->builder->branchIf($isObjectLike, $objBlock, $missBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $class = '';
+        if (
+            null !== $containerOp
+            && null !== $containerOp->type
+            && Type::TYPE_OBJECT === $containerOp->type->type
+        ) {
+            $class = $containerOp->type->userType ?? '';
+        }
+        $propIsset = $context->type->object->propertyIsSet($objPtr, $class, $propName);
+        $objEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1, 'isset_value_box_phi');
+        $phi->addIncoming($i1->constInt(0, false), $missBlock);
+        $phi->addIncoming($propIsset, $objEnd);
+
+        return $phi;
     }
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable
