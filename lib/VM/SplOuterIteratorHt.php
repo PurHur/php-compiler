@@ -24,6 +24,9 @@ final class SplOuterIteratorHt
             'recursivearrayiterator',
             'recursiveiteratoriterator',
             'arrayobject',
+            'parentiterator',
+            'multipleiterator',
+            'recursivetreeiterator',
         ];
     }
 

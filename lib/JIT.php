@@ -17493,7 +17493,11 @@ class JIT {
             || $toCall instanceof JIT\Call\RecursiveIteratorIteratorConstruct
             || $toCall instanceof JIT\Call\LimitIteratorConstruct
             || $toCall instanceof JIT\Call\RegexIteratorConstruct
+            || $toCall instanceof JIT\Call\ParentIteratorConstruct
+            || $toCall instanceof JIT\Call\RecursiveTreeIteratorConstruct
             || ($toCall instanceof JIT\Call\AppendIteratorMethod
+                && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\MultipleIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplHtPosIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))

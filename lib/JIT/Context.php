@@ -1099,6 +1099,14 @@ class Context {
                 $fiMethod
             );
         }
+        // ParentIterator / MultipleIterator / RecursiveTreeIterator — HT snapshot foreach (#27584).
+        $this->type->object->lookup('ParentIterator');
+        $this->type->object->lookup('MultipleIterator');
+        $this->type->object->lookup('RecursiveTreeIterator');
+        $this->functionProxies['parentiterator::__construct'] = new Call\ParentIteratorConstruct();
+        $this->functionProxies['multipleiterator::__construct'] = new Call\MultipleIteratorMethod('__construct');
+        $this->functionProxies['multipleiterator::attachiterator'] = new Call\MultipleIteratorMethod('attachIterator');
+        $this->functionProxies['recursivetreeiterator::__construct'] = new Call\RecursiveTreeIteratorConstruct();
         // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
