@@ -17,6 +17,7 @@ final class GetClassRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('emitClassNameFromId', $source);
         $this->assertStringContainsString('emitSelectWalk', $source);
         $this->assertStringContainsString('seedThrowableClassNames', $source);
+        $this->assertStringContainsString('RuntimeException', $source); // #27625 cross-function catch
         $this->assertStringContainsString('helperSourceForMap', $source);
         $this->assertStringContainsString('constantStringFromString', $source);
         $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
