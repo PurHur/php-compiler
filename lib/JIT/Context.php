@@ -1083,6 +1083,15 @@ class Context {
                 \PHPCompiler\VM\SplHtPosIteratorJitHelper::NEXT_WRAP
             );
         }
+        // EmptyIterator — always-invalid; current/key throw (#27582).
+        $this->type->object->lookup('EmptyIterator');
+        // Eager: get_class select-walk is frozen before method bodies compile (#27582).
+        $this->type->object->lookup('BadMethodCallException');
+        foreach (['__construct', 'rewind', 'valid', 'current', 'key', 'next'] as $eiMethod) {
+            $this->functionProxies['emptyiterator::'.strtolower($eiMethod)] = new Call\EmptyIteratorMethod(
+                $eiMethod
+            );
+        }
         // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289).
         $this->type->object->lookup('SplFileInfo');
         $this->type->object->lookup('DirectoryIterator');
