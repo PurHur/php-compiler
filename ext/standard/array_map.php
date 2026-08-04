@@ -18,6 +18,7 @@ use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -31,6 +32,8 @@ use PHPLLVM\Value;
  *
  * JIT/AOT: null, compile-time string builtins, and closure/arrow callbacks with native int/double
  * returns are lowered (issue #142). [class, method] callables remain JIT-deferred (#1154) but work on VM.
+ *
+ * php-src: ext/standard/array.c — PHP_FUNCTION(array_map) / Z_PARAM_ARRAY for $array
  */
 final class array_map extends Internal
 {
@@ -48,13 +51,14 @@ final class array_map extends Internal
         $callback = $frame->calledArgs[0]->resolveIndirect();
         $arrays = [];
         for ($i = 1; $i < $argc; ++$i) {
-            // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
-            $arrays[] = VmArray::requireArrayParam(
-                $frame->calledArgs[$i]->resolveIndirect(),
-                'array_map',
-                $i + 1,
-                'array'
-            );
+            // php-src Z_PARAM_ARRAY — arg #2 named $array; args #3+ variadic omit ($param) (#27631).
+            $arg = $frame->calledArgs[$i]->resolveIndirect();
+            $argNum = $i + 1;
+            if (2 === $argNum) {
+                $arrays[] = VmArray::requireArrayParam($arg, 'array_map', $argNum, 'array');
+            } else {
+                $arrays[] = VmArray::requireArrayArgNum($arg, 'array_map', $argNum);
+            }
         }
         if (1 === \count($arrays)) {
             $frame->returnVar->array(self::mapSingleArray($frame, $callback, $arrays[0]));
@@ -68,27 +72,35 @@ final class array_map extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        ExceptionBridge::ensureLinked($context);
+        TypeErrorRaise::ensureLinked($context);
         if (\count($args) < 2) {
             throw new \LogicException('array_map() expects at least 2 arguments in this compiler build');
         }
         $callback = $args[0];
         $arrays = \array_slice($args, 1);
-        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27631; re-#21916).
+        // Always via JitArrayElem → ExceptionBridge (not bare static-null early return of []).
+        // Arg #2 is named $array; args #3+ are variadic (...$arrays) — Zend omits ($param) (#27631).
         foreach ($arrays as $i => $array) {
-            if (JITVariable::TYPE_NULL === $array->type || ($array->isNullConstant ?? false)) {
-                JitArrayElem::requireArrayParam($context, $array, 'array_map', $i + 2, 'array');
-
-                return HashTableHelper::emptyVariable($context)->value;
+            if (JITVariable::TYPE_STRING === $array->type || JITVariable::TYPE_VALUE === $array->type) {
+                $this->jitString($context, $array, 'array_map() argument #'.($i + 2));
+            }
+            $argNum = $i + 2;
+            if (2 === $argNum) {
+                JitArrayElem::requireArrayParam($context, $array, 'array_map', $argNum, 'array');
+            } else {
+                JitArrayElem::requireArrayArgNum($context, $array, 'array_map', $argNum);
             }
         }
         foreach ($arrays as $i => $array) {
-            if (JITVariable::TYPE_HASHTABLE !== ($array->type & ~JITVariable::IS_NATIVE_ARRAY)
-                && !ArrayBuiltinHelper::isNativeArray($array->type)
-                && JITVariable::TYPE_VALUE !== $array->type) {
-                throw new \LogicException(
-                    'array_map() argument #'.($i + 2).' must be an array in this compiler build'
-                );
+            if (JITVariable::TYPE_HASHTABLE === ($array->type & ~JITVariable::IS_NATIVE_ARRAY)
+                || ArrayBuiltinHelper::isNativeArray($array->type)
+                || JITVariable::TYPE_VALUE === $array->type) {
+                continue;
             }
+            // Static non-array types already raised above; poison return for SSA.
+            return HashTableHelper::emptyVariable($context)->value;
         }
         if (1 === \count($arrays)) {
             return self::lowerSingleArrayMap($context, $callback, $arrays[0]);
