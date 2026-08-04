@@ -1,7 +1,8 @@
 --TEST--
-Language: AOT #[\SensitiveParameter] getTrace wraps SensitiveParameterValue (#27333)
+Language: AOT #[\SensitiveParameter] getTrace wraps SensitiveParameterValue (#27333 / #27549)
 --FILE--
 <?php
+ini_set('zend.exception_ignore_args', '0');
 function f(#[\SensitiveParameter] string $p) {
     throw new Exception('x');
 }
