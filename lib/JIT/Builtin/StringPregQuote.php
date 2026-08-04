@@ -13,6 +13,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
  * env clear — no hand-rolled NestedJit compile loop). Peer: StringStripTags #21711 / StringUcwords #21726.
+ * User-script AOT: helper logical is USER_SCRIPT_INLINE_ONLY (#27564) so NestedJIT runs instead of
+ * the prelinked unit.o that returns "" on cache hit.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(preg_quote)
  */

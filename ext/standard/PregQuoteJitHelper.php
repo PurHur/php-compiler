@@ -9,8 +9,10 @@ namespace PHPCompiler\ext\standard;
  *
  * Escape loop matches php-src php_preg_quote / VM SSOT (kept inline — NestedJIT
  * user-script AOT segfaults when this helper pulls the full string runtime, #26827).
+ * User-script AOT NestedJITs this leaf via HelperRuntimeCache USER_SCRIPT_INLINE_ONLY
+ * (#27564) — the committed helper-runtime unit.o returns "" on default cache hit.
  *
- * php-src: ext/standard/string.c — PHP_FUNCTION(preg_quote)
+ * php-src: ext/pcre/php_pcre.c — PHP_FUNCTION(preg_quote) / php_preg_quote
  */
 final class PregQuoteJitHelper
 {

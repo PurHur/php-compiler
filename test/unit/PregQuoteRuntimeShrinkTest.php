@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\PregQuoteJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** preg_quote() JIT routes through PregQuoteJitHelper + JitVmHelperLink (#14743, #21751, #26827). */
+/** preg_quote() JIT routes through PregQuoteJitHelper + JitVmHelperLink (#14743, #21751, #26827, #27564). */
 final class PregQuoteRuntimeShrinkTest extends TestCase
 {
     public function testStringPregQuoteUsesJitHelperNotInlineLlvm(): void
@@ -30,6 +30,16 @@ final class PregQuoteRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__string__preg_quote', $builtin);
         $this->assertStringContainsString('__string__alloc', $builtin);
         $this->assertStringNotContainsString('JitPregQuote', $builtin);
+    }
+
+    public function testUserScriptAotForcesNestedJitOfPregQuoteHelper(): void
+    {
+        $cache = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            "phpcompiler\\\\ext\\\\standard\\\\pregquotejithelper::pregquoteargv",
+            $cache,
+            'USER_SCRIPT_INLINE_ONLY must NestedJIT pregQuoteArgv — prelinked unit.o returns "" (#27564)'
+        );
     }
 
     public function testPregQuoteJitHelperMatchesVmStringWithoutCallingIt(): void

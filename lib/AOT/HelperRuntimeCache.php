@@ -71,6 +71,9 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\strreplacejithelper::replaceargv' => true,
         'phpcompiler\\ext\\standard\\strreplacejithelper::ireplaceargv' => true,
         'phpcompiler\\ext\\standard\\strreplacejithelper::takelastcount' => true,
+        // #27564 / re-#26827 — helper-runtime PregQuoteJitHelper unit.o returns "" under
+        // default cache hit; NestedJIT of the inline-escape helper matches VM/JIT (O=0 OK).
+        'phpcompiler\\ext\\standard\\pregquotejithelper::pregquoteargv' => true,
         // #25345 — helper-runtime unit.o returns "" for method-return / dynamic string args;
         // NestedJIT recursive escapeFrom works (MiniWebApp $appName).
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::htmlspecialchars' => true,
