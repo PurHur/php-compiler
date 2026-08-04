@@ -368,14 +368,31 @@ final class JitHashCryptoKernel
         $context->builder->positionAtEnd($failDefaultLen);
         $context->builder->returnValue($nullStr);
 
+        // php-src ext/hash/hash.c PHP_FUNCTION(hash_pbkdf2): when binary=false,
+        // $length is the returned hex string length — derive ceil(length/2) bytes (#27241).
         $context->builder->positionAtEnd($useArgLen);
-        $argKeyLen = $context->builder->truncOrBitCast($length64, $i32);
+        $rawNonZero = $context->builder->icmp(Builder::INT_NE, $raw, $i32->constInt(0, false));
+        $argRawKeyLenBb = $fn->appendBasicBlock('hc_llvm_pbkdf2_keylen_arg_raw');
+        $argHexKeyLenBb = $fn->appendBasicBlock('hc_llvm_pbkdf2_keylen_arg_hex');
+        $context->builder->branchIf($rawNonZero, $argRawKeyLenBb, $argHexKeyLenBb);
+
+        $context->builder->positionAtEnd($argRawKeyLenBb);
+        $rawArgKeyLen = $context->builder->truncOrBitCast($length64, $i32);
+        $context->builder->branch($keylenReady);
+
+        $context->builder->positionAtEnd($argHexKeyLenBb);
+        $lengthI32 = $context->builder->truncOrBitCast($length64, $i32);
+        $hexArgKeyLen = $context->builder->lShr(
+            $context->builder->add($lengthI32, $i32->constInt(1, false)),
+            $i32->constInt(1, false)
+        );
         $context->builder->branch($keylenReady);
 
         $context->builder->positionAtEnd($keylenReady);
         $keylenPhi = $context->builder->phi($i32);
         $keylenPhi->addIncoming($defaultKeyLen, $useDigestLen);
-        $keylenPhi->addIncoming($argKeyLen, $useArgLen);
+        $keylenPhi->addIncoming($rawArgKeyLen, $argRawKeyLenBb);
+        $keylenPhi->addIncoming($hexArgKeyLen, $argHexKeyLenBb);
 
         $outBuf = $context->builder->arrayAlloca($i8, $keylenPhi);
         $passPtr = self::stringData($context, $password);
@@ -406,7 +423,8 @@ final class JitHashCryptoKernel
         $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($okDerive);
-        self::formatDigest($context, $fn, $outBuf, $keylenPhi, $raw);
+        // Hex path: return exactly $length chars (truncates odd lengths; php-src ZSTR_VAL[length]=0).
+        self::formatDigest($context, $fn, $outBuf, $keylenPhi, $raw, $lengthZero, $length64);
     }
 
     private static function emitHkdf(Context $context, LlvmFunction $fn): void
@@ -736,12 +754,19 @@ final class JitHashCryptoKernel
         return $context->builder->load($slot);
     }
 
+    /**
+     * @param Value|null $lengthZero   when set with $requestedLen: hex output uses $requestedLen
+     *                                 chars if length was non-zero (hash_pbkdf2; #27241)
+     * @param Value|null $requestedLen i64 caller-facing length (hex char count when !raw)
+     */
     private static function formatDigest(
         Context $context,
         LlvmFunction $fn,
         Value $mdBuf,
         Value $mdLen,
-        Value $raw
+        Value $raw,
+        ?Value $lengthZero = null,
+        ?Value $requestedLen = null
     ): void {
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -770,7 +795,13 @@ final class JitHashCryptoKernel
 
         $context->builder->positionAtEnd($hexBb);
         $mdLenI64 = $context->builder->zExt($mdLen, $i64);
-        $hexLen = $context->builder->mul($mdLenI64, $i64->constInt(2, false));
+        $fullHexLen = $context->builder->mul($mdLenI64, $i64->constInt(2, false));
+        if (null !== $lengthZero && null !== $requestedLen) {
+            // length==0 → full hex of digest_size bytes; else exactly $requestedLen chars.
+            $hexLen = $context->builder->select($lengthZero, $fullHexLen, $requestedLen);
+        } else {
+            $hexLen = $fullHexLen;
+        }
         $hexStr = $context->builder->call($context->lookupFunction('__string__alloc'), $hexLen);
         $strMap = $context->structFieldMap['__string__'];
         $context->builder->store($hexLen, $context->builder->structGep($hexStr, $strMap['length']));
@@ -789,7 +820,17 @@ final class JitHashCryptoKernel
 
         $context->builder->positionAtEnd($loopHead);
         $idx = $context->builder->load($idxSlot);
-        $stop = $context->builder->icmp(Builder::INT_SGE, $idx, $mdLenI64);
+        $pastDigest = $context->builder->icmp(Builder::INT_SGE, $idx, $mdLenI64);
+        $outPosProbe = $context->builder->mulNoSignedWrap(
+            $context->builder->truncOrBitCast($idx, $i32),
+            $i32->constInt(2, false)
+        );
+        $pastHex = $context->builder->icmp(
+            Builder::INT_SGE,
+            $context->builder->zExt($outPosProbe, $i64),
+            $hexLen
+        );
+        $stop = $context->builder->bitwiseOr($pastDigest, $pastHex);
         $context->builder->branchIf($stop, $loopDone, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
@@ -799,14 +840,35 @@ final class JitHashCryptoKernel
         $hi = $context->builder->lShr($byteI32, $i32->constInt(4, false));
         $lo = $context->builder->bitwiseAnd($byteI32, $i32->constInt(0x0F, false));
         $outPos = $context->builder->mulNoSignedWrap($idxI32, $i32->constInt(2, false));
+        $outPosI64 = $context->builder->zExt($outPos, $i64);
+        $hiInRange = $context->builder->icmp(Builder::INT_SLT, $outPosI64, $hexLen);
+        $writeHiBb = $fn->appendBasicBlock('hc_llvm_hex_write_hi');
+        $afterHiBb = $fn->appendBasicBlock('hc_llvm_hex_after_hi');
+        $context->builder->branchIf($hiInRange, $writeHiBb, $afterHiBb);
+
+        $context->builder->positionAtEnd($writeHiBb);
         $context->builder->store(
             $context->builder->load($context->builder->gep($hexTable, $hi)),
             $context->builder->gep($destPtr, $outPos)
         );
+        $context->builder->branch($afterHiBb);
+
+        $context->builder->positionAtEnd($afterHiBb);
+        $loPos = $context->builder->add($outPos, $i32->constInt(1, false));
+        $loPosI64 = $context->builder->zExt($loPos, $i64);
+        $loInRange = $context->builder->icmp(Builder::INT_SLT, $loPosI64, $hexLen);
+        $writeLoBb = $fn->appendBasicBlock('hc_llvm_hex_write_lo');
+        $afterLoBb = $fn->appendBasicBlock('hc_llvm_hex_after_lo');
+        $context->builder->branchIf($loInRange, $writeLoBb, $afterLoBb);
+
+        $context->builder->positionAtEnd($writeLoBb);
         $context->builder->store(
             $context->builder->load($context->builder->gep($hexTable, $lo)),
-            $context->builder->gep($destPtr, $context->builder->add($outPos, $i32->constInt(1, false)))
+            $context->builder->gep($destPtr, $loPos)
         );
+        $context->builder->branch($afterLoBb);
+
+        $context->builder->positionAtEnd($afterLoBb);
         $context->builder->store($context->builder->add($idx, $i64->constInt(1, false)), $idxSlot);
         $context->builder->branch($loopHead);
 
