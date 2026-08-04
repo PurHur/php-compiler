@@ -25,6 +25,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Embed: NestedJIT {@see VarExportJitHelper} (php-in-PHP).
  * Thin standalone AOT: scalar LLVM bridge — NestedJIT of the helper segfaults without
  * Runtime->vm (peer StringPrintR #24266 / StringVarDump #23540; #26855).
+ * String scalars use pure-LLVM quote/escape (not NestedJIT addslashes — #27574).
  * SSOT: {@see \PHPCompiler\ext\standard\VmVarExport::formatVariable()}.
  * php-src: ext/standard/var.c — php_var_export_ex
  */
@@ -257,14 +258,16 @@ final class StringVarExport
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterNull);
+        // TYPE_STRING carries IS_REFCOUNTED; $kind is already masked with 0x7f above.
         $isString = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false));
         $context->builder->branchIf($isString, $stringBlock, $fallback);
 
         $context->builder->positionAtEnd($stringBlock);
-        StringAddslashes::ensureLinked($context);
+        // Thin AOT must not call NestedJIT __string__addslashes — it segfaults without
+        // Runtime->vm (#27574; peer NestedJIT avoid for VarExportJitHelper #26855).
+        // Escape \\ / ' (+ NUL concat form) in pure LLVM — VmVarExport::formatExportString.
         $rawStr = $context->builder->call($context->lookupFunction('__value__readString'), $arg);
-        $escaped = $context->builder->call($context->lookupFunction('__string__addslashes'), $rawStr);
-        $stringStr = self::wrapInSingleQuotes($context, $escaped);
+        $stringStr = self::formatExportQuotedString($context, $rawStr);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
@@ -296,27 +299,201 @@ final class StringVarExport
         );
     }
 
-    private static function wrapInSingleQuotes(Context $context, Value $inner): Value
+    /**
+     * Thin AOT: format a string like {@see \PHPCompiler\ext\standard\VmVarExport} formatExportString.
+     *
+     * Avoids NestedJIT {@see StringAddslashes} which segfaults under thin standalone (#27574).
+     */
+    private static function formatExportQuotedString(Context $context, Value $rawStr): Value
     {
-        $map = $context->structFieldMap['__string__'];
-        $quote = self::constExportString($context, "'");
-        $context->intrinsic->builder = $context->builder;
-        $leftLen = $context->builder->load($context->builder->structGep($quote, $map['length']));
-        $innerLen = $context->builder->load($context->builder->structGep($inner, $map['length']));
-        $rightLen = $leftLen;
-        $size1 = $context->builder->addNoUnsignedWrap($leftLen, $innerLen);
-        $size = $context->builder->addNoUnsignedWrap($size1, $rightLen);
-        $result = $context->builder->call($context->lookupFunction('__string__alloc'), $size);
-        $char = $context->builder->structGep($result, $map['value']);
-        $qChar = $context->builder->structGep($quote, $map['value']);
-        $context->intrinsic->memcpy($char, $qChar, $leftLen, false);
-        $char = $context->builder->gep($char, $leftLen);
-        $iChar = $context->builder->structGep($inner, $map['value']);
-        $context->intrinsic->memcpy($char, $iChar, $innerLen, false);
-        $char = $context->builder->gep($char, $innerLen);
-        $context->intrinsic->memcpy($char, $qChar, $rightLen, false);
+        self::ensureFormatExportStringHelper($context);
 
-        return $result;
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_var_export_format_string'),
+            $rawStr
+        );
+    }
+
+    /**
+     * Pure-LLVM helper: "'" + escape(\,') + NUL→' . "\0" . ' + "'".
+     * Matches {@see \PHPCompiler\ext\standard\VmVarExport} formatExportString (#27574).
+     */
+    private static function ensureFormatExportStringHelper(Context $context): void
+    {
+        $name = '__compiler_var_export_format_string';
+        $existing = $context->module->getNamedFunction($name);
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $existing);
+
+            return;
+        }
+
+        StringDir::ensureLinked($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $map = $context->structFieldMap['__string__'];
+        $nulForm = "' . \"\\0\" . '";
+        $nulFormLen = \strlen($nulForm);
+
+        $fn = null !== $existing
+            ? $existing
+            : $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $strPtr)
+            );
+
+        $savedBuilder = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $b = $context->builder;
+
+        $entry = $fn->appendBasicBlock('ve_fmt_entry');
+        $nullIn = $fn->appendBasicBlock('ve_fmt_null');
+        $countInit = $fn->appendBasicBlock('ve_fmt_count_init');
+        $countLoop = $fn->appendBasicBlock('ve_fmt_count_loop');
+        $countBody = $fn->appendBasicBlock('ve_fmt_count_body');
+        $countNul = $fn->appendBasicBlock('ve_fmt_count_nul');
+        $countEscCheck = $fn->appendBasicBlock('ve_fmt_count_esc_check');
+        $countEsc = $fn->appendBasicBlock('ve_fmt_count_esc');
+        $countLit = $fn->appendBasicBlock('ve_fmt_count_lit');
+        $countNext = $fn->appendBasicBlock('ve_fmt_count_next');
+        $countDone = $fn->appendBasicBlock('ve_fmt_count_done');
+        $writeLoop = $fn->appendBasicBlock('ve_fmt_write_loop');
+        $writeBody = $fn->appendBasicBlock('ve_fmt_write_body');
+        $writeNul = $fn->appendBasicBlock('ve_fmt_write_nul');
+        $writeEscCheck = $fn->appendBasicBlock('ve_fmt_write_esc_check');
+        $writeEsc = $fn->appendBasicBlock('ve_fmt_write_esc');
+        $writeLit = $fn->appendBasicBlock('ve_fmt_write_lit');
+        $writeNext = $fn->appendBasicBlock('ve_fmt_write_next');
+        $writeDone = $fn->appendBasicBlock('ve_fmt_write_done');
+
+        $b->positionAtEnd($entry);
+        $arg = $fn->getParam(0);
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $arg, $strPtr->constNull()),
+            $nullIn,
+            $countInit
+        );
+
+        $b->positionAtEnd($nullIn);
+        $b->returnValue($b->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(2, false),
+            $b->pointerCast($context->constantFromString("''"), $i8p)
+        ));
+
+        $b->positionAtEnd($countInit);
+        $inLen = $b->load($b->structGep($arg, $map['length']));
+        $inChars = $b->pointerCast($b->structGep($arg, $map['value']), $i8p);
+        $idx = $b->alloca($i64);
+        $outLenSlot = $b->alloca($i64);
+        $b->store($i64->constInt(0, false), $idx);
+        $b->store($i64->constInt(2, false), $outLenSlot); // surrounding quotes
+        $b->branch($countLoop);
+
+        $b->positionAtEnd($countLoop);
+        $ci = $b->load($idx);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $ci, $inLen), $countBody, $countDone);
+
+        $b->positionAtEnd($countBody);
+        $ch = $b->load($b->gep($inChars, $ci));
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $ch, $i8->constInt(0, false)),
+            $countNul,
+            $countEscCheck
+        );
+
+        $b->positionAtEnd($countNul);
+        $b->store($b->add($b->load($outLenSlot), $i64->constInt($nulFormLen, false)), $outLenSlot);
+        $b->branch($countNext);
+
+        $b->positionAtEnd($countEscCheck);
+        $needsEsc = $b->or(
+            $b->icmp(Builder::INT_EQ, $ch, $i8->constInt(\ord('\\'), false)),
+            $b->icmp(Builder::INT_EQ, $ch, $i8->constInt(\ord("'"), false))
+        );
+        $b->branchIf($needsEsc, $countEsc, $countLit);
+
+        $b->positionAtEnd($countEsc);
+        $b->store($b->add($b->load($outLenSlot), $i64->constInt(2, false)), $outLenSlot);
+        $b->branch($countNext);
+
+        $b->positionAtEnd($countLit);
+        $b->store($b->add($b->load($outLenSlot), $i64->constInt(1, false)), $outLenSlot);
+        $b->branch($countNext);
+
+        $b->positionAtEnd($countNext);
+        $b->store($b->add($ci, $i64->constInt(1, false)), $idx);
+        $b->branch($countLoop);
+
+        $b->positionAtEnd($countDone);
+        $total = $b->load($outLenSlot);
+        $result = $b->call($context->lookupFunction('__string__alloc'), $total);
+        $outChars = $b->pointerCast($b->structGep($result, $map['value']), $i8p);
+        $b->store($i8->constInt(\ord("'"), false), $outChars);
+        $outIdx = $b->alloca($i64);
+        $b->store($i64->constInt(1, false), $outIdx);
+        $b->store($i64->constInt(0, false), $idx);
+        $b->branch($writeLoop);
+
+        $b->positionAtEnd($writeLoop);
+        $wi = $b->load($idx);
+        $b->branchIf($b->icmp(Builder::INT_ULT, $wi, $inLen), $writeBody, $writeDone);
+
+        $b->positionAtEnd($writeBody);
+        $wch = $b->load($b->gep($inChars, $wi));
+        $b->branchIf(
+            $b->icmp(Builder::INT_EQ, $wch, $i8->constInt(0, false)),
+            $writeNul,
+            $writeEscCheck
+        );
+
+        $b->positionAtEnd($writeNul);
+        $oiNul = $b->load($outIdx);
+        $context->intrinsic->builder = $b;
+        $context->intrinsic->memcpy(
+            $b->gep($outChars, $oiNul),
+            $b->pointerCast($context->constantFromString($nulForm), $i8p),
+            $i64->constInt($nulFormLen, false),
+            false
+        );
+        $b->store($b->add($oiNul, $i64->constInt($nulFormLen, false)), $outIdx);
+        $b->branch($writeNext);
+
+        $b->positionAtEnd($writeEscCheck);
+        $wNeedsEsc = $b->or(
+            $b->icmp(Builder::INT_EQ, $wch, $i8->constInt(\ord('\\'), false)),
+            $b->icmp(Builder::INT_EQ, $wch, $i8->constInt(\ord("'"), false))
+        );
+        $b->branchIf($wNeedsEsc, $writeEsc, $writeLit);
+
+        $b->positionAtEnd($writeEsc);
+        $oiEsc = $b->load($outIdx);
+        $b->store($i8->constInt(\ord('\\'), false), $b->gep($outChars, $oiEsc));
+        $b->store($wch, $b->gep($outChars, $b->add($oiEsc, $i64->constInt(1, false))));
+        $b->store($b->add($oiEsc, $i64->constInt(2, false)), $outIdx);
+        $b->branch($writeNext);
+
+        $b->positionAtEnd($writeLit);
+        $oiLit = $b->load($outIdx);
+        $b->store($wch, $b->gep($outChars, $oiLit));
+        $b->store($b->add($oiLit, $i64->constInt(1, false)), $outIdx);
+        $b->branch($writeNext);
+
+        $b->positionAtEnd($writeNext);
+        $b->store($b->add($wi, $i64->constInt(1, false)), $idx);
+        $b->branch($writeLoop);
+
+        $b->positionAtEnd($writeDone);
+        $oiEnd = $b->load($outIdx);
+        $b->store($i8->constInt(\ord("'"), false), $b->gep($outChars, $oiEnd));
+        $b->returnValue($result);
+
+        $context->builder->clearInsertionPosition();
+        $context->builder = $savedBuilder;
+        $context->registerFunction($name, $fn);
     }
 
     private static function emitThinUnsupportedAbort(Context $context): void

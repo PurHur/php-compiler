@@ -17,6 +17,8 @@ final class VarExportRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('var_export_bridge_entry', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('implementThinScalarBridge', $source);
+        $this->assertStringContainsString('__compiler_var_export_format_string', $source);
+        $this->assertStringContainsString('#27574', $source);
         $this->assertStringNotContainsString('JitVarExportKernel', $source);
         $this->assertStringNotContainsString('var_export_user_script_bridge', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
