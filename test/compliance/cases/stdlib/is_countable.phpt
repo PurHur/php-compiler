@@ -1,5 +1,5 @@
 --TEST--
-stdlib is_countable() — Countable/array detection (#3452)
+stdlib is_countable() — Countable/array detection (#3452 / #27552)
 --FILE--
 <?php
 class D implements \Countable {
@@ -9,6 +9,10 @@ class E {}
 var_export(is_countable(new D()));
 echo "\n";
 var_export(is_countable([]));
+echo "\n";
+var_export(is_countable([1]));
+echo "\n";
+echo (int)is_countable([1]), (int)is_countable(new ArrayObject([1])), (int)is_countable(1);
 echo "\n";
 var_export(is_countable(new stdClass()));
 echo "\n";
@@ -23,6 +27,8 @@ echo "\n";
 --EXPECT--
 true
 true
+true
+110
 false
 false
 false
