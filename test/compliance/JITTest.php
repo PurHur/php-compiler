@@ -925,6 +925,11 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::isGnupgComplianceCase($name)) {
                 continue;
             }
+            // Functional stats cases set PHP_COMPILER_ENABLE_STATS via --ENV--; phantoms when withheld (#26743).
+            if (!\PHPCompiler\ext\stats\StatsExtensionPolicy::runsStatsCompliance($name)
+                && \PHPCompiler\ext\stats\StatsExtensionPolicy::isStatsComplianceCase($name)) {
+                continue;
+            }
             // Functional mailparse cases set PHP_COMPILER_ENABLE_MAILPARSE via --ENV--; phantoms when withheld (#24908).
             if (!\PHPCompiler\ext\mailparse\MailparseExtensionPolicy::runsMailparseCompliance($name)
                 && \PHPCompiler\ext\mailparse\MailparseExtensionPolicy::isMailparseComplianceCase($name)) {
