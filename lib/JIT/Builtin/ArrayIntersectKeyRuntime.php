@@ -5,34 +5,35 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableKeyFilterLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_intersect_key() via ArrayIntersectKeyJitHelper PHP (#12551, #23728).
+ * JIT/AOT link for array_intersect_key() (#12551, #27521).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayIntersect #23627).
- * Standalone AOT compiles {@see ArrayIntersectKeyJitHelper} via nested JIT bridges (#14400); embed uses same PHP path.
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayIntersectKeyJitHelper}
+ * returned empty hashtables (#27521 — peer array_keys #27211). Call-site LLVM via
+ * {@see HashTableKeyFilterLlvm}.
+ *
+ * Fresh ABI names (`__copy` / `__filter`) avoid colliding with helper-runtime-cached
+ * NestedJIT bodies for the old `__single` / `__two` symbols (#15889).
+ *
+ * Operand HTs are loaded before bridge emit; boxed args use
+ * {@see HashTableHelper::loadHashtablePointer} rather than ensureHashtablePointer so a
+ * transient null read cannot wipe thin-AOT const-local array boxes (#27521).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_intersect_key)
  */
 final class ArrayIntersectKeyRuntime
 {
-    private const HELPER_PATH = '/ext/standard/ArrayIntersectKeyJitHelper.php';
+    private const ABI_SINGLE = '__array_intersect_key__copy';
 
-    private const INTERSECT_KEY_SINGLE = 'PHPCompiler\\ext\\standard\\ArrayIntersectKeyJitHelper::intersectKeySingleCopy';
-
-    private const INTERSECT_KEY_TWO = 'PHPCompiler\\ext\\standard\\ArrayIntersectKeyJitHelper::intersectKeyTwo';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::INTERSECT_KEY_SINGLE,
-        self::INTERSECT_KEY_TWO,
-    ];
+    private const ABI_TWO = '__array_intersect_key__filter';
 
     public static function ensureLinked(Context $context): void
     {
@@ -46,16 +47,20 @@ final class ArrayIntersectKeyRuntime
 
     public static function intersectKey(Context $context, JITVariable $first, JITVariable ...$others): Value
     {
+        $firstHt = self::argToHashtable($context, $first);
+        $otherHts = [];
+        foreach ($others as $other) {
+            $otherHts[] = self::argToHashtable($context, $other);
+        }
+
         self::ensureLinked($context);
 
-        $firstHt = self::argToHashtable($context, $first);
-        if ([] === $others) {
+        if ([] === $otherHts) {
             return self::callIntersectKeySingle($context, $firstHt);
         }
 
         $result = self::callIntersectKeySingle($context, $firstHt);
-        foreach ($others as $other) {
-            $nextHt = self::argToHashtable($context, $other);
+        foreach ($otherHts as $nextHt) {
             $result = self::callIntersectKeyTwo($context, $result, $nextHt);
         }
 
@@ -64,55 +69,55 @@ final class ArrayIntersectKeyRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__array_intersect_key__single');
+        $probe = $context->module->getNamedFunction(self::ABI_SINGLE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__array_intersect_key__single', self::implementIntersectKeySingleBridge(...));
-        self::implementIfMissing($context, '__array_intersect_key__two', self::implementIntersectKeyTwoBridge(...));
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitSingleBridge($context);
+        self::emitTwoBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
     }
 
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
+    private static function emitSingleBridge(Context $context): void
     {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
+        $fn = self::declareFunction($context, self::ABI_SINGLE);
+        $entry = $fn->appendBasicBlock('array_intersect_key_copy_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $copied = HashTableKeyFilterLlvm::copy($context, $fn->getParam(0));
+        $context->builder->returnValue($copied);
+        $context->registerFunction(self::ABI_SINGLE, $fn);
+        $context->builder->clearInsertionPosition();
+    }
 
-            return;
-        }
-
-        $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
-        $context->registerFunction($name, $fn);
+    private static function emitTwoBridge(Context $context): void
+    {
+        $fn = self::declareFunction($context, self::ABI_TWO);
+        $entry = $fn->appendBasicBlock('array_intersect_key_filter_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $filtered = HashTableKeyFilterLlvm::intersectKey(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($filtered);
+        $context->registerFunction(self::ABI_TWO, $fn);
         $context->builder->clearInsertionPosition();
     }
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            // fall through
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            return $probe;
         }
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -123,36 +128,12 @@ final class ArrayIntersectKeyRuntime
                 $htPtr,
                 false,
                 ...match ($name) {
-                    '__array_intersect_key__single' => [$htPtr],
-                    '__array_intersect_key__two' => [$htPtr, $htPtr],
+                    self::ABI_SINGLE => [$htPtr],
+                    self::ABI_TWO => [$htPtr, $htPtr],
                     default => throw new \LogicException('unknown array_intersect_key bridge: '.$name),
                 }
             )
         );
-    }
-
-    private static function implementIntersectKeySingleBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_intersect_key_single_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::INTERSECT_KEY_SINGLE),
-            [$fn->getParam(0)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
-    }
-
-    private static function implementIntersectKeyTwoBridge(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('array_intersect_key_two_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::INTERSECT_KEY_TWO),
-            [$fn->getParam(0), $fn->getParam(1)]
-        );
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
     }
 
     private static function callIntersectKeySingle(Context $context, Value $ht): Value
@@ -160,7 +141,7 @@ final class ArrayIntersectKeyRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_intersect_key__single'),
+            $context->lookupFunction(self::ABI_SINGLE),
             $ht
         );
     }
@@ -170,7 +151,7 @@ final class ArrayIntersectKeyRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_intersect_key__two'),
+            $context->lookupFunction(self::ABI_TWO),
             $left,
             $right
         );
@@ -185,29 +166,12 @@ final class ArrayIntersectKeyRuntime
         return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#23728');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#23728'
-        );
-    }
-
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__array_intersect_key__single', '__array_intersect_key__two'] as $name) {
+        foreach ([self::ABI_SINGLE, self::ABI_TWO] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayIntersectKeyRuntime bridge (#12551)');
+                throw new \LogicException($name.' missing after ArrayIntersectKeyRuntime bridge (#27521)');
             }
             $context->registerFunction($name, $fn);
         }

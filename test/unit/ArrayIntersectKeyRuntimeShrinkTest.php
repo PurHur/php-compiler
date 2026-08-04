@@ -10,25 +10,31 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_intersect_key() NestedJIT via JitVmHelperLink::ensureCompiled (#23728 / peer #23627).
+ * array_intersect_key() JIT: call-site HashTableKeyFilterLlvm (#12551, #27521).
  */
 final class ArrayIntersectKeyRuntimeShrinkTest extends TestCase
 {
-    public function testArrayIntersectKeyRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayIntersectKeyRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void
     {
+        // #27521: NestedJIT of ArrayIntersectKeyJitHelper returned empty under thin AOT.
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIntersectKeyRuntime.php');
-        $this->assertStringContainsString('ArrayIntersectKeyJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
-        $this->assertStringNotContainsString('parseAndCompile', $runtime);
-        $this->assertStringNotContainsString('new JIT(', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
+        $this->assertStringContainsString('HashTableKeyFilterLlvm', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::loadHashTable', $runtime);
+        $this->assertStringContainsString('__array_intersect_key__copy', $runtime);
+        $this->assertStringContainsString('__array_intersect_key__filter', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('ensureCompiled', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_intersect_key.php');
         $this->assertStringContainsString('ArrayIntersectKeyRuntime::intersectKey', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableKeyFilterLlvm.php');
+        $this->assertStringContainsString('function intersectKey', $llvm);
+        $this->assertStringContainsString('function diffKey', $llvm);
+        $this->assertStringContainsString('filterByKeyPresence', $llvm);
+        $this->assertStringContainsString('exportPairsForSlice', $llvm);
     }
 
     public function testArrayIntersectKeyJitHelperSingleCopy(): void

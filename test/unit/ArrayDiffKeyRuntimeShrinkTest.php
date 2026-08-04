@@ -10,27 +10,31 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * array_diff_key() NestedJIT via JitVmHelperLink::ensureCompiled (#23787 / peer #23116).
+ * array_diff_key() JIT: call-site HashTableKeyFilterLlvm (#12553, #27522).
  */
 final class ArrayDiffKeyRuntimeShrinkTest extends TestCase
 {
-    public function testArrayDiffKeyRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayDiffKeyRuntimeUsesCallSiteLlvmNotNestedJitHelper(): void
     {
+        // #27522: NestedJIT of ArrayDiffKeyJitHelper returned empty under thin AOT.
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayDiffKeyRuntime.php');
-        $this->assertStringContainsString('ArrayDiffKeyJitHelper', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
-        $this->assertStringNotContainsString('parseAndCompile', $runtime);
-        $this->assertStringNotContainsString('new JIT(', $runtime);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiffKey', $runtime);
+        $this->assertStringContainsString('HashTableKeyFilterLlvm', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::loadHashTable', $runtime);
+        $this->assertStringContainsString('__array_diff_key__copy', $runtime);
+        $this->assertStringContainsString('__array_diff_key__filter', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('ensureCompiled', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiffKey', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_diff_key.php');
         $this->assertStringContainsString('ArrayDiffKeyRuntime::diffKey', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiffKey', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableKeyFilterLlvm.php');
+        $this->assertStringContainsString('function diffKey', $llvm);
+        $this->assertStringContainsString('function intersectKey', $llvm);
     }
 
     public function testArrayDiffKeyJitHelperRemovesSharedKeys(): void
@@ -38,18 +42,30 @@ final class ArrayDiffKeyRuntimeShrinkTest extends TestCase
         $first = new HashTable();
         $a = new Variable();
         $a->string('x');
-        $first->add('k', $a);
+        $first->add('a', $a);
         $b = new Variable();
-        $b->string('keep');
-        $first->add('z', $b);
+        $b->string('y');
+        $first->add('b', $b);
 
         $other = new HashTable();
         $c = new Variable();
-        $c->string('other');
-        $other->add('k', $c);
+        $c->string('z');
+        $other->add('a', $c);
 
         $result = ArrayDiffKeyJitHelper::diffKeyTwo($first, $other);
-        $this->assertNull($result->find('k'));
-        $this->assertSame('keep', $result->find('z')?->toString());
+        $this->assertSame('y', $result->find('b')?->toString());
+        $this->assertNull($result->find('a'));
+    }
+
+    public function testArrayDiffKeyJitHelperSingleCopy(): void
+    {
+        $base = new HashTable();
+        $a = new Variable();
+        $a->string('1');
+        $base->add('a', $a);
+
+        $copy = ArrayDiffKeyJitHelper::diffKeySingleCopy($base);
+        $this->assertNotSame($base, $copy);
+        $this->assertSame(1, $copy->getNumElements());
     }
 }
