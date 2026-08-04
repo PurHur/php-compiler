@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6991 |
-| Phase A inventory files (M2 ratio SSOT) | 6991 |
+| PHP files on vm.php path | 6992 |
+| Phase A inventory files (M2 ratio SSOT) | 6992 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22438 |
+| Source constructs flagged (warnings) | 22451 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -409,6 +409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationGetFeature.php` | 0 | 2 |
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 2 |
+| `ext/dom/JitDomAppendChildLiveSlots.php` | 0 | 12 |
 | `ext/dom/JitDomAppendChildUserScript.php` | 0 | 10 |
 | `ext/dom/JitDomAttrRename.php` | 0 | 3 |
 | `ext/dom/JitDomAttributeNodeNS.php` | 0 | 3 |
@@ -5195,7 +5196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ExceptionHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ExceptionThrowToStringSeed.php` | 0 | 5 |
+| `lib/JIT/Builtin/ExceptionThrowToStringSeed.php` | 0 | 6 |
 | `lib/JIT/Builtin/ExecutionLimitsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterInputTypeJit.php` | 0 | 1 |
@@ -9483,6 +9484,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 42)
 - 2 class method(s)
+
+### `ext/dom/JitDomAppendChildLiveSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 38)
+- new JITVariable (line 120)
+- new JITVariable (line 163)
+- new JITVariable (line 250)
+- new JITVariable (line 269)
+- new JITVariable (line 280)
+- new JITVariable (line 287)
+- new JITVariable (line 295)
+- new JITVariable (line 302)
+- new JITVariable (line 362)
+- new JITVariable (line 391)
+- 11 class method(s)
 
 ### `ext/dom/JitDomAppendChildUserScript.php`
 
@@ -45451,17 +45468,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomNodeLiveMutationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 348)
-- new Variable (line 349)
-- new Variable (line 366)
-- new Variable (line 407)
-- new Variable (line 408)
-- new Variable (line 419)
-- new Variable (line 460)
-- new Variable (line 471)
-- new Variable (line 558)
-- new Variable (line 597)
-- new Variable (line 666)
+- new Variable (line 367)
+- new Variable (line 368)
+- new Variable (line 385)
+- new Variable (line 426)
+- new Variable (line 427)
+- new Variable (line 438)
+- new Variable (line 479)
+- new Variable (line 490)
+- new Variable (line 577)
+- new Variable (line 616)
+- new Variable (line 685)
 - 36 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
@@ -45603,10 +45620,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ExceptionThrowToStringSeed.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 76)
-- new Variable (line 126)
-- new Variable (line 135)
-- new Variable (line 150)
+- new Variable (line 101)
+- new Variable (line 155)
+- new Variable (line 168)
+- new Variable (line 173)
+- new Variable (line 188)
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/ExecutionLimitsRuntime.php`
@@ -45882,7 +45900,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IniRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 26 class method(s)
 
 ### `lib/JIT/Builtin/IniSet.php`
 

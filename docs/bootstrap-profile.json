@@ -408,6 +408,7 @@
         "ext/dom/ImplementationGetFeature.php",
         "ext/dom/ImplementationHasFeature.php",
         "ext/dom/JitDomAppendChild.php",
+        "ext/dom/JitDomAppendChildLiveSlots.php",
         "ext/dom/JitDomAppendChildUserScript.php",
         "ext/dom/JitDomAttrRename.php",
         "ext/dom/JitDomAttributeNodeNS.php",
