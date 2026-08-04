@@ -21784,36 +21784,50 @@ class JIT {
 
     /**
      * unset($var) on boxed locals: run __destruct before nulling when {main} defers delref destroy (#4096).
+     * Also clear WeakMap/WeakReference immediately — {main} may defer __ref__delref free (#27621 / #26795).
      */
     private function jitWriteNullForUnset(\PHPLLVM\Value $valueBoxPtr): void
     {
+        $map = $this->context->structFieldMap['__value__'];
+        $i8 = $this->context->getTypeFromString('int8');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valueBoxPtr, $map['type'])
+        );
+        $isObject = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $objBlock = JIT\BasicBlockHelper::append($this->context, 'unset_object_side');
+        $doneBlock = JIT\BasicBlockHelper::append($this->context, 'unset_object_done');
+        $this->context->builder->branchIf($isObject, $objBlock, $doneBlock);
+        $this->context->builder->positionAtEnd($objBlock);
+        $obj = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readObject'),
+            $valueBoxPtr
+        );
+        $objI8 = $this->context->builder->pointerCast($obj, $i8p);
         if ($this->context->type->object->hasUserDestructors()) {
             \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
-            $map = $this->context->structFieldMap['__value__'];
-            $i8 = $this->context->getTypeFromString('int8');
-            $typeByte = $this->context->builder->load(
-                $this->context->builder->structGep($valueBoxPtr, $map['type'])
-            );
-            $isObject = $this->context->builder->icmp(
-                \PHPLLVM\Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_OBJECT, false)
-            );
-            $invokeBlock = JIT\BasicBlockHelper::append($this->context, 'unset_destruct_invoke');
-            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'unset_destruct_done');
-            $this->context->builder->branchIf($isObject, $invokeBlock, $doneBlock);
-            $this->context->builder->positionAtEnd($invokeBlock);
-            $obj = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readObject'),
-                $valueBoxPtr
-            );
             $this->context->builder->call(
                 $this->context->lookupFunction('phpc_destruct_try_invoke'),
-                $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*'))
+                $objI8
             );
-            $this->context->builder->branch($doneBlock);
-            $this->context->builder->positionAtEnd($doneBlock);
         }
+        // WeakMap keys must drop before count() even when delref destroy is deferred (#27621).
+        // Save insert point — WeakRefRuntime::ensureLinked clears the builder (#27621).
+        $insertBefore = $this->context->builder->getInsertBlock();
+        JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
+        if (null !== $insertBefore) {
+            $this->context->builder->positionAtEnd($insertBefore);
+        }
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_weakref_clear_object'),
+            $objI8
+        );
+        $this->context->builder->branch($doneBlock);
+        $this->context->builder->positionAtEnd($doneBlock);
         $this->jitNoteMemoryReleaseForUnset($valueBoxPtr);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeNull'),

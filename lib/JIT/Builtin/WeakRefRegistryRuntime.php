@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\WeakRefRegistryJitHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -13,10 +14,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for phpc_weakref_* registry via WeakRefRegistryJitHelper PHP (#9191, #26028).
+ * JIT/AOT link for phpc_weakref_* registry (#9191, #26028, #26795, #27621).
  *
  * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer InetRuntime #26010).
- * Replaces lib/AOT/runtime/phpc_weakref.c; registry storage in WeakRefRegistryJitHelper PHP (#9191).
+ * Replaces lib/AOT/runtime/phpc_weakref.c. Ref + map slot tables are LLVM globals for AOT
+ * standalone (JitHelper statics are unreliable under NestedJIT); format/resolve still use
+ * WeakRefRegistryJitHelper PHP (#9191).
  * php-src: Zend/zend_weakrefs.c
  */
 final class WeakRefRegistryRuntime
@@ -83,10 +86,19 @@ final class WeakRefRegistryRuntime
 
     public static function implement(Context $context): void
     {
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit
+        // (Refcount delref → ensureLinked) (#27550 / #27621).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         $probe = $context->module->getNamedFunction('phpc_weakref_register_ref');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::ensureGcNotifyObjectFreed($context);
             self::registerLinkedRuntime($context);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
 
             return;
         }
@@ -104,7 +116,11 @@ final class WeakRefRegistryRuntime
         self::implementClearObjectTypedBridge($context);
         self::ensureGcNotifyObjectFreed($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementResetBridge(Context $context): void
@@ -124,15 +140,17 @@ final class WeakRefRegistryRuntime
         $context->builder->positionAtEnd($entry);
         $context->builder->call(self::helperFunction($context, self::RESET));
         self::ensureRefGlobals($context);
-        $context->builder->store(
-            $context->getTypeFromString('int32')->constInt(0, false),
-            $context->module->getNamedGlobal(self::G_REF_COUNT)
-        );
+        self::ensureMapGlobals($context);
+        $zero32 = $context->getTypeFromString('int32')->constInt(0, false);
+        $context->builder->store($zero32, $context->module->getNamedGlobal(self::G_REF_COUNT));
+        $context->builder->store($zero32, $context->module->getNamedGlobal(self::G_MAP_COUNT));
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
 
     private const MAX_REFS_LLVM = 4096;
+
+    private const MAX_MAPS_LLVM = 4096;
 
     private const G_REF_COUNT = 'phpc_wr_ref_count';
 
@@ -141,6 +159,14 @@ final class WeakRefRegistryRuntime
     private const G_REF_SLOTS = 'phpc_wr_ref_slots';
 
     private const G_LAST_SLOT = 'phpc_wr_last_slot';
+
+    private const G_MAP_COUNT = 'phpc_wr_map_count';
+
+    private const G_MAP_TARGETS = 'phpc_wr_map_targets';
+
+    private const G_MAP_HTS = 'phpc_wr_map_hts';
+
+    private const G_MAP_KEYS = 'phpc_wr_map_keys';
 
     private static function ensureRefGlobals(Context $context): void
     {
@@ -162,6 +188,32 @@ final class WeakRefRegistryRuntime
         if (null === $context->module->getNamedGlobal(self::G_REF_SLOTS)) {
             $arrTy = $i8p->arrayType(self::MAX_REFS_LLVM);
             $g = $context->module->addGlobal($arrTy, self::G_REF_SLOTS);
+            $g->setInitializer($arrTy->constNull());
+        }
+    }
+
+    private static function ensureMapGlobals(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        if (null === $context->module->getNamedGlobal(self::G_MAP_COUNT)) {
+            $g = $context->module->addGlobal($i32, self::G_MAP_COUNT);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_MAP_TARGETS)) {
+            $arrTy = $i8p->arrayType(self::MAX_MAPS_LLVM);
+            $g = $context->module->addGlobal($arrTy, self::G_MAP_TARGETS);
+            $g->setInitializer($arrTy->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_MAP_HTS)) {
+            $arrTy = $i8p->arrayType(self::MAX_MAPS_LLVM);
+            $g = $context->module->addGlobal($arrTy, self::G_MAP_HTS);
+            $g->setInitializer($arrTy->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_MAP_KEYS)) {
+            $arrTy = $strPtr->arrayType(self::MAX_MAPS_LLVM);
+            $g = $context->module->addGlobal($arrTy, self::G_MAP_KEYS);
             $g->setInitializer($arrTy->constNull());
         }
     }
@@ -248,20 +300,76 @@ final class WeakRefRegistryRuntime
             return;
         }
 
+        self::ensureMapGlobals($context);
+        self::ensureExternals($context);
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('wr_reg_map_bridge_entry');
+        $entry = $fn->appendBasicBlock('wr_reg_map_entry');
+        $done = $fn->appendBasicBlock('wr_reg_map_done');
+        $checkHt = $fn->appendBasicBlock('wr_reg_map_check_ht');
+        $checkKey = $fn->appendBasicBlock('wr_reg_map_check_key');
+        $checkCap = $fn->appendBasicBlock('wr_reg_map_check_cap');
+        $store = $fn->appendBasicBlock('wr_reg_map_store');
         $context->builder->positionAtEnd($entry);
-        $keyStr = self::cstrToString($context, $fn->getParam(2));
-        $context->builder->call(
-            self::helperFunction($context, self::REGISTER_MAP),
-            $context->builder->pointerCast($fn->getParam(0), $i64),
-            $context->builder->pointerCast($fn->getParam(1), $i64),
-            $keyStr
+
+        $target = $fn->getParam(0);
+        $ht = $fn->getParam(1);
+        $keyCstr = $fn->getParam(2);
+        $null = $i8p->constNull();
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $target, $null),
+            $done,
+            $checkHt
         );
+        $context->builder->positionAtEnd($checkHt);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $ht, $null),
+            $done,
+            $checkKey
+        );
+        $context->builder->positionAtEnd($checkKey);
+        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $keyLen, $sizeT->constInt(0, false)),
+            $done,
+            $checkCap
+        );
+        $context->builder->positionAtEnd($checkCap);
+        $countPtr = $context->module->getNamedGlobal(self::G_MAP_COUNT);
+        $count = $context->builder->load($countPtr);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_SGE,
+                $count,
+                $i32->constInt(self::MAX_MAPS_LLVM, false)
+            ),
+            $done,
+            $store
+        );
+        $context->builder->positionAtEnd($store);
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($keyLen, $i64),
+            $keyCstr
+        );
+        $targets = $context->module->getNamedGlobal(self::G_MAP_TARGETS);
+        $hts = $context->module->getNamedGlobal(self::G_MAP_HTS);
+        $keys = $context->module->getNamedGlobal(self::G_MAP_KEYS);
+        $zero = $context->context->int32Type()->constInt(0, false);
+        $context->builder->store($target, $context->builder->gep($targets, $zero, $count));
+        $context->builder->store($ht, $context->builder->gep($hts, $zero, $count));
+        $context->builder->store($keyStr, $context->builder->gep($keys, $zero, $count));
+        $context->builder->store(
+            $context->builder->add($count, $i32->constInt(1, false)),
+            $countPtr
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -276,32 +384,33 @@ final class WeakRefRegistryRuntime
             return;
         }
 
+        self::ensureMapGlobals($context);
+        self::ensureExternals($context);
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('wr_unmap_bridge_entry');
-        $doneBb = $fn->appendBasicBlock('wr_unmap_bridge_done');
-        $checkHtBb = $fn->appendBasicBlock('wr_unmap_bridge_check_ht');
-        $checkKeyBb = $fn->appendBasicBlock('wr_unmap_bridge_check_key');
-        $loopPrep = $fn->appendBasicBlock('wr_unmap_bridge_prep');
+        $entry = $fn->appendBasicBlock('wr_unmap_entry');
+        $doneBb = $fn->appendBasicBlock('wr_unmap_done');
+        $checkHtBb = $fn->appendBasicBlock('wr_unmap_check_ht');
+        $checkKeyBb = $fn->appendBasicBlock('wr_unmap_check_keylen');
+        $loopPrep = $fn->appendBasicBlock('wr_unmap_prep');
         $context->builder->positionAtEnd($entry);
 
-        $target = $context->builder->pointerCast($fn->getParam(0), $i64);
-        $ht = $context->builder->pointerCast($fn->getParam(1), $i64);
+        $target = $fn->getParam(0);
+        $ht = $fn->getParam(1);
         $keyCstr = $fn->getParam(2);
-        $zero = $i64->constInt(0, false);
+        $null = $i8p->constNull();
         $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $target, $zero),
+            $context->builder->icmp(Builder::INT_EQ, $target, $null),
             $doneBb,
             $checkHtBb
         );
 
         $context->builder->positionAtEnd($checkHtBb);
         $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $ht, $zero),
+            $context->builder->icmp(Builder::INT_EQ, $ht, $null),
             $doneBb,
             $checkKeyBb
         );
@@ -427,14 +536,14 @@ final class WeakRefRegistryRuntime
         );
 
         $context->builder->positionAtEnd($checkBb);
-        $masked = $context->builder->and(
-            $typeinfo,
-            $i32->constInt(self::TYPEINFO_TYPEMASK, false)
-        );
+        // Match Refcount delref: object bit set (not equality-to-8 after mask) (#27621).
         $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $masked,
-            $i32->constInt(self::TYPEINFO_TYPE_OBJECT, false)
+            Builder::INT_NE,
+            $context->builder->and(
+                $typeinfo,
+                $i32->constInt(self::TYPEINFO_TYPE_OBJECT, false)
+            ),
+            $i32->constInt(0, false)
         );
         $fnClear = $context->lookupFunction('phpc_weakref_clear_object');
         $context->builder->branchIf($isObject, $workBb, $doneBb);
@@ -459,6 +568,8 @@ final class WeakRefRegistryRuntime
         }
 
         self::ensureRefGlobals($context);
+        self::ensureMapGlobals($context);
+        self::ensureExternals($context);
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
@@ -471,6 +582,7 @@ final class WeakRefRegistryRuntime
         $body = $fn->appendBasicBlock('wr_clear_body');
         $match = $fn->appendBasicBlock('wr_clear_match');
         $next = $fn->appendBasicBlock('wr_clear_next');
+        $mapsInit = $fn->appendBasicBlock('wr_clear_maps_init');
         $done = $fn->appendBasicBlock('wr_clear_done');
 
         $null = $i8p->constNull();
@@ -510,7 +622,7 @@ final class WeakRefRegistryRuntime
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_SLT, $idx, $count),
             $body,
-            $done
+            $mapsInit
         );
 
         $context->builder->positionAtEnd($body);
@@ -542,6 +654,10 @@ final class WeakRefRegistryRuntime
         $nextIdx = $context->builder->add($idx, $one32);
         $idx->addIncoming($nextIdx, $next);
         $context->builder->branch($loopHead);
+
+        // WeakMap HT keys: NestedJIT stubs phpc_weakref_unset_map_key and JitHelper map
+        // statics are unreliable under AOT — purge via LLVM globals (#27621 / zend_weakrefs.c).
+        self::emitClearMapLoop($context, $fn, $target, $mapsInit, $done);
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
@@ -597,17 +713,91 @@ final class WeakRefRegistryRuntime
         $context->registerFunction('phpc_gc_notify_object_freed', $fn);
     }
 
+    private static function emitClearMapLoop(
+        Context $context,
+        Value $fn,
+        Value $target,
+        $loopInit,
+        $doneBb,
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $null = $i8p->constNull();
+        $strNull = $strPtr->constNull();
+        $unsetKey = $context->lookupFunction('__hashtable__unsetStringKey');
+
+        $loopCond = $fn->appendBasicBlock('wr_clear_maps_cond');
+        $loopBody = $fn->appendBasicBlock('wr_clear_maps_body');
+        $clearBb = $fn->appendBasicBlock('wr_clear_maps_do');
+        $loopInc = $fn->appendBasicBlock('wr_clear_maps_inc');
+
+        $context->builder->positionAtEnd($loopInit);
+        $count = $context->builder->load($context->module->getNamedGlobal(self::G_MAP_COUNT));
+        $idx = $context->builder->alloca($i32, 1, 'wr_clear_map_i');
+        $context->builder->store($i32->constInt(0, false), $idx);
+        $context->builder->branch($loopCond);
+
+        $context->builder->positionAtEnd($loopCond);
+        $i = $context->builder->load($idx);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $i, $count),
+            $loopBody,
+            $doneBb
+        );
+
+        $context->builder->positionAtEnd($loopBody);
+        $zero = $context->context->int32Type()->constInt(0, false);
+        $targets = $context->module->getNamedGlobal(self::G_MAP_TARGETS);
+        $hts = $context->module->getNamedGlobal(self::G_MAP_HTS);
+        $keys = $context->module->getNamedGlobal(self::G_MAP_KEYS);
+        $storedTarget = $context->builder->load($context->builder->gep($targets, $zero, $i));
+        $storedHt = $context->builder->load($context->builder->gep($hts, $zero, $i));
+        $keyStr = $context->builder->load($context->builder->gep($keys, $zero, $i));
+        $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $target);
+        $htNonNull = $context->builder->icmp(Builder::INT_NE, $storedHt, $null);
+        $keyNonNull = $context->builder->icmp(Builder::INT_NE, $keyStr, $strNull);
+        $doClear = $context->builder->and(
+            $targetMatch,
+            $context->builder->and($htNonNull, $keyNonNull)
+        );
+        $context->builder->branchIf($doClear, $clearBb, $loopInc);
+
+        $context->builder->positionAtEnd($clearBb);
+        $context->builder->call(
+            $unsetKey,
+            $context->builder->pointerCast($storedHt, $htPtr),
+            $keyStr
+        );
+        $context->builder->store($null, $context->builder->gep($targets, $zero, $i));
+        $context->builder->store($null, $context->builder->gep($hts, $zero, $i));
+        $context->builder->store($strNull, $context->builder->gep($keys, $zero, $i));
+        $context->builder->branch($loopInc);
+
+        $context->builder->positionAtEnd($loopInc);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($idx), $i32->constInt(1, false)),
+            $idx
+        );
+        $context->builder->branch($loopCond);
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function emitUnregisterMapLoop(
         Context $context,
         Value $fn,
-        Value $targetI64,
-        Value $htI64,
+        Value $target,
+        Value $ht,
         Value $keyCstr,
         $loopPrep,
         $doneBb,
     ): void {
         $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $null = $i8p->constNull();
+        $strNull = $strPtr->constNull();
 
         $loopCond = $fn->appendBasicBlock('wr_unmap_cond');
         $loopBody = $fn->appendBasicBlock('wr_unmap_body');
@@ -618,8 +808,7 @@ final class WeakRefRegistryRuntime
 
         $context->builder->positionAtEnd($loopPrep);
         $keyStr = self::cstrToString($context, $keyCstr);
-        $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
-        $countI32 = $context->builder->trunc($count, $i32);
+        $count = $context->builder->load($context->module->getNamedGlobal(self::G_MAP_COUNT));
         $idx = $context->builder->alloca($i32, 1, 'wr_unmap_i');
         $context->builder->store($i32->constInt(0, false), $idx);
         $context->builder->branch($loopCond);
@@ -627,29 +816,39 @@ final class WeakRefRegistryRuntime
         $context->builder->positionAtEnd($loopCond);
         $i = $context->builder->load($idx);
         $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SLT, $i, $countI32),
+            $context->builder->icmp(Builder::INT_SLT, $i, $count),
             $loopBody,
             $doneBb
         );
 
         $context->builder->positionAtEnd($loopBody);
-        $i64Idx = $context->builder->sext($i, $i64);
-        $storedTarget = $context->builder->call(self::helperFunction($context, self::MAP_TARGET), $i64Idx);
-        $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
+        $zero = $context->context->int32Type()->constInt(0, false);
+        $targets = $context->module->getNamedGlobal(self::G_MAP_TARGETS);
+        $hts = $context->module->getNamedGlobal(self::G_MAP_HTS);
+        $keys = $context->module->getNamedGlobal(self::G_MAP_KEYS);
+        $storedTarget = $context->builder->load($context->builder->gep($targets, $zero, $i));
+        $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $target);
         $context->builder->branchIf($targetMatch, $checkHtBb, $loopInc);
 
         $context->builder->positionAtEnd($checkHtBb);
-        $storedHt = $context->builder->call(self::helperFunction($context, self::MAP_HT), $i64Idx);
-        $htMatch = $context->builder->icmp(Builder::INT_EQ, $storedHt, $htI64);
+        $storedHt = $context->builder->load($context->builder->gep($hts, $zero, $i));
+        $htMatch = $context->builder->icmp(Builder::INT_EQ, $storedHt, $ht);
         $context->builder->branchIf($htMatch, $checkKeyBb, $loopInc);
 
         $context->builder->positionAtEnd($checkKeyBb);
-        $storedKey = $context->builder->call(self::helperFunction($context, self::MAP_KEY), $i64Idx);
+        $storedKey = $context->builder->load($context->builder->gep($keys, $zero, $i));
+        $keyNonNull = $context->builder->icmp(Builder::INT_NE, $storedKey, $strNull);
+        $keyMatchBb = $fn->appendBasicBlock('wr_unmap_key_cmp');
+        $context->builder->branchIf($keyNonNull, $keyMatchBb, $loopInc);
+
+        $context->builder->positionAtEnd($keyMatchBb);
         $keyMatch = JitStringCompare::identical($context, $storedKey, $keyStr);
         $context->builder->branchIf($keyMatch, $clearBb, $loopInc);
 
         $context->builder->positionAtEnd($clearBb);
-        $context->builder->call(self::helperFunction($context, self::CLEAR_MAP), $i64Idx);
+        $context->builder->store($null, $context->builder->gep($targets, $zero, $i));
+        $context->builder->store($null, $context->builder->gep($hts, $zero, $i));
+        $context->builder->store($strNull, $context->builder->gep($keys, $zero, $i));
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($loopInc);
