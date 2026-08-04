@@ -96,9 +96,18 @@ if [[ "${relink}" == "1" ]]; then
       echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
       exit 0
     fi
-    echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe; falling back to full spine link" >&2
+    echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe" >&2
     printf '%s\n' "${probe_out}" >&2
     rm -f "${OUT}"
+    # north-star5-verify-fast must stay ~minutes (#10533). Accidental Zend full-spine
+    # fallback here is multi-hour and poisons shared bind-mounts — require an explicit
+    # FULL_LINK=1 (or make bootstrap-gen0-refresh-sidecar / exclusive docker refresh).
+    echo "bootstrap-selfhost-vm-driver-execute-probe: refusing multi-hour Zend spine fallback without BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 (refresh prelinked/bootstrap-gen0 compiler_lib via script/bootstrap-refresh-gen0-sidecar.sh — #8559, #10533)" >&2
+    exit 1
+  elif [[ "${full_link}" != "1" ]]; then
+    # No usable prelinked blob and not an explicit full-link request: fail fast.
+    echo "bootstrap-selfhost-vm-driver-execute-probe: no working spine binary/prelinked seed; refusing multi-hour Zend fallback without BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 (#10533)" >&2
+    exit 1
   fi
   # shellcheck source=php-env.sh
   source "$(dirname "$0")/php-env.sh"
