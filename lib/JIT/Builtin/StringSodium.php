@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -18,6 +20,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 final class StringSodium
 {
     private const HELPER_PATH = '/ext/sodium/SodiumJitHelper.php';
+    private const PAD_HELPER_PATH = '/ext/sodium/SodiumPadJitHelper.php';
 
     private const SECRETBOX_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::secretbox';
 
@@ -34,6 +37,10 @@ final class StringSodium
     private const MEMCMP_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::memcmp';
 
     private const COMPARE_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::compare';
+
+    private const PAD_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumPadJitHelper::pad';
+
+    private const UNPAD_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumPadJitHelper::unpad';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -55,8 +62,58 @@ final class StringSodium
         self::implementAuthVerifyBridge($context);
         self::implementMemcmpBridge($context);
         self::implementCompareBridge($context);
+        self::implementPadBridge($context, '__compiler_sodium_pad', self::PAD_HELPER);
+        self::implementPadBridge($context, '__compiler_sodium_unpad', self::UNPAD_HELPER);
         self::implementBridge($context, '__compiler_sodium_stream_xor', self::STREAM_XOR_HELPER);
         self::implementBridge($context, '__compiler_sodium_stream_xchacha20_xor', self::STREAM_XCHACHA20_XOR_HELPER);
+    }
+
+    public static function invokePadHelper(Context $context, string $name, Value $string, Value $blockSize): Value
+    {
+        self::ensurePadJitHelperCompiled($context);
+        $logical = 'sodium_unpad' === $name ? self::UNPAD_HELPER : self::PAD_HELPER;
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::padHelperFunction($context, $logical),
+            [$string, $blockSize]
+        );
+
+        return JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+    }
+
+    private static function implementPadBridge(Context $context, string $abiName, string $helper): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $restore = self::captureInsertBlock($context);
+        self::ensureJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('sodium_pad_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helper),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
     }
 
     private static function implementBridge(Context $context, string $abiName, string $helper): void
@@ -253,6 +310,13 @@ final class StringSodium
         return JitVmHelperLink::lookupCompiled($context, $logical, '#23519');
     }
 
+    private static function padHelperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensurePadJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27687');
+    }
+
     private static function ensureJitHelperCompiled(Context $context): void
     {
         JitVmHelperLink::ensureCompiled(
@@ -260,6 +324,16 @@ final class StringSodium
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#23519'
+        );
+    }
+
+    private static function ensurePadJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::PAD_HELPER_PATH,
+            [self::PAD_HELPER, self::UNPAD_HELPER],
+            '#27687'
         );
     }
 }
