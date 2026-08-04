@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6992 |
-| Phase A inventory files (M2 ratio SSOT) | 6992 |
+| PHP files on vm.php path | 6993 |
+| Phase A inventory files (M2 ratio SSOT) | 6993 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22442 |
+| Source constructs flagged (warnings) | 22454 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -409,6 +409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationGetFeature.php` | 0 | 2 |
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 2 |
+| `ext/dom/JitDomAppendChildLiveSlots.php` | 0 | 12 |
 | `ext/dom/JitDomAppendChildUserScript.php` | 0 | 10 |
 | `ext/dom/JitDomAttrRename.php` | 0 | 3 |
 | `ext/dom/JitDomAttributeNodeNS.php` | 0 | 3 |
@@ -9484,6 +9485,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 42)
 - 2 class method(s)
+
+### `ext/dom/JitDomAppendChildLiveSlots.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 38)
+- new JITVariable (line 120)
+- new JITVariable (line 163)
+- new JITVariable (line 250)
+- new JITVariable (line 269)
+- new JITVariable (line 280)
+- new JITVariable (line 287)
+- new JITVariable (line 295)
+- new JITVariable (line 302)
+- new JITVariable (line 362)
+- new JITVariable (line 391)
+- 11 class method(s)
 
 ### `ext/dom/JitDomAppendChildUserScript.php`
 
@@ -38422,7 +38439,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/range.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/rawurldecode.php`
 
@@ -45453,17 +45470,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomNodeLiveMutationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 348)
-- new Variable (line 349)
-- new Variable (line 366)
-- new Variable (line 407)
-- new Variable (line 408)
-- new Variable (line 419)
-- new Variable (line 460)
-- new Variable (line 471)
-- new Variable (line 558)
-- new Variable (line 597)
-- new Variable (line 666)
+- new Variable (line 367)
+- new Variable (line 368)
+- new Variable (line 385)
+- new Variable (line 426)
+- new Variable (line 427)
+- new Variable (line 438)
+- new Variable (line 479)
+- new Variable (line 490)
+- new Variable (line 577)
+- new Variable (line 616)
+- new Variable (line 685)
 - 36 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
@@ -46584,7 +46601,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/RangeIntRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/ReadonlyRaise.php`
 
