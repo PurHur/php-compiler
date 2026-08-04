@@ -103,7 +103,17 @@ final class json_decode extends Internal
             $literal = '';
         }
         if (null !== $literal) {
-            $decoded = VmJsonFormat::decode($literal, $assoc, $depth, $flags);
+            try {
+                $decoded = VmJsonFormat::decode($literal, $assoc, $depth, $flags);
+            } catch (\JsonException $e) {
+                // Compile-time THROW fold → runtime catchable JsonException (#27623).
+                return JitJsonThrow::emitFromException($context, $e);
+            }
+            // Soft-fail sticky last_error (invalid literal without THROW) (#27623 / #26792).
+            $sticky = VmJson::lastError();
+            if (0 !== $sticky && !VmJsonFlags::throwsOnError($flags)) {
+                JitJsonEncodeCompileTime::emitSetLastError($context, $sticky);
+            }
 
             return JitJsonDecode::materializeDecoded($context, $decoded, $assoc);
         }
@@ -152,6 +162,12 @@ final class json_decode extends Internal
             return false;
         }
         if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return VmJsonFlags::objectAsArray($flags);
+        }
+        // ConstFetch null is a module-global load — prefer folded name (#27623 / #24137).
+        if (null !== $args[1]->compileTimeConstantName
+            && 'null' === strtolower($args[1]->compileTimeConstantName)
+        ) {
             return VmJsonFlags::objectAsArray($flags);
         }
         if ($context->callerStrictTypes) {
@@ -242,16 +258,62 @@ final class json_decode extends Internal
         return null;
     }
 
+    /**
+     * Resolve a compile-time int for depth/flags (#27623).
+     *
+     * Named JSON_* ConstFetch lowers as a load from a module global — LLVMIsAConstantInt
+     * sees the Load, not the initializer. Prefer {@see JITVariable::$compileTimeLong} /
+     * {@see JITVariable::$compileTimeConstantName} (same shape as preg_split #27647).
+     */
     private static function compileTimeInt(Context $context, JITVariable $var): ?int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $var->type || JITVariable::KIND_VALUE !== $var->kind) {
-            return null;
+        if (null !== ($var->compileTimeLong ?? null)) {
+            return (int) $var->compileTimeLong;
         }
-        $lib = $context->llvm->lib;
-        if (null === $lib->LLVMIsAConstantInt($var->value->value)) {
-            return null;
+        $constName = $var->compileTimeConstantName ?? null;
+        if (null !== $constName) {
+            $lookup = strtolower($constName);
+            if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            $jsonFlags = VmJsonFlags::constants();
+            if (isset($jsonFlags[$constName])) {
+                return $jsonFlags[$constName];
+            }
+            if (isset($jsonFlags[strtoupper($constName)])) {
+                return $jsonFlags[strtoupper($constName)];
+            }
+            if (null !== $context->runtime->vmContext) {
+                $phpVar = $context->runtime->vmContext->constantFetch($constName);
+                if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                    return $phpVar->toInt();
+                }
+            }
+        }
+        // JSON_* globals: load operand → registered constant name (#21723 / encode peer).
+        if (
+            JITVariable::TYPE_NATIVE_LONG === $var->type
+            && JITVariable::KIND_VALUE === $var->kind
+            && null !== $var->value
+        ) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
+            if (null !== $lib->LLVMIsALoadInst($var->value->value)) {
+                $ptr = $var->value->getOperand(0);
+                $name = $lib->LLVMGetValueName($ptr->value)?->toString() ?? '';
+                if ('' !== $name && isset($context->constants[$name])) {
+                    if ($context->constants[$name][0] === $var->type) {
+                        $phpVar = $context->runtime->vmContext?->constantFetch($name);
+                        if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                            return $phpVar->toInt();
+                        }
+                    }
+                }
+            }
         }
 
-        return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        return null;
     }
 }

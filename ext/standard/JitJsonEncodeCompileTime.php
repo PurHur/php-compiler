@@ -85,21 +85,23 @@ final class JitJsonEncodeCompileTime
         try {
             $exported = VmJson::export($vmArray);
         } catch (VmJsonExportException $e) {
-            if (
-                VmJsonFlags::throwsOnError($flags)
-                && !VmJsonFlags::partialOutputOnError($flags)
-            ) {
-                VmJson::throwExceptionPreservingLastError($e->errorCode);
-            }
             if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode);
+                // Prefer catchable emit over aborting AOT with host JsonException (#27623).
+                return JitJsonThrow::emitFromException(
+                    $context,
+                    new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode)
+                );
             }
             // Soft-fail: bake false + sticky last_error (avoid AOT runtime INF crash, #26792).
             self::emitSetLastError($context, $e->errorCode);
 
             return self::emitFalse($context);
         }
-        $encoded = VmJsonFormat::encodeExported($exported, $flags);
+        try {
+            $encoded = VmJsonFormat::encodeExported($exported, $flags);
+        } catch (\JsonException $e) {
+            return JitJsonThrow::emitFromException($context, $e);
+        }
         $sticky = VmJson::lastError();
         if (false === $encoded) {
             if (VmJsonFlags::throwsOnError($flags)) {

@@ -81,7 +81,12 @@ final class json_encode extends Internal
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal && null !== $knownFlags) {
             // PHP-in-PHP fold — same encoder as VM/runtime (#21723); avoid host ext/json skew.
-            $encoded = VmJsonFormat::encodeExported($literal, $knownFlags);
+            try {
+                $encoded = VmJsonFormat::encodeExported($literal, $knownFlags);
+            } catch (\JsonException $e) {
+                // Compile-time THROW fold → runtime catchable JsonException (#27623).
+                return JitJsonThrow::emitFromException($context, $e);
+            }
             $sticky = VmJson::lastError();
             if (false === $encoded) {
                 if (VmJsonFlags::throwsOnError($knownFlags)) {
@@ -175,6 +180,26 @@ final class json_encode extends Internal
             return 0;
         }
         $flagsArg = $args[1];
+        // Prefer folded metadata — ConstFetch JSON_* is a Load, not ConstantInt (#27623).
+        if (null !== ($flagsArg->compileTimeLong ?? null)) {
+            return (int) $flagsArg->compileTimeLong;
+        }
+        $constName = $flagsArg->compileTimeConstantName ?? null;
+        if (null !== $constName) {
+            $jsonFlags = VmJsonFlags::constants();
+            if (isset($jsonFlags[$constName])) {
+                return $jsonFlags[$constName];
+            }
+            if (isset($jsonFlags[strtoupper($constName)])) {
+                return $jsonFlags[strtoupper($constName)];
+            }
+            if (null !== $context->runtime->vmContext) {
+                $phpVar = $context->runtime->vmContext->constantFetch($constName);
+                if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                    return $phpVar->toInt();
+                }
+            }
+        }
         if (JITVariable::TYPE_NATIVE_LONG !== $flagsArg->type || JITVariable::KIND_VALUE !== $flagsArg->kind) {
             return null;
         }

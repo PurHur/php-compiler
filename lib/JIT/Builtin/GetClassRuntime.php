@@ -123,6 +123,8 @@ PHP;
             'BadMethodCallException', 'BadFunctionCallException', 'LogicException',
             // never-typed / cross-function throw → catch get_class (#27625).
             'RuntimeException',
+            // json_decode/encode JSON_THROW_ON_ERROR compile-time fold (#27623).
+            'JsonException',
         ] as $name) {
             $object->lookup($name);
         }
