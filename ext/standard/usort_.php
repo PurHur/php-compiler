@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -93,6 +94,17 @@ final class usort_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('usort() requires exactly two arguments');
         }
-        return UsortRuntime::usortPacked($context, $args[0], $args[1]);
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27510).
+        ExceptionBridge::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'usort', 1, 'array');
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
+            return UsortRuntime::usortPacked($context, $args[0], $args[1]);
+        }
+
+        // Static non-array types already raised above; poison bool return for SSA.
+        return $context->getTypeFromString('int1')->constInt(1, false);
     }
 }
