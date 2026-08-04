@@ -17,6 +17,19 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(0, PregAotFastPath::matchCount('/\d+/', 'no-digits', 0));
     }
 
+    /** Issue #27561 — unclosed group is PREG_INTERNAL_ERROR, not silent no-match. */
+    public function testUnclosedGroupSetsInternalError(): void
+    {
+        $this->assertSame(-1, PregAotFastPath::matchCount('/(/', 'x', 0));
+        $this->assertSame(1, PregAotFastPath::lastError());
+        $this->assertSame('Internal error', PregAotFastPath::lastErrorMsg());
+        $this->assertSame(-1, PregAotFastPath::matchCount('#(#', 'x', 0));
+        $this->assertSame(1, PregAotFastPath::lastError());
+        $this->assertSame(1, PregAotFastPath::matchCount('/\d/', 'a1', 0));
+        $this->assertSame(0, PregAotFastPath::lastError());
+        $this->assertSame('No error', PregAotFastPath::lastErrorMsg());
+    }
+
     /** Issue #27250 — bare /\d/ (no +) must match under thin AOT. */
     public function testDigitOnceMatch(): void
     {

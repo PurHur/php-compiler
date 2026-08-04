@@ -14,33 +14,25 @@ use PHPCompiler\VM\HashTable;
  */
 final class PregJitHelper
 {
-    private static int $lastError = 0;
-
     private static ?HashTable $lastMatchExHt = null;
 
     private static ?HashTable $lastMatchAllExHt = null;
 
     public static function lastError(): int
     {
-        return self::$lastError;
+        // SSOT on PregAotFastPath — NestedJIT TUs do not share PregJitHelper statics (#27561).
+        return PregAotFastPath::lastError();
     }
 
     public static function lastErrorMsg(): string
     {
-        if (0 === self::$lastError) {
-            return 'No error';
-        }
-
-        return 'Internal error';
+        return PregAotFastPath::lastErrorMsg();
     }
 
     public static function matchArgv(string $pattern, string $subject): int
     {
-        self::$lastError = 0;
         $code = PregAotFastPath::matchCount($pattern, $subject, 0);
         if ($code < 0) {
-            self::$lastError = 1;
-
             return -1;
         }
         if (0 === $code) {
@@ -52,10 +44,10 @@ final class PregJitHelper
 
     public static function matchAllArgv(string $pattern, string $subject): int
     {
-        self::$lastError = 0;
+        PregAotFastPath::setLastError(0);
         $n = PregAotFastPath::matchAllStore($pattern, $subject, 0, 0);
         if ($n < 0) {
-            self::$lastError = 1;
+            PregAotFastPath::setLastError(1);
 
             return -1;
         }
@@ -65,12 +57,9 @@ final class PregJitHelper
 
     public static function matchExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
-        self::$lastError = 0;
         self::$lastMatchExHt = null;
         $code = PregAotFastPath::matchCount($pattern, $subject, $offset);
         if ($code < 0) {
-            self::$lastError = 1;
-
             return -1;
         }
         if (0 === $code) {
@@ -103,11 +92,11 @@ final class PregJitHelper
 
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
-        self::$lastError = 0;
         self::$lastMatchAllExHt = null;
+        PregAotFastPath::setLastError(0);
         $n = PregAotFastPath::matchAllStore($pattern, $subject, $flags, $offset);
         if ($n < 0) {
-            self::$lastError = 1;
+            PregAotFastPath::setLastError(1);
 
             return -1;
         }
@@ -138,10 +127,10 @@ final class PregJitHelper
      */
     public static function replaceFindNext(string $pattern, string $subject, int $offset): int
     {
-        self::$lastError = 0;
+        PregAotFastPath::setLastError(0);
         $rc = PregAotFastPath::replaceFindNext($pattern, $subject, $offset);
         if ($rc < 0) {
-            self::$lastError = 1;
+            PregAotFastPath::setLastError(1);
         }
 
         return $rc;
@@ -172,10 +161,10 @@ final class PregJitHelper
         // Thin AOT: NestedJIT cannot return/build `__hashtable__*` (#27080). Store parts in
         // PregAotFastPath slots; LLVM may fill from thinSplitPart* — prefer literal fold
         // ({@see JitPregSplitCompileTime}) or implementThinSplitBridge (#27208).
-        self::$lastError = 0;
+        PregAotFastPath::setLastError(0);
         $n = PregAotFastPath::splitStore($pattern, $subject, $limit, $flags);
         if ($n < 0) {
-            self::$lastError = 1;
+            PregAotFastPath::setLastError(1);
 
             return null;
         }
@@ -195,14 +184,14 @@ final class PregJitHelper
 
     public static function replaceCallbackArgv(string $pattern, string $subject, int $callbackFnAddr): ?string
     {
-        self::$lastError = 1;
+        PregAotFastPath::setLastError(1);
 
         return null;
     }
 
     public static function replaceCallbackArrayArgv(HashTable $patterns, string $subject): ?string
     {
-        self::$lastError = 1;
+        PregAotFastPath::setLastError(1);
 
         return null;
     }
