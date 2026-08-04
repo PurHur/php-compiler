@@ -64,10 +64,21 @@ final class GeneratorThrow implements Call
         JitThrow::ensureLinked($context);
         $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
         $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        // Only branch when dispatch lives in this function — a leaked generator-resume
+        // handler would create a cross-function `br` and fail module verify (#27518).
         if (null !== $handler && null !== $handler->dispatchBb) {
-            $context->builder->branch($handler->dispatchBb);
+            $insert = $context->builder->getInsertBlock();
+            $parent = null !== $insert ? $insert->getParent() : null;
+            $dispatchParent = $handler->dispatchBb->getParent();
+            if (
+                $parent instanceof \PHPLLVM\Value\Function_
+                && $dispatchParent instanceof \PHPLLVM\Value\Function_
+                && TryCatchHelper::sameLlvmFunction($parent, $dispatchParent)
+            ) {
+                $context->builder->branch($handler->dispatchBb);
 
-            return;
+                return;
+            }
         }
         $context->builder->call($context->lookupFunction('abort'));
     }

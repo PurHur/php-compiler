@@ -23,6 +23,83 @@ use PHPLLVM\Value;
 final class GeneratorIteratorJitHelper
 {
     /**
+     * On resume: if Generator::throw() set has_pending_throw, inject into the active
+     * try/catch dispatch (or pend for the caller) — mirrors FiberHelperLlvm (#27518).
+     *
+     * @return \PHPLLVM\BasicBlock block to continue resume-prefix lowering from
+     */
+    public static function emitInjectPendingThrow(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        Value $stateParam,
+        \PHPLLVM\BasicBlock $caseBlock
+    ): \PHPLLVM\BasicBlock {
+        $context = $jit->context;
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $normalEntry = $func->appendBasicBlock('gen_resume_normal');
+        $throwEntry = $func->appendBasicBlock('gen_resume_throw_inject');
+        $context->builder->positionAtEnd($caseBlock);
+        $hasPending = $context->builder->load(
+            $context->builder->structGep($stateParam, $map['has_pending_throw'])
+        );
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $hasPending, $i1->constInt(0, false)),
+            $throwEntry,
+            $normalEntry
+        );
+        $context->builder->positionAtEnd($throwEntry);
+        \PHPCompiler\JIT\Builtin\JitThrow::registerDeclarations($context);
+        \PHPCompiler\JIT\Builtin\JitThrow::ensureLinked($context);
+        $pendingField = $context->builder->structGep($stateParam, $map['pending_throw']);
+        $excObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::pointer($context, $pendingField)
+        );
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
+        $context->builder->store(
+            $i1->constInt(0, false),
+            $context->builder->structGep($stateParam, $map['has_pending_throw'])
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $pendingField)
+        );
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        $branchedToDispatch = false;
+        if (null !== $handler && null !== $handler->dispatchBb) {
+            // While lowering this resume function, dispatchBb was just appended to $func
+            // — branch without sameLlvmFunction (wrapper identity can miss, #27518).
+            if ($context->compilingGeneratorResume) {
+                $context->builder->branch($handler->dispatchBb);
+                $branchedToDispatch = true;
+            } else {
+                $dispatchParent = $handler->dispatchBb->getParent();
+                if (
+                    $dispatchParent instanceof \PHPLLVM\Value\Function_
+                    && TryCatchHelper::sameLlvmFunction($func, $dispatchParent)
+                ) {
+                    $context->builder->branch($handler->dispatchBb);
+                    $branchedToDispatch = true;
+                }
+            }
+        }
+        if (!$branchedToDispatch) {
+            // No in-generator catch: close and return so the caller observes throw-pending
+            // (Zend zend_generator_throw → GeneratorUncaughtThrow).
+            $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
+            $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
+            $context->builder->returnValue($i64->constInt(0, false));
+        }
+        // Always leave the builder on the open normal path — callers (pending_send) must
+        // not append after throwEntry's terminator (#27518).
+        $context->builder->positionAtEnd($normalEntry);
+
+        return $normalEntry;
+    }
+
+    /**
      * On resume past a yield: copy pending_send into the yield expression result (or
      * discard when the yield has no receive slot) — Zend zend_generator_resume (#26819).
      *
@@ -42,6 +119,7 @@ final class GeneratorIteratorJitHelper
         $hasPendingPtr = $context->builder->structGep($stateParam, $map['has_pending_send']);
         if (null === $yieldOp->arg1) {
             // Plain `yield expr` — discard the sent value (VM #18108 / #23712).
+            $context->builder->positionAtEnd($entryBlock);
             $context->builder->store($i1->constInt(0, false), $hasPendingPtr);
 
             return $entryBlock;
@@ -52,6 +130,7 @@ final class GeneratorIteratorJitHelper
         }
         $resultVar = $context->getVariableFromOp($resultOp);
         $pendingField = $context->builder->structGep($stateParam, $map['pending_send']);
+        $context->builder->positionAtEnd($entryBlock);
         $hasPending = $context->builder->load($hasPendingPtr);
         $parent = $context->builder->getInsertBlock()->getParent();
         $copyBb = $parent->appendBasicBlock('gen_inject_send');
