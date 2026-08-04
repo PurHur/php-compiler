@@ -811,6 +811,13 @@ final class BuiltinInternalArgInfo
                 3 => '?array',
                 default => null,
             },
+            // ext/reflection/php_reflection.stub.php — PHP 8.4+ getRawValue/setRawValue (#27599)
+            'reflectionproperty::getrawvalue' => 0 === $index ? 'object' : null,
+            'reflectionproperty::setrawvalue' => match ($index) {
+                0 => 'object',
+                1 => 'mixed',
+                default => null,
+            },
             // ext/dom/php_dom.stub.php — string $source / int $options = 0 / ?string $overrideEncoding = null (#26080)
             'dom\\htmldocument::createfromstring',
             'dom\\xmldocument::createfromstring' => match ($index) {

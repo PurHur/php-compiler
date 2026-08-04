@@ -46,6 +46,9 @@ final class BuiltinParamNames
             'dateperiod::__construct' => ['start', 'interval=', 'end=', 'options='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
+            // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+; absent from InternalArgInfo (#27599)
+            'reflectionproperty::getrawvalue' => ['object'],
+            'reflectionproperty::setrawvalue' => ['object', 'value'],
             // php-src ext/reflection/php_reflection.stub.php — ...$args; Z_PARAM_VARIADIC_WITH_NAMED (#24949)
             'reflectionfunction::invoke' => ['...args='],
             'reflectionmethod::invoke' => ['object', '...args='],

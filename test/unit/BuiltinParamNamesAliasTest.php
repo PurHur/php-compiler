@@ -1372,6 +1372,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'connect', 3));
     }
 
+    /** @covers issue #27599 */
+    public function testReflectionPropertyRawValueNamedParameters(): void
+    {
+        $get = 'ReflectionProperty::getRawValue';
+        $set = 'ReflectionProperty::setRawValue';
+        self::assertSame(['object'], BuiltinParamNames::forClassMethod($get));
+        self::assertSame(['object', 'value'], BuiltinParamNames::forClassMethod($set));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($get), 'object', $get));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($set), 'object', $set));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($set), 'value', $set));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionProperty', 'getRawValue'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('ReflectionProperty', 'getRawValue'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionProperty', 'setRawValue'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('ReflectionProperty', 'setRawValue'));
+        self::assertSame('object', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionproperty', 'getrawvalue', 0));
+        self::assertSame('object', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionproperty', 'setrawvalue', 0));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionproperty', 'setrawvalue', 1));
+    }
+
     /** @covers issue #26080 */
     public function testDomCreateFromStringNamedParameters(): void
     {
