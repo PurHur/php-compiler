@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6978 |
-| Phase A inventory files (M2 ratio SSOT) | 6978 |
+| PHP files on vm.php path | 6979 |
+| Phase A inventory files (M2 ratio SSOT) | 6979 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22425 |
+| Source constructs flagged (warnings) | 22426 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6005,6 +6005,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableChunkLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableCowLlvm.php` | 0 | 3 |
 | `lib/JIT/HashTableHelper.php` | 0 | 10 |
+| `lib/JIT/HashTableKeyFilterLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableKeysLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableMutateNestedLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableNestedExportLlvm.php` | 0 | 1 |
@@ -43352,8 +43353,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2194)
-- new ArgumentCountError (line 2205)
+- new ArgumentCountError (line 2217)
+- new ArgumentCountError (line 2228)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -44892,7 +44893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayDiffKeyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/ArrayDiffRuntime.php`
 
@@ -44937,7 +44938,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayIntersectKeyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/ArrayIntersectRuntime.php`
 
@@ -50166,6 +50167,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 468)
 - new Variable (line 490)
 - 43 class method(s)
+
+### `lib/JIT/HashTableKeyFilterLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `lib/JIT/HashTableKeysLlvm.php`
 
