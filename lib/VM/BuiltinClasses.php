@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
+use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\VM\Builtin\DatePeriodConstruct;
 use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
 use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
@@ -1164,6 +1165,12 @@ final class BuiltinClasses
             $rp->methodVisibility['setrawvalue'] = $pub;
             $rp->methods['getrawvalue'] = new ReflectionPropertyGetRawValue();
             $rp->methodVisibility['getrawvalue'] = $pub;
+            // Explicit `mixed` is Literal — CfgType\Mixed_ means undeclared (#22064 / #27599).
+            $rp->methodReturnDeclaredTypes['getrawvalue'] = new CfgType\Literal('mixed');
+            $voidRet = ReflectionTypeSupport::cfgTypeFromLabel('void');
+            if (null !== $voidRet) {
+                $rp->methodReturnDeclaredTypes['setrawvalue'] = $voidRet;
+            }
         }
         $rp->methods['getattributes'] = new ReflectionPropertyGetAttributes();
         $rp->methodVisibility['getattributes'] = $pub;
