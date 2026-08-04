@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\VmDom;
+use PHPCompiler\ext\dom\JitDomAppendChildLiveSlots;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\ext\standard\JitStringConcat;
@@ -210,6 +211,24 @@ final class DomNodeLiveMutationRuntime
                 return self::nullValuePtr($context);
             }
             $orderedArgs = 'prepend' === $kind ? array_reverse($extraArgs) : $extraArgs;
+            // #27476: Element single-object append — LLVM live-slot sync only (peer
+            // insertBefore #27449). NestedJIT+syncChildLinkSlots+bump resets length to 1
+            // on same-parent moves. Document appendChild uses DomDocumentAppendChild.
+            if (
+                'append' === $kind
+                && 1 === $extraArgCount
+                && \in_array($extraArgs[0]->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)
+            ) {
+                JitDomAppendChildLiveSlots::sync(
+                    $context,
+                    self::receiverObject($context, $receiver),
+                    self::mutationArgObject($context, $extraArgs[0])
+                );
+                self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
+                self::syncUserScriptInnerXmlFromArgs($context, $receiver, $extraArgs, $kind);
+
+                return self::nullValuePtr($context);
+            }
             $firstArg = $extraArgs[0];
             $lastArg = $extraArgs[\count($extraArgs) - 1];
             $firstChildObj = null;
