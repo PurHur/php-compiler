@@ -4,33 +4,28 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitExplode;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for phpc_explode via ExplodeJitHelper PHP (#14750).
+ * JIT/AOT emit for explode() runtime path (#14750 / #27660).
  *
- * Replaces ~500 LOC inline LLVM in JitExplode.php runtime paths.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * NestedJIT of {@see \PHPCompiler\ext\standard\ExplodeJitHelper} aborts under thin AOT:
+ * unbound {@see VmString} stubs become null, and NestedJIT {@see HashTable} construction
+ * segfaults at compile time (peer #26956 RangeInt / #27078 ParseUrl). Runtime therefore
+ * uses LLVM emission via {@see JitExplode::explode()} — same shape as {@see JitStrSplit}.
+ *
+ * Compile-time literals still const-fold through {@see JitExplode::buildPackedStrings()}.
+ * Host/PHPUnit SSOT remains ExplodeJitHelper (no NestedJIT).
+ *
  * php-src: ext/standard/string.c — php_explode()
  */
 final class StringExplode
 {
-    private const ABI = 'phpc_explode';
-
-    private const HELPER_PATH = '/ext/standard/ExplodeJitHelper.php';
-
-    private const EXPLODE_HELPER = 'PHPCompiler\\ext\\standard\\ExplodeJitHelper::explodeArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::EXPLODE_HELPER,
-    ];
-
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        // JitExplode::explode pulls JitStringSearch / string_trim as needed.
     }
 
     public static function ensureStandaloneBodies(Context $context): void
@@ -44,31 +39,6 @@ final class StringExplode
         Value $haystack,
         Value $limit
     ): Value {
-        self::ensureLinked($context);
-
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI),
-            $delimiter,
-            $haystack,
-            $limit
-        );
-    }
-
-    private static function implement(Context $context): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI,
-            'explode_bridge_entry',
-            [$strPtr, $strPtr, $i64],
-            $htPtr,
-            self::EXPLODE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#14750'
-        );
+        return JitExplode::explode($context, $delimiter, $haystack, $limit);
     }
 }
