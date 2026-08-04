@@ -33,17 +33,6 @@ final class JitRealpathCache
 
     public static function get(Context $context): Value
     {
-        // Peer get_included_files / password_algos — box empty HT as __value__*
-        // so FUNCCALL_EXEC_RETURN assign works under thin AOT (#27665).
-        $ht = ArrayBuiltinHelper::emptyArray($context);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $ptr,
-            $ht
-        );
-
-        return $ptr;
+        return ArrayBuiltinHelper::emptyArray($context);
     }
 }
