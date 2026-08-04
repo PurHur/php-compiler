@@ -4854,6 +4854,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayProductRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayProductLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPushRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayRandRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayRandLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReduceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReplaceKeyRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReplaceRecursiveRuntime.php';

@@ -9,15 +9,24 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_rand() JIT routes through ArrayRandJitHelper PHP not __hashtable__arrayRandPacked LLVM (#16135). */
+/**
+ * array_rand() JIT/AOT uses ArrayRandLlvm (not NestedJIT Variable return) (#16135, #27547).
+ */
 final class ArrayRandRuntimeShrinkTest extends TestCase
 {
-    public function testArrayRandRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayRandRuntimeUsesCallSiteLlvmNotNestedJitVariableBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayRandRuntime.php');
-        $this->assertStringContainsString('ArrayRandJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayRandLlvm', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('__array_rand__pick', $runtime);
         $this->assertStringNotContainsString('__hashtable__arrayRandPacked', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayRandLlvm.php');
+        $this->assertStringContainsString('__compiler_random_bytes', $llvm);
+        $this->assertStringContainsString('StringRandomBytes', $llvm);
+        $this->assertStringContainsString('__value__writeLong', $llvm);
 
         $hashTable = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
         $this->assertStringNotContainsString('__hashtable__arrayRandPacked', $hashTable);
@@ -46,7 +55,6 @@ final class ArrayRandRuntimeShrinkTest extends TestCase
         }
         sort($picked);
         $this->assertCount(2, $picked);
-        $this->assertSame([0, 1, 2, 3], range(0, 3));
         foreach ($picked as $k) {
             $this->assertContains($k, [0, 1, 2, 3]);
         }

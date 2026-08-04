@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6999 |
-| Phase A inventory files (M2 ratio SSOT) | 6999 |
+| PHP files on vm.php path | 7000 |
+| Phase A inventory files (M2 ratio SSOT) | 7000 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22478 |
+| Source constructs flagged (warnings) | 22480 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5049,6 +5049,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayMapLlvm.php` | 0 | 5 |
 | `lib/JIT/ArrayProductLlvm.php` | 0 | 1 |
+| `lib/JIT/ArrayRandLlvm.php` | 0 | 2 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayReduceLlvm.php` | 0 | 2 |
 | `lib/JIT/ArraySearchLlvm.php` | 0 | 2 |
@@ -44842,6 +44843,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/ArrayRandLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 186)
+- 3 class method(s)
+
 ### `lib/JIT/ArrayReduceCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -45063,7 +45070,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayRandRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/ArrayReduceRuntime.php`
 
