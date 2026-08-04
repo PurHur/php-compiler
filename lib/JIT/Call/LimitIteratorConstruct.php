@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * LimitIterator::__construct — thin AOT snapshot of inner `__spl_ht` window (#26825).
  *
  * php-src: ext/spl/spl_iterators.c — spl_dual_it_construct / LimitIterator
+ * Keys are preserved (preserve_keys=1) so foreach matches Zend/VM (#27581).
  *
  * Must be listed in JIT::isVoidJitConstructCall so markObjectConstructed runs
  * after __construct (otherwise constructed=0 aborts get_class / HT reads).
@@ -59,13 +60,14 @@ final class LimitIteratorConstruct implements Call
             $count,
             $i64->constInt(0, false)
         );
+        // preserveKeys=true — LimitIterator forwards inner keys (php-src spl_limit_it_key; #27581).
         $sliced = HashTableSliceLlvm::slice(
             $context,
             $context->helper->loadValue($copy),
             $offset,
             $hasLength,
             $count,
-            $i1->constInt(0, false)
+            $i1->constInt(1, false)
         );
         $slicedVar = new Variable(
             $context,
