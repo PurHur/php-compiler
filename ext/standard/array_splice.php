@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArraySpliceRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -78,6 +79,7 @@ final class array_splice extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        ExceptionBridge::ensureLinked($context);
         $argc = \count($args);
         if ($argc < 2) {
             throw new \ArgumentCountError(\sprintf(
@@ -91,6 +93,10 @@ final class array_splice extends Internal
                 $argc
             ));
         }
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27491).
+        // Always via JitArrayElem → ExceptionBridge (not bare TypeErrorRaise::emitRaise).
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_splice', 1, 'array');
+
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         JitInternalStrictArg::requireInt($context, $args[1], 'array_splice', 'offset', 2);
@@ -111,14 +117,22 @@ final class array_splice extends Internal
         $hasReplacement = isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3]);
         $replacement = $hasReplacement ? $args[3] : null;
 
-        return ArraySpliceRuntime::splice(
-            $context,
-            $args[0],
-            $offset,
-            $hasLength,
-            $length,
-            $replacement,
-            $hasReplacement
-        );
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
+            return ArraySpliceRuntime::splice(
+                $context,
+                $args[0],
+                $offset,
+                $hasLength,
+                $length,
+                $replacement,
+                $hasReplacement
+            );
+        }
+
+        // Static non-array types already raised above; poison return for SSA.
+        return $context->getTypeFromString('__value__*')->constNull();
     }
 }
