@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\JIT\Builtin\MathIsNan;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
@@ -13,51 +14,16 @@ use PHPLLVM\Value;
  * SSOT for JIT native double compare lowering (Zend zend_operators.c, #4712, #5084, #9976).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitFloatCompare}
+ * NaN detect: {@see MathIsNan} fcmp (no libc isnan — #27590).
  */
 final class VmFloatCompare
 {
-    /**
-     * libc isnan(double) — declare on demand when ext/standard Module init did not run
-     * (selfhost/minimal AOT modules). Mirrors {@see \PHPCompiler\ext\standard\JitSpaceshipCompareKernel}.
-     */
-    public static function lookupOrDeclareIsNan(Context $context): Value
-    {
-        $name = 'isnan';
-        if (null !== $context->module->getNamedFunction($name)) {
-            return $context->lookupFunction($name);
-        }
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $i32 = $context->getTypeFromString('int32');
-            $dbl = $context->getTypeFromString('double');
-            $fn = $context->module->addFunction(
-                $name,
-                $context->context->functionType($i32, false, $dbl)
-            );
-            $context->registerFunction($name, $fn);
-
-            return $fn;
-        }
-    }
-
     private static function eitherOperandIsNaN(Context $context, Value $left, Value $right): Value
     {
-        $isnan = self::lookupOrDeclareIsNan($context);
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $leftNan = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->call($isnan, $left),
-            $zero
+        return $context->builder->or(
+            MathIsNan::invoke($context, $left),
+            MathIsNan::invoke($context, $right)
         );
-        $rightNan = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->call($isnan, $right),
-            $zero
-        );
-
-        return $context->builder->or($leftNan, $rightNan);
     }
 
     public static function relationalCompare(

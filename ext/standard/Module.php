@@ -700,9 +700,6 @@ class Module extends ModuleAbstract
             new phpc_log10_kernel(),
 
             new phpc_floor_kernel(),
-            new phpc_is_finite_kernel(),
-            new phpc_is_infinite_kernel(),
-            new phpc_is_nan_kernel(),
             new phpc_sqrt_kernel(),
             new sys_get_temp_dir(),
             new sys_getloadavg(),
@@ -1250,7 +1247,6 @@ class Module extends ModuleAbstract
                 $context->registerFunction($name, $fn);
             }
         }
-        $i32 = $context->getTypeFromString('int32');
         $doublePtr = $context->getTypeFromString('double*');
         $i32Ptr = $context->getTypeFromString('int32*');
         foreach ([
@@ -1261,15 +1257,6 @@ class Module extends ModuleAbstract
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
                 $ft = $context->context->functionType($double, false, ...$params);
-                $fn = $context->module->addFunction($name, $ft);
-                $context->registerFunction($name, $fn);
-            }
-        }
-        foreach (['isnan', 'isfinite', 'isinf'] as $name) {
-            try {
-                $context->lookupFunction($name);
-            } catch (\Throwable $e) {
-                $ft = $context->context->functionType($i32, false, $double);
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);
             }
