@@ -8,10 +8,12 @@ use PHPCompiler\ext\standard\FloorJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** floor() JIT: always FloorJitHelper via JitVmHelperLink + phpc_floor_kernel (#15128, #27004). */
+/**
+ * floor() NestedJIT via JitVmHelperLink::ensureBridge (#27650 / peer deg2rad #27400).
+ */
 final class FloorRuntimeShrinkTest extends TestCase
 {
-    public function testFloorUsesJitHelperNotLibcLookup(): void
+    public function testFloorUsesJitHelperNotKernel(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/floor.php');
         $this->assertStringContainsString('MathFloor::invoke', $builtin);
@@ -20,50 +22,56 @@ final class FloorRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFloor.php');
         $this->assertStringContainsString('FloorJitHelper', $bridge);
         $this->assertStringContainsString('phpc_floor', $bridge);
-        $this->assertStringContainsString('JitFloorKernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitFloorKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
-    public function testFloorJitHelperDelegatesToKernel(): void
+    public function testFloorJitHelperInlinesNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FloorJitHelper.php');
-        $this->assertStringContainsString('phpc_floor_kernel', $source);
-        $this->assertMatchesRegularExpression(
-            '/function floorArgv\(.*?\{[^}]*phpc_floor_kernel/s',
-            $source
-        );
+        $this->assertStringContainsString('(int) $num', $source);
+        $this->assertStringNotContainsString('9007199254740992.0', $source);
+        $this->assertStringNotContainsString('self::INTEGRAL', $source);
+        $this->assertStringNotContainsString('phpc_floor_kernel', $source);
         $this->assertDoesNotMatchRegularExpression(
             '/function floorArgv\(.*?\{[^}]*VmMath::floor/s',
             $source
         );
-
-        if (!\function_exists('phpc_floor_kernel')) {
-            $this->markTestSkipped('phpc_floor_kernel requires compiler runtime');
-        }
-        $this->assertSame(
-            VmMath::floor(1.7),
-            FloorJitHelper::floorArgv(1.7)
+        $this->assertDoesNotMatchRegularExpression(
+            '/function floorArgv\(.*?\{[^}]*\\\\floor\(/s',
+            $source
         );
+
+        $this->assertSame(VmMath::floor(1.7), FloorJitHelper::floorArgv(1.7));
+        $this->assertSame(VmMath::floor(-1.2), FloorJitHelper::floorArgv(-1.2));
         $this->assertSame(
-            VmMath::floor(-1.2),
-            FloorJitHelper::floorArgv(-1.2)
+            \unpack('P', \pack('d', VmMath::floor(-0.0)))[1],
+            \unpack('P', \pack('d', FloorJitHelper::floorArgv(-0.0)))[1]
         );
     }
 
-    public function testContextAllowlistsFloorKernelForNestedJit(): void
+    public function testKernelFilesRemoved(): void
+    {
+        $root = __DIR__.'/../..';
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitFloorKernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_floor_kernel.php');
+    }
+
+    public function testContextNoLongerAllowlistsFloorKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('phpc_floor_kernel', $source);
-        $this->assertStringContainsString('phpc_ceil_kernel', $source);
+        $this->assertStringNotContainsString('phpc_floor_kernel', $source);
+        $this->assertStringNotContainsString('phpc_ceil_kernel', $source);
     }
 
-    public function testSpineBundleIncludesFloorJitHelper(): void
+    public function testSpineBundleIncludesFloorHelperWithoutKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FloorJitHelper.php', $spine);
         $this->assertStringContainsString('MathFloor.php', $spine);
-        $this->assertStringContainsString('JitFloorKernel.php', $spine);
-        $this->assertStringContainsString('phpc_floor_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitFloorKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_floor_kernel.php', $spine);
     }
 }
