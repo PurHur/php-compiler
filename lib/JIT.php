@@ -11387,16 +11387,20 @@ class JIT {
                                 $block->constants[$sendSlot]
                             );
                         } elseif (
-                            null === $sendValue->compileTimeLong
-                            && isset($block->constants[$sendSlot])
+                            isset($block->constants[$sendSlot])
                             && (
                                 \PHPCompiler\VM\Variable::TYPE_BOOLEAN === $block->constants[$sendSlot]->type
                                 || \PHPCompiler\VM\Variable::TYPE_INTEGER === $block->constants[$sendSlot]->type
+                                || \PHPCompiler\VM\Variable::TYPE_NULL === $block->constants[$sendSlot]->type
+                            )
+                            && (
+                                null === $sendValue->compileTimeLong
+                                || \PHPCompiler\VM\Variable::TYPE_NULL === $block->constants[$sendSlot]->type
                             )
                         ) {
-                            // Bool/int literal Temporary often lands as TYPE_VALUE without compileTimeLong;
-                            // rematerialize so header()/JitBoolArg/JitLongArg skip mid-function BB
-                            // diamonds after `(string)$arr[$k]` (#23427 SessionsWeb Location 303).
+                            // Bool/int/null literal Temporary often lands as TYPE_VALUE without
+                            // compileTimeLong / isNullConstant; rematerialize so builtins can fold
+                            // (json_decode assoc=null + JSON_THROW_ON_ERROR, #27623 / #23427).
                             $sendValue = JIT\VmConstantJit::toVariable(
                                 $this->context,
                                 $block->constants[$sendSlot]
