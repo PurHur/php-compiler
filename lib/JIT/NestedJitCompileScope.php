@@ -71,6 +71,7 @@ final class NestedJitCompileScope
         $savedArgs = $context->scope->args;
         $savedArgOperands = $context->scope->argOperands;
         $savedMagicCallMethodName = $context->scope->magicCallMethodName;
+        $savedMagicCallIsStatic = $context->scope->magicCallIsStatic;
         $savedPreserveNewResultOnNullCall = $context->scope->preserveNewResultOnNullCall;
         // Nested helper compile of ErrorSilence/etc. can mutate tryCatch->handlerStack while
         // lowering inside an outer try — DEP then loses catchable ValueError (#22680).
@@ -83,6 +84,7 @@ final class NestedJitCompileScope
         $context->scope->args = [];
         $context->scope->argOperands = [];
         $context->scope->magicCallMethodName = null;
+        $context->scope->magicCallIsStatic = false;
         $context->scope->preserveNewResultOnNullCall = false;
         $prevStubEnv = self::clearStubEnvForNestedHelperCompile();
         try {
@@ -103,6 +105,7 @@ final class NestedJitCompileScope
             $context->scope->args = $savedArgs;
             $context->scope->argOperands = $savedArgOperands;
             $context->scope->magicCallMethodName = $savedMagicCallMethodName;
+            $context->scope->magicCallIsStatic = $savedMagicCallIsStatic;
             $context->scope->preserveNewResultOnNullCall = $savedPreserveNewResultOnNullCall;
             $context->tryCatch->handlerStack = $savedHandlerStack;
             self::resyncNamedBindings($context);

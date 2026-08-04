@@ -27,8 +27,14 @@ class Scope {
     public ?Call $toCall = null;
     public array $args = [];
 
-    /** Original method name when dispatching via __call (#146, #4022). */
+    /** Original method name when dispatching via __call / __callStatic (#146, #4022). */
     public ?string $magicCallMethodName = null;
+
+    /**
+     * True when {@see $magicCallMethodName} was set by `__callStatic` (no `$this` prefix).
+     * Distinguishes static magic from instance `__call` when user args are Variables (#27517).
+     */
+    public bool $magicCallIsStatic = false;
 
     /** Resume LLVM symbol when calling a user generator (#3074). */
     public ?string $generatorResumeCallee = null;

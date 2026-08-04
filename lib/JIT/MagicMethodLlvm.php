@@ -253,6 +253,7 @@ final class MagicMethodLlvm
             return false;
         }
         $context->scope->magicCallMethodName = $methodName;
+        $context->scope->magicCallIsStatic = false;
         $context->scope->toCall = $context->resolveFunctionProxy($proxy);
         $context->scope->args = [$receiverVar];
 
@@ -272,6 +273,7 @@ final class MagicMethodLlvm
             return false;
         }
         $context->scope->magicCallMethodName = $methodName;
+        $context->scope->magicCallIsStatic = true;
         $context->scope->toCall = $context->resolveFunctionProxy($proxy);
         $context->scope->args = [];
 
@@ -279,11 +281,14 @@ final class MagicMethodLlvm
     }
 
     /**
-     * Rewrite instance `__call` outgoing args to `($this, $name, $arguments)`.
+     * Rewrite `__call` / `__callStatic` outgoing args to `($this?, $name, $arguments)`.
      *
      * Named args and compile-time named unpacks are packed into `$arguments` with
      * string keys preserved (Zend zend_object_handlers.c / #23336). Runtime unpack
      * that cannot be folded returns null so the caller keeps a non-magic path.
+     *
+     * Static vs instance is taken from {@see Scope::$magicCallIsStatic} — do not infer
+     * from whether `$argEntries[0]` is a Variable (user args are Variables; #27517).
      *
      * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
      * @param list<Operand|null>                                                          $argOperands
@@ -296,20 +301,15 @@ final class MagicMethodLlvm
         array $argEntries,
         array $argOperands
     ): ?array {
+        if ($context->scope->magicCallIsStatic) {
+            return self::rewriteOutgoingMagicCallArgsStatic($context, $methodName, $argEntries, $argOperands);
+        }
         if ([] === $argEntries) {
-            // Static `__callStatic` with no user args: still pass ($name, []).
-            $nameVar = self::stringVariable($context, $methodName);
-            $argsVar = self::packMagicArgumentsArray($context, []);
-
-            return [
-                [$nameVar, $argsVar],
-                [null, null],
-            ];
+            return null;
         }
         $receiver = $argEntries[0];
         if (!($receiver instanceof Variable)) {
-            // Static `__callStatic`: no receiver prefix — pack all entries as user args.
-            return self::rewriteOutgoingMagicCallArgsStatic($context, $methodName, $argEntries, $argOperands);
+            return null;
         }
         $userEntries = \array_slice($argEntries, 1);
         $userOperands = \array_slice($argOperands, 1);
