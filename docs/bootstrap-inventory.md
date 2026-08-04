@@ -28553,7 +28553,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIsCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/JitIsFiniteKernel.php`
 
@@ -37292,8 +37292,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 39)
-- new JITVariable (line 132)
-- new JITVariable (line 208)
+- new JITVariable (line 135)
+- new JITVariable (line 211)
 - 9 class method(s)
 
 ### `ext/standard/is_dir.php`
