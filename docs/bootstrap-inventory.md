@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6973 |
-| Phase A inventory files (M2 ratio SSOT) | 6973 |
+| PHP files on vm.php path | 6974 |
+| Phase A inventory files (M2 ratio SSOT) | 6974 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22401 |
+| Source constructs flagged (warnings) | 22410 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -427,7 +427,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 2 |
 | `ext/dom/JitDomImportNode.php` | 0 | 3 |
-| `ext/dom/JitDomInsertBefore.php` | 0 | 1 |
+| `ext/dom/JitDomInsertBefore.php` | 0 | 9 |
 | `ext/dom/JitDomInstanceMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomLoad.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTML.php` | 0 | 1 |
@@ -2651,6 +2651,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFputcsv.php` | 0 | 1 |
 | `ext/standard/JitFread.php` | 0 | 1 |
 | `ext/standard/JitFsGlob.php` | 0 | 1 |
+| `ext/standard/JitFsGlobKernel.php` | 0 | 1 |
 | `ext/standard/JitFseek.php` | 0 | 1 |
 | `ext/standard/JitFstat.php` | 0 | 1 |
 | `ext/standard/JitFsync.php` | 0 | 1 |
@@ -9613,7 +9614,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomInsertBefore.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new JITVariable (line 97)
+- new JITVariable (line 98)
+- new JITVariable (line 99)
+- new JITVariable (line 206)
+- new JITVariable (line 207)
+- new JITVariable (line 208)
+- new JITVariable (line 215)
+- new JITVariable (line 241)
+- 5 class method(s)
 
 ### `ext/dom/JitDomInstanceMethodKernel.php`
 
@@ -27932,7 +27941,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFsGlob.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
+
+### `ext/standard/JitFsGlobKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 16 class method(s)
 
 ### `ext/standard/JitFseek.php`
 
@@ -48162,25 +48176,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2601)
 - new Variable (line 2614)
 - new Variable (line 2813)
-- new VMVariable (line 4100)
-- new VMVariable (line 4120)
-- new VMVariable (line 4130)
-- new VMVariable (line 4150)
-- new ReflectionClassConstant (line 5880)
-- new Variable (line 6299)
-- new Variable (line 6325)
-- new Variable (line 6333)
-- new Variable (line 6356)
-- new Variable (line 6382)
-- new Variable (line 6390)
-- new Variable (line 6464)
-- new Literal (line 6481)
-- new Literal (line 6486)
-- new Literal (line 6491)
-- new Variable (line 6502)
-- new Variable (line 6535)
-- new Variable (line 6558)
-- new Variable (line 6929)
+- new VMVariable (line 4104)
+- new VMVariable (line 4124)
+- new VMVariable (line 4134)
+- new VMVariable (line 4154)
+- new ReflectionClassConstant (line 5887)
+- new Variable (line 6306)
+- new Variable (line 6332)
+- new Variable (line 6340)
+- new Variable (line 6363)
+- new Variable (line 6389)
+- new Variable (line 6397)
+- new Variable (line 6471)
+- new Literal (line 6488)
+- new Literal (line 6493)
+- new Literal (line 6498)
+- new Variable (line 6509)
+- new Variable (line 6542)
+- new Variable (line 6565)
+- new Variable (line 6936)
 - 296 class method(s)
 - 8 closure(s)
 

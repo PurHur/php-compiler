@@ -2453,6 +2453,7 @@ require_once __DIR__.'/../../../ext/standard/JitFprintf.php';
 require_once __DIR__.'/../../../ext/standard/JitFputcsv.php';
 require_once __DIR__.'/../../../ext/standard/JitFread.php';
 require_once __DIR__.'/../../../ext/standard/JitFsGlob.php';
+require_once __DIR__.'/../../../ext/standard/JitFsGlobKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitFseek.php';
 require_once __DIR__.'/../../../ext/standard/JitFstat.php';
 require_once __DIR__.'/../../../ext/standard/JitFsync.php';

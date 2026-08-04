@@ -10,19 +10,18 @@ use PHPCompiler\ext\standard\VmFsGlob;
 use PHPUnit\Framework\TestCase;
 
 /**
- * StringFsGlobVecJit routes through FsGlobJitHelper PHP not libc LLVM (#11515, #12909).
- * NestedJIT via JitVmHelperLink::ensureCompiled (#22205 / peer #22187).
+ * StringFsGlobVecJit: NestedJIT helper (embed) + libc JitFsGlobKernel (thin AOT) (#11515, #27235).
  */
 final class FsGlobVecRuntimeShrinkTest extends TestCase
 {
-    public function testStringFsGlobVecJitIsThinDispatcher(): void
+    public function testStringFsGlobVecJitDispatchesThinAotKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFsGlobVecJit.php');
-        $this->assertStringContainsString('FsGlobVecRuntime', $source);
+        $this->assertStringContainsString('JitFsGlobKernel', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('FsGlobVecRuntime::ensureLinked', $source);
         $this->assertStringNotContainsString('FsGlobVecStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('emitGlobVec', $source);
-        $this->assertStringNotContainsString('emitScandirVec', $source);
-        $this->assertLessThan(25, \substr_count($source, "\n") + 1);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFsGlobKernel.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/FsGlobVecStandaloneLlvm.php');
     }
 
@@ -34,18 +33,27 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertLessThan(70, \substr_count($source, "\n") + 1);
     }
 
-    public function testJitFsGlobUsesFsGlobJitHelperOnEmbedAndStandalone(): void
+    public function testJitFsGlobUsesKernelOnThinAotAndHelperOnEmbed(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFsGlob.php');
-        $this->assertStringContainsString('FsGlobVecRuntime::GLOB_HELPER', $source);
+        $this->assertStringContainsString('__phpc_glob_vec', $source);
+        $this->assertStringContainsString('collectList', $source);
         $this->assertStringContainsString('collectFromHelper', $source);
-        $this->assertStringNotContainsString('__phpc_glob_vec', $source);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('FsGlobVecRuntime::GLOB_HELPER', $source);
+    }
+
+    public function testJitFsGlobKernelEmitsLibcCollectors(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFsGlobKernel.php');
+        $this->assertStringContainsString('__phpc_glob_vec', $source);
+        $this->assertStringContainsString('__phpc_scandir_vec', $source);
+        $this->assertStringContainsString("'glob'", $source);
+        $this->assertStringContainsString("'scandir'", $source);
+        $this->assertStringNotContainsString('runtime/', $source);
     }
 
     public function testFsGlobJitHelperDelegatesToVmSsot(): void
@@ -53,21 +61,25 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FsGlobJitHelper.php');
         $this->assertStringContainsString('VmFsGlob::glob', $source);
         $this->assertStringContainsString('VmDir::scandir', $source);
-        $this->assertStringContainsString('VmFs::stringListToArray', $source);
+        $this->assertStringContainsString('?array', $source);
+        $this->assertStringNotContainsString('VmFs::stringListToArray', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\VM\\HashTable', $source);
     }
 
     public function testFsGlobJitHelperGlobArgvRoundTrip(): void
     {
-        $ht = FsGlobJitHelper::globArgv('*.php', 0);
-        $this->assertNotNull($ht);
-        $this->assertGreaterThan(0, $ht->getNumElements());
+        $list = FsGlobJitHelper::globArgv('composer.*', 0);
+        $this->assertNotNull($list);
+        $this->assertIsArray($list);
+        $this->assertGreaterThan(0, \count($list));
     }
 
     public function testFsGlobJitHelperScandirArgvRoundTrip(): void
     {
-        $ht = FsGlobJitHelper::scandirArgv('.', \SCANDIR_SORT_ASCENDING);
-        $this->assertNotNull($ht);
-        $this->assertGreaterThan(0, $ht->getNumElements());
+        $list = FsGlobJitHelper::scandirArgv('.', \SCANDIR_SORT_ASCENDING);
+        $this->assertNotNull($list);
+        $this->assertIsArray($list);
+        $this->assertGreaterThan(0, \count($list));
     }
 
     public function testFsGlobJitHelperMatchesVmGlob(): void
@@ -76,7 +88,7 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $this->assertIsArray($vm);
         $jit = FsGlobJitHelper::globArgv('composer.json', 0);
         $this->assertNotNull($jit);
-        $this->assertSame(\count($vm), $jit->getNumElements());
+        $this->assertSame(\count($vm), \count($jit));
     }
 
     public function testFsGlobJitHelperMatchesVmScandir(): void
@@ -85,6 +97,6 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $this->assertIsArray($vm);
         $jit = FsGlobJitHelper::scandirArgv('.', \SCANDIR_SORT_ASCENDING);
         $this->assertNotNull($jit);
-        $this->assertSame(\count($vm), $jit->getNumElements());
+        $this->assertSame(\count($vm), \count($jit));
     }
 }
