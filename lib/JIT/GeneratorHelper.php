@@ -204,6 +204,7 @@ final class GeneratorHelper
         }
 
         $context->generatorCatchDispatchEntry = [];
+        $handlerStackDepth = \count($context->tryCatch->handlerStack);
         $trySetup = [] !== $points ? GeneratorJitHelper::findTrySetupForYieldBlock($block, $points[0]['block']) : null;
         if (null !== $trySetup) {
             [$handlerBlock, , $tryIndex] = $trySetup;
@@ -226,6 +227,21 @@ final class GeneratorHelper
         for ($i = 0; $i < $n; ++$i) {
             $context->builder->positionAtEnd($caseBlocks[$i]);
             $prefixEntry = $caseBlocks[$i];
+            $point = $points[$i];
+            $pointBlock = $point['block'];
+            $yieldIdx = GeneratorJitHelper::opcodeIndex($pointBlock, $point['op']);
+            $catchDispatchBb = $context->generatorCatchDispatchEntry[spl_object_id($pointBlock)] ?? null;
+            // Wire try/catch before pending-throw inject so dispatchBb is in this function (#27518).
+            if (0 === $i && $pointBlock !== $block) {
+                $prefixEntry = self::compileEntryLeadIn($jit, $func, $block, $point, $prefixEntry);
+            }
+            // Generator::throw() → has_pending_throw: inject into try/catch (fiber-shaped, #27518).
+            $prefixEntry = GeneratorIteratorJitHelper::emitInjectPendingThrow(
+                $jit,
+                $func,
+                $stateParam,
+                $prefixEntry
+            );
             // Zend zend_generator_resume: apply send()/next() value into the prior yield
             // expression result before running code after that yield (#26819).
             if ($i > 0 && 'yield' === $points[$i - 1]['kind']) {
@@ -235,18 +251,19 @@ final class GeneratorHelper
                     $points[$i - 1]['block'],
                     $points[$i - 1]['op'],
                     $stateParam,
-                    $caseBlocks[$i]
+                    $prefixEntry
                 );
             }
-            $point = $points[$i];
-            $pointBlock = $point['block'];
-            $yieldIdx = GeneratorJitHelper::opcodeIndex($pointBlock, $point['op']);
-            if (0 === $i && $pointBlock !== $block) {
-                $prefixEntry = self::compileEntryLeadIn($jit, $func, $block, $point, $prefixEntry);
+            // Catch-body yield points resume via gen_catch_resume_* — do not lower catch
+            // opcodes into gen_case_* (that left terminators mid-block, #27518).
+            if (null !== $catchDispatchBb) {
+                $context->builder->positionAtEnd($prefixEntry);
+                if (null === $prefixEntry->getTerminator()) {
+                    $context->builder->branch($catchDispatchBb);
+                }
             } elseif ($i > 0 && $points[$i - 1]['block'] !== $pointBlock) {
                 self::compileCrossBlockResumePrefix($jit, $func, $points[$i - 1], $point, $prefixEntry);
             }
-            $catchDispatchBb = $context->generatorCatchDispatchEntry[spl_object_id($pointBlock)] ?? null;
             $prefixStart = GeneratorJitHelper::resumePrefixStart($points, $i);
             if ('yield' === $point['kind']) {
                 $yieldBb = $catchDispatchBb ?? $prefixEntry;
@@ -297,6 +314,10 @@ final class GeneratorHelper
         $context->compilingGeneratorResume = false;
         $context->generatorStateParam = null;
         $context->generatorCatchDispatchEntry = [];
+        // beginTryGeneratorResume pushes handlers that finishPostTryOpcode never pops (#27518).
+        while (\count($context->tryCatch->handlerStack) > $handlerStackDepth) {
+            TryCatchHelper::popHandler($context);
+        }
 
         $context->functions[$lc] = $func;
         $context->functionReturnType[$lc] = 'int64';

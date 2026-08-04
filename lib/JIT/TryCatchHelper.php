@@ -407,6 +407,16 @@ final class TryCatchHelper
 
         $handler = self::resolveThrowHandler($context);
         if (null !== $handler && null !== $handler->dispatchBb) {
+            $dispatchParent = $handler->dispatchBb->getParent();
+            // Skip leaked resume-function handlers — cross-function br fails verify (#27518).
+            if (
+                !$dispatchParent instanceof Function_
+                || !self::sameLlvmFunction($func, $dispatchParent)
+            ) {
+                $handler = null;
+            }
+        }
+        if (null !== $handler && null !== $handler->dispatchBb) {
             $i32 = $context->getTypeFromString('int32');
             $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
             $hasBool = $builder->icmp(
@@ -794,8 +804,8 @@ final class TryCatchHelper
         return $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
     }
 
-    /** True when two Function_ wrappers refer to the same LLVM function (#24105). */
-    private static function sameLlvmFunction(Function_ $a, Function_ $b): bool
+    /** True when two Function_ wrappers refer to the same LLVM function (#24105, #27518). */
+    public static function sameLlvmFunction(Function_ $a, Function_ $b): bool
     {
         if ($a === $b) {
             return true;
@@ -902,8 +912,9 @@ final class TryCatchHelper
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
             }
-            $builder->branch($catchBodyBb);
-
+            // Generator/fiber catch arms with a dedicated resume entry: branch there only.
+            // Branching to catchBodyBb first then again to catchResume put a second terminator
+            // on try_catch_setup (#27518 — "Terminator found in the middle of a basic block").
             if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
                 $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
                 if (null !== $catchResume) {
@@ -926,6 +937,7 @@ final class TryCatchHelper
                     continue;
                 }
             }
+            $builder->branch($catchBodyBb);
             $catchTail = $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
             // Prefer an open insert block — the return value may be a mid-block that already
             // branches to the arm's real tail (#23641 AFTER).
