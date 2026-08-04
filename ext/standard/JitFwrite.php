@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fwrite() via __compiler_fwrite (native FILE* writes). */
+/**
+ * LLVM lowering for fwrite() via __compiler_fwrite (native FILE* writes).
+ *
+ * Call-site ensureLinked so fprintf/vfprintf/fwrite AOT without a prior fopen
+ * still emit the StreamIo kernel body (#27677; same shape as JitFopen #9142).
+ */
 final class JitFwrite
 {
     /** Omitted fwrite() length: write the full string (not -1, which means zero bytes per php-src). */
@@ -22,6 +28,8 @@ final class JitFwrite
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $dataStr, Value $lengthLong): Value
     {
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+
         $bytes = $context->builder->call(
             $context->lookupFunction('__compiler_fwrite'),
             $handleLong,
