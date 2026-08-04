@@ -3758,6 +3758,69 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('splfileinfo' === $lcname) {
+            // Thin AOT: pathname/filename for getFilename (#27289 / #27422).
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, ['Stringable']);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'getfilename', 'getpathname', 'getpath', 'getbasename',
+                'getextension', '__tostring',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
+        if ('directoryiterator' === $lcname || 'filesystemiterator' === $lcname) {
+            // Thin AOT: snapshot `__spl_ht` + Iterator; current() returns $this (#27289).
+            // php-src ext/spl/spl_directory.c — DirectoryIterator / FilesystemIterator.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('SeekableIterator');
+            $this->setInterfaceExtends('SeekableIterator', ['Iterator', 'Traversable']);
+            $ifaces = [
+                'Stringable',
+                'SeekableIterator',
+                'Traversable',
+                'Iterator',
+            ];
+            $this->setClassInterfaces($displayName, $ifaces);
+            // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_POS, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
+            if ('filesystemiterator' === $lcname) {
+                $this->seedExternalClassConstants($id, [
+                    'CURRENT_AS_PATHNAME' => 32,
+                    'CURRENT_AS_FILEINFO' => 0,
+                    'CURRENT_AS_SELF' => 16,
+                    'CURRENT_MODE_MASK' => 0x000000F0,
+                    'KEY_AS_PATHNAME' => 0,
+                    'KEY_AS_FILENAME' => 256,
+                    'KEY_MODE_MASK' => 0x00000F00,
+                    'NEW_CURRENT_AND_KEY' => 256,
+                    'SKIP_DOTS' => 4096,
+                    'UNIX_PATHS' => 8192,
+                    'FOLLOW_SYMLINKS' => 0x00004000,
+                    'OTHER_MODE_MASK' => 0x00007000,
+                ]);
+            }
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $methods = [
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
+                'isdot', 'getfilename', 'getpathname', 'getpath', 'gettype', '__tostring',
+            ];
+            if ('filesystemiterator' === $lcname) {
+                $methods = array_merge($methods, ['getflags', 'setflags']);
+            }
+            foreach ($methods as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('recursiveiteratoriterator' === $lcname) {
             // Thin AOT: LEAVES_ONLY flatten into `__spl_ht` at construct (#26775).
             // php-src ext/spl/spl_iterators.c — OuterIterator + Iterator.

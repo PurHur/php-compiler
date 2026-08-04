@@ -1069,6 +1069,26 @@ class Context {
         $this->functionProxies['appenditerator::__construct'] = new Call\AppendIteratorMethod('__construct');
         $this->functionProxies['appenditerator::append'] = new Call\AppendIteratorMethod('append');
         $this->functionProxies['regexiterator::__construct'] = new Call\RegexIteratorConstruct();
+        // DirectoryIterator / FilesystemIterator / SplFileInfo — dir snapshot + Iterator (#27289).
+        $this->type->object->lookup('SplFileInfo');
+        $this->type->object->lookup('DirectoryIterator');
+        $this->type->object->lookup('FilesystemIterator');
+        foreach (['DirectoryIterator', 'FilesystemIterator'] as $diClass) {
+            $diLc = strtolower($diClass);
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next',
+                'isDot', 'getFilename',
+            ] as $diMethod) {
+                $this->functionProxies[$diLc.'::'.strtolower($diMethod)] = new Call\DirectoryIteratorMethod(
+                    $diMethod,
+                    $diClass
+                );
+            }
+        }
+        $this->functionProxies['splfileinfo::getfilename'] = new Call\DirectoryIteratorMethod(
+            'getFilename',
+            'SplFileInfo'
+        );
         // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
         foreach ([
             'splmaxheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MAX,
