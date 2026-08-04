@@ -3406,10 +3406,14 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CLASS_NAME, Variable::TYPE_STRING);
         }
         // HashContext JIT handle slot must exist before allocate() (ext/hash/JitHashContext.php, #3357).
+        // __hcKey / __hcHmac required for standalone AOT final + hash_copy (#23585, #27264) —
+        // undeclared props auto-define as TYPE_STRING and reject the HMAC int64 store.
         if ('hashcontext' === $lcname) {
             $this->defineProperty($id, '__hcId', Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, '__hcAlgo', Variable::TYPE_STRING);
             $this->defineProperty($id, '__hcBuf', Variable::TYPE_STRING);
+            $this->defineProperty($id, '__hcKey', Variable::TYPE_STRING);
+            $this->defineProperty($id, '__hcHmac', Variable::TYPE_NATIVE_LONG);
         }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
@@ -4353,11 +4357,14 @@ class Object_ extends Type {
             return Variable::TYPE_HASHTABLE;
         }
 
-        // HashContext JIT handle (ext/hash/JitHashContext.php, #3357).
-        if ('hashcontext' === $lcClass && '__hcid' === $lcName) {
+        // HashContext JIT handle (ext/hash/JitHashContext.php, #3357 / #27264).
+        if ('hashcontext' === $lcClass && ('__hcid' === $lcName || '__hchmac' === $lcName)) {
             return Variable::TYPE_NATIVE_LONG;
         }
-        if ('hashcontext' === $lcClass && ('__hcalgo' === $lcName || '__hcbuf' === $lcName)) {
+        if (
+            'hashcontext' === $lcClass
+            && ('__hcalgo' === $lcName || '__hcbuf' === $lcName || '__hckey' === $lcName)
+        ) {
             return Variable::TYPE_STRING;
         }
 

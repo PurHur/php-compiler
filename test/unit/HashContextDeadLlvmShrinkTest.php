@@ -48,4 +48,19 @@ final class HashContextDeadLlvmShrinkTest extends TestCase
         $this->assertStringContainsString('finalLoweringStandaloneAot', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
+
+    /**
+     * Undeclared HashContext props auto-define as TYPE_STRING; HMAC int64 store then fails (#27264).
+     */
+    public function testObjectDeclaresHashContextKeyAndHmacSlots(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString("defineProperty(\$id, '__hcKey', Variable::TYPE_STRING)", $source);
+        $this->assertStringContainsString("defineProperty(\$id, '__hcHmac', Variable::TYPE_NATIVE_LONG)", $source);
+        $this->assertMatchesRegularExpression(
+            "/'__hcid' === \\\$lcName \|\| '__hchmac' === \\\$lcName/",
+            $source
+        );
+        $this->assertStringContainsString("'__hckey' === \$lcName", $source);
+    }
 }
