@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitIterableArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -63,6 +64,7 @@ final class iterator_to_array extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('iterator_to_array() requires one or two arguments in this compiler build');
         }
+        ExceptionBridge::ensureLinked($context);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             // Always TypeError — typed Traversable|array (php-src-strict; #21893).
             // Do not soft-null / empty-array; InternalStrictArg must not gate this.
@@ -74,6 +76,10 @@ final class iterator_to_array extends Internal
                 'null'
             );
 
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
+        // Constant-boxed null (`$x = null`) — reject before Iterator/Generator protocol (#27634).
+        if (!JitIterableArg::guardIterableOperand($context, $args[0], 'iterator_to_array')) {
             return $context->getTypeFromString('__value__*')->constNull();
         }
         if (2 === $argc) {

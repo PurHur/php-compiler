@@ -6,22 +6,31 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
+use PHPCompiler\JIT\JitIterableArg;
+use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
  * LLVM JIT lowering for iterator_to_array() (issue #3179, php-src ext/spl/iterator.c).
+ *
+ * Boxed `__value__` (e.g. `$x = null`) must TypeError before Iterator/Generator
+ * protocol lowering — otherwise thin AOT hits `__generator_resume` (#27634).
  */
 final class JitIteratorToArray
 {
     public static function invoke(Context $context, Variable $iterator, bool $preserveKeys): Value
     {
+        ExceptionBridge::ensureLinked($context);
+
         return self::wrapHashTable($context, self::materializeHashtable($context, $iterator, $preserveKeys));
     }
 
@@ -63,12 +72,149 @@ final class JitIteratorToArray
         bool $preserveKeys,
         ?string $containerUserType = null
     ): Value {
+        if (Variable::TYPE_NULL === $iterator->type || ($iterator->isNullConstant ?? false)) {
+            JitIterableArg::emitIterableTypeErrorAndAbort(
+                $context,
+                'iterator_to_array',
+                0,
+                'iterator',
+                'null'
+            );
+
+            return HashTableHelper::alloc($context);
+        }
+        if (Variable::TYPE_VALUE === $iterator->type || JitValueBox::isValueOperand($iterator)) {
+            return self::materializeBoxedValue($context, $iterator, $preserveKeys, $containerUserType);
+        }
+
+        return self::materializeKnownTyped($context, $iterator, $preserveKeys, $containerUserType);
+    }
+
+    /**
+     * Runtime tag dispatch for boxed operands — null/non-iterable TypeError before
+     * Generator rewind proxies (#27634 / peer #27633).
+     */
+    private static function materializeBoxedValue(
+        Context $context,
+        Variable $arg,
+        bool $preserveKeys,
+        ?string $containerUserType
+    ): Value {
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $i8 = $context->getTypeFromString('int8');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $htTag = $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false);
+        $arrayTag = $i8->constInt(VmVariable::TYPE_ARRAY & 0x7f, false);
+        $objTag = $i8->constInt(VmVariable::TYPE_OBJECT & 0x7f, false);
+        $nullTag = $i8->constInt(VmVariable::TYPE_NULL & 0x7f, false);
+        $isHt = $context->builder->icmp(Builder::INT_EQ, $kind, $htTag);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $kind, $arrayTag);
+        $isObj = $context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $kind, $nullTag);
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $htPtrTy);
+        $htBb = BasicBlockHelper::append($context, 'ita_box_ht');
+        $afterHt = BasicBlockHelper::append($context, 'ita_box_after_ht');
+        $arrBb = BasicBlockHelper::append($context, 'ita_box_array');
+        $afterArr = BasicBlockHelper::append($context, 'ita_box_after_array');
+        $objBb = BasicBlockHelper::append($context, 'ita_box_obj');
+        $afterObj = BasicBlockHelper::append($context, 'ita_box_after_obj');
+        $nullBb = BasicBlockHelper::append($context, 'ita_box_null');
+        $badBb = BasicBlockHelper::append($context, 'ita_box_bad');
+        $done = BasicBlockHelper::append($context, 'ita_box_done');
+
+        $context->builder->branchIf($isHt, $htBb, $afterHt);
+
+        $context->builder->positionAtEnd($htBb);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $htVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
+        $context->builder->store(
+            self::materializeFromArray($context, $htVar, $preserveKeys),
+            $resultSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterHt);
+        $context->builder->branchIf($isArray, $arrBb, $afterArr);
+
+        $context->builder->positionAtEnd($arrBb);
+        // TYPE_ARRAY boxes still expose an HT via the same reader as hashtable (#27634).
+        $arrHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $arrVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $arrHt);
+        $context->builder->store(
+            self::materializeFromArray($context, $arrVar, $preserveKeys),
+            $resultSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArr);
+        $context->builder->branchIf($isObj, $objBb, $afterObj);
+
+        $context->builder->positionAtEnd($objBb);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        $context->builder->store(
+            self::materializeKnownTyped($context, $objVar, $preserveKeys, $containerUserType),
+            $resultSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterObj);
+        $context->builder->branchIf($isNull, $nullBb, $badBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        JitIterableArg::emitIterableTypeErrorAndAbort(
+            $context,
+            'iterator_to_array',
+            0,
+            'iterator',
+            'null'
+        );
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($badBb);
+        JitIterableArg::emitIterableTypeErrorAndAbort(
+            $context,
+            'iterator_to_array',
+            0,
+            'iterator',
+            JitOperandTypeLabel::givenLabel($context, $arg)
+        );
+        $context->builder->store(HashTableHelper::alloc($context), $resultSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function materializeKnownTyped(
+        Context $context,
+        Variable $iterator,
+        bool $preserveKeys,
+        ?string $containerUserType = null
+    ): Value {
         $opUserType = $context->jitIteratorToArrayIteratorOperand?->type?->userType ?? null;
         $userType = $containerUserType
             ?? (is_string($opUserType) && '' !== $opUserType ? $opUserType : null)
             ?? $iterator->userType
             ?? $iterator->classUserType
-            ?? (Variable::TYPE_OBJECT === $iterator->type || Variable::TYPE_VALUE === $iterator->type
+            ?? (Variable::TYPE_OBJECT === $iterator->type
                 ? ($iterator->compileTimeString ?? $iterator->objectPropertyClassName)
                 : null);
         if (\PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($userType)) {
