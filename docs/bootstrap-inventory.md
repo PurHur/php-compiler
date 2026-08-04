@@ -44770,12 +44770,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 57)
-- new Variable (line 120)
-- new Variable (line 214)
-- new Variable (line 216)
-- 10 class method(s)
+- new Variable (line 59)
+- new Variable (line 68)
+- new Variable (line 131)
+- new Variable (line 225)
+- new Variable (line 227)
+- 11 class method(s)
 
 ### `lib/JIT/ArrayColumnLlvm.php`
 
