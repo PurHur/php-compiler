@@ -7,9 +7,19 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3301 @covers issue #3284 */
+/** @covers issue #3301 @covers issue #3284 @covers issue #27677 */
 final class FprintfFscanfBuiltinTest extends TestCase
 {
+    public function testJitFwriteEnsuresStreamIoLinkedForUserScriptAot(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFwrite.php');
+        $this->assertStringContainsString(
+            'StreamIoRuntime::ensureLinkedForUserScriptLowering',
+            $source,
+            'fprintf/vfprintf AOT without fopen must pull __compiler_fwrite (#27677)'
+        );
+    }
+
     public function testFprintfBuiltinRegisteredOnVm(): void
     {
         $runtime = new Runtime();
