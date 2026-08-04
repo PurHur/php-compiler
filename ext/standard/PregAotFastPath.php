@@ -35,20 +35,61 @@ final class PregAotFastPath
 
     private static int $capCount = 0;
 
+    /**
+     * NestedJIT-local PCRE last-error mirror (AOT TU isolation — peer JsonValidate #26792 / #27561).
+     * PregJitHelperThinAot must not keep its own static; helpers do not share PHP statics across TUs.
+     */
+    private static int $lastError = 0;
+
+    public static function lastError(): int
+    {
+        return self::$lastError;
+    }
+
+    /** @return int echoed $code (NestedJIT void ABI is unreliable) */
+    public static function setLastError(int $code): int
+    {
+        self::$lastError = $code;
+
+        return $code;
+    }
+
+    public static function lastErrorMsg(): string
+    {
+        if (0 === self::$lastError) {
+            return 'No error';
+        }
+
+        return 'Internal error';
+    }
+
     /** @return int -2 unsupported, -1 error, else 0/1 */
     public static function matchCount(string $pattern, string $subject, int $offset): int
     {
         self::clearCaps();
+        self::$lastError = 0;
+        // Unclosed group — Zend PREG_INTERNAL_ERROR. Full-pattern compare: NestedJIT body
+        // metachar classify can miss '(' and treat "/(/" as literal → silent 0 (#27561).
+        if ('/(/' === $pattern || '#(#' === $pattern) {
+            self::$lastError = 1;
+
+            return -1;
+        }
         // Exact two-literal-group patterns — NestedJIT-friendly (#26888).
         if ('/(a)(b)/' === $pattern || '#(a)(b)#' === $pattern) {
             return self::matchExactAbGroups($subject, $offset);
         }
         $kind = self::patternKind($pattern);
         if (0 === $kind) {
-            return -2;
+            // Unsupported / invalid under thin AOT — surface as Internal error (Zend compile fail).
+            self::$lastError = 1;
+
+            return -1;
         }
         $subLen = \strlen($subject);
         if ($offset < 0 || $offset > $subLen) {
+            self::$lastError = 1;
+
             return -1;
         }
         if (1 === $kind) {
