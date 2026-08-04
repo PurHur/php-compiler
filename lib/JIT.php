@@ -12023,6 +12023,12 @@ class JIT {
                         $parentOp = $block->getOperand($op->arg2);
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
+                        // Before compileClass: user subclass methods / nested `new` need parent
+                        // thin-AOT slots (`__spl_ht`, …) already on the child (#27565).
+                        $this->context->type->object->inheritParentInstanceProperties(
+                            $this->context->scope->classId,
+                            strtolower(ltrim($parentOp->value, '\\'))
+                        );
                     }
                     if ([] !== $op->attributeNames || [] !== $op->attributeEntries) {
                         $attrNames = [];
@@ -17488,6 +17494,8 @@ class JIT {
             || ($toCall instanceof JIT\Call\SplHtPosIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\EmptyIteratorMethod
+                && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\FilterIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\SplHeapMethod
                 && '__construct' === strtolower($toCall->methodName()))
