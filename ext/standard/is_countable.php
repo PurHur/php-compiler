@@ -114,15 +114,18 @@ final class is_countable extends Internal
             $context->builder->structGep($loaded, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Value-box writers store JIT type tags (TYPE_HASHTABLE=135, TYPE_OBJECT=133),
+        // not VM TYPE_ARRAY=6. Mask IS_REFCOUNTED like __value__readHashtable (#26977 / #27552).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isArray = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_ARRAY, false)
+            $kind,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
         );
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
         );
         $objectCheck = self::jitValueBoxObjectImplementsCountable($context, $loaded);
         $arrayBool = $context->constantFromBool(true);
