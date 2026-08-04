@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6980 |
-| Phase A inventory files (M2 ratio SSOT) | 6980 |
+| PHP files on vm.php path | 6988 |
+| Phase A inventory files (M2 ratio SSOT) | 6988 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22427 |
+| Source constructs flagged (warnings) | 22435 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1999,11 +1999,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
+| `ext/sockets/JitSocketClose.php` | 0 | 1 |
+| `ext/sockets/JitSocketCreate.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
 | `ext/sockets/Module.php` | 0 | 38 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
+| `ext/sockets/SocketCloseJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
+| `ext/sockets/SocketCreateJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketImportStreamJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketSerializeDeny.php` | 0 | 3 |
@@ -5424,6 +5428,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketCloseRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SocketCreateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketExportStreamRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SortRuntime.php` | 0 | 1 |
@@ -5603,6 +5609,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketClose.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSocketCreate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketExportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketImportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodium.php` | 0 | 1 |
@@ -23345,6 +23353,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/sockets/JitSocketClose.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `ext/sockets/JitSocketCreate.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/sockets/JitSocketExportStream.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23402,10 +23420,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/sockets/SocketCloseJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/sockets/SocketConstants.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/sockets/SocketCreateJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/sockets/SocketExportStreamJitHelper.php`
 
@@ -23443,8 +23471,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 87)
 - new Variable (line 232)
 - new ObjectEntry (line 233)
-- new Variable (line 353)
-- 26 class method(s)
+- new Variable (line 413)
+- 30 class method(s)
 
 ### `ext/sockets/VmSocketAddrinfo.php`
 
@@ -23464,7 +23492,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSockets.php`
 
 **Warnings** (review for bootstrap subset):
-- 40 class method(s)
+- 42 class method(s)
 
 ### `ext/sockets/socket_accept.php`
 
@@ -46790,6 +46818,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/SocketCloseRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `lib/JIT/Builtin/SocketCreateRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/SocketExportStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47688,6 +47726,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `lib/JIT/Builtin/StringSocketClose.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StringSocketCreate.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSocketExportStream.php`
 
