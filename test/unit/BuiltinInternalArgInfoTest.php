@@ -563,6 +563,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
     }
 
+    /** php-src ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324). */
+    public function testPregGrepPregMatchAllReflectionReturnUnions(): void
+    {
+        $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_grep'));
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_match_all'));
+    }
+
     /** php-src ext/libxml/libxml.stub.php — array return; ?bool $use_errors = null (#25844). */
     public function testLibxmlErrorControlReflectionStubs(): void
     {
