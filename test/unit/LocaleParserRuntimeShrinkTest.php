@@ -31,11 +31,19 @@ final class LocaleParserRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('canonicalizeArgv', $source);
     }
 
+    public function testLocaleDefaultJitHelperDelegatesSemantics(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/intl/LocaleDefaultJitHelper.php');
+        $this->assertStringContainsString('getDefaultArgv', $source);
+        $this->assertStringContainsString('GetenvLookupJitHelper::fromEnviron', $source);
+    }
+
     public function testSpineBundleIncludesLocaleParserHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('LocaleParser.php', $spine);
         $this->assertStringContainsString('LocaleParserJitHelper.php', $spine);
+        $this->assertStringContainsString('LocaleDefaultJitHelper.php', $spine);
         $this->assertStringContainsString('JitLocaleParser.php', $spine);
     }
 }

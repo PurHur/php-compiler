@@ -829,9 +829,8 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
-            // locale_get_default()/locale_get_*/locale_gated: JIT lowering deferred (#9576, #5125, #19670).
-            if (str_contains($name, 'locale_get_default')
-                || str_contains($name, 'locale_get_parts')
+            // locale_get_parts/locale_gated: JIT lowering deferred (#5125, #19670). locale_get_default via LocaleParser (#27369).
+            if (str_contains($name, 'locale_get_parts')
                 || str_contains($name, 'locale_gated')) {
                 continue;
             }

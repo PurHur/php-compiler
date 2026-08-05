@@ -89,4 +89,9 @@ final class JitLocaleParser
             JitStringBuiltinArg::lowerZparamStr($context, $locale, $function, 0, 'locale')
         );
     }
+
+    public static function getDefault(Context $context): Value
+    {
+        return LocaleParser::invokeDefault($context);
+    }
 }

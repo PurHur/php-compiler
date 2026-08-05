@@ -11,8 +11,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for locale_get_primary_language/region/script + canonicalize via LocaleParserJitHelper
- * (#17072, #20101, #20760).
+ * JIT/AOT link for locale_get_primary_language/region/script + canonicalize + get_default via LocaleParserJitHelper
+ * (#17072, #20101, #20760, #27369).
  *
  * Always {@see JitVmHelperLink} → {@see \PHPCompiler\ext\intl\LocaleParserJitHelper}
  * (no user-script NestedJIT defer early-return — thin/user-script AOT must still link bridges).
@@ -29,6 +29,8 @@ final class LocaleParser
 
     private const ABI_CANONICALIZE = '__phpc_jit_locale_canonicalize';
 
+    private const ABI_DEFAULT = '__phpc_jit_locale_get_default';
+
     private const HELPER_PATH = '/ext/intl/LocaleParserJitHelper.php';
 
     private const PRIMARY_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::primaryLanguageArgv';
@@ -39,12 +41,21 @@ final class LocaleParser
 
     private const CANONICALIZE_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::canonicalizeArgv';
 
+    private const DEFAULT_HELPER = 'PHPCompiler\\ext\\intl\\LocaleDefaultJitHelper::getDefaultArgv';
+
+    private const HELPER_PATH_DEFAULT = '/ext/intl/LocaleDefaultJitHelper.php';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::PRIMARY_HELPER,
         self::REGION_HELPER,
         self::SCRIPT_HELPER,
         self::CANONICALIZE_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const COMPILED_DEFAULT_HELPERS = [
+        self::DEFAULT_HELPER,
     ];
 
     public static function invokePrimaryLanguage(Context $context, Value $locale): Value
@@ -84,6 +95,15 @@ final class LocaleParser
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CANONICALIZE),
             $locale
+        );
+    }
+
+    public static function invokeDefault(Context $context): Value
+    {
+        self::ensureDefaultLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_DEFAULT)
         );
     }
 
@@ -127,19 +147,36 @@ final class LocaleParser
         );
     }
 
+    public static function ensureDefaultLinked(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            self::ABI_DEFAULT,
+            'locale_get_default_bridge_entry',
+            self::DEFAULT_HELPER,
+            [],
+            self::HELPER_PATH_DEFAULT,
+            self::COMPILED_DEFAULT_HELPERS
+        );
+    }
+
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::ensurePrimaryLanguageLinked($context);
         self::ensureRegionLinked($context);
         self::ensureScriptLinked($context);
         self::ensureCanonicalizeLinked($context);
+        self::ensureDefaultLinked($context);
     }
 
     private static function ensureBridge(
         Context $context,
         string $abi,
         string $entry,
-        string $helper
+        string $helper,
+        ?array $paramTypes = null,
+        ?string $helperPath = null,
+        ?array $compiledHelpers = null
     ): void {
         if (NestedJitCompileScope::isActive()) {
             return;
@@ -154,15 +191,16 @@ final class LocaleParser
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $strPtr = $context->getTypeFromString('__string__*');
+        $params = $paramTypes ?? [$strPtr];
         JitVmHelperLink::ensureBridge(
             $context,
             $abi,
             $entry,
-            [$strPtr],
+            $params,
             $strPtr,
             $helper,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
+            $helperPath ?? self::HELPER_PATH,
+            $compiledHelpers ?? self::COMPILED_HELPERS,
             '#20101'
         );
         if (null !== $savedInsert) {
