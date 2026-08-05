@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * strcoll() for compiled JIT/AOT modules (#13566 phase 2, php-in-PHP).
+ * strcoll() helper retained for VM/unit SSOT (#13566). Thin AOT/JIT uses
+ * {@see \PHPCompiler\JIT\Builtin\StringStrcoll} libc trampoline (#27059) —
+ * NestedJIT mis-reads {@see __string__*} under AOT (silent 0).
  *
  * SSOT: {@see VmLocaleCollate::strcoll()}
  * php-src: ext/standard/string.c — PHP_FUNCTION(strcoll)
