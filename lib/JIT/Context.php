@@ -1134,6 +1134,16 @@ class Context {
             'getFilename',
             'SplFileInfo'
         );
+        // GlobIterator — glob snapshot + Iterator (#27422).
+        $this->type->object->lookup('GlobIterator');
+        foreach ([
+            '__construct', 'rewind', 'valid', 'current', 'key', 'next',
+            'getFilename', 'count',
+        ] as $giMethod) {
+            $this->functionProxies['globiterator::'.strtolower($giMethod)] = new Call\GlobIteratorMethod(
+                $giMethod
+            );
+        }
         // SplHeap family — `__spl_heap` + Iterator protocol for thin AOT foreach (#26784).
         foreach ([
             'splmaxheap' => \PHPCompiler\ext\spl\SplHeapBuiltin::KIND_MAX,

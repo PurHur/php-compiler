@@ -1505,6 +1505,7 @@ class Type extends Builtin {
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
+        GlobIteratorSnapshotRuntime::ensureLinked($this->context);
         StringFsGlob::ensureLinked($this->context);
         StringFsDir::ensureLinked($this->context);
         StatCache::ensureLinked($this->context);
