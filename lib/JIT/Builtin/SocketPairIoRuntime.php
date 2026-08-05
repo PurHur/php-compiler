@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for socket_create_pair / socket_write / socket_read (#27423).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SocketCreate #27394).
+ * socketpair(2) is a direct libc LLVM call — NestedJIT FFI cannot read out-params (#27423).
+ * Registration + write/read stay in {@see \PHPCompiler\ext\sockets\SocketCreateJitHelper}.
  */
 final class SocketPairIoRuntime
 {
@@ -22,13 +25,14 @@ final class SocketPairIoRuntime
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::H.'::createAndRegisterArgv',
+        self::H.'::registerOwnedArgv',
+        self::H.'::fdForHandleArgv',
         self::H.'::writeArgv',
         self::H.'::readArgv',
         self::H.'::readFailedArgv',
-        // Same NestedJIT unit as #27394 — compile create* too if pair runs first.
+        self::H.'::markReadFailedArgv',
+        self::H.'::clearReadFailedArgv',
         self::H.'::createFdArgv',
-        self::H.'::registerOwnedArgv',
     ];
 
     /** @var list<string> */
@@ -55,6 +59,7 @@ final class SocketPairIoRuntime
         }
 
         self::ensureJitHelperCompiled($context);
+        self::ensureLibcSocketpair($context);
         self::implementCreatePairBridge($context);
         self::implementWriteBridge($context);
         self::implementReadBridge($context);
@@ -66,6 +71,23 @@ final class SocketPairIoRuntime
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function ensureLibcSocketpair(Context $context): void
+    {
+        $existing = $context->module->getNamedFunction('socketpair');
+        if (null !== $existing) {
+            $context->registerFunction('socketpair', $existing);
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i32Ptr = $i32->pointerType(0);
+        $fn = $context->module->addFunction(
+            'socketpair',
+            $context->context->functionType($i32, false, $i32, $i32, $i32, $i32Ptr)
+        );
+        $context->registerFunction('socketpair', $fn);
     }
 
     private static function implementCreatePairBridge(Context $context): void
@@ -88,21 +110,41 @@ final class SocketPairIoRuntime
             );
 
         $entry = $fn->appendBasicBlock('socket_create_pair_entry');
+        $failBb = $fn->appendBasicBlock('socket_create_pair_fail');
+        $okBb = $fn->appendBasicBlock('socket_create_pair_ok');
         $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
+
+        $sv = BasicBlockHelper::entryAlloca(
             $context,
-            self::helperFunction($context, self::H.'::createAndRegisterArgv'),
-            [
-                $fn->getParam(0),
-                $fn->getParam(1),
-                $fn->getParam(2),
-                $fn->getParam(3),
-                $fn->getParam(4),
-            ]
+            $i32->arrayType(2)
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)
+        $zero = $i32->constInt(0, false);
+        $sv0Ptr = $context->builder->gep($sv, $zero, $zero);
+        $domain = $context->builder->trunc($fn->getParam(0), $i32);
+        $type = $context->builder->trunc($fn->getParam(1), $i32);
+        $protocol = $context->builder->trunc($fn->getParam(2), $i32);
+        $rc = $context->builder->call(
+            $context->lookupFunction('socketpair'),
+            $domain,
+            $type,
+            $protocol,
+            $sv0Ptr
         );
+        $ok = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(0, false));
+        $context->builder->branchIf($ok, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($i32->constInt(0, false));
+
+        $context->builder->positionAtEnd($okBb);
+        $fd0 = $context->builder->zext($context->builder->load($sv0Ptr), $i64);
+        $sv1Ptr = $context->builder->gep($sv, $zero, $i32->constInt(1, false));
+        $fd1 = $context->builder->zext($context->builder->load($sv1Ptr), $i64);
+        $reg = self::helperFunction($context, self::H.'::registerOwnedArgv');
+        $context->builder->call($reg, $fn->getParam(3), $fd0, $fn->getParam(0));
+        $context->builder->call($reg, $fn->getParam(4), $fd1, $fn->getParam(0));
+        $context->builder->returnValue($i32->constInt(1, false));
+
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -117,7 +159,11 @@ final class SocketPairIoRuntime
             return;
         }
 
+        \PHPCompiler\JIT\LibcExtern::register($context);
+
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
             ? $probe
@@ -127,15 +173,46 @@ final class SocketPairIoRuntime
             );
 
         $entry = $fn->appendBasicBlock('socket_write_entry');
+        $failBb = $fn->appendBasicBlock('socket_write_fail');
+        $okBb = $fn->appendBasicBlock('socket_write_ok');
         $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
+
+        // Resolve fd via NestedJIT; perform write(2) in LLVM — NestedJIT FFI send/write
+        // returns 0 under thin AOT (#27423).
+        $rawFd = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::writeArgv'),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
+            self::helperFunction($context, self::H.'::fdForHandleArgv'),
+            [$fn->getParam(0)]
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        $fdI64 = JitNestedHelperCoerce::coerceBridgeResult($context, $rawFd, $i64);
+        $fdOk = $context->builder->icmp(Builder::INT_SGE, $fdI64, $i64->constInt(0, true));
+        $context->builder->branchIf($fdOk, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($i64->constInt(-1, true));
+
+        $context->builder->positionAtEnd($okBb);
+        $str = $fn->getParam(1);
+        $reqLen = $fn->getParam(2);
+        $stringMap = $context->structFieldMap['__string__'];
+        $data = $context->builder->structGep($str, $stringMap['value']);
+        $strLen = $context->builder->zext(
+            $context->builder->load($context->builder->structGep($str, $stringMap['length'])),
+            $i64
         );
+        $useReq = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGT, $reqLen, $i64->constInt(0, true)),
+            $context->builder->icmp(Builder::INT_SLT, $reqLen, $strLen)
+        );
+        $len = $context->builder->select($useReq, $reqLen, $strLen);
+        $n = $context->builder->call(
+            $context->lookupFunction('write'),
+            $context->builder->trunc($fdI64, $i32),
+            $context->builder->pointerCast($data, $i8p),
+            $len
+        );
+        $context->builder->returnValue($n);
+
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -150,8 +227,13 @@ final class SocketPairIoRuntime
             return;
         }
 
+        \PHPCompiler\JIT\LibcExtern::register($context);
+
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
+        $sizeT = $context->getTypeFromString('size_t');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
@@ -160,15 +242,66 @@ final class SocketPairIoRuntime
             );
 
         $entry = $fn->appendBasicBlock('socket_read_entry');
+        $failBb = $fn->appendBasicBlock('socket_read_fail');
+        $okBb = $fn->appendBasicBlock('socket_read_ok');
         $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
+
+        $rawFd = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::H.'::readArgv'),
-            [$fn->getParam(0), $fn->getParam(1)]
+            self::helperFunction($context, self::H.'::fdForHandleArgv'),
+            [$fn->getParam(0)]
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
+        $fdI64 = JitNestedHelperCoerce::coerceBridgeResult($context, $rawFd, $i64);
+        $fdOk = $context->builder->icmp(Builder::INT_SGE, $fdI64, $i64->constInt(0, true));
+        $context->builder->branchIf($fdOk, $okBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->call(
+            self::helperFunction($context, self::H.'::markReadFailedArgv')
         );
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->call(
+            self::helperFunction($context, self::H.'::clearReadFailedArgv')
+        );
+        $length = $fn->getParam(1);
+        $buf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->truncOrBitCast($length, $sizeT)
+        );
+        $n = $context->builder->call(
+            $context->lookupFunction('read'),
+            $context->builder->trunc($fdI64, $i32),
+            $buf,
+            $length
+        );
+        $neg = $context->builder->icmp(Builder::INT_SLT, $n, $i64->constInt(0, true));
+        $errBb = $fn->appendBasicBlock('socket_read_err');
+        $goodBb = $fn->appendBasicBlock('socket_read_good');
+        $context->builder->branchIf($neg, $errBb, $goodBb);
+
+        $context->builder->positionAtEnd($errBb);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->call(
+            self::helperFunction($context, self::H.'::markReadFailedArgv')
+        );
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($goodBb);
+        $nSize = $context->builder->truncOrBitCast($n, $sizeT);
+        $str = $context->builder->call($context->lookupFunction('__string__alloc'), $nSize);
+        $stringMap = $context->structFieldMap['__string__'];
+        $dst = $context->builder->structGep($str, $stringMap['value']);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->pointerCast($dst, $i8p),
+            $buf,
+            $nSize
+        );
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->returnValue($str);
+
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }

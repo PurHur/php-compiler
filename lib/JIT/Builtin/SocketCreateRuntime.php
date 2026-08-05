@@ -26,10 +26,12 @@ final class SocketCreateRuntime
         self::H.'::createFdArgv',
         self::H.'::registerOwnedArgv',
         // Same NestedJIT unit as #27423 — compile pair/io too if create runs first.
-        self::H.'::createAndRegisterArgv',
+        self::H.'::fdForHandleArgv',
         self::H.'::writeArgv',
         self::H.'::readArgv',
         self::H.'::readFailedArgv',
+        self::H.'::markReadFailedArgv',
+        self::H.'::clearReadFailedArgv',
     ];
 
     /** @var list<string> */

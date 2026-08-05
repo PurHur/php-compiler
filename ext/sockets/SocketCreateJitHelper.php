@@ -9,6 +9,10 @@ namespace PHPCompiler\ext\sockets;
  *
  * One NestedJIT unit so {@see SocketsLibcThinAbi} FFI statics stay shared under thin AOT.
  * php-src: ext/sockets/sockets.c
+ *
+ * Note: socketpair(2) itself is invoked from LLVM (libc) in {@see \PHPCompiler\JIT\Builtin\SocketPairIoRuntime}
+ * because NestedJIT cannot reliably read FFI out-params (#27423). This helper only registers
+ * fds and performs write/read.
  */
 final class SocketCreateJitHelper
 {
@@ -36,54 +40,46 @@ final class SocketCreateJitHelper
     public static function registerOwnedArgv(int $objAddr, int $fd, int $domain): void
     {
         VmSocket::registerJitOwnedFd($objAddr, $fd, $domain);
+        // Helper-local map for pair write/read under NestedJIT (#27423).
+        if ($objAddr <= 0 || $fd < 0) {
+            return;
+        }
+        if (0 === self::$pairFdByHandle0) {
+            self::$pairFdByHandle0 = $objAddr;
+            self::$pairFd0 = $fd;
+
+            return;
+        }
+        self::$pairFdByHandle1 = $objAddr;
+        self::$pairFd1 = $fd;
     }
 
-    /**
-     * socketpair(2) + register two JIT Socket object addresses (#27423).
-     *
-     * @return int 1 on success, 0 on failure
-     */
-    public static function createAndRegisterArgv(
-        int $domain,
-        int $type,
-        int $protocol,
-        int $objAddr0,
-        int $objAddr1
-    ): int {
-        // Skip available() — NestedJIT bool return from available() is unreliable here;
-        // socket()/socketpair() already null-check ffi() (#27423).
-        $fds = SocketsLibcThinAbi::socketpair($domain, $type, $protocol);
-        if (false === $fds) {
-            VmSockets::recordLibcErrno(null);
+    /** Resolve Socket object handle to owned fd (-1 if missing). */
+    public static function fdForHandleArgv(int $handle): int
+    {
+        $fd = self::fdForHandle($handle);
 
-            return 0;
-        }
-        if ($objAddr0 <= 0 || $objAddr1 <= 0) {
-            SocketsLibcThinAbi::close($fds[0]);
-            SocketsLibcThinAbi::close($fds[1]);
-
-            return 0;
-        }
-        VmSocket::registerJitOwnedFd($objAddr0, $fds[0], $domain);
-        VmSocket::registerJitOwnedFd($objAddr1, $fds[1], $domain);
-
-        return 1;
+        return null === $fd ? -1 : $fd;
     }
 
     /** @return int bytes written, or -1 on failure */
     public static function writeArgv(int $handle, string $data, int $length): int
     {
-        $fd = VmSocket::fdForLookupKey($handle);
+        $fd = self::fdForHandle($handle);
         if (null === $fd) {
+            return -1;
+        }
+        $payloadLen = \strlen($data);
+        if ($payloadLen < 1) {
             return -1;
         }
         if ($length < 0) {
             throw new \ValueError('socket_write(): Argument #3 ($length) must be greater than or equal to 0');
         }
-        if ($length > \strlen($data)) {
-            $length = \strlen($data);
+        if ($length > 0 && $length < $payloadLen) {
+            $payloadLen = $length;
         }
-        $n = SocketsLibcThinAbi::send($fd, $data, $length, 0);
+        $n = SocketsLibcThinAbi::send($fd, $data, $payloadLen, 0);
 
         return $n < 0 ? -1 : $n;
     }
@@ -96,7 +92,7 @@ final class SocketCreateJitHelper
     public static function readArgv(int $handle, int $length): string
     {
         self::$readFailed = false;
-        $fd = VmSocket::fdForLookupKey($handle);
+        $fd = self::fdForHandle($handle);
         if (null === $fd) {
             self::$readFailed = true;
 
@@ -115,10 +111,40 @@ final class SocketCreateJitHelper
         return $data;
     }
 
+    public static function markReadFailedArgv(): void
+    {
+        self::$readFailed = true;
+    }
+
+    public static function clearReadFailedArgv(): void
+    {
+        self::$readFailed = false;
+    }
+
     public static function readFailedArgv(): int
     {
         return self::$readFailed ? 1 : 0;
     }
 
+    private static function fdForHandle(int $handle): ?int
+    {
+        if ($handle > 0 && $handle === self::$pairFdByHandle0 && self::$pairFd0 >= 0) {
+            return self::$pairFd0;
+        }
+        if ($handle > 0 && $handle === self::$pairFdByHandle1 && self::$pairFd1 >= 0) {
+            return self::$pairFd1;
+        }
+
+        return VmSocket::fdForLookupKey($handle);
+    }
+
     private static bool $readFailed = false;
+
+    private static int $pairFdByHandle0 = 0;
+
+    private static int $pairFdByHandle1 = 0;
+
+    private static int $pairFd0 = -1;
+
+    private static int $pairFd1 = -1;
 }

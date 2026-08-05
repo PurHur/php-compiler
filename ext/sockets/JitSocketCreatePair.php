@@ -94,6 +94,7 @@ final class JitSocketCreatePair
             $pairPtr,
             $ht
         );
+        $context->refcount->addref($ht);
         JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(1, false));
         $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBb);
