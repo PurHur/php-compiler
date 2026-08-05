@@ -1131,6 +1131,102 @@ final class VmImapCore
     }
 
     /**
+     * imap_uid() — sequence number → UID (local mbox: UID == msgno) (#27815).
+     */
+    public static function uid(ObjectEntry $object, int $msgNo): int|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        if ($msgNo < 1 || $msgNo > \count($st['messages'])) {
+            return false;
+        }
+
+        return $msgNo;
+    }
+
+    /**
+     * imap_msgno() — UID → sequence number (local mbox: UID == msgno) (#27815).
+     */
+    public static function msgno(ObjectEntry $object, int $messageUid): int
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return 0;
+        }
+        if ($messageUid < 1 || $messageUid > \count($st['messages'])) {
+            return 0;
+        }
+
+        return $messageUid;
+    }
+
+    /**
+     * imap_num_recent() — recent message count (#27815).
+     */
+    public static function numRecent(ObjectEntry $object): int
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return 0;
+        }
+        // Local mbox v1 does not track RECENT flags — always 0 (Zend mbox often same).
+
+        return 0;
+    }
+
+    /**
+     * imap_reopen() — rebind connection to another local mailbox (#27815).
+     */
+    public static function reopen(
+        ObjectEntry $object,
+        string $mailbox,
+        int $flags,
+        int $retries
+    ): bool {
+        unset($flags, $retries);
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = $mailbox;
+        if (preg_match('#^\{php-compiler-mbox\}(.+)$#i', $mailbox, $m)) {
+            $path = $m[1];
+        } elseif (str_starts_with($mailbox, '{')) {
+            $msg = "Couldn't reopen stream {$mailbox}";
+            self::pushError('No IMAP protocol client available for remote mailbox (v1 local-mbox only)');
+            self::pushError($msg);
+            self::warnImap('imap_reopen(): '.$msg);
+
+            return false;
+        }
+        if (!is_file($path) || !is_readable($path)) {
+            $msg = "Couldn't reopen stream {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_reopen(): '.$msg);
+
+            return false;
+        }
+        try {
+            $messages = ImapMboxEngine::parseFile($path);
+        } catch (\Throwable $e) {
+            $msg = "Couldn't reopen stream {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_reopen(): '.$msg);
+
+            return false;
+        }
+        self::$state[$object->id]['mailbox'] = $path;
+        self::$state[$object->id]['messages'] = $messages;
+        self::$state[$object->id]['deleted'] = [];
+        self::$state[$object->id]['flags'] = [];
+        // Keep subscribed/acl across reopen (same connection object).
+
+        return true;
+    }
+
+    /**
      * imap_setflag_full() — set message flags (#27800).
      */
     public static function setFlagFull(
