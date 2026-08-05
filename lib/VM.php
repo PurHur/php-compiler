@@ -17066,8 +17066,9 @@ restart:
     protected function initClosureCall(Frame $frame, ClosureState $state): void
     {
         if (null !== $state->methodName && null !== $state->methodReceiver) {
-            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
-                $frame->calledClass = $state->boundScopeClass;
+            $calledScope = $this->closureCalledScopeClass($state);
+            if (null !== $calledScope && '' !== $calledScope) {
+                $frame->calledClass = $calledScope;
             }
             $this->initMethodCall($frame, $state->methodReceiver, $state->methodName);
             $frame->closureCall = null;
@@ -17081,8 +17082,9 @@ restart:
             && null !== $state->wrappedFunc
             && null === $state->methodReceiver
         ) {
-            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
-                $frame->calledClass = $state->boundScopeClass;
+            $calledScope = $this->closureCalledScopeClass($state);
+            if (null !== $calledScope && '' !== $calledScope) {
+                $frame->calledClass = $calledScope;
             }
             $frame->magicCallMethodName = $state->methodName;
             $frame->call = $state->wrappedFunc;
@@ -17094,8 +17096,9 @@ restart:
             return;
         }
         if (null !== $state->wrappedFunc) {
-            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
-                $frame->calledClass = $state->boundScopeClass;
+            $calledScope = $this->closureCalledScopeClass($state);
+            if (null !== $calledScope && '' !== $calledScope) {
+                $frame->calledClass = $calledScope;
             }
             $frame->call = $state->wrappedFunc;
             $frame->closureCall = null;

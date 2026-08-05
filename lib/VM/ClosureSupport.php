@@ -195,7 +195,10 @@ final class ClosureSupport
                 return self::wrapState($ctx, self::fromNewClassCallable($ctx, $frame, substr($name, 4)));
             }
             if (str_contains($name, '::')) {
-                return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name, $fromCallableApi));
+                return self::wrapState(
+                    $ctx,
+                    self::fromStaticStringCallable($ctx, $frame, $name, $fromCallableApi, $scope)
+                );
             }
 
             return self::wrapState($ctx, self::fromFunctionName($ctx, $name, $fromCallableApi));
@@ -563,7 +566,8 @@ final class ClosureSupport
         Context $ctx,
         Frame $frame,
         string $callable,
-        bool $fromCallableApi = false
+        bool $fromCallableApi = false,
+        ?string $scope = null
     ): ClosureState {
         [$className, $methodName] = explode('::', $callable, 2);
         $lcClass = self::resolveClassScopeName($className, $frame, $ctx);
@@ -673,10 +677,34 @@ final class ClosureSupport
 
         // Named class is called-scope for LSB (zend_closures.c): Closure::fromCallable([B::class, 'foo'])
         // / 'B::foo' / FCC B::foo(...) must resolve static:: to B, not declaring class A (#24431).
+        // self::/parent:: FCC: method resolve uses declaring/parent, but called_scope stays the
+        // creation frame's late-static class (B::viaSelf → self::foo keeps B) (#27835).
         $state = ClosureState::fromWrappedFunc($class->methods[$methodLc]);
         $state->boundScopeClass = $namedClass->name;
+        self::applyScopedStaticFccCalledScope($state, $frame, $scope, $className);
 
         return $state;
+    }
+
+    /**
+     * Preserve creation-time LSB for self::/parent:: static FCC (#27835, zend_closures.c).
+     *
+     * Named Class::method FCC freezes called_scope to that class; self/parent keep the
+     * enclosing frame's called_scope (distinct from scope/ce used for method resolve).
+     */
+    private static function applyScopedStaticFccCalledScope(
+        ClosureState $state,
+        Frame $frame,
+        ?string $scope,
+        string $originalClassName
+    ): void {
+        $lc = strtolower($scope ?? $originalClassName);
+        if ('self' !== $lc && 'parent' !== $lc) {
+            return;
+        }
+        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $state->boundCalledScopeClass = $frame->calledClass;
+        }
     }
 
     private static function fromArrayCallable(
@@ -775,7 +803,8 @@ final class ClosureSupport
                 $ctx,
                 $frame,
                 $ctx->classes[$scopeLc]->name.'::'.$methodName,
-                $fromCallableApi
+                $fromCallableApi,
+                $scope
             );
         }
 

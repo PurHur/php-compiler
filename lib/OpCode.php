@@ -370,9 +370,11 @@ class OpCode {
     /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
     public bool $staticCallParentScope = false;
     /**
-     * TYPE_FROM_CALLABLE: scoped `parent::` / `self::` instance FCC (#17655, #26630, zend_compile.c).
+     * TYPE_FROM_CALLABLE: scoped `parent::` / `self::` FCC (#17655, #26630, #27835, zend_compile.c).
      *
-     * null = virtual/`static::` or `$obj->m(...)`; `'parent'` / `'self'` pin the resolve class.
+     * null = virtual/`static::` or `$obj->m(...)` / named `Class::m(...)`;
+     * `'parent'` / `'self'` pin the resolve class and (for static methods) preserve creation-time
+     * late-static called_scope when the Class::method string was baked to a FQCN.
      */
     public ?string $fromCallableScope = null;
     /**

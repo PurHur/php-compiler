@@ -42939,6 +42939,11 @@ class Compiler {
             $this->throwCompileError('Cannot create Closure for new expression');
         }
 
+        $scopeKeyword = null;
+        if (2 === $expr->kind && null !== $expr->class) {
+            $scopeKeyword = $this->firstClassCallableScopeKeyword($expr->class);
+        }
+
         if (1 === $expr->kind) {
             if ($expr->name instanceof Operand\Literal) {
                 $callableSlot = $this->compileFirstClassFunctionNameSlot($expr->name, $block);
@@ -42957,6 +42962,11 @@ class Compiler {
             $result,
             $callableSlot
         );
+        // Bake self/parent → fqcn for AOT/JIT lookup, but keep the keyword so VM can preserve
+        // creation-time late-static called_scope (B::viaSelf with self::foo → B, not A) (#27835).
+        if ('self' === $scopeKeyword || 'parent' === $scopeKeyword) {
+            $fromCallable->fromCallableScope = $scopeKeyword;
+        }
         // FCC Error throw site needs opcode line for getLine() (#24397, zend_exceptions.c).
         $this->assignSourceMetadata($fromCallable, $expr);
 
