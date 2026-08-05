@@ -485,8 +485,9 @@ final class JitFilter
 
     public static function validateUrl(Context $context, JITVariable $value): Value
     {
-        StringFilterUrl::ensureLinked($context);
         if (JITVariable::TYPE_VALUE === $value->type) {
+            StringFilterUrl::ensureLinked($context);
+
             return self::boxValueValidateUrl($context, $value);
         }
 
@@ -501,6 +502,30 @@ final class JitFilter
             return $ptr;
         }
 
+        // Compile-time string — fold via VmFilter SSOT (NestedJIT ?string returns are
+        // corrupt under thin AOT; #27206 / peer EMAIL #27068 / BOOL #26853).
+        $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
+        if (null !== $lit) {
+            if (!VmFilter::isValidUrlSubset($lit)) {
+                JitValueBox::writeBool($context, $slot, $falseVal);
+
+                return $ptr;
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load($context->constantStringFromString($lit))
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $owned
+            );
+
+            return $ptr;
+        }
+
+        // Dynamic string — NestedJIT isValidInt + return input __string__* (#27206).
+        StringFilterUrl::ensureLinked($context);
         $str = $context->helper->loadValue($value);
         $validated = $context->builder->call(
             $context->lookupFunction('__compiler_filter_validate_url'),

@@ -628,6 +628,7 @@ require_once __DIR__.'/../../../ext/filter/FilterIntJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterIpJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterMacJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterSanitizeJitHelper.php';
+require_once __DIR__.'/../../../ext/filter/FilterUrlValidate.php';
 require_once __DIR__.'/../../../ext/filter/FilterUrlJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/JitFilter.php';
 require_once __DIR__.'/../../../ext/filter/JitFilterId.php';
