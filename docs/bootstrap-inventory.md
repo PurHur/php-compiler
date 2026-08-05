@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7021 |
-| Phase A inventory files (M2 ratio SSOT) | 7021 |
+| PHP files on vm.php path | 7022 |
+| Phase A inventory files (M2 ratio SSOT) | 7022 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22575 |
+| Source constructs flagged (warnings) | 22576 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2982,6 +2982,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaKernel.php` | 0 | 1 |
+| `ext/standard/JitStreamMetaThinAot.php` | 0 | 1 |
 | `ext/standard/JitStreamModeKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
 | `ext/standard/JitStreamPath.php` | 0 | 1 |
@@ -29778,7 +29779,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamMetaKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
+
+### `ext/standard/JitStreamMetaThinAot.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
 
 ### `ext/standard/JitStreamModeKernel.php`
 
@@ -32842,18 +32848,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmErrorHandler.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 78)
-- new Variable (line 87)
-- new Variable (line 93)
-- new Variable (line 99)
-- new Variable (line 105)
-- new Variable (line 118)
-- new Variable (line 166)
-- new Variable (line 168)
-- new Variable (line 209)
-- new Variable (line 217)
-- new Variable (line 225)
-- new Variable (line 237)
+- new Variable (line 79)
+- new Variable (line 88)
+- new Variable (line 94)
+- new Variable (line 100)
+- new Variable (line 106)
+- new Variable (line 119)
+- new Variable (line 167)
+- new Variable (line 169)
+- new Variable (line 210)
+- new Variable (line 218)
+- new Variable (line 226)
+- new Variable (line 238)
 - 13 class method(s)
 
 ### `ext/standard/VmErrorLog.php`
@@ -52075,16 +52081,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 20719)
 - new Variable (line 20737)
 - new NoDiscardMetadata (line 20985)
-- new Variable (line 21182)
-- new Variable (line 21184)
-- new CompileError (line 21212)
-- new CompileError (line 21243)
-- new CompileError (line 21282)
-- new CompileError (line 21427)
-- new CompileError (line 21456)
-- new CompileError (line 21489)
-- new CompileError (line 21496)
-- new Variable (line 21734)
+- new Variable (line 21181)
+- new Variable (line 21183)
+- new CompileError (line 21211)
+- new CompileError (line 21242)
+- new CompileError (line 21281)
+- new CompileError (line 21426)
+- new CompileError (line 21455)
+- new CompileError (line 21488)
+- new CompileError (line 21495)
+- new Variable (line 21733)
 - 591 class method(s)
 - 31 closure(s)
 
@@ -55742,10 +55748,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ErrorReporter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 148)
-- new ScriptExit (line 534)
-- new Variable (line 706)
-- 53 class method(s)
+- new Variable (line 174)
+- new ScriptExit (line 560)
+- new Variable (line 732)
+- 54 class method(s)
 
 ### `lib/VM/ExceptionHandlerStack.php`
 
