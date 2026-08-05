@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitAtanKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for atan() via AtanJitHelper PHP (#15142).
+ * JIT/AOT link for atan() via AtanJitHelper PHP (#15142, #27017).
  *
- * Replaces libc `atan` LLVM lookup in ext/standard/atan.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see AtanJitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27016 asin shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering AtanJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(atan)
  */
 final class MathAtan
@@ -28,6 +31,8 @@ final class MathAtan
         self::ATAN_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'atan_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathAtan
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitAtanKernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathAtan
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_ATAN);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_ATAN, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_ATAN,
-            'atan_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::ATAN_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15142'
+            '#27017'
         );
     }
 }
