@@ -35,10 +35,24 @@ final class VmImapCore
      *     mailbox: string,
      *     closed: bool,
      *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
-     *     subscribed: array<string, true>
+     *     subscribed: array<string, true>,
+     *     deleted: array<int, true>
      * }>
      */
     private static array $state = [];
+
+    /** imap_status() SA_* flags (php_imap.h). */
+    public const SA_MESSAGES = 1;
+
+    public const SA_RECENT = 2;
+
+    public const SA_UNSEEN = 4;
+
+    public const SA_UIDNEXT = 8;
+
+    public const SA_UIDVALIDITY = 16;
+
+    public const SA_ALL = 31;
 
     public static function clearErrors(): void
     {
@@ -161,6 +175,7 @@ final class VmImapCore
             'closed' => false,
             'messages' => $messages,
             'subscribed' => [],
+            'deleted' => [],
         ];
         $var->object($object);
 
@@ -707,6 +722,7 @@ final class VmImapCore
         if ((false !== $openReal && $openReal === $pathReal) || $openPath === $path) {
             try {
                 self::$state[$object->id]['messages'] = ImapMboxEngine::parseFile($path);
+                self::$state[$object->id]['deleted'] = [];
             } catch (\Throwable $e) {
                 // Disk write succeeded; keep prior in-memory view on parse failure.
             }
@@ -892,6 +908,235 @@ final class VmImapCore
         return 'From '.$sender.' '.$date."\n";
     }
 
+    /**
+     * imap_delete() — mark message sequence deleted (#27783).
+     */
+    public static function deleteMessages(ObjectEntry $object, string $sequence, int $flags = 0): bool
+    {
+        unset($flags);
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $indices = self::parseSequence($sequence, \count($st['messages']));
+        if ([] === $indices) {
+            return false;
+        }
+        foreach ($indices as $idx) {
+            self::$state[$object->id]['deleted'][$idx] = true;
+        }
+
+        return true;
+    }
+
+    /**
+     * imap_undelete() — clear deleted marks (#27783).
+     */
+    public static function undeleteMessages(ObjectEntry $object, string $sequence, int $flags = 0): bool
+    {
+        unset($flags);
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $indices = self::parseSequence($sequence, \count($st['messages']));
+        if ([] === $indices) {
+            return false;
+        }
+        foreach ($indices as $idx) {
+            unset(self::$state[$object->id]['deleted'][$idx]);
+        }
+
+        return true;
+    }
+
+    /**
+     * imap_expunge() — drop deleted messages and rewrite local mbox (#27783).
+     */
+    public static function expunge(ObjectEntry $object): bool
+    {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        if ([] === $st['deleted']) {
+            return true;
+        }
+        $kept = [];
+        foreach ($st['messages'] as $i => $msg) {
+            if (!isset($st['deleted'][$i])) {
+                $kept[] = $msg;
+            }
+        }
+        $blob = '';
+        foreach ($kept as $msg) {
+            $raw = $msg['raw'];
+            if (!str_ends_with($raw, "\n")) {
+                $raw .= "\n";
+            }
+            $blob .= $raw;
+        }
+        if (false === @file_put_contents($st['mailbox'], $blob)) {
+            $msg = "Couldn't expunge mailbox {$st['mailbox']}";
+            self::pushError($msg);
+            self::warnImap('imap_expunge(): '.$msg);
+
+            return false;
+        }
+        self::$state[$object->id]['messages'] = $kept;
+        self::$state[$object->id]['deleted'] = [];
+
+        return true;
+    }
+
+    /**
+     * imap_ping() — connection still live (#27783).
+     */
+    public static function ping(ObjectEntry $object): bool
+    {
+        return null !== self::liveState($object);
+    }
+
+    /**
+     * imap_check() — mailbox overview object (#27783).
+     */
+    public static function check(ObjectEntry $object, Context $ctx): Variable|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        if (!isset($ctx->classes['stdclass'])) {
+            $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
+            $ce->isInternal = true;
+            $ctx->classes['stdclass'] = $ce;
+        }
+        $obj = new ObjectEntry($ctx->classes['stdclass']);
+        $obj->constructed = true;
+        $setStr = static function (string $name, string $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->string($value);
+        };
+        $setInt = static function (string $name, int $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->int($value);
+        };
+        $setStr('Date', gmdate('D, d M Y H:i:s +0000'));
+        $setStr('Driver', 'mbox');
+        $setStr('Mailbox', $st['mailbox']);
+        $setInt('Nmsgs', \count($st['messages']));
+        $setInt('Recent', 0);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($obj);
+
+        return $var;
+    }
+
+    /**
+     * imap_status() — status flags for a mailbox path (#27783).
+     */
+    public static function status(
+        ObjectEntry $object,
+        string $mailbox,
+        int $flags,
+        Context $ctx
+    ): Variable|false {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path || !is_file($path)) {
+            $msg = "Can't get status for mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_status(): '.$msg);
+
+            return false;
+        }
+        try {
+            $messages = ImapMboxEngine::parseFile($path);
+        } catch (\Throwable $e) {
+            $msg = "Can't get status for mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_status(): '.$msg);
+
+            return false;
+        }
+        if (!isset($ctx->classes['stdclass'])) {
+            $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
+            $ce->isInternal = true;
+            $ctx->classes['stdclass'] = $ce;
+        }
+        $obj = new ObjectEntry($ctx->classes['stdclass']);
+        $obj->constructed = true;
+        $setInt = static function (string $name, int $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->int($value);
+        };
+        $flags = 0 === $flags ? self::SA_ALL : $flags;
+        $n = \count($messages);
+        if ($flags & self::SA_MESSAGES) {
+            $setInt('messages', $n);
+        }
+        if ($flags & self::SA_RECENT) {
+            $setInt('recent', 0);
+        }
+        if ($flags & self::SA_UNSEEN) {
+            $setInt('unseen', $n);
+        }
+        if ($flags & self::SA_UIDNEXT) {
+            $setInt('uidnext', $n + 1);
+        }
+        if ($flags & self::SA_UIDVALIDITY) {
+            $setInt('uidvalidity', 1);
+        }
+        $flagsProp = $obj->allocateProperty('flags');
+        $flagsProp->int($flags);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($obj);
+
+        return $var;
+    }
+
+    /**
+     * @return list<int> 0-based indices
+     */
+    private static function parseSequence(string $sequence, int $messageCount): array
+    {
+        $sequence = trim($sequence);
+        if ('' === $sequence || $messageCount < 1) {
+            return [];
+        }
+        $out = [];
+        foreach (explode(',', $sequence) as $part) {
+            $part = trim($part);
+            if ('' === $part) {
+                continue;
+            }
+            if (preg_match('/^(\d+):(\d+)$/', $part, $m)) {
+                $a = (int) $m[1];
+                $b = (int) $m[2];
+                if ($a > $b) {
+                    $tmp = $a;
+                    $a = $b;
+                    $b = $tmp;
+                }
+                for ($n = $a; $n <= $b; ++$n) {
+                    if ($n >= 1 && $n <= $messageCount) {
+                        $out[$n - 1] = $n - 1;
+                    }
+                }
+            } elseif (preg_match('/^\d+$/', $part)) {
+                $n = (int) $part;
+                if ($n >= 1 && $n <= $messageCount) {
+                    $out[$n - 1] = $n - 1;
+                }
+            }
+        }
+
+        return array_values($out);
+    }
+
     public static function headerInfo(
         ObjectEntry $object,
         int $msgNo,
@@ -958,7 +1203,8 @@ final class VmImapCore
      *     mailbox: string,
      *     closed: bool,
      *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
-     *     subscribed: array<string, true>
+     *     subscribed: array<string, true>,
+     *     deleted: array<int, true>
      * }|null
      */
     private static function liveState(ObjectEntry $object): ?array
@@ -975,7 +1221,8 @@ final class VmImapCore
      *     mailbox: string,
      *     closed: bool,
      *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
-     *     subscribed: array<string, true>
+     *     subscribed: array<string, true>,
+     *     deleted: array<int, true>
      * }|null
      */
     private static function liveStateMutable(ObjectEntry $object): ?array
