@@ -52,6 +52,10 @@ class Module extends ModuleAbstract
             new imap_deletemailbox(),
             new imap_renamemailbox(),
             new imap_getmailboxes(),
+            new imap_append(),
+            new imap_savebody(),
+            new imap_bodystruct(),
+            new imap_fetchmime(),
         ];
     }
 }
