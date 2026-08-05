@@ -20,8 +20,9 @@ use PHPLLVM\Value;
  */
 final class JitGetClassMethods
 {
+    // php-src zend_builtin_functions.c — same wording as VM requireObjectOrValidClassName (#27706)
     private const TYPE_ERROR =
-        'get_class_methods(): Argument #1 ($object_or_class) must be of type object|string, %s given';
+        'get_class_methods(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given';
 
     public static function invoke(Context $context, JITVariable $classArg): Value
     {

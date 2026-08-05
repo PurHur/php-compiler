@@ -22,7 +22,8 @@ final class GetClassMethodsJitHelper
         $frame = VmExecutingFrame::requireFromActiveContext();
         $ctx = VmReflection::requireContext($frame);
 
-        VmClassHas::requireObjectOrClass($objectOrClass, 'get_class_methods', 'object_or_class');
+        // php-src zend_builtin_functions.c — “object or a valid class name”, not bare object|string (#27706)
+        VmClassHas::requireObjectOrValidClassName($objectOrClass, 'get_class_methods');
         $entry = VmReflection::requireClassForGetClassMethods($ctx, $objectOrClass);
 
         return VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT, $ctx, $frame);

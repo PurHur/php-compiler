@@ -36,7 +36,8 @@ final class get_class_methods_ extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'get_class_methods', 'object_or_class');
+        // php-src zend_builtin_functions.c — “object or a valid class name”, not bare object|string (#27706)
+        VmClassHas::requireObjectOrValidClassName($frame->calledArgs[0], 'get_class_methods');
         $entry = VmReflection::requireClassForGetClassMethods($ctx, $frame->calledArgs[0]);
         // Scope via $frame — zend_get_executed_scope() (#23530).
         $frame->returnVar->copyFrom(
