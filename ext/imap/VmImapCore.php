@@ -25,11 +25,17 @@ final class VmImapCore
 
     private static ?string $lastError = null;
 
+    /** c-client LATT_* bits used by imap_getmailboxes() (php_imap.h). */
+    public const LATT_NOINFERIORS = 0x01;
+
+    public const LATT_HASNOCHILDREN = 0x40;
+
     /**
      * @var array<int, array{
      *     mailbox: string,
      *     closed: bool,
-     *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>
+     *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
+     *     subscribed: array<string, true>
      * }>
      */
     private static array $state = [];
@@ -154,6 +160,7 @@ final class VmImapCore
             'mailbox' => $mailbox,
             'closed' => false,
             'messages' => $messages,
+            'subscribed' => [],
         ];
         $var->object($object);
 
@@ -170,6 +177,408 @@ final class VmImapCore
         unset(self::$state[$object->id]);
 
         return true;
+    }
+
+    /**
+     * imap_list() — local directory scan matching c-client * / % patterns (#27799).
+     *
+     * @return list<string>|false
+     */
+    public static function listMailboxes(ObjectEntry $object, string $reference, string $pattern): array|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $names = self::scanLocalMailboxes($st['mailbox'], $reference, $pattern, 'imap_list');
+        if (null === $names) {
+            return false;
+        }
+        if ([] === $names) {
+            return false;
+        }
+
+        return $names;
+    }
+
+    /**
+     * imap_lsub() — subscribed subset of {@see listMailboxes()} (#27799).
+     *
+     * @return list<string>|false
+     */
+    public static function listSubscribed(ObjectEntry $object, string $reference, string $pattern): array|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $names = self::scanLocalMailboxes($st['mailbox'], $reference, $pattern, 'imap_lsub');
+        if (null === $names) {
+            return false;
+        }
+        $out = [];
+        foreach ($names as $name) {
+            if (isset($st['subscribed'][$name])) {
+                $out[] = $name;
+            }
+        }
+        if ([] === $out) {
+            return false;
+        }
+
+        return $out;
+    }
+
+    /**
+     * imap_getmailboxes() — list + stdClass{name,delimiter,attributes} (#27799).
+     */
+    public static function getMailboxes(
+        ObjectEntry $object,
+        string $reference,
+        string $pattern,
+        Context $ctx
+    ): Variable|false {
+        $names = self::listMailboxes($object, $reference, $pattern);
+        if (false === $names) {
+            return false;
+        }
+        if (!isset($ctx->classes['stdclass'])) {
+            $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
+            $ce->isInternal = true;
+            $ctx->classes['stdclass'] = $ce;
+        }
+        $ht = new HashTable();
+        foreach ($names as $name) {
+            $obj = new ObjectEntry($ctx->classes['stdclass']);
+            $obj->constructed = true;
+            $nameProp = $obj->allocateProperty('name');
+            $nameProp->string($name);
+            $delimProp = $obj->allocateProperty('delimiter');
+            $delimProp->string('/');
+            $attrProp = $obj->allocateProperty('attributes');
+            $attrProp->int(self::LATT_NOINFERIORS | self::LATT_HASNOCHILDREN);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($ht);
+
+        return $var;
+    }
+
+    public static function subscribe(ObjectEntry $object, string $mailbox): bool
+    {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path || !is_file($path)) {
+            $msg = "Can't subscribe to {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_subscribe(): '.$msg);
+
+            return false;
+        }
+        self::$state[$object->id]['subscribed'][$path] = true;
+
+        return true;
+    }
+
+    public static function unsubscribe(ObjectEntry $object, string $mailbox): bool
+    {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path) {
+            $msg = "Can't unsubscribe from {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_unsubscribe(): '.$msg);
+
+            return false;
+        }
+        if (!isset(self::$state[$object->id]['subscribed'][$path])) {
+            $msg = "Can't unsubscribe from {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_unsubscribe(): '.$msg);
+
+            return false;
+        }
+        unset(self::$state[$object->id]['subscribed'][$path]);
+
+        return true;
+    }
+
+    public static function createMailbox(ObjectEntry $object, string $mailbox): bool
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path) {
+            $msg = "Can't create mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_createmailbox(): '.$msg);
+
+            return false;
+        }
+        if (is_file($path) || is_dir($path)) {
+            $msg = "Can't create mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_createmailbox(): '.$msg);
+
+            return false;
+        }
+        $dir = \dirname($path);
+        if (!is_dir($dir) || !is_writable($dir)) {
+            $msg = "Can't create mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_createmailbox(): '.$msg);
+
+            return false;
+        }
+        if (false === @file_put_contents($path, '')) {
+            $msg = "Can't create mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_createmailbox(): '.$msg);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function deleteMailbox(ObjectEntry $object, string $mailbox): bool
+    {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path || !is_file($path)) {
+            $msg = "Can't delete mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_deletemailbox(): '.$msg);
+
+            return false;
+        }
+        if ($path === realpath($st['mailbox']) || $path === $st['mailbox']) {
+            $msg = "Can't delete mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_deletemailbox(): '.$msg);
+
+            return false;
+        }
+        if (!@unlink($path)) {
+            $msg = "Can't delete mailbox {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_deletemailbox(): '.$msg);
+
+            return false;
+        }
+        unset(self::$state[$object->id]['subscribed'][$path]);
+
+        return true;
+    }
+
+    public static function renameMailbox(ObjectEntry $object, string $from, string $to): bool
+    {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $fromPath = self::normalizeLocalMailboxPath($from, $st['mailbox']);
+        $toPath = self::normalizeLocalMailboxPath($to, $st['mailbox']);
+        if (null === $fromPath || null === $toPath || !is_file($fromPath)) {
+            $msg = "Can't rename mailbox {$from}";
+            self::pushError($msg);
+            self::warnImap('imap_renamemailbox(): '.$msg);
+
+            return false;
+        }
+        if (is_file($toPath) || is_dir($toPath)) {
+            $msg = "Can't rename mailbox {$from}";
+            self::pushError($msg);
+            self::warnImap('imap_renamemailbox(): '.$msg);
+
+            return false;
+        }
+        $dir = \dirname($toPath);
+        if (!is_dir($dir) || !is_writable($dir)) {
+            $msg = "Can't rename mailbox {$from}";
+            self::pushError($msg);
+            self::warnImap('imap_renamemailbox(): '.$msg);
+
+            return false;
+        }
+        if (!@rename($fromPath, $toPath)) {
+            $msg = "Can't rename mailbox {$from}";
+            self::pushError($msg);
+            self::warnImap('imap_renamemailbox(): '.$msg);
+
+            return false;
+        }
+        $toReal = realpath($toPath);
+        if (false !== $toReal) {
+            $toPath = $toReal;
+        }
+        if (isset(self::$state[$object->id]['subscribed'][$fromPath])) {
+            unset(self::$state[$object->id]['subscribed'][$fromPath]);
+            self::$state[$object->id]['subscribed'][$toPath] = true;
+        }
+        if ($fromPath === $st['mailbox'] || $fromPath === realpath($st['mailbox'])) {
+            self::$state[$object->id]['mailbox'] = $toPath;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return list<string>|null null on hard failure (missing dir / remote)
+     */
+    private static function scanLocalMailboxes(
+        string $openMailbox,
+        string $reference,
+        string $pattern,
+        string $warnFn = 'imap_list'
+    ): ?array {
+        $dir = self::resolveListReference($reference, $openMailbox);
+        if (null === $dir) {
+            $msg = "Can't open mailbox {$reference}";
+            self::pushError($msg);
+            self::warnImap($warnFn.'(): '.$msg);
+
+            return null;
+        }
+        if (!is_dir($dir) || !is_readable($dir)) {
+            $msg = "Can't open mailbox {$reference}";
+            self::pushError($msg);
+            self::warnImap($warnFn.'(): '.$msg);
+
+            return null;
+        }
+        $entries = @scandir($dir);
+        if (false === $entries) {
+            $msg = "Can't open mailbox {$reference}";
+            self::pushError($msg);
+            self::warnImap($warnFn.'(): '.$msg);
+
+            return null;
+        }
+        $out = [];
+        $dir = rtrim($dir, '/');
+        foreach ($entries as $entry) {
+            if ('.' === $entry || '..' === $entry) {
+                continue;
+            }
+            $full = $dir.'/'.$entry;
+            if (!is_file($full)) {
+                continue;
+            }
+            $real = realpath($full);
+            if (false !== $real) {
+                $full = $real;
+            }
+            $base = basename($full);
+            if (self::matchMailboxPattern($base, $pattern) || self::matchMailboxPattern($full, $pattern)) {
+                $out[] = $full;
+            }
+        }
+        sort($out);
+
+        return $out;
+    }
+
+    private static function resolveListReference(string $reference, string $openMailbox): ?string
+    {
+        $reference = trim($reference);
+        if (str_starts_with($reference, '{') && !preg_match('#^\{php-compiler-mbox\}#i', $reference)) {
+            return null;
+        }
+        if (preg_match('#^\{php-compiler-mbox\}(.+)$#i', $reference, $m)) {
+            $reference = $m[1];
+        }
+        if ('' === $reference) {
+            $base = realpath($openMailbox);
+            if (false === $base) {
+                $base = $openMailbox;
+            }
+
+            return \dirname($base);
+        }
+        if (is_dir($reference)) {
+            $real = realpath($reference);
+
+            return false !== $real ? $real : $reference;
+        }
+        // Reference may be a mailbox path prefix — use its directory when it names a file.
+        if (is_file($reference)) {
+            $real = realpath($reference);
+
+            return \dirname(false !== $real ? $real : $reference);
+        }
+        $asDir = rtrim($reference, '/');
+        if (is_dir($asDir)) {
+            $real = realpath($asDir);
+
+            return false !== $real ? $real : $asDir;
+        }
+
+        return null;
+    }
+
+    private static function normalizeLocalMailboxPath(string $mailbox, string $openMailbox): ?string
+    {
+        $mailbox = trim($mailbox);
+        if (str_starts_with($mailbox, '{') && !preg_match('#^\{php-compiler-mbox\}#i', $mailbox)) {
+            return null;
+        }
+        if (preg_match('#^\{php-compiler-mbox\}(.+)$#i', $mailbox, $m)) {
+            $mailbox = $m[1];
+        }
+        if ('' === $mailbox) {
+            return null;
+        }
+        if ('/' !== $mailbox[0] && !preg_match('#^[A-Za-z]:[\\\\/]#', $mailbox)) {
+            $base = realpath($openMailbox);
+            if (false === $base) {
+                $base = $openMailbox;
+            }
+            $mailbox = \dirname($base).'/'.$mailbox;
+        }
+        if (is_file($mailbox) || is_dir($mailbox)) {
+            $real = realpath($mailbox);
+            if (false !== $real) {
+                return $real;
+            }
+        }
+
+        return $mailbox;
+    }
+
+    private static function matchMailboxPattern(string $name, string $pattern): bool
+    {
+        if ('' === $pattern) {
+            return false;
+        }
+        $regex = '';
+        $len = \strlen($pattern);
+        for ($i = 0; $i < $len; ++$i) {
+            $c = $pattern[$i];
+            if ('*' === $c) {
+                $regex .= '.*';
+            } elseif ('%' === $c) {
+                $regex .= '[^/]*';
+            } else {
+                $regex .= preg_quote($c, '/');
+            }
+        }
+
+        return 1 === preg_match('/^'.$regex.'$/D', $name);
     }
 
     public static function numMsg(ObjectEntry $object): int|false
@@ -281,7 +690,12 @@ final class VmImapCore
     }
 
     /**
-     * @return array{mailbox: string, closed: bool, messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>}|null
+     * @return array{
+     *     mailbox: string,
+     *     closed: bool,
+     *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
+     *     subscribed: array<string, true>
+     * }|null
      */
     private static function liveState(ObjectEntry $object): ?array
     {
@@ -290,6 +704,19 @@ final class VmImapCore
         }
 
         return self::$state[$object->id];
+    }
+
+    /**
+     * @return array{
+     *     mailbox: string,
+     *     closed: bool,
+     *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
+     *     subscribed: array<string, true>
+     * }|null
+     */
+    private static function liveStateMutable(ObjectEntry $object): ?array
+    {
+        return self::liveState($object);
     }
 
     private static function pushError(string $message): void

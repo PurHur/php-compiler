@@ -44,6 +44,14 @@ class Module extends ModuleAbstract
             new imap_headerinfo(),
             new imap_fetchbody(),
             new imap_search(),
+            new imap_list(),
+            new imap_lsub(),
+            new imap_subscribe(),
+            new imap_unsubscribe(),
+            new imap_createmailbox(),
+            new imap_deletemailbox(),
+            new imap_renamemailbox(),
+            new imap_getmailboxes(),
         ];
     }
 }
