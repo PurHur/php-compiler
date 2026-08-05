@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringIconvSubstr;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for iconv_strlen/strpos/substr/strrpos (#6247, #20208; php-src ext/iconv/iconv.c). */
+/** LLVM lowering for iconv_strlen/strpos/substr/strrpos (#6247, #20208, #27197; php-src ext/iconv/iconv.c). */
 final class JitIconvString
 {
     public static function dispatch(Context $context, string $function, JITVariable ...$args): Value
@@ -81,20 +86,125 @@ final class JitIconvString
         if (self::abortOnStrictNull($context, $args[0], 'iconv_substr', 0, 'string')) {
             return self::unreachableStringOrFalse($context);
         }
-        $inputLit = self::softNullStringLit($context, $args[0], 'iconv_substr', 0, 'string');
-        $offsetLit = self::tryCompileTimeInt($context, $args[1]);
-        $lengthLit = $argc >= 3 ? self::tryCompileTimeOptionalInt($context, $args[2]) : null;
-        $encodingLit = $argc >= 4 ? self::encodingLiteral($args, 3) : 'UTF-8';
-        if (null !== $inputLit && null !== $offsetLit && null !== $encodingLit) {
-            $result = VmIconv::iconvSubstr($inputLit, $offsetLit, $lengthLit, $encodingLit);
-            if (false === $result) {
-                return $context->getTypeFromString('bool')->constInt(0, false);
-            }
 
-            return $context->constantFromString($result);
+        $folded = self::tryFoldSubstr($context, $args);
+        if (null !== $folded) {
+            return $folded;
         }
 
-        throw new \LogicException('iconv_substr() JIT requires compile-time string arguments in this compiler build');
+        $input = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv_substr', 0, 'string')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'iconv_substr', 0, 'string');
+
+        $i64 = $context->getTypeFromString('int64');
+        $offset = JitLongArg::lower($context, $args[1], 'iconv_substr() offset');
+
+        $lengthOrOmitted = $i64->constInt(IconvStringJitHelper::LENGTH_OMITTED, true);
+        if ($argc >= 3) {
+            $lengthIsNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
+            if (!$lengthIsNull) {
+                $lengthOrOmitted = JitLongArg::lower($context, $args[2], 'iconv_substr() length');
+            }
+        }
+
+        if ($argc >= 4) {
+            $encodingIsNull = JITVariable::TYPE_NULL === $args[3]->type || $args[3]->isNullConstant;
+            $encoding = $encodingIsNull
+                ? $context->builder->load($context->constantStringFromString('UTF-8'))
+                : ($context->callerStrictTypes
+                    ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[3], 'iconv_substr', 3, 'encoding')
+                    : JitStringBuiltinArg::lowerZparamStr($context, $args[3], 'iconv_substr', 3, 'encoding'));
+        } else {
+            $encoding = $context->builder->load($context->constantStringFromString('UTF-8'));
+        }
+
+        StringIconvSubstr::ensureLinked($context);
+        $result = $context->builder->call(
+            $context->lookupFunction('__compiler_iconv_substr'),
+            $input,
+            $offset,
+            $lengthOrOmitted,
+            $encoding
+        );
+
+        return self::materializeStringOrFalse($context, $result);
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    private static function tryFoldSubstr(Context $context, array $args): ?Value
+    {
+        $argc = \count($args);
+        $inputLit = self::softNullStringLit($context, $args[0], 'iconv_substr', 0, 'string');
+        $offsetLit = self::tryCompileTimeInt($context, $args[1]);
+        if (null === $inputLit || null === $offsetLit) {
+            return null;
+        }
+
+        $lengthLit = null;
+        if ($argc >= 3) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+                $lengthLit = null;
+            } else {
+                $lengthLit = self::tryCompileTimeInt($context, $args[2]);
+                if (null === $lengthLit) {
+                    return null;
+                }
+            }
+        }
+
+        $encodingLit = $argc >= 4 ? self::encodingLiteral($args, 3) : 'UTF-8';
+        if (null === $encodingLit) {
+            return null;
+        }
+
+        $result = VmIconv::iconvSubstr($inputLit, $offsetLit, $argc >= 3 ? $lengthLit : null, $encodingLit);
+        if (false === $result) {
+            $slot = JitValueBox::alloc($context);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        // constantFromString() is a C-string global (unknown*) — box as __string__ like
+        // JitIconv::foldCompileTime so AOT can infer the builtin return type (#27197).
+        $strPtr = $context->builder->load($context->constantStringFromString($result));
+
+        return self::materializeStringOrFalse($context, $strPtr);
+    }
+
+    /** Box `__string__*` / null into `__value__*` (string or false) for AOT type inference. */
+    private static function materializeStringOrFalse(Context $context, Value $contents): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $failed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtr->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+
+        $failBlock = BasicBlockHelper::append($context, 'iconv_substr_fail');
+        $okBlock = BasicBlockHelper::append($context, 'iconv_substr_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'iconv_substr_done');
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $contents
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     private static function strrpos(Context $context, JITVariable ...$args): Value
@@ -166,7 +276,11 @@ final class JitIconvString
 
     private static function unreachableStringOrFalse(Context $context): Value
     {
-        return $context->getTypeFromString('bool')->constInt(0, false);
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function encodingLiteral(array $args, int $index): ?string
@@ -186,19 +300,7 @@ final class JitIconvString
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type && null !== $arg->compileTimeLong) {
             return (int) $arg->compileTimeLong;
         }
-        if (JITVariable::TYPE_INTEGER === $arg->type && null !== $arg->compileTimeLong) {
-            return (int) $arg->compileTimeLong;
-        }
 
         return null;
-    }
-
-    private static function tryCompileTimeOptionalInt(Context $context, JITVariable $arg): ?int
-    {
-        if (JITVariable::TYPE_NULL === $arg->type) {
-            return null;
-        }
-
-        return self::tryCompileTimeInt($context, $arg);
     }
 }
