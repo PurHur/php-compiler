@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitSqrtKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for sqrt() via SqrtJitHelper PHP (#15115, #20664).
+ * JIT/AOT link for sqrt() via SqrtJitHelper PHP (#15115, #20664, #27888).
  *
- * Embed + thin standalone AOT: {@see SqrtJitHelper} via {@see JitVmHelperLink}
- * (Rename #20603 shape — double via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
- * Nested helper compile: libc leaf without re-entering SqrtJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (floor/ceil #27650 / fmod #27838 shape).
+ * NestedJIT no longer needs a libc sqrt(3) kernel — helper inlines NestedJIT-safe Newton.
  * php-src: ext/standard/math.c — PHP_FUNCTION(sqrt)
  */
 final class MathSqrt
@@ -45,10 +42,6 @@ final class MathSqrt
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitSqrtKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathSqrt
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_SQRT);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_SQRT, $probe);
@@ -80,7 +69,7 @@ final class MathSqrt
             self::SQRT_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20664'
+            '#27888'
         );
     }
 }
