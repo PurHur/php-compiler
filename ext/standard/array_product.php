@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayProductRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -28,12 +29,8 @@ final class array_product extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if (1 !== $argc) {
-            throw new \ArgumentCountError(
-                'array_product() expects exactly 1 argument, '.$argc.' given'
-            );
-        }
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'array_product', 1);
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_product');
         if (null === $frame->returnVar) {
             return;
@@ -45,56 +42,28 @@ final class array_product extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
+        ExceptionBridge::ensureLinked($context);
         TypeErrorRaise::ensureLinked($context);
-        if (1 !== $argc) {
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'array_product() expects exactly 1 argument, '.$argc.' given'
-            );
-
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_product', 1)) {
             return $context->getTypeFromString('int64')->constInt(1, false);
         }
+        // php-src Z_PARAM_ARRAY — catchable TypeError under AOT try/catch (#27483; peer #27479).
+        // Always via JitArrayElem → ExceptionBridge (not bare TypeErrorRaise::emitRaise).
+        JitArrayElem::requireArrayArg($context, $args[0], 'array_product');
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_product() argument #'.((int) $i + 1));
             }
         }
-        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || JITVariable::TYPE_VALUE === $args[0]->type
+        ) {
             return ArrayProductRuntime::product($context, $args[0]);
         }
-        if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            return ArrayProductRuntime::product($context, $args[0]);
-        }
-        if (JITVariable::TYPE_VALUE === $args[0]->type) {
-            JitArrayElem::requireArrayArg($context, $args[0], 'array_product');
 
-            return ArrayProductRuntime::product($context, $args[0]);
-        }
-        TypeErrorRaise::emitRaise(
-            $context,
-            'array_product(): Argument #1 ($array) must be of type array, '
-            .$this->jitArgTypeLabel($args[0]).' given'
-        );
-
+        // Static non-array types already raised above; poison return for SSA (empty product = 1).
         return $context->getTypeFromString('int64')->constInt(1, false);
-    }
-
-    private function jitArgTypeLabel(JITVariable $arg): string
-    {
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return 'int';
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return 'float';
-            case JITVariable::TYPE_NATIVE_BOOL:
-                return 'bool';
-            case JITVariable::TYPE_STRING:
-                return 'string';
-            case JITVariable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
     }
 }
