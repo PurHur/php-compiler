@@ -108,6 +108,8 @@ final class LibcExtern
             'tanh' => [$dbl, false, [$dbl]],
             'acos' => [$dbl, false, [$dbl]],
             'asin' => [$dbl, false, [$dbl]],
+            'atan' => [$dbl, false, [$dbl]],
+            'atan2' => [$dbl, false, [$dbl, $dbl]],
             'acosh' => [$dbl, false, [$dbl]],
             'asinh' => [$dbl, false, [$dbl]],
             'atanh' => [$dbl, false, [$dbl]],
