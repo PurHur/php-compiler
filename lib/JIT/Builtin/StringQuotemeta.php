@@ -9,11 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __string__quotemeta via QuotemetaJitHelper PHP (#14705, #21589).
+ * JIT/AOT link for __string__quotemeta via QuotemetaJitHelper PHP (#14705, #21589, #27011).
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringSoundex #21362 / StringChunkSplit #21399.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrRot13 #26868 / StringStrrev #27007
+ * (self-contained helper — no VmString ExternalMethod stub under NestedJIT).
+ * SSOT: {@see \PHPCompiler\ext\standard\QuotemetaJitHelper} (mirrors {@see \PHPCompiler\ext\standard\VmString}).
  * php-src: ext/standard/string.c — PHP_FUNCTION(quotemeta)
  */
 final class StringQuotemeta
