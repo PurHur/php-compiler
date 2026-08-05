@@ -230,6 +230,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #27916 */
+    public function testOpensslCipherKeyLengthReflectionStubTypes(): void
+    {
+        self::assertSame(
+            'int|false',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_cipher_key_length')
+        );
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('openssl_cipher_key_length', 0);
+        self::assertNotNull($info);
+        self::assertSame('cipher_algo', $info['name']);
+        self::assertSame('string', $info['type']);
+        self::assertFalse($info['isOptional']);
+    }
+
     /** @covers issue #23626 */
     public function testOpensslRandomPseudoBytesZendStubNamedParams(): void
     {

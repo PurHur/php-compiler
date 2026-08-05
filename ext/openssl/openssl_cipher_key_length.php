@@ -18,6 +18,7 @@ use PHPLLVM\Value;
 /**
  * openssl_cipher_key_length() — cipher key length probe (php-src ext/openssl/openssl.c; #6522).
  *
+ * Reflection: string $cipher_algo → int|false via BuiltinInternalArgInfo (#27916; openssl.stub.php).
  * VM: VmOpenssl + OpensslCipherRegistry. JIT/AOT: compile-time literal baking via JitOpensslCipherKeyLength.
  */
 final class openssl_cipher_key_length extends Internal

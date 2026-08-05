@@ -159,6 +159,8 @@ final class BuiltinInternalArgInfo
             'session_id' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
+            // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
+            'openssl_cipher_key_length' => 'int|false',
             // ext/intl/grapheme/grapheme.stub.php — InternalArgInfo size_t/string/int without |false (#27884)
             'grapheme_strlen' => 'int|false|null',
             'grapheme_substr',
@@ -481,6 +483,8 @@ final class BuiltinInternalArgInfo
                 2 => 'int',
                 default => null,
             },
+            // ext/openssl/openssl.stub.php — absent from InternalArgInfo; string $cipher_algo (#27916)
+            'openssl_cipher_key_length' => 0 === $index ? 'string' : null,
             // ext/intl/grapheme/grapheme.stub.php — Zend names/types; &$next untyped (#27884)
             'grapheme_strlen' => 0 === $index ? 'string' : null,
             'grapheme_substr' => match ($index) {
