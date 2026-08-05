@@ -7,21 +7,23 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * filter_var FILTER_VALIDATE_URL JIT routes through FilterUrlJitHelper PHP
- * via JitVmHelperLink::ensureCompiled (#11274 / #26766 / peer #26699).
+ * filter_var FILTER_VALIDATE_URL JIT routes through FilterUrlValidate PHP
+ * via JitVmHelperLink::ensureCompiled (#11274 / #26766 / #27206 / peer #27068).
  */
 final class FilterUrlJitRuntimeShrinkTest extends TestCase
 {
-    public function testFilterUrlJitHelperDelegatesToVmFilter(): void
+    public function testFilterUrlValidateIsSelfContained(): void
     {
-        $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/FilterUrlJitHelper.php');
-        $this->assertStringContainsString('VmFilter::isValidUrlSubset', $source);
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/FilterUrlValidate.php');
+        $this->assertStringContainsString('function isValidInt', $source);
+        $this->assertStringNotContainsString('preg_match(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\ext\\standard', $source);
     }
 
-    public function testStringFilterUrlRoutesThroughFilterUrlJitHelper(): void
+    public function testStringFilterUrlRoutesThroughFilterUrlValidate(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilterUrl.php');
-        $this->assertStringContainsString('FilterUrlJitHelper', $source);
+        $this->assertStringContainsString('FilterUrlValidate::isValidInt', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
@@ -30,30 +32,44 @@ final class FilterUrlJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('putenv', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n"), 'StringFilterUrl must be a thin bridge');
+        $this->assertLessThan(160, \substr_count($source, "\n"), 'StringFilterUrl must be a thin bridge');
     }
 
     public function testJitFilterRoutesThroughStringFilterUrl(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/JitFilter.php');
         $this->assertStringContainsString('StringFilterUrl::ensureLinked', $source);
+        $this->assertStringContainsString('VmFilter::isValidUrlSubset', $source);
     }
 
-    public function testFilterUrlJitHelperSemanticsMatchVmFilter(): void
+    public function testFilterUrlValidateSemanticsMatchVmFilter(): void
     {
-        $this->assertSame('https://example.com', \PHPCompiler\ext\filter\FilterUrlJitHelper::validate('https://example.com'));
-        $this->assertSame(
+        $cases = [
+            'https://example.com/a',
+            'https://example.com',
             'http://127.0.0.1:8080/path?q=1#frag',
-            \PHPCompiler\ext\filter\FilterUrlJitHelper::validate('http://127.0.0.1:8080/path?q=1#frag')
-        );
-        $this->assertSame('ftp://example.com', \PHPCompiler\ext\filter\FilterUrlJitHelper::validate('ftp://example.com'));
-        $this->assertNull(\PHPCompiler\ext\filter\FilterUrlJitHelper::validate('not a url'));
-        $this->assertNull(\PHPCompiler\ext\filter\FilterUrlJitHelper::validate('http://'));
+            'ftp://example.com',
+            'mailto:a@b.co',
+            'not a url',
+            'http://',
+            'https://exam_ple.com',
+            'news:comp.lang.php',
+        ];
+        foreach ($cases as $c) {
+            $vm = \PHPCompiler\ext\filter\VmFilter::isValidUrlSubset($c);
+            $aot = \PHPCompiler\ext\filter\FilterUrlValidate::isValid($c);
+            $this->assertSame($vm, $aot, 'mismatch for '.$c);
+            $helper = \PHPCompiler\ext\filter\FilterUrlJitHelper::validate($c);
+            $this->assertSame($vm ? $c : null, $helper, 'helper mismatch for '.$c);
+        }
+        $this->assertSame(1, \PHPCompiler\ext\filter\FilterUrlValidate::isValidInt('https://example.com/a'));
+        $this->assertSame(0, \PHPCompiler\ext\filter\FilterUrlValidate::isValidInt('not a url'));
     }
 
-    public function testSpineBundleIncludesFilterUrlJitHelper(): void
+    public function testSpineBundleIncludesFilterUrlValidate(): void
     {
         $spine = (string) \file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('FilterUrlValidate.php', $spine);
         $this->assertStringContainsString('FilterUrlJitHelper.php', $spine);
         $this->assertStringContainsString('StringFilterUrl.php', $spine);
     }

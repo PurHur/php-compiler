@@ -8,23 +8,28 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\Value\Function_ as LlvmFunction;
+use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_filter_validate_url via FilterUrlJitHelper PHP (#11274, #26766).
+ * JIT/AOT link for __compiler_filter_validate_url via FilterUrlValidate PHP (#11274, #26766, #27206).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterInt #26699 / StringFilterMac #25019).
+ * Const string `filter_var(..., FILTER_VALIDATE_URL)` may fold in {@see \PHPCompiler\ext\filter\JitFilter}
+ * via VmFilter SSOT. Dynamic strings NestedJIT {@see FilterUrlValidate::isValidInt} (int 0/1) and
+ * return the ABI input `__string__*` on success — NestedJIT `?string` / VmFilter / preg paths are
+ * corrupt under thin AOT (#26853 / #27068 / #27078 / #26888).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterEmail #27068).
  * php-src: ext/filter/logical_filters.c — php_filter_validate_url
  */
 final class StringFilterUrl
 {
-    private const HELPER_PATH = '/ext/filter/FilterUrlJitHelper.php';
+    private const VALIDATE_PATH = '/ext/filter/FilterUrlValidate.php';
 
-    private const VALIDATE_HELPER = 'PHPCompiler\\ext\\filter\\FilterUrlJitHelper::validate';
+    private const VALIDATE_IS_VALID_INT = 'PHPCompiler\\ext\\filter\\FilterUrlValidate::isValidInt';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::VALIDATE_HELPER,
+    private const COMPILED_VALIDATE = [
+        self::VALIDATE_IS_VALID_INT,
     ];
 
     /** @var list<string> */
@@ -34,7 +39,11 @@ final class StringFilterUrl
 
     public static function ensureLinked(Context $context): void
     {
+        $restore = BasicBlockHelper::tryGetInsertBlock($context);
         self::implement($context);
+        if (null !== $restore) {
+            BasicBlockHelper::restoreInsertBlock($context, $restore);
+        }
     }
 
     public static function implement(Context $context): void
@@ -46,7 +55,7 @@ final class StringFilterUrl
             return;
         }
 
-        // Restore caller insert block after bridge emit (#20988 / peer StringFilterInt #26699) —
+        // Restore caller insert block after bridge emit (#20988 / peer StringFilterEmail #27068) —
         // clearInsertionPosition left the user-script builder detached
         // ("Current basic block has no parent function").
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
@@ -71,37 +80,44 @@ final class StringFilterUrl
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($strPtr, false, $strPtr);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('filter_url_bridge_entry');
+        $okBlock = $fn->appendBasicBlock('filter_url_bridge_ok');
+        $failBlock = $fn->appendBasicBlock('filter_url_bridge_fail');
         $context->builder->positionAtEnd($entry);
-        // NestedJIT ?string may be __value__*; ABI is __string__* (#26853).
-        $helper = self::helperFunction($context, self::VALIDATE_HELPER);
-        $raw = JitNestedHelperCoerce::callHelper($context, $helper, [$fn->getParam(0)]);
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $strPtr)
+
+        $isValidInt = JitVmHelperLink::lookupCompiled($context, self::VALIDATE_IS_VALID_INT, '#27206');
+        $flagsZero = $i64->constInt(0, false);
+        $rawOk = JitNestedHelperCoerce::callHelper(
+            $context,
+            $isValidInt,
+            [$fn->getParam(0), $flagsZero]
         );
+        $okI64 = JitNestedHelperCoerce::coerceBridgeResult($context, $rawOk, $i64);
+        $ok = $context->builder->icmp(
+            Builder::INT_NE,
+            $okI64,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($ok, $okBlock, $failBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->returnValue($fn->getParam(0));
+
+        $context->builder->positionAtEnd($failBlock);
+        $context->builder->returnValue($strPtr->constNull());
+
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#26766');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#26766'
-        );
+        JitVmHelperLink::ensureCompiled($context, self::VALIDATE_PATH, self::COMPILED_VALIDATE, '#27206');
     }
 
     private static function registerLinkedRuntime(Context $context): void
