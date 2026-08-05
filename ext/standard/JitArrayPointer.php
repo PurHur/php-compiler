@@ -24,9 +24,12 @@ final class JitArrayPointer
         return ArrayPointerRuntime::key($context, $array);
     }
 
-    public static function current(Context $context, JITVariable $array): Value
+    /**
+     * @param string $fn Builtin name for TypeError (current, or pos alias — #27512)
+     */
+    public static function current(Context $context, JITVariable $array, string $fn = 'current'): Value
     {
-        self::requireArrayArg($context, $array, 'current');
+        self::requireArrayArg($context, $array, $fn);
 
         return ArrayPointerRuntime::current($context, $array);
     }
