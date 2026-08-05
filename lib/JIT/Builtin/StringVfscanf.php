@@ -6,12 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_vfscanf via fgets + SscanfJitHelper (#12541, #25718, #27663).
+ * JIT/AOT link for __compiler_vfscanf via fgets + __compiler_sscanf (#12541, #25718, #27663).
+ *
+ * Prefer {@see \PHPCompiler\ext\standard\JitVfscanf} emitting fgets+sscanf in the **user**
+ * function — NestedJIT parseAssignMeta aborts when entered from this ABI with outCount>0
+ * (#27663). This ABI remains for inventory/ensureLinked callers.
  *
  * Do **not** NestedJIT VmVfscanf/VmFs with live StreamIo (#27663 module verify).
  * Thin AOT: libc fgets/fseek/ftell via {@see StreamReadRuntime::forceLibcStreamPositionAbis}.
@@ -19,8 +21,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringVfscanf
 {
-    private const PARSE_ASSIGN_HELPER = 'PHPCompiler\\ext\\standard\\SscanfJitHelper::parseAssignMeta';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -44,7 +44,6 @@ final class StringVfscanf
             StreamReadRuntime::ensureVfscanfAbi($context);
         }
 
-        SscanfAssignApply::ensureLinked($context);
         StringSscanfByRef::ensureLinked($context);
         self::implementVfscanfBridge($context);
         self::registerLinkedRuntime($context);
@@ -67,7 +66,6 @@ final class StringVfscanf
         }
 
         $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtrPtr = $context->getTypeFromString('__value__**');
         $ft = $context->context->functionType(
@@ -116,28 +114,15 @@ final class StringVfscanf
         $context->builder->branchIf($empty, $fail, $scan);
 
         $context->builder->positionAtEnd($scan);
-        $meta = $context->builder->call(
-            self::helperFunction($context, self::PARSE_ASSIGN_HELPER),
+        $assigned = $context->builder->call(
+            $context->lookupFunction('__compiler_sscanf'),
             $line,
             $fmt,
-            $outCount
-        );
-        $consumedSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
-        $assigned = $context->builder->call(
-            $context->lookupFunction('phpc_sscanf_apply_assign_blob'),
-            $meta,
-            $outPtrs,
-            $consumedSlot
+            $outCount,
+            $outPtrs
         );
         $context->builder->returnValue($assigned);
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        StringSscanfByRef::ensureLinked($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#27663');
     }
 
     private static function registerLinkedRuntime(Context $context): void

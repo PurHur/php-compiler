@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7014 |
-| Phase A inventory files (M2 ratio SSOT) | 7014 |
+| PHP files on vm.php path | 7015 |
+| Phase A inventory files (M2 ratio SSOT) | 7015 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22537 |
+| Source constructs flagged (warnings) | 22538 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5447,6 +5447,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SplAutoloadOutput.php` | 0 | 2 |
 | `lib/JIT/Builtin/Sscanf.php` | 0 | 1 |
 | `lib/JIT/Builtin/SscanfAssignApply.php` | 0 | 1 |
+| `lib/JIT/Builtin/SscanfStrtolApply.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatCache.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatCacheRuntime.php` | 0 | 1 |
@@ -29526,8 +29527,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new VMVariable (line 151)
-- new JITVariable (line 229)
+- new VMVariable (line 154)
+- new JITVariable (line 232)
 - 5 class method(s)
 
 ### `ext/standard/JitStat.php`
@@ -29741,7 +29742,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamIoKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 29 class method(s)
+- 35 class method(s)
 
 ### `ext/standard/JitStreamIsLocal.php`
 
@@ -30123,7 +30124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitVfscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new VMVariable (line 158)
+- new VMVariable (line 226)
 - 4 class method(s)
 
 ### `ext/standard/JitVsprintf.php`
@@ -31777,7 +31778,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SscanfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 43)
+- new Variable (line 45)
 - 10 class method(s)
 
 ### `ext/standard/StatArrayJitHelper.php`
@@ -32267,7 +32268,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VfscanfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 27)
+- new Variable (line 29)
 - 1 class method(s)
 
 ### `ext/standard/VmApache.php`
@@ -34348,15 +34349,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 257)
-- new HashTable (line 270)
-- new Variable (line 274)
-- new HashTable (line 280)
-- new Variable (line 282)
-- new Variable (line 941)
-- new Variable (line 948)
-- new Variable (line 955)
-- 30 class method(s)
+- new HashTable (line 268)
+- new Variable (line 272)
+- new HashTable (line 278)
+- new Variable (line 280)
+- new Variable (line 945)
+- new Variable (line 953)
+- new Variable (line 960)
+- new Variable (line 967)
+- 31 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmStatCache.php`
@@ -43439,7 +43440,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1000)
+- new InternalArgInfo (line 1002)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44793,17 +44794,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19381)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19600)
 - new JIT\Call\VmCoerceVariableToString (line 19727)
-- new JIT\Call\NoOpConstruct (line 19899)
-- new JIT\Call\IncludePathResolverResolve (line 20069)
-- new Operand\Literal (line 20156)
+- new JIT\Call\NoOpConstruct (line 19902)
+- new JIT\Call\IncludePathResolverResolve (line 20072)
 - new Operand\Literal (line 20159)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 20202)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20349)
-- new VM (line 21484)
-- new VM\Variable (line 21493)
-- new Variable (line 21514)
-- new Variable (line 21560)
-- new Variable (line 22282)
+- new Operand\Literal (line 20162)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 20205)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20352)
+- new VM (line 21487)
+- new VM\Variable (line 21496)
+- new Variable (line 21517)
+- new Variable (line 21563)
+- new Variable (line 22285)
 - 426 class method(s)
 - 20 closure(s)
 
@@ -46976,6 +46977,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `lib/JIT/Builtin/SscanfStrtolApply.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StatArrayRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47149,7 +47155,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamReadRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/StreamResource.php`
 
@@ -48190,7 +48196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringVfscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringVsprintf.php`
 
@@ -50964,7 +50970,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmVariableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\VariableWriteNested (line 46)
+- new Call\VariableWriteNested (line 48)
 - 2 class method(s)
 
 ### `lib/JIT/NoDiscardCallGuard.php`
