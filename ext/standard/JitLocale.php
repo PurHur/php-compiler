@@ -126,13 +126,18 @@ final class JitLocale
     {
         $ht = HashTableHelper::alloc($context);
         foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            if (VMVariable::TYPE_STRING !== $keyVar->type) {
+            $key = $keyVar->resolveIndirect();
+            // Top-level localeconv keys are strings; grouping/mon_grouping are int[] (#27029).
+            if (VMVariable::TYPE_STRING === $key->type) {
+                $keyStr = $context->builder->load(
+                    $context->constantStringFromString($key->toString())
+                );
+                self::storeVmVariable($context, $ht, $keyStr, $valueVar);
                 continue;
             }
-            $keyStr = $context->builder->load(
-                $context->constantStringFromString($keyVar->toString())
-            );
-            self::storeVmVariable($context, $ht, $keyStr, $valueVar);
+            if (VMVariable::TYPE_INTEGER === $key->type) {
+                self::storeVmVariableAtIndex($context, $ht, $key->toInt(), $valueVar);
+            }
         }
 
         return $ht;
@@ -159,6 +164,17 @@ final class JitLocale
     ): void {
         $resolved = $value->resolveIndirect();
         switch ($resolved->type) {
+            case VMVariable::TYPE_ARRAY:
+                // grouping / mon_grouping (and any nested arrays) — mirror JitGetDefinedConstants (#27029).
+                $nestedHt = self::emitHashTablePtr($context, $resolved->toArray());
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                    $ht,
+                    $keyStr,
+                    $nestedHt
+                );
+
+                return;
             case VMVariable::TYPE_INTEGER:
                 $jit = new JITVariable(
                     $context,
@@ -181,8 +197,53 @@ final class JitLocale
                 return;
             default:
                 throw new \LogicException(
-                    'localeconv() unsupported field type: '
-                    .VMVariable::getStringType($resolved->type)
+                    'localeconv() unsupported field type: '.$resolved->type
+                );
+        }
+    }
+
+    private static function storeVmVariableAtIndex(
+        Context $context,
+        Value $ht,
+        int $index,
+        VMVariable $value
+    ): void {
+        $resolved = $value->resolveIndirect();
+        $idx = $context->getTypeFromString('size_t')->constInt($index, false);
+        switch ($resolved->type) {
+            case VMVariable::TYPE_ARRAY:
+                $nestedHt = self::emitHashTablePtr($context, $resolved->toArray());
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setHashtableAt'),
+                    $ht,
+                    $idx,
+                    $nestedHt
+                );
+
+                return;
+            case VMVariable::TYPE_INTEGER:
+                $jit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_LONG,
+                    JITVariable::KIND_VALUE,
+                    $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                );
+                HashTableHelper::setAtIndex($context, $ht, $idx, $jit);
+
+                return;
+            case VMVariable::TYPE_STRING:
+                $jit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_STRING,
+                    JITVariable::KIND_VALUE,
+                    $context->builder->load($context->constantStringFromString($resolved->toString()))
+                );
+                HashTableHelper::setAtIndex($context, $ht, $idx, $jit);
+
+                return;
+            default:
+                throw new \LogicException(
+                    'localeconv() unsupported packed field type: '.$resolved->type
                 );
         }
     }
