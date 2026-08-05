@@ -16,6 +16,9 @@ final class AddslashesRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringAddslashes.php');
         $this->assertStringContainsString('AddslashesJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        // Thin AOT: pure LLVM inside StringAddslashes (no NestedJIT / no separate Llvm file) (#26907).
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThinLlvm', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringAddslashesLlvm', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringAddslashesLlvm.php');
