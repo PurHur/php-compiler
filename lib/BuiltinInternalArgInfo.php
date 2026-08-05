@@ -200,6 +200,10 @@ final class BuiltinInternalArgInfo
             'get_resource_id' => 'int',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; Zend : string (#26375)
             'get_debug_type' => 'string',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)
+            'get_parent_class' => 'string|false',
+            // ext/spl/php_spl.stub.php — InternalArgInfo false|array; Zend array only (#27902)
+            'spl_autoload_functions' => 'array',
             // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)
             'exit', 'die' => 'never',
             // ext/standard/math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595)
@@ -432,6 +436,8 @@ final class BuiltinInternalArgInfo
             'get_object_id' => 0 === $index ? 'object' : null,
             // Zend/zend_builtin_functions.stub.php — object|string; InternalArgInfo empty type (#27706, re-#23401)
             'get_class_methods' => 0 === $index ? 'object|string' : null,
+            // Zend/zend_builtin_functions.stub.php — object|string; InternalArgInfo empty type (#27902)
+            'get_parent_class' => 0 === $index ? 'object|string' : null,
             // Zend/zend_builtin_functions.stub.php — object|string untyped in Reflection (InternalArgInfo object) (#25498)
             'class_parents' => 0 === $index ? '' : null,
             // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)

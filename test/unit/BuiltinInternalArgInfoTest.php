@@ -77,6 +77,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         );
     }
 
+    /** Zend get_parent_class + SPL spl_autoload_functions Reflection stubs (#27902). */
+    public function testGetParentClassAndSplAutoloadFunctionsReflectionStubs(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_parent_class'));
+        $this->assertSame('object|string', BuiltinInternalArgInfo::stubParamTypeOverride('get_parent_class', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('get_parent_class', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('object|string', $info['type']);
+        $this->assertTrue($info['isOptional']);
+        $this->assertSame(
+            ['object_or_class='],
+            BuiltinParamNames::forFunction('get_parent_class')
+        );
+
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('spl_autoload_functions'));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('spl_autoload_functions', 0));
+    }
+
     /** Zend/zend_builtin_functions.stub.php — mixed $object_or_class (InternalArgInfo empty) (#26359). */
     public function testIsAIsSubclassOfObjectOrClassIsMixed(): void
     {
