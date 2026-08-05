@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\MathRound;
+use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitRoundModeArg;
@@ -102,10 +103,16 @@ final class JitRound
         }
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            if (null === $args[2]->compileTimeLong) {
+            // Resolve RoundingMode::… at fold time so constant modes never NestedJIT
+            // RoundJitHelper (avoids AOT module-verify / writeString ABI traps — #26939 / #26800).
+            $resolvedMode = RoundingModeJit::compileTimeRoundMode($context, $args[2]);
+            if (null === $resolvedMode && null !== $args[2]->compileTimeLong) {
+                $resolvedMode = (int) $args[2]->compileTimeLong;
+            }
+            if (null === $resolvedMode) {
                 return null;
             }
-            $mode = (int) $args[2]->compileTimeLong;
+            $mode = $resolvedMode;
         }
 
         $result = RoundJitHelper::roundArgv((float) $num, $places, $mode);
