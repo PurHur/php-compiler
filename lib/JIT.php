@@ -17504,6 +17504,7 @@ class JIT {
             || $toCall instanceof JIT\Call\LimitIteratorConstruct
             || $toCall instanceof JIT\Call\RegexIteratorConstruct
             || $toCall instanceof JIT\Call\CallbackFilterIteratorConstruct
+            || $toCall instanceof JIT\Call\CachingIteratorConstruct
             || $toCall instanceof JIT\Call\ParentIteratorConstruct
             || $toCall instanceof JIT\Call\RecursiveTreeIteratorConstruct
             || ($toCall instanceof JIT\Call\AppendIteratorMethod

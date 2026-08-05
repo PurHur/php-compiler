@@ -1066,6 +1066,9 @@ class Context {
         $this->functionProxies['appenditerator::append'] = new Call\AppendIteratorMethod('append');
         $this->functionProxies['regexiterator::__construct'] = new Call\RegexIteratorConstruct();
         $this->functionProxies['callbackfilteriterator::__construct'] = new Call\CallbackFilterIteratorConstruct();
+        $this->type->object->lookup('CachingIterator');
+        $this->functionProxies['cachingiterator::__construct'] = new Call\CachingIteratorConstruct();
+        $this->functionProxies['cachingiterator::getcache'] = new Call\CachingIteratorGetCache();
         // NoRewindIterator / InfiniteIterator — HT snapshot + Iterator protocol (#27583 / #27568).
         $this->type->object->lookup('NoRewindIterator');
         $this->type->object->lookup('InfiniteIterator');

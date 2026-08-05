@@ -21,6 +21,7 @@ final class SplOuterIteratorHt
             'appenditerator',
             'regexiterator',
             'callbackfilteriterator',
+            'cachingiterator',
             'arrayiterator',
             'recursivearrayiterator',
             'recursiveiteratoriterator',
