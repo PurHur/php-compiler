@@ -208,6 +208,42 @@ final class HelperRuntimeCacheFingerprintTest extends TestCase
         );
     }
 
+    /**
+     * FILTER_VALIDATE_{EMAIL,IP,URL} use VALIDATE_PATH + COMPILED_VALIDATE (#27068/#27207/#27206).
+     * Emit discovery must pair them like HELPER_PATH or orphan Filter*JitHelper prelink dirs
+     * stay stale forever after the Validate split (#27911–13).
+     */
+    public function testEmitDiscoversValidatePathCompiledValidatePairs(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $source = (string) file_get_contents($root.'/script/emit-helper-runtime-object.php');
+        $this->assertStringContainsString("str_ends_with(\$constName, 'VALIDATE_PATH')", $source);
+        $this->assertStringContainsString("COMPILED_VALIDATE", $source);
+        $this->assertStringContainsString('FILTER_VALIDATE_{EMAIL,IP,URL}', $source);
+
+        foreach ([
+            'StringFilterEmail.php' => '/ext/filter/FilterEmailValidate.php',
+            'StringFilterIp.php' => '/ext/filter/FilterIpValidate.php',
+            'StringFilterUrl.php' => '/ext/filter/FilterUrlValidate.php',
+        ] as $builtin => $unit) {
+            $code = (string) file_get_contents($root.'/lib/JIT/Builtin/'.$builtin);
+            $this->assertStringContainsString('VALIDATE_PATH', $code);
+            $this->assertStringContainsString($unit, $code);
+            $this->assertStringContainsString('COMPILED_VALIDATE', $code);
+            $slug = HelperRuntimeCache::slugFor($unit);
+            $this->assertFileExists(
+                $root.'/prelinked/helper-runtime/x86_64-linux/units/'.$slug.'/unit.o',
+                $unit.' must be in committed helper-runtime after VALIDATE_PATH discovery'
+            );
+        }
+        $this->assertDirectoryDoesNotExist(
+            $root.'/prelinked/helper-runtime/x86_64-linux/units/ext_filter_FilterIpJitHelper_php'
+        );
+        $this->assertDirectoryDoesNotExist(
+            $root.'/prelinked/helper-runtime/x86_64-linux/units/ext_filter_FilterUrlJitHelper_php'
+        );
+    }
+
     private function fingerprintViaSubprocess(string $root, string $unitFile, string $llvmPath): string
     {
         $php = escapeshellarg(PHP_BINARY);

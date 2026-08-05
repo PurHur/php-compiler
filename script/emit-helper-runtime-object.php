@@ -7,7 +7,8 @@ declare(strict_types=1);
  * Incremental emitter for split-compilation helper TUs (#15889).
  *
  * Discovers every JitVmHelperLink helper unit (*HELPER_PATH /
- * *COMPILED_HELPERS class-constant pairs), and for each unit:
+ * *COMPILED_HELPERS, and peer *VALIDATE_PATH / *COMPILED_VALIDATE pairs —
+ * FILTER_VALIDATE_{EMAIL,IP,URL} #27068/#27207/#27206), and for each unit:
  *
  *   fresh manifest?          -> skip (cached)
  *   fresh failure marker?    -> skip (known-broken; re-attempted only when
@@ -129,16 +130,28 @@ foreach ([$root.'/lib', $root.'/ext'] as $dir) {
             continue;
         }
         foreach ($constants as $constName => $path) {
-            if (!\is_string($path) || !str_ends_with($constName, 'HELPER_PATH')) {
+            if (!\is_string($path)) {
                 continue;
             }
-            $prefix = substr($constName, 0, -\strlen('HELPER_PATH'));
-            $names = $constants[$prefix.'COMPILED_HELPERS'] ?? null;
+            // HELPER_PATH + COMPILED_HELPERS (default), or VALIDATE_PATH +
+            // COMPILED_VALIDATE (thin-AOT filter peers — not discovered before
+            // left orphan Filter*JitHelper prelink dirs stale after #27911–13).
+            if (str_ends_with($constName, 'HELPER_PATH')) {
+                $prefix = substr($constName, 0, -\strlen('HELPER_PATH'));
+                $names = $constants[$prefix.'COMPILED_HELPERS'] ?? null;
+                $bundleKey = $prefix.'HELPER_BUNDLE';
+            } elseif (str_ends_with($constName, 'VALIDATE_PATH')) {
+                $prefix = substr($constName, 0, -\strlen('VALIDATE_PATH'));
+                $names = $constants[$prefix.'COMPILED_VALIDATE'] ?? null;
+                $bundleKey = $prefix.'HELPER_BUNDLE';
+            } else {
+                continue;
+            }
             if (!\is_array($names) || [] === $names) {
                 continue;
             }
             $sites[$path] = array_values(array_unique(array_merge($sites[$path] ?? [], array_map('strval', $names))));
-            $bundle = $constants[$prefix.'HELPER_BUNDLE'] ?? null;
+            $bundle = $constants[$bundleKey] ?? null;
             if (\is_array($bundle) && [] !== $bundle) {
                 $bundles[$path] = array_values(array_map('strval', $bundle));
             }
