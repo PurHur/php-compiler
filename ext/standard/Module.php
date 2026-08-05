@@ -699,7 +699,6 @@ class Module extends ModuleAbstract
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
 
-            new phpc_sqrt_kernel(),
             new sys_get_temp_dir(),
             new sys_getloadavg(),
             new openlog(),

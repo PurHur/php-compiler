@@ -832,7 +832,6 @@ class Context {
             'phpc_log_kernel',
             'phpc_log10_kernel',
 
-            'phpc_sqrt_kernel',
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',
             'phpc_random_bytes_kernel',

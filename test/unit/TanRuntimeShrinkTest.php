@@ -55,7 +55,7 @@ final class TanRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('phpc_tan_kernel', $source);
-        $this->assertStringContainsString('phpc_sqrt_kernel', $source);
+        $this->assertStringContainsString('phpc_hypot_kernel', $source);
     }
 
     public function testSpineBundleIncludesTanJitHelper(): void
