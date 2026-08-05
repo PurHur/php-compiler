@@ -126,10 +126,8 @@ final class StreamContextJitHelper
         }
         $wrapperName = self::coerceOptionKeyString($wrapperKey->resolveIndirect());
         $optionName = self::coerceOptionKeyString($optionKey->resolveIndirect());
+        // exportValue already collapses non-scalars to ''; avoid NestedJIT is_scalar (#27573).
         $exportedValue = self::exportValue($value);
-        if (!\is_scalar($exportedValue) && null !== $exportedValue && !\is_array($exportedValue)) {
-            $exportedValue = '';
-        }
         VmParseStr::mergeInto($dest, [
             $wrapperName => [$optionName => $exportedValue],
         ]);
@@ -230,7 +228,7 @@ final class StreamContextJitHelper
         $slot->array($paramsHt);
         $existing = $context->find(VmStreamContext::PARAMS_MARKER_KEY);
         if (null !== $existing) {
-            $existing->separateArrayForWrite();
+            // NestedJIT: Variable::separateArrayForWrite is not lowered (#27573); copyFrom replaces.
             $existing->copyFrom($slot);
         } else {
             $context->add(VmStreamContext::PARAMS_MARKER_KEY, $slot);
@@ -254,14 +252,26 @@ final class StreamContextJitHelper
             return;
         }
 
-        $paramsSlot->separateArrayForWrite();
-        $paramsHt = $paramsSlot->resolveIndirect()->toArray();
-        $existing = $paramsHt->find($name);
-        if (null !== $existing) {
-            $existing->copyFrom($copy);
-        } else {
-            $paramsHt->add($name, $copy);
+        // Rebuild params HT — NestedJIT cannot lower Variable::separateArrayForWrite (#27573).
+        $oldHt = $paramsSlot->resolveIndirect()->toArray();
+        $paramsHt = new HashTable();
+        foreach ($oldHt->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $keyName = $key->toString();
+            if ($keyName === $name) {
+                continue;
+            }
+            $kept = new Variable();
+            $kept->copyFrom($valVar);
+            $paramsHt->add($keyName, $kept);
         }
+        $paramsHt->add($name, $copy);
+        $slot = new Variable(Variable::TYPE_ARRAY);
+        $slot->array($paramsHt);
+        $paramsSlot->copyFrom($slot);
     }
 
     /**

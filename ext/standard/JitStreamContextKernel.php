@@ -4,26 +4,28 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPLLVM\BasicBlock;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream context ABI via StreamContextJitHelper PHP (#9340, #12895, #19817, #23049).
+ * JIT/AOT link for stream context ABI via StreamContextJitHelper PHP (#9340, #12895, #19817, #23049, #27573).
  *
  * Quarantined from lib/JIT/Builtin/StreamContextRuntime — {@see \PHPCompiler\JIT\Builtin\StreamContextRuntime}
  * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
  * (peer StreamCaps #23012 / StreamSync #23004 / StreamMeta #22994).
+ *
+ * Thin AOT NestedJIT returns `__value__*` for HashTable — bridges use {@see JitNestedHelperCoerce}
+ * (peer PasswordCryptoRuntime / StreamMetaKernel).
  *
  * SSOT: {@see StreamContextJitHelper}, {@see VmStreamContext}
  * php-src: main/streams/streams.c — stream_context_create, stream_context_get_default
  */
 final class JitStreamContextKernel
 {
-    private static int $blockSerial = 0;
-
     private const HELPER_PATH = '/ext/standard/StreamContextJitHelper.php';
 
     private const CREATE_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::create';
@@ -66,35 +68,28 @@ final class JitStreamContextKernel
 
     public static function ensureLinked(Context $context): void
     {
-        $savedInsert = $context->builder->getInsertBlock();
+        // Peer StreamMeta/StreamIo: restore user insert block after NestedJIT (#27573).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::implement($context);
-        self::resumeBuilderAfterEnsureLinked($context, $savedInsert);
-    }
-
-    /** Reposition builder in the user function after runtime helper codegen (#6367). */
-    public static function resumeBuilderAfterEnsureLinked(Context $context, ?BasicBlock $savedInsert): void
-    {
-        unset($savedInsert);
-
-        $targetFn = null;
-        if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
-            $targetFn = $context->functions[$context->activeFunction];
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
-        if (null === $targetFn) {
-            $targetFn = $context->main;
-        }
-        if (null === $targetFn) {
-            throw new \LogicException('StreamContext JIT: no active insert block after ensureLinked');
-        }
-
-        $resume = $targetFn->appendBasicBlock('stream_ctx_jit_resume_'.(++self::$blockSerial));
-        $context->builder->positionAtEnd($resume);
     }
 
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__phpc_stream_context_create');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        // Thin AOT: NestedJIT StreamContextJitHelper fails LLVM verify (#27573) — LLVM markers.
+        if ($context->isThinStandaloneAotMain()) {
+            JitStreamContextThinAot::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -120,21 +115,20 @@ final class JitStreamContextKernel
 
     private static function implementCreateBridge(Context $context): void
     {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
         self::implementBridge(
             $context,
             '__phpc_stream_context_create',
-            $context->context->functionType(
-                $context->getTypeFromString('__hashtable__*'),
-                false,
-                $context->getTypeFromString('__hashtable__*'),
-                $context->getTypeFromString('__hashtable__*')
-            ),
-            self::CREATE_HELPER,
-            static fn (Context $ctx, LlvmFunction $fn) => $ctx->builder->call(
-                self::helperFunction($ctx, self::CREATE_HELPER),
-                $fn->getParam(0),
-                $fn->getParam(1)
-            )
+            $context->context->functionType($htPtr, false, $htPtr, $htPtr),
+            static function (Context $ctx, LlvmFunction $fn): Value {
+                $raw = JitNestedHelperCoerce::callHelper(
+                    $ctx,
+                    self::helperFunction($ctx, self::CREATE_HELPER),
+                    [$fn->getParam(0), $fn->getParam(1)]
+                );
+
+                return JitNestedHelperCoerce::coerceToHashtablePtr($ctx, $raw);
+            }
         );
     }
 
@@ -145,12 +139,15 @@ final class JitStreamContextKernel
             $context,
             '__phpc_stream_context_merge_options',
             $context->context->functionType($context->getTypeFromString('void'), false, $htPtr, $htPtr),
-            self::MERGE_HELPER,
             static function (Context $ctx, LlvmFunction $fn): void {
-                $ctx->builder->call(
+                // NestedJIT keeps the optional $functionName param — pass explicit name (#27573).
+                $fnName = $ctx->builder->load(
+                    $ctx->constantStringFromString('stream_context_set_options')
+                );
+                JitNestedHelperCoerce::callHelper(
+                    $ctx,
                     self::helperFunction($ctx, self::MERGE_HELPER),
-                    $fn->getParam(0),
-                    $fn->getParam(1)
+                    [$fn->getParam(0), $fn->getParam(1), $fnName]
                 );
                 $ctx->builder->returnVoid();
             },
@@ -165,11 +162,15 @@ final class JitStreamContextKernel
             $context,
             '__phpc_stream_context_get_options',
             $context->context->functionType($htPtr, false, $htPtr),
-            self::GET_OPTIONS_HELPER,
-            static fn (Context $ctx, LlvmFunction $fn) => $ctx->builder->call(
-                self::helperFunction($ctx, self::GET_OPTIONS_HELPER),
-                $fn->getParam(0)
-            )
+            static function (Context $ctx, LlvmFunction $fn): Value {
+                $raw = JitNestedHelperCoerce::callHelper(
+                    $ctx,
+                    self::helperFunction($ctx, self::GET_OPTIONS_HELPER),
+                    [$fn->getParam(0)]
+                );
+
+                return JitNestedHelperCoerce::coerceToHashtablePtr($ctx, $raw);
+            }
         );
     }
 
@@ -180,12 +181,11 @@ final class JitStreamContextKernel
             $context,
             '__phpc_stream_context_set_params',
             $context->context->functionType($context->getTypeFromString('void'), false, $htPtr, $htPtr),
-            self::SET_PARAMS_HELPER,
             static function (Context $ctx, LlvmFunction $fn): void {
-                $ctx->builder->call(
+                JitNestedHelperCoerce::callHelper(
+                    $ctx,
                     self::helperFunction($ctx, self::SET_PARAMS_HELPER),
-                    $fn->getParam(0),
-                    $fn->getParam(1)
+                    [$fn->getParam(0), $fn->getParam(1)]
                 );
                 $ctx->builder->returnVoid();
             },
@@ -201,14 +201,11 @@ final class JitStreamContextKernel
             $context,
             '__phpc_stream_context_set_single_option',
             $context->context->functionType($context->getTypeFromString('void'), false, $htPtr, $valPtr, $valPtr, $valPtr),
-            self::SET_SINGLE_OPTION_HELPER,
             static function (Context $ctx, LlvmFunction $fn): void {
-                $ctx->builder->call(
+                JitNestedHelperCoerce::callHelper(
+                    $ctx,
                     self::helperFunction($ctx, self::SET_SINGLE_OPTION_HELPER),
-                    $fn->getParam(0),
-                    $fn->getParam(1),
-                    $fn->getParam(2),
-                    $fn->getParam(3)
+                    [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
                 );
                 $ctx->builder->returnVoid();
             },
@@ -223,22 +220,25 @@ final class JitStreamContextKernel
             $context,
             '__phpc_stream_context_get_params',
             $context->context->functionType($htPtr, false, $htPtr),
-            self::GET_PARAMS_HELPER,
-            static fn (Context $ctx, LlvmFunction $fn) => $ctx->builder->call(
-                self::helperFunction($ctx, self::GET_PARAMS_HELPER),
-                $fn->getParam(0)
-            )
+            static function (Context $ctx, LlvmFunction $fn): Value {
+                $raw = JitNestedHelperCoerce::callHelper(
+                    $ctx,
+                    self::helperFunction($ctx, self::GET_PARAMS_HELPER),
+                    [$fn->getParam(0)]
+                );
+
+                return JitNestedHelperCoerce::coerceToHashtablePtr($ctx, $raw);
+            }
         );
     }
 
     /**
-     * @param callable(Context, LlvmFunction): Value|void $emitReturn
+     * @param callable(Context, LlvmFunction): (Value|void) $emitReturn
      */
     private static function implementBridge(
         Context $context,
         string $abiName,
         $ft,
-        string $helperLogical,
         callable $emitReturn,
         bool $returnsVoid = false
     ): void {
@@ -256,10 +256,9 @@ final class JitStreamContextKernel
         $entry = $fn->appendBasicBlock($abiName.'_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $result = $emitReturn($context, $fn);
-        if ($returnsVoid) {
-            return;
+        if (!$returnsVoid) {
+            $context->builder->returnValue($result);
         }
-        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 
@@ -288,8 +287,8 @@ final class JitStreamContextKernel
     {
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after StreamContextRuntime bridge (#9340)');
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($name.' missing after StreamContextRuntime bridge (#9340/#27573)');
             }
             $context->registerFunction($name, $fn);
         }
