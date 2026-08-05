@@ -27,6 +27,8 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('sortPackedWithClosure', $helper);
         $this->assertStringContainsString('sortKeysWithClosure', $helper);
         $this->assertStringContainsString('sortValuesWithClosure', $helper);
+        // Thin AOT writeback: direct assignPackedList (#26954).
+        $this->assertStringContainsString('$ht->assignPackedList($values)', $helper);
         $this->assertStringContainsString('VmClosureCall', $helper);
 
         $usort = (string) file_get_contents(__DIR__.'/../../ext/standard/usort_.php');
