@@ -1095,6 +1095,17 @@ final class BuiltinClasses
             $rc->methodVisibility['resetaslazyproxy'] = $pubStatic;
             $rc->methods['resetaslazyobject'] = new ReflectionClassResetAsLazyObject();
             $rc->methodVisibility['resetaslazyobject'] = $pub;
+            // php-src stub return types — absent from php-types InternalArgInfo (#27741).
+            $objectRet = ReflectionTypeSupport::cfgTypeFromLabel('object');
+            $voidRet = ReflectionTypeSupport::cfgTypeFromLabel('void');
+            if (null !== $objectRet) {
+                $rc->methodReturnDeclaredTypes['newlazyghost'] = $objectRet;
+                $rc->methodReturnDeclaredTypes['newlazyproxy'] = $objectRet;
+            }
+            if (null !== $voidRet) {
+                $rc->methodReturnDeclaredTypes['resetaslazyghost'] = $voidRet;
+                $rc->methodReturnDeclaredTypes['resetaslazyproxy'] = $voidRet;
+            }
         }
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
         $rc->methodVisibility['isinternal'] = $pub;

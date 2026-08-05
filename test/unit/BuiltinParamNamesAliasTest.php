@@ -1391,6 +1391,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionproperty', 'setrawvalue', 1));
     }
 
+    /** @covers issue #27741 */
+    public function testReflectionClassLazyFactoryNamedParameters(): void
+    {
+        $ghost = 'ReflectionClass::newLazyGhost';
+        $proxy = 'ReflectionClass::newLazyProxy';
+        $resetGhost = 'ReflectionClass::resetAsLazyGhost';
+        $resetProxy = 'ReflectionClass::resetAsLazyProxy';
+        self::assertSame(['initializer', 'options='], BuiltinParamNames::forClassMethod($ghost));
+        self::assertSame(['factory', 'options='], BuiltinParamNames::forClassMethod($proxy));
+        self::assertSame(['object', 'initializer', 'options='], BuiltinParamNames::forClassMethod($resetGhost));
+        self::assertSame(['object', 'factory', 'options='], BuiltinParamNames::forClassMethod($resetProxy));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($ghost), 'initializer', $ghost));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($ghost), 'options', $ghost));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(BuiltinParamNames::forClassMethod($proxy), 'factory', $proxy));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionClass', 'newLazyGhost'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('ReflectionClass', 'newLazyGhost'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionClass', 'newLazyProxy'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('ReflectionClass', 'newLazyProxy'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalMethod('ReflectionClass', 'resetAsLazyGhost'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod('ReflectionClass', 'resetAsLazyGhost'));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionclass', 'newlazyghost', 0));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionclass', 'newlazyghost', 1));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionclass', 'newlazyproxy', 0));
+        self::assertSame('object', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionclass', 'resetaslazyghost', 0));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionclass', 'resetaslazyghost', 1));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('reflectionclass', 'resetaslazyghost', 2));
+    }
+
     /** @covers issue #26080 */
     public function testDomCreateFromStringNamedParameters(): void
     {
