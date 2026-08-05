@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitHypotKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for hypot() via HypotJitHelper PHP (#15074, #20664).
+ * JIT/AOT link for hypot() via HypotJitHelper PHP (#15074, #20664, #27909).
  *
- * Embed + thin standalone AOT: {@see HypotJitHelper} via {@see JitVmHelperLink}
- * (Rename #20603 shape — double via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
- * Nested helper compile: libc leaf without re-entering HypotJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathSqrt #27888 shape).
+ * NestedJIT no longer needs a libc hypot(3) kernel — helper uses NestedJIT-safe scale + sqrt.
  * php-src: ext/standard/math.c — PHP_FUNCTION(hypot)
  */
 final class MathHypot
@@ -45,10 +42,6 @@ final class MathHypot
 
     public static function invoke(Context $context, Value $x, Value $y): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitHypotKernel::invoke($context, $x, $y);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -60,10 +53,6 @@ final class MathHypot
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_HYPOT);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_HYPOT, $probe);
@@ -81,7 +70,7 @@ final class MathHypot
             self::HYPOT_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20664'
+            '#27909'
         );
     }
 }

@@ -55,7 +55,7 @@ final class CosRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('phpc_cos_kernel', $source);
-        $this->assertStringContainsString('phpc_hypot_kernel', $source);
+        $this->assertStringContainsString('phpc_sin_kernel', $source);
     }
 
     public function testSpineBundleIncludesCosJitHelper(): void
