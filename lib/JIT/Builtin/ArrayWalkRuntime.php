@@ -6,17 +6,25 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\ArrayWalkLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value;
 
 /**
  * JIT/AOT link for array_walk() / array_walk_recursive() via ArrayWalkJitHelper PHP (#14875, #14877, #14933).
  *
  * Standalone AOT compiles {@see ArrayWalkJitHelper} via JitVmHelperLink bridge (string builtin + closure).
+ * Thin AOT must publish sg_vm_context + NestedClosureInvoke before NestedJIT of the helper
+ * (VmClosureCall needs an active VM context — #27632 / peer UsortRuntime #24142).
+ * In-place HT mutation: skip unconditional storeHashtableInArrayVariable on value boxes (#27227).
  * SSOT: {@see \PHPCompiler\ext\standard\array_walk}, {@see \PHPCompiler\ext\standard\array_walk_recursive}
  * php-src: ext/standard/array.c — php_array_walk() / php_array_walk_recursive()
  */
@@ -73,7 +81,7 @@ final class ArrayWalkRuntime
             $ht,
             $context->constantFromString($name)
         );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::storeIfNative($context, $array, $ht);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
@@ -103,7 +111,7 @@ final class ArrayWalkRuntime
             $ht,
             $context->constantFromString($name)
         );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        self::storeIfNative($context, $array, $ht);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
@@ -122,19 +130,27 @@ final class ArrayWalkRuntime
                 'array_walk() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to a variable first'
             );
         }
+        if (null !== $userdata) {
+            // Keep NestedJIT bridge for userdata — LLVM path is 2-arg only (#27632).
+            self::ensureLinked($context);
+            $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $context->builder->call(
+                $context->lookupFunction(self::ABI_WALK_CLOSURE),
+                $ht,
+                JitValueBox::valuePtrFromVariable($context, $callback),
+                JitValueBox::valuePtrFromVariable($context, $userdata)
+            );
+            self::storeIfNative($context, $array, $ht);
 
-        self::ensureLinked($context);
+            return $context->getTypeFromString('int1')->constInt(1, false);
+        }
+
+        // Pure LLVM + NestedClosureInvoke — NestedJIT ArrayWalkJitHelper segfaults (#27632 / #24156).
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $context->builder->call(
-            $context->lookupFunction(self::ABI_WALK_CLOSURE),
-            $ht,
-            JitValueBox::valuePtrFromVariable($context, $callback),
-            null !== $userdata
-                ? JitValueBox::valuePtrFromVariable($context, $userdata)
-                : $valuePtr->constNull()
-        );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        ArrayWalkLlvm::walkWithClosure($context, $ht, $callback);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
@@ -153,21 +169,27 @@ final class ArrayWalkRuntime
                 'array_walk_recursive() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to a variable first'
             );
         }
+        if (null !== $userdata) {
+            throw new \LogicException(
+                'array_walk_recursive() userdata is not supported for JIT/AOT in this compiler build (#4913)'
+            );
+        }
 
-        self::ensureLinked($context);
+        // Pure LLVM + NestedClosureInvoke — NestedJIT ArrayWalkJitHelper segfaults (#27632 / #24156).
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $context->builder->call(
-            $context->lookupFunction(self::ABI_WALK_RECURSIVE_CLOSURE),
-            $ht,
-            JitValueBox::valuePtrFromVariable($context, $callback),
-            null !== $userdata
-                ? JitValueBox::valuePtrFromVariable($context, $userdata)
-                : $valuePtr->constNull()
-        );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        ArrayWalkLlvm::walkRecursiveWithClosure($context, $ht, $callback);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    /** In-place HT mutation; unconditional store corrupts thin AOT value boxes (#27227 / #27632). */
+    private static function storeIfNative(Context $context, JITVariable $array, Value $ht): void
+    {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        }
     }
 
     public static function ensureLinked(Context $context): void
@@ -182,6 +204,13 @@ final class ArrayWalkRuntime
 
     public static function implement(Context $context): void
     {
+        // Thin standalone AOT: publish sg_vm_context before NestedJIT of ArrayWalkJitHelper
+        // (VmClosureCall needs an active VM context — #27632 / peer #24142).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
+
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
 

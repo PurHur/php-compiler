@@ -76,6 +76,10 @@ final class array_walk extends Internal
                 'array_walk(): Argument #1 ($array) must be of type array, '.$badSubject.' given'
             );
         }
+        // Runtime-null / boxed non-array under thin AOT (#27632 / peer #26969).
+        if (JITVariable::TYPE_VALUE === $args[0]->type || \PHPCompiler\JIT\JitValueBox::isValueOperand($args[0])) {
+            JitArrayElem::requireArrayParam($context, $args[0], 'array_walk', 1, 'array');
+        }
         if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
             throw new \TypeError(
                 'array_walk(): Argument #2 ($callback) must be a valid callback, no array or string given'
