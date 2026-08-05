@@ -70,4 +70,26 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'attribute_constructor_bare_array.php'));
         $this->assertSame("1,2\n", ob_get_clean());
     }
+
+    /**
+     * #27709 — anonymous class in attribute ctor arg: Zend const-expr fatal, not "Dynamic class name…".
+     *
+     * @see Zend/zend_compile.c — zend_compile_const_expr / ZEND_ACC_ANON_CLASS
+     */
+    public function testAnonymousClassInAttributeCtorIsConstExprFatal(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot use anonymous class in constant expression');
+        $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+#[Attribute]
+class A { public function __construct(public object $o) {} }
+#[A(new class {})]
+class C {}
+PHP,
+            'attribute_constructor_anon_class.php'
+        );
+    }
 }

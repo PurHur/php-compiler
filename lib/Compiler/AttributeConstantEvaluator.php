@@ -422,6 +422,16 @@ final class AttributeConstantEvaluator
 
     private static function evalNew(Expr\New_ $expr): CompileTimeNew
     {
+        // php-src Zend/zend_compile.c — zend_compile_const_expr rejects ZEND_ACC_ANON_CLASS (#27709).
+        if ($expr->class instanceof Node\Stmt\Class_) {
+            $file = '' !== self::$scriptFile ? self::$scriptFile : 'unknown';
+
+            throw new CompileFatal(
+                $file,
+                max(1, $expr->getStartLine()),
+                FunctionStaticAnonymousClassCompileCheck::MESSAGE
+            );
+        }
         if (!$expr->class instanceof Node\Name) {
             throw new \LogicException(
                 'Dynamic class name in attribute constructor new expression is not supported'
