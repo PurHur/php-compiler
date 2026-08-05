@@ -59,14 +59,20 @@ final class htmlspecialchars_decode extends Internal
             throw new \LogicException('htmlspecialchars_decode() requires one or two arguments in this compiler build');
         }
 
+        // Fold proven compile-time strings: KIND_VALUE immediates and TYPE_STRING
+        // stack slots (literal args / assigned locals keep KIND_VARIABLE with
+        // compileTimeString) — peer htmlspecialchars (#25345) / html_entity_decode.
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $maybeLiteral = $args[0]->compileTimeString ?? null;
-            if (null !== $maybeLiteral && JITVariable::KIND_VALUE === $args[0]->kind) {
+            if (null !== $maybeLiteral
+                && (JITVariable::KIND_VALUE === $args[0]->kind
+                    || JITVariable::TYPE_STRING === $args[0]->type)) {
                 $literal = $maybeLiteral;
             }
         }
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
+        $flagsKnown = $argc < 2;
         if ($argc >= 2) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
                 throw new \LogicException('htmlspecialchars_decode() flags must be an integer in this compiler build');
@@ -74,9 +80,10 @@ final class htmlspecialchars_decode extends Internal
             $ct = $args[1]->compileTimeLong ?? null;
             if (null !== $ct) {
                 $flags = (int) $ct;
+                $flagsKnown = true;
             }
         }
-        if (null !== $literal && 1 === $argc) {
+        if (null !== $literal && $flagsKnown) {
             return $context->builder->load(
                 $context->constantStringFromString(
                     VmString::htmlspecialchars_decode($literal, $flags)

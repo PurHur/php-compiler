@@ -26,13 +26,26 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
     public function testHtmlspecialcharsDecodeJitHelperMirrorsVmStringSemantics(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HtmlspecialcharsDecodeJitHelper.php');
-        $this->assertStringContainsString('entityAt', $source);
+        $this->assertStringContainsString('decodeFrom', $source);
+        $this->assertStringContainsString('entityMatch', $source);
         $this->assertStringContainsString('Self-contained', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$len\s*=\s*\\\\strlen\s*\(/', $source);
+        $this->assertDoesNotMatchRegularExpression('/while\s*\(\s*\$i\s*</', $source);
 
         $input = '&lt;a&gt;&quot;b&#039;c';
         $flags = ENT_QUOTES | ENT_HTML5;
         $expected = \PHPCompiler\ext\standard\VmString::htmlspecialchars_decode($input, $flags);
         $this->assertSame($expected, HtmlspecialcharsDecodeJitHelper::htmlspecialcharsDecodeArgv($input, $flags));
+    }
+
+    public function testHelperRuntimeCacheForcesDecodeInlineForUserScriptAot(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString(
+            'htmlspecialcharsdecodejithelper::htmlspecialcharsdecodeargv',
+            $source
+        );
+        $this->assertStringContainsString('#27050', $source);
     }
 
     public function testSpineBundleOmitsDeletedHtmlspecialcharsDecodeLlvm(): void
