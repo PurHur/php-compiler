@@ -60,6 +60,10 @@ final class VmIteratorProtocol
                 || \PHPCompiler\VM\SplOuterIteratorHt::isHtBacked($containerUserType)) {
                 return false;
             }
+            // Arrays are never Iterator protocol (#27105).
+            if ('array' === $ut) {
+                return false;
+            }
         }
         if ($container->type & JitVariable::IS_NATIVE_ARRAY) {
             return false;
@@ -69,6 +73,18 @@ final class VmIteratorProtocol
         }
         if (JitVariable::TYPE_OBJECT !== $container->type && JitVariable::TYPE_VALUE !== $container->type) {
             return false;
+        }
+        // Main-script locals are TYPE_VALUE script globals. Without a concrete class
+        // hint, multi-candidate RuntimeIndirect would claim arrays as Iterators and
+        // __value__readObject a hashtable (#27105 / AOT foreach segfault).
+        if (JitVariable::TYPE_VALUE === $container->type) {
+            if (null === $containerUserType || '' === $containerUserType) {
+                return false;
+            }
+            $ut = strtolower(ltrim($containerUserType, '\\'));
+            if ('object' === $ut) {
+                return false;
+            }
         }
         try {
             $receiver = self::normalizeObjectReceiver($context, $container);
