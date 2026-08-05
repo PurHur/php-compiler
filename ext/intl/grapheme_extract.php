@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * grapheme_extract() — extract grapheme clusters from UTF-8 (php-src ext/intl/grapheme; #6023).
  *
  * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme::tryExtractFold} (#6023, #19965).
+ * Reflection / named args: Zend stub `$haystack`/`$type`/`$offset`/`&$next` → `string|false` (#27884).
  */
 final class grapheme_extract extends Internal
 {
@@ -54,7 +55,7 @@ final class grapheme_extract extends Internal
                 $frame->calledArgs[2],
                 'grapheme_extract',
                 3,
-                'extract_type'
+                'type'
             );
         }
         $start = 0;
@@ -63,7 +64,7 @@ final class grapheme_extract extends Internal
                 $frame->calledArgs[3],
                 'grapheme_extract',
                 4,
-                'start'
+                'offset'
             );
         }
         $nextVar = null;

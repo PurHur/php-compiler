@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  * grapheme_strstr() — grapheme-cluster strstr (php-src ext/intl/grapheme; #7221).
  *
  * VM: {@see VmGrapheme}; JIT/AOT: compile-time fold via {@see JitGrapheme}.
+ * Reflection / named args: Zend stub `$beforeNeedle` (not `$part`) → `string|false` (#27884).
  */
 final class grapheme_strstr extends Internal
 {

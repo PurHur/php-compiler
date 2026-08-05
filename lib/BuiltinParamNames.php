@@ -1779,6 +1779,21 @@ final class BuiltinParamNames
             // php-src ext/intl/intl_error.stub.php — InternalArgInfo still says error_code (#25587)
             case 'intl_error_name':
                 return ['errorCode'];
+            // php-src ext/intl/grapheme/grapheme.stub.php — InternalArgInfo still str/start/part/extract_type (#27884)
+            case 'grapheme_strlen':
+                return ['string'];
+            case 'grapheme_substr':
+                return ['string', 'offset', 'length='];
+            case 'grapheme_strstr':
+            case 'grapheme_stristr':
+                return ['haystack', 'needle', 'beforeNeedle='];
+            case 'grapheme_extract':
+                return ['haystack', 'size', 'type=', 'offset=', '&next='];
+            case 'grapheme_strpos':
+            case 'grapheme_stripos':
+            case 'grapheme_strrpos':
+            case 'grapheme_strripos':
+                return ['haystack', 'needle', 'offset='];
             // php-src ext/intl/resourcebundle/resourcebundle.stub.php — bundlename + fallback infer false (#25587)
             case 'resourcebundle_create':
                 return ['locale', 'bundle', 'fallback='];
