@@ -11,10 +11,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/openssl.c / pkey.c; issue #15428, #26689).
+ * openssl_pkey_derive() — EVP_PKEY_derive (php-src ext/openssl/openssl.c / pkey.c; issue #15428, #26689, #27685).
  *
  * Args are untyped zvals in php-src (`zend_parse_parameters(..., "zz|l")`); invalid scalars soft-fail
  * to false via php_openssl_pkey_from_zval — not TypeError.
+ *
+ * Reflection / named args: Zend stub `public_key`, `private_key`, `int $key_length = 0`: `string|false`
+ * (absent from php-types InternalArgInfo — see BuiltinParamNames / BuiltinInternalArgInfo).
  */
 final class openssl_pkey_derive extends Internal
 {

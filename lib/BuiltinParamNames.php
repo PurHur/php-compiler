@@ -1108,6 +1108,9 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says configargs (#24491)
             case 'openssl_pkey_new':
                 return ['options'];
+            // php-src ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
+            case 'openssl_pkey_derive':
+                return ['public_key', 'private_key', 'key_length='];
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says out/config_args / outfilename (#24492)
             case 'openssl_pkey_export':
                 return ['key', 'output', 'passphrase', 'options'];

@@ -4172,6 +4172,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #27685 */
+    public function testOpensslPkeyDeriveNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('openssl_pkey_derive');
+        self::assertSame(['public_key', 'private_key', 'key_length='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'public_key', 'openssl_pkey_derive'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'private_key', 'openssl_pkey_derive'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'key_length', 'openssl_pkey_derive'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'peer_key', 'openssl_pkey_derive'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_pkey_derive'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('openssl_pkey_derive'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_pkey_derive'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_pkey_derive', 0));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_pkey_derive', 1));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_pkey_derive', 2));
+    }
+
     /** @covers issue #24551 */
     public function testPcntlSignalNamedParamsResolve(): void
     {

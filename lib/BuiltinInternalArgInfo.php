@@ -157,6 +157,8 @@ final class BuiltinInternalArgInfo
             'mb_convert_encoding' => 'array|string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
+            // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
+            'openssl_pkey_derive' => 'string|false',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -454,6 +456,12 @@ final class BuiltinInternalArgInfo
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25018)
             'hash_hkdf' => match ($index) {
                 0, 1, 3, 4 => 'string',
+                2 => 'int',
+                default => null,
+            },
+            // ext/openssl/openssl.stub.php — absent from InternalArgInfo; $public_key/$private_key untyped (#27685)
+            'openssl_pkey_derive' => match ($index) {
+                0, 1 => '',
                 2 => 'int',
                 default => null,
             },
