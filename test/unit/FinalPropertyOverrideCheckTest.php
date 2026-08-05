@@ -548,4 +548,39 @@ PHP;
         $runtime->run($block);
         self::assertSame('c', ob_get_clean());
     }
+
+    /**
+     * @covers issue #27818 — trait-imported final plain property: isFinal=1 + child
+     * override CompileFatal (same Zend inheritance rules as class-declared finals).
+     */
+    public function testTraitImportedFinalPropertyIsFinalAndOverrideCompileFatal(): void
+    {
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $isFinalCode = <<<'PHP'
+<?php
+trait T { final public string $x = 't'; }
+class A { use T; }
+echo 'isFinal=', (int) (new ReflectionProperty(A::class, 'x'))->isFinal(), "\n";
+$a = new A();
+$a->x = 'z';
+echo 'wrote=', $a->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($isFinalCode, 'issue27818_trait_isFinal.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("isFinal=1\nwrote=z\n", ob_get_clean());
+
+        $overrideCode = <<<'PHP'
+<?php
+trait T { final public string $x = 't'; }
+class A { use T; }
+class B extends A { public string $x = 'b'; }
+echo "bad\n";
+PHP;
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage('Cannot override final property A::$x');
+        $runtime->parseAndCompile($overrideCode, 'issue27818_trait_override.php');
+    }
 }
