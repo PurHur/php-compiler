@@ -47,8 +47,8 @@ final class ucwords extends Internal
             throw new \LogicException('ucwords() requires one or two arguments');
         }
         $str = self::jitStringArg($context, $args[0], 0, 'string');
-        // Empty / soft-null → '' without linking or calling __string__ucwords —
-        // AOT helper segfaults on empty / when co-linked with other string builtins (#24598).
+        // Empty / soft-null → '' without linking or calling __string__ucwords (#24598).
+        // Non-empty path uses self-contained UcwordsJitHelper (no VmString NestedJIT stub) (#27049).
         $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         if (
             JITVariable::TYPE_NULL === $args[0]->type

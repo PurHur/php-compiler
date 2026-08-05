@@ -9,12 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __string__ucwords / __string__ucwords_ex via UcwordsJitHelper PHP (#14717, #21726).
+ * JIT/AOT link for __string__ucwords / __string__ucwords_ex via UcwordsJitHelper PHP (#14717, #21726, #27049).
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringCslashes #21617 / StringStripTags #21711 /
- * StringVersionCompare #21706.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrrev #27007 / StringQuotemeta #27011
+ * (self-contained helper — no VmString ExternalMethod stub under NestedJIT).
+ * SSOT: {@see \PHPCompiler\ext\standard\UcwordsJitHelper} (mirrors {@see \PHPCompiler\ext\standard\VmString}).
  * php-src: ext/standard/string.c — php_ucwords() / php_ucwords_ex()
  */
 final class StringUcwords
