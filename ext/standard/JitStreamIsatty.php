@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamCaps;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -14,6 +16,11 @@ final class JitStreamIsatty
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamCaps::ensureLinked($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_stream_isatty'),
             $handleLong

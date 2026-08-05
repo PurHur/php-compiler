@@ -85,6 +85,14 @@ final class StreamCapsRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testJitStreamIsattyLazyLinksStreamCapsBeforeLookup(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamIsatty.php');
+        $this->assertStringContainsString('StreamCaps::ensureLinked', $source);
+        $supports = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSupports.php');
+        $this->assertStringContainsString('StreamCaps::ensureLinked', $supports);
+    }
+
     public function testStreamCapsJitHelperMatchesVmFsIsLocal(): void
     {
         $handle = VmFs::fopen('php://memory', 'r+');
