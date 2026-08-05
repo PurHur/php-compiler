@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\UcwordsJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** ucwords() JIT routes through UcwordsJitHelper + JitVmHelperLink (#14717, #21726). */
+/** ucwords() JIT routes through UcwordsJitHelper + JitVmHelperLink (#14717, #21726, #27049). */
 final class UcwordsRuntimeShrinkTest extends TestCase
 {
     public function testStringUcwordsUsesJitHelperNotInlineLlvm(): void
@@ -29,15 +29,23 @@ final class UcwordsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__string__ucwords', $builtin);
     }
 
-    public function testUcwordsJitHelperDelegatesToVmString(): void
+    public function testUcwordsJitHelperIsSelfContainedAndMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UcwordsJitHelper.php');
-        $this->assertStringContainsString('VmString::asciiUcwords', $source);
-        $this->assertStringContainsString('VmString::asciiUcwordsEx', $source);
+        // NestedJIT AOT: no VmString / ExternalMethod stub (#16075 / #27049).
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('upperAsciiLower', $source);
 
         $this->assertSame('Hello World', UcwordsJitHelper::ucwordsArgv('hello world'));
         $this->assertSame(VmString::asciiUcwords('hello world'), UcwordsJitHelper::ucwordsArgv('hello world'));
+        $this->assertSame('  Hello', UcwordsJitHelper::ucwordsArgv('  hello'));
+        $this->assertSame('Hello-world', UcwordsJitHelper::ucwordsArgv('hello-world'));
         $this->assertSame('Hello-World', UcwordsJitHelper::ucwordsExArgv('hello-world', '-'));
+        $this->assertSame(
+            VmString::asciiUcwordsEx('hello.world', '.'),
+            UcwordsJitHelper::ucwordsExArgv('hello.world', '.')
+        );
+        $this->assertSame('', UcwordsJitHelper::ucwordsArgv(''));
     }
 
     public function testSpineBundleIncludesUcwordsJitHelper(): void
