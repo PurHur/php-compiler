@@ -57,6 +57,8 @@ final class ScopeBuiltinRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        // ScopeBuiltinJitHelper::isValidVarName uses preg_match → `__compiler_preg_match` (#27520).
+        PregMatchRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::ensureExtractResolveLinked($context);
         self::ensureCompactCollectLinked($context);
@@ -86,6 +88,7 @@ final class ScopeBuiltinRuntime
 
     public static function ensureExtractResolveLinked(Context $context): void
     {
+        PregMatchRuntime::ensureLinked($context);
         $probe = $context->module->getNamedFunction(self::ABI_RESOLVE_EXTRACT_TARGET);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_RESOLVE_EXTRACT_TARGET, $probe);
@@ -259,6 +262,7 @@ final class ScopeBuiltinRuntime
 
     public static function ensureMatchNamedVarLinked(Context $context): void
     {
+        PregMatchRuntime::ensureLinked($context);
         $probe = $context->module->getNamedFunction(self::ABI_MATCH_NAMED_VAR_INDEX);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_MATCH_NAMED_VAR_INDEX, $probe);
@@ -485,6 +489,8 @@ final class ScopeBuiltinRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
+        // Before NestedJIT of ScopeBuiltinJitHelper (preg_match in isValidVarName) (#27520).
+        PregMatchRuntime::ensureLinked($context);
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,

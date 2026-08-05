@@ -69,7 +69,11 @@ final class ScopeBuiltinIndexLlvm
     public static function assignFromValueEntry(Context $context, Variable $dest, Value $entryPtr): void
     {
         if (Variable::TYPE_VALUE === $dest->type) {
-            JitValueBox::copyFromPointer($context, $dest->value, $entryPtr);
+            // Script globals store `__value__*` in a global slot — load before copy (#27520).
+            $destPtr = $dest->functionStaticGlobal
+                ? $context->builder->load($dest->value)
+                : JitValueBox::pointer($context, $dest->value);
+            JitValueBox::copyIntoPointer($context, $destPtr, $entryPtr);
 
             return;
         }
