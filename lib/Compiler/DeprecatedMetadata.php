@@ -220,7 +220,8 @@ final class DeprecatedMetadata
     /**
      * Trait use-site notice (PHP 8.5+, Zend zend_execute / rfc:deprecated_traits, #22989).
      *
-     * Bare `#[\Deprecated]` (no message/since) still emits — unlike function/class use sites (#4392).
+     * Bare `#[\Deprecated]` (no message/since) still emits — same as function/method/const use sites
+     * (rfc:deprecated_attribute, #27825).
      */
     public function formatTraitUse(string $trait, string $class): string
     {
@@ -246,8 +247,7 @@ final class DeprecatedMetadata
      * Property-hook accessor notice (PHP 8.4+, Zend zend_attributes.c / zend_property_hooks.c, #26370).
      *
      * Zend formats hook methods as `Method Class::$prop::get()` / `::set()`, not the
-     * synthetic `__phpc_property_*` names. Bare `#[\Deprecated]` still emits (same as
-     * property targets — do not gate on {@see emitsRuntimeNotice()}).
+     * synthetic `__phpc_property_*` names. Bare `#[\Deprecated]` still emits.
      */
     public function formatPropertyHook(string $class, string $property, string $hook): string
     {
@@ -260,16 +260,16 @@ final class DeprecatedMetadata
     }
 
     /**
-     * Whether call/const/class use sites emit E_USER_DEPRECATED (#4392).
+     * Whether call/const/class use sites emit E_USER_DEPRECATED.
      *
-     * Bare #[\Deprecated] (no message/since) stays reflection-only on those targets.
-     * Property read/write, property-hook accessors, and trait-use paths do not consult
-     * this — attribute presence alone emits (Zend zend_object_handlers.c /
-     * zend_property_hooks.c / rfc:deprecated_traits, #23536, #22989, #26370).
+     * Attribute presence alone is enough — bare `#[\Deprecated]` (no message/since) still
+     * emits `Function f() is deprecated` / equivalent (php-src zend_execute.c +
+     * rfc:deprecated_attribute, #27825). Message/since only shape the notice suffix.
+     * Callers also gate on {@see CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()}.
      */
     public function emitsRuntimeNotice(): bool
     {
-        return null !== $this->message || null !== $this->since;
+        return true;
     }
 
     /**

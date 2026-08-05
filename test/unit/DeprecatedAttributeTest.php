@@ -91,10 +91,10 @@ final class DeprecatedAttributeTest extends TestCase
         );
     }
 
-    public function testBareDeprecatedDoesNotEmitRuntimeNotice(): void
+    public function testBareDeprecatedEmitsRuntimeNotice(): void
     {
         $meta = new DeprecatedMetadata(null, null);
-        $this->assertFalse($meta->emitsRuntimeNotice());
+        $this->assertTrue($meta->emitsRuntimeNotice());
 
         $meta = new DeprecatedMetadata('old', null);
         $this->assertTrue($meta->emitsRuntimeNotice());
@@ -151,22 +151,74 @@ final class DeprecatedAttributeTest extends TestCase
         );
     }
 
-    public function testBareDeprecatedMethodCallIsSilent(): void
+    /** @covers issue #27825 */
+    public function testBareDeprecatedMethodCallEmitsUnderProfile84(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
+ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
 class Box {
     #[\Deprecated]
     public function ping(): string {
         return 'pong';
     }
 }
-echo (new Box())->ping();
+(new Box())->ping();
+$last = error_get_last();
+echo ($last['message'] ?? 'none'), "\n";
+echo (($last['type'] ?? 0) === 16384) ? 'dep' : 'no';
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'bare_deprecated_method.php'));
-        $this->assertSame('pong', ob_get_clean());
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'bare_deprecated_method.php'));
+            $this->assertSame(
+                "Method Box::ping() is deprecated\ndep",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #27825 */
+    public function testBareDeprecatedFunctionCallEmitsUnderProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
+#[\Deprecated]
+function bare_dep(): void {}
+bare_dep();
+$last = error_get_last();
+echo ($last['message'] ?? 'none'), "\n";
+echo (($last['type'] ?? 0) === 16384) ? 'dep' : 'no';
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'bare_deprecated_fn.php'));
+            $this->assertSame(
+                "Function bare_dep() is deprecated\ndep",
+                ob_get_clean()
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testDeprecatedOnPropertyIsCompileFatalUnderProfile84(): void

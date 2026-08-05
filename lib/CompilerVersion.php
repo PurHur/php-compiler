@@ -653,8 +653,9 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ #[\Deprecated(message|since)] runtime E_USER_DEPRECATED at use sites (Zend/zend_execute.c, #16090).
+     * PHP 8.4+ #[\Deprecated] runtime E_USER_DEPRECATED at use sites (Zend/zend_execute.c, #16090, #27825).
      *
+     * Bare attribute (no message/since) still emits; message/since only shape the notice text.
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 silent gate.
      */
     public static function supportsDeprecatedAttributeRuntimeNotices(): bool

@@ -20894,13 +20894,14 @@ restart:
             return;
         }
         $name = $frame->call->getName();
-        // Property-hook methods: bare #[\Deprecated] emits; Zend message is Class::$prop::get/set (#26370).
+        // Property-hook methods: Zend message is Class::$prop::get/set (#26370).
         $hookMessage = $this->formatPropertyHookDeprecationMessage($meta, $name, null);
         if (null !== $hookMessage) {
             $this->emitDeprecatedNotice($hookMessage, $frame);
 
             return;
         }
+        // Bare #[\Deprecated] emits too (rfc:deprecated_attribute / #27825).
         if (!$meta->emitsRuntimeNotice()) {
             return;
         }
@@ -20916,8 +20917,7 @@ restart:
     /**
      * #[\Deprecated] on property get/set hooks — Zend Method Class::$prop::get/set() (#26370).
      *
-     * Hook dispatch bypasses FUNCCALL_EXEC ({@see invokePhpFunctionWithPropertyHookRaw});
-     * bare attribute still emits (unlike ordinary methods gated by emitsRuntimeNotice()).
+     * Hook dispatch bypasses FUNCCALL_EXEC ({@see invokePhpFunctionWithPropertyHookRaw}).
      */
     private function emitPropertyHookDeprecationNotice(
         Func\PHP $func,
@@ -21120,8 +21120,7 @@ restart:
             return;
         }
         // Property targets: attribute presence is enough (bare #[\Deprecated] still emits —
-        // Zend zend_object_handlers.c / #23536). Do not reuse emitsRuntimeNotice() (#4392
-        // call/const gate), which treats bare as reflection-only.
+        // Zend zend_object_handlers.c / #23536; same rule as call sites #27825).
         $meta = $declEntry->propDeprecated[$propLc];
         $this->emitDeprecatedNotice(
             $meta->formatProperty($declEntry->name, $propName),
