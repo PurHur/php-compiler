@@ -829,8 +829,10 @@ class Context {
             'phpc_asinh_kernel',
             'phpc_atanh_kernel',
             'phpc_exp_kernel',
+            'phpc_expm1_kernel',
             'phpc_log_kernel',
             'phpc_log10_kernel',
+            'phpc_log1p_kernel',
 
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',

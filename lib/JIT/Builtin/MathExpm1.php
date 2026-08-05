@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitExpm1Kernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for expm1() via Expm1JitHelper PHP (#15157).
+ * JIT/AOT link for expm1() via Expm1JitHelper PHP (#15157, #27057).
  *
- * Replaces libc `expm1` LLVM lookup in ext/standard/expm1.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see Expm1JitHelper} via {@see JitVmHelperLink}
+ * (Ceil/Sqrt #20664 / #27047 exp shape — double via helper result coerce).
+ * Nested helper compile: libc leaf without re-entering Expm1JitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(expm1)
  */
 final class MathExpm1
@@ -28,6 +31,8 @@ final class MathExpm1
         self::EXPM1_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'expm1_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathExpm1
 
     public static function invoke(Context $context, Value $num): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitExpm1Kernel::invoke($context, $num);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -50,17 +59,28 @@ final class MathExpm1
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_EXPM1);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_EXPM1, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_EXPM1,
-            'expm1_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double],
             $double,
             self::EXPM1_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15157'
+            '#27057'
         );
     }
 }
