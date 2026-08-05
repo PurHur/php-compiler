@@ -21,6 +21,7 @@ use PHPLLVM\Value;
  *
  * VM: {@see VmGrapheme}; JIT/AOT: compile-time fold via {@see JitGrapheme}.
  * Z_PARAM_STR null TypeError on 8.4 forward profile (#20694).
+ * Reflection / named args: Zend stub `$string`/`$offset`/`?int $length` → `string|false` (#27884).
  */
 final class grapheme_substr extends Internal
 {
@@ -51,7 +52,7 @@ final class grapheme_substr extends Internal
             $frame->calledArgs[1],
             'grapheme_substr',
             2,
-            'start'
+            'offset'
         );
         $length = null;
         if (3 === $argc) {

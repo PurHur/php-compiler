@@ -284,6 +284,35 @@ final class BuiltinInternalDefaultValues
         'openssl_pkey_derive' => [
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/intl/grapheme/grapheme.stub.php — ?int $length = null (InternalArgInfo int→0) (#27884)
+        'grapheme_substr' => [
+            2 => ['kind' => 'null'],
+        ],
+        // php-src grapheme.stub.php — bool $beforeNeedle = false
+        'grapheme_strstr' => [
+            2 => ['kind' => 'bool', 'value' => false],
+        ],
+        'grapheme_stristr' => [
+            2 => ['kind' => 'bool', 'value' => false],
+        ],
+        // php-src grapheme.stub.php — type=0, offset=0, &$next = null
+        'grapheme_extract' => [
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'int', 'value' => 0],
+            4 => ['kind' => 'null'],
+        ],
+        'grapheme_strpos' => [
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
+        'grapheme_stripos' => [
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
+        'grapheme_strrpos' => [
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
+        'grapheme_strripos' => [
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/hash/hash.stub.php — length=0, binary=false, options=[] (#25469)
         'hash_pbkdf2' => [
             4 => ['kind' => 'int', 'value' => 0],

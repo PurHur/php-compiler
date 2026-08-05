@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  *
  * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme}.
  * Z_PARAM_STR null TypeError on 8.4 forward profile (#20694).
+ * Reflection / named args: Zend stub `string $string`: `int|false|null` (#27884).
  */
 final class grapheme_strlen extends Internal
 {

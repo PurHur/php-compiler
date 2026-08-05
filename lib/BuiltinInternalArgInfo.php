@@ -159,6 +159,16 @@ final class BuiltinInternalArgInfo
             'session_id' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
+            // ext/intl/grapheme/grapheme.stub.php — InternalArgInfo size_t/string/int without |false (#27884)
+            'grapheme_strlen' => 'int|false|null',
+            'grapheme_substr',
+            'grapheme_strstr',
+            'grapheme_stristr',
+            'grapheme_extract' => 'string|false',
+            'grapheme_strpos',
+            'grapheme_stripos',
+            'grapheme_strrpos',
+            'grapheme_strripos' => 'int|false',
             // ext/intl/resourcebundle/resourcebundle.stub.php — InternalArgInfo return ResourceBundle (missing ?) (#25587)
             'resourcebundle_create' => '?ResourceBundle',
             // ext/json/json.stub.php — InternalArgInfo omits mixed / |false (#25458)
@@ -462,6 +472,30 @@ final class BuiltinInternalArgInfo
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo; $public_key/$private_key untyped (#27685)
             'openssl_pkey_derive' => match ($index) {
                 0, 1 => '',
+                2 => 'int',
+                default => null,
+            },
+            // ext/intl/grapheme/grapheme.stub.php — Zend names/types; &$next untyped (#27884)
+            'grapheme_strlen' => 0 === $index ? 'string' : null,
+            'grapheme_substr' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                2 => '?int',
+                default => null,
+            },
+            'grapheme_strstr', 'grapheme_stristr' => match ($index) {
+                0, 1 => 'string',
+                2 => 'bool',
+                default => null,
+            },
+            'grapheme_extract' => match ($index) {
+                0 => 'string',
+                1, 2, 3 => 'int',
+                4 => '',
+                default => null,
+            },
+            'grapheme_strpos', 'grapheme_stripos', 'grapheme_strrpos', 'grapheme_strripos' => match ($index) {
+                0, 1 => 'string',
                 2 => 'int',
                 default => null,
             },

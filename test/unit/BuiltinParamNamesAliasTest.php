@@ -4189,6 +4189,50 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_pkey_derive', 2));
     }
 
+    /** @covers issue #27884 */
+    public function testGraphemeNamedParamsResolve(): void
+    {
+        $strlen = BuiltinParamNames::forFunction('grapheme_strlen');
+        self::assertSame(['string'], $strlen);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strlen, 'string', 'grapheme_strlen'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strlen, 'str', 'grapheme_strlen'));
+        self::assertSame('int|false|null', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_strlen'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('grapheme_strlen', 0));
+
+        $substr = BuiltinParamNames::forFunction('grapheme_substr');
+        self::assertSame(['string', 'offset', 'length='], $substr);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($substr, 'offset', 'grapheme_substr'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($substr, 'start', 'grapheme_substr'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('grapheme_substr'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('grapheme_substr'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_substr'));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('grapheme_substr', 2));
+
+        $strstr = BuiltinParamNames::forFunction('grapheme_strstr');
+        self::assertSame(['haystack', 'needle', 'beforeNeedle='], $strstr);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($strstr, 'beforeNeedle', 'grapheme_strstr'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strstr, 'part', 'grapheme_strstr'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_strstr'));
+
+        $extract = BuiltinParamNames::forFunction('grapheme_extract');
+        self::assertSame(['haystack', 'size', 'type=', 'offset=', '&next='], $extract);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($extract, 'haystack', 'grapheme_extract'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($extract, 'type', 'grapheme_extract'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($extract, 'offset', 'grapheme_extract'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($extract, 'next', 'grapheme_extract'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($extract, 'str', 'grapheme_extract'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($extract, 'extract_type', 'grapheme_extract'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($extract, 'start', 'grapheme_extract'));
+        self::assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_extract'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('grapheme_extract', 4));
+
+        self::assertSame(
+            ['haystack', 'needle', 'beforeNeedle='],
+            BuiltinParamNames::forFunction('grapheme_stristr')
+        );
+        self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('grapheme_strpos'));
+    }
+
     /** @covers issue #24551 */
     public function testPcntlSignalNamedParamsResolve(): void
     {
