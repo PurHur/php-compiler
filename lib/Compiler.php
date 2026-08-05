@@ -533,10 +533,14 @@ class Compiler {
      *
      * @return never
      */
-    protected function throwCompileError(string $detail): void
+    protected function throwCompileError(string $detail, ?string $sourceFile = null, ?int $sourceLine = null): void
     {
         if (null === $this->compileAbortDetail) {
             $this->compileAbortDetail = $detail;
+        }
+
+        if (null !== $sourceFile) {
+            throw new CompileFatal($sourceFile, max(1, $sourceLine ?? 1), $detail);
         }
 
         throw new \CompileError($detail);
@@ -41832,8 +41836,10 @@ class Compiler {
                 $returnLine = $terminal->getLine();
                 $returnLineArg = $returnLine > 0 ? $returnLine : null;
                 if ($block->returnTypeNever) {
+                    $neverFile = $terminal->getFile() ?: 'unknown';
+                    $neverLine = $returnLine > 0 ? $returnLine : 1;
                     if (!is_null($terminal->expr)) {
-                        $this->throwCompileError('A never-returning function must not return');
+                        $this->throwCompileError('A never-returning function must not return', $neverFile, $neverLine);
                     }
                     if ($this->neverFunctionHasAbnormalExitBeforeReturn($block->orig, $terminal)) {
                         return [];
@@ -41844,7 +41850,7 @@ class Compiler {
                             $returnLineArg
                         )];
                     }
-                    $this->throwCompileError('A never-returning function must not return');
+                    $this->throwCompileError('A never-returning function must not return', $neverFile, $neverLine);
                 }
                 if (is_null($terminal->expr)) {
                     return [new OpCode(
