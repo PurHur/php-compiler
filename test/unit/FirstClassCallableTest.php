@@ -115,6 +115,38 @@ PHP;
         $this->assertSame('parent', ob_get_clean());
     }
 
+    /** Issue #27834: parent::/self:: FCC invoke must forward user args (re-#17655). */
+    public function testVmParentInstanceMethodFirstClassCallableWithArgs(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A {
+  public $v = 'A';
+  public function foo($x) { return $this->v.':'.$x; }
+  public static function bar($x) { return 'A:'.$x; }
+}
+class B extends A {
+  public $v = 'B';
+  public function foo($x) { return $this->v.':'.$x; }
+  public function test() {
+    $f = parent::foo(...);
+    echo get_class($f), "\n";
+    echo $f('z'), "\n";
+    $g = self::foo(...);
+    echo $g('w'), "\n";
+    $h = parent::bar(...);
+    echo $h('s'), "\n";
+  }
+}
+(new B)->test();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("Closure\nB:z\nB:w\nA:s\n", ob_get_clean());
+    }
+
     /** Issue #26252: parent::staticMethod(...) from static context (re-#17655). */
     public function testVmParentStaticMethodFirstClassCallableFromStatic(): void
     {

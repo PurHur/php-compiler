@@ -17099,7 +17099,10 @@ restart:
             }
             $frame->call = $state->wrappedFunc;
             $frame->closureCall = null;
-            $frame->callArgs = [];
+            // Scoped parent/self FCC (#17655/#26630) and fromCallable instance wrappers clear
+            // methodReceiver and call wrappedFunc directly. Instance methods still need $this
+            // as callArgs[0] so user args land at ARG_RECV indices 1..n (#27834).
+            $frame->callArgs = $this->wrappedFuncInstanceThisPrefix($state);
             $frame->callArgEntries = [];
             $frame->builtinCalleeQualifiedMethod = null;
 
@@ -17117,6 +17120,30 @@ restart:
         $frame->callArgs = [];
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = null;
+    }
+
+    /**
+     * $this prefix for wrappedFunc instance-method FCC / fromCallable (#27834).
+     *
+     * @return list<Variable>
+     */
+    private function wrappedFuncInstanceThisPrefix(ClosureState $state): array
+    {
+        if (null === $state->boundThis || null === $state->wrappedFunc) {
+            return [];
+        }
+        if ($this->methodIsStatic($state->wrappedFunc)) {
+            return [];
+        }
+        $wrapped = $state->wrappedFunc;
+        if ($wrapped instanceof Func\PHP) {
+            $decl = $wrapped->block->func ?? null;
+            if (null === $decl || null === $decl->class) {
+                return [];
+            }
+        }
+
+        return [$state->boundThis];
     }
 
     protected function applyClosureBinding(Frame $callee, ?ClosureState $closureState): void
