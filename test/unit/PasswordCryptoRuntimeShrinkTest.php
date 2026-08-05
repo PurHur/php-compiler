@@ -52,7 +52,10 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmPassword::crypt', $source);
         $this->assertStringContainsString('VmPassword::getInfo', $source);
         $this->assertStringContainsString('VmPassword::needsRehash', $source);
-        $this->assertStringContainsString('VmPassword::algos', $source);
+        // NestedJIT/AOT: algosArgv() literal list (HashTable return emptied under AOT — #27658).
+        $this->assertStringContainsString('algosArgv', $source);
+        $this->assertStringContainsString("['2y', 'argon2i', 'argon2id']", $source);
+        $this->assertStringContainsString('VmPasswordNative::passwordAlgos', $source);
         $this->assertStringContainsString('phpc_argon2_hash', $source);
         $this->assertStringContainsString('phpc_libcrypt_kernel', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
@@ -72,6 +75,8 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
 
         $info = PasswordJitHelper::getInfoHashtable($hash);
         $this->assertSame('bcrypt', $info->find('algoName')->resolveIndirect()->toString());
+
+        $this->assertSame(VmPasswordNative::passwordAlgos(), PasswordJitHelper::algosArgv());
 
         if (VmPasswordNative::argon2Available()) {
             $argon = PasswordJitHelper::hashArgv('secret', VmPassword::PASSWORD_ARGON2ID, 0);

@@ -81,9 +81,25 @@ final class PasswordJitHelper
         return VmPassword::needsRehash($hash, $algo, $options) ? 1 : 0;
     }
 
-    public static function algosHashtable(): HashTable
+    /**
+     * password_algos() names for JIT/AOT bridges (#6195, #27658).
+     *
+     * Return type is `array` (not {@see HashTable}): NestedJIT maps class HashTable to
+     * object ABI and yields empty under thin AOT (#20652 / hash_algos #20652 shape).
+     *
+     * NestedJIT leaf: literal list — {@see VmPasswordNative::passwordAlgos()} uses FFI
+     * ({@see argon2Available}) which NestedJIT cannot link; argon2 is available via
+     * {@see phpc_argon2_hash} (#26773), matching php-src with HAVE_ARGON2.
+     *
+     * @return list<string>
+     */
+    public static function algosArgv(): array
     {
-        return VmPassword::algos();
+        if (NestedJitCompileScope::isActive()) {
+            return ['2y', 'argon2i', 'argon2id'];
+        }
+
+        return VmPasswordNative::passwordAlgos();
     }
 
     private static function hashArgvThin(string $password, int $algo, int $cost): string
