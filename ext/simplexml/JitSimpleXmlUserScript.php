@@ -330,6 +330,42 @@ final class JitSimpleXmlUserScript
         return self::nullValue($context);
     }
 
+    /**
+     * Compile-time SimpleXMLElement::registerXPathNamespace via host php-src (#27534).
+     * Mutates the host tree so a subsequent literal xpath() fold sees registered prefixes.
+     */
+    public static function tryRegisterXPathNamespace(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 3 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $prefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $prefix) {
+            return null;
+        }
+        $namespace = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $namespace) {
+            return null;
+        }
+        try {
+            $tree->registerXPathNamespace($prefix, $namespace);
+        } catch (\Throwable) {
+            return null;
+        }
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt(1, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
     public static function tryAsXml(Context $context, JITVariable ...$args): ?Value
     {
         if ([] === $args) {

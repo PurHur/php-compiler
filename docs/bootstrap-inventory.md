@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7006 |
-| Phase A inventory files (M2 ratio SSOT) | 7006 |
+| PHP files on vm.php path | 7008 |
+| Phase A inventory files (M2 ratio SSOT) | 7008 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22524 |
+| Source constructs flagged (warnings) | 22528 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1904,6 +1904,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlGet.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlLoadString.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlOffsetGet.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlRegisterXPathNamespace.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlToString.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 6 |
 | `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
@@ -5951,6 +5952,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/SimpleXMLElementCount.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementGet.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementOffsetGet.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementToString.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementXpath.php` | 0 | 1 |
 | `lib/JIT/Call/SplDllistMethod.php` | 0 | 2 |
@@ -6153,7 +6155,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SensitiveParamHelper.php` | 0 | 1 |
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 9 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 10 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
@@ -22572,6 +22574,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/simplexml/JitSimpleXmlRegisterXPathNamespace.php`
+
+**Warnings** (review for bootstrap subset):
+- new ExternalMethod (line 25)
+- 1 class method(s)
+
 ### `ext/simplexml/JitSimpleXmlToString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22582,9 +22590,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new SimpleXMLElement (line 119)
 - new JITVariable (line 253)
-- new JITVariable (line 476)
-- new JITVariable (line 545)
-- 20 class method(s)
+- new JITVariable (line 512)
+- new JITVariable (line 581)
+- 21 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -35198,10 +35206,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_pad.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 37)
-- new ArgumentCountError (line 43)
-- new ArgumentCountError (line 69)
-- new ArgumentCountError (line 75)
+- new ArgumentCountError (line 39)
+- new ArgumentCountError (line 45)
+- new ArgumentCountError (line 71)
+- new ArgumentCountError (line 77)
 - 2 class method(s)
 
 ### `ext/standard/array_pop.php`
@@ -49634,6 +49642,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SimpleXMLElementToString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51152,14 +51165,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 43)
-- new Call\SimpleXMLElementAddChild (line 48)
-- new Call\SimpleXMLElementAsXml (line 54)
-- new Call\SimpleXMLElementXpath (line 59)
-- new Call\SimpleXMLElementGet (line 64)
-- new Call\SimpleXMLElementOffsetGet (line 69)
-- new Call\SimpleXMLElementCount (line 74)
-- new Call\SimpleXMLElementToString (line 79)
+- new Call\SimpleXMLElementConstruct (line 44)
+- new Call\SimpleXMLElementAddChild (line 49)
+- new Call\SimpleXMLElementAsXml (line 55)
+- new Call\SimpleXMLElementXpath (line 60)
+- new Call\SimpleXMLElementRegisterXPathNamespace (line 65)
+- new Call\SimpleXMLElementGet (line 70)
+- new Call\SimpleXMLElementOffsetGet (line 75)
+- new Call\SimpleXMLElementCount (line 80)
+- new Call\SimpleXMLElementToString (line 85)
 - 2 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`

@@ -16,6 +16,7 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::asxml' => true,
         'simplexmlelement::savexml' => true,
         'simplexmlelement::xpath' => true,
+        'simplexmlelement::registerxpathnamespace' => true,
         'simplexmlelement::__get' => true,
         'simplexmlelement::offsetget' => true,
         'simplexmlelement::count' => true,
@@ -57,6 +58,11 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::xpath' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementXpath();
+
+            return;
+        }
+        if ('simplexmlelement::registerxpathnamespace' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementRegisterXPathNamespace();
 
             return;
         }
