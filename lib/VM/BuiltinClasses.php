@@ -2215,6 +2215,11 @@ final class BuiltinClasses
                 ? $pubStatic
                 : $pub;
         }
+        // Zend/zend_fibers.stub.php — getCurrent(): ?Fiber (#27740).
+        $getCurrentRet = ReflectionTypeSupport::cfgTypeFromLabel('?Fiber');
+        if (null !== $getCurrentRet) {
+            $entry->methodReturnDeclaredTypes['getcurrent'] = $getCurrentRet;
+        }
         $ctx->classes[FiberSupport::CLASS_FIBER] = $entry;
     }
 }
