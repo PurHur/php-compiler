@@ -10,25 +10,22 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for realpath cache introspection (#3463, #27665).
+ * LLVM lowering for realpath cache introspection (#3463, #27664, #27665).
  *
  * JIT/AOT realpath() uses libc directly without PHP cache bookkeeping — return empty snapshot.
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(realpath_cache_get)
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(realpath_cache_get/size)
  */
 final class JitRealpathCache
 {
     public static function size(Context $context): Value
     {
+        // Empty-snapshot size is 0 — JIT/AOT realpath() does not bookkeep a PHP cache (#3463, #27664).
+        // Use __value__writeLong (there is no __value__writeInt).
         $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
         $i64 = $context->getTypeFromString('int64');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeInt'),
-            $ptr,
-            $i64->constInt(0, false, true)
-        );
+        JitValueBox::writeLong($context, $slot, $i64->constInt(0, false));
 
-        return $ptr;
+        return JitValueBox::pointer($context, $slot);
     }
 
     public static function get(Context $context): Value
