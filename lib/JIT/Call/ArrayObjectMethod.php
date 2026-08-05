@@ -69,6 +69,14 @@ final class ArrayObjectMethod implements Call
                     'ArrayObject::offsetUnset() expects exactly 1 argument, 0 given'
                 )
             ),
+            'getiteratorclass' => ArrayObjectJitHelper::compileGetIteratorClass(
+                $context,
+                $args[0] ?? throw new \LogicException('ArrayObject::getIteratorClass() called without $this')
+            ),
+            'getiterator' => ArrayObjectJitHelper::compileGetIterator(
+                $context,
+                $args[0] ?? throw new \LogicException('ArrayObject::getIterator() called without $this')
+            ),
             default => throw new \LogicException(
                 'ArrayObject JIT lowering is not implemented for '.$this->method.'()'
             ),

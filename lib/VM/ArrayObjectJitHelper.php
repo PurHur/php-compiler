@@ -13,11 +13,17 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT ArrayObject — `__spl_ht` storage (#26823, #27286, ext/spl/spl_array.c).
+ * Thin-AOT ArrayObject — `__spl_ht` storage (#26823, #27286, #27567, ext/spl/spl_array.c).
  */
 final class ArrayObjectJitHelper
 {
     public const PROP_HT = '__spl_ht';
+
+    /** php-src ArrayObject iteratorClass string (#27567). */
+    public const PROP_ITERATOR_CLASS = '__iterator_class';
+
+    /** Compile-time resolved class id for getIterator() allocation (#27567). */
+    public const PROP_ITERATOR_CLASS_ID = '__iterator_class_id';
 
     public const CLASS_NAME = 'ArrayObject';
 
@@ -172,6 +178,73 @@ final class ArrayObjectJitHelper
         HashTableWriteLlvm::unsetValueBoxKey($context, $ht, self::asValueBoxKey($context, $key));
 
         return self::voidResult($context);
+    }
+
+    /** php-src SPL_METHOD(ArrayObject, getIteratorClass) (#27567). */
+    public static function compileGetIteratorClass(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $nameSlot = $context->type->object->propertyFetch($obj, self::CLASS_NAME, self::PROP_ITERATOR_CLASS);
+        $namePtr = JITVariable::TYPE_STRING === $nameSlot->type
+            ? $context->helper->loadValue($nameSlot)
+            : $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $nameSlot)
+            );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $namePtr
+        );
+
+        return $slot;
+    }
+
+    /**
+     * php-src spl_array_get_iterator — allocate iteratorClass, copy `__spl_ht` (#27567).
+     *
+     * Thin AOT uses the class id stored at construct (from `MyIter::class` literal).
+     */
+    public static function compileGetIterator(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $objectType = $context->type->object;
+        $idSlot = $objectType->propertyFetch($obj, self::CLASS_NAME, self::PROP_ITERATOR_CLASS_ID);
+        $classId = JITVariable::TYPE_NATIVE_LONG === $idSlot->type
+            ? $context->helper->loadValue($idSlot)
+            : $context->builder->call(
+                $context->lookupFunction('__value__toLong'),
+                JitValueBox::valuePtrFromVariable($context, $idSlot)
+            );
+        $iterObj = $objectType->allocateForRuntimeClassId($classId);
+        $srcHt = self::htPtr($context, $obj);
+        $copy = new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        HashTableHelper::spreadInto(
+            $context,
+            $copy,
+            new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $srcHt)
+        );
+        // Slot 0 is `__spl_ht` for ArrayIterator family (#26783); subclasses inherit layout.
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($iterObj, 'ArrayIterator', self::PROP_HT),
+            $copy,
+            JITVariable::TYPE_HASHTABLE
+        );
+        $objectType->markObjectConstructed($iterObj);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $iterObj
+        );
+
+        return $slot;
     }
 
     /** Dim keys from literals are TYPE_STRING / NATIVE_LONG — box for HT value-key APIs. */
