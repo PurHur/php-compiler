@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9812: AOT standalone strtok must use StrtokJitHelper PHP, not LLVM buffer/table walk.
+ * Issue #9812 / #27645: AOT standalone strtok defines phpc_strtok via LLVM globals.
  *
  * @group aot-lint
  */
@@ -28,10 +28,11 @@ final class StringStrtokRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testStringStrtokRoutesThroughStrtokJitHelper(): void
+    public function testStringStrtokRoutesThroughLlvmEmitter(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringStrtok.php');
-        $this->assertStringContainsString('StrtokJitHelper', $source);
-        $this->assertStringNotContainsString('__phpc_strtok_buf', $source);
+        $this->assertStringContainsString('StringStrtokJit', $source);
+        $jit = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringStrtokJit.php');
+        $this->assertStringContainsString('__phpc_strtok_buf', $jit);
     }
 }
