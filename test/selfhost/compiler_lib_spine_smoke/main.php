@@ -7136,4 +7136,5 @@ unset($__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfStrtolApply.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
