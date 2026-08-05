@@ -63,10 +63,14 @@ class Module extends ModuleAbstract
 
         return [
             new imap_open(),
+            new imap_reopen(),
             new imap_close(),
             new imap_errors(),
             new imap_last_error(),
             new imap_num_msg(),
+            new imap_num_recent(),
+            new imap_uid(),
+            new imap_msgno(),
             new imap_headerinfo(),
             new imap_fetchbody(),
             new imap_body(),
