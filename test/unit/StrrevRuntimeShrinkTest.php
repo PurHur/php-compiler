@@ -29,13 +29,18 @@ final class StrrevRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('strrev_body', $builtin);
     }
 
-    public function testStrrevJitHelperDelegatesToVmString(): void
+    public function testStrrevJitHelperIsSelfContainedAndMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StrrevJitHelper.php');
-        $this->assertStringContainsString('VmString::strrev', $source);
+        // NestedJIT AOT: no VmString / ExternalMethod stub (#16075 / #27007).
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('$len - 1 - $i', $source);
 
         $this->assertSame('cba', StrrevJitHelper::strrevArgv('abc'));
         $this->assertSame('cba', VmString::strrev('abc'));
+        $this->assertSame('', StrrevJitHelper::strrevArgv(''));
+        $this->assertSame('a', StrrevJitHelper::strrevArgv('a'));
+        $this->assertSame("\0ba", StrrevJitHelper::strrevArgv("ab\0"));
     }
 
     public function testSpineBundleIncludesStrrevJitHelper(): void

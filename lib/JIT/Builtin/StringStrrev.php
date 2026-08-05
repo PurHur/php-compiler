@@ -9,12 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_strrev via StrrevJitHelper PHP (#14566, #21648).
+ * JIT/AOT link for __compiler_strrev via StrrevJitHelper PHP (#14566, #21648, #27007).
  *
  * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
- * env clear — no hand-rolled NestedJit compile loop). Peer: StringQuotemeta #21589 / StringNl2br #21630 /
- * StringStrRepeat #21601.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrRot13 #26868 / Bin2hex #20452
+ * (self-contained helper — no VmString ExternalMethod stub under NestedJIT).
+ * SSOT: {@see \PHPCompiler\ext\standard\StrrevJitHelper} (mirrors {@see \PHPCompiler\ext\standard\VmString}).
  * php-src: ext/standard/string.c — PHP_FUNCTION(strrev)
  */
 final class StringStrrev
