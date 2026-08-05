@@ -25,7 +25,15 @@ use PHPCompiler\VM\ClassFinal;
  */
 final class FinalPropertyOverrideCheck
 {
-    /** @var array<string, array{display: string, extends: ?string, properties: array<string, array{final: bool, fromFlags: bool, display: string, file: string, line: int}>}> */
+    /**
+     * @var array<string, array{
+     *     display: string,
+     *     extends: ?string,
+     *     properties: array<string, array{final: bool, fromFlags: bool, display: string, file: string, line: int}>,
+     *     traitUses: list<string>,
+     *     isTrait: bool
+     * }>
+     */
     private array $classes = [];
 
     /**
@@ -67,6 +75,8 @@ final class FinalPropertyOverrideCheck
             foreach ($current->children as $child) {
                 if ($child instanceof Op\Stmt\Class_) {
                     $this->collectClass($child);
+                } elseif ($child instanceof Op\Stmt\Trait_) {
+                    $this->collectTrait($child);
                 }
                 OpSubBlockAccess::enqueueSubBlocks($child, $queue);
             }
@@ -87,7 +97,47 @@ final class FinalPropertyOverrideCheck
             'display' => $this->operandDisplayName($class->name, $lc),
             'extends' => $parentLc,
             'properties' => $this->collectProperties($class, $lc),
+            'traitUses' => $this->collectTraitUses($class->stmts->children),
+            'isTrait' => false,
         ];
+    }
+
+    private function collectTrait(Op\Stmt\Trait_ $trait): void
+    {
+        $lc = $this->operandLcName($trait->name);
+        if (null === $lc) {
+            return;
+        }
+        $this->classes[$lc] = [
+            'display' => $this->operandDisplayName($trait->name, $lc),
+            'extends' => null,
+            'properties' => $this->collectPropertiesFromMembers($trait->stmts->children, $lc),
+            'traitUses' => $this->collectTraitUses($trait->stmts->children),
+            'isTrait' => true,
+        ];
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return list<string>
+     */
+    private function collectTraitUses(array $members): array
+    {
+        $traits = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($member->traits as $traitOperand) {
+                $traitLc = $this->operandLcName($traitOperand);
+                if (null !== $traitLc) {
+                    $traits[] = $traitLc;
+                }
+            }
+        }
+
+        return $traits;
     }
 
     /**
@@ -97,8 +147,18 @@ final class FinalPropertyOverrideCheck
      */
     private function collectProperties(Op\Stmt\Class_ $class, string $classLc): array
     {
+        return $this->collectPropertiesFromMembers($class->stmts->children, $classLc);
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return array<string, array{final: bool, fromFlags: bool, display: string, file: string, line: int}>
+     */
+    private function collectPropertiesFromMembers(array $members, string $classLc): array
+    {
         $properties = [];
-        foreach ($class->stmts->children as $member) {
+        foreach ($members as $member) {
             if ($member instanceof Op\Stmt\Property) {
                 $propDisplay = $this->propertyDisplayName($member->name);
                 $propLc = strtolower($propDisplay);
@@ -283,7 +343,10 @@ final class FinalPropertyOverrideCheck
             }
             $visited[$current] = true;
             $type = $this->classes[$current] ?? null;
-            if (null !== $type && isset($type['properties'][$propLc])) {
+            if (null === $type) {
+                break;
+            }
+            if (isset($type['properties'][$propLc])) {
                 $prop = $type['properties'][$propLc];
 
                 return [
@@ -293,7 +356,60 @@ final class FinalPropertyOverrideCheck
                     'ownerDisplay' => $type['display'],
                 ];
             }
+            // Trait-imported properties belong to the composing class for inheritance
+            // fatals (zend_traits.c / zend_inheritance.c — "Cannot override … A::$x") (#27818).
+            $fromTrait = $this->findPropertyFromTraitUses($type['traitUses'] ?? [], $propLc, $type['display'], $visited);
+            if (null !== $fromTrait) {
+                return $fromTrait;
+            }
             $current = $type['extends'] ?? null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<string> $traitUses
+     * @param array<string, true> $visited
+     *
+     * @return array{final: bool, fromFlags: bool, display: string, ownerDisplay: string}|null
+     */
+    private function findPropertyFromTraitUses(
+        array $traitUses,
+        string $propLc,
+        string $ownerDisplay,
+        array &$visited
+    ): ?array {
+        $queue = $traitUses;
+        $traitGuard = 0;
+        while ([] !== $queue) {
+            if (++$traitGuard > 256) {
+                break;
+            }
+            $traitLc = array_shift($queue);
+            if (!is_string($traitLc) || '' === $traitLc || isset($visited['trait:'.$traitLc])) {
+                continue;
+            }
+            $visited['trait:'.$traitLc] = true;
+            $trait = $this->classes[$traitLc] ?? null;
+            if (null === $trait) {
+                continue;
+            }
+            if (isset($trait['properties'][$propLc])) {
+                $prop = $trait['properties'][$propLc];
+
+                return [
+                    'final' => $prop['final'],
+                    'fromFlags' => $prop['fromFlags'],
+                    'display' => $prop['display'],
+                    'ownerDisplay' => $ownerDisplay,
+                ];
+            }
+            foreach ($trait['traitUses'] ?? [] as $nested) {
+                if (is_string($nested) && '' !== $nested) {
+                    $queue[] = $nested;
+                }
+            }
         }
 
         return null;

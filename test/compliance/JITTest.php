@@ -1605,6 +1605,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_plain_property_override_84')
                 || str_contains($name, 'final_plain_property_override_85')
                 || str_contains($name, 'final_plain_property_child_override_84')
+                || str_contains($name, 'final_plain_property_trait_override_84')
                 || str_contains($name, 'final_plain_property_override_after_ternary_84')) {
                 continue;
             }

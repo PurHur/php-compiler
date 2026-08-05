@@ -5829,6 +5829,10 @@ class Object_ extends Type {
                 $this->staticPropertyDeclaringClassId[$classId][$name]
                     = $this->staticPropertyDeclaringClassId[$traitId][$name];
             }
+            // ZEND_ACC_FINAL — ReflectionProperty::isFinal + override reject (#27818, #27315).
+            if ($this->isPropertyFinal($traitId, $name)) {
+                $this->markPropertyFinal($classId, $name);
+            }
             $arms = $this->dnfArmsForStaticProperty($traitId, $name);
             if (null !== $arms) {
                 $this->defineStaticPropertyDnfArms($classId, $name, $arms);
@@ -5881,6 +5885,11 @@ class Object_ extends Type {
             }
             if ($this->isPropertyReadonly($traitId, $name)) {
                 $this->markPropertyReadonly($classId, $name);
+            }
+            // Trait-imported finals must stay final on the composing class (#27818):
+            // thin AOT isFinal table + child override otherwise miss ZEND_ACC_FINAL.
+            if ($this->isPropertyFinal($traitId, $name)) {
+                $this->markPropertyFinal($classId, $name);
             }
             $arms = $this->dnfArmsForProperty($traitId, $name);
             if (null !== $arms) {
