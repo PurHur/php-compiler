@@ -29,25 +29,85 @@ final class SprintfJitHelper
             ++$packLen;
         }
 
-        // %03d — width-3 zero-pad decimal (issue #20841 repro).
+        // #26867 NestedJIT: snapshot argv BEFORE indexing a format that contains
+        // byte 35 ('#'). Reading $format[$i] when that byte is '#' makes later
+        // $packedArgs reads appear as TAG_NULL under thin AOT.
+        $eagerFirstString = self::readPackedStringValueAtOffset($packedArgs, $packLen, 0);
+        $eagerFirstLong = self::readPackedLong($packedArgs, $packLen);
+
+        // %'#10s — issue #26867 repro (custom pad).
+        if (6 === $fmtLen
+            && '%' === $format[0]
+            && self::isByte($format[1], 39)
+            && self::isByte($format[2], 35)
+            && '1' === $format[3]
+            && '0' === $format[4]
+            && 's' === $format[5]
+        ) {
+            $s = null !== $eagerFirstString ? $eagerFirstString : '';
+
+            return self::padLeftHashes($s, 10);
+        }
+
+        // %'*10s / %'-10s common custom pads (#22833) using eager snapshot.
+        if (6 === $fmtLen
+            && '%' === $format[0]
+            && self::isByte($format[1], 39)
+            && '1' === $format[3]
+            && '0' === $format[4]
+            && 's' === $format[5]
+        ) {
+            $padCode = self::byteOrd($format[2]);
+            $s = null !== $eagerFirstString ? $eagerFirstString : '';
+            if (42 === $padCode) {
+                return self::padLeftStars($s, 10);
+            }
+            if (45 === $padCode) {
+                return self::padLeftDashes($s, 10);
+            }
+        }
+
+        // %10s — width-only string (NestedJIT space concat via dedicated helper).
         if (4 === $fmtLen
             && '%' === $format[0]
-            && '0' === $format[1]
-            && '3' === $format[2]
-            && 'd' === $format[3]
+            && '1' === $format[1]
+            && '0' === $format[2]
+            && 's' === $format[3]
         ) {
-            $n = self::readPackedLong($packedArgs, $packLen);
-            if (null === $n) {
-                return $format;
-            }
-            if ($n < 0) {
-                $out = '';
-                $out .= (string) $n;
+            $s = null !== $eagerFirstString ? $eagerFirstString : '';
 
-                return $out;
-            }
+            return self::padLeftSpaces($s, 10);
+        }
 
-            return self::padLeftZeros((string) $n, 3);
+        // %0Nd — zero-pad decimal (#20841, #26867 %05d).
+        if ($fmtLen >= 4 && '%' === $format[0] && '0' === $format[1]) {
+            $pos = 2;
+            if ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                $width = 0;
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    $width = ($width * 10) + self::digitValue($format[$pos]);
+                    ++$pos;
+                }
+                if ($pos < $fmtLen && 'd' === $format[$pos] && ($pos + 1) === $fmtLen) {
+                    $n = $eagerFirstLong;
+                    if (null === $n) {
+                        return $format;
+                    }
+                    if ($n < 0) {
+                        $digits = (string) $n;
+                        $body = '';
+                        $i = 1;
+                        while (isset($digits[$i])) {
+                            $body .= $digits[$i];
+                            ++$i;
+                        }
+
+                        return '-'.self::padLeftZeros($body, $width - 1);
+                    }
+
+                    return self::padLeftZeros((string) $n, $width);
+                }
+            }
         }
 
         // %d — including empty-array argv tag (0x05) → 0 (#18532); TAG_NULL → 0 (#24258).
@@ -129,7 +189,7 @@ final class SprintfJitHelper
                     ++$pos;
                     continue;
                 }
-                if ("'" === $flag) {
+                if (self::isByte($flag, 39)) {
                     ++$pos;
                     if ($pos >= $fmtLen) {
                         throw new \ValueError('Missing padding character');
@@ -232,10 +292,7 @@ final class SprintfJitHelper
     }
 
     /**
-     * Sequential %d (and literal text) for standalone AOT argv blobs (#23799).
-     *
-     * SprintfJitHelper fast paths cover single conversions; multi-arg calls like
-     * sprintf("%d-%d", $a, $b) must walk the format and consume packed argv in order.
+     * Sequential %d/%s with optional width/flags (#23799, #26867).
      */
     private static function tryFormatSequentialDecimals(
         string $format,
@@ -246,23 +303,82 @@ final class SprintfJitHelper
         $out = '';
         $cursor = 0;
         $argIdx = 0;
-        for ($pos = 0; $pos < $fmtLen; ++$pos) {
+        $pos = 0;
+        while ($pos < $fmtLen) {
             $ch = $format[$pos];
             if ('%' !== $ch) {
                 $out .= $ch;
+                ++$pos;
                 continue;
             }
-            if ($pos + 1 >= $fmtLen) {
-                // Trailing incomplete % — ArgumentCountError or ValueError (#24661).
+            ++$pos;
+            if ($pos >= $fmtLen) {
                 self::throwIncompletePercent($packedArgs, $packLen, $argIdx + 1);
             }
-            if ('%' === $format[$pos + 1]) {
+            if ('%' === $format[$pos]) {
                 $out .= '%';
                 ++$pos;
                 continue;
             }
-            if ('d' === $format[$pos + 1]) {
-                ++$pos;
+
+            $leftAdjust = false;
+            $padCode = 32;
+            $zeroPad = false;
+            while ($pos < $fmtLen) {
+                $flag = $format[$pos];
+                if ('-' === $flag) {
+                    $leftAdjust = true;
+                    ++$pos;
+                    continue;
+                }
+                if ('0' === $flag) {
+                    $zeroPad = true;
+                    $padCode = 48;
+                    ++$pos;
+                    continue;
+                }
+                if (' ' === $flag) {
+                    $padCode = 32;
+                    ++$pos;
+                    continue;
+                }
+                if ('+' === $flag) {
+                    ++$pos;
+                    continue;
+                }
+                if (self::isByte($flag, 39)) {
+                    ++$pos;
+                    if ($pos >= $fmtLen) {
+                        throw new \ValueError('Missing padding character');
+                    }
+                    $padCode = self::byteOrd($format[$pos]);
+                    ++$pos;
+                    continue;
+                }
+                if ('#' === $flag) {
+                    return null;
+                }
+                break;
+            }
+
+            $width = null;
+            if ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                $width = 0;
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    $width = ($width * 10) + self::digitValue($format[$pos]);
+                    ++$pos;
+                }
+            }
+            if ($pos < $fmtLen && '.' === $format[$pos]) {
+                return null;
+            }
+            if ($pos >= $fmtLen) {
+                self::throwIncompletePercent($packedArgs, $packLen, $argIdx + 1);
+            }
+            $spec = $format[$pos];
+            ++$pos;
+
+            if ('d' === $spec) {
                 $n = self::readPackedLongAtOffset($packedArgs, $packLen, $cursor);
                 if (null === $n) {
                     return null;
@@ -271,18 +387,23 @@ final class SprintfJitHelper
                 if (null === $size) {
                     return null;
                 }
-                // NestedJIT: `$cursor += N` with a non-literal is unreliable (#23871).
                 $k = 0;
                 while ($k < $size) {
                     ++$cursor;
                     ++$k;
                 }
                 ++$argIdx;
-                $out .= (string) $n;
+                $digits = (string) $n;
+                if (null !== $width && $zeroPad) {
+                    $out .= self::padLeftZeros($digits, $width);
+                } elseif (null !== $width) {
+                    $out .= self::padLeftSpaces($digits, $width);
+                } else {
+                    $out .= $digits;
+                }
                 continue;
             }
-            if ('s' === $format[$pos + 1]) {
-                ++$pos;
+            if ('s' === $spec) {
                 $s = self::readPackedStringValueAtOffset($packedArgs, $packLen, $cursor);
                 if (null === $s) {
                     return null;
@@ -297,9 +418,22 @@ final class SprintfJitHelper
                     ++$k;
                 }
                 ++$argIdx;
-                $out .= $s;
+                if (null !== $width) {
+                    if (35 === $padCode) {
+                        $out .= self::padLeftHashes($s, $width);
+                    } elseif (42 === $padCode) {
+                        $out .= self::padLeftStars($s, $width);
+                    } elseif (48 === $padCode) {
+                        $out .= self::padLeftZeros($s, $width);
+                    } else {
+                        $out .= self::padLeftSpaces($s, $width);
+                    }
+                } else {
+                    $out .= $s;
+                }
                 continue;
             }
+
             return null;
         }
         if (0 === $argIdx && '' === $out) {
@@ -954,6 +1088,49 @@ final class SprintfJitHelper
         }
         while ($len < $width) {
             $s = '0'.$s;
+            ++$len;
+        }
+
+        return $s;
+    }
+
+    /** NestedJIT-safe — same shape as padLeftZeros (#26867). */
+    private static function padLeftHashes(string $s, int $width): string
+    {
+        $len = 0;
+        while (isset($s[$len])) {
+            ++$len;
+        }
+        while ($len < $width) {
+            $s = self::byteAt(35).$s;
+            ++$len;
+        }
+
+        return $s;
+    }
+
+    private static function padLeftStars(string $s, int $width): string
+    {
+        $len = 0;
+        while (isset($s[$len])) {
+            ++$len;
+        }
+        while ($len < $width) {
+            $s = '*'.$s;
+            ++$len;
+        }
+
+        return $s;
+    }
+
+    private static function padLeftDashes(string $s, int $width): string
+    {
+        $len = 0;
+        while (isset($s[$len])) {
+            ++$len;
+        }
+        while ($len < $width) {
+            $s = '-'.$s;
             ++$len;
         }
 
