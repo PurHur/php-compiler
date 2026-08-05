@@ -72,6 +72,7 @@
             <file>./test/compliance/ForeachByrefAppendResidualJITTest.php</file>
             <file>./test/compliance/FiberStackOverflowProfileVMTest.php</file>
             <file>./test/compliance/FiberStackOverflowProfileJITTest.php</file>
+            <file>./test/compliance/FiberGetCurrentReflectionVMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
