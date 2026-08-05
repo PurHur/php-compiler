@@ -45,6 +45,27 @@ final class HashTableCowLlvm
         return $dest;
     }
 
+    /**
+     * array_replace(): copy left, then overwrite/add keys from right (#27519).
+     *
+     * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace) / php_array_merge
+     * (non-recursive overlay). VM SSOT: {@see \PHPCompiler\VM\HashTable::replaceCopy()}.
+     */
+    public static function replace(Context $context, Value $leftHt, Value $rightHt): Value
+    {
+        $dest = self::duplicate($context, $leftHt);
+        self::overlayOnto($context, $dest, $rightHt);
+
+        return $dest;
+    }
+
+    /** Overlay all keys from src onto dest (always overwrite when src set). */
+    public static function overlayOnto(Context $context, Value $dest, Value $srcHt): void
+    {
+        self::overlayPacked($context, $dest, $srcHt);
+        self::overlayStringKeys($context, $dest, $srcHt);
+    }
+
     private static function copyPackedPreservingIndex(Context $context, Value $dest, Value $srcHt): void
     {
         $map = $context->structFieldMap['__hashtable__'];
@@ -223,6 +244,91 @@ final class HashTableCowLlvm
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $next = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($next, $nodeSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /** Overlay packed indices from src onto dest (always overwrite when src set). */
+    private static function overlayPacked(Context $context, Value $dest, Value $srcHt): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->builder->load($context->builder->structGep($srcHt, $map['nextFreeElement']));
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+        $tag = (string) self::nextSeq();
+        $head = BasicBlockHelper::append($context, 'ht_cow_replace_packed_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'ht_cow_replace_packed_body_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'ht_cow_replace_packed_advance_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_cow_replace_packed_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $srcSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $srcHt,
+            $idx
+        );
+        $skip = BasicBlockHelper::append($context, 'ht_cow_replace_packed_skip_'.$tag);
+        $copy = BasicBlockHelper::append($context, 'ht_cow_replace_packed_copy_'.$tag);
+        $context->builder->branchIf($srcSet, $copy, $skip);
+
+        $context->builder->positionAtEnd($copy);
+        $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);
+        HashTableWriteLlvm::setAtIndex($context, $dest, $idx, $elem);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /** Overlay string keys from src onto dest (always overwrite). */
+    private static function overlayStringKeys(Context $context, Value $dest, Value $srcHt): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $tag = (string) self::nextSeq();
+        $head = BasicBlockHelper::append($context, 'ht_cow_replace_str_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'ht_cow_replace_str_body_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'ht_cow_replace_str_advance_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_cow_replace_str_done_'.$tag);
+        $nodeSlot = BasicBlockHelper::entryAlloca($context, $nodePtrType);
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($srcHt, $map['strKeys'])),
+            $nodeSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $node = $context->builder->load($nodeSlot);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($isNull, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $valField = $context->builder->structGep($node, $nodeMap['value']);
+        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+        HashTableWriteLlvm::setAtStringKey($context, $dest, $keyStr, $elem);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);

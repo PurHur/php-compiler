@@ -68,4 +68,11 @@ final class ArrayReplaceRuntimeShrinkTest extends TestCase
         $this->assertSame('keep', $result->findIndex(1)?->toString());
         $this->assertSame('added', $result->findIndex(2)?->toString());
     }
+
+    public function testNestedVmRegistersReplaceCopyHandler(): void
+    {
+        $nested = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedVmHashTableMethodLlvm.php');
+        $this->assertStringContainsString("'replacecopy' => Call\\HashTableReplaceCopy::class", $nested);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Call/HashTableReplaceCopy.php');
+    }
 }
