@@ -54017,6 +54017,19 @@ class Compiler {
             }
         }
 
+        // `$a = ['k'=>1]; array_values($a)` — an identical dest←rhs ASSIGN already exists.
+        // Emitting a second free()+store delrefs the HT and empties string-key walks under
+        // thin AOT (#27545 / re-#27212). Peer: skip when CONCAT already wrote dest (#16281).
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_ASSIGN === $op->type
+                && (int) $op->arg2 === (int) $destSlot
+                && (int) $op->arg3 === (int) $rhsSlot
+            ) {
+                return [];
+            }
+        }
+
         return [new OpCode(
             OpCode::TYPE_ASSIGN,
             $this->compileOperand($prev->result, $block, false),
