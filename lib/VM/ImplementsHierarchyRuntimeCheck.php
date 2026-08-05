@@ -168,7 +168,7 @@ final class ImplementsHierarchyRuntimeCheck
             : 0;
 
         throw new \LogicException(sprintf(
-            'Fatal error: %s in %s on line %d',
+            'PHP Fatal error:  %s in %s on line %d',
             $message,
             $file,
             $line

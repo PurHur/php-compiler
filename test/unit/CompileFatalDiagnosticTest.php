@@ -19,7 +19,7 @@ final class CompileFatalDiagnosticTest extends TestCase
             3
         );
         $this->assertSame(
-            'Parse error: syntax error, unexpected token "{", expecting "," or ";" in example.php on line 3'."\n",
+            'PHP Parse error:  syntax error, unexpected token "{", expecting "," or ";" in example.php on line 3'."\n",
             $line
         );
     }
@@ -31,7 +31,7 @@ final class CompileFatalDiagnosticTest extends TestCase
             'example.php',
             4
         );
-        $this->assertStringStartsWith('Fatal error: Cannot specify default value', $line);
+        $this->assertStringStartsWith('PHP Fatal error:  Cannot specify default value', $line);
     }
 
     public function testZendStderrLineOnCompileFatalInstance(): void
@@ -41,7 +41,7 @@ final class CompileFatalDiagnosticTest extends TestCase
             2,
             PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW
         );
-        $this->assertStringStartsWith('Parse error: syntax error, unexpected token "=>"', $fatal->zendStderrLine());
+        $this->assertStringStartsWith('PHP Parse error:  syntax error, unexpected token "=>"', $fatal->zendStderrLine());
     }
 
     public function testVmEmitsParseErrorForReferenceProfilePropertyHooks(): void
@@ -55,7 +55,7 @@ final class CompileFatalDiagnosticTest extends TestCase
         $output = shell_exec($cmd) ?? '';
         $firstLine = strtok($output, "\n") ?: '';
         $this->assertStringStartsWith(
-            'Parse error: syntax error, unexpected token "{", expecting "," or ";"',
+            'PHP Parse error:  syntax error, unexpected token "{", expecting "," or ";"',
             $firstLine
         );
         $this->assertStringNotContainsString('Fatal error:', $firstLine);

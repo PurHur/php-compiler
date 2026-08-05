@@ -23,7 +23,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: T and U define the same property ($x) in the composition of C. '
+            'PHP Fatal error:  T and U define the same property ($x) in the composition of C. '
             .'However, the definition differs and is considered incompatible. Class was composed'
         );
         $runtime->run($block, false);
@@ -42,7 +42,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: T and U define the same property ($x) in the composition of C. '
+            'PHP Fatal error:  T and U define the same property ($x) in the composition of C. '
             .'However, the definition differs and is considered incompatible. Class was composed'
         );
         $runtime->run($block, false);
@@ -60,7 +60,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: C and T define the same property ($x) in the composition of C. '
+            'PHP Fatal error:  C and T define the same property ($x) in the composition of C. '
             .'However, the definition differs and is considered incompatible. Class was composed'
         );
         $runtime->run($block, false);
@@ -127,7 +127,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: C and T define the same property ($x) in the composition of C. '
+            'PHP Fatal error:  C and T define the same property ($x) in the composition of C. '
             .'However, the definition differs and is considered incompatible. Class was composed'
         );
         $runtime->run($block, false);

@@ -33,9 +33,9 @@ final class CompileFatal extends \CompileError
      */
     public static function formatZendStderrLine(string $message, string $sourceFile, int $sourceLine): string
     {
-        $prefix = self::isSyntaxParseErrorMessage($message) ? 'Parse error' : 'Fatal error';
+        $prefix = self::isSyntaxParseErrorMessage($message) ? 'PHP Parse error' : 'PHP Fatal error';
 
-        return sprintf("%s: %s in %s on line %d\n", $prefix, $message, $sourceFile, max(1, $sourceLine));
+        return sprintf("%s:  %s in %s on line %d\n", $prefix, $message, $sourceFile, max(1, $sourceLine));
     }
 
     public function zendStderrLine(): string

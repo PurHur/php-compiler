@@ -164,7 +164,7 @@ PHP;
                 'Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants',
                 $e->getMessage()
             );
-            self::assertStringStartsWith('Fatal error:', $e->zendStderrLine());
+            self::assertStringStartsWith('PHP Fatal error:', $e->zendStderrLine());
         }
     }
 
@@ -332,7 +332,7 @@ PHP;
             $this->fail('Expected CompileFatal on final property override');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
             self::assertStringContainsString('Cannot override final property ParentF::$name', $e->getMessage());
-            self::assertStringStartsWith('Fatal error:', $e->zendStderrLine());
+            self::assertStringStartsWith('PHP Fatal error:', $e->zendStderrLine());
             self::assertStringContainsString('on line', $e->zendStderrLine());
         }
     }

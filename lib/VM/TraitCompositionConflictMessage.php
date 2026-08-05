@@ -43,7 +43,7 @@ final class TraitCompositionConflictMessage
     {
         $file = '' !== $sourceFile ? $sourceFile : 'Standard input code';
         throw new \LogicException(sprintf(
-            'Fatal error: %s in %s on line %d',
+            'PHP Fatal error:  %s in %s on line %d',
             $message,
             $file,
             max(1, $sourceLine),

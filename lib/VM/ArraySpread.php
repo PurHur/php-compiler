@@ -64,7 +64,7 @@ final class ArraySpread
         $file = '' !== $frame->scriptPath ? $frame->scriptPath : 'Standard input code';
         $line = $sourceLine > 0 ? $sourceLine : 0;
         throw new \LogicException(sprintf(
-            'Fatal error: %s in %s on line %d',
+            'PHP Fatal error:  %s in %s on line %d',
             self::NON_TRAVERSABLE_MESSAGE,
             $file,
             $line

@@ -190,7 +190,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: Class X cannot implement interface Throwable, extend Exception or Error instead'
+            'PHP Fatal error:  Class X cannot implement interface Throwable, extend Exception or Error instead'
         );
         $runtime->run($block, false);
     }
@@ -206,7 +206,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'implements_throwable_empty.php');
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: Class Y cannot implement interface Throwable, extend Exception or Error instead'
+            'PHP Fatal error:  Class Y cannot implement interface Throwable, extend Exception or Error instead'
         );
         $runtime->run($block, false);
     }
@@ -222,7 +222,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'enum_implements_throwable.php');
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: Enum E cannot implement interface Throwable'
+            'PHP Fatal error:  Enum E cannot implement interface Throwable'
         );
         $runtime->run($block, false);
     }
@@ -264,7 +264,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: Class X cannot implement interface Throwable, extend Exception or Error instead'
+            'PHP Fatal error:  Class X cannot implement interface Throwable, extend Exception or Error instead'
         );
         $runtime->run($block, false);
     }
@@ -281,7 +281,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: Class Y cannot implement interface Throwable, extend Exception or Error instead'
+            'PHP Fatal error:  Class Y cannot implement interface Throwable, extend Exception or Error instead'
         );
         $runtime->run($block, false);
     }
@@ -297,7 +297,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'enum_implements_throwable.php');
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Fatal error: Enum E cannot implement interface Throwable');
+        $this->expectExceptionMessage('PHP Fatal error:  Enum E cannot implement interface Throwable');
         $runtime->run($block, false);
     }
 
@@ -317,7 +317,7 @@ PHP;
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: Enum E cannot implement the Serializable interface'
+            'PHP Fatal error:  Enum E cannot implement the Serializable interface'
         );
         $runtime->run($block, false);
     }
@@ -379,7 +379,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'datetimeinterface.php');
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage("Fatal error: DateTimeInterface can't be implemented by user classes");
+        $this->expectExceptionMessage("PHP Fatal error:  DateTimeInterface can't be implemented by user classes");
         $runtime->run($block, false);
     }
 
@@ -394,7 +394,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
         $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage("Fatal error: DateTimeInterface can't be implemented by user classes");
+        $this->expectExceptionMessage("PHP Fatal error:  DateTimeInterface can't be implemented by user classes");
         $runtime->run($block, false);
     }
 
@@ -409,7 +409,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'internaliterator.php');
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'Fatal error: UserInternalIterator cannot implement InternalIterator - it is not an interface'
+            'PHP Fatal error:  UserInternalIterator cannot implement InternalIterator - it is not an interface'
         );
         $runtime->run($block);
     }
@@ -478,7 +478,7 @@ class C implements Closure {
 PHP;
         $block = $runtime->parseAndCompile($code, 'implements_closure.php');
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Fatal error: C cannot implement Closure - it is not an interface');
+        $this->expectExceptionMessage('PHP Fatal error:  C cannot implement Closure - it is not an interface');
         $runtime->run($block);
     }
 
@@ -492,7 +492,7 @@ class G implements Generator {}
 PHP;
         $block = $runtime->parseAndCompile($code, 'implements_generator.php');
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Fatal error: G cannot implement Generator - it is not an interface');
+        $this->expectExceptionMessage('PHP Fatal error:  G cannot implement Generator - it is not an interface');
         $runtime->run($block);
     }
 
@@ -508,7 +508,7 @@ class S implements stdClass {
 PHP;
         $block = $runtime->parseAndCompile($code, 'implements_stdclass.php');
         $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Fatal error: S cannot implement stdClass - it is not an interface');
+        $this->expectExceptionMessage('PHP Fatal error:  S cannot implement stdClass - it is not an interface');
         $runtime->run($block);
     }
 
