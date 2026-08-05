@@ -3741,6 +3741,10 @@ class Object_ extends Type {
             }
             $this->setClassInterfaces($displayName, $ifaces);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            if ('appenditerator' === $lcname) {
+                // Parallel original keys — spreadInto renumbers packed indices (#27312).
+                $this->defineProperty($id, \PHPCompiler\JIT\Call\AppendIteratorMethod::PROP_KEYS, Variable::TYPE_HASHTABLE);
+            }
             if ('cachingiterator' === $lcname) {
                 $this->defineProperty($id, \PHPCompiler\JIT\Call\CachingIteratorConstruct::PROP_CACHE, Variable::TYPE_HASHTABLE);
                 $this->seedExternalClassConstants($id, [
