@@ -628,6 +628,270 @@ final class VmImapCore
         return $msg['body'];
     }
 
+    /**
+     * imap_append() — append RFC822 message to a local mailbox file (#27814).
+     */
+    public static function append(
+        ObjectEntry $object,
+        string $folder,
+        string $message,
+        ?string $options = null,
+        ?string $internalDate = null
+    ): bool {
+        unset($options);
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($folder, $st['mailbox']);
+        if (null === $path) {
+            $msg = "Can't append to mailbox {$folder}";
+            self::pushError($msg);
+            self::warnImap('imap_append(): '.$msg);
+
+            return false;
+        }
+        // Allow appending into a newly created empty mailbox file.
+        if (!is_file($path)) {
+            $dir = \dirname($path);
+            if (!is_dir($dir) || !is_writable($dir)) {
+                $msg = "Can't append to mailbox {$folder}";
+                self::pushError($msg);
+                self::warnImap('imap_append(): '.$msg);
+
+                return false;
+            }
+            if (false === @file_put_contents($path, '')) {
+                $msg = "Can't append to mailbox {$folder}";
+                self::pushError($msg);
+                self::warnImap('imap_append(): '.$msg);
+
+                return false;
+            }
+        }
+        $message = str_replace(["\r\n", "\r"], "\n", $message);
+        $message = rtrim($message, "\n")."\n";
+        $fromLine = self::buildFromEnvelopeLine($message, $internalDate);
+        if (!str_starts_with($message, 'From ')) {
+            $chunk = $fromLine.$message;
+            if (!str_ends_with($chunk, "\n")) {
+                $chunk .= "\n";
+            }
+        } else {
+            $chunk = $message;
+            if (!str_ends_with($chunk, "\n")) {
+                $chunk .= "\n";
+            }
+        }
+        // Separate messages with a blank line when file already has content.
+        $existing = @file_get_contents($path);
+        if (false === $existing) {
+            $msg = "Can't append to mailbox {$folder}";
+            self::pushError($msg);
+            self::warnImap('imap_append(): '.$msg);
+
+            return false;
+        }
+        $prefix = ('' !== $existing && !str_ends_with($existing, "\n")) ? "\n" : '';
+        if (false === @file_put_contents($path, $prefix.$chunk, FILE_APPEND)) {
+            $msg = "Can't append to mailbox {$folder}";
+            self::pushError($msg);
+            self::warnImap('imap_append(): '.$msg);
+
+            return false;
+        }
+
+        $openPath = $st['mailbox'];
+        $openReal = realpath($openPath);
+        $pathReal = realpath($path);
+        if ((false !== $openReal && $openReal === $pathReal) || $openPath === $path) {
+            try {
+                self::$state[$object->id]['messages'] = ImapMboxEngine::parseFile($path);
+            } catch (\Throwable $e) {
+                // Disk write succeeded; keep prior in-memory view on parse failure.
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * imap_savebody() — write message body/section to a file path (#27814).
+     */
+    public static function saveBody(
+        ObjectEntry $object,
+        string $file,
+        int $msgNo,
+        string $section = '',
+        int $flags = 0
+    ): bool {
+        $body = self::fetchBody($object, $msgNo, $section, $flags);
+        if (false === $body) {
+            $msg = "Can't save body for message {$msgNo}";
+            self::pushError($msg);
+            self::warnImap('imap_savebody(): '.$msg);
+
+            return false;
+        }
+        if (false === @file_put_contents($file, $body)) {
+            $msg = "Can't save body for message {$msgNo}";
+            self::pushError($msg);
+            self::warnImap('imap_savebody(): '.$msg);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * imap_fetchmime() — MIME headers for section (local single-part v1) (#27814).
+     */
+    public static function fetchMime(
+        ObjectEntry $object,
+        int $msgNo,
+        string $section,
+        int $flags = 0
+    ): string|false {
+        unset($flags);
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $idx = $msgNo - 1;
+        if ($idx < 0 || $idx >= \count($st['messages'])) {
+            return false;
+        }
+        $msg = $st['messages'][$idx];
+        // Single-part mbox: section "" / "1" / "TEXT" → full header block.
+        if ('' === $section || '1' === $section || 'TEXT' === strtoupper($section)) {
+            return $msg['headers']."\n";
+        }
+
+        return $msg['headers']."\n";
+    }
+
+    /**
+     * imap_bodystruct() — part structure object for local single-part messages (#27814).
+     */
+    public static function bodyStruct(
+        ObjectEntry $object,
+        int $msgNo,
+        string $section,
+        Context $ctx
+    ): Variable|false {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $idx = $msgNo - 1;
+        if ($idx < 0 || $idx >= \count($st['messages'])) {
+            return false;
+        }
+        unset($section); // v1: single-part body only
+        $msg = $st['messages'][$idx];
+        $map = $msg['headerMap'];
+        $ctype = (string) ($map['content-type'] ?? 'text/plain');
+        $subtype = 'PLAIN';
+        $type = 0; // TYPETEXT
+        if (preg_match('#^([^/]+)/([^;]+)#', $ctype, $m)) {
+            $major = strtolower(trim($m[1]));
+            $subtype = strtoupper(trim($m[2]));
+            if ('text' === $major) {
+                $type = 0;
+            } elseif ('multipart' === $major) {
+                $type = 1;
+            } elseif ('message' === $major) {
+                $type = 2;
+            } elseif ('application' === $major) {
+                $type = 3;
+            } elseif ('audio' === $major) {
+                $type = 4;
+            } elseif ('image' === $major) {
+                $type = 5;
+            } elseif ('video' === $major) {
+                $type = 6;
+            } else {
+                $type = 7; // TYPEOTHER
+            }
+        }
+        $encoding = 0; // ENC7BIT
+        $cte = strtolower((string) ($map['content-transfer-encoding'] ?? ''));
+        if (str_contains($cte, 'quoted-printable')) {
+            $encoding = 4;
+        } elseif (str_contains($cte, 'base64')) {
+            $encoding = 3;
+        } elseif (str_contains($cte, '8bit')) {
+            $encoding = 1;
+        } elseif (str_contains($cte, 'binary')) {
+            $encoding = 2;
+        }
+
+        if (!isset($ctx->classes['stdclass'])) {
+            $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
+            $ce->isInternal = true;
+            $ctx->classes['stdclass'] = $ce;
+        }
+        $obj = new ObjectEntry($ctx->classes['stdclass']);
+        $obj->constructed = true;
+        $setInt = static function (string $name, int $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->int($value);
+        };
+        $setStr = static function (string $name, string $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->string($value);
+        };
+        $setBool = static function (string $name, bool $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->bool($value);
+        };
+
+        $body = $msg['body'];
+        $bytes = \strlen($body);
+        $lines = 0 === $bytes ? 0 : substr_count($body, "\n") + (str_ends_with($body, "\n") ? 0 : 1);
+
+        $setInt('type', $type);
+        $setInt('encoding', $encoding);
+        $setBool('ifsubtype', true);
+        $setStr('subtype', $subtype);
+        $setBool('ifdescription', false);
+        $setStr('description', '');
+        $setBool('ifid', isset($map['content-id']));
+        $setStr('id', (string) ($map['content-id'] ?? ''));
+        $setInt('lines', $lines);
+        $setInt('bytes', $bytes);
+        $setBool('ifdisposition', isset($map['content-disposition']));
+        $setStr('disposition', (string) ($map['content-disposition'] ?? ''));
+        $setBool('ifdparameters', false);
+        $setBool('ifparameters', false);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($obj);
+
+        return $var;
+    }
+
+    private static function buildFromEnvelopeLine(string $message, ?string $internalDate): string
+    {
+        $sender = 'unknown@php-compiler.local';
+        if (preg_match('/^From:\s*(.+)$/mi', $message, $m)) {
+            $from = trim($m[1]);
+            if (preg_match('/<([^>]+)>/', $from, $em)) {
+                $sender = $em[1];
+            } elseif (preg_match('/\S+@\S+/', $from, $em)) {
+                $sender = $em[0];
+            }
+        }
+        if (null !== $internalDate && '' !== trim($internalDate)) {
+            $date = trim($internalDate);
+        } else {
+            $date = gmdate('D M d H:i:s Y');
+        }
+
+        return 'From '.$sender.' '.$date."\n";
+    }
+
     public static function headerInfo(
         ObjectEntry $object,
         int $msgNo,
