@@ -54,6 +54,24 @@ final class VmImapCore
 
     public const SA_ALL = 31;
 
+    /** imap_sort() SORT* criteria (c-client mail.h). */
+    public const SORTDATE = 0;
+
+    public const SORTARRIVAL = 1;
+
+    public const SORTFROM = 2;
+
+    public const SORTSUBJECT = 3;
+
+    public const SORTTO = 4;
+
+    public const SORTCC = 5;
+
+    public const SORTSIZE = 6;
+
+    /** SE_UID — return UIDs from search/sort (php_imap.h). */
+    public const SE_UID = 1;
+
     public static function clearErrors(): void
     {
         self::$errors = [];
@@ -886,6 +904,198 @@ final class VmImapCore
         $var->object($obj);
 
         return $var;
+    }
+
+    /**
+     * imap_fetchstructure() — full-message structure (local single-part v1) (#27784).
+     */
+    public static function fetchStructure(
+        ObjectEntry $object,
+        int $msgNo,
+        int $flags,
+        Context $ctx
+    ): Variable|false {
+        unset($flags); // FT_UID ignored: local mbox UIDs == sequence numbers
+
+        return self::bodyStruct($object, $msgNo, '1', $ctx);
+    }
+
+    /**
+     * imap_fetchheader() — raw header block for a message (#27784).
+     */
+    public static function fetchHeader(
+        ObjectEntry $object,
+        int $msgNo,
+        int $flags = 0
+    ): string|false {
+        unset($flags);
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $idx = $msgNo - 1;
+        if ($idx < 0 || $idx >= \count($st['messages'])) {
+            return false;
+        }
+
+        return $st['messages'][$idx]['headers']."\n";
+    }
+
+    /**
+     * imap_body() / imap_fetchtext() — full message body (#27784).
+     */
+    public static function body(
+        ObjectEntry $object,
+        int $msgNo,
+        int $flags = 0
+    ): string|false {
+        return self::fetchBody($object, $msgNo, '', $flags);
+    }
+
+    /**
+     * imap_fetch_overview() — per-message overview objects for a sequence (#27784).
+     */
+    public static function fetchOverview(
+        ObjectEntry $object,
+        string $sequence,
+        int $flags,
+        Context $ctx
+    ): Variable|false {
+        unset($flags); // FT_UID ignored: local mbox UIDs == sequence numbers
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $indices = self::parseSequence($sequence, \count($st['messages']));
+        if ([] === $indices) {
+            return false;
+        }
+        if (!isset($ctx->classes['stdclass'])) {
+            $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
+            $ce->isInternal = true;
+            $ctx->classes['stdclass'] = $ce;
+        }
+        $ht = new HashTable();
+        foreach ($indices as $idx) {
+            $msg = $st['messages'][$idx];
+            $map = $msg['headerMap'];
+            $msgNo = $idx + 1;
+            $obj = new ObjectEntry($ctx->classes['stdclass']);
+            $obj->constructed = true;
+            $setStr = static function (string $name, string $value) use ($obj): void {
+                $prop = $obj->allocateProperty($name);
+                $prop->string($value);
+            };
+            $setInt = static function (string $name, int $value) use ($obj): void {
+                $prop = $obj->allocateProperty($name);
+                $prop->int($value);
+            };
+            $setStr('subject', (string) ($map['subject'] ?? ''));
+            $setStr('from', (string) ($map['from'] ?? ''));
+            $setStr('to', (string) ($map['to'] ?? ''));
+            $setStr('date', (string) ($map['date'] ?? ''));
+            $setStr('message_id', (string) ($map['message-id'] ?? ''));
+            $setInt('size', \strlen($msg['raw']));
+            $setInt('uid', $msgNo);
+            $setInt('msgno', $msgNo);
+            $setInt('recent', 0);
+            $setInt('flagged', 0);
+            $setInt('answered', 0);
+            $setInt('deleted', isset($st['deleted'][$idx]) ? 1 : 0);
+            $setInt('seen', 0);
+            $setInt('draft', 0);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * imap_sort() — message numbers ordered by SORT* criteria (#27784).
+     *
+     * @return list<int>|false
+     */
+    public static function sort(
+        ObjectEntry $object,
+        int $criteria,
+        int $reverse,
+        int $flags = 0,
+        ?string $searchCriteria = null,
+        ?string $charset = null
+    ): array|false {
+        unset($charset); // charset unused for local mbox v1
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $count = \count($st['messages']);
+        if ($count < 1) {
+            return [];
+        }
+        $msgNos = [];
+        if (null !== $searchCriteria && '' !== trim($searchCriteria)) {
+            $hits = ImapMboxEngine::search($st['messages'], $searchCriteria);
+            if ([] === $hits) {
+                return [];
+            }
+            $msgNos = $hits;
+        } else {
+            for ($n = 1; $n <= $count; ++$n) {
+                $msgNos[] = $n;
+            }
+        }
+        $keys = [];
+        foreach ($msgNos as $msgNo) {
+            $idx = $msgNo - 1;
+            $msg = $st['messages'][$idx];
+            $map = $msg['headerMap'];
+            switch ($criteria) {
+                case self::SORTFROM:
+                    $keys[$msgNo] = strtolower((string) ($map['from'] ?? ''));
+                    break;
+                case self::SORTSUBJECT:
+                    $keys[$msgNo] = strtolower((string) ($map['subject'] ?? ''));
+                    break;
+                case self::SORTTO:
+                    $keys[$msgNo] = strtolower((string) ($map['to'] ?? ''));
+                    break;
+                case self::SORTCC:
+                    $keys[$msgNo] = strtolower((string) ($map['cc'] ?? ''));
+                    break;
+                case self::SORTSIZE:
+                    $keys[$msgNo] = \strlen($msg['raw']);
+                    break;
+                case self::SORTDATE:
+                case self::SORTARRIVAL:
+                default:
+                    $keys[$msgNo] = strtolower((string) ($map['date'] ?? ''));
+                    break;
+            }
+        }
+        uksort($keys, static function (int $a, int $b) use ($keys): int {
+            $ka = $keys[$a];
+            $kb = $keys[$b];
+            if ($ka === $kb) {
+                return $a <=> $b;
+            }
+            if (\is_int($ka) && \is_int($kb)) {
+                return $ka <=> $kb;
+            }
+
+            return ((string) $ka) <=> ((string) $kb);
+        });
+        $ordered = array_keys($keys);
+        if (0 !== $reverse) {
+            $ordered = array_reverse($ordered);
+        }
+        // SE_UID: local mbox UIDs == sequence numbers — same list.
+        unset($flags);
+
+        return array_values($ordered);
     }
 
     private static function buildFromEnvelopeLine(string $message, ?string $internalDate): string
