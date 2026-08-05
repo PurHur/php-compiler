@@ -9,18 +9,23 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** ksort()/krsort() JIT routes all operands through KeySortJitHelper PHP not ArrayBuiltinHelper LLVM (#12770, #13050, #18381). */
+/**
+ * ksort()/krsort() — VM via KeySortJitHelper; thin AOT via Type\HashTable LLVM (#27227).
+ * ArrayBuiltinHelper must not regain the deleted ksort/krsort monolith (#18381).
+ */
 final class KeySortRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 4520;
 
-    public function testKeySortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testKeySortRuntimeUsesHashTableLlvmNotArrayBuiltinHelper(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/KeySortRuntime.php');
-        $this->assertStringContainsString('KeySortJitHelper', $runtime);
-        $this->assertStringContainsString('invokeKeySort', $runtime);
+        $this->assertStringContainsString('__hashtable__sortStringKeys', $runtime);
+        $this->assertStringContainsString('__hashtable__sortStringKeysReverse', $runtime);
+        $this->assertStringNotContainsString('KeySortJitHelper::', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::ksortByKey', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::krsortByKey', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $ksort = (string) file_get_contents(__DIR__.'/../../ext/standard/ksort_.php');
@@ -35,11 +40,10 @@ final class KeySortRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('function krsortByKey', $arrayBuiltin);
         $this->assertStringNotContainsString('function krsortPackedListByKey', $arrayBuiltin);
         $this->assertStringNotContainsString('function sortStringKeys(', $arrayBuiltin);
-        $this->assertStringNotContainsString('__hashtable__sortStringKeys', $arrayBuiltin);
 
         $hashtableType = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
-        $this->assertStringNotContainsString('__hashtable__sortStringKeys', $hashtableType);
-        $this->assertStringNotContainsString('implementSortStringKeys', $hashtableType);
+        $this->assertStringContainsString('__hashtable__sortStringKeys', $hashtableType);
+        $this->assertStringContainsString('implementSortStringKeys', $hashtableType);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterKeysortLlvmDeletion(): void

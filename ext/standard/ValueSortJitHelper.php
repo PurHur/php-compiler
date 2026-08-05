@@ -10,6 +10,10 @@ use PHPCompiler\VM\Variable;
 /**
  * asort()/arsort() for compiled JIT/AOT modules (#12771, php-in-PHP).
  *
+ * Host/VM SSOT + unit tests. Thin standalone AOT uses Type\HashTable LLVM
+ * ({@see \PHPCompiler\JIT\Builtin\ValueSortRuntime}) — NestedJIT of this helper
+ * aborts on HashTable method stubs (#27227 / peer #26975).
+ *
  * SSOT shared with {@see asort_} / {@see arsort_} VM execute()
  * php-src: ext/standard/array.c — php_array_asort / php_array_arsort
  */
