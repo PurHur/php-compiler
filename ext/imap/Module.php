@@ -40,6 +40,9 @@ class Module extends ModuleAbstract
             'SORTCC' => VmImapCore::SORTCC,
             'SORTSIZE' => VmImapCore::SORTSIZE,
             'SE_UID' => VmImapCore::SE_UID,
+            'IMAP_GC_ELT' => VmImapCore::IMAP_GC_ELT,
+            'IMAP_GC_ENV' => VmImapCore::IMAP_GC_ENV,
+            'IMAP_GC_TEXTS' => VmImapCore::IMAP_GC_TEXTS,
         ] as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
             $var->int($value);
@@ -90,6 +93,15 @@ class Module extends ModuleAbstract
             new imap_ping(),
             new imap_check(),
             new imap_status(),
+            new imap_setflag_full(),
+            new imap_clearflag_full(),
+            new imap_alerts(),
+            new imap_gc(),
+            new imap_thread(),
+            new imap_getacl(),
+            new imap_setacl(),
+            new imap_headers(),
+            new imap_mailboxmsginfo(),
         ];
     }
 }

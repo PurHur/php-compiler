@@ -25,6 +25,9 @@ final class VmImapCore
 
     private static ?string $lastError = null;
 
+    /** @var list<string> */
+    private static array $alerts = [];
+
     /** c-client LATT_* bits used by imap_getmailboxes() (php_imap.h). */
     public const LATT_NOINFERIORS = 0x01;
 
@@ -36,7 +39,9 @@ final class VmImapCore
      *     closed: bool,
      *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
      *     subscribed: array<string, true>,
-     *     deleted: array<int, true>
+     *     deleted: array<int, true>,
+     *     flags: array<int, array{seen: bool, flagged: bool, answered: bool, draft: bool}>,
+     *     acl: array<string, array<string, string>>
      * }>
      */
     private static array $state = [];
@@ -72,6 +77,13 @@ final class VmImapCore
     /** SE_UID — return UIDs from search/sort (php_imap.h). */
     public const SE_UID = 1;
 
+    /** imap_gc() IMAP_GC_* flags (php_imap.h). */
+    public const IMAP_GC_ELT = 1;
+
+    public const IMAP_GC_ENV = 2;
+
+    public const IMAP_GC_TEXTS = 4;
+
     public static function clearErrors(): void
     {
         self::$errors = [];
@@ -88,6 +100,22 @@ final class VmImapCore
         }
         $out = self::$errors;
         self::$errors = [];
+
+        return $out;
+    }
+
+    /**
+     * imap_alerts() — drain alert stack (#27800).
+     *
+     * @return list<string>|false
+     */
+    public static function alerts(): array|false
+    {
+        if ([] === self::$alerts) {
+            return false;
+        }
+        $out = self::$alerts;
+        self::$alerts = [];
 
         return $out;
     }
@@ -194,6 +222,8 @@ final class VmImapCore
             'messages' => $messages,
             'subscribed' => [],
             'deleted' => [],
+            'flags' => [],
+            'acl' => [],
         ];
         $var->object($object);
 
@@ -741,6 +771,7 @@ final class VmImapCore
             try {
                 self::$state[$object->id]['messages'] = ImapMboxEngine::parseFile($path);
                 self::$state[$object->id]['deleted'] = [];
+                self::$state[$object->id]['flags'] = [];
             } catch (\Throwable $e) {
                 // Disk write succeeded; keep prior in-memory view on parse failure.
             }
@@ -999,11 +1030,12 @@ final class VmImapCore
             $setInt('uid', $msgNo);
             $setInt('msgno', $msgNo);
             $setInt('recent', 0);
-            $setInt('flagged', 0);
-            $setInt('answered', 0);
+            $flags = $st['flags'][$idx] ?? ['seen' => false, 'flagged' => false, 'answered' => false, 'draft' => false];
+            $setInt('flagged', !empty($flags['flagged']) ? 1 : 0);
+            $setInt('answered', !empty($flags['answered']) ? 1 : 0);
             $setInt('deleted', isset($st['deleted'][$idx]) ? 1 : 0);
-            $setInt('seen', 0);
-            $setInt('draft', 0);
+            $setInt('seen', !empty($flags['seen']) ? 1 : 0);
+            $setInt('draft', !empty($flags['draft']) ? 1 : 0);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
@@ -1098,6 +1130,272 @@ final class VmImapCore
         return array_values($ordered);
     }
 
+    /**
+     * imap_setflag_full() — set message flags (#27800).
+     */
+    public static function setFlagFull(
+        ObjectEntry $object,
+        string $sequence,
+        string $flag,
+        int $options = 0
+    ): bool {
+        unset($options);
+
+        return self::mutateFlags($object, $sequence, $flag, true);
+    }
+
+    /**
+     * imap_clearflag_full() — clear message flags (#27800).
+     */
+    public static function clearFlagFull(
+        ObjectEntry $object,
+        string $sequence,
+        string $flag,
+        int $options = 0
+    ): bool {
+        unset($options);
+
+        return self::mutateFlags($object, $sequence, $flag, false);
+    }
+
+    private static function mutateFlags(
+        ObjectEntry $object,
+        string $sequence,
+        string $flag,
+        bool $set
+    ): bool {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $indices = self::parseSequence($sequence, \count($st['messages']));
+        if ([] === $indices) {
+            return false;
+        }
+        $tokens = preg_split('/\s+/', strtoupper(trim($flag))) ?: [];
+        foreach ($indices as $idx) {
+            if (!isset(self::$state[$object->id]['flags'][$idx])) {
+                self::$state[$object->id]['flags'][$idx] = [
+                    'seen' => false,
+                    'flagged' => false,
+                    'answered' => false,
+                    'draft' => false,
+                ];
+            }
+            foreach ($tokens as $tok) {
+                $tok = ltrim($tok, '\\');
+                if ('SEEN' === $tok) {
+                    self::$state[$object->id]['flags'][$idx]['seen'] = $set;
+                } elseif ('FLAGGED' === $tok) {
+                    self::$state[$object->id]['flags'][$idx]['flagged'] = $set;
+                } elseif ('ANSWERED' === $tok) {
+                    self::$state[$object->id]['flags'][$idx]['answered'] = $set;
+                } elseif ('DRAFT' === $tok) {
+                    self::$state[$object->id]['flags'][$idx]['draft'] = $set;
+                } elseif ('DELETED' === $tok) {
+                    if ($set) {
+                        self::$state[$object->id]['deleted'][$idx] = true;
+                    } else {
+                        unset(self::$state[$object->id]['deleted'][$idx]);
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * imap_gc() — discard cached elements (no-op success for local mbox) (#27800).
+     */
+    public static function gc(ObjectEntry $object, int $flags): bool
+    {
+        unset($flags);
+
+        return null !== self::liveState($object);
+    }
+
+    /**
+     * imap_thread() — flat thread map for local mbox (#27800).
+     *
+     * Returns numeric keys: 0.rootNum, 0.next, 1.rootNum, … matching c-client
+     * thread array shape closely enough for compliance (no References graph).
+     */
+    public static function thread(ObjectEntry $object, int $flags = 0): Variable|false
+    {
+        unset($flags);
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $ht = new HashTable();
+        $n = \count($st['messages']);
+        for ($i = 0; $i < $n; ++$i) {
+            $rootVal = new Variable();
+            $rootVal->int($i + 1);
+            $ht->add($i.'.num', $rootVal);
+            $nextVal = new Variable();
+            $nextVal->int(0);
+            $ht->add($i.'.next', $nextVal);
+        }
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * imap_setacl() — store ACL rights for a local mailbox path (#27800).
+     */
+    public static function setAcl(
+        ObjectEntry $object,
+        string $mailbox,
+        string $userId,
+        string $rights
+    ): bool {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path) {
+            $msg = "Can't set ACL on {$mailbox}";
+            self::pushError($msg);
+            self::warnImap('imap_setacl(): '.$msg);
+
+            return false;
+        }
+        self::$state[$object->id]['acl'][$path][$userId] = $rights;
+
+        return true;
+    }
+
+    /**
+     * imap_getacl() — ACL map for a mailbox (#27800).
+     *
+     * @return array<string, string>|false
+     */
+    public static function getAcl(ObjectEntry $object, string $mailbox): array|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path) {
+            return false;
+        }
+        $acl = $st['acl'][$path] ?? [];
+        if ([] === $acl) {
+            // Default: owner-like rights for the current mailbox when unset.
+            return ['anyone' => 'lrswipkxtecda'];
+        }
+
+        return $acl;
+    }
+
+    /**
+     * imap_headers() — one summary line per message (#27800).
+     *
+     * @return list<string>|false
+     */
+    public static function headers(ObjectEntry $object): array|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $out = [];
+        foreach ($st['messages'] as $idx => $msg) {
+            $map = $msg['headerMap'];
+            $msgNo = $idx + 1;
+            $flags = $st['flags'][$idx] ?? ['seen' => false, 'flagged' => false, 'answered' => false, 'draft' => false];
+            $mark = !empty($flags['seen']) ? ' ' : 'U';
+            if (isset($st['deleted'][$idx])) {
+                $mark = 'D';
+            }
+            $from = (string) ($map['from'] ?? '');
+            $subject = (string) ($map['subject'] ?? '');
+            $date = (string) ($map['date'] ?? '');
+            $size = \strlen($msg['raw']);
+            $out[] = sprintf(
+                '%s%4d) %-20.20s %-20.20s (%d chars) %s',
+                $mark,
+                $msgNo,
+                $date,
+                $from,
+                $size,
+                $subject
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * imap_mailboxmsginfo() — mailbox summary object (#27800).
+     */
+    public static function mailboxMsgInfo(ObjectEntry $object, Context $ctx): Variable|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        if (!isset($ctx->classes['stdclass'])) {
+            $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
+            $ce->isInternal = true;
+            $ctx->classes['stdclass'] = $ce;
+        }
+        $obj = new ObjectEntry($ctx->classes['stdclass']);
+        $obj->constructed = true;
+        $setStr = static function (string $name, string $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->string($value);
+        };
+        $setInt = static function (string $name, int $value) use ($obj): void {
+            $prop = $obj->allocateProperty($name);
+            $prop->int($value);
+        };
+        $unread = 0;
+        $size = 0;
+        foreach ($st['messages'] as $idx => $msg) {
+            $size += \strlen($msg['raw']);
+            $flags = $st['flags'][$idx] ?? ['seen' => false];
+            if (empty($flags['seen'])) {
+                ++$unread;
+            }
+        }
+        $setStr('Date', gmdate('D, d M Y H:i:s +0000'));
+        $setStr('Driver', 'mbox');
+        $setStr('Mailbox', $st['mailbox']);
+        $setInt('Nmsgs', \count($st['messages']));
+        $setInt('Recent', 0);
+        $setInt('Unread', $unread);
+        $setInt('Deleted', \count($st['deleted']));
+        $setInt('Size', $size);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($obj);
+
+        return $var;
+    }
+
+    /**
+     * Convert string=>string map to HashTable (#27800 ACL).
+     *
+     * @param array<string, string> $map
+     */
+    public static function stringMapToHashTable(array $map): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($map as $key => $value) {
+            $v = new Variable();
+            $v->string($value);
+            $ht->add((string) $key, $v);
+        }
+
+        return $ht;
+    }
+
     private static function buildFromEnvelopeLine(string $message, ?string $internalDate): string
     {
         $sender = 'unknown@php-compiler.local';
@@ -1173,9 +1471,15 @@ final class VmImapCore
             return true;
         }
         $kept = [];
+        $keptFlags = [];
+        $newIdx = 0;
         foreach ($st['messages'] as $i => $msg) {
             if (!isset($st['deleted'][$i])) {
                 $kept[] = $msg;
+                if (isset($st['flags'][$i])) {
+                    $keptFlags[$newIdx] = $st['flags'][$i];
+                }
+                ++$newIdx;
             }
         }
         $blob = '';
@@ -1195,6 +1499,7 @@ final class VmImapCore
         }
         self::$state[$object->id]['messages'] = $kept;
         self::$state[$object->id]['deleted'] = [];
+        self::$state[$object->id]['flags'] = $keptFlags;
 
         return true;
     }
@@ -1414,7 +1719,9 @@ final class VmImapCore
      *     closed: bool,
      *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
      *     subscribed: array<string, true>,
-     *     deleted: array<int, true>
+     *     deleted: array<int, true>,
+     *     flags: array<int, array{seen: bool, flagged: bool, answered: bool, draft: bool}>,
+     *     acl: array<string, array<string, string>>
      * }|null
      */
     private static function liveState(ObjectEntry $object): ?array
@@ -1432,7 +1739,9 @@ final class VmImapCore
      *     closed: bool,
      *     messages: list<array{raw: string, headers: string, body: string, headerMap: array<string, string>}>,
      *     subscribed: array<string, true>,
-     *     deleted: array<int, true>
+     *     deleted: array<int, true>,
+     *     flags: array<int, array{seen: bool, flagged: bool, answered: bool, draft: bool}>,
+     *     acl: array<string, array<string, string>>
      * }|null
      */
     private static function liveStateMutable(ObjectEntry $object): ?array
