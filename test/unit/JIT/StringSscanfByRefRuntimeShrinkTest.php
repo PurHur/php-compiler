@@ -14,6 +14,12 @@ final class StringSscanfByRefRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../../ext/standard/SscanfJitHelper.php');
         $this->assertStringContainsString('VmSscanf::parseWithConsumed', $source);
         $this->assertStringContainsString('parseAssignMeta', $source);
+        // NestedJIT of SscanfJitHelper must not emit phpc_round (#27663 / peer #26862).
+        $this->assertStringNotContainsString('(int) \\round(', $source);
+        $this->assertStringContainsString('(int) ($scaled + 0.5)', $source);
+        $vmSscanf = (string) \file_get_contents(__DIR__.'/../../../ext/standard/VmSscanf.php');
+        $this->assertStringNotContainsString('\\str_pad(', $vmSscanf);
+        $this->assertStringNotContainsString('byRefTarget()', $vmSscanf);
     }
 
     public function testStringSscanfByRefRoutesThroughEnsureCompiledBundle(): void

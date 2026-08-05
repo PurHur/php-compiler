@@ -254,9 +254,7 @@ final class VmSscanf
     {
         $n = \count($outVars);
         for ($i = $outIdx; $i < $n; ++$i) {
-            $tmp = new Variable();
-            $tmp->null();
-            $outVars[$i]->byRefTarget()->copyFrom($tmp);
+            self::assignNull($outVars[$i]);
         }
 
         return [$assigned, $inPos, $outIdx];
@@ -919,7 +917,13 @@ final class VmSscanf
     private static function subtractDecimalStrings(string $minuend, string $subtrahend): string
     {
         $aDigits = \str_split($minuend);
-        $bDigits = \str_split(\str_pad($subtrahend, \strlen($minuend), '0', \STR_PAD_LEFT));
+        // Left-pad without \str_pad — NestedJIT would emit unresolved __compiler_str_pad (#27663).
+        $width = \strlen($minuend);
+        $padded = $subtrahend;
+        while (\strlen($padded) < $width) {
+            $padded = '0'.$padded;
+        }
+        $bDigits = \str_split($padded);
         $borrow = 0;
         for ($i = \count($aDigits) - 1; $i >= 0; --$i) {
             $d = (int) $aDigits[$i] - (int) $bDigits[$i] - $borrow;
@@ -936,24 +940,32 @@ final class VmSscanf
         return '' === $result ? '0' : $result;
     }
 
+    private static function assignNull(Variable $dest): void
+    {
+        $tmp = new Variable();
+        $tmp->null();
+        // resolveIndirect: NestedJIT-bridged; byRefTarget was not (#27663 / peer #24117).
+        $dest->resolveIndirect()->copyFrom($tmp);
+    }
+
     private static function assignInt(Variable $dest, int $value): void
     {
         $tmp = new Variable();
         $tmp->int($value);
-        $dest->byRefTarget()->copyFrom($tmp);
+        $dest->resolveIndirect()->copyFrom($tmp);
     }
 
     private static function assignString(Variable $dest, string $value): void
     {
         $tmp = new Variable();
         $tmp->string($value);
-        $dest->byRefTarget()->copyFrom($tmp);
+        $dest->resolveIndirect()->copyFrom($tmp);
     }
 
     private static function assignFloat(Variable $dest, float $value): void
     {
         $tmp = new Variable();
         $tmp->float($value);
-        $dest->byRefTarget()->copyFrom($tmp);
+        $dest->resolveIndirect()->copyFrom($tmp);
     }
 }

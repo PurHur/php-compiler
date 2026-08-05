@@ -17,14 +17,18 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for vfscanf() (issue #6174).
+ * LLVM JIT/AOT helper for vfscanf() / fscanf() (issue #6174, #27663).
+ *
+ * Restores the insert block after ensureLinked — NestedJIT clears it and
+ * otherwise trips BasicBlockHelper::parentFunction (#27663).
  */
 final class JitVfscanf
 {
     public static function parse(Context $context, JITVariable ...$args): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         Sscanf::ensureLinked($context);
-        StreamRead::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
 
         $argc = \count($args);
         if ($argc < 2) {

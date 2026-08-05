@@ -11,6 +11,8 @@ use PHPCompiler\VM\Variable;
  * sscanf() for compiled JIT/AOT modules (#9134, #12467 php-in-PHP).
  *
  * SSOT: {@see VmSscanf} (php-src ext/standard/sscanf.c).
+ * NestedJIT note (#27663 / peer #26862): do **not** call \round() — MathRound skips
+ * under NestedJIT so thin AOT fscanf/vfscanf fails with unresolved `phpc_round`.
  */
 final class SscanfJitHelper
 {
@@ -105,7 +107,9 @@ final class SscanfJitHelper
         $abs = \abs($value);
         [$mantissa, $exponent] = self::frexpDecompose($abs);
         $exp = $exponent - 1 + 1023;
-        $fraction = (int) \round(($mantissa - 0.5) * 2.0 * 4503599627370496.0);
+        // Half-up without round builtin (#27663 / Ieee754 #26862).
+        $scaled = ($mantissa - 0.5) * 2.0 * 4503599627370496.0;
+        $fraction = (int) ($scaled + 0.5);
         if ($fraction >= 4503599627370496) {
             $fraction = 0;
             ++$exp;

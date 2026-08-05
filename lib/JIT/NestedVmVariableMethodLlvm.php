@@ -12,6 +12,8 @@ final class NestedVmVariableMethodLlvm
     /** @var array<string, class-string<Call>> */
     private const METHOD_HANDLERS = [
         'resolveindirect' => Call\VariableResolveIndirect::class,
+        // One-level by-ref unwrap — NestedJIT as resolveIndirect (full chain is safe) (#27663).
+        'byreftarget' => Call\VariableResolveIndirect::class,
         'copyfrom' => Call\VariableCopyFrom::class,
         // usort/uksort/uasort NestedJIT snapshots (#24142): value-box copyFrom is the
         // NestedJIT stand-in for Variable::duplicateFrom (INDIRECT/ARRAY COW stays VM-side).

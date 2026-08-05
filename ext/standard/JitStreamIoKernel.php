@@ -53,6 +53,7 @@ final class JitStreamIoKernel
         '__compiler_popen',
         '__compiler_tmpfile',
         '__compiler_fread',
+        '__compiler_fgets',
         '__compiler_stream_supports',
     ];
 
@@ -78,6 +79,7 @@ final class JitStreamIoKernel
         self::implementIfMissing($context, '__compiler_popen', self::emitPopen(...));
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
         self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
+        self::implementFgetsForce($context);
         self::implementIfMissing($context, '__compiler_stream_supports', self::emitStreamSupports(...));
         self::registerLinkedRuntime($context);
 
@@ -197,6 +199,10 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($strPtr, false, $i64, $i64)
             ),
+            '__compiler_fgets' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $i64, $i64)
+            ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
@@ -239,6 +245,8 @@ final class JitStreamIoKernel
             ['free', $void, [$i8p]],
             ['malloc', $i8p, [$sizeT]],
             ['fread', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
+            ['fgets', $i8p, [$i8p, $i32, $i8p]],
+            ['strlen', $sizeT, [$i8p]],
             ['ferror', $i32, [$i8p]],
             ['strcmp', $i32, [$i8p, $i8p]],
             ['strncmp', $i32, [$i8p, $i8p, $sizeT]],
@@ -932,6 +940,116 @@ final class JitStreamIoKernel
         $context->builder->positionAtEnd($makeBb);
         $gotI64 = $context->builder->sext($got, $i64);
         $result = $context->builder->call($context->lookupFunction('__string__init'), $gotI64, $buf);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $result
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
+    }
+
+    /**
+     * Idempotent libc fgets for thin AOT (#27663). Do not recreate after NestedJIT.
+     */
+    public static function implementFgetsForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fgets');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fgets_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fgets', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fgets');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fgets');
+        }
+        self::emitFgets($context, $fn);
+        $context->registerFunction('__compiler_fgets', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** libc fgets on FILE* handle table — length -1 → {@see DEFAULT_BUFFER_SIZE} (#27663). */
+    private static function emitFgets(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('fgets_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $length = $fn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $defaultLen = $i64->constInt(self::DEFAULT_BUFFER_SIZE, false);
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
+        $failBb = $fn->appendBasicBlock('fgets_fail');
+        $lenBb = $fn->appendBasicBlock('fgets_len');
+        $context->builder->branchIf($fpNull, $failBb, $lenBb);
+
+        $context->builder->positionAtEnd($lenBb);
+        $isOmit = $context->builder->icmp(Builder::INT_EQ, $length, $i64->constInt(-1, true));
+        $positive = $context->builder->icmp(Builder::INT_SGT, $length, $zeroI64);
+        $okLen = $context->builder->or($isOmit, $positive);
+        $allocBb = $fn->appendBasicBlock('fgets_alloc');
+        $context->builder->branchIf($okLen, $allocBb, $failBb);
+
+        $context->builder->positionAtEnd($allocBb);
+        $bufLen = $context->builder->select($isOmit, $defaultLen, $length);
+        $allocSize = $context->builder->trunc($bufLen, $sizeT);
+        $buf = $context->builder->call($context->lookupFunction('malloc'), $allocSize);
+        $bufNull = $context->builder->icmp(Builder::INT_EQ, $buf, $nullPtr);
+        $readBb = $fn->appendBasicBlock('fgets_read');
+        $context->builder->branchIf($bufNull, $failBb, $readBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $sizeI32 = $context->builder->trunc($bufLen, $i32);
+        $got = $context->builder->call(
+            $context->lookupFunction('fgets'),
+            $buf,
+            $sizeI32,
+            $fp
+        );
+        $gotNull = $context->builder->icmp(Builder::INT_EQ, $got, $nullPtr);
+        $freeFailBb = $fn->appendBasicBlock('fgets_free_fail');
+        $makeBb = $fn->appendBasicBlock('fgets_make');
+        $context->builder->branchIf($gotNull, $freeFailBb, $makeBb);
+
+        $context->builder->positionAtEnd($freeFailBb);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($makeBb);
+        $gotLen = $context->builder->call($context->lookupFunction('strlen'), $buf);
+        $gotLenI64 = $context->builder->zExt($gotLen, $i64);
+        $result = $context->builder->call($context->lookupFunction('__string__init'), $gotLenI64, $buf);
         $context->builder->call($context->lookupFunction('free'), $buf);
         $context->builder->returnValue(
             $context->builder->call(

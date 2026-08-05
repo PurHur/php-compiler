@@ -19739,6 +19739,8 @@ class JIT {
         // when the receiver is a value-box Variable param (#22678 AOT append/replaceChild).
         // Also accept *JitHelper declaringClass when NestedJIT leaked scope->className onto
         // `new Variable()` temps ($x->null() → ArrayReduceJitHelper::null, #24117).
+        // Same leak on NestedJIT'd Vm* SSOT classes: `$outVars[$i]->byRefTarget()` →
+        // VmSscanf::byreftarget (#27663 fscanf/vfscanf AOT).
         if (
             'phpcompiler\\vm\\variable' !== $declaringClassLc
             && 'object' !== $declaringClassLc
@@ -19746,6 +19748,7 @@ class JIT {
             && !str_ends_with($declaringClassLc, '\\vm\\variable')
             && !(Variable::TYPE_VALUE === $receiverVar->type)
             && !str_ends_with($declaringClassLc, 'jithelper')
+            && !preg_match('/\\\\vm[a-z0-9_]*$/', $declaringClassLc)
         ) {
             return false;
         }
