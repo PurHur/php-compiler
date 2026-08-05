@@ -31,13 +31,18 @@ final class HashTableMutateNestedLlvm
     /**
      * Replace packed-list values in place (same length; indices 0..n-1).
      *
+     * Implemented as clear + copy (same as {@see assignPackedList}): NestedJIT
+     * setAtIndex overwrite without clear was a silent no-op / segfault under thin
+     * AOT usort writeback (#26954 / peer #24157).
+     *
      * @param Value $ht       receiver {@see __hashtable__*}
      * @param Value $valuesHt packed list of replacement values
      */
     public static function replacePackedValues(Context $context, Value $ht, Value $valuesHt): void
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ht_mut_rpl_cont');
-        self::copyPackedValuesOnto($context, $ht, $valuesHt, false);
+        self::clearInPlace($context, $ht);
+        self::copyPackedValuesOnto($context, $ht, $valuesHt, true);
     }
 
     /**

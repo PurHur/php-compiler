@@ -12,8 +12,10 @@ use PHPCompiler\Web\Superglobals;
 /**
  * usort()/uksort()/uasort() closure comparators for compiled JIT/AOT modules (#15518, php-in-PHP).
  *
- * Packed usort: in-place {@see HashTable::replacePackedValues} — NestedJIT `new HashTable()`
- * segfaults under thin standalone AOT (#24156). Compare via {@see Variable::toInt()} on the
+ * Packed usort: NestedJIT `new HashTable()` segfaults under thin standalone AOT (#24156).
+ * Writeback must call {@see HashTable::assignPackedList} on the receiver — NestedJIT of
+ * {@see VmArray::writeReindexedValues} / {@see HashTable::replacePackedValues} leaves the
+ * user array unsorted under thin AOT (#26954). Compare via {@see Variable::toInt()} on the
  * invoke result — {@see VmClosureCall::coerceUserSortCallbackResult} reads VM type tags that
  * NestedClosureInvoke value-boxes do not populate.
  *
@@ -55,7 +57,8 @@ final class UsortJitHelper
                 }
             }
         }
-        VmArray::writeReindexedValues($ht, $values);
+        // Direct NestedJIT mutator — do not route through VmArray::writeReindexedValues (#26954).
+        $ht->assignPackedList($values);
 
         return $ht;
     }
