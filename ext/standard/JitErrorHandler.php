@@ -41,7 +41,8 @@ final class JitErrorHandler
             );
         }
 
-        $mask = \E_ALL;
+        // Profile-aware E_ALL (30719 on ≥8.4) — not host \E_ALL (#27824).
+        $mask = \PHPCompiler\VM\ErrorReporter::eAll();
         if (null !== $maskArg) {
             $mask = JitLongArg::lower($context, $maskArg, 'set_error_handler() error type mask');
         }
