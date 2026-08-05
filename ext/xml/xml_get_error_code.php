@@ -36,6 +36,15 @@ final class xml_get_error_code extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryGetErrorCode($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_get_error_code() user-script AOT requires a tracked XMLParser (#27293)'
+            );
+        }
         throw new \LogicException('xml_get_error_code() is not JIT-lowered in this compiler build');
     }
 }

@@ -4408,6 +4408,7 @@ require_once __DIR__.'/../../../ext/wddx/wddx_deserialize.php';
 require_once __DIR__.'/../../../ext/wddx/wddx_serialize_value.php';
 require_once __DIR__.'/../../../ext/wddx/wddx_serialize_vars.php';
 require_once __DIR__.'/../../../ext/xml/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/xml/JitXmlParserUserScript.php';
 require_once __DIR__.'/../../../ext/xml/Module.php';
 require_once __DIR__.'/../../../ext/xml/VmXml.php';
 require_once __DIR__.'/../../../ext/xml/VmXmlSaxDispatcher.php';
