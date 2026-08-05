@@ -5510,6 +5510,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/RecursiveIteratorIteratorConstruct.
 require_once __DIR__.'/../../../lib/JIT/Call/LimitIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/AppendIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RegexIteratorConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/CallbackFilterIteratorConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SplHtPosIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/EmptyIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FilterIteratorMethod.php';

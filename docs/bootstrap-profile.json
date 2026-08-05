@@ -5817,6 +5817,7 @@
         "lib/JIT/Call/BcMathNumberConstruct.php",
         "lib/JIT/Call/BcMathNumberMethod.php",
         "lib/JIT/Call/BcMathNumberToString.php",
+        "lib/JIT/Call/CallbackFilterIteratorConstruct.php",
         "lib/JIT/Call/ClosureBind.php",
         "lib/JIT/Call/ClosureBindTo.php",
         "lib/JIT/Call/ClosureCall.php",
@@ -7250,9 +7251,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7016,
+        "inventory_files": 7017,
         "excluded": 0,
-        "eligible": 7016,
+        "eligible": 7017,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
