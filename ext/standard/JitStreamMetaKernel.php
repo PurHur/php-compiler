@@ -48,6 +48,13 @@ final class JitStreamMetaKernel
 
     public static function implement(Context $context): void
     {
+        // Thin AOT: LLVM meta from StreamGlobalsJit paths — NestedJIT VmFs misses those slots (#27659).
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinStandalone($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_stream_get_meta_data');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -60,6 +67,24 @@ final class JitStreamMetaKernel
         StreamModeRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_stream_get_meta_data', self::implementGetMetaBridge(...));
+        self::implementIfMissing($context, '__compiler_stream_set_blocking', self::implementSetBlockingBridge(...));
+        self::implementIfMissing($context, '__compiler_stream_enable_crypto', self::implementEnableCryptoBridge(...));
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** Thin user-script AOT: path-table meta + NestedJIT set_blocking/enable_crypto (#27659). */
+    private static function implementThinStandalone(Context $context): void
+    {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
+        JitStreamMetaThinAot::implementGetMetaData($context);
+        self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_stream_set_blocking', self::implementSetBlockingBridge(...));
         self::implementIfMissing($context, '__compiler_stream_enable_crypto', self::implementEnableCryptoBridge(...));
         self::registerLinkedRuntime($context);
