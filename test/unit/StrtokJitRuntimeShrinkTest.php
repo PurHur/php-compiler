@@ -6,7 +6,11 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** strtok JIT routes through StrtokJitHelper PHP, not hand-written LLVM (#9812). */
+/**
+ * strtok JIT/AOT: LLVM module-global state (#27645); VmString remains VM SSOT.
+ * NestedJIT StrtokJitHelper aborts under thin AOT (#26906) — keep helper for
+ * semantic parity checks only.
+ */
 final class StrtokJitRuntimeShrinkTest extends TestCase
 {
     public function testStrtokJitHelperDelegatesToVmString(): void
@@ -17,36 +21,36 @@ final class StrtokJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmString::strtokInitState', $source);
     }
 
-    public function testStringStrtokRoutesThroughStrtokJitHelper(): void
+    public function testStringStrtokRoutesThroughLlvmModuleGlobals(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrtok.php');
-        $this->assertStringContainsString('StrtokJitHelper', $source);
-        $this->assertStringNotContainsString('__phpc_strtok_buf', $source);
-        $this->assertStringNotContainsString('emitStrtok', $source);
-        $this->assertStringNotContainsString('emitReset', $source);
-        $this->assertStringNotContainsString('emitInit', $source);
+        $this->assertStringContainsString('StringStrtokJit::implement', $source);
 
-        $jitShim = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrtokJit.php');
-        $this->assertLessThan(20, \substr_count($jitShim, "\n"), 'StringStrtokJit must be a thin shim');
+        $jit = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrtokJit.php');
+        $this->assertStringContainsString('__phpc_strtok_buf', $jit);
+        $this->assertStringContainsString('emitStrtok', $jit);
+        $this->assertStringContainsString('emitReset', $jit);
+        $this->assertStringContainsString('emitInit', $jit);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $jit);
+        $this->assertStringNotContainsString('StrtokJitHelper::', $jit);
     }
 
     public function testJitStrtokRoutesThroughStringStrtok(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/strtok.php');
         $this->assertStringContainsString('StringStrtok::ensureLinked', $source);
+        $this->assertStringNotContainsString('tryFoldCompileTime', $source);
     }
 
     public function testStrtokJitHelperSemanticsMatchVmString(): void
     {
         \PHPCompiler\ext\standard\VmString::strtokResetState();
-        // tokenize(str, tok, init, strIsNull, tokIsNull) — #25171 null flags
         $this->assertSame('a', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('a,b,c', ',', 1, 0, 0));
         $this->assertSame('b', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ',', 0, 1, 0));
         $this->assertSame('c', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ',', 0, 1, 0));
         $this->assertFalse(\PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ',', 0, 1, 0));
         \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('x:y', ':', 1, 0, 0);
         $this->assertSame('y', \PHPCompiler\ext\standard\StrtokJitHelper::tokenize('', ':', 0, 1, 0));
-        // Explicit null token → false (php-src Z_PARAM_STR_OR_NULL one-arg mode) (#25171)
         $this->assertFalse(\PHPCompiler\ext\standard\StrtokJitHelper::tokenize('a.b.c', '', 1, 0, 1));
     }
 }

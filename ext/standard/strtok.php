@@ -9,12 +9,11 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrtok;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * strtok() — tokenize strings with static continuation state (php-src ext/standard/string.c; #3201).
+ * strtok() — tokenize strings with static continuation state (php-src ext/standard/string.c; #3201, #27645).
  */
 final class strtok extends Internal
 {
@@ -52,12 +51,6 @@ final class strtok extends Internal
             throw new \LogicException('strtok() accepts one or two arguments in this compiler build');
         }
 
-        // Thin AOT: NestedJIT StrtokJitHelper segfaults (#26906). Fold literal
-        // init+continuation sequences via VmString SSOT at compile time.
-        $folded = self::tryFoldCompileTime($context, ...$args);
-        if (null !== $folded) {
-            return $folded;
-        }
 
         if (1 === $argc) {
             StringStrtok::ensureLinked($context);
@@ -86,48 +79,4 @@ final class strtok extends Internal
         );
     }
 
-    /**
-     * Emit a constant string|false when every strtok operand is a compile-time string (#26906).
-     */
-    private static function tryFoldCompileTime(Context $context, JITVariable ...$args): ?Value
-    {
-        $argc = \count($args);
-        if (1 === $argc) {
-            $token = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-            if (null === $token) {
-                return null;
-            }
-            // One-arg continue: VmString::strtok($delimiter) with $tok=null.
-            $result = VmString::strtok($token);
-        } else {
-            $str = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
-            if (null === $str) {
-                return null;
-            }
-            if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
-                $tok = null;
-            } else {
-                $tok = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-                if (null === $tok) {
-                    return null;
-                }
-            }
-            $result = VmString::strtok($str, $tok);
-        }
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        if (false === $result) {
-            $i1 = $context->getTypeFromString('int1');
-            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
-        } else {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
-                $ptr,
-                $context->builder->load($context->constantStringFromString($result))
-            );
-        }
-
-        return $ptr;
-    }
 }

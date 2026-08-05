@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for phpc_strtok (#9812, #25171, php-in-PHP).
+ * PHP SSOT mirror of strtok for NestedJIT experiments / unit checks (#9812, #25171).
  *
- * Non-nullable `string` params (+ null flags) keep NestedJIT on __string__* ABI;
- * `string|false` return is boxed `__value__*` (bridge maps false → null __string__*).
+ * Thin AOT NestedJIT of this helper aborts (#26906); production JIT/AOT uses
+ * {@see \PHPCompiler\JIT\Builtin\StringStrtokJit} module globals (#27645).
  *
- * SSOT: {@see VmString::strtok()} (php-src ext/standard/string.c — PHP_FUNCTION(strtok)).
+ * SSOT for VM: {@see VmString::strtok()} (php-src ext/standard/string.c — PHP_FUNCTION(strtok)).
  */
 final class StrtokJitHelper
 {
