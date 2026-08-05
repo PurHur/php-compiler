@@ -65,7 +65,7 @@ final class JitStreamContextSetOption
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::pointer($context, $arg->value)
+                JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
 
@@ -85,7 +85,7 @@ final class JitStreamContextSetOption
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::pointer($context, $arg->value)
+                JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
 
@@ -97,7 +97,7 @@ final class JitStreamContextSetOption
     private static function loadValuePointer(Context $context, JITVariable $arg, int $position): Value
     {
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return JitValueBox::pointer($context, $arg->value);
+            return JitValueBox::valuePtrFromVariable($context, $arg);
         }
 
         throw new \LogicException(

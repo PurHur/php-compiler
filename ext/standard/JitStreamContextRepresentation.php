@@ -106,7 +106,7 @@ final class JitStreamContextRepresentation
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::pointer($context, $arg->value)
+                JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
 

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7020 |
-| Phase A inventory files (M2 ratio SSOT) | 7020 |
+| PHP files on vm.php path | 7021 |
+| Phase A inventory files (M2 ratio SSOT) | 7021 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22573 |
+| Source constructs flagged (warnings) | 22577 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2965,6 +2965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamContextSetOption.php` | 0 | 1 |
 | `ext/standard/JitStreamContextSetOptions.php` | 0 | 1 |
 | `ext/standard/JitStreamContextSetParams.php` | 0 | 1 |
+| `ext/standard/JitStreamContextThinAot.php` | 0 | 1 |
 | `ext/standard/JitStreamCopyToStream.php` | 0 | 1 |
 | `ext/standard/JitStreamEnableCrypto.php` | 0 | 1 |
 | `ext/standard/JitStreamFilter.php` | 0 | 1 |
@@ -3206,7 +3207,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamBucketJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamBufferJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamCapsJitHelper.php` | 0 | 1 |
-| `ext/standard/StreamContextJitHelper.php` | 0 | 15 |
+| `ext/standard/StreamContextJitHelper.php` | 0 | 18 |
 | `ext/standard/StreamErrorBuiltin.php` | 0 | 16 |
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamIoJitHelper.php` | 0 | 1 |
@@ -29653,7 +29654,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamContextKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 12 class method(s)
 - 6 closure(s)
 
 ### `ext/standard/JitStreamContextOptionalArg.php`
@@ -29690,6 +29691,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/standard/JitStreamContextThinAot.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s)
 
 ### `ext/standard/JitStreamCopyToStream.php`
 
@@ -31891,17 +31897,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 26)
 - new HashTable (line 56)
 - new Variable (line 66)
-- new HashTable (line 143)
-- new Variable (line 146)
-- new Variable (line 162)
-- new Variable (line 200)
-- new HashTable (line 218)
-- new Variable (line 220)
-- new HashTable (line 227)
-- new Variable (line 229)
-- new Variable (line 244)
-- new HashTable (line 248)
-- new Variable (line 250)
+- new HashTable (line 141)
+- new Variable (line 144)
+- new Variable (line 160)
+- new Variable (line 198)
+- new HashTable (line 216)
+- new Variable (line 218)
+- new HashTable (line 225)
+- new Variable (line 227)
+- new Variable (line 242)
+- new HashTable (line 246)
+- new Variable (line 248)
+- new HashTable (line 257)
+- new Variable (line 267)
+- new Variable (line 272)
 - 17 class method(s)
 
 ### `ext/standard/StreamErrorBuiltin.php`
@@ -52014,71 +52023,71 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 16851)
 - new Variable (line 16896)
 - new Variable (line 17037)
-- new Variable (line 17133)
-- new Variable (line 17303)
-- new VM\PropertyIsInitializedHandler (line 17312)
-- new Error (line 17477)
-- new VM\EnumFromHandler (line 17503)
-- new Error (line 17886)
-- new CompileError (line 18331)
-- new VM\ClassProperty (line 18573)
-- new CompileError (line 18660)
-- new Variable (line 18961)
-- new CompileError (line 18990)
-- new CompileError (line 18997)
-- new Variable (line 19282)
-- new Variable (line 19284)
-- new ClassEntry (line 19334)
-- new Func\PHP (line 19341)
-- new VM\ClassProperty (line 19437)
-- new Func\PHP (line 19682)
-- new Variable (line 19758)
-- new Variable (line 19765)
-- new Variable (line 19771)
-- new Variable (line 19809)
-- new Variable (line 19839)
-- new Variable (line 20027)
-- new Variable (line 20073)
-- new VM\ClassProperty (line 20143)
-- new Error (line 20194)
-- new Error (line 20229)
-- new Error (line 20232)
-- new Error (line 20235)
-- new Error (line 20238)
-- new ObjectEntry (line 20240)
-- new Error (line 20253)
+- new Variable (line 17160)
+- new Variable (line 17330)
+- new VM\PropertyIsInitializedHandler (line 17339)
+- new Error (line 17504)
+- new VM\EnumFromHandler (line 17530)
+- new Error (line 17913)
+- new CompileError (line 18358)
+- new VM\ClassProperty (line 18600)
+- new CompileError (line 18687)
+- new Variable (line 18988)
+- new CompileError (line 19017)
+- new CompileError (line 19024)
+- new Variable (line 19309)
+- new Variable (line 19311)
+- new ClassEntry (line 19361)
+- new Func\PHP (line 19368)
+- new VM\ClassProperty (line 19464)
+- new Func\PHP (line 19709)
+- new Variable (line 19785)
+- new Variable (line 19792)
+- new Variable (line 19798)
+- new Variable (line 19836)
+- new Variable (line 19866)
+- new Variable (line 20054)
+- new Variable (line 20100)
+- new VM\ClassProperty (line 20170)
+- new Error (line 20221)
 - new Error (line 20256)
 - new Error (line 20259)
 - new Error (line 20262)
+- new Error (line 20265)
+- new ObjectEntry (line 20267)
+- new Error (line 20280)
 - new Error (line 20283)
-- new ObjectEntry (line 20288)
-- new Variable (line 20290)
-- new Variable (line 20308)
-- new Variable (line 20321)
-- new Variable (line 20342)
-- new Variable (line 20355)
-- new Error (line 20497)
-- new Error (line 20502)
-- new Error (line 20505)
-- new Error (line 20508)
-- new Error (line 20511)
-- new VM\ObjectEntry (line 20516)
-- new Func\PHP (line 20583)
-- new ClosureState (line 20595)
-- new Variable (line 20719)
-- new Variable (line 20737)
-- new NoDiscardMetadata (line 20985)
-- new Variable (line 21181)
-- new Variable (line 21183)
-- new CompileError (line 21211)
-- new CompileError (line 21242)
-- new CompileError (line 21281)
-- new CompileError (line 21426)
-- new CompileError (line 21455)
-- new CompileError (line 21488)
-- new CompileError (line 21495)
-- new Variable (line 21733)
-- 591 class method(s)
+- new Error (line 20286)
+- new Error (line 20289)
+- new Error (line 20310)
+- new ObjectEntry (line 20315)
+- new Variable (line 20317)
+- new Variable (line 20335)
+- new Variable (line 20348)
+- new Variable (line 20369)
+- new Variable (line 20382)
+- new Error (line 20524)
+- new Error (line 20529)
+- new Error (line 20532)
+- new Error (line 20535)
+- new Error (line 20538)
+- new VM\ObjectEntry (line 20543)
+- new Func\PHP (line 20610)
+- new ClosureState (line 20622)
+- new Variable (line 20746)
+- new Variable (line 20764)
+- new NoDiscardMetadata (line 21012)
+- new Variable (line 21208)
+- new Variable (line 21210)
+- new CompileError (line 21238)
+- new CompileError (line 21269)
+- new CompileError (line 21308)
+- new CompileError (line 21453)
+- new CompileError (line 21482)
+- new CompileError (line 21515)
+- new CompileError (line 21522)
+- new Variable (line 21760)
+- 592 class method(s)
 - 31 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`

@@ -17,6 +17,7 @@ final class StreamContextRuntimeShrinkTest extends TestCase
     public function testBuiltinStreamContextRuntimeIsThinOrchestrator(): void
     {
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamContextKernel.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamContextThinAot.php');
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StreamContextRuntime.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamContextStandaloneLlvm.php');
 
@@ -30,7 +31,7 @@ final class StreamContextRuntimeShrinkTest extends TestCase
         $this->assertLessThan(45, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelUsesJitVmHelperLinkNotHandRolledNestedJit(): void
+    public function testKernelUsesThinAotForUserScriptAndJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamContextKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
@@ -39,25 +40,32 @@ final class StreamContextRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('StreamContextJitHelper', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('JitStreamContextThinAot', $source);
+        $this->assertStringContainsString('JitNestedHelperCoerce', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 2)', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
     }
 
-    public function testSpineBundleIncludesKernelAndOrchestrator(): void
+    public function testSpineBundleIncludesKernelThinAotAndOrchestrator(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitStreamContextKernel.php', $spine);
+        $this->assertStringContainsString('JitStreamContextThinAot.php', $spine);
         $this->assertStringContainsString('StreamContextRuntime.php', $spine);
         $kernelPos = strpos($spine, 'JitStreamContextKernel.php');
+        $thinPos = strpos($spine, 'JitStreamContextThinAot.php');
         $orchPos = strpos($spine, 'lib/JIT/Builtin/StreamContextRuntime.php');
         $this->assertNotFalse($kernelPos);
+        $this->assertNotFalse($thinPos);
         $this->assertNotFalse($orchPos);
-        $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
+        $this->assertLessThan($thinPos, $kernelPos, 'kernel must load before thin AOT');
+        $this->assertLessThan($orchPos, $thinPos, 'thin AOT must load before thin orchestrator');
     }
 
     public function testJitStreamContextGetDefaultUsesHelperForEmbed(): void

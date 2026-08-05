@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -90,10 +91,12 @@ final class is_scalar extends Internal
 
     private function jitBoxedIsScalar(Context $context, JITVariable $arg): Value
     {
-        $loaded = $context->helper->loadValue($arg);
+        // NestedJIT helpers (e.g. StreamContextJitHelper::setSingleOption) pass TYPE_VALUE
+        // slots — loadValue() yields a non-pointer and structGep SIGSEGVs (#27573 / peer is_numeric).
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $typeField = $context->structFieldMap['__value__']['type'];
         $typeByte = $context->builder->load(
-            $context->builder->structGep($loaded, $typeField)
+            $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
         $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NULL, false));
