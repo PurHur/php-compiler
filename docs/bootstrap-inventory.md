@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7016 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22545 |
+| Source constructs flagged (warnings) | 22544 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5949,7 +5949,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionPropertyIsFinal.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionPropertyIsVirtual.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionPropertySetRawValue.php` | 0 | 1 |
-| `lib/JIT/Call/RegexIteratorConstruct.php` | 0 | 5 |
+| `lib/JIT/Call/RegexIteratorConstruct.php` | 0 | 4 |
 | `lib/JIT/Call/RuntimeIndirectClosureCall.php` | 0 | 1 |
 | `lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php` | 0 | 2 |
 | `lib/JIT/Call/RuntimeIndirectStaticMethodCall.php` | 0 | 1 |
@@ -38297,8 +38297,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/pos.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 40)
 - 2 class method(s)
 
 ### `ext/standard/pow.php`
@@ -43450,7 +43450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1025)
+- new InternalArgInfo (line 1036)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -49640,10 +49640,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/RegexIteratorConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 38)
-- new Variable (line 52)
-- new Variable (line 76)
-- new Variable (line 179)
+- new ArgumentCountError (line 42)
+- new Variable (line 56)
+- new Variable (line 190)
 - 5 class method(s)
 
 ### `lib/JIT/Call/RuntimeIndirectClosureCall.php`

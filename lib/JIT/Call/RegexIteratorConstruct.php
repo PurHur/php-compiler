@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
+use PHPCompiler\JIT\HashTableSliceLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\SplOuterIteratorHt;
@@ -17,11 +18,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * RegexIterator::__construct — thin AOT MATCH filter into `__spl_ht` (#26825).
+ * RegexIterator::__construct — thin AOT MATCH filter into `__spl_ht` (#26825, #27313).
  *
- * Packed append of MATCH hits via `__compiler_preg_match` + {@see PregAotFastPath}
- * kind 9 (`/^lit/`). Avoids NestedJIT filter helper (LLVM 9 segfault) and JitPregGrep
- * sparse-copy path (count abort under thin AOT).
+ * Walks inner HT via key/value pair export (peer ParentIterator / HashTableSliceLlvm)
+ * so string-keyed ArrayIterator entries are not skipped. Packed-only index walks
+ * missed assoc keys and yielded empty under AOT (#27313).
+ *
+ * Match hits via `__compiler_preg_match` + {@see PregAotFastPath} kind 9 (`/^lit/`).
+ * Keys are preserved; int-key holes sealed UNDEFINED so foreach skips them (#27581).
  *
  * php-src: ext/spl/spl_iterators.c — RegexIterator MATCH mode
  */
@@ -48,7 +52,7 @@ final class RegexIteratorConstruct implements Call
             $context->type->object->splBackingHashtable($inner)
         );
         $pattern = self::loadString($context, $args[2]);
-        $filtered = self::filterMatchPacked($context, $srcHt, $pattern);
+        $filtered = self::filterMatchKeyed($context, $srcHt, $pattern);
         $filteredVar = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
@@ -66,18 +70,23 @@ final class RegexIteratorConstruct implements Call
         return self::voidResult($context);
     }
 
-    private static function filterMatchPacked(Context $context, Value $srcHt, Value $pattern): Value
+    private static function filterMatchKeyed(Context $context, Value $srcHt, Value $pattern): Value
     {
         $tag = (string) (++self::$seq);
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
-        $map = $context->structFieldMap['__hashtable__'];
-        $dest = HashTableHelper::alloc($context);
-        $destVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $dest);
-        $count = $context->builder->load($context->builder->structGep($srcHt, $map['nextFreeElement']));
-        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
+        $pairs = HashTableExportKeyValuePairs::exportPairsForSlice($context, $srcHt);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $pairs
+        );
+        $dest = HashTableHelper::alloc($context);
+        $written = HashTableHelper::alloc($context);
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($zero, $idxSlot);
 
         $head = BasicBlockHelper::append($context, 'regex_it_head_'.$tag);
@@ -87,33 +96,29 @@ final class RegexIteratorConstruct implements Call
 
         $context->builder->positionAtEnd($head);
         $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $srcHt,
-            $idx
+        $pair = HashTableReadLlvm::readIndexedToValueBox($context, $pairs, $idx);
+        $pairHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::valuePtrFromVariable($context, $pair)
         );
-        $advance = BasicBlockHelper::append($context, 'regex_it_adv_'.$tag);
-        $tryMatch = BasicBlockHelper::append($context, 'regex_it_try_'.$tag);
-        $context->builder->branchIf($isSet, $tryMatch, $advance);
-
-        $context->builder->positionAtEnd($tryMatch);
-        $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);
-        $entry = JitValueBox::valuePtrFromVariable($context, $elem);
+        $keyVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $zero);
+        $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $one);
+        $entry = JitValueBox::valuePtrFromVariable($context, $valVar);
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entry, $valueMap['type'])
         );
-        $i8 = $context->getTypeFromString('int8');
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
         $pregBlock = BasicBlockHelper::append($context, 'regex_it_preg_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'regex_it_adv_'.$tag);
         $context->builder->branchIf($isString, $pregBlock, $advance);
 
         $context->builder->positionAtEnd($pregBlock);
@@ -135,7 +140,7 @@ final class RegexIteratorConstruct implements Call
         $context->builder->branchIf($matched, $keep, $advance);
 
         $context->builder->positionAtEnd($keep);
-        HashTableHelper::addElement($context, $destVar, $elem, null);
+        HashTableSliceLlvm::writeKeyed($context, $dest, $written, $keyVar, $valVar);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);
@@ -143,6 +148,12 @@ final class RegexIteratorConstruct implements Call
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+        HashTableSliceLlvm::markUnwrittenNullHolesUndefined(
+            $context,
+            $dest,
+            $written,
+            $i1->constInt(1, false)
+        );
 
         return $dest;
     }
