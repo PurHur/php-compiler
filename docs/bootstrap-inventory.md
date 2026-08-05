@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7015 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22538 |
+| Source constructs flagged (warnings) | 22542 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3039,7 +3039,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitUmask.php` | 0 | 1 |
 | `ext/standard/JitUnitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitUnlink.php` | 0 | 1 |
-| `ext/standard/JitUnpack.php` | 0 | 3 |
+| `ext/standard/JitUnpack.php` | 0 | 7 |
 | `ext/standard/JitUnserialize.php` | 0 | 1 |
 | `ext/standard/JitUnserializeOptions.php` | 0 | 1 |
 | `ext/standard/JitUploadTempKernel.php` | 0 | 1 |
@@ -30073,9 +30073,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitUnpack.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new ArgumentCountError (line 33)
-- 1 class method(s)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 38)
+- new JITVariable (line 225)
+- new JITVariable (line 226)
+- new JITVariable (line 228)
+- new JITVariable (line 238)
+- 4 class method(s)
 
 ### `ext/standard/JitUnserialize.php`
 
