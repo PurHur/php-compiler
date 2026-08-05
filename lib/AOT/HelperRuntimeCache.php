@@ -78,6 +78,11 @@ final class HelperRuntimeCache
         // NestedJIT recursive escapeFrom works (MiniWebApp $appName).
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::htmlspecialchars' => true,
         'phpcompiler\\ext\\standard\\htmlspecialcharsjithelper::escapefrom' => true,
+        // #27050 — helper-runtime HtmlspecialcharsDecodeJitHelper unit.o returns "" under thin
+        // AOT (strlen/while accumulator NestedJIT miscompile). Force NestedJIT of recursive
+        // decodeFrom (peer #25345 htmlspecialchars encode).
+        'phpcompiler\\ext\\standard\\htmlspecialcharsdecodejithelper::htmlspecialcharsdecodeargv' => true,
+        'phpcompiler\\ext\\standard\\htmlspecialcharsdecodejithelper::decodefrom' => true,
         // #24156 — prelinked helper TUs lack main-module {closure}_* proxies; NestedJIT
         // closure helpers into the user AOT module so NestedClosureInvoke can dispatch.
         'phpcompiler\\ext\\standard\\arrayreducejithelper::reducewithclosure' => true,
