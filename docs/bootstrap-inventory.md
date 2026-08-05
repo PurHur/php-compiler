@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7033 |
-| Phase A inventory files (M2 ratio SSOT) | 7033 |
+| PHP files on vm.php path | 7040 |
+| Phase A inventory files (M2 ratio SSOT) | 7040 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22606 |
+| Source constructs flagged (warnings) | 22630 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -969,16 +969,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/BuiltinClasses.php` | 0 | 1 |
 | `ext/imap/ImapExtensionPolicy.php` | 0 | 1 |
 | `ext/imap/ImapMboxEngine.php` | 0 | 1 |
-| `ext/imap/Module.php` | 0 | 21 |
+| `ext/imap/Module.php` | 0 | 27 |
 | `ext/imap/VmImapArg.php` | 0 | 1 |
 | `ext/imap/VmImapConnection.php` | 0 | 2 |
-| `ext/imap/VmImapCore.php` | 0 | 16 |
+| `ext/imap/VmImapCore.php` | 0 | 20 |
 | `ext/imap/imap_append.php` | 0 | 1 |
 | `ext/imap/imap_bodystruct.php` | 0 | 1 |
+| `ext/imap/imap_check.php` | 0 | 1 |
 | `ext/imap/imap_close.php` | 0 | 2 |
 | `ext/imap/imap_createmailbox.php` | 0 | 1 |
+| `ext/imap/imap_delete.php` | 0 | 1 |
 | `ext/imap/imap_deletemailbox.php` | 0 | 1 |
 | `ext/imap/imap_errors.php` | 0 | 2 |
+| `ext/imap/imap_expunge.php` | 0 | 1 |
 | `ext/imap/imap_fetchbody.php` | 0 | 2 |
 | `ext/imap/imap_fetchmime.php` | 0 | 1 |
 | `ext/imap/imap_getmailboxes.php` | 0 | 1 |
@@ -988,10 +991,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_lsub.php` | 0 | 1 |
 | `ext/imap/imap_num_msg.php` | 0 | 2 |
 | `ext/imap/imap_open.php` | 0 | 2 |
+| `ext/imap/imap_ping.php` | 0 | 1 |
 | `ext/imap/imap_renamemailbox.php` | 0 | 1 |
 | `ext/imap/imap_savebody.php` | 0 | 1 |
 | `ext/imap/imap_search.php` | 0 | 2 |
+| `ext/imap/imap_status.php` | 0 | 1 |
 | `ext/imap/imap_subscribe.php` | 0 | 1 |
+| `ext/imap/imap_undelete.php` | 0 | 1 |
 | `ext/imap/imap_unsubscribe.php` | 0 | 1 |
 | `ext/inotify/InotifyConstants.php` | 0 | 1 |
 | `ext/inotify/InotifyExtensionPolicy.php` | 0 | 1 |
@@ -5072,6 +5078,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArraySearchLlvm.php` | 0 | 2 |
 | `lib/JIT/ArraySumLlvm.php` | 0 | 1 |
 | `lib/JIT/ArrayUniqueLlvm.php` | 0 | 8 |
+| `lib/JIT/ArrayWalkLlvm.php` | 0 | 8 |
 | `lib/JIT/AsymmetricVisibilityGuard.php` | 0 | 2 |
 | `lib/JIT/BackedEnumDuplicateJitGuard.php` | 0 | 1 |
 | `lib/JIT/BackedEnumFromJit.php` | 0 | 2 |
@@ -13907,26 +13914,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new imap_open (line 39)
-- new imap_close (line 40)
-- new imap_errors (line 41)
-- new imap_last_error (line 42)
-- new imap_num_msg (line 43)
-- new imap_headerinfo (line 44)
-- new imap_fetchbody (line 45)
-- new imap_search (line 46)
-- new imap_list (line 47)
-- new imap_lsub (line 48)
-- new imap_subscribe (line 49)
-- new imap_unsubscribe (line 50)
-- new imap_createmailbox (line 51)
-- new imap_deletemailbox (line 52)
-- new imap_renamemailbox (line 53)
-- new imap_getmailboxes (line 54)
-- new imap_append (line 55)
-- new imap_savebody (line 56)
-- new imap_bodystruct (line 57)
-- new imap_fetchmime (line 58)
+- new imap_open (line 54)
+- new imap_close (line 55)
+- new imap_errors (line 56)
+- new imap_last_error (line 57)
+- new imap_num_msg (line 58)
+- new imap_headerinfo (line 59)
+- new imap_fetchbody (line 60)
+- new imap_search (line 61)
+- new imap_list (line 62)
+- new imap_lsub (line 63)
+- new imap_subscribe (line 64)
+- new imap_unsubscribe (line 65)
+- new imap_createmailbox (line 66)
+- new imap_deletemailbox (line 67)
+- new imap_renamemailbox (line 68)
+- new imap_getmailboxes (line 69)
+- new imap_append (line 70)
+- new imap_savebody (line 71)
+- new imap_bodystruct (line 72)
+- new imap_fetchmime (line 73)
+- new imap_delete (line 74)
+- new imap_undelete (line 75)
+- new imap_expunge (line 76)
+- new imap_ping (line 77)
+- new imap_check (line 78)
+- new imap_status (line 79)
 - 3 class method(s)
 
 ### `ext/imap/VmImapArg.php`
@@ -13943,22 +13956,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/VmImapCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 156)
-- new ObjectEntry (line 157)
-- new HashTable (line 250)
-- new ObjectEntry (line 252)
-- new Variable (line 260)
-- new Variable (line 264)
-- new ObjectEntry (line 835)
-- new Variable (line 869)
-- new ObjectEntry (line 919)
-- new Variable (line 940)
-- new HashTable (line 1019)
-- new Variable (line 1021)
-- new HashTable (line 1038)
-- new Variable (line 1040)
-- 37 class method(s)
-- 4 closure(s)
+- new Variable (line 170)
+- new ObjectEntry (line 171)
+- new HashTable (line 265)
+- new ObjectEntry (line 267)
+- new Variable (line 275)
+- new Variable (line 279)
+- new ObjectEntry (line 851)
+- new Variable (line 885)
+- new ObjectEntry (line 1014)
+- new Variable (line 1029)
+- new ObjectEntry (line 1070)
+- new Variable (line 1095)
+- new ObjectEntry (line 1164)
+- new Variable (line 1185)
+- new HashTable (line 1266)
+- new Variable (line 1268)
+- new HashTable (line 1285)
+- new Variable (line 1287)
+- 44 class method(s)
+- 7 closure(s)
 
 ### `ext/imap/imap_append.php`
 
@@ -13966,6 +13983,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/imap/imap_bodystruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_check.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -13981,6 +14003,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/imap/imap_delete.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/imap/imap_deletemailbox.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13990,6 +14017,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/imap/imap_expunge.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/imap/imap_fetchbody.php`
@@ -14042,6 +14074,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 29)
 - 2 class method(s)
 
+### `ext/imap/imap_ping.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/imap/imap_renamemailbox.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14058,7 +14095,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 26)
 - 2 class method(s)
 
+### `ext/imap/imap_status.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/imap/imap_subscribe.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_undelete.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -31606,7 +31653,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/QuotemetaJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/Rad2degJitHelper.php`
 
@@ -35497,18 +35544,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_walk.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 134)
-- new HashTable (line 152)
-- new Variable (line 154)
-- new Variable (line 157)
-- new Variable (line 210)
-- new Variable (line 265)
+- new Variable (line 138)
+- new HashTable (line 156)
+- new Variable (line 158)
+- new Variable (line 161)
+- new Variable (line 214)
+- new Variable (line 269)
 - 6 class method(s)
 
 ### `ext/standard/array_walk_recursive.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/arsort_.php`
 
@@ -45045,6 +45092,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 388)
 - 11 class method(s)
 
+### `lib/JIT/ArrayWalkLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 107)
+- new Variable (line 278)
+- new Variable (line 287)
+- new NestedClosureInvoke (line 294)
+- new Variable (line 304)
+- new Variable (line 316)
+- new NestedClosureInvoke (line 323)
+- 8 class method(s)
+
 ### `lib/JIT/AsymmetricVisibilityGuard.php`
 
 **Warnings** (review for bootstrap subset):
@@ -45323,7 +45382,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayWalkRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/AssertFail.php`
 
