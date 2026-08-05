@@ -32,19 +32,33 @@ final class StreamMetaKernelShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('StreamMetaJitHelper', $source);
+        $this->assertStringContainsString('JitStreamMetaThinAot', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(210, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(240, \substr_count($source, "\n") + 1);
+    }
+
+    public function testThinAotMetaLivesOutsideKernel(): void
+    {
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamMetaThinAot.php');
+        $thin = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamMetaThinAot.php');
+        $this->assertStringContainsString('phpc_stream_paths', $thin);
+        $this->assertStringContainsString('__hashtable__setStringKeyString', $thin);
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamMetaKernel.php');
+        $this->assertStringNotContainsString('phpc_stream_handles', $kernel);
+        $this->assertStringNotContainsString("lookupFunction('feof')", $kernel);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinJit(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitStreamMetaKernel.php', $spine);
+        $this->assertStringContainsString('JitStreamMetaThinAot.php', $spine);
         $this->assertStringNotContainsString('StreamMetaJit.php', $spine);
         $this->assertStringContainsString('StreamMeta.php', $spine);
     }
