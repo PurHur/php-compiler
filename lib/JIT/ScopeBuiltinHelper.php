@@ -85,7 +85,15 @@ final class ScopeBuiltinHelper
             $prefixStr = JitStringBuiltinArg::lowerRequiredString($context, $prefixArg, 'extract', 2, 'prefix');
         }
 
-        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot, $prefixStr);
+        ScopeBuiltinEmitHelper::walkStringKeyNodes(
+            $context,
+            $ht,
+            $named,
+            $flags,
+            $countSlot,
+            $prefixStr,
+            null === $flagsArg
+        );
 
         return $context->builder->load($countSlot);
     }
@@ -100,7 +108,7 @@ final class ScopeBuiltinHelper
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
         $emptyPrefix = $context->builder->load($context->constantStringFromString(''));
-        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, null, $emptyPrefix);
+        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, null, $emptyPrefix, true);
     }
 
     public static function compact(Context $context, Variable ...$nameArgs): Value

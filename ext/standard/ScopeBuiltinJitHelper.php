@@ -26,10 +26,13 @@ final class ScopeBuiltinJitHelper
      */
     public static function matchNamedVariableIndex(string $name, string $namesTable): int
     {
-        $names = \array_values(\array_filter(
-            \explode("\0", $namesTable),
-            static fn (string $part): bool => '' !== $part
-        ));
+        // NestedJIT cannot lower array_filter with a callback in this helper (#27520).
+        $names = [];
+        foreach (\explode("\0", $namesTable) as $part) {
+            if ('' !== $part) {
+                $names[] = $part;
+            }
+        }
 
         return VariableFunctionCall::matchCandidateIndex($name, $names);
     }
@@ -98,6 +101,8 @@ final class ScopeBuiltinJitHelper
         ?string $prefix,
     ): ?string {
         $finalName = null;
+        // NestedJIT: keep $prefixArg as string ('' = absent) — avoid null ternaries (#27520).
+        $prefixArg = null === $prefix ? '' : $prefix;
 
         switch ($extractType) {
             case VmScope::EXTR_IF_EXISTS:
@@ -112,7 +117,7 @@ final class ScopeBuiltinJitHelper
             case VmScope::EXTR_PREFIX_IF_EXISTS:
                 // php_extract: set → prefixed; absent/IS_UNDEF → import unprefixed (#24330).
                 if ($varExists) {
-                    return self::prefixVarName($prefix ?? '', $key);
+                    return self::prefixVarName($prefixArg, $key);
                 }
 
                 return $key;
@@ -125,14 +130,14 @@ final class ScopeBuiltinJitHelper
 
             case VmScope::EXTR_PREFIX_ALL:
                 if (null === $finalName) {
-                    return self::prefixVarName($prefix ?? '', $key);
+                    return self::prefixVarName($prefixArg, $key);
                 }
 
                 return $finalName;
 
             case VmScope::EXTR_PREFIX_INVALID:
                 if (!self::isValidVarName($key)) {
-                    return self::prefixVarName($prefix ?? '', $key);
+                    return self::prefixVarName($prefixArg, $key);
                 }
 
                 return $key;
@@ -158,11 +163,12 @@ final class ScopeBuiltinJitHelper
         int $extractType,
         string $prefix,
     ): string {
+        // Always pass string prefix into final-name matrix ('' = absent) (#27520).
         $finalName = self::resolveExtractFinalName(
             $key,
             0 !== $varExists,
             $extractType,
-            '' === $prefix ? null : $prefix
+            $prefix
         );
         if (null === $finalName || !self::isValidVarName($finalName)) {
             return '';

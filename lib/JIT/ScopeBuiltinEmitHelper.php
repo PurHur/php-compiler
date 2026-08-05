@@ -30,6 +30,7 @@ final class ScopeBuiltinEmitHelper
         Value $flags,
         ?Value $countSlot,
         Value $prefixStr,
+        bool $defaultOverwrite = false,
     ): void {
         HashTableReadLlvm::forEachStringKeyNode(
             $context,
@@ -39,8 +40,17 @@ final class ScopeBuiltinEmitHelper
                 Context $context,
                 Value $keyStr,
                 Value $valEntry
-            ) use ($named, $flags, $countSlot, $prefixStr): void {
-                self::importExtractKey($context, $keyStr, $valEntry, $named, $flags, $prefixStr, $countSlot);
+            ) use ($named, $flags, $countSlot, $prefixStr, $defaultOverwrite): void {
+                self::importExtractKey(
+                    $context,
+                    $keyStr,
+                    $valEntry,
+                    $named,
+                    $flags,
+                    $prefixStr,
+                    $countSlot,
+                    $defaultOverwrite
+                );
             }
         );
     }
@@ -55,9 +65,18 @@ final class ScopeBuiltinEmitHelper
         array $named,
         Value $flags,
         Value $prefixStr,
-        ?Value $countSlot
+        ?Value $countSlot,
+        bool $defaultOverwrite
     ): void {
         if ([] === $named) {
+            return;
+        }
+
+        // Default EXTR_OVERWRITE: match keys in LLVM (no NestedJIT string-return /
+        // matchNamedVariableIndex under thin AOT) (#27520).
+        if ($defaultOverwrite) {
+            self::importExtractKeyOverwriteLlvm($context, $keyStr, $valEntry, $named, $flags, $countSlot);
+
             return;
         }
 
@@ -100,7 +119,56 @@ final class ScopeBuiltinEmitHelper
             $nonEmpty
         );
 
+        // Assign/skip → $merge must continue the walk; else sealFunction emits `ret void` (#27520).
+        $context->builder->positionAtEnd($merge);
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->builder->branch($emptyDone);
+        }
         $context->builder->positionAtEnd($emptyDone);
+    }
+
+    /**
+     * EXTR_OVERWRITE import: strcmp each compile-time local name against the runtime key.
+     *
+     * @param array<string, Variable> $named
+     */
+    private static function importExtractKeyOverwriteLlvm(
+        Context $context,
+        Value $keyStr,
+        Value $valEntry,
+        array $named,
+        Value $flags,
+        ?Value $countSlot
+    ): void {
+        $tag = 'eo'.(string) ++self::$blockSeq;
+        $done = BasicBlockHelper::append($context, 'extract_ow_done_'.$tag);
+        $names = \array_keys($named);
+        $n = \count($names);
+        $checkBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = BasicBlockHelper::append($context, 'extract_ow_chk_'.$tag.'_'.$i);
+        }
+        $context->builder->branch($checkBlocks[0]);
+
+        foreach ($names as $i => $name) {
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            if ('GLOBALS' === $name) {
+                $next = ($i < $n - 1) ? $checkBlocks[$i + 1] : $done;
+                $context->builder->branch($next);
+
+                continue;
+            }
+            $nameStr = $context->builder->load($context->constantStringFromString($name));
+            $eq = JitStringCompare::identical($context, $keyStr, $nameStr);
+            $match = BasicBlockHelper::append($context, 'extract_ow_match_'.$tag.'_'.$i);
+            $next = ($i < $n - 1) ? $checkBlocks[$i + 1] : $done;
+            $context->builder->branchIf($eq, $match, $next);
+
+            $context->builder->positionAtEnd($match);
+            self::maybeAssignExtract($context, $named[$name], $valEntry, $flags, $countSlot, $done);
+        }
+
+        $context->builder->positionAtEnd($done);
     }
 
     /**

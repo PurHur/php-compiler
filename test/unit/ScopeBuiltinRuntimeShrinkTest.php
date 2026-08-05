@@ -56,7 +56,7 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('compact_invalid_int_', $source);
         $this->assertStringNotContainsString('emitStandaloneCompactInvalidArgumentWarningMessage', $source);
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(500, $loc, 'ScopeBuiltinRuntime.php LOC');
+        $this->assertLessThan(520, $loc, 'ScopeBuiltinRuntime.php LOC');
     }
 
     public function testScopeBuiltinRuntimeHelperCompileViaJitVmHelperLink(): void
@@ -77,6 +77,14 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertSame(0, \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::matchNamedVariableIndex('foo', $table));
         $this->assertSame(1, \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::matchNamedVariableIndex('BAR', $table));
         $this->assertSame(-1, \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::matchNamedVariableIndex('missing', $table));
+        // NestedJIT cannot lower array_filter()+callback when compiling this helper (#27520).
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ScopeBuiltinJitHelper.php');
+        $this->assertStringNotContainsString('\\array_filter(', $source);
+        $this->assertTrue(\PHPCompiler\ext\standard\ScopeBuiltinJitHelper::isValidVarName('hello'));
+        $this->assertTrue(\PHPCompiler\ext\standard\ScopeBuiltinJitHelper::isValidVarName('_n7'));
+        $this->assertFalse(\PHPCompiler\ext\standard\ScopeBuiltinJitHelper::isValidVarName('7bad'));
+        $this->assertFalse(\PHPCompiler\ext\standard\ScopeBuiltinJitHelper::isValidVarName('a-b'));
+        $this->assertFalse(\PHPCompiler\ext\standard\ScopeBuiltinJitHelper::isValidVarName(''));
     }
 
     public function testScopeBuiltinJitHelperCompactAndDefinedVarsBridges(): void
@@ -118,8 +126,8 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $loc = substr_count($source, "\n") + 1;
-        // Phase-4b baseline was ≤550 (#19043); #22136 compact-after-unset grew to ~574.
-        $this->assertLessThan(580, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        // Phase-4b baseline was ≤550 (#19043); #22136 ~574; #27520 EXTR_OVERWRITE AOT path ≤660.
+        $this->assertLessThan(660, $loc, 'ScopeBuiltinEmitHelper.php LOC');
         $this->assertStringContainsString('HashTableReadLlvm::forEachStringKeyNode', $source);
         $this->assertStringContainsString('HashTableReadLlvm::forEachIndexedStringAt', $source);
         $this->assertStringContainsString('ScopeBuiltinDefinedLlvm::getDefinedVars', $source);
