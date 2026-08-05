@@ -236,6 +236,36 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('hash_equals', 1));
     }
 
+    /** php-src ext/hash/hash.stub.php — HashContext on hash_copy (#27745). */
+    public function testHashCopyReflectionStubTypes(): void
+    {
+        $this->assertSame('HashContext', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_copy'));
+        $this->assertSame('HashContext', BuiltinInternalArgInfo::stubParamTypeOverride('hash_copy', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('hash_copy', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('context', $info['name']);
+        $this->assertSame('HashContext', $info['type']);
+        $this->assertFalse($info['isOptional']);
+    }
+
+    /** php-src ext/hash/hash.stub.php — HashContext on incremental hash builtins (#27737). */
+    public function testHashIncrementalContextReflectionStubTypes(): void
+    {
+        foreach (['hash_update', 'hash_update_file', 'hash_final'] as $fn) {
+            $this->assertSame('HashContext', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($info, $fn);
+            $this->assertSame('HashContext', $info['type'], $fn);
+        }
+        $this->assertSame('HashContext', BuiltinInternalArgInfo::stubParamTypeOverride('hash_update_stream', 0));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('hash_update_stream', 2));
+        $length = BuiltinInternalArgInfo::paramInfoForFunction('hash_update_stream', 2);
+        $this->assertNotNull($length);
+        $this->assertSame('length', $length['name']);
+        $this->assertSame('int', $length['type']);
+        $this->assertTrue($length['isOptional']);
+    }
+
     /** php-src ext/json/json.stub.php — InternalArgInfo omits mixed / |false / ?bool (#25458). */
     public function testJsonDecodeEncodeReflectionStubTypes(): void
     {
