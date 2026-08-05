@@ -83,6 +83,33 @@ PHP;
         }
     }
 
+    /** Zend stubs: object|string → string|false; spl_autoload_functions → array (#27902). */
+    public function testVmGetParentClassAndSplAutoloadFunctionsReflectionTypes(): void
+    {
+        $code = <<<'PHP'
+<?php
+foreach (['get_parent_class', 'spl_autoload_functions'] as $f) {
+    $rf = new ReflectionFunction($f);
+    $ret = $rf->getReturnType();
+    echo $f, ' ret=', $ret ? (string) $ret : '(none)', "\n";
+    foreach ($rf->getParameters() as $p) {
+        $t = $p->getType();
+        echo '  ', ($t ? (string) $t.' ' : ''), '$', $p->getName(), "\n";
+    }
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_parent_class_spl_refl.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "get_parent_class ret=string|false\n"
+            ."  object|string \$object_or_class\n"
+            ."spl_autoload_functions ret=array\n",
+            ob_get_clean()
+        );
+    }
+
     public function testVmGetParentClassEnumCaseReturnsFalse(): void
     {
         $code = <<<'PHP'
