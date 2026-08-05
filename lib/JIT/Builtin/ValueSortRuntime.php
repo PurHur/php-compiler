@@ -7,39 +7,26 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 /**
- * JIT/AOT link for asort()/arsort() via ValueSortJitHelper PHP (#12771).
+ * JIT/AOT link for asort()/arsort() (#12771, #27227).
  *
- * Embed and standalone AOT compile the same PHP bridge (#13053).
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::asortCopy()} /
+ * NestedJIT {@see \PHPCompiler\ext\standard\ValueSortJitHelper} aborts under thin
+ * standalone AOT (same HashTable-method stub class as KeySort / NaturalSort #26975).
+ * Emit string-key value bubble sorts already in {@see Type\HashTable}.
+ *
+ * SSOT (VM): {@see \PHPCompiler\ext\standard\VmArray::asortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::arsortCopy()}
  * php-src: ext/standard/array.c — php_array_asort / php_array_arsort
  */
 final class ValueSortRuntime
 {
-    private const ABI_ASORT = '__asort__by_value';
+    private const ABI_ASORT = '__hashtable__sortStringKeyValues';
 
-    private const ABI_ASORT_LOCALE = '__asort__by_value_locale';
+    private const ABI_ASORT_LOCALE = '__hashtable__sortStringKeyValuesLocale';
 
-    private const ABI_ARSORT = '__arsort__by_value';
-
-    private const HELPER_PATH = '/ext/standard/ValueSortJitHelper.php';
-
-    private const ASORT_HELPER = 'PHPCompiler\\ext\\standard\\ValueSortJitHelper::asortByValue';
-
-    private const ASORT_LOCALE_HELPER = 'PHPCompiler\\ext\\standard\\ValueSortJitHelper::asortByValueLocale';
-
-    private const ARSORT_HELPER = 'PHPCompiler\\ext\\standard\\ValueSortJitHelper::arsortByValue';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::ASORT_HELPER,
-        self::ASORT_LOCALE_HELPER,
-        self::ARSORT_HELPER,
-    ];
+    private const ABI_ARSORT = '__hashtable__sortStringKeyValuesReverse';
 
     public static function asortByValue(Context $context, JITVariable $array): void
     {
@@ -59,8 +46,15 @@ final class ValueSortRuntime
     private static function invokeByValueSort(Context $context, JITVariable $array, string $abi): void
     {
         self::ensureLinked($context);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'asort()/arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction($abi), $ht);
+        // In-place mutation via HT pointer; store only native slots (peer NaturalSort #26975).
+        // Unconditional store corrupts thin-standalone value-boxed arrays (#27227).
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
         }
@@ -68,54 +62,17 @@ final class ValueSortRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::assertAbi($context, self::ABI_ASORT);
+        self::assertAbi($context, self::ABI_ASORT_LOCALE);
+        self::assertAbi($context, self::ABI_ARSORT);
     }
 
-    public static function implement(Context $context): void
+    private static function assertAbi(Context $context, string $name): void
     {
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
+        $fn = $context->module->getNamedFunction($name);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException($name.' missing after HashTable type init (#27227)');
         }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $void = $context->getTypeFromString('void');
-        $bridges = [
-            [self::ABI_ASORT, 'asort_by_value_bridge_entry', self::ASORT_HELPER],
-            [self::ABI_ASORT_LOCALE, 'asort_by_value_locale_bridge_entry', self::ASORT_LOCALE_HELPER],
-            [self::ABI_ARSORT, 'arsort_by_value_bridge_entry', self::ARSORT_HELPER],
-        ];
-        foreach ($bridges as [$abi, $entry, $helper]) {
-            JitVmHelperLink::ensureBridge(
-                $context,
-                $abi,
-                $entry,
-                [$htPtr],
-                $void,
-                $helper,
-                self::HELPER_PATH,
-                self::COMPILED_HELPERS,
-                '#12771'
-            );
-        }
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach ([self::ABI_ASORT, self::ABI_ASORT_LOCALE, self::ABI_ARSORT] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ValueSortRuntime bridge (#12771)');
-            }
-            $context->registerFunction($name, $fn);
-        }
+        $context->registerFunction($name, $fn);
     }
 }
