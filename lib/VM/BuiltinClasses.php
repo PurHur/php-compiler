@@ -2231,6 +2231,9 @@ final class BuiltinClasses
         if (null !== $getCurrentRet) {
             $entry->methodReturnDeclaredTypes['getcurrent'] = $getCurrentRet;
         }
+        // Zend/zend_fibers.stub.php — getReturn(): mixed (#27746).
+        // Explicit `mixed` is Literal — CfgType\Mixed_ means undeclared (#22064 / #27599).
+        $entry->methodReturnDeclaredTypes['getreturn'] = new CfgType\Literal('mixed');
         $ctx->classes[FiberSupport::CLASS_FIBER] = $entry;
     }
 }
