@@ -50,7 +50,7 @@ final class ImplementsHierarchyJitGuard
                 : 0;
 
             $full = sprintf(
-                'Fatal error: %s in %s on line %d',
+                'PHP Fatal error:  %s in %s on line %d',
                 $message,
                 $file,
                 $line
@@ -87,11 +87,9 @@ final class ImplementsHierarchyJitGuard
             $context->context->functionType($context->getTypeFromString('void'), false, $i32)
         );
         $stderr = StringTriggerErrorJit::stderrFilePtr($context);
-        // Zend prints "PHP Fatal error:  …" (two spaces after the colon).
-        $body = str_starts_with($fullMessage, 'Fatal error: ')
-            ? substr($fullMessage, strlen('Fatal error: '))
-            : $fullMessage;
-        $line = 'PHP Fatal error:  '.$body."\n";
+        $line = str_starts_with($fullMessage, 'PHP Fatal error:')
+            ? $fullMessage."\n"
+            : 'PHP Fatal error:  '.$fullMessage."\n";
         $context->builder->call(
             $context->lookupFunction('fprintf'),
             $stderr,

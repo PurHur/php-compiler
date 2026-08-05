@@ -112,7 +112,7 @@ final class DateTimeInterfaceSupport
             ? $sourceLocation->startLine
             : FatalSite::lineFromOpcodes($frame);
         throw new \LogicException(sprintf(
-            'Fatal error: %s in %s on line %d',
+            'PHP Fatal error:  %s in %s on line %d',
             self::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE,
             $file,
             max(1, $line),
