@@ -25,8 +25,12 @@ final class locale_get_default extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'locale_get_default() JIT runtime lowering is deferred; use VM (#9576)'
-        );
+        if (0 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'locale_get_default() expects exactly 0 arguments, '.\count($args).' given'
+            );
+        }
+
+        return JitLocaleParser::getDefault($context);
     }
 }

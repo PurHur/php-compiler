@@ -1013,6 +1013,7 @@ require_once __DIR__.'/../../../ext/intl/LocaleGetScript.php';
 require_once __DIR__.'/../../../ext/intl/LocaleLookup.php';
 require_once __DIR__.'/../../../ext/intl/LocaleParseLocale.php';
 require_once __DIR__.'/../../../ext/intl/LocaleParserJitHelper.php';
+require_once __DIR__.'/../../../ext/intl/LocaleDefaultJitHelper.php';
 require_once __DIR__.'/../../../ext/intl/LocaleSetDefault.php';
 require_once __DIR__.'/../../../ext/intl/Module.php';
 require_once __DIR__.'/../../../ext/intl/NormalizerGetRawDecomposition.php';
