@@ -114,8 +114,10 @@ final class LibcExtern
             'asinh' => [$dbl, false, [$dbl]],
             'atanh' => [$dbl, false, [$dbl]],
             'exp' => [$dbl, false, [$dbl]],
+            'expm1' => [$dbl, false, [$dbl]],
             'log' => [$dbl, false, [$dbl]],
             'log10' => [$dbl, false, [$dbl]],
+            'log1p' => [$dbl, false, [$dbl]],
             'sqrt' => [$dbl, false, [$dbl]],
 
             // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
