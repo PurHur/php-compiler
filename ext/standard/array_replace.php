@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayReplaceRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -62,6 +63,10 @@ final class array_replace extends Internal
         TypeErrorRaise::ensureLinked($context);
         foreach ($args as $i => $arg) {
             JitArrayElem::requireArrayParam($context, $arg, 'array_replace', $i + 1, 'array');
+            // Compile-time null: TypeError already emitted — do not loadHashTable (#27519 / peer #27512).
+            if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+                return HashTableHelper::alloc($context);
+            }
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_replace() argument #'.((int) $i + 1));
             }

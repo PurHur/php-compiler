@@ -103,6 +103,7 @@ require_once __DIR__.'/../../../lib/Func/Internal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../ext/dom/DomClassMethod.php';
 require_once __DIR__.'/../../../lib/FinalPromotedPropertySyntaxRejector.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableReplaceCopy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableReplaceRecursiveCopy.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableReplaceRecursiveLlvm.php';
 require_once __DIR__.'/../../../bin/vm.php';
