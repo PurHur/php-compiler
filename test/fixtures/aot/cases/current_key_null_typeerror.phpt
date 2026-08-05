@@ -1,5 +1,5 @@
 --TEST--
-stdlib current(null)/key(null) TypeError catchable (#27493, ext/standard/array.c)
+AOT: current(null)/key(null) catchable TypeError (#27493, ext/standard/array.c)
 --FILE--
 <?php
 try {
