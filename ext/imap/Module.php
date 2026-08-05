@@ -32,6 +32,14 @@ class Module extends ModuleAbstract
             'SA_UIDNEXT' => VmImapCore::SA_UIDNEXT,
             'SA_UIDVALIDITY' => VmImapCore::SA_UIDVALIDITY,
             'SA_ALL' => VmImapCore::SA_ALL,
+            'SORTDATE' => VmImapCore::SORTDATE,
+            'SORTARRIVAL' => VmImapCore::SORTARRIVAL,
+            'SORTFROM' => VmImapCore::SORTFROM,
+            'SORTSUBJECT' => VmImapCore::SORTSUBJECT,
+            'SORTTO' => VmImapCore::SORTTO,
+            'SORTCC' => VmImapCore::SORTCC,
+            'SORTSIZE' => VmImapCore::SORTSIZE,
+            'SE_UID' => VmImapCore::SE_UID,
         ] as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
             $var->int($value);
@@ -58,6 +66,11 @@ class Module extends ModuleAbstract
             new imap_num_msg(),
             new imap_headerinfo(),
             new imap_fetchbody(),
+            new imap_body(),
+            new imap_fetchstructure(),
+            new imap_fetchheader(),
+            new imap_fetch_overview(),
+            new imap_sort(),
             new imap_search(),
             new imap_list(),
             new imap_lsub(),
