@@ -52,8 +52,10 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ensureCompiled', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_values.php');
+        // #27212 / #27545: call-site ArrayValuesRuntime → HashTableValuesLlvm (not NestedJIT helper).
         $this->assertStringContainsString('ArrayValuesRuntime::values', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildValuesArray', $builtin);
+        $this->assertStringNotContainsString('ArrayMergeRuntime::merge', $builtin);
 
         $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
         $this->assertStringNotContainsString('function buildValuesArray', $arrayBuiltin);
@@ -62,7 +64,8 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
 
         $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableValuesLlvm.php');
         $this->assertStringContainsString('function values', $llvm);
-        $this->assertStringContainsString('valuesFromPairs', $llvm);
+        $this->assertStringContainsString('appendPackedValues', $llvm);
+        $this->assertStringContainsString('appendStringKeyValues', $llvm);
 
         $nested = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedVmHashTableMethodLlvm.php');
         $this->assertStringContainsString("'valuescopy'", $nested);

@@ -12,18 +12,23 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_values() (#12329, #27212).
+ * JIT/AOT link for array_values() (#12329, #27212, #27545).
  *
  * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayValuesJitHelper} returned
  * empty hashtables because NestedVmHashTableMethodLlvm skipped valuesCopy (#20533).
- * Call-site LLVM via {@see HashTableValuesLlvm} (peer ArrayKeysRuntime / #27211).
+ * Call-site LLVM via ABI bridge + {@see HashTableValuesLlvm} packed/strKeys walk
+ * (peer ArrayFlipRuntime / HashTableMergeLlvm).
+ *
+ * Companion fix: {@see \PHPCompiler\Compiler::tryEmitAdjacentAssignForInlineCallArg}
+ * must not emit a duplicate dest←rhs ASSIGN after `$a = [...]` (#27545).
  *
  * VM SSOT: {@see \PHPCompiler\VM\HashTable::valuesCopy()}
  * php-src: ext/standard/array.c — php_array_values()
  */
 final class ArrayValuesRuntime
 {
-    private const ABI_VALUES = '__array_values__copy';
+    /** Distinct from pre-#27545 `__array_values__copy` (exportPairs path). */
+    private const ABI_VALUES = '__array_values__copy_direct';
 
     public static function values(Context $context, JITVariable $array): Value
     {
@@ -88,7 +93,7 @@ final class ArrayValuesRuntime
     {
         $fn = $context->module->getNamedFunction(self::ABI_VALUES);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_VALUES.' missing after ArrayValuesRuntime bridge (#27212)');
+            throw new \LogicException(self::ABI_VALUES.' missing after ArrayValuesRuntime bridge (#27545)');
         }
         $context->registerFunction(self::ABI_VALUES, $fn);
     }
