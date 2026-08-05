@@ -416,6 +416,8 @@ final class BuiltinInternalArgInfo
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
             // ext/standard/basic_functions.stub.php — object $object (InternalArgInfo omits) (#26210)
             'get_object_id' => 0 === $index ? 'object' : null,
+            // Zend/zend_builtin_functions.stub.php — object|string; InternalArgInfo empty type (#27706, re-#23401)
+            'get_class_methods' => 0 === $index ? 'object|string' : null,
             // Zend/zend_builtin_functions.stub.php — object|string untyped in Reflection (InternalArgInfo object) (#25498)
             'class_parents' => 0 === $index ? '' : null,
             // Zend/zend_builtin_functions.stub.php — user_error alias absent from InternalArgInfo (#25174)

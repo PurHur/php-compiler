@@ -62,6 +62,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** Zend/zend_builtin_functions.stub.php — object|string $object_or_class (InternalArgInfo empty) (#27706). */
+    public function testGetClassMethodsObjectOrClassIsObjectOrString(): void
+    {
+        $f = 'get_class_methods';
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction($f));
+        $this->assertSame('object|string', BuiltinInternalArgInfo::stubParamTypeOverride($f, 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction($f, 0);
+        $this->assertNotNull($info);
+        $this->assertSame('object|string', $info['type']);
+        $this->assertSame(
+            ['object_or_class'],
+            BuiltinParamNames::forFunction($f)
+        );
+    }
+
     /** Zend/zend_builtin_functions.stub.php — mixed $object_or_class (InternalArgInfo empty) (#26359). */
     public function testIsAIsSubclassOfObjectOrClassIsMixed(): void
     {
