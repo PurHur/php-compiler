@@ -100,7 +100,6 @@ final class LibcExtern
             'flock' => [$i32, false, [$i32, $i32]],
             'pow' => [$dbl, false, [$dbl, $dbl]],
             'hypot' => [$dbl, false, [$dbl, $dbl]],
-            'fmod' => [$dbl, false, [$dbl, $dbl]],
             'cos' => [$dbl, false, [$dbl]],
             'cosh' => [$dbl, false, [$dbl]],
             'sin' => [$dbl, false, [$dbl]],

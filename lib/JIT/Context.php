@@ -815,7 +815,6 @@ class Context {
             'phpc_fpow_kernel',
             'phpc_nextafter_kernel',
             'phpc_hypot_kernel',
-            'phpc_fmod_kernel',
             'phpc_cos_kernel',
             'phpc_cosh_kernel',
             'phpc_sin_kernel',

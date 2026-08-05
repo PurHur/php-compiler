@@ -682,7 +682,6 @@ class Module extends ModuleAbstract
             new phpc_fpow_kernel(),
             new phpc_nextafter_kernel(),
             new phpc_hypot_kernel(),
-            new phpc_fmod_kernel(),
             new phpc_cos_kernel(),
             new phpc_cosh_kernel(),
             new phpc_sin_kernel(),
@@ -1235,11 +1234,11 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'acosh', 'asinh', 'atanh', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
+        foreach (['round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'acosh', 'asinh', 'atanh', 'pow', 'hypot', 'atan2'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
-                $params = in_array($name, ['pow', 'hypot', 'atan2', 'fmod'], true) ? [$double, $double] : [$double];
+                $params = in_array($name, ['pow', 'hypot', 'atan2'], true) ? [$double, $double] : [$double];
                 $ft = $context->context->functionType($double, false, ...$params);
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);
