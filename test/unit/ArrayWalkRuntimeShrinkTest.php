@@ -38,6 +38,7 @@ final class ArrayWalkRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayWalkRuntime.php');
         $this->assertStringContainsString('ArrayWalkJitHelper', $runtime);
         $this->assertStringContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringContainsString('ArrayWalkLlvm::walkRecursiveWithClosure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::walkInPlace', $runtime);
     }
 

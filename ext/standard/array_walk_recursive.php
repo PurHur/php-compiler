@@ -66,6 +66,18 @@ final class array_walk_recursive extends Internal
                 'array_walk_recursive() requires two or three arguments in this compiler build'
             );
         }
+        // Zend TypeError text is "array" only (php-src ext/standard/array.c) — #19836 / #27632.
+        $badSubject = self::jitKnownBadArraySubjectLabel($args[0]);
+        if (null !== $badSubject) {
+            throw new \TypeError(
+                'array_walk_recursive(): Argument #1 ($array) must be of type array, '
+                .$badSubject.' given'
+            );
+        }
+        // Runtime-null / boxed non-array under thin AOT — catchable TypeError, not segfault (#27632).
+        if (JITVariable::TYPE_VALUE === $args[0]->type || \PHPCompiler\JIT\JitValueBox::isValueOperand($args[0])) {
+            JitArrayElem::requireArrayParam($context, $args[0], 'array_walk_recursive', 1, 'array');
+        }
         if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
             throw new \TypeError(
                 'array_walk_recursive(): Argument #2 ($callback) must be a valid callback, no array or string given'
@@ -87,6 +99,25 @@ final class array_walk_recursive extends Internal
         }
 
         return ArrayWalkRuntime::walkRecursiveInPlaceWithStringBuiltin($context, $args[0], $args[1]);
+    }
+
+    private static function jitKnownBadArraySubjectLabel(JITVariable $subject): ?string
+    {
+        if (JITVariable::TYPE_NULL === $subject->type || ($subject->isNullConstant ?? false)) {
+            return 'null';
+        }
+        switch ($subject->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            default:
+                return null;
+        }
     }
 
     private function walkSubjectArray(
