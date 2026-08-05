@@ -823,6 +823,29 @@ final class BuiltinInternalArgInfo
                 1 => 'mixed',
                 default => null,
             },
+            // ext/reflection/php_reflection.stub.php — PHP 8.4+ lazy factories (#27741)
+            'reflectionclass::newlazyghost' => match ($index) {
+                0 => 'callable',
+                1 => 'int',
+                default => null,
+            },
+            'reflectionclass::newlazyproxy' => match ($index) {
+                0 => 'callable',
+                1 => 'int',
+                default => null,
+            },
+            'reflectionclass::resetaslazyghost' => match ($index) {
+                0 => 'object',
+                1 => 'callable',
+                2 => 'int',
+                default => null,
+            },
+            'reflectionclass::resetaslazyproxy' => match ($index) {
+                0 => 'object',
+                1 => 'callable',
+                2 => 'int',
+                default => null,
+            },
             // ext/dom/php_dom.stub.php — string $source / int $options = 0 / ?string $overrideEncoding = null (#26080)
             'dom\\htmldocument::createfromstring',
             'dom\\xmldocument::createfromstring' => match ($index) {

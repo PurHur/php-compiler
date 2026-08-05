@@ -49,6 +49,11 @@ final class BuiltinParamNames
             // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+; absent from InternalArgInfo (#27599)
             'reflectionproperty::getrawvalue' => ['object'],
             'reflectionproperty::setrawvalue' => ['object', 'value'],
+            // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+ lazy factories; absent from InternalArgInfo (#27741)
+            'reflectionclass::newlazyghost' => ['initializer', 'options='],
+            'reflectionclass::newlazyproxy' => ['factory', 'options='],
+            'reflectionclass::resetaslazyghost' => ['object', 'initializer', 'options='],
+            'reflectionclass::resetaslazyproxy' => ['object', 'factory', 'options='],
             // php-src ext/reflection/php_reflection.stub.php — ...$args; Z_PARAM_VARIADIC_WITH_NAMED (#24949)
             'reflectionfunction::invoke' => ['...args='],
             'reflectionmethod::invoke' => ['object', '...args='],
@@ -1288,8 +1293,6 @@ final class BuiltinParamNames
             case 'utf8_encode':
             case 'utf8_decode':
                 return ['string'];
-            case 'resetaslazyghost':
-                return ['object', 'initializer', 'options'];
             // php-src Zend/zend_builtin_functions.stub.php — string|int $status = 0 only (#23957; reverts #6718 two-arg)
             case 'exit':
             case 'die':
