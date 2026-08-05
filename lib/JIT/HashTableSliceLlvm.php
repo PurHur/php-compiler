@@ -195,8 +195,10 @@ final class HashTableSliceLlvm
     /**
      * Grow memset zeroes new slots as TYPE_NULL; foreach treats NULL as a real
      * element. Mark slots that preserveKeys never wrote as TYPE_UNDEFINED (#27581).
+     *
+     * Public for RegexIterator / ParentIterator preserve-keys snapshots (#27313).
      */
-    private static function markUnwrittenNullHolesUndefined(
+    public static function markUnwrittenNullHolesUndefined(
         Context $context,
         Value $dest,
         Value $written,
@@ -270,7 +272,8 @@ final class HashTableSliceLlvm
         $context->builder->positionAtEnd($skip);
     }
 
-    private static function writeKeyed(
+    /** Preserve-keys write + int-key written-set for hole sealing (#27581 / #27313). */
+    public static function writeKeyed(
         Context $context,
         Value $dest,
         Value $written,
