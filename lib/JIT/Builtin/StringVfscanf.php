@@ -11,41 +11,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_vfscanf via VfscanfJitHelper PHP (#12541, #25718).
+ * JIT/AOT link for __compiler_vfscanf via fgets + SscanfJitHelper (#12541, #25718, #27663).
  *
- * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
- * (VmSscanf → SscanfJitHelper → VmVfscanf → VfscanfJitHelper) in one NestedJIT scope
- * (peer StringSscanfByRef #25691 / StringSscanfArray #25653).
- * php-src: ext/standard/scanf.c — vfscanf stream branch
+ * Do **not** NestedJIT VmVfscanf/VmFs with live StreamIo (#27663 module verify).
+ * Thin AOT: libc fgets/fseek/ftell via {@see StreamReadRuntime::forceLibcStreamPositionAbis}.
+ * php-src: ext/standard/file.c fscanf → php_stream_get_line + php_sscanf_internal
  */
 final class StringVfscanf
 {
-    private const HELPER_PATH = '/ext/standard/VfscanfJitHelper.php';
-
-    private const VM_VFSCANF_PATH = '/ext/standard/VmVfscanf.php';
-
-    private const VM_SSCANF_PATH = '/ext/standard/VmSscanf.php';
-
-    private const SSCANF_HELPER_PATH = '/ext/standard/SscanfJitHelper.php';
-
-    /**
-     * Ordered NestedJIT sources — sscanf chain before vfscanf (#25718).
-     *
-     * @var list<string>
-     */
-    private const HELPER_BUNDLE = [
-        self::VM_SSCANF_PATH,
-        self::SSCANF_HELPER_PATH,
-        self::VM_VFSCANF_PATH,
-        self::HELPER_PATH,
-    ];
-
-    private const PARSE_ASSIGN_HELPER = 'PHPCompiler\\ext\\standard\\VfscanfJitHelper::parseAssignMeta';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::PARSE_ASSIGN_HELPER,
-    ];
+    private const PARSE_ASSIGN_HELPER = 'PHPCompiler\\ext\\standard\\SscanfJitHelper::parseAssignMeta';
 
     public static function ensureLinked(Context $context): void
     {
@@ -61,11 +35,25 @@ final class StringVfscanf
             return;
         }
 
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+
+        if ($context->isThinStandaloneAotMain()) {
+            StreamReadRuntime::forceLibcStreamPositionAbis($context);
+        } else {
+            StreamReadRuntime::ensureVfscanfAbi($context);
+        }
+
         SscanfAssignApply::ensureLinked($context);
-        self::ensureJitHelperCompiled($context);
+        StringSscanfByRef::ensureLinked($context);
         self::implementVfscanfBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementVfscanfBridge(Context $context): void
@@ -96,34 +84,45 @@ final class StringVfscanf
 
         $entry = $fn->appendBasicBlock('vfscanf_byref_entry');
         $fail = $fn->appendBasicBlock('vfscanf_byref_fail');
-        $work = $fn->appendBasicBlock('vfscanf_byref_work');
+        $gotLine = $fn->appendBasicBlock('vfscanf_byref_got_line');
+        $scan = $fn->appendBasicBlock('vfscanf_byref_scan');
         $context->builder->positionAtEnd($entry);
 
         $handle = $fn->getParam(0);
         $fmt = $fn->getParam(1);
         $outCount = $fn->getParam(2);
         $outPtrs = $fn->getParam(3);
-        $minusOne = $i64->constInt(-1, false);
+        $minusOne = $i64->constInt(-1, true);
 
         $nullFmt = $context->builder->icmp(Builder::INT_EQ, $fmt, $strPtr->constNull());
-        $context->builder->branchIf($nullFmt, $fail, $work);
+        $context->builder->branchIf($nullFmt, $fail, $gotLine);
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($minusOne);
 
-        $context->builder->positionAtEnd($work);
+        $context->builder->positionAtEnd($gotLine);
+        $line = $context->builder->call(
+            $context->lookupFunction('__compiler_fgets'),
+            $handle,
+            $i64->constInt(-1, true)
+        );
+        $lineNull = $context->builder->icmp(Builder::INT_EQ, $line, $strPtr->constNull());
+        $nonNull = $fn->appendBasicBlock('vfscanf_byref_non_null');
+        $context->builder->branchIf($lineNull, $fail, $nonNull);
+
+        $context->builder->positionAtEnd($nonNull);
+        $lineLen = $context->builder->call($context->lookupFunction('__string__strlen'), $line);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $lineLen, $i64->constInt(0, false));
+        $context->builder->branchIf($empty, $fail, $scan);
+
+        $context->builder->positionAtEnd($scan);
         $meta = $context->builder->call(
             self::helperFunction($context, self::PARSE_ASSIGN_HELPER),
-            $handle,
+            $line,
             $fmt,
             $outCount
         );
-        $metaNull = $context->builder->icmp(Builder::INT_EQ, $meta, $strPtr->constNull());
-        $apply = $fn->appendBasicBlock('vfscanf_byref_apply');
-        $context->builder->branchIf($metaNull, $fail, $apply);
-
-        $context->builder->positionAtEnd($apply);
-        $consumedSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $consumedSlot = BasicBlockHelper::entryAllocaForFunction($context, $fn, $sizeT);
         $assigned = $context->builder->call(
             $context->lookupFunction('phpc_sscanf_apply_assign_blob'),
             $meta,
@@ -136,19 +135,9 @@ final class StringVfscanf
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        StringSscanfByRef::ensureLinked($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#25718');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiledBundle(
-            $context,
-            self::HELPER_BUNDLE,
-            self::COMPILED_HELPERS,
-            '#25718'
-        );
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#27663');
     }
 
     private static function registerLinkedRuntime(Context $context): void

@@ -27,6 +27,7 @@ final class JitVfscanf
     public static function parse(Context $context, JITVariable ...$args): Value
     {
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
         Sscanf::ensureLinked($context);
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
 

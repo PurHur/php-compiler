@@ -80,6 +80,8 @@ final class JitStreamIoKernel
         self::implementIfMissing($context, '__compiler_tmpfile', self::emitTmpfile(...));
         self::implementIfMissing($context, '__compiler_fread', self::emitFread(...));
         self::implementFgetsForce($context);
+        self::implementFseekForce($context);
+        self::implementFtellForce($context);
         self::implementIfMissing($context, '__compiler_stream_supports', self::emitStreamSupports(...));
         self::registerLinkedRuntime($context);
 
@@ -203,6 +205,14 @@ final class JitStreamIoKernel
                 $name,
                 $context->context->functionType($strPtr, false, $i64, $i64)
             ),
+            '__compiler_fseek' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $i64, $i64, $i64)
+            ),
+            '__compiler_ftell' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($i64, false, $i64)
+            ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false, $i64, $i64)
@@ -246,6 +256,8 @@ final class JitStreamIoKernel
             ['malloc', $i8p, [$sizeT]],
             ['fread', $sizeT, [$i8p, $sizeT, $sizeT, $i8p]],
             ['fgets', $i8p, [$i8p, $i32, $i8p]],
+            ['fseek', $i32, [$i8p, $i64, $i32]],
+            ['ftell', $i64, [$i8p]],
             ['strlen', $sizeT, [$i8p]],
             ['ferror', $i32, [$i8p]],
             ['strcmp', $i32, [$i8p, $i8p]],
@@ -1063,6 +1075,115 @@ final class JitStreamIoKernel
         $context->builder->returnValue($nullStr);
     }
 
+
+
+    public static function implementFseekForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_fseek');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('fseek_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_fseek', $probe);
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_fseek');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_fseek');
+        }
+        self::emitFseek($context, $fn);
+        $context->registerFunction('__compiler_fseek', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function emitFseek(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('fseek_entry');
+        $context->builder->positionAtEnd($entry);
+        $handle = $fn->getParam(0);
+        $offset = $fn->getParam(1);
+        $whence = $fn->getParam(2);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $minusOne = $i64->constInt(-1, true);
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('fseek_fail');
+        $okBb = $fn->appendBasicBlock('fseek_ok');
+        $context->builder->branchIf($context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr), $failBb, $okBb);
+        $context->builder->positionAtEnd($okBb);
+        $rc = $context->builder->call($context->lookupFunction('fseek'), $fp, $offset, $context->builder->trunc($whence, $i32));
+        $context->builder->returnValue($context->builder->sext($rc, $i64));
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
+    }
+
+    public static function implementFtellForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_ftell');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('ftell_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_ftell', $probe);
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_ftell');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_ftell');
+        }
+        self::emitFtell($context, $fn);
+        $context->registerFunction('__compiler_ftell', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function emitFtell(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ftell_entry');
+        $context->builder->positionAtEnd($entry);
+        $handle = $fn->getParam(0);
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $nullPtr = $i8p->constNull();
+        $minusOne = $i64->constInt(-1, true);
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('ftell_fail');
+        $okBb = $fn->appendBasicBlock('ftell_ok');
+        $context->builder->branchIf($context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr), $failBb, $okBb);
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->returnValue($context->builder->call($context->lookupFunction('ftell'), $fp));
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($minusOne);
+    }
 
     /**
      * stream_supports() — LOCK true for libc FILE* except php://memory|temp (#19462).

@@ -6,37 +6,40 @@ namespace PHPCompiler\JIT;
 
 use PHPUnit\Framework\TestCase;
 
-/** vfscanf() JIT NestedJIT via JitVmHelperLink::ensureCompiledBundle (#12541, #25718). */
+/** vfscanf() JIT via fgets + SscanfJitHelper (#12541, #25718, #27663). */
 final class StringVfscanfRuntimeShrinkTest extends TestCase
 {
-    public function testSscanfEmbedRoutesVfscanfThroughJitHelper(): void
+    public function testSscanfEmbedRoutesVfscanfThroughStringVfscanf(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/Sscanf.php');
         $this->assertStringContainsString('StringVfscanf::implement', $source);
         $this->assertStringNotContainsString('SscanfJit::implementVfscanfOnly', $source);
     }
 
-    public function testVfscanfJitHelperUsesVmVfscanf(): void
+    public function testVfscanfJitHelperKeptForVmHost(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../../ext/standard/VfscanfJitHelper.php');
         $this->assertStringContainsString('VmVfscanf::parse', $source);
         $this->assertStringContainsString('SscanfJitHelper::packMetaFromVariables', $source);
     }
 
-    public function testStringVfscanfRoutesThroughEnsureCompiledBundle(): void
+    public function testStringVfscanfUsesFgetsPlusSscanfNoVmVfscanfNestedJit(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVfscanf.php');
-        $this->assertStringContainsString('VfscanfJitHelper', $source);
-        $this->assertStringContainsString('VmVfscanf.php', $source);
-        $this->assertStringContainsString('VmSscanf.php', $source);
-        $this->assertStringContainsString('SscanfJitHelper.php', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringNotContainsString('parseAndCompile', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
-        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('SscanfJitHelper::parseAssignMeta', $source);
+        $this->assertStringContainsString('__compiler_fgets', $source);
+        $this->assertStringContainsString('forceLibcStreamPositionAbis', $source);
+        $this->assertStringContainsString('StringSscanfByRef::ensureLinked', $source);
+        $this->assertStringNotContainsString('VmVfscanf.php', $source);
+        $this->assertStringNotContainsString('VfscanfJitHelper', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+    }
+
+    public function testThinAotSkipsSscanfArrayEagerNestedJit(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/Sscanf.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('StringSscanfArray::implement', $source);
     }
 }

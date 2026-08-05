@@ -46,7 +46,7 @@ final class SscanfAssignApply
         $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtrPtr = $context->getTypeFromString('__value__**');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $i8 = $context->getTypeFromString('int8');
         $ft = $context->context->functionType(
             $i64,
@@ -88,16 +88,16 @@ final class SscanfAssignApply
         $consumedSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($assignedSlot, $voidPtr),
-            $context->builder->pointerCast($metaData, $voidPtr),
+            $context->builder->pointerCast($assignedSlot, $i8p),
+            $context->builder->pointerCast($metaData, $i8p),
             $sizeT->constInt(8, false)
         );
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($consumedSlot, $voidPtr),
+            $context->builder->pointerCast($consumedSlot, $i8p),
             $context->builder->pointerCast(
                 $context->builder->gep($metaData, $sizeT->constInt(8, false)),
-                $voidPtr
+                $i8p
             ),
             $sizeT->constInt(8, false)
         );
@@ -157,7 +157,7 @@ final class SscanfAssignApply
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i8p = $context->getTypeFromString('int8*');
 
@@ -244,7 +244,7 @@ final class SscanfAssignApply
         $context->builder->call(
             $context->lookupFunction('memcpy'),
             $buf,
-            $context->builder->pointerCast($context->builder->gep($metaData, $pos), $voidPtr),
+            $context->builder->pointerCast($context->builder->gep($metaData, $pos), $i8p),
             $context->builder->truncOrBitCast($slen, $sizeT)
         );
         $context->builder->store(
@@ -268,12 +268,12 @@ final class SscanfAssignApply
         Value $destSlot
     ): void {
         $sizeT = $context->getTypeFromString('size_t');
-        $voidPtr = $context->getTypeFromString('void*');
+        $i8p = $context->getTypeFromString('int8*');
         $pos = $context->builder->load($posSlot);
         $context->builder->call(
             $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($destSlot, $voidPtr),
-            $context->builder->pointerCast($context->builder->gep($metaData, $pos), $voidPtr),
+            $context->builder->pointerCast($destSlot, $i8p),
+            $context->builder->pointerCast($context->builder->gep($metaData, $pos), $i8p),
             $sizeT->constInt($byteCount, false)
         );
         $context->builder->store(
@@ -284,13 +284,14 @@ final class SscanfAssignApply
 
     private static function ensureLibc(Context $context): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
+        \PHPCompiler\JIT\LibcExtern::register($context);
+        $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
 
         foreach (
             [
-                ['malloc', $voidPtr, [$sizeT]],
-                ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
+                ['malloc', $i8p, [$sizeT]],
+                ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             try {

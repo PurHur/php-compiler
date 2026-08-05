@@ -27,7 +27,10 @@ final class Sscanf
 
     public static function implement(Context $context): void
     {
-        StringSscanfArray::implement($context);
+        // parseToArray NestedJIT next to live StreamIo mistypes HT returns (#27663).
+        if (!$context->isThinStandaloneAotMain()) {
+            StringSscanfArray::implement($context);
+        }
         StringSscanfByRef::implement($context);
         StringVfscanf::implement($context);
     }
