@@ -272,6 +272,38 @@ PHP;
         );
     }
 
+    /** Issue #27835: self::staticMethod(...) FCC keeps creation late-static called_scope. */
+    public function testVmSelfStaticMethodFccPreservesLateStaticBinding(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A {
+  public static function foo($x) { return static::class.":$x"; }
+  public static function viaSelf() {
+    $f = self::foo(...);
+    return $f("s");
+  }
+  public static function viaNamed() {
+    $f = A::foo(...);
+    return $f("s");
+  }
+}
+class B extends A {}
+echo "Aself=", A::viaSelf(), "\n";
+echo "Bself=", B::viaSelf(), "\n";
+echo "Anamed=", A::viaNamed(), "\n";
+echo "Bnamed=", B::viaNamed(), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "Aself=A:s\nBself=B:s\nAnamed=A:s\nBnamed=A:s\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
     public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
     {
