@@ -16098,16 +16098,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/grapheme_strstr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new ArgumentCountError (line 76)
+- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 77)
 - 2 class method(s)
 - 1 closure(s)
 
 ### `ext/intl/grapheme_substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 36)
-- new ArgumentCountError (line 79)
+- new ArgumentCountError (line 37)
+- new ArgumentCountError (line 80)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -32466,7 +32466,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UcwordsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/UmaskJitHelper.php`
 
@@ -32527,9 +32527,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UsortJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
-- new Variable (line 102)
-- new HashTable (line 115)
+- new Variable (line 103)
+- new Variable (line 105)
+- new HashTable (line 118)
 - 5 class method(s)
 
 ### `ext/standard/Utf8EndecDeprecation.php`
@@ -43750,7 +43750,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1044)
+- new InternalArgInfo (line 1084)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -43766,8 +43766,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2228)
-- new ArgumentCountError (line 2239)
+- new ArgumentCountError (line 2243)
+- new ArgumentCountError (line 2254)
 - 19 class method(s)
 - 1 closure(s)
 
