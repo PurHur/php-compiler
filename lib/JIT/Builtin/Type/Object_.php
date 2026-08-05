@@ -3714,8 +3714,9 @@ class Object_ extends Type {
             || 'appenditerator' === $lcname
             || 'regexiterator' === $lcname
             || 'callbackfilteriterator' === $lcname
+            || 'cachingiterator' === $lcname
         ) {
-            // Thin AOT: snapshot / filter into `__spl_ht` at construct (#26825, #27259).
+            // Thin AOT: snapshot / filter into `__spl_ht` at construct (#26825, #27259, #27421).
             // php-src ext/spl/spl_iterators.stub.php — OuterIterator + Iterator.
             // markHasConstructor requires isVoidJitConstructCall recognition or
             // constructed stays 0 and get_class / HT reads abort (#26825).
@@ -3723,12 +3724,34 @@ class Object_ extends Type {
             $this->markInterfaceClass('OuterIterator');
             $this->setInterfaceExtends('OuterIterator', ['Iterator', 'Traversable']);
             // Iterator-first rematerialized order (#25798).
-            $this->setClassInterfaces($displayName, [
+            $ifaces = [
                 'Iterator',
                 'Traversable',
                 'OuterIterator',
-            ]);
+            ];
+            if ('cachingiterator' === $lcname) {
+                $ifaces = [
+                    'Stringable',
+                    'Iterator',
+                    'Traversable',
+                    'OuterIterator',
+                    'ArrayAccess',
+                    'Countable',
+                ];
+            }
+            $this->setClassInterfaces($displayName, $ifaces);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            if ('cachingiterator' === $lcname) {
+                $this->defineProperty($id, \PHPCompiler\JIT\Call\CachingIteratorConstruct::PROP_CACHE, Variable::TYPE_HASHTABLE);
+                $this->seedExternalClassConstants($id, [
+                    'CALL_TOSTRING' => 1,
+                    'TOSTRING_USE_KEY' => 2,
+                    'TOSTRING_USE_CURRENT' => 4,
+                    'TOSTRING_USE_INNER' => 8,
+                    'CATCH_GET_CHILD' => 16,
+                    'FULL_CACHE' => 0x100,
+                ]);
+            }
             if ('regexiterator' === $lcname) {
                 $this->seedExternalClassConstants($id, [
                     'USE_KEY' => 1,
@@ -3752,7 +3775,11 @@ class Object_ extends Type {
                 $methods[] = 'append';
                 $methods[] = 'getiteratorindex';
                 $methods[] = 'getarrayiterator';
-            } else {
+            } elseif ('cachingiterator' === $lcname) {
+                $methods[] = 'getcache';
+                $methods[] = 'count';
+                $methods[] = 'hasnext';
+            } elseif ('regexiterator' === $lcname || 'callbackfilteriterator' === $lcname) {
                 $methods[] = 'accept';
             }
             foreach ($methods as $method) {

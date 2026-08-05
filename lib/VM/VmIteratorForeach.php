@@ -69,6 +69,7 @@ final class VmIteratorForeach
             || 'appenditerator' === $ut
             || 'regexiterator' === $ut
             || 'callbackfilteriterator' === $ut
+            || 'cachingiterator' === $ut
             || 'parentiterator' === $ut
             || 'multipleiterator' === $ut
             || 'recursivetreeiterator' === $ut;
