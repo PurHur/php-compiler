@@ -141,6 +141,8 @@ final class BuiltinInternalArgInfo
             'hash_pbkdf2' => 'string',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits the function (#25845)
             'hash_hkdf' => 'string',
+            // ext/hash/hash.stub.php — InternalArgInfo return resource; Zend HashContext (#27745)
+            'hash_copy' => 'HashContext',
             // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
             'sodium_crypto_generichash',
             'sodium_crypto_secretbox',
@@ -466,6 +468,15 @@ final class BuiltinInternalArgInfo
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => match ($index) {
                 0, 1 => 'string',
+                default => null,
+            },
+            // ext/hash/hash.stub.php — HashContext $context; InternalArgInfo untyped / resource (#27745, #27737)
+            'hash_copy', 'hash_update', 'hash_final' => 0 === $index ? 'HashContext' : null,
+            'hash_update_file' => 0 === $index ? 'HashContext' : null,
+            // length: InternalArgInfo "integer"; Zend ?int advertised as int (optional) (#27737)
+            'hash_update_stream' => match ($index) {
+                0 => 'HashContext',
+                2 => 'int',
                 default => null,
             },
             // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
