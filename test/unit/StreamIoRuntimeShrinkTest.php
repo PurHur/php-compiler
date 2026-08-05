@@ -48,6 +48,8 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
         $this->assertStringContainsString('implementForUserScriptLowering', $kernel);
         $this->assertStringContainsString('__compiler_fopen', $kernel);
+        $this->assertStringContainsString('implementStreamGetContentsForce', $kernel);
+        $this->assertStringContainsString('sgc_entry', $kernel);
     }
 
     public function testStreamIoJitHelperMemoryAllocatesLiveHandle(): void

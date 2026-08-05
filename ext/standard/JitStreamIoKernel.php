@@ -82,6 +82,7 @@ final class JitStreamIoKernel
         self::implementFgetsForce($context);
         self::implementFseekForce($context);
         self::implementFtellForce($context);
+        self::implementStreamGetContentsForce($context);
         self::implementIfMissing($context, '__compiler_stream_supports', self::emitStreamSupports(...));
         self::registerLinkedRuntime($context);
 
@@ -212,6 +213,10 @@ final class JitStreamIoKernel
             '__compiler_ftell' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $i64)
+            ),
+            '__compiler_stream_get_contents' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($strPtr, false, $i64, $i64, $i64)
             ),
             '__compiler_stream_supports' => $context->module->addFunction(
                 $name,
@@ -1183,6 +1188,222 @@ final class JitStreamIoKernel
         $context->builder->returnValue($context->builder->call($context->lookupFunction('ftell'), $fp));
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($minusOne);
+    }
+
+    /**
+     * Idempotent libc stream_get_contents for thin AOT (#27437).
+     *
+     * NestedJIT StreamReadJitHelper→VmFs cannot see JitStreamIoKernel's FILE* table
+     * (php://memory opens via tmpfile()). Replace the bridge after NestedJIT.
+     * php-src: ext/standard/file.c — PHP_FUNCTION(stream_get_contents)
+     */
+    public static function implementStreamGetContentsForce(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__compiler_stream_get_contents');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach ($probe->getBasicBlocks() as $bb) {
+                if ('sgc_entry' === $bb->getName()) {
+                    $context->registerFunction('__compiler_stream_get_contents', $probe);
+
+                    return;
+                }
+                break;
+            }
+        }
+        $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        $context->builder->clearInsertionPosition();
+        self::ensureStreamGlobals($context);
+        $probe = $context->module->getNamedFunction('__compiler_stream_get_contents');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            foreach (array_reverse($probe->getBasicBlocks()) as $block) {
+                $block->delete();
+            }
+            $fn = $probe;
+        } else {
+            $fn = self::declareFunction($context, '__compiler_stream_get_contents');
+        }
+        self::emitStreamGetContents($context, $fn);
+        $context->registerFunction('__compiler_stream_get_contents', $fn);
+        if (null !== $savedBlock) {
+            \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * libc FILE* stream_get_contents — seekable tmpfile/memory via remaining-size fread (#27437).
+     *
+     * offset >= 0 → fseek SEEK_SET (fail → null/false); maxlength 0 → ""; maxlength < 0 → to EOF;
+     * maxlength > 0 → up to that many bytes. Empty remaining is "" (not false), matching php-src.
+     */
+    private static function emitStreamGetContents(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('sgc_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $handle = $fn->getParam(0);
+        $maxlength = $fn->getParam(1);
+        $offset = $fn->getParam(2);
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $nullPtr = $i8p->constNull();
+        $zeroI64 = $i64->constInt(0, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $emptyCstr = $context->pointerFromStringConstant('');
+
+        $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
+        $failBb = $fn->appendBasicBlock('sgc_fail');
+        $seekCheckBb = $fn->appendBasicBlock('sgc_seek_check');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr),
+            $failBb,
+            $seekCheckBb
+        );
+
+        // php-src file.c: only offset >= 0 seeks; negative keeps current position (#23190).
+        $context->builder->positionAtEnd($seekCheckBb);
+        $needSeek = $context->builder->icmp(Builder::INT_SGE, $offset, $zeroI64);
+        $doSeekBb = $fn->appendBasicBlock('sgc_do_seek');
+        $lenBb = $fn->appendBasicBlock('sgc_len');
+        $context->builder->branchIf($needSeek, $doSeekBb, $lenBb);
+
+        $context->builder->positionAtEnd($doSeekBb);
+        $seekRc = $context->builder->call(
+            $context->lookupFunction('fseek'),
+            $fp,
+            $offset,
+            $i32->constInt(0, false) // SEEK_SET
+        );
+        $seekFail = $context->builder->icmp(Builder::INT_NE, $seekRc, $zeroI32);
+        $context->builder->branchIf($seekFail, $failBb, $lenBb);
+
+        $context->builder->positionAtEnd($lenBb);
+        $isZeroLen = $context->builder->icmp(Builder::INT_EQ, $maxlength, $zeroI64);
+        $emptyBb = $fn->appendBasicBlock('sgc_empty');
+        $sizeBb = $fn->appendBasicBlock('sgc_size');
+        $context->builder->branchIf($isZeroLen, $emptyBb, $sizeBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $emptyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $zeroI64,
+            $emptyCstr
+        );
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $emptyStr
+            )
+        );
+
+        // Seekable remaining: ftell → SEEK_END → restore → min(remaining, maxlength when > 0).
+        $context->builder->positionAtEnd($sizeBb);
+        $pos = $context->builder->call($context->lookupFunction('ftell'), $fp);
+        $posBad = $context->builder->icmp(Builder::INT_SLT, $pos, $zeroI64);
+        $endSeekBb = $fn->appendBasicBlock('sgc_end_seek');
+        $context->builder->branchIf($posBad, $failBb, $endSeekBb);
+
+        $context->builder->positionAtEnd($endSeekBb);
+        $endSeekRc = $context->builder->call(
+            $context->lookupFunction('fseek'),
+            $fp,
+            $zeroI64,
+            $i32->constInt(2, false) // SEEK_END
+        );
+        $endSeekFail = $context->builder->icmp(Builder::INT_NE, $endSeekRc, $zeroI32);
+        $endTellBb = $fn->appendBasicBlock('sgc_end_tell');
+        $context->builder->branchIf($endSeekFail, $failBb, $endTellBb);
+
+        $context->builder->positionAtEnd($endTellBb);
+        $end = $context->builder->call($context->lookupFunction('ftell'), $fp);
+        $restoreRc = $context->builder->call(
+            $context->lookupFunction('fseek'),
+            $fp,
+            $pos,
+            $i32->constInt(0, false)
+        );
+        $restoreFail = $context->builder->icmp(Builder::INT_NE, $restoreRc, $zeroI32);
+        $remainBb = $fn->appendBasicBlock('sgc_remain');
+        $context->builder->branchIf($restoreFail, $failBb, $remainBb);
+
+        $context->builder->positionAtEnd($remainBb);
+        $remaining = $context->builder->sub($end, $pos);
+        $noRemain = $context->builder->icmp(Builder::INT_SLE, $remaining, $zeroI64);
+        $capBb = $fn->appendBasicBlock('sgc_cap');
+        $context->builder->branchIf($noRemain, $emptyBb, $capBb);
+
+        $context->builder->positionAtEnd($capBb);
+        // maxlength < 0 → read all remaining; else min(remaining, maxlength).
+        $unlimited = $context->builder->icmp(Builder::INT_SLT, $maxlength, $zeroI64);
+        $capped = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SLT, $maxlength, $remaining),
+            $maxlength,
+            $remaining
+        );
+        $toRead = $context->builder->select($unlimited, $remaining, $capped);
+        $stillZero = $context->builder->icmp(Builder::INT_EQ, $toRead, $zeroI64);
+        $allocBb = $fn->appendBasicBlock('sgc_alloc');
+        $context->builder->branchIf($stillZero, $emptyBb, $allocBb);
+
+        $context->builder->positionAtEnd($allocBb);
+        $readLen = $context->builder->trunc($toRead, $sizeT);
+        $buf = $context->builder->call($context->lookupFunction('malloc'), $readLen);
+        $bufNull = $context->builder->icmp(Builder::INT_EQ, $buf, $nullPtr);
+        $readBb = $fn->appendBasicBlock('sgc_read');
+        $context->builder->branchIf($bufNull, $failBb, $readBb);
+
+        $context->builder->positionAtEnd($readBb);
+        $got = $context->builder->call(
+            $context->lookupFunction('fread'),
+            $buf,
+            $sizeT->constInt(1, false),
+            $readLen,
+            $fp
+        );
+        $gotZero = $context->builder->icmp(Builder::INT_EQ, $got, $sizeT->constInt(0, false));
+        $errBb = $fn->appendBasicBlock('sgc_err_check');
+        $makeBb = $fn->appendBasicBlock('sgc_make');
+        $context->builder->branchIf($gotZero, $errBb, $makeBb);
+
+        $context->builder->positionAtEnd($errBb);
+        $hasErr = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('ferror'), $fp),
+            $zeroI32
+        );
+        $freeFailBb = $fn->appendBasicBlock('sgc_free_fail');
+        $freeEmptyBb = $fn->appendBasicBlock('sgc_free_empty');
+        // Zero bytes + no error → empty success (EOF); error → false.
+        $context->builder->branchIf($hasErr, $freeFailBb, $freeEmptyBb);
+
+        $context->builder->positionAtEnd($freeEmptyBb);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->branch($emptyBb);
+
+        $context->builder->positionAtEnd($freeFailBb);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->branch($failBb);
+
+        $context->builder->positionAtEnd($makeBb);
+        $gotI64 = $context->builder->zExt($got, $i64);
+        $result = $context->builder->call($context->lookupFunction('__string__init'), $gotI64, $buf);
+        $context->builder->call($context->lookupFunction('free'), $buf);
+        $context->builder->returnValue(
+            $context->builder->call(
+                $context->lookupFunction('__compiler_stream_filter_apply_read'),
+                $handle,
+                $result
+            )
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($nullStr);
     }
 
     /**

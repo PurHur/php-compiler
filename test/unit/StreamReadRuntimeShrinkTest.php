@@ -20,7 +20,10 @@ final class StreamReadRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        // Thin AOT still NestedJITs the helper, then forceLibc* replaces FILE*-table ABIs (#27663, #27437).
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('forceLibcStreamPositionAbis', $source);
+        $this->assertStringContainsString('implementStreamGetContentsForce', $source);
         $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
         $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
         $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
@@ -29,7 +32,7 @@ final class StreamReadRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StreamReadStandaloneLlvm', $source);
         $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(230, \substr_count($source, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamReadStandaloneLlvm.php');
     }
