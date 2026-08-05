@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\QuotemetaJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** quotemeta() JIT routes through QuotemetaJitHelper + JitVmHelperLink (#14705, #21589). */
+/** quotemeta() JIT routes through QuotemetaJitHelper + JitVmHelperLink (#14705, #21589, #27011). */
 final class QuotemetaRuntimeShrinkTest extends TestCase
 {
     public function testStringQuotemetaUsesJitHelperNotInlineLlvm(): void
@@ -20,7 +20,6 @@ final class QuotemetaRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('quotemeta_count_head', $source);
-        $this->assertStringNotContainsString('shouldEscape', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitQuotemeta.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/quotemeta.php');
@@ -29,14 +28,25 @@ final class QuotemetaRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitQuotemeta', $builtin);
     }
 
-    public function testQuotemetaJitHelperDelegatesToVmString(): void
+    public function testQuotemetaJitHelperIsSelfContainedAndMatchesVmString(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/QuotemetaJitHelper.php');
-        $this->assertStringContainsString('VmString::quotemeta', $source);
+        // NestedJIT AOT: no VmString / ExternalMethod stub (#16075 / #27011).
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('escapeChar', $source);
+        $this->assertStringNotContainsString('str_contains', $source);
+        // No if-in-loop — that empties helper-runtime unit.o under NestedJIT emit (#27011).
+        $this->assertDoesNotMatchRegularExpression(
+            '/for\s*\([^)]+\)\s*\{[^}]*\bif\s*\(/s',
+            $source
+        );
 
         $expected = VmString::quotemeta('$a.b');
         $this->assertSame($expected, QuotemetaJitHelper::quotemetaArgv('$a.b'));
         $this->assertSame($expected, VmString::quotemeta('$a.b'));
+        $this->assertSame(VmString::quotemeta('plain'), QuotemetaJitHelper::quotemetaArgv('plain'));
+        $this->assertSame(VmString::quotemeta('.\\+*?[]^()$'), QuotemetaJitHelper::quotemetaArgv('.\\+*?[]^()$'));
+        $this->assertSame('', QuotemetaJitHelper::quotemetaArgv(''));
     }
 
     public function testSpineBundleOmitsDeletedJitQuotemeta(): void
