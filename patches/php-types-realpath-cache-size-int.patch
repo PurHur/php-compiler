@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -6131,7 +6131,7 @@
+         'readline_write_history' => ['bool', 'filename=' => 'string'],
+         'readlink' => ['string', 'filename' => 'string'],
+         'realpath_cache_get' => ['array'],
+-        'realpath_cache_size' => ['bool'],
++        'realpath_cache_size' => ['int'],
+         'realpath' => ['string', 'path' => 'string'],
+         'recode_file' => ['bool', 'request' => 'string', 'input' => '', 'output' => ''],
+         'recode_string' => ['string', 'request' => 'string', 'str' => 'string'],
