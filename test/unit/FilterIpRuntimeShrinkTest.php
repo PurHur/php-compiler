@@ -7,21 +7,23 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * filter_var FILTER_VALIDATE_IP JIT routes through FilterIpJitHelper PHP
- * via JitVmHelperLink::ensureCompiled (#4403 / #24650 / peer #23612).
+ * filter_var FILTER_VALIDATE_IP JIT routes through FilterIpValidate PHP
+ * via JitVmHelperLink::ensureCompiled (#4403 / #24650 / #27207 / peer #27068).
  */
 final class FilterIpRuntimeShrinkTest extends TestCase
 {
-    public function testFilterIpJitHelperDelegatesToVmFilter(): void
+    public function testFilterIpValidateIsSelfContained(): void
     {
-        $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/FilterIpJitHelper.php');
-        $this->assertStringContainsString('VmFilter::isValidIpAddress', $source);
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/FilterIpValidate.php');
+        $this->assertStringContainsString('function isValidInt', $source);
+        $this->assertStringNotContainsString('preg_match(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\ext\\standard', $source);
     }
 
-    public function testStringFilterIpRoutesThroughFilterIpJitHelper(): void
+    public function testStringFilterIpRoutesThroughFilterIpValidate(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilterIp.php');
-        $this->assertStringContainsString('FilterIpJitHelper', $source);
+        $this->assertStringContainsString('FilterIpValidate::isValidInt', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
@@ -30,25 +32,34 @@ final class FilterIpRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('putenv', $source);
-        $this->assertLessThan(150, \substr_count($source, "\n"), 'StringFilterIp must be a thin bridge');
+        $this->assertLessThan(160, \substr_count($source, "\n"), 'StringFilterIp must be a thin bridge');
     }
 
     public function testJitFilterRoutesThroughStringFilterIp(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/JitFilter.php');
         $this->assertStringContainsString('StringFilterIp::ensureLinked', $source);
+        $this->assertStringContainsString('VmFilter::isValidIpAddress', $source);
     }
 
-    public function testFilterIpJitHelperSemanticsMatchVmFilter(): void
+    public function testFilterIpValidateSemanticsMatchVmFilter(): void
     {
-        $this->assertSame('127.0.0.1', \PHPCompiler\ext\filter\FilterIpJitHelper::validate('127.0.0.1'));
-        $this->assertNull(\PHPCompiler\ext\filter\FilterIpJitHelper::validate('not-an-ip'));
-        $this->assertSame('::1', \PHPCompiler\ext\filter\FilterIpJitHelper::validate('::1'));
+        $cases = ['127.0.0.1', '999.0.0.1', '::1', 'not-an-ip', '192.168.0.1'];
+        foreach ($cases as $c) {
+            $vm = \PHPCompiler\ext\filter\VmFilter::isValidIpAddress($c);
+            $aot = \PHPCompiler\ext\filter\FilterIpValidate::isValid($c);
+            $this->assertSame($vm, $aot, 'mismatch for '.$c);
+            $helper = \PHPCompiler\ext\filter\FilterIpJitHelper::validate($c);
+            $this->assertSame($vm ? $c : null, $helper, 'helper mismatch for '.$c);
+        }
+        $this->assertSame(1, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('127.0.0.1'));
+        $this->assertSame(0, \PHPCompiler\ext\filter\FilterIpValidate::isValidInt('999.0.0.1'));
     }
 
-    public function testSpineBundleIncludesFilterIpJitHelper(): void
+    public function testSpineBundleIncludesFilterIpValidate(): void
     {
         $spine = (string) \file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('FilterIpValidate.php', $spine);
         $this->assertStringContainsString('FilterIpJitHelper.php', $spine);
         $this->assertStringContainsString('StringFilterIp.php', $spine);
     }

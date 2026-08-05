@@ -612,8 +612,9 @@ final class JitFilter
 
     public static function validateIp(Context $context, JITVariable $value, ?Value $flags = null): Value
     {
-        StringFilterIp::ensureLinked($context);
         if (JITVariable::TYPE_VALUE === $value->type) {
+            StringFilterIp::ensureLinked($context);
+
             return self::boxValueValidateIp($context, $value, $flags);
         }
 
@@ -629,6 +630,28 @@ final class JitFilter
             return $ptr;
         }
 
+        // Compile-time string + default flags — fold via VmFilter SSOT (#27207 / EMAIL #27068).
+        $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
+        if (null !== $lit && null === $flags) {
+            if (!VmFilter::isValidIpAddress($lit, 0)) {
+                JitValueBox::writeBool($context, $slot, $falseVal);
+
+                return $ptr;
+            }
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load($context->constantStringFromString($lit))
+            );
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $owned
+            );
+
+            return $ptr;
+        }
+
+        StringFilterIp::ensureLinked($context);
         $str = $context->helper->loadValue($value);
         $validated = $context->builder->call(
             $context->lookupFunction('__compiler_filter_validate_ip'),

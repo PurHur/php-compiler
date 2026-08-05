@@ -625,6 +625,7 @@ require_once __DIR__.'/../../../ext/filter/FilterDomainJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterEmailJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterEmailValidate.php';
 require_once __DIR__.'/../../../ext/filter/FilterIntJitHelper.php';
+require_once __DIR__.'/../../../ext/filter/FilterIpValidate.php';
 require_once __DIR__.'/../../../ext/filter/FilterIpJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterMacJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterSanitizeJitHelper.php';
