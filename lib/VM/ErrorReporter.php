@@ -25,28 +25,54 @@ final class ErrorReporter
     public const E_USER_NOTICE = 1024;
     public const E_USER_DEPRECATED = 16384;
     public const E_DEPRECATED = 8192;
+    /** Zend E_STRICT bit (still defined for BC on 8.4+; not included in E_ALL since 8.4). */
+    public const E_STRICT = 2048;
+    /**
+     * Zend ≤8.3 E_ALL (includes E_STRICT) — php-src Zend/zend_constants.c before PHP 8.4.
+     * Hardcoded so PROFILE gating is independent of host PHP's E_ALL (#27824).
+     */
+    public const E_ALL_LEGACY = 32767;
+    /**
+     * Zend 8.4+ E_ALL without E_STRICT — php-src Zend/zend_constants.c / migration84.
+     */
+    public const E_ALL_WITHOUT_STRICT = 30719;
 
     /**
      * Zend ≤8.3 / default-profile startup mask: E_ALL & ~E_DEPRECATED & ~E_STRICT (#4842).
      *
-     * E_STRICT is 2048 on PHP ≤8.3; bit cleared even when the constant is removed (PHP 8.4+).
      * Prefer {@see defaultStartupReporting()} — PROFILE≥8.4 uses Zend 8.4's E_ALL (includes
      * E_DEPRECATED) so file-level compile deprecations are not silent (#26083).
      */
-    public const DEFAULT_STARTUP_REPORTING = \E_ALL & ~self::E_DEPRECATED & ~2048;
+    public const DEFAULT_STARTUP_REPORTING = self::E_ALL_LEGACY & ~self::E_DEPRECATED & ~self::E_STRICT;
 
     /**
-     * Profile-aware guest default for error_reporting / ErrorReporter (#4842, #26083).
+     * Profile-aware guest E_ALL constant value (#27824).
      *
-     * PHP 8.0+ php.ini default is E_ALL (includes E_DEPRECATED). On PROFILE≥8.4, E_ALL no longer
-     * contains E_STRICT (value 30719 on Zend 8.4). Unset / ≤8.3 profiles keep #4842's 22527 mask
-     * so default-profile compliance stays stable.
+     * php-src: Zend/zend_constants.c — E_ALL drops E_STRICT in 8.4 (32767 → 30719).
+     * Gate: {@see \PHPCompiler\CompilerVersion::supportsImplicitNullableParameterDeprecation()}
+     * (languageProfileVersion ≥ 8.4.0). Host PHP's {@code \E_ALL} is not used — a Zend 8.2
+     * host would otherwise keep advertising 32767 under PROFILE=8.4.
+     */
+    public static function eAll(): int
+    {
+        if (\PHPCompiler\CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
+            return self::E_ALL_WITHOUT_STRICT;
+        }
+
+        return self::E_ALL_LEGACY;
+    }
+
+    /**
+     * Profile-aware guest default for error_reporting / ErrorReporter (#4842, #26083, #27824).
+     *
+     * PHP 8.0+ php.ini default is E_ALL (includes E_DEPRECATED). On PROFILE≥8.4, E_ALL is 30719
+     * and equals the startup level. Unset / ≤8.3 profiles keep #4842's 22527 mask so
+     * default-profile compliance stays stable.
      */
     public static function defaultStartupReporting(): int
     {
         if (\PHPCompiler\CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
-            // Zend 8.4: E_ALL without E_STRICT bit (php-src main/main.c / E_STRICT removal).
-            return \E_ALL & ~2048;
+            return self::eAll();
         }
 
         return self::DEFAULT_STARTUP_REPORTING;

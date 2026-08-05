@@ -536,11 +536,11 @@ class Context {
             'e_user_error' => ErrorReporter::E_USER_ERROR,
             'e_user_warning' => ErrorReporter::E_USER_WARNING,
             'e_user_notice' => ErrorReporter::E_USER_NOTICE,
-            'e_strict' => 2048,
+            'e_strict' => ErrorReporter::E_STRICT,
             'e_recoverable_error' => 4096,
             'e_deprecated' => ErrorReporter::E_DEPRECATED,
             'e_user_deprecated' => ErrorReporter::E_USER_DEPRECATED,
-            'e_all' => E_ALL,
+            'e_all' => ErrorReporter::eAll(),
             default => null,
         };
     }
@@ -559,11 +559,11 @@ class Context {
             'E_USER_ERROR' => ErrorReporter::E_USER_ERROR,
             'E_USER_WARNING' => ErrorReporter::E_USER_WARNING,
             'E_USER_NOTICE' => ErrorReporter::E_USER_NOTICE,
-            'E_STRICT' => 2048,
+            'E_STRICT' => ErrorReporter::E_STRICT,
             'E_RECOVERABLE_ERROR' => 4096,
             'E_DEPRECATED' => ErrorReporter::E_DEPRECATED,
             'E_USER_DEPRECATED' => ErrorReporter::E_USER_DEPRECATED,
-            'E_ALL' => E_ALL,
+            'E_ALL' => ErrorReporter::eAll(),
             default => null,
         };
     }

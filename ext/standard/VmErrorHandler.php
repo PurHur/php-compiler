@@ -59,7 +59,8 @@ final class VmErrorHandler
     private static function parseMask(?Variable $maskVar): int
     {
         if (null === $maskVar) {
-            return \E_ALL;
+            // Profile-aware E_ALL (30719 on ≥8.4) — not host \E_ALL (#27824).
+            return ErrorReporter::eAll();
         }
         $mask = $maskVar->resolveIndirect();
         if (Variable::TYPE_INTEGER !== $mask->type) {
