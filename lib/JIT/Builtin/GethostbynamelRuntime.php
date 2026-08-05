@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
@@ -46,11 +47,17 @@ final class GethostbynamelRuntime
             return;
         }
 
+        // Preserve caller insert block — clearInsertionPosition alone orphans mid-emit (#27406).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureLibc($context);
         self::ensureJitHelperCompiled($context);
         self::implementResolveBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementResolveBridge(Context $context): void
