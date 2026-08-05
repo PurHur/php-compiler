@@ -155,15 +155,16 @@ final class StringSscanfByRef
 
     private static function ensureRuntimeHelpers(Context $context): void
     {
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
-
+        // Match LibcExtern i8* memcpy — void* decls make NestedJIT emit mistyped calls (#27663).
+        \PHPCompiler\JIT\LibcExtern::register($context);
         try {
             $context->lookupFunction('memcpy');
         } catch (\Throwable) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
             $fn = $context->module->addFunction(
                 'memcpy',
-                $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
+                $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)
             );
             $context->registerFunction('memcpy', $fn);
         }

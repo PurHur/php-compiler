@@ -106,6 +106,9 @@ final class StreamReadRuntime
         $probe = $context->module->getNamedFunction('__compiler_flock');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            if ($context->isThinStandaloneAotMain()) {
+                self::forceLibcStreamPositionAbis($context);
+            }
 
             return;
         }
@@ -131,11 +134,23 @@ final class StreamReadRuntime
         JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_stream_copy_to_stream', self::STREAM_COPY_TO_STREAM, 4);
         self::registerLinkedRuntime($context);
 
+        if ($context->isThinStandaloneAotMain()) {
+            self::forceLibcStreamPositionAbis($context);
+        }
+
         if (null !== $savedBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    /** Thin AOT: libc FILE* fgets/fseek/ftell matching JitStreamIoKernel fopen/fwrite (#27663). */
+    public static function forceLibcStreamPositionAbis(Context $context): void
+    {
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFgetsForce($context);
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFseekForce($context);
+        \PHPCompiler\ext\standard\JitStreamIoKernel::implementFtellForce($context);
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction

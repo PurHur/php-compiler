@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\Sscanf;
+use PHPCompiler\JIT\Builtin\StringSscanfArray;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -69,6 +70,8 @@ final class JitSscanf
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
         if (0 === $outCount) {
+            StringSscanfArray::ensureLinked($context);
+
             return $context->builder->call(
                 $context->lookupFunction('__compiler_sscanf_array'),
                 $str,

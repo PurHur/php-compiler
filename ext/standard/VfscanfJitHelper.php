@@ -7,14 +7,16 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\Variable;
 
 /**
- * vfscanf() for compiled JIT/AOT modules (#12541, php-in-PHP).
+ * vfscanf()/fscanf() helper for VM/host (#12541).
  *
- * SSOT: {@see VmVfscanf} (php-src ext/standard/scanf.c).
+ * Thin AOT {@see \PHPCompiler\JIT\Builtin\StringVfscanf} does not NestedJIT this class
+ * (#27663) — it uses `__compiler_fgets` + {@see SscanfJitHelper::parseAssignMeta}.
+ * php-src: ext/standard/file.c PHP_FUNCTION(fscanf) / scanf.c
  */
 final class VfscanfJitHelper
 {
     /**
-     * By-ref assignment path: meta blob for {@see SscanfAssignApply} (consumed unused).
+     * By-ref assignment path: meta blob for {@see SscanfAssignApply}.
      */
     public static function parseAssignMeta(int $handle, string $format, int $outCount): ?string
     {
