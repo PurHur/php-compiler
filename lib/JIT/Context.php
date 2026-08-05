@@ -1056,14 +1056,16 @@ class Context {
         }
         // RecursiveIteratorIterator — flatten inner HT to LEAVES_ONLY `__spl_ht` (#26775).
         $this->functionProxies['recursiveiteratoriterator::__construct'] = new Call\RecursiveIteratorIteratorConstruct();
-        // LimitIterator / AppendIterator / RegexIterator — snapshot into `__spl_ht` (#26825).
+        // LimitIterator / AppendIterator / RegexIterator / CallbackFilterIterator — `__spl_ht` (#26825, #27259).
         $this->type->object->lookup('LimitIterator');
         $this->type->object->lookup('AppendIterator');
         $this->type->object->lookup('RegexIterator');
+        $this->type->object->lookup('CallbackFilterIterator');
         $this->functionProxies['limititerator::__construct'] = new Call\LimitIteratorConstruct();
         $this->functionProxies['appenditerator::__construct'] = new Call\AppendIteratorMethod('__construct');
         $this->functionProxies['appenditerator::append'] = new Call\AppendIteratorMethod('append');
         $this->functionProxies['regexiterator::__construct'] = new Call\RegexIteratorConstruct();
+        $this->functionProxies['callbackfilteriterator::__construct'] = new Call\CallbackFilterIteratorConstruct();
         // NoRewindIterator / InfiniteIterator — HT snapshot + Iterator protocol (#27583 / #27568).
         $this->type->object->lookup('NoRewindIterator');
         $this->type->object->lookup('InfiniteIterator');

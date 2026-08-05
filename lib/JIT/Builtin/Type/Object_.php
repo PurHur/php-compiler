@@ -3713,8 +3713,9 @@ class Object_ extends Type {
             'limititerator' === $lcname
             || 'appenditerator' === $lcname
             || 'regexiterator' === $lcname
+            || 'callbackfilteriterator' === $lcname
         ) {
-            // Thin AOT: snapshot / filter into `__spl_ht` at construct (#26825).
+            // Thin AOT: snapshot / filter into `__spl_ht` at construct (#26825, #27259).
             // php-src ext/spl/spl_iterators.stub.php — OuterIterator + Iterator.
             // markHasConstructor requires isVoidJitConstructCall recognition or
             // constructed stays 0 and get_class / HT reads abort (#26825).
