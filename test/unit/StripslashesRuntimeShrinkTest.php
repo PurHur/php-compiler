@@ -16,6 +16,9 @@ final class StripslashesRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStripslashes.php');
         $this->assertStringContainsString('StripslashesJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        // Thin AOT: pure LLVM inside StringStripslashes (#26907).
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThinLlvm', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringStripslashesLlvm', $source);
         $this->assertStringNotContainsString('stripslashes_count_head', $source);
