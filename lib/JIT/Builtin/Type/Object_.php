@@ -3907,9 +3907,9 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
-        if ('directoryiterator' === $lcname || 'filesystemiterator' === $lcname) {
-            // Thin AOT: snapshot `__spl_ht` + Iterator; current() returns $this (#27289).
-            // php-src ext/spl/spl_directory.c — DirectoryIterator / FilesystemIterator.
+        if ('directoryiterator' === $lcname || 'filesystemiterator' === $lcname || 'globiterator' === $lcname) {
+            // Thin AOT: snapshot `__spl_ht` + Iterator; current() returns $this (#27289 / #27422).
+            // php-src ext/spl/spl_directory.c — DirectoryIterator / FilesystemIterator / GlobIterator.
             $this->ensureZendBuiltinInterfaces();
             $this->markInterfaceClass('SeekableIterator');
             $this->setInterfaceExtends('SeekableIterator', ['Iterator', 'Traversable']);
@@ -3919,6 +3919,9 @@ class Object_ extends Type {
                 'Traversable',
                 'Iterator',
             ];
+            if ('globiterator' === $lcname) {
+                $ifaces[] = 'Countable';
+            }
             $this->setClassInterfaces($displayName, $ifaces);
             // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
@@ -3926,7 +3929,7 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FILENAME, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_PATH, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\VM\DirectoryIteratorJitHelper::PROP_FLAGS, Variable::TYPE_NATIVE_LONG);
-            if ('filesystemiterator' === $lcname) {
+            if ('filesystemiterator' === $lcname || 'globiterator' === $lcname) {
                 $this->seedExternalClassConstants($id, [
                     'CURRENT_AS_PATHNAME' => 32,
                     'CURRENT_AS_FILEINFO' => 0,
@@ -3950,6 +3953,9 @@ class Object_ extends Type {
             ];
             if ('filesystemiterator' === $lcname) {
                 $methods = array_merge($methods, ['getflags', 'setflags']);
+            }
+            if ('globiterator' === $lcname) {
+                $methods = array_merge($methods, ['count', 'getflags', 'setflags']);
             }
             foreach ($methods as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
