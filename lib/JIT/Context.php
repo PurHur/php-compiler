@@ -1053,7 +1053,7 @@ class Context {
         // ArrayObject — same `__spl_ht` construct + count/ArrayAccess/getArrayCopy (#26823).
         $this->type->object->lookup('ArrayObject');
         $this->functionProxies['arrayobject::__construct'] = new Call\ArrayIteratorConstruct('ArrayObject');
-        foreach (['count', 'append', 'getArrayCopy', 'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset'] as $aoMethod) {
+        foreach (['count', 'append', 'getArrayCopy', 'offsetGet', 'offsetSet', 'offsetExists', 'offsetUnset', 'getIteratorClass', 'getIterator'] as $aoMethod) {
             $this->functionProxies['arrayobject::'.strtolower($aoMethod)] = new Call\ArrayObjectMethod($aoMethod);
         }
         // RecursiveIteratorIterator — flatten inner HT to LEAVES_ONLY `__spl_ht` (#26775).

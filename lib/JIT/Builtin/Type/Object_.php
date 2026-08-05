@@ -3685,7 +3685,7 @@ class Object_ extends Type {
             }
         }
         if ('arrayobject' === $lcname) {
-            // Thin AOT: `__spl_ht` + IteratorAggregate foreach / ArrayAccess (#26823).
+            // Thin AOT: `__spl_ht` + IteratorAggregate foreach / ArrayAccess (#26823, #27567).
             // php-src ext/spl/spl_array.stub.php — IteratorAggregate, ArrayAccess, Serializable, Countable.
             $this->ensureZendBuiltinInterfaces();
             $this->setClassInterfaces($displayName, [
@@ -3695,6 +3695,8 @@ class Object_ extends Type {
                 'Countable',
             ]);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\ArrayObjectJitHelper::PROP_ITERATOR_CLASS, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ArrayObjectJitHelper::PROP_ITERATOR_CLASS_ID, Variable::TYPE_NATIVE_LONG);
             $this->seedExternalClassConstants($id, [
                 'STD_PROP_LIST' => 1,
                 'ARRAY_AS_PROPS' => 2,
@@ -3702,7 +3704,7 @@ class Object_ extends Type {
             $this->markHasConstructor($id);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach ([
-                '__construct', 'count', 'getarraycopy', 'getiterator',
+                '__construct', 'count', 'getarraycopy', 'getiterator', 'getiteratorclass', 'setiteratorclass',
                 'getflags', 'setflags', 'append', 'exchangearray',
                 'offsetget', 'offsetset', 'offsetexists', 'offsetunset',
             ] as $method) {
