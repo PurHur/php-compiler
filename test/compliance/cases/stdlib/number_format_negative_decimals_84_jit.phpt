@@ -1,14 +1,13 @@
 --TEST--
-stdlib number_format() negative $decimals ValueError JIT on PHP 8.4+ profile (#17369)
+stdlib number_format() negative $decimals JIT round on PHP 8.4+ profile (#27899)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-try {
-    number_format(1234.5678, -1);
-    echo "no exception\n";
-} catch (ValueError $e) {
-    echo $e->getMessage(), "\n";
-}
+echo number_format(1234.5678, -1), "\n";
+echo number_format(1234.5678, -2), "\n";
+echo number_format(12.345, -1), "\n";
 --EXPECT--
-number_format(): Argument #2 ($decimals) must be greater than or equal to 0
+1,230
+1,200
+10

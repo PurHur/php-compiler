@@ -1,5 +1,5 @@
 --TEST--
-AOT: number_format() negative $decimals on PHP 8.3+ profile (#17261)
+AOT: number_format() negative $decimals round on PHP 8.4+ profile (#27899)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--

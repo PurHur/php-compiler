@@ -184,6 +184,9 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertSame('1,234.50', SprintfJitHelper::numberFormat(1234.5, 2, '.', ','));
         $this->assertSame('3', SprintfJitHelper::numberFormat(2.5, 0, '.', '', 1));
         $this->assertSame('2', SprintfJitHelper::numberFormat(2.5, 0, '.', '', 7));
+        // Helper assumes non-negative $decimals; negative places are pre-rounded by
+        // VmNumberFormat / JitNumberFormat (#27899).
+        $this->assertSame('1,235', SprintfJitHelper::numberFormat(1234.567, -1, '.', ','));
     }
 
     public function testSpineBundleIncludesStringFormatPhpJitPath(): void
