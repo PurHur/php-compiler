@@ -10,22 +10,27 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPUnit\Framework\TestCase;
 
-/** array_unique() JIT routes all operands through ArrayUniqueJitHelper PHP not ArrayBuiltinHelper LLVM (#12341, #14385, #18221). */
+/**
+ * array_unique() AOT/JIT uses ArrayUniqueLlvm (#27066); VM SSOT remains ArrayUniqueJitHelper (#12341).
+ */
 final class ArrayUniqueRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 5800;
 
-    public function testArrayUniqueRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayUniqueRuntimeUsesCallSiteLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayUniqueRuntime.php');
-        $this->assertStringContainsString('ArrayUniqueJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayUniqueLlvm', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayUnique', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_unique.php');
         $this->assertStringContainsString('ArrayUniqueRuntime::unique', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayUnique', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayUniqueLlvm.php');
+        $this->assertStringContainsString('uniqueHashTable', $llvm);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterNativeUniqueLlvmDeletion(): void
@@ -67,6 +72,33 @@ final class ArrayUniqueRuntimeShrinkTest extends TestCase
         }
         $out = ArrayUniqueJitHelper::unique($ht, StdlibConstants::SORT_REGULAR);
         $this->assertSame(1, self::countElements($out));
+    }
+
+    public function testArrayUniqueJitHelperRejectsPlainObjectUnderSortString(): void
+    {
+        $ht = new HashTable();
+        $obj = new Variable();
+        $entry = new \PHPCompiler\VM\ObjectEntry(new \PHPCompiler\VM\ClassEntry('stdClass'));
+        $obj->object($entry);
+        $ht->append($obj);
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Object of class stdClass could not be converted to string');
+        ArrayUniqueJitHelper::unique($ht, StdlibConstants::SORT_STRING);
+    }
+
+    public function testArrayUniqueJitHelperHasNoCastObjectToStringOrPregMatch(): void
+    {
+        $src = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayUniqueJitHelper.php');
+        $this->assertStringNotContainsString(
+            '->castObjectToString(',
+            $src,
+            'NestedJIT rebinds VM::castObjectToString onto the helper (#27066)'
+        );
+        $this->assertStringNotContainsString(
+            'preg_match(',
+            $src,
+            'NestedJIT preg_match needs __compiler_preg_match_ex at AOT link (#27066)'
+        );
     }
 
     private static function countElements(HashTable $ht): int

@@ -38,7 +38,7 @@ final class array_unique extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array(ArrayUniqueJitHelper::unique($ht, $flags, $frame));
+        $frame->returnVar->array(ArrayUniqueJitHelper::unique($ht, $flags));
     }
 
     private static function resolveVmFlags(Frame $frame, int $argc): int

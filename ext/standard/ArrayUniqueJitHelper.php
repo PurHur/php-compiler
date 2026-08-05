@@ -4,32 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionTypeSupport;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_unique() for compiled JIT/AOT modules (#12341, php-in-PHP).
+ * array_unique() VM SSOT (#12341, php-in-PHP).
  *
- * SSOT shared with {@see array_unique} VM execute()
+ * AOT/JIT use {@see \PHPCompiler\JIT\ArrayUniqueLlvm} via ArrayUniqueRuntime (#27066).
  * php-src: ext/standard/array.c — php_array_unique()
  */
 final class ArrayUniqueJitHelper
 {
-    public static function unique(HashTable $ht, int $flags, ?Frame $frame = null): HashTable
+    public static function unique(HashTable $ht, int $flags): HashTable
     {
         $flags = self::normalizeFlags($flags);
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         $out = new HashTable();
-        $seen = [];
+        $seen = new HashTable();
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
-            self::assertUniqueElement($value, $flags, $frame);
-            if (self::isDuplicate($value, $seen, $flags)) {
+            self::assertUniqueElement($value, $flags);
+            if (self::isSeen($value, $seen, $sortType)) {
                 continue;
             }
-            $seenCopy = new Variable();
-            $seenCopy->copyFrom($value);
-            $seen[] = $seenCopy;
+            self::markSeen($value, $seen, $sortType);
             $stored = new Variable();
             $stored->copyFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
@@ -43,9 +44,10 @@ final class ArrayUniqueJitHelper
     }
 
     /**
-     * SORT_STRING: objects and enum cases without __toString must throw (ext/standard/array.c, #4698, #5531).
+     * SORT_STRING: objects/enums without __toString must throw (#4698, #5531).
+     * NestedJIT-safe: never call VM::castObjectToString() (#27066).
      */
-    private static function assertUniqueElement(Variable $value, int $flags, ?Frame $frame): void
+    private static function assertUniqueElement(Variable $value, int $flags): void
     {
         if (StdlibConstants::SORT_STRING !== ($flags & ~StdlibConstants::SORT_FLAG_CASE)) {
             return;
@@ -59,12 +61,69 @@ final class ArrayUniqueJitHelper
         if (Variable::TYPE_OBJECT !== $value->type) {
             return;
         }
-        if (null !== $frame && null !== $frame->vmContext && null !== $frame->vmContext->runtime->vm) {
-            $frame->vmContext->runtime->vm->castObjectToString($value->toObject());
+        self::assertObjectStringableForUnique($value->toObject());
+    }
+
+    private static function assertObjectStringableForUnique(ObjectEntry $object): void
+    {
+        if (ResourceSupport::isResourceObject($object)) {
+            return;
+        }
+        if (null !== ReflectionTypeSupport::tryObjectTypeString($object)) {
+            return;
+        }
+        if (isset($object->class->methods['__tostring'])) {
+            return;
+        }
+        throw new \Error(
+            'Object of class '.$object->class->name.' could not be converted to string'
+        );
+    }
+
+    private static function isSeen(Variable $value, HashTable $seen, int $sortType): bool
+    {
+        if (StdlibConstants::SORT_STRING === $sortType) {
+            return null !== $seen->find($value->resolveIndirect()->toString());
+        }
+        if (StdlibConstants::SORT_NUMERIC === $sortType) {
+            return null !== $seen->find(self::numericSeenKey($value));
+        }
+        foreach ($seen->iterateKeyed(true) as [$_key, $seenValue]) {
+            if ($value->equals($seenValue)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function markSeen(Variable $value, HashTable $seen, int $sortType): void
+    {
+        $marker = new Variable();
+        $marker->int(1);
+        if (StdlibConstants::SORT_STRING === $sortType) {
+            $seen->update($value->resolveIndirect()->toString(), $marker);
 
             return;
         }
-        $value->toString();
+        if (StdlibConstants::SORT_NUMERIC === $sortType) {
+            $seen->update(self::numericSeenKey($value), $marker);
+
+            return;
+        }
+        $copy = new Variable();
+        $copy->copyFrom($value);
+        $seen->append($copy);
+    }
+
+    private static function numericSeenKey(Variable $value): string
+    {
+        $n = self::numericUniqueScalar($value);
+        if (\is_float($n)) {
+            return 'f:'.(string) $n;
+        }
+
+        return 'i:'.(string) $n;
     }
 
     public static function normalizeFlagsForCall(int $flags): int
@@ -86,42 +145,6 @@ final class ArrayUniqueJitHelper
         }
 
         return $flags;
-    }
-
-    /** @param list<Variable> $seen */
-    private static function isDuplicate(Variable $value, array $seen, int $flags): bool
-    {
-        foreach ($seen as $seenValue) {
-            if (self::valuesMatchForUnique($value, $seenValue, $flags)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static function valuesMatchForUnique(Variable $a, Variable $b, int $flags): bool
-    {
-        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
-        if (StdlibConstants::SORT_STRING === $sortType) {
-            return $a->resolveIndirect()->toString() === $b->resolveIndirect()->toString();
-        }
-        if (StdlibConstants::SORT_NUMERIC === $sortType) {
-            return 0 === self::compareNumericOperandsForUnique($a, $b);
-        }
-
-        return $a->equals($b);
-    }
-
-    private static function compareNumericOperandsForUnique(Variable $a, Variable $b): int
-    {
-        $av = self::numericUniqueScalar($a);
-        $bv = self::numericUniqueScalar($b);
-        if (\is_float($av) || \is_float($bv)) {
-            return (float) $av <=> (float) $bv;
-        }
-
-        return (int) $av <=> (int) $bv;
     }
 
     private static function numericUniqueScalar(Variable $value): int|float
@@ -150,17 +173,8 @@ final class ArrayUniqueJitHelper
 
                 return (float) $s;
             }
-            if (!preg_match('/^\s*[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/', $s, $m)) {
-                return 0;
-            }
-            $numPart = ltrim($m[0], " \t\n\r\0\x0B");
-            if (((string) (int) $numPart) === $numPart
-                && !str_contains($numPart, '.')
-                && !str_contains(strtolower($numPart), 'e')) {
-                return (int) $numPart;
-            }
 
-            return (float) $numPart;
+            return (float) $s;
         }
 
         return 0;
