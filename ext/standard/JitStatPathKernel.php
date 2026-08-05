@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -19,7 +20,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * {@see phpc_stat_mode_kernel} / {@see phpc_access_kernel}.
  *
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (peer Pack #22842 /
- * SessionStorage #23284).
+ * SessionStorage #23284). Long-field ABI uses libc via {@see JitStatKernel::longField} (#27013).
  *
  * SSOT: {@see StatPathJitHelper}, {@see StatFieldsJitHelper}
  * php-src: ext/standard/filestat.c
@@ -76,8 +77,6 @@ final class JitStatPathKernel
 
     private const IS_EXECUTABLE_HELPER = 'PHPCompiler\\ext\\standard\\StatPathJitHelper::isExecutable';
 
-    private const LONG_FIELD_HELPER = 'PHPCompiler\\ext\\standard\\StatFieldsJitHelper::longField';
-
     private const FILETYPE_LABEL_HELPER = 'PHPCompiler\\ext\\standard\\StatFieldsJitHelper::filetypeLabel';
 
     private const DISK_FREE_HELPER = 'PHPCompiler\\ext\\standard\\StatFieldsJitHelper::diskFreeBytes';
@@ -93,7 +92,7 @@ final class JitStatPathKernel
         self::IS_READABLE_HELPER,
         self::IS_WRITABLE_HELPER,
         self::IS_EXECUTABLE_HELPER,
-        self::LONG_FIELD_HELPER,
+        // longField: libc via JitStatKernel (#27013) — not NestedJIT VmStatCache arrays
         self::FILETYPE_LABEL_HELPER,
         self::DISK_FREE_HELPER,
         self::DISK_TOTAL_HELPER,
@@ -225,13 +224,16 @@ final class JitStatPathKernel
         $context->builder->branchIf($nullPath, $fail, $run);
 
         $context->builder->positionAtEnd($run);
-        $value = $context->builder->call(
-            self::helperFunction($context, self::LONG_FIELD_HELPER),
-            $path,
-            $fn->getParam(1),
-            $fn->getParam(2)
+        // Thin AOT NestedJIT of VmStatCache arrays returns type-tag/pointer garbage for
+        // filesize/filemtime/… (#27013). Peer path predicates + FtokRuntime: libc leaf.
+        $context->builder->returnValue(
+            JitStatKernel::longField(
+                $context,
+                $path,
+                $fn->getParam(1),
+                $fn->getParam(2)
+            )
         );
-        $context->builder->returnValue($value);
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($i64->constInt(-1, true));
@@ -306,8 +308,15 @@ final class JitStatPathKernel
         $context->builder->branchIf($nullPath, $fail, $run);
 
         $context->builder->positionAtEnd($run);
-        $bytes = $context->builder->call(self::helperFunction($context, $helper), $path);
-        $context->builder->returnValue($bytes);
+        // Same boxed-int extract as longField (#27013 / #20266).
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helper),
+            [$path]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($i64->constInt(-1, true));

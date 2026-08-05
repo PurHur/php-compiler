@@ -56,6 +56,8 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StatCacheRuntime::ensureLinked', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('JitStatKernel::longField', $source);
+        $this->assertStringContainsString('#27013', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -99,6 +101,9 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString("lookupFunction(\$statFn)", $kernel);
         $this->assertStringContainsString("lookupFunction('access')", $kernel);
         $this->assertStringContainsString('STAT_MODE_OFFSET', $kernel);
+        $this->assertStringContainsString('LONG_FIELD_LAYOUT', $kernel);
+        $this->assertStringContainsString('ensureLongFieldStandalone', $kernel);
+        $this->assertStringContainsString('#27013', $kernel);
     }
 
     public function testStatFieldsJitHelperDelegatesToVmStatCache(): void

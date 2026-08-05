@@ -7,6 +7,10 @@ namespace PHPCompiler\ext\standard;
 /**
  * Stat field reads for compiled JIT/AOT modules (#9112, php-in-PHP).
  *
+ * Long fields (filesize/filemtime/…): AOT bridge uses libc via {@see JitStatKernel::longField}
+ * (#27013) — NestedJIT of this VmStatCache path mis-reads array values under thin standalone.
+ * This helper remains the FIELD_* id table + filetype/disk NestedJIT surface.
+ *
  * VM SSOT: {@see VmStatCache}, {@see VmFs}, {@see VmFsDiskNative}
  * php-src: ext/standard/filestat.c
  */
@@ -30,7 +34,11 @@ final class StatFieldsJitHelper
 
     public const FIELD_MODE = 8;
 
-    /** @return int field value, or -1 on failure (LLVM i64 ABI) */
+    /**
+     * VM / host fallback for long fields (AOT uses {@see JitStatKernel::longField}).
+     *
+     * @return int field value, or -1 on failure (LLVM i64 ABI)
+     */
     public static function longField(string $path, int $useLstat, int $fieldId): int
     {
         if ('' === $path) {
