@@ -536,8 +536,39 @@ final class VmIteratorForeach
         if (self::usesWeakMapHashtable($containerUserType)) {
             return self::compileKeyWeakMap($context, $array, $slotKey);
         }
+        if (self::usesAppendIteratorKeys($containerUserType)) {
+            return self::compileKeyAppendIterator($context, $slotKey);
+        }
 
         return self::compileKeyHashtable($context, $array, $slotKey);
+    }
+
+    private static function usesAppendIteratorKeys(?string $containerUserType): bool
+    {
+        return null !== $containerUserType
+            && 'appenditerator' === strtolower(ltrim($containerUserType, '\\'));
+    }
+
+    /** Read original inner keys from AppendIterator `__spl_keys` (#27312). */
+    private static function compileKeyAppendIterator(Context $context, JitVariable $slotKey): JitVariable
+    {
+        $receiver = JitVariable::TYPE_OBJECT === $slotKey->type
+            ? $slotKey
+            : VmIteratorProtocol::normalizeObjectReceiver($context, $slotKey);
+        $keysHt = \PHPCompiler\JIT\Call\AppendIteratorMethod::keysHashtable($context, $receiver);
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
+        $keyBox = HashTableHelper::readIndexedToValueBox(
+            $context,
+            $context->helper->loadValue($keysHt),
+            $idx
+        );
+
+        return new JitVariable(
+            $context,
+            JitVariable::TYPE_VALUE,
+            JitVariable::KIND_VARIABLE,
+            $keyBox->value
+        );
     }
 
     private static function compileKeyObject(Context $context, JitVariable $slotKey): JitVariable
