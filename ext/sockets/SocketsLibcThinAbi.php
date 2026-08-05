@@ -68,13 +68,20 @@ final class SocketsLibcThinAbi
         if (null === $ffi) {
             return false;
         }
-        $sv = $ffi->new('int[2]');
-        $rc = (int) $ffi->socketpair($domain, $type, $protocol, $sv);
+        $box = $ffi->new('struct phpc_socketpair_fds');
+        $box->fd0 = -1;
+        $box->fd1 = -1;
+        $rc = (int) $ffi->socketpair($domain, $type, $protocol, \FFI::addr($box->fd0));
         if (0 !== $rc) {
             return false;
         }
+        $fd0 = (int) $box->fd0;
+        $fd1 = (int) $box->fd1;
+        if ($fd0 < 0 || $fd1 < 0) {
+            return false;
+        }
 
-        return [(int) $sv[0], (int) $sv[1]];
+        return [$fd0, $fd1];
     }
 
     public static function connectInet(int $fd, string $addr, int $port): int
@@ -313,6 +320,10 @@ final class SocketsLibcThinAbi
             return 0;
         }
         $payload = \substr($buf, 0, $length);
+        // Prefer write(2) with PHP string — NestedJIT FFI char[]+send is unreliable (#27423).
+        if (0 === $flags) {
+            return (int) $ffi->write($fd, $payload, \strlen($payload));
+        }
         $c = $ffi->new('char['.\strlen($payload).']');
         \FFI::memcpy($c, $payload, \strlen($payload));
 
@@ -332,7 +343,10 @@ final class SocketsLibcThinAbi
             return '';
         }
         $c = $ffi->new('char['.$length.']');
-        $n = (int) $ffi->recv($fd, $c, $length, $flags);
+        // Prefer read(2) when flags=0 — NestedJIT FFI recv path (#27423).
+        $n = 0 === $flags
+            ? (int) $ffi->read($fd, $c, $length)
+            : (int) $ffi->recv($fd, $c, $length, $flags);
         if ($n < 0) {
             return false;
         }
@@ -837,7 +851,8 @@ struct addrinfo {
 struct timeval { long tv_sec; long tv_usec; };
 struct linger { int l_onoff; int l_linger; };
 int socket(int domain, int type, int protocol);
-int socketpair(int domain, int type, int protocol, int sv[2]);
+struct phpc_socketpair_fds { int fd0; int fd1; };
+int socketpair(int domain, int type, int protocol, int *sv);
 int connect(int sockfd, const void *addr, unsigned int addrlen);
 int bind(int sockfd, const void *addr, unsigned int addrlen);
 int listen(int sockfd, int backlog);
@@ -848,6 +863,8 @@ int setsockopt(int sockfd, int level, int optname, const void *optval, unsigned 
 int getsockopt(int sockfd, int level, int optname, void *optval, unsigned int *optlen);
 long send(int sockfd, const void *buf, unsigned long len, int flags);
 long recv(int sockfd, void *buf, unsigned long len, int flags);
+long write(int fd, const void *buf, unsigned long count);
+long read(int fd, void *buf, unsigned long count);
 long sendto(int sockfd, const void *buf, unsigned long len, int flags, const void *addr, unsigned int addrlen);
 long recvfrom(int sockfd, void *buf, unsigned long len, int flags, void *addr, unsigned int *addrlen);
 int close(int fd);

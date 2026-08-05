@@ -58,6 +58,6 @@ final class socket_write extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('socket_write() JIT lowering not implemented (#19286)');
+        return JitSocketWrite::invoke($context, ...$args);
     }
 }
