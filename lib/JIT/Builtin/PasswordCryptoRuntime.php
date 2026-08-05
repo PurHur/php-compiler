@@ -32,7 +32,7 @@ final class PasswordCryptoRuntime
 
     private const NEEDS_REHASH_HELPER = 'PHPCompiler\\ext\\standard\\PasswordJitHelper::needsRehashArgv';
 
-    private const ALGOS_HELPER = 'PHPCompiler\\ext\\standard\\PasswordJitHelper::algosHashtable';
+    private const ALGOS_HELPER = 'PHPCompiler\\ext\\standard\\PasswordJitHelper::algosArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
