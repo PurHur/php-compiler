@@ -40,6 +40,9 @@ final class StreamCapsJit
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
                 return false;
             }
+            if ('__compiler_stream_supports' === $name && StreamIoRuntime::isDeferStub($fn)) {
+                return false;
+            }
         }
 
         return true;

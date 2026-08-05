@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamCaps;
 use PHPCompiler\JIT\Builtin\StringDir;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -44,6 +45,11 @@ final class JitStreamIsLocal
     /** @return Value i1 */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamCaps::ensureLinked($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_stream_is_local'),
             $handleLong
@@ -56,7 +62,12 @@ final class JitStreamIsLocal
     /** @return Value i1 */
     private static function invokeUriString(Context $context, Value $strPtr): Value
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         StringDir::ensureLinked($context);
+        StreamCaps::ensureLinked($context);
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        }
         $i8p = $context->getTypeFromString('int8*');
         $cstr = $context->builder->call($context->lookupFunction('__string__cstr'), $strPtr);
         $ret = $context->builder->call(
