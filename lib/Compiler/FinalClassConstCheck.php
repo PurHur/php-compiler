@@ -70,6 +70,8 @@ final class FinalClassConstCheck
             'implements' => $implements,
             'ifaceExtends' => [],
             'traitUses' => $this->collectTraitUses($class->stmts->children),
+            'file' => $class->getFile() ?: 'unknown',
+            'line' => max(1, $class->getLine()),
         ];
     }
 
@@ -93,6 +95,8 @@ final class FinalClassConstCheck
             'implements' => [],
             'ifaceExtends' => $extends,
             'traitUses' => [],
+            'file' => $iface->getFile() ?: 'unknown',
+            'line' => max(1, $iface->getLine()),
         ];
     }
 
@@ -109,6 +113,8 @@ final class FinalClassConstCheck
             'implements' => [],
             'ifaceExtends' => [],
             'traitUses' => $this->collectTraitUses($trait->stmts->children),
+            'file' => $trait->getFile() ?: 'unknown',
+            'line' => max(1, $trait->getLine()),
         ];
     }
 
@@ -132,6 +138,8 @@ final class FinalClassConstCheck
             'implements' => $implements,
             'ifaceExtends' => [],
             'traitUses' => $this->collectTraitUses($enum->stmts->children),
+            'file' => $enum->getFile() ?: 'unknown',
+            'line' => max(1, $enum->getLine()),
         ];
     }
 
@@ -212,13 +220,17 @@ final class FinalClassConstCheck
                 if (!isset($inheritedFinals[$constLc])) {
                     continue;
                 }
-                throw new \CompileError(sprintf(
-                    '%s::%s cannot override final constant %s::%s',
-                    $type['display'],
-                    $constInfo['display'],
-                    $inheritedFinals[$constLc]['ownerDisplay'],
-                    $inheritedFinals[$constLc]['constDisplay']
-                ));
+                throw new CompileFatal(
+                    $type['file'] ?? 'unknown',
+                    $type['line'] ?? 1,
+                    sprintf(
+                        '%s::%s cannot override final constant %s::%s',
+                        $type['display'],
+                        $constInfo['display'],
+                        $inheritedFinals[$constLc]['ownerDisplay'],
+                        $inheritedFinals[$constLc]['constDisplay']
+                    )
+                );
             }
             $this->verifyTraitFinalConstantOverrides($type);
         }
@@ -241,14 +253,18 @@ final class FinalClassConstCheck
                 if (!$traitConst['final'] || !isset($type['constants'][$constLc])) {
                     continue;
                 }
-                throw new \CompileError(sprintf(
-                    '%s and %s define the same constant (%s) in the composition of %s. '
-                    .'However, the definition differs and is considered incompatible. Class was composed',
-                    $type['display'],
-                    $trait['display'],
-                    $traitConst['display'],
-                    $type['display']
-                ));
+                throw new CompileFatal(
+                    $type['file'] ?? 'unknown',
+                    $type['line'] ?? 1,
+                    sprintf(
+                        '%s and %s define the same constant (%s) in the composition of %s. '
+                        .'However, the definition differs and is considered incompatible. Class was composed',
+                        $type['display'],
+                        $trait['display'],
+                        $traitConst['display'],
+                        $type['display']
+                    )
+                );
             }
         }
     }

@@ -261,7 +261,9 @@ final class InterfaceImplementationCheck
                 static fn (array $pair): string => $pair[0].'::'.$pair[1],
                 $missing
             ));
-            throw new \CompileError(
+            throw new CompileFatal(
+                $class['file'] ?: 'unknown',
+                $class['line'],
                 "Class {$class['display']} contains {$count} abstract method{$suffix} "
                 ."and must therefore be declared abstract or implement the remaining methods ({$list})"
             );
