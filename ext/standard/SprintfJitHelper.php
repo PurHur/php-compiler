@@ -1001,6 +1001,9 @@ final class SprintfJitHelper
         string $thousandsSeparator,
         int $roundingMode = 1
     ): string {
+        // Call sites that need php-src 8.3+ negative-$decimals rounding pre-round via
+        // RoundMath / JitNumberFormat and pass MAX(0, $decimals) here (#27899).
+        // NestedJIT of this TU mishandles negative $decimals — keep this path non-negative.
         if ($decimals < 0) {
             $decimals = 0;
         }

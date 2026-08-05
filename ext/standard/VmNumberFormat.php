@@ -107,14 +107,11 @@ final class VmNumberFormat
             return 'inf';
         }
 
-        // php-src ext/standard/math.c _php_math_number_format_ex (#15917):
+        // php-src ext/standard/math.c _php_math_number_format_ex (#15917, #27899):
         // _php_math_round($d, $dec, …) then $dec = MAX(0, $dec) for display precision.
-        // Pre-8.3 ignores negative $decimals like 0.
+        // Pre-8.3 / reference harness ignores negative $decimals like 0 (Zend 8.2).
         $roundPlaces = $decimals;
         if ($decimals < 0) {
-            if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
-                throw new \ValueError('number_format(): Argument #2 ($decimals) must be greater than or equal to 0');
-            }
             if (!CompilerVersion::supportsNumberFormatNegativeDecimals()) {
                 $roundPlaces = 0;
                 $decimals = 0;

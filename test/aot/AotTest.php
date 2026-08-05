@@ -183,7 +183,8 @@ class AotTest extends BaseTest
                 continue;
             }
             if (!CompilerVersion::supportsNumberFormatNegativeDecimals()
-                && str_contains($name, 'number_format_negative_decimals_84')) {
+                && str_contains($name, 'number_format_negative_decimals')
+                && !str_contains($name, 'number_format_negative_decimals_84')) {
                 continue;
             }
             if (CompilerVersion::supportsNumberFormatNegativeDecimals()
@@ -192,7 +193,9 @@ class AotTest extends BaseTest
             }
             // SprintfJitHelper user-script AOT: helper cache runtime_safe:false or nested
             // compile OOM (#15642, #16075) — VM/JIT compliance covers parity (#18525).
-            if (str_contains($name, 'number_format')) {
+            // #27899 negative-decimals_84 is verified via bin/compile.php repro (not this suite).
+            if (str_contains($name, 'number_format')
+                && !str_contains($name, 'number_format_negative_decimals_84')) {
                 continue;
             }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
