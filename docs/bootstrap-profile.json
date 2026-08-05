@@ -1941,6 +1941,7 @@
         "ext/simplexml/JitSimpleXmlGet.php",
         "ext/simplexml/JitSimpleXmlLoadString.php",
         "ext/simplexml/JitSimpleXmlOffsetGet.php",
+        "ext/simplexml/JitSimpleXmlRegisterXPathNamespace.php",
         "ext/simplexml/JitSimpleXmlToString.php",
         "ext/simplexml/JitSimpleXmlUserScript.php",
         "ext/simplexml/JitSimpleXmlXpath.php",
@@ -2121,6 +2122,7 @@
         "ext/sodium/SodiumOneStringBoolFunction.php",
         "ext/sodium/SodiumOneStringFunction.php",
         "ext/sodium/SodiumPadFunction.php",
+        "ext/sodium/SodiumPadJitHelper.php",
         "ext/sodium/SodiumPwhashFunction.php",
         "ext/sodium/SodiumPwhashScryptFunction.php",
         "ext/sodium/SodiumPwhashStrFunction.php",
@@ -4539,6 +4541,7 @@
         "ext/standard/zlib_get_coding_type.php",
         "ext/stats/JitStats.php",
         "ext/stats/Module.php",
+        "ext/stats/StatsExtensionPolicy.php",
         "ext/stats/StatsFunction.php",
         "ext/stats/StatsJitHelper.php",
         "ext/stats/VmStats.php",
@@ -6017,6 +6020,7 @@
         "lib/JIT/Call/SimpleXMLElementCount.php",
         "lib/JIT/Call/SimpleXMLElementGet.php",
         "lib/JIT/Call/SimpleXMLElementOffsetGet.php",
+        "lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php",
         "lib/JIT/Call/SimpleXMLElementToString.php",
         "lib/JIT/Call/SimpleXMLElementXpath.php",
         "lib/JIT/Call/SplDllistMethod.php",
@@ -7238,9 +7242,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7004,
+        "inventory_files": 7008,
         "excluded": 0,
-        "eligible": 7004,
+        "eligible": 7008,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
