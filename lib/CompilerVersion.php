@@ -1615,6 +1615,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.2+ deprecates `"self::method"` / `"static::method"` / `"parent::method"` (and
+     * `["self"|"static"|"parent", "method"]`) callables in is_callable / call_user_func*.
+     *
+     * php-src: Zend/zend_execute_API.c zend_is_callable_ex (#27915).
+     */
+    public static function supportsScopeKeywordCallableDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.2.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ deprecates `case <expr>;` / `default;` in switch (prefer `:`).
      *
      * php-src: Zend/zend_compile.c ZEND_ALT_CASE_SYNTAX (#26279).

@@ -435,7 +435,14 @@ final class VmCallable
             if ('' === $class || '' === $method || !self::isValidMethodName($method)) {
                 return false;
             }
-            $resolved = self::resolveScopeKeywordClass($ctx, $class, $scopeFrame, false, 'is_callable');
+            $resolved = self::resolveScopeKeywordClass(
+                $ctx,
+                $class,
+                $scopeFrame,
+                false,
+                'is_callable',
+                !$syntaxOnly
+            );
             if (null === $resolved) {
                 return false;
             }
@@ -507,7 +514,14 @@ final class VmCallable
             if ('' === $class) {
                 return false;
             }
-            $resolved = self::resolveScopeKeywordClass($ctx, $class, $scopeFrame, false, 'is_callable');
+            $resolved = self::resolveScopeKeywordClass(
+                $ctx,
+                $class,
+                $scopeFrame,
+                false,
+                'is_callable',
+                !$syntaxOnly
+            );
             if (null === $resolved) {
                 return false;
             }
@@ -1028,6 +1042,9 @@ final class VmCallable
     /**
      * php-src zend_is_callable_ex — resolve parent/self/static from the active class scope (#25625).
      *
+     * On successful resolve under PROFILE≥8.2, emits E_DEPRECATED for the scope keyword (#27915)
+     * unless {@see $emitDeprecation} is false (is_callable syntax-only).
+     *
      * @return string|null resolved class name; null when not resolvable (is_callable → false)
      */
     private static function resolveScopeKeywordClass(
@@ -1035,7 +1052,8 @@ final class VmCallable
         string $className,
         ?Frame $scopeFrame,
         bool $throwOnFailure,
-        string $function
+        string $function,
+        bool $emitDeprecation = true
     ): ?string {
         $normalized = VmReflection::normalizeGlobalIntrospectionName($className);
         $lc = strtolower($normalized);
@@ -1055,7 +1073,7 @@ final class VmCallable
         }
         if ('static' === $lc) {
             try {
-                return VmReflection::getCalledClass($scopeFrame);
+                $resolved = VmReflection::getCalledClass($scopeFrame);
             } catch (\Error) {
                 if ($throwOnFailure) {
                     throw new \TypeError(\sprintf(
@@ -1067,10 +1085,13 @@ final class VmCallable
 
                 return null;
             }
+            self::maybeDeprecateScopeKeywordCallable($ctx, $scopeFrame, $lc, $emitDeprecation);
+
+            return $resolved;
         }
         if ('self' === $lc) {
             try {
-                return VmReflection::zeroArgGetClassName($scopeFrame);
+                $resolved = VmReflection::zeroArgGetClassName($scopeFrame);
             } catch (\Error) {
                 if ($throwOnFailure) {
                     throw new \TypeError(\sprintf(
@@ -1082,6 +1103,9 @@ final class VmCallable
 
                 return null;
             }
+            self::maybeDeprecateScopeKeywordCallable($ctx, $scopeFrame, $lc, $emitDeprecation);
+
+            return $resolved;
         }
         // parent
         try {
@@ -1112,8 +1136,32 @@ final class VmCallable
             return null;
         }
         $parentLc = $ctx->classes[$lcDefining]->parentLc;
+        $resolved = $ctx->classes[$parentLc]->name;
+        self::maybeDeprecateScopeKeywordCallable($ctx, $scopeFrame, $lc, $emitDeprecation);
 
-        return $ctx->classes[$parentLc]->name;
+        return $resolved;
+    }
+
+    /**
+     * php-src zend_is_callable_ex — E_DEPRECATED for self/static/parent in callables (#27915).
+     */
+    private static function maybeDeprecateScopeKeywordCallable(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        string $keywordLc,
+        bool $emitDeprecation
+    ): void {
+        if (!$emitDeprecation) {
+            return;
+        }
+        if (!\PHPCompiler\CompilerVersion::supportsScopeKeywordCallableDeprecation()) {
+            return;
+        }
+        $ctx->errors->internalDeprecated(
+            \sprintf('Use of "%s" in callables is deprecated', $keywordLc),
+            $ctx,
+            $scopeFrame
+        );
     }
 
     /**
