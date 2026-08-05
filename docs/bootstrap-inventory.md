@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7015 |
-| Phase A inventory files (M2 ratio SSOT) | 7015 |
+| PHP files on vm.php path | 7016 |
+| Phase A inventory files (M2 ratio SSOT) | 7016 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22542 |
+| Source constructs flagged (warnings) | 22545 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4621,6 +4621,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/wddx/wddx_serialize_value.php` | 0 | 1 |
 | `ext/wddx/wddx_serialize_vars.php` | 0 | 1 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
+| `ext/xml/JitXmlParserUserScript.php` | 0 | 2 |
 | `ext/xml/Module.php` | 0 | 23 |
 | `ext/xml/VmXml.php` | 0 | 1 |
 | `ext/xml/VmXmlSaxDispatcher.php` | 0 | 15 |
@@ -6050,7 +6051,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableShiftLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableSliceLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableSpliceLlvm.php` | 0 | 1 |
-| `lib/JIT/HashTableValuesLlvm.php` | 0 | 1 |
+| `lib/JIT/HashTableValuesLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableWriteLlvm.php` | 0 | 16 |
 | `lib/JIT/HeaderCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/Helper.php` | 0 | 7 |
@@ -31771,8 +31772,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SprintfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 208)
-- 29 class method(s)
+- new ArgumentCountError (line 268)
+- 32 class method(s)
 
 ### `ext/standard/SqrtJitHelper.php`
 
@@ -41106,6 +41107,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/xml/JitXmlParserUserScript.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 163)
+- 10 class method(s)
+
 ### `ext/xml/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -43995,37 +44002,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 51265)
 - new OpCode (line 52944)
 - new Operand\Temporary (line 53415)
-- new OpCode (line 54020)
-- new Operand\Literal (line 54389)
-- new Variable (line 54391)
-- new OpCode (line 54437)
-- new OpCode (line 54652)
-- new OpCode (line 54662)
+- new OpCode (line 54033)
+- new Operand\Literal (line 54402)
+- new Variable (line 54404)
+- new OpCode (line 54450)
 - new OpCode (line 54665)
-- new Operand\Temporary (line 54692)
-- new Operand\Temporary (line 54729)
-- new OpCode (line 54731)
-- new OpCode (line 54742)
-- new Operand\Temporary (line 54745)
-- new OpCode (line 54747)
+- new OpCode (line 54675)
+- new OpCode (line 54678)
+- new Operand\Temporary (line 54705)
+- new Operand\Temporary (line 54742)
+- new OpCode (line 54744)
 - new OpCode (line 54755)
-- new OpCode (line 54765)
-- new OpCode (line 54773)
-- new OpCode (line 54776)
-- new OpCode (line 54903)
-- new OpCode (line 54940)
-- new OpCode (line 54966)
-- new OpCode (line 54985)
-- new OpCode (line 54992)
-- new Operand\Literal (line 55909)
-- new OpCode (line 57536)
-- new Literal (line 57699)
-- new OpCode (line 57798)
-- new Variable (line 57805)
-- new Temporary (line 57807)
-- new OpCode (line 57810)
-- new CompileFatal (line 58268)
-- new CompileFatal (line 58523)
+- new Operand\Temporary (line 54758)
+- new OpCode (line 54760)
+- new OpCode (line 54768)
+- new OpCode (line 54778)
+- new OpCode (line 54786)
+- new OpCode (line 54789)
+- new OpCode (line 54916)
+- new OpCode (line 54953)
+- new OpCode (line 54979)
+- new OpCode (line 54998)
+- new OpCode (line 55005)
+- new Operand\Literal (line 55922)
+- new OpCode (line 57549)
+- new Literal (line 57712)
+- new OpCode (line 57811)
+- new Variable (line 57818)
+- new Temporary (line 57820)
+- new OpCode (line 57823)
+- new CompileFatal (line 58281)
+- new CompileFatal (line 58536)
 - 1181 class method(s)
 - 58 closure(s)
 
@@ -50507,7 +50514,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/HashTableValuesLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new Variable (line 112)
+- 5 class method(s)
 
 ### `lib/JIT/HashTableWriteLlvm.php`
 

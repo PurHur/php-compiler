@@ -55,6 +55,15 @@ final class xml_parse extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryParse($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parse() user-script AOT requires a tracked parser + compile-time data (#27293)'
+            );
+        }
         throw new \LogicException('xml_parse() is not JIT-lowered in this compiler build');
     }
 }

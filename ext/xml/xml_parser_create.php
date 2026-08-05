@@ -28,6 +28,15 @@ final class xml_parser_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (JitXmlParserUserScript::isUserScriptAot()) {
+            $result = JitXmlParserUserScript::tryCreate($context, ...$args);
+            if (null !== $result) {
+                return $result;
+            }
+            throw new \LogicException(
+                'xml_parser_create() user-script AOT requires at most one compile-time encoding (#27293)'
+            );
+        }
         throw new \LogicException('xml_parser_create() is not JIT-lowered in this compiler build');
     }
 }
