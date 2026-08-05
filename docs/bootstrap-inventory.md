@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7015 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22543 |
+| Source constructs flagged (warnings) | 22542 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3674,7 +3674,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_multisort.php` | 0 | 9 |
 | `ext/standard/array_pad.php` | 0 | 5 |
 | `ext/standard/array_pop.php` | 0 | 1 |
-| `ext/standard/array_product.php` | 0 | 2 |
+| `ext/standard/array_product.php` | 0 | 1 |
 | `ext/standard/array_push.php` | 0 | 4 |
 | `ext/standard/array_rand.php` | 0 | 1 |
 | `ext/standard/array_reduce.php` | 0 | 8 |
@@ -26631,7 +26631,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ConvertUuJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/CopyJitHelper.php`
 
@@ -35252,8 +35252,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_product.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/array_push.php`
 
@@ -39540,7 +39539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strtok.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/strtolower.php`
 
@@ -47204,7 +47203,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringAddslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringBase64Decode.php`
 
@@ -47294,7 +47293,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringConvertUu.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/StringCountChars.php`
 
@@ -47945,7 +47944,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrcoll.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringStreamCsv.php`
 
@@ -47970,7 +47969,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStripslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringStrnatcasecmp.php`
 
@@ -48035,12 +48034,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrtok.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringStrtokJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/StringStrtotime.php`
 
