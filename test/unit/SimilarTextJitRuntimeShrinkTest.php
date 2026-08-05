@@ -9,10 +9,12 @@ use PHPUnit\Framework\TestCase;
 /** similar_text JIT NestedJIT via JitVmHelperLink::ensureCompiled (#9731 / #25784). */
 final class SimilarTextJitRuntimeShrinkTest extends TestCase
 {
-    public function testSimilarTextJitHelperDelegatesToVmString(): void
+    public function testSimilarTextJitHelperDoesNotCallVmString(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/SimilarTextJitHelper.php');
-        $this->assertStringContainsString('VmString::similar_text', $source);
+        // Docblock may @see VmString; the call itself must stay local (#26897 NestedJIT stub → 0).
+        $this->assertStringNotContainsString('VmString::similar_text(', $source);
+        $this->assertStringContainsString('strlen', $source);
     }
 
     public function testStringSimilarTextJitRoutesThroughSimilarTextJitHelper(): void
