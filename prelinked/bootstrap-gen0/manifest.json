@@ -1,14 +1,14 @@
 {
     "version": 1,
-    "generated_at": "2026-08-05T16:40:31+00:00",
+    "generated_at": "2026-08-05T17:05:54+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "compiler_lib_sidecar": "prelinked/bootstrap-gen0/compiler_lib_aot_blob",
     "role": "gen-0 native argv compile driver + M0/M2/M4 link-time sidecars (no Zend)",
-    "sha256_driver": "ad535374baa798cb82b1ebbb9b0172d3415f47d53b34b44f18023cfb1d92c532",
+    "sha256_driver": "e54a130a674dffbfab5745c965bbafbb8f226b6e241214d7618816ab50318159",
     "sha256_compiler_minimal_sidecar": "ecc681eb5caa780a187a605c0b0f970f78d602cfa4144cb00ee06ce5f4b2d7d8",
     "sha256_compiler_lib_sidecar": "c7c1c5d49f310d865866081fcc7f6aa58ecb9fa39fae4fe96657452782a7f7b8",
-    "size_bytes_driver": 38776760,
+    "size_bytes_driver": 38776696,
     "size_bytes_compiler_minimal_sidecar": 841608,
     "size_bytes_compiler_lib_sidecar": 4382920,
     "m3_sidecars": [
@@ -29,6 +29,6 @@
     ],
     "build_target": "inventory argv emit (Zend native rebuild, BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0)",
     "issue": "#3053, #1492, #2880, #3046, #8713",
-    "lowering_source_fingerprint": "ebb16d6c177aa9607fe2bf4c3d58eb861508834a33c88abd7d2f8907028cd57e",
+    "lowering_source_fingerprint": "5dd3115ecf3d08fd17ef620543a8307033c7af272dc660872a3e13719bf80062",
     "provenance": "verified-fresh"
 }
