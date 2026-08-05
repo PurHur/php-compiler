@@ -37,8 +37,6 @@ final class DomInstanceMethodJit
 
     /** @var array<string, true> */
     private const USER_SCRIPT_GENERIC_DOM_METHODS = [
-        'domxpath::registernamespace' => true,
-        'domxpath::registerphpfunctions' => true,
         'domxpath::registerphpfunctionns' => true,
         'domnode::comparedocumentposition' => true,
     ];
@@ -133,6 +131,8 @@ final class DomInstanceMethodJit
         'domdocument::c14n' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
+        'domxpath::registernamespace' => true,
+        'domxpath::registerphpfunctions' => true,
         'domnodelist::item' => true,
         'domnodelist::getiterator' => true,
         'domnamednodemap::getnameditem' => true,
@@ -527,6 +527,16 @@ final class DomInstanceMethodJit
             }
             if ('domxpath::evaluate' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathEvaluate();
+
+                return;
+            }
+            if ('domxpath::registernamespace' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomXPathRegisterNamespace();
+
+                return;
+            }
+            if ('domxpath::registerphpfunctions' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomXPathRegisterPhpFunctions();
 
                 return;
             }

@@ -33,6 +33,16 @@ final class JitDomXPathEvaluateUserScript
         }
 
         $expression = trim($exprLit);
+        // php:function() / php:functionString() after registerPhpFunctions (#27575).
+        // Never host-fold these — unbound php: looks "invalid" on host Zend without registration.
+        if (self::isPhpFunctionEvaluateExpr($expression)) {
+            $phpFn = self::tryCompileTimePhpFunction($xml, $expression);
+            if (null !== $phpFn) {
+                return self::boxString($context, $phpFn);
+            }
+
+            return null;
+        }
         // Invalid literal → warning + false before specialized folds (#22755 / #22721).
         $invalid = JitDomXPathQueryUserScript::tryHostInvalidExpressionFalse($context, $xml, $exprLit, 'evaluate');
         if (null !== $invalid) {
@@ -118,6 +128,70 @@ final class JitDomXPathEvaluateUserScript
         $arith = self::tryCompileTimeArithmetic($xml, $expression);
         if (null !== $arith) {
             return self::boxDouble($context, $arith);
+        }
+
+        return null;
+    }
+
+    /**
+     * php:function("name", string(...)) / php:functionString(...) when registered (#27575).
+     *
+     * Requires registerNamespace("php", PHP_XPATH_NS) + registerPhpFunctions tracked
+     * by {@see JitDomXPathRegisterUserScript}.
+     */
+    private static function isPhpFunctionEvaluateExpr(string $expression): bool
+    {
+        return 1 === preg_match('~^php:function(?:String)?\(~i', $expression);
+    }
+
+    private static function tryCompileTimePhpFunction(string $xml, string $expression): ?string
+    {
+        $phpNs = JitDomXPathRegisterUserScript::namespaceUri('php');
+        if (DomConstants::PHP_XPATH_NS !== $phpNs) {
+            return null;
+        }
+        // php:function("name", string(inner)) or php:functionString("name", //path)
+        if (!preg_match(
+            '~^php:(function(?:String)?)\(\s*["\']([^"\']+)["\']\s*,\s*(.+)\s*\)$~i',
+            $expression,
+            $m
+        )) {
+            return null;
+        }
+        $kind = strtolower($m[1]);
+        $handler = $m[2];
+        $argExpr = trim($m[3]);
+        if (!JitDomXPathRegisterUserScript::isPhpFunctionAllowed($handler)) {
+            return null;
+        }
+        if (!\is_callable($handler)) {
+            return null;
+        }
+        $arg = null;
+        if (preg_match('~^string\((.+)\)$~i', $argExpr, $stringWrap)) {
+            $arg = self::stringForXPath($xml, trim($stringWrap[1]));
+        } elseif ('functionstring' === $kind) {
+            // functionString coerces node-set to string-value
+            $arg = self::stringForXPath($xml, $argExpr);
+        } else {
+            return null;
+        }
+        if (null === $arg) {
+            return null;
+        }
+        try {
+            $result = $handler($arg);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (\is_string($result)) {
+            return $result;
+        }
+        if (null === $result) {
+            return '';
+        }
+        if (\is_bool($result) || \is_int($result) || \is_float($result)) {
+            return (string) $result;
         }
 
         return null;

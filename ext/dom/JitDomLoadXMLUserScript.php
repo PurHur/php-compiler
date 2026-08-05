@@ -62,6 +62,7 @@ final class JitDomLoadXMLUserScript
         self::$lastCompileTimeXml = $xml;
         self::$lastLoadWasPureUserScript = false;
         self::$lastDocumentClass = $documentClass;
+        JitDomXPathRegisterUserScript::reset();
     }
 
     public static function rememberLivingDocumentClass(string $documentClass): void
