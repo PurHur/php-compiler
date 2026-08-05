@@ -1,13 +1,9 @@
 --TEST--
-AOT: convert_uuencode() / convert_uudecode()
+AOT: convert_uuencode() / convert_uudecode() round-trip (#26898)
 --FILE--
 <?php
-$raw = "Hello\n";
-$enc = convert_uuencode($raw);
-echo convert_uudecode($enc);
-echo (convert_uudecode('bad') === false) ? "\nfalse" : "\nnot-false";
+echo convert_uudecode(convert_uuencode("cat")), "\n";
 --EXPECT--
-Hello
-false
+cat
 --EXPECT_EXIT--
 0

@@ -9,14 +9,14 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227, #18827).
+ * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227, #18827, #26898).
  *
- * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
- * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Helper is NestedJIT-self-contained (peer Hex2bin #27008 / Bin2hex #20452 / Base64 #26890).
+ * Encode: __string__* → __string__*. Decode: string|false → __value__ writeString / writeBool
+ * (no tag+static lastString — AOT statics were empty under helper-runtime units).
  * php-src: ext/standard/uuencode.c
  */
 final class StringConvertUu
@@ -25,21 +25,16 @@ final class StringConvertUu
 
     private const ENCODE_HELPER = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::encode';
 
-    private const DECODE_TAG = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::decodeTag';
-
-    private const LAST_STRING = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::lastString';
+    private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::decodeArgv';
 
     private const ENCODE_BRIDGE_ENTRY = 'convert_uu_encode_bridge_entry';
 
-    private const TAG_FALSE = 0;
-
-    private const TAG_STRING = 1;
+    private const DECODE_BRIDGE_ENTRY = 'convert_uu_decode_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ENCODE_HELPER,
-        self::DECODE_TAG,
-        self::LAST_STRING,
+        self::DECODE_HELPER,
     ];
 
     /** @var list<string> */
@@ -66,8 +61,8 @@ final class StringConvertUu
 
         $encodeProbe = $context->module->getNamedFunction('__compiler_convert_uuencode');
         $decodeProbe = $context->module->getNamedFunction('__compiler_convert_uudecode');
-        if (null !== $encodeProbe && $encodeProbe->countBasicBlocks() > 0
-            && null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($encodeProbe, self::ENCODE_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($decodeProbe, self::DECODE_BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
             self::restoreInsertBlock($context, BasicBlockHelper::tryGetInsertBlock($context));
 
@@ -75,6 +70,8 @@ final class StringConvertUu
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringTriggerError::ensureLinked($context);
+        self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         JitVmHelperLink::ensureBridge(
@@ -86,7 +83,7 @@ final class StringConvertUu
             self::ENCODE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#18827'
+            '#26898'
         );
         self::implementDecodeBridge($context);
         self::registerLinkedRuntime($context);
@@ -97,17 +94,18 @@ final class StringConvertUu
     {
         $abiName = '__compiler_convert_uudecode';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::DECODE_BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#18827');
+        self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
@@ -115,25 +113,23 @@ final class StringConvertUu
                 $context->context->functionType($voidTy, false, $strPtr, $valuePtr)
             );
 
-        $entry = $fn->appendBasicBlock('convert_uu_decode_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::DECODE_BRIDGE_ENTRY);
         $falseBb = $fn->appendBasicBlock('convert_uu_decode_false');
         $stringBb = $fn->appendBasicBlock('convert_uu_decode_string');
         $doneBb = $fn->appendBasicBlock('convert_uu_decode_done');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(1);
-        $i32 = $context->getTypeFromString('int32');
-        $tag = JitNestedHelperCoerce::callHelper(
+        $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::DECODE_TAG),
+            self::helperFunction($context, self::DECODE_HELPER),
             [$fn->getParam(0)]
         );
-        $tagI32 = $context->builder->trunc($tag, $i32);
-
-        $isFalse = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false));
+        $isFalse = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
         $context->builder->branchIf($isFalse, $falseBb, $stringBb);
 
         $context->builder->positionAtEnd($falseBb);
+        // __value__writeBool ABI is (__value__*, i32) — not i8 (#27008).
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),
             $out,
@@ -142,15 +138,10 @@ final class StringConvertUu
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($stringBb);
-        $strResult = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::LAST_STRING),
-            []
-        );
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $out,
-            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strResult)
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
         );
         $context->builder->branch($doneBb);
 
@@ -161,7 +152,19 @@ final class StringConvertUu
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#18827');
+        self::ensureJitHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#26898');
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#26898'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -169,7 +172,7 @@ final class StringConvertUu
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringConvertUu bridge (#18827)');
+                throw new \LogicException($name.' missing after StringConvertUu bridge (#26898)');
             }
             $context->registerFunction($name, $fn);
         }
