@@ -73,6 +73,7 @@
             <file>./test/compliance/FiberStackOverflowProfileVMTest.php</file>
             <file>./test/compliance/FiberStackOverflowProfileJITTest.php</file>
             <file>./test/compliance/FiberGetCurrentReflectionVMTest.php</file>
+            <file>./test/compliance/FiberGetReturnReflectionVMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
