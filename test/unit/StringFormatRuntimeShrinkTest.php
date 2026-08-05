@@ -80,6 +80,21 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertSame(VmSprintf::format('%03d', [$v]), SprintfJitHelper::sprintfArgv('%03d', $blob));
     }
 
+
+    public function testSprintfJitHelperZeroPadAndCustomPadMatchVmSprintf(): void
+    {
+        $blobInt = "\x01".\pack('q', 42);
+        $this->assertSame('00042', SprintfJitHelper::sprintfArgv('%05d', $blobInt));
+        $v = new Variable();
+        $v->int(42);
+        $this->assertSame(VmSprintf::format('%05d', [$v]), SprintfJitHelper::sprintfArgv('%05d', $blobInt));
+        $blobStr = "\x04".\pack('q', 1).'x';
+        $this->assertSame('#########x', SprintfJitHelper::sprintfArgv("%'#10s", $blobStr));
+        $x = new Variable();
+        $x->string('x');
+        $this->assertSame(VmSprintf::format("%'#10s", [$x]), SprintfJitHelper::sprintfArgv("%'#10s", $blobStr));
+    }
+
     public function testSprintfJitHelperCoercesEmptyArrayForPercentD(): void
     {
         $emptyArrayBlob = "\x05";
