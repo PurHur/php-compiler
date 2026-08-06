@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getrusage via GetrusageJitHelper PHP (#9184, #25754).
+ * JIT/AOT link for __compiler_getrusage via GetrusageJitHelper PHP (#9184, #25754, #27551).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer PosixTimes #25600 / StatArray #25490).
- * Replaces struct rusage offset LLVM in StringGetrusage. SSOT: VmProcess::getrusage.
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(getrusage)
+ * Thin AOT: NestedJIT HashTable return is not a real `__hashtable__*` — materialize via
+ * `__hashtable__alloc` + `__hashtable__setStringKeyLong` from NestedJIT scalars
+ * (peer gc_status #26943 / sys_getloadavg #27294).
+ * SSOT: VmGetrusageNative. php-src: ext/standard/basic_functions.c — PHP_FUNCTION(getrusage)
  */
 final class StringGetrusageRuntime
 {
@@ -22,11 +27,39 @@ final class StringGetrusageRuntime
 
     private const HELPER_PATH = '/ext/standard/GetrusageJitHelper.php';
 
-    private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\GetrusageJitHelper::resolve';
+    private const RESOLVE_OK = 'PHPCompiler\\ext\\standard\\GetrusageJitHelper::resolveOk';
+
+    private const VALUE_AT = 'PHPCompiler\\ext\\standard\\GetrusageJitHelper::valueAt';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::RESOLVE_HELPER,
+        self::RESOLVE_OK,
+        self::VALUE_AT,
+    ];
+
+    /**
+     * Must match {@see \PHPCompiler\ext\standard\GetrusageJitHelper::KEYS}.
+     *
+     * @var list<string>
+     */
+    private const KEYS = [
+        'ru_oublock',
+        'ru_inblock',
+        'ru_msgsnd',
+        'ru_msgrcv',
+        'ru_maxrss',
+        'ru_ixrss',
+        'ru_idrss',
+        'ru_minflt',
+        'ru_majflt',
+        'ru_nsignals',
+        'ru_nvcsw',
+        'ru_nivcsw',
+        'ru_nswap',
+        'ru_utime.tv_usec',
+        'ru_utime.tv_sec',
+        'ru_stime.tv_usec',
+        'ru_stime.tv_sec',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -36,6 +69,12 @@ final class StringGetrusageRuntime
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            self::declareAbiForNestedJit($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -43,21 +82,33 @@ final class StringGetrusageRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureExternals($context);
         self::ensureJitHelperCompiled($context);
         self::implementGetrusageBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function declareAbiForNestedJit(Context $context): void
+    {
+        try {
+            $context->lookupFunction(self::ABI_NAME);
+        } catch (\Throwable) {
+            $voidTy = $context->getTypeFromString('void');
+            $i64 = $context->getTypeFromString('int64');
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $context->registerFunction(
+                self::ABI_NAME,
+                $context->module->addFunction(
+                    self::ABI_NAME,
+                    $context->context->functionType($voidTy, false, $i64, $valuePtr)
+                )
+            );
         }
     }
 
@@ -94,17 +145,12 @@ final class StringGetrusageRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $htObj = $context->builder->call(
-            self::helperFunction($context, self::RESOLVE_HELPER),
-            $who
-        );
-        $ht = $htObj->typeOf() === $htPtr
-            ? $htObj
-            : $context->builder->pointerCast($htObj, $htPtr);
-        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $okWide = $context->builder->call(self::helperFunction($context, self::RESOLVE_OK), $who);
+        $ok = $context->builder->trunc($okWide, $i32);
+        $okFlag = $context->builder->icmp(Builder::INT_NE, $ok, $i32->constInt(0, false));
         $failBb = $fn->appendBasicBlock('gr_bridge_fail');
         $okBb = $fn->appendBasicBlock('gr_bridge_ok');
-        $context->builder->branchIf($htNull, $failBb, $okBb);
+        $context->builder->branchIf($okFlag, $okBb, $failBb);
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->call(
@@ -115,6 +161,22 @@ final class StringGetrusageRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($okBb);
+        $ht = HashTableHelper::alloc($context);
+        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $valueAt = self::helperFunction($context, self::VALUE_AT);
+        foreach (self::KEYS as $i => $key) {
+            $v = $context->builder->call(
+                $valueAt,
+                $who,
+                $i64->constInt($i, false)
+            );
+            $context->builder->call(
+                $setLong,
+                $ht,
+                self::literalKeyString($context, $key),
+                $v
+            );
+        }
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $out,
@@ -123,6 +185,18 @@ final class StringGetrusageRuntime
         $context->builder->returnVoid();
         $context->registerFunction(self::ABI_NAME, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function literalKeyString(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            $context->builder->pointerCast($context->constantFromString($text), $charPtr)
+        );
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
@@ -149,6 +223,8 @@ final class StringGetrusageRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i32 = $context->getTypeFromString('int32');
 
+        // Do NOT declare empty stubs for __hashtable__* / __string__init — that masks the
+        // HashTable builtin / helper-runtime bodies (#27294 / #27551).
         foreach ([
             ['__value__writeBool', $voidTy, [$valuePtr, $i32]],
             ['__value__writeHashtable', $voidTy, [$valuePtr, $htPtr]],
@@ -157,6 +233,17 @@ final class StringGetrusageRuntime
                 $context,
                 $name,
                 $context->context->functionType($ret, false, ...$params)
+            );
+        }
+        try {
+            $context->lookupFunction('__hashtable__alloc');
+            $context->lookupFunction('__hashtable__setStringKeyLong');
+            $context->lookupFunction('__string__init');
+        } catch (\Throwable $e) {
+            throw new \LogicException(
+                'StringGetrusageRuntime requires __hashtable__alloc/setStringKeyLong/__string__init (#27551): '.$e->getMessage(),
+                0,
+                $e
             );
         }
     }
