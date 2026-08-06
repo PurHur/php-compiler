@@ -16,6 +16,7 @@ use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\VmDomLiving;
+use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\ext\zip\ZipArchiveConstants;
 use PHPCompiler\VM\ExceptionSupport;
@@ -3267,6 +3268,14 @@ class Object_ extends Type {
             // php-src ext/zip/php_zip.c REGISTER_ZIPARCHIVE_CLASS_CONST_* (#20712).
             // Host PHP often lacks ext-zip; seed from ZipArchiveConstants for AOT/JIT.
             $this->seedExternalClassConstants($id, ZipArchiveConstants::CLASS_CONSTANTS);
+        }
+        if ('sqlite3' === $lcname && CompilerVersion::supportsSqlite3()) {
+            // php-src ext/sqlite3/sqlite3.c — authorizer + open flags (#28098 / #20683).
+            // Seed for AOT/JIT ClassConstFetch (peer ZipArchive #28110).
+            $this->seedExternalClassConstants($id, Sqlite3Constants::CLASS_CONSTANTS);
+        }
+        if ('sqlite3stmt' === $lcname && CompilerVersion::supportsSqlite3()) {
+            $this->seedExternalClassConstants($id, Sqlite3Constants::STMT_CLASS_CONSTANTS);
         }
     }
 

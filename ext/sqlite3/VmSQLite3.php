@@ -34,12 +34,14 @@ final class VmSQLite3
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SQLite3');
         $entry->isInternal = true;
+        // Declared casing is the storage key (ClassConstName / #25929). Do not
+        // lowercase — SQLite3::OK / defined('SQLite3::OK') must resolve (#28098).
         foreach (Sqlite3Constants::CLASS_CONSTANTS as $name => $value) {
-            $lc = strtolower($name);
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$lc] = $const;
-            $entry->constNames[$lc] = Sqlite3Constants::CLASS_CONSTANT_NAMES[$name];
+            $canonical = Sqlite3Constants::CLASS_CONSTANT_NAMES[$name];
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
