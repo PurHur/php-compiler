@@ -65,6 +65,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'mb_str_pad_pad_type_literal_forward_84.phpt',
         'strcoll_signs.phpt',
         'stream_get_contents_php_memory.phpt',
+        'http_build_query_nested_27031.phpt',
     ];
 
     /**

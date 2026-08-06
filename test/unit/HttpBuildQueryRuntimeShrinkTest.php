@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
-use PHPCompiler\ext\standard\HttpBuildQueryJitHelper;
 use PHPCompiler\ext\standard\VmHttpBuildQuery;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 
-/** StringHttpBuildQuery via HttpBuildQueryJitHelper + JitVmHelperLink::ensureCompiled (#9443, #24887). */
+/** StringHttpBuildQuery via HttpBuildQueryJitHelper + JitVmHelperLink::ensureCompiled (#9443, #24887, #27031). */
 final class HttpBuildQueryRuntimeShrinkTest extends TestCase
 {
     public function testStringHttpBuildQueryUsesJitHelperNotLlvmWalker(): void
@@ -42,32 +39,27 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
     public function testHttpBuildQueryJitHelperIsNestedJitSafeInline(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HttpBuildQueryJitHelper.php');
-        $this->assertStringContainsString('percentEncode', $source);
-        $this->assertStringContainsString('iterateKeyed', $source);
         $this->assertStringContainsString('exportKeyValuePairs', $source);
+        $this->assertStringContainsString('0x7f', $source);
         $this->assertStringNotContainsString('VmHttpBuildQuery::buildFromHashTable', $source);
         $this->assertStringNotContainsString('as [$', $source);
         $this->assertStringNotContainsString('rawurlencode(', $source);
         $this->assertStringNotContainsString('urlencode(', $source);
+        $this->assertStringNotContainsString('strtr(', $source);
+        $this->assertStringNotContainsString('->resolveIndirect', $source);
+        $this->assertStringNotContainsString('->toArray(', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$parts\s*\[\s*\]\s*=/', $source);
+        $this->assertStringNotContainsString('\\implode(', $source);
+        $this->assertStringNotContainsString('->iterateKeyed', $source);
     }
 
-    public function testHttpBuildQueryJitHelperMatchesVmHttpBuildQuery(): void
+    public function testVmHttpBuildQuerySsotNested(): void
     {
-        $ht = new HashTable();
-        $a = new Variable();
-        $a->int(1);
-        $ht->add('a', $a);
-        $nested = new HashTable();
-        $c = new Variable();
-        $c->int(2);
-        $nested->add('c', $c);
-        $b = new Variable();
-        $b->array($nested);
-        $ht->add('b', $b);
-
-        $expected = VmHttpBuildQuery::build(['a' => 1, 'b' => ['c' => 2]]);
-        $actual = HttpBuildQueryJitHelper::build($ht, '', '&', VmHttpBuildQuery::ENCODING_RFC1738);
-        $this->assertSame($expected, $actual);
+        $this->assertSame('a=1&b=2', VmHttpBuildQuery::build(['a' => 1, 'b' => 2]));
+        $this->assertSame(
+            'a=1&b%5Bc%5D=2',
+            VmHttpBuildQuery::build(['a' => 1, 'b' => ['c' => 2]])
+        );
     }
 
     public function testJitHttpBuildQueryEnsuresLinkedAtCallSite(): void
