@@ -13,7 +13,14 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap-gen0-manifest-lib.php';
 
 $root = dirname(__DIR__);
+$manifestBefore = bootstrap_gen0_manifest_read($root);
 $errors = bootstrap_gen0_manifest_sync_errors($root);
+$manifestAfter = bootstrap_gen0_manifest_read($root);
+if (is_array($manifestBefore) && is_array($manifestAfter)
+    && 'verified-fresh' === trim((string) ($manifestBefore['provenance'] ?? ''))
+    && 'unverified-restamp' === trim((string) ($manifestAfter['provenance'] ?? ''))) {
+    fwrite(STDERR, "check-bootstrap-gen0-manifest-sync: downgraded provenance verified-fresh → unverified-restamp (lowering drift, blobs unchanged — rebuild via script/bootstrap-refresh-gen0-sidecar.sh; #10533)\n");
+}
 $warnings = bootstrap_gen0_manifest_sync_warnings($root);
 
 foreach ($warnings as $warning) {

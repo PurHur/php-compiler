@@ -135,11 +135,15 @@ function bootstrap_gen0_manifest_sync_warnings(string $root, ?array $manifest = 
 }
 
 /**
+ * Size/sha256 mismatches for committed gen-0 blobs — excludes lowering fingerprint (#8713).
+ *
  * @return list<string>
  */
-function bootstrap_gen0_manifest_sync_errors(string $root): array
+function bootstrap_gen0_manifest_blob_sync_errors(string $root, ?array $manifest = null): array
 {
-    $manifest = bootstrap_gen0_manifest_read($root);
+    if (null === $manifest) {
+        $manifest = bootstrap_gen0_manifest_read($root);
+    }
     if (null === $manifest) {
         return ['missing or invalid '.bootstrap_gen0_manifest_path($root)];
     }
@@ -196,6 +200,56 @@ function bootstrap_gen0_manifest_sync_errors(string $root): array
             $errors[] = ".m3_bin_compile_aot_blob sha256 must match {$driverRel}";
         }
     }
+
+    return $errors;
+}
+
+/**
+ * Drop a false verified-fresh claim when lowering drifted but committed blobs are unchanged.
+ *
+ * After a verified-fresh gen-0 refresh, merges that touch lib/ext/patches without relinking
+ * leave manifest fingerprint stale while driver bytes still match — hard-failing 4f-m blocks
+ * the whole tree until a multi-hour rebuild. Downgrade provenance instead of restamping (#10533).
+ */
+function bootstrap_gen0_manifest_downgrade_stale_verified_fresh_provenance(string $root): bool
+{
+    $manifest = bootstrap_gen0_manifest_read($root);
+    if (null === $manifest) {
+        return false;
+    }
+    if ('verified-fresh' !== trim((string) ($manifest['provenance'] ?? ''))) {
+        return false;
+    }
+    if ([] === bootstrap_gen0_manifest_lowering_fingerprint_errors($root, $manifest)) {
+        return false;
+    }
+    if ([] !== bootstrap_gen0_manifest_blob_sync_errors($root, $manifest)) {
+        return false;
+    }
+
+    $manifest['provenance'] = 'unverified-restamp';
+    $manifest['generated_at'] = gmdate('c');
+    $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+    if (false === file_put_contents(bootstrap_gen0_manifest_path($root), $encoded)) {
+        throw new \RuntimeException('failed writing '.bootstrap_gen0_manifest_path($root));
+    }
+
+    return true;
+}
+
+/**
+ * @return list<string>
+ */
+function bootstrap_gen0_manifest_sync_errors(string $root): array
+{
+    bootstrap_gen0_manifest_downgrade_stale_verified_fresh_provenance($root);
+
+    $manifest = bootstrap_gen0_manifest_read($root);
+    if (null === $manifest) {
+        return ['missing or invalid '.bootstrap_gen0_manifest_path($root)];
+    }
+
+    $errors = bootstrap_gen0_manifest_blob_sync_errors($root, $manifest);
 
     foreach (bootstrap_gen0_manifest_lowering_fingerprint_errors($root, $manifest) as $fpError) {
         $errors[] = $fpError;
