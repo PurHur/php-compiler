@@ -1261,6 +1261,18 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'insert_adjacent_html_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomElementGetElementsByClassName()
+                && str_contains($name, 'get_elements_by_class_name_85')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomElementGetElementsByClassName()
+                && str_contains($name, 'dom_html_collection_classname')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomElementGetElementsByClassName()
+                && str_contains($name, 'get_elements_by_class_name_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomElementInsertAdjacentElement()
                 && str_contains($name, 'dom_element_insert_adjacent_element')
                 && !str_contains($name, 'insert_adjacent_element_phantom')) {

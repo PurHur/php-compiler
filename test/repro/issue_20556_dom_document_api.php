@@ -1,5 +1,6 @@
 <?php
-// Repro #20556 — Dom\HTMLDocument / Dom\XMLDocument Document API
+// Repro #20556 / #27593 — Dom\HTMLDocument / Dom\XMLDocument Document API
+// Run with PHP_COMPILER_PROFILE=8.5 (getElementsByClassName is PHP 8.5+).
 $d = Dom\HTMLDocument::createFromString('<html><body><p class="x y">x</p></body></html>');
 foreach ([
     'createElement', 'createElementNS', 'createTextNode', 'createComment',

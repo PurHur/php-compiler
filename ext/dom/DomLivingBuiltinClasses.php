@@ -335,9 +335,12 @@ final class DomLivingBuiltinClasses
         $element->methods['queryselectorall'] = new ElementQuerySelectorAll();
         $element->methodVisibility['queryselectorall'] = $pub;
         $element->methodNames['queryselectorall'] = 'querySelectorAll';
-        $element->methods['getelementsbyclassname'] = new ElementGetElementsByClassName();
-        $element->methodVisibility['getelementsbyclassname'] = $pub;
-        $element->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
+        // PHP 8.5+ only (php-src PHP-8.5 UPGRADING / php_dom.stub.php; #27593).
+        if (CompilerVersion::supportsDomElementGetElementsByClassName()) {
+            $element->methods['getelementsbyclassname'] = new ElementGetElementsByClassName();
+            $element->methodVisibility['getelementsbyclassname'] = $pub;
+            $element->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
+        }
         $element->methods['getinscopenamespaces'] = new ElementGetInScopeNamespaces();
         $element->methodVisibility['getinscopenamespaces'] = $pub;
         $element->methodNames['getinscopenamespaces'] = 'getInScopeNamespaces';
@@ -434,9 +437,12 @@ final class DomLivingBuiltinClasses
         );
         // Living Dom casing (php-src HTMLDocument/XMLDocument::saveXml; #20556).
         $document->methodNames['savexml'] = 'saveXml';
-        $document->methods['getelementsbyclassname'] = new DocumentGetElementsByClassName();
-        $document->methodVisibility['getelementsbyclassname'] = $pub;
-        $document->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
+        // Document alias of Element::getElementsByClassName — PHP 8.5+ (#27593).
+        if (CompilerVersion::supportsDomElementGetElementsByClassName()) {
+            $document->methods['getelementsbyclassname'] = new DocumentGetElementsByClassName();
+            $document->methodVisibility['getelementsbyclassname'] = $pub;
+            $document->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
+        }
         // Dom\Document::importLegacyNode — legacy DOM* → living Dom\* (#20940).
         $document->methods['importlegacynode'] = new DocumentImportLegacyNode();
         $document->methodVisibility['importlegacynode'] = $pub;

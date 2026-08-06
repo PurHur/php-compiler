@@ -3844,6 +3844,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ Dom\Element::getElementsByClassName() (+ Dom\Document alias)
+     * (php-src PHP-8.5+ ext/dom/php_dom.stub.php; #27593).
+     *
+     * PHP-8.4 stubs have getElementsByTagName(NS) only on living Element/Document —
+     * no getElementsByClassName. Withheld on PROFILE=8.4 / Zend 8.4. Enable via stable
+     * 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsDomElementGetElementsByClassName(): bool
+    {
+        return self::supportsDomApiSince('8.5.0');
+    }
+
+    /**
      * PHP 8.4+ DOMElement::insertAdjacentElement() (ext/dom/php_dom.c, #16865).
      */
     public static function supportsDomElementInsertAdjacentElement(): bool
