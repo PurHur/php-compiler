@@ -2829,6 +2829,30 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ XML_OPTION_PARSE_HUGE (ext/xml/xml.stub.php; PHP_XML_OPTION_PARSE_HUGE; #28171).
+     *
+     * Withheld on 8.4.0-dev reference / PROFILE≤8.3 (Zend 8.2/8.3 defined() false). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` / `8.5` forward profile.
+     */
+    public static function supportsXmlOptionParseHuge(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ array_all/any/find/find_key only (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675, #24000, #24821).
      *
      * php-src never ships array_any_key()/array_all_key() — those phantoms were removed (#24000).
