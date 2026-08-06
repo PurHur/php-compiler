@@ -12,11 +12,14 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_reverse() (#12329, #27067).
+ * JIT/AOT link for array_reverse() (#12329, #27067, #27130).
  *
  * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayReverseJitHelper} failed on
  * unresolved HashTable::reverseCopy (#27067). Call-site LLVM via {@see HashTableReverseLlvm}
- * (peer ArrayFlipRuntime / #26970).
+ * (peer ArrayFlipRuntime / #26970 / HashTableMergeLlvm / #27546).
+ *
+ * Native literals use {@see ArrayBuiltinHelper::nativeListToHashTable} (same as merge) so
+ * NestedJIT json_encode sees a dense packed result rather than `{}` (#27130).
  *
  * VM SSOT: {@see \PHPCompiler\VM\HashTable::reverseCopy()}
  * php-src: ext/standard/array.c — php_array_reverse()
@@ -36,9 +39,16 @@ final class ArrayReverseRuntime
             ? $i1->constInt(0, false)
             : $preserveKeys;
 
+        // Prefer nativeListToHashTable for native literals — same as ArrayMergeRuntime
+        // (#27546). loadHashTable→materializeNativeArrayForCall yields tables that
+        // index/foreach correctly but NestedJIT json_encode sees as empty `{}` (#27130).
+        $srcHt = ArrayBuiltinHelper::isNativeArray($array->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
+            : ArrayBuiltinHelper::loadHashTable($context, $array);
+
         return $context->builder->call(
             $context->lookupFunction(self::ABI_REVERSE),
-            ArrayBuiltinHelper::loadHashTable($context, $array),
+            $srcHt,
             $flag
         );
     }

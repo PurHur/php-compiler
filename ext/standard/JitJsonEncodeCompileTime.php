@@ -25,6 +25,7 @@ use PHPLLVM\Value;
  * `json_encode(array_flip(lit…))` (#27072),
  * `json_encode(array_combine(lit, lit))` (#27132),
  * `json_encode(array_merge(lit…))` (#27546),
+ * `json_encode(array_reverse(lit…))` (#27130),
  * `json_encode(array_fill(lit, lit, lit))` (#27073),
  * `json_encode(array_fill_keys(lit, lit))` (#27127), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
@@ -64,6 +65,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayMerge($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayReverse($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayFill($block, $operand);
@@ -469,6 +473,44 @@ final class JitJsonEncodeCompileTime
         $merged = VmArray::merge($first, ...$others);
         $var = new VmVariable();
         $var->array($merged);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_reverse(…))` when args are compile-time (#27130).
+     *
+     * Uses {@see ArrayReverseJitHelper::reverseCopy()} / {@see \PHPCompiler\VM\HashTable::reverseCopy()}
+     * SSOT (php-src array.c). Call-site {@see \PHPCompiler\JIT\HashTableReverseLlvm} builds a
+     * dim/count/foreach-green HT; NestedJIT json_encode still cannot export those runtime
+     * tables (peer #27546 / #27132 / #27072).
+     */
+    private static function tryCompileTimeArrayFromArrayReverse(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_reverse');
+        if (null === $args || 0 === \count($args) || \count($args) > 2) {
+            return null;
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[0]->type) {
+            return null;
+        }
+        $preserve = false;
+        if (2 === \count($args)) {
+            if (VmVariable::TYPE_BOOLEAN === $args[1]->type) {
+                $preserve = $args[1]->toBool();
+            } elseif (VmVariable::TYPE_INTEGER === $args[1]->type) {
+                $preserve = 0 !== $args[1]->toInt();
+            } else {
+                return null;
+            }
+        }
+        $reversed = ArrayReverseJitHelper::reverseCopy($args[0]->toArray(), $preserve);
+        $var = new VmVariable();
+        $var->array($reversed);
 
         return $var;
     }

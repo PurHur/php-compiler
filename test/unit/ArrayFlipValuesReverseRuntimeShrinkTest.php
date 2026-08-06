@@ -93,7 +93,10 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
 
         $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReverseLlvm.php');
         $this->assertStringContainsString('function reverse', $llvm);
-        $this->assertStringContainsString('writeReversedEntry', $llvm);
+        // #27130: thin AOT walks packed/strKeys directly (peer HashTableMergeLlvm).
+        $this->assertStringContainsString('appendPackedReversed', $llvm);
+        $this->assertStringContainsString('appendStringKeysReversed', $llvm);
+        $this->assertStringNotContainsString('exportPairsForSlice', $llvm);
 
         $nested = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedVmHashTableMethodLlvm.php');
         $this->assertStringContainsString("'reversecopy'", $nested);
