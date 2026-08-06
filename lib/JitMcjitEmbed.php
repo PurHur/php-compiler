@@ -74,12 +74,50 @@ final class JitMcjitEmbed
 
     private static function prependMcjitBootstrap(string $code): string
     {
+        // Namespace must be the first statement in the compilation unit (php-src
+        // zend_language_parser.y / nikic php-parser). Prepending the MCJIT pad class
+        // before `namespace` breaks bracketed and unbracketed scripts (#28002).
+        if (self::phpSegmentHasNamespaceDeclaration($code)) {
+            return self::appendMcjitBootstrapForNamespaced($code);
+        }
+
         return preg_replace(
             '/^<\?php\s*/',
             '<?php '.self::BOOTSTRAP_CLASS."\n",
             $code,
             1
         ) ?? $code;
+    }
+
+    /**
+     * True when the PHP segment declares a namespace (comments/strings blanked).
+     *
+     * Matches `namespace Foo;`, `namespace Foo {`, and `namespace {` — not the
+     * relative name qualifier `namespace\Foo`.
+     */
+    private static function phpSegmentHasNamespaceDeclaration(string $code): bool
+    {
+        $mask = self::blankPhpOpaqueRegionsPreservingLength($code);
+
+        return (bool) preg_match('/\bnamespace(\s*\{|\s+[\w\\\\]+)/i', $mask);
+    }
+
+    /**
+     * Inject the MCJIT bootstrap without preceding `namespace` / `declare`.
+     *
+     * Bracketed files: append a global `namespace { … }` block (multiple global
+     * blocks are legal). Unbracketed files: append the class at EOF so it lands
+     * in the file's single namespace (cannot mix bracketed + unbracketed).
+     */
+    private static function appendMcjitBootstrapForNamespaced(string $code): string
+    {
+        $mask = self::blankPhpOpaqueRegionsPreservingLength($code);
+        $bootstrap = rtrim(self::BOOTSTRAP_CLASS);
+        if (preg_match('/\bnamespace(?:\s+[\w\\\\]+)?\s*\{/i', $mask)) {
+            return rtrim($code)."\nnamespace { ".$bootstrap." }\n";
+        }
+
+        return rtrim($code)."\n".$bootstrap."\n";
     }
 
     private static function padPropertylessUserClassesForMcjit(string $code, bool &$needsReadonlyPromotedBootstrap): string
