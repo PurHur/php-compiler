@@ -5,37 +5,36 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableChangeKeyCaseLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_change_key_case() via ArrayChangeKeyCaseJitHelper PHP (#12371, #18024).
+ * JIT/AOT link for array_change_key_case() (#12371, #14530, #18024, #27183).
  *
- * Standalone AOT compiles {@see ArrayChangeKeyCaseJitHelper} via JitVmHelperLink bridge (#14530);
- * operands materialize via {@see ArrayBuiltinHelper::loadHashTable()} (preserves string keys; #25500).
- * SSOT: {@see \PHPCompiler\ext\standard\VmArray::changeKeyCase()}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayChangeKeyCaseJitHelper}
+ * segfaulted under HELPER_RUNTIME_O=0 (#27183). Call-site LLVM via
+ * {@see HashTableChangeKeyCaseLlvm} (peer ArrayFillKeysRuntime / #27127,
+ * ArrayFlipRuntime / #26970).
+ *
+ * Operands materialize via {@see ArrayBuiltinHelper::loadHashTable()} (preserves
+ * string keys; #25500). Literal `json_encode(array_change_key_case(…))` is folded
+ * in {@see \PHPCompiler\ext\standard\JitJsonEncodeCompileTime} (peer #27072).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmArray::changeKeyCase()} /
+ * {@see \PHPCompiler\ext\standard\ArrayChangeKeyCaseJitHelper}
  * php-src: ext/standard/array.c — php_array_change_key_case()
  */
 final class ArrayChangeKeyCaseRuntime
 {
-    private const ABI_CHANGE = '__array_change_key_case__change';
-
-    private const HELPER_PATH = '/ext/standard/ArrayChangeKeyCaseJitHelper.php';
-
-    private const CHANGE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayChangeKeyCaseJitHelper::changeKeyCase';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CHANGE_HELPER,
-    ];
+    private const ABI_CHANGE = '__array_change_key_case__llvm';
 
     public static function changeKeyCase(Context $context, JITVariable $array, Value $case): Value
     {
         self::ensureLinked($context);
 
-        // Prefer loadHashTable over packed-list materialization so string keys survive (#25500).
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CHANGE),
             ArrayBuiltinHelper::loadHashTable($context, $array),
@@ -62,39 +61,46 @@ final class ArrayChangeKeyCaseRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_CHANGE,
-            'array_change_key_case_bridge_entry',
-            [$htPtr, $i64],
-            $htPtr,
-            self::CHANGE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12371'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StreamGlobalsJit::implementThinIsResource($context);
+        self::emitChangeBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitChangeBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $probe = $context->module->getNamedFunction(self::ABI_CHANGE);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_CHANGE,
+                $context->context->functionType($htPtr, false, $htPtr, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('array_change_key_case_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $changed = HashTableChangeKeyCaseLlvm::changeKeyCase(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($changed);
+        $context->registerFunction(self::ABI_CHANGE, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_CHANGE);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_CHANGE.' missing after ArrayChangeKeyCaseRuntime bridge (#12371)');
+            throw new \LogicException(self::ABI_CHANGE.' missing after ArrayChangeKeyCaseRuntime bridge (#27183)');
         }
         $context->registerFunction(self::ABI_CHANGE, $fn);
     }
