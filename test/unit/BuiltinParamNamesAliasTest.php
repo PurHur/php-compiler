@@ -4871,12 +4871,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #25453 */
+    /** @covers issue #25453 / #28239 */
     public function testStreamContextSetOptionsStubReturnAndOptionsType(): void
     {
         self::assertSame(
-            'bool',
+            'true',
             BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_set_options')
+        );
+        self::assertSame(
+            'true',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_set_params')
         );
         self::assertSame(
             'array',
