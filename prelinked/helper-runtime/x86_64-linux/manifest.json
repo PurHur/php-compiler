@@ -8,6 +8,6 @@
     "unit_count": 362,
     "published_fresh": 362,
     "kept_live_unpublished": 0,
-    "total_bytes": 620246328,
+    "total_bytes": 620256400,
     "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)"
 }

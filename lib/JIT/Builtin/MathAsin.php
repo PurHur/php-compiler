@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitAsinKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for asin() via AsinJitHelper PHP (#15130, #27016).
+ * JIT/AOT link for asin() via AsinJitHelper PHP (#15130, #27016, #28263).
  *
- * Embed + thin standalone AOT: {@see AsinJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27048 acos shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering AsinJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathSin #28016 / MathHypot #27909 shape).
+ * NestedJIT no longer needs a libc asin(3) kernel — helper uses NestedJIT-safe fdlibm poly.
  * php-src: ext/standard/math.c — PHP_FUNCTION(asin)
  */
 final class MathAsin
@@ -45,10 +42,6 @@ final class MathAsin
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitAsinKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathAsin
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_ASIN);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_ASIN, $probe);
@@ -80,7 +69,7 @@ final class MathAsin
             self::ASIN_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27016'
+            '#28263'
         );
     }
 }
