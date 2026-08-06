@@ -212,6 +212,9 @@ final class BuiltinInternalArgInfo
             'phpversion' => 'string|false',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)
             'func_get_arg' => 'mixed',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty / absent; Zend void / int (#28022)
+            'gc_disable', 'gc_enable' => 'void',
+            'gc_mem_caches' => 'int',
             // ext/spl/php_spl.stub.php — InternalArgInfo false|array; Zend array only (#27902)
             'spl_autoload_functions' => 'array',
             // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)

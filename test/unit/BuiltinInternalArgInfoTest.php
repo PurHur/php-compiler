@@ -106,6 +106,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['position'], BuiltinParamNames::forFunction('func_get_arg'));
     }
 
+    /** Zend/zend_builtin_functions.stub.php — gc_disable/enable void; gc_mem_caches int (#28022). */
+    public function testGcControlReflectionReturnTypes(): void
+    {
+        $this->assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('gc_disable'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('gc_disable'));
+        $this->assertSame('void', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('gc_enable'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('gc_enable'));
+        $this->assertSame('int', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('gc_mem_caches'));
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('gc_mem_caches'));
+        // Siblings already match Zend via InternalArgInfo.
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('gc_collect_cycles'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('gc_enabled'));
+    }
+
     /** Zend/zend_builtin_functions.stub.php — phpversion(?string $extension = null): string|false (#28004). */
     public function testPhpversionReflectionStub(): void
     {
