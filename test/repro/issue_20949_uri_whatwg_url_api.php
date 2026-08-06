@@ -1,5 +1,6 @@
 <?php
-// Repro for #20949 — Uri\WhatWg\Url withers / resolve / getHostType / UrlValidationError
+// Repro for #20949 — Uri\WhatWg\Url withers / resolve / UrlValidationError
+// Phantoms isSpecialScheme/getHostType/UrlHostType retired for php-src-strict (#28199)
 declare(strict_types=1);
 
 $u = Uri\WhatWg\Url::parse('https://user:pass@example.com:8443/a/b?q=1#f');
@@ -9,11 +10,9 @@ foreach ([
 ] as $m) {
     echo $m, '=', method_exists($u, $m) ? 'yes' : 'no', PHP_EOL;
 }
+echo 'UrlHostType=', enum_exists('Uri\\WhatWg\\UrlHostType') ? 'yes' : 'no', PHP_EOL;
 echo 'UrlValidationError=', class_exists('Uri\\WhatWg\\UrlValidationError') ? 'yes' : 'no', PHP_EOL;
 echo 'UrlValidationErrorType=', enum_exists('Uri\\WhatWg\\UrlValidationErrorType') ? 'yes' : 'no', PHP_EOL;
-
-echo 'special=', $u->isSpecialScheme() ? 'Y' : 'N', PHP_EOL;
-echo 'hostType=', $u->getHostType()->name, PHP_EOL;
 
 $u2 = $u->withScheme('http')->withHost('example.org')->withPath('/z')->withPort(80)->withUsername('a')->withPassword('b');
 echo 'mut=', $u2->toAsciiString(), PHP_EOL;

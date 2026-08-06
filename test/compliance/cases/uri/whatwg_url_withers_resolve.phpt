@@ -1,7 +1,7 @@
 --TEST--
-Uri\WhatWg\Url withers/resolve/getHostType/UrlValidationError (#20949)
+Uri\WhatWg\Url withers/resolve/UrlValidationError (#20949, phantoms retired #28199)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --SKIPIF--
 <?php
 if (!class_exists('Uri\\WhatWg\\Url')) die('skip no Uri\\WhatWg\\Url');
@@ -11,8 +11,9 @@ if (!class_exists('Uri\\WhatWg\\Url')) die('skip no Uri\\WhatWg\\Url');
 declare(strict_types=1);
 
 $u = Uri\WhatWg\Url::parse('https://user:pass@example.com:8443/a/b?q=1#f');
-echo 'special=', $u->isSpecialScheme() ? 'Y' : 'N', "\n";
-echo 'hostType=', $u->getHostType()->name, "\n";
+echo 'isSpecialScheme=', method_exists($u, 'isSpecialScheme') ? 'Y' : 'N', "\n";
+echo 'getHostType=', method_exists($u, 'getHostType') ? 'Y' : 'N', "\n";
+echo 'UrlHostType=', enum_exists('Uri\\WhatWg\\UrlHostType') ? 'Y' : 'N', "\n";
 echo 'UrlValidationError=', class_exists('Uri\\WhatWg\\UrlValidationError') ? 'Y' : 'N', "\n";
 echo 'UrlValidationErrorType=', enum_exists('Uri\\WhatWg\\UrlValidationErrorType') ? 'Y' : 'N', "\n";
 
@@ -32,8 +33,9 @@ $abs = $u->resolve('https://other.test/x');
 echo 'abs=', $abs->toAsciiString(), "\n";
 ?>
 --EXPECT--
-special=Y
-hostType=Domain
+isSpecialScheme=N
+getHostType=N
+UrlHostType=N
 UrlValidationError=Y
 UrlValidationErrorType=Y
 mut=http://a:b@example.org:8080/z?q=1#f
