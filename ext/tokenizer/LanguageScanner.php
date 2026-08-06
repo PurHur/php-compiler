@@ -33,15 +33,6 @@ final class LanguageScanner
      */
     private array $nestStack = [];
 
-    /** @var array<string, int> */
-    private static ?array $keywords = null;
-
-    /** @var list<array{0: string, 1: int}> */
-    private static ?array $multiOps = null;
-
-    /** @var array<string, int> */
-    private static ?array $casts = null;
-
     private function __construct(string $source, int $flags)
     {
         $this->source = $source;
@@ -642,6 +633,12 @@ final class LanguageScanner
             }
         }
 
+        // php-src Zend/zend_language_scanner.l — "private(set)" / "public(set)" / "protected(set)"
+        // as single tokens under PHP 8.4+ (#28130). No spaces inside the parentheses.
+        if ($this->tryAsymmetricSetModifier($startLine)) {
+            return;
+        }
+
         while ($this->pos < $this->len && $this->isLabelContinue($this->source[$this->pos])) {
             ++$this->pos;
         }
@@ -651,6 +648,13 @@ final class LanguageScanner
 
         if ('__halt_compiler' === $lower) {
             $this->pushToken($this->id('T_HALT_COMPILER'), $text, $startLine);
+
+            return;
+        }
+
+        $magicId = self::magicConstantMap()[$lower] ?? null;
+        if (null !== $magicId) {
+            $this->pushToken($magicId, $text, $startLine);
 
             return;
         }
@@ -669,6 +673,41 @@ final class LanguageScanner
         }
 
         $this->pushToken($this->id('T_STRING'), $text, $startLine);
+    }
+
+    /**
+     * php-src: Zend/zend_language_scanner.l T_PRIVATE_SET / T_PUBLIC_SET / T_PROTECTED_SET (#28130).
+     *
+     * Case-insensitive; spaces inside `(set)` are not allowed (falls through to T_PRIVATE + '(' …).
+     */
+    private function tryAsymmetricSetModifier(int $startLine): bool
+    {
+        if (!TokenConstants::usePhp84TokenizerSurface()) {
+            return false;
+        }
+
+        static $literals = [
+            'private(set)' => 'T_PRIVATE_SET',
+            'protected(set)' => 'T_PROTECTED_SET',
+            'public(set)' => 'T_PUBLIC_SET',
+        ];
+
+        foreach ($literals as $literal => $tokenName) {
+            $len = \strlen($literal);
+            if ($this->pos + $len > $this->len) {
+                continue;
+            }
+            $slice = \substr($this->source, $this->pos, $len);
+            if (0 !== \strcasecmp($slice, $literal)) {
+                continue;
+            }
+            $this->pushToken($this->id($tokenName), $slice, $startLine);
+            $this->pos += $len;
+
+            return true;
+        }
+
+        return false;
     }
 
     private function scanQualifiedName(bool $fullyQualified, int $prefixStart = -1, int $prefixLine = -1, string $prefix = ''): void
@@ -833,19 +872,22 @@ final class LanguageScanner
 
     private function id(string $name): int
     {
-        static $map = null;
-        if (null === $map) {
-            $map = TokenConstantsData::nameToId();
+        static $maps = [];
+        $key = TokenConstants::usePhp84TokenizerSurface() ? '84' : '82';
+        if (!isset($maps[$key])) {
+            $maps[$key] = TokenConstantsData::nameToId();
         }
 
-        return $map[$name];
+        return $maps[$key][$name];
     }
 
     /** @return array<string, int> */
     private static function keywordMap(): array
     {
-        if (null !== self::$keywords) {
-            return self::$keywords;
+        static $byProfile = [];
+        $key = TokenConstants::usePhp84TokenizerSurface() ? '84' : '82';
+        if (isset($byProfile[$key])) {
+            return $byProfile[$key];
         }
 
         $skip = [
@@ -892,7 +934,8 @@ final class LanguageScanner
                 || \str_contains($name, 'T_CURLY_OPEN') || \str_contains($name, 'T_DOLLAR_OPEN')
                 || \str_contains($name, 'T_OPEN_TAG') || \str_contains($name, 'T_STRING_VARNAME')
                 || \str_contains($name, 'T_NUM_STRING') || \str_contains($name, 'T_HALT_COMPILER')
-                || \str_ends_with($name, '_C') || \str_contains($name, 'T_LINE') || \str_contains($name, 'T_FILE')
+                || \str_ends_with($name, '_C') || \str_ends_with($name, '_SET')
+                || \str_contains($name, 'T_LINE') || \str_contains($name, 'T_FILE')
                 || \str_contains($name, 'T_DIR') || \str_contains($name, 'T_YIELD_FROM')
             ) {
                 continue;
@@ -900,16 +943,50 @@ final class LanguageScanner
             $keywords[\strtolower(\substr($name, 2))] = $id;
         }
 
-        self::$keywords = $keywords;
+        $byProfile[$key] = $keywords;
 
-        return self::$keywords;
+        return $keywords;
+    }
+
+    /**
+     * php-src Zend/zend_language_scanner.l magic constants (T_*_C / T_LINE / …; #28130).
+     *
+     * @return array<string, int>
+     */
+    private static function magicConstantMap(): array
+    {
+        static $byProfile = [];
+        $key = TokenConstants::usePhp84TokenizerSurface() ? '84' : '82';
+        if (isset($byProfile[$key])) {
+            return $byProfile[$key];
+        }
+
+        $ids = TokenConstantsData::nameToId();
+        $map = [
+            '__line__' => $ids['T_LINE'],
+            '__file__' => $ids['T_FILE'],
+            '__dir__' => $ids['T_DIR'],
+            '__class__' => $ids['T_CLASS_C'],
+            '__trait__' => $ids['T_TRAIT_C'],
+            '__method__' => $ids['T_METHOD_C'],
+            '__function__' => $ids['T_FUNC_C'],
+            '__namespace__' => $ids['T_NS_C'],
+        ];
+        if (isset($ids['T_PROPERTY_C'])) {
+            $map['__property__'] = $ids['T_PROPERTY_C'];
+        }
+        $byProfile[$key] = $map;
+
+        return $map;
     }
 
     /** @return list<array{0: string, 1: int}> */
     private static function multiOpMap(): array
     {
-        if (null !== self::$multiOps) {
-            return self::$multiOps;
+        static $byProfile = [];
+        $key = TokenConstants::usePhp84TokenizerSurface() ? '84' : '82';
+        if (isset($byProfile[$key])) {
+            return $byProfile[$key];
         }
 
         $pairs = [
@@ -955,20 +1032,22 @@ final class LanguageScanner
             $ops[] = [$text, $map[$name]];
         }
         \usort($ops, static fn (array $a, array $b): int => \strlen($b[0]) <=> \strlen($a[0]));
-        self::$multiOps = $ops;
+        $byProfile[$key] = $ops;
 
-        return self::$multiOps;
+        return $ops;
     }
 
     /** @return array<string, int> */
     private static function castMap(): array
     {
-        if (null !== self::$casts) {
-            return self::$casts;
+        static $byProfile = [];
+        $key = TokenConstants::usePhp84TokenizerSurface() ? '84' : '82';
+        if (isset($byProfile[$key])) {
+            return $byProfile[$key];
         }
 
         $map = TokenConstantsData::nameToId();
-        self::$casts = [
+        $casts = [
             '(int)' => $map['T_INT_CAST'],
             '(integer)' => $map['T_INT_CAST'],
             '(bool)' => $map['T_BOOL_CAST'],
@@ -981,7 +1060,8 @@ final class LanguageScanner
             '(object)' => $map['T_OBJECT_CAST'],
             '(unset)' => $map['T_UNSET_CAST'],
         ];
+        $byProfile[$key] = $casts;
 
-        return self::$casts;
+        return $casts;
     }
 }
