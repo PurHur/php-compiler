@@ -693,7 +693,6 @@ class Module extends ModuleAbstract
             new phpc_acosh_kernel(),
             new phpc_asinh_kernel(),
             new phpc_atanh_kernel(),
-            new phpc_exp_kernel(),
             new phpc_expm1_kernel(),
             new phpc_log_kernel(),
             new phpc_log10_kernel(),

@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitExpKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for exp() via ExpJitHelper PHP (#15116, #27047).
+ * JIT/AOT link for exp() via ExpJitHelper PHP (#15116, #27047, #28241).
  *
- * Embed + thin standalone AOT: {@see ExpJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering ExpJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathTan #28226 / MathCos #28042 shape).
+ * NestedJIT no longer needs a libc exp(3) kernel — helper uses NestedJIT-safe ln2 + Horner.
  * php-src: ext/standard/math.c — PHP_FUNCTION(exp)
  */
 final class MathExp
@@ -45,10 +42,6 @@ final class MathExp
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitExpKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathExp
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_EXP);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_EXP, $probe);
@@ -80,7 +69,7 @@ final class MathExp
             self::EXP_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27047'
+            '#28241'
         );
     }
 }
