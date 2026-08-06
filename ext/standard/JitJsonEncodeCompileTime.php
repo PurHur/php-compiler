@@ -24,7 +24,8 @@ use PHPLLVM\Value;
  * `json_encode(array_replace_recursive(lit…))` (#26977),
  * `json_encode(array_flip(lit…))` (#27072),
  * `json_encode(array_combine(lit, lit))` (#27132),
- * `json_encode(array_merge(lit…))` (#27546), and
+ * `json_encode(array_merge(lit…))` (#27546),
+ * `json_encode(array_fill(lit, lit, lit))` (#27073), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
@@ -62,6 +63,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayMerge($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayFill($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromParseUrl($block, $operand);
@@ -461,6 +465,40 @@ final class JitJsonEncodeCompileTime
         $merged = VmArray::merge($first, ...$others);
         $var = new VmVariable();
         $var->array($merged);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_fill(…))` when start/count/value are compile-time (#27073).
+     *
+     * Uses {@see ArrayFillJitHelper::fillCopy()} SSOT (php-src array.c). Call-site
+     * {@see \PHPCompiler\JIT\HashTableFillLlvm} builds a dim/count/foreach-green HT; NestedJIT
+     * json_encode still cannot export those runtime tables (peer #27132 / #27072).
+     */
+    private static function tryCompileTimeArrayFromArrayFill(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_fill');
+        if (null === $args || 3 !== \count($args)) {
+            return null;
+        }
+        if (VmVariable::TYPE_INTEGER !== $args[0]->type
+            || VmVariable::TYPE_INTEGER !== $args[1]->type) {
+            return null;
+        }
+        $start = $args[0]->toInt();
+        $count = $args[1]->toInt();
+        if ($count < 0) {
+            // Leave negative count to runtime ValueError (php-src php_array_fill).
+            return null;
+        }
+        $filled = ArrayFillJitHelper::fillCopy($start, $count, $args[2]);
+        $var = new VmVariable();
+        $var->array($filled);
 
         return $var;
     }
