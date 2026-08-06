@@ -16967,7 +16967,16 @@ class Compiler {
     {
         $encoded = [];
         foreach ($types as $name) {
-            $encoded[] = strtolower(ltrim($name, '\\'));
+            // Intersection arms arrive as a single `A&B` member from php-cfg (#28205).
+            if (str_contains($name, '&')) {
+                $parts = [];
+                foreach (explode('&', $name) as $part) {
+                    $parts[] = strtolower(ltrim($part, '\\'));
+                }
+                $encoded[] = implode('&', $parts);
+            } else {
+                $encoded[] = strtolower(ltrim($name, '\\'));
+            }
         }
 
         return implode('|', $encoded);

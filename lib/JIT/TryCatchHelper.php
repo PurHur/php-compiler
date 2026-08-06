@@ -607,7 +607,11 @@ final class TryCatchHelper
         if ([] === $catchTypes) {
             return 'Throwable';
         }
+        // Intersection `a&b` (#28205): hint from the first member only.
         $lc = $catchTypes[0];
+        if (str_contains($lc, '&')) {
+            $lc = explode('&', $lc, 2)[0];
+        }
         if ('throwable' === $lc) {
             return 'Throwable';
         }

@@ -4067,6 +4067,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.1+ catch intersection types `catch (A&B $e)` (#28205).
+     *
+     * php-parser 4.x rejects `&` in catch lists; {@see Ast\CatchIntersectionSupport} rewrites.
+     * php-src: Zend/zend_language_parser.y catch_list; intersection types RFC (8.1).
+     */
+    public static function supportsCatchIntersectionTypes(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.1.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ parenthesized DNF intersection-only types `(I1&I2) $param` / `(): (I1&I2)`.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
