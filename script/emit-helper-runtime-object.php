@@ -293,6 +293,8 @@ if (null !== $unitPath) {
         // #28104 — self-contained NestedJIT escapeFrom is green in-process; helper-runtime
         // unit.o still segfaults under HELPER_RUNTIME_O=1 (peer htmlspecialchars #25345).
         '/ext/standard/AddslashesJitHelper.php' => true,
+        // #28104 — mutual $i+1 stripFrom/emitEscaped NestedJIT green in-process; unit.o peer.
+        '/ext/standard/StripslashesJitHelper.php' => true,
         // Peer always-helper (#20589); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/VarExportJitHelper.php' => true,
         // var_dump/print_r need consumer-module NestedJIT + live VM (#16075 / #23540).
