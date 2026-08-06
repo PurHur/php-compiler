@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7095 |
-| Phase A inventory files (M2 ratio SSOT) | 7095 |
+| PHP files on vm.php path | 7102 |
+| Phase A inventory files (M2 ratio SSOT) | 7102 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22804 |
+| Source constructs flagged (warnings) | 22831 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4939,14 +4939,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zmq/zmq_send.php` | 0 | 3 |
 | `ext/zmq/zmq_socket.php` | 0 | 3 |
 | `ext/zstd/JitZstd.php` | 0 | 1 |
-| `ext/zstd/Module.php` | 0 | 4 |
+| `ext/zstd/Module.php` | 0 | 10 |
+| `ext/zstd/VmZstdContext.php` | 0 | 9 |
 | `ext/zstd/VmZstdCore.php` | 0 | 1 |
 | `ext/zstd/VmZstdNative.php` | 0 | 1 |
 | `ext/zstd/ZstdExtensionPolicy.php` | 0 | 1 |
 | `ext/zstd/ZstdJitHelper.php` | 0 | 1 |
 | `ext/zstd/zstd_compress.php` | 0 | 1 |
+| `ext/zstd/zstd_compress_add.php` | 0 | 2 |
+| `ext/zstd/zstd_compress_dict.php` | 0 | 2 |
+| `ext/zstd/zstd_compress_init.php` | 0 | 2 |
 | `ext/zstd/zstd_decompress.php` | 0 | 1 |
 | `ext/zstd/zstd_uncompress.php` | 0 | 1 |
+| `ext/zstd/zstd_uncompress_add.php` | 0 | 2 |
+| `ext/zstd/zstd_uncompress_dict.php` | 0 | 2 |
+| `ext/zstd/zstd_uncompress_init.php` | 0 | 2 |
 | `lib/AOT/AutoloadDiscovery.php` | 0 | 2 |
 | `lib/AOT/ExternalMethodBind.php` | 0 | 2 |
 | `lib/AOT/HelperRuntimeCache.php` | 0 | 2 |
@@ -43582,10 +43589,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zstd/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new zstd_compress (line 24)
-- new zstd_decompress (line 25)
-- new zstd_uncompress (line 26)
-- 1 class method(s)
+- new zstd_compress (line 43)
+- new zstd_decompress (line 44)
+- new zstd_uncompress (line 45)
+- new zstd_compress_dict (line 46)
+- new zstd_uncompress_dict (line 47)
+- new zstd_compress_init (line 48)
+- new zstd_compress_add (line 49)
+- new zstd_uncompress_init (line 50)
+- new zstd_uncompress_add (line 51)
+- 2 class method(s)
+
+### `ext/zstd/VmZstdContext.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 41)
+- new ClassEntry (line 47)
+- new ObjectEntry (line 63)
+- new Variable (line 71)
+- new ObjectEntry (line 83)
+- new Variable (line 91)
+- new Error (line 101)
+- new Error (line 122)
+- 6 class method(s)
 
 ### `ext/zstd/VmZstdCore.php`
 
@@ -43612,6 +43638,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/zstd/zstd_compress_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+
+### `ext/zstd/zstd_compress_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+
+### `ext/zstd/zstd_compress_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+
 ### `ext/zstd/zstd_decompress.php`
 
 **Warnings** (review for bootstrap subset):
@@ -43620,6 +43664,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zstd/zstd_uncompress.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/zstd/zstd_uncompress_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/zstd/zstd_uncompress_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/zstd/zstd_uncompress_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
 - 2 class method(s)
 
 ### `lib/AOT/AutoloadDiscovery.php`
