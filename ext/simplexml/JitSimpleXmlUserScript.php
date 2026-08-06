@@ -21,6 +21,12 @@ use PHPLLVM\Value;
  */
 final class JitSimpleXmlUserScript
 {
+    /** Runtime-readable local name on foreach-snapshot SXE objects (#27535). */
+    private const BAKED_NAME_PROP = '__phpc_sxe_name';
+
+    /** Runtime-readable string cast on foreach-snapshot SXE objects (#27535). */
+    private const BAKED_TEXT_PROP = '__phpc_sxe_text';
+
     /** @var \SplObjectStorage<JITVariable, \SimpleXMLElement>|null */
     private static ?\SplObjectStorage $trees = null;
 
@@ -43,6 +49,13 @@ final class JitSimpleXmlUserScript
      * @var array{token: string, elements: list<JITVariable>}|null
      */
     private static ?array $pendingXpathAssign = null;
+
+    /**
+     * Pending host SXE token after materializeElement (load/children/attributes/…).
+     *
+     * @var array{token: string, tree: \SimpleXMLElement}|null
+     */
+    private static ?array $pendingElementAssign = null;
 
     /** @var array<string, list<JITVariable>> */
     private static array $xpathListsByToken = [];
@@ -134,6 +147,191 @@ final class JitSimpleXmlUserScript
         return self::nullValue($context);
     }
 
+    /**
+     * SimpleXMLElement::children — host child view (#27535).
+     * php-src: ext/simplexml/sxe.c — PHP_METHOD(SimpleXMLElement, children)
+     */
+    public static function tryChildren(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $namespaceOrPrefix = null;
+        $isPrefix = true;
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $namespaceOrPrefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $namespaceOrPrefix) {
+                return null;
+            }
+        }
+        if (isset($args[2]) && JITVariable::TYPE_NULL !== $args[2]->type) {
+            $isPrefix = self::compileTimeBool($context, $args[2]);
+            if (null === $isPrefix) {
+                return null;
+            }
+        }
+        try {
+            if (null !== $namespaceOrPrefix) {
+                $view = $tree->children($namespaceOrPrefix, $isPrefix);
+            } else {
+                $view = $tree->children();
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!($view instanceof \SimpleXMLElement)) {
+            return self::nullValue($context);
+        }
+
+        return self::materializeElement($context, $view);
+    }
+
+    /**
+     * SimpleXMLElement::attributes — host attribute view (#27535 sibling).
+     * php-src: ext/simplexml/sxe.c — PHP_METHOD(SimpleXMLElement, attributes)
+     */
+    public static function tryAttributes(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $namespaceOrPrefix = null;
+        $isPrefix = true;
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $namespaceOrPrefix = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null === $namespaceOrPrefix) {
+                return null;
+            }
+        }
+        if (isset($args[2]) && JITVariable::TYPE_NULL !== $args[2]->type) {
+            $isPrefix = self::compileTimeBool($context, $args[2]);
+            if (null === $isPrefix) {
+                return null;
+            }
+        }
+        try {
+            if (null !== $namespaceOrPrefix) {
+                $view = $tree->attributes($namespaceOrPrefix, $isPrefix);
+            } else {
+                $view = $tree->attributes();
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+        if (null === $view) {
+            return self::nullValue($context);
+        }
+        if (!($view instanceof \SimpleXMLElement)) {
+            return self::nullValue($context);
+        }
+
+        return self::materializeElement($context, $view);
+    }
+
+    /**
+     * SimpleXMLElement::getName — host local name (#27535).
+     * php-src: ext/simplexml/sxe.c — PHP_METHOD(SimpleXMLElement, getName)
+     *
+     * Exact host match only — never lastTree (foreach loop vars would all fold to the
+     * last child). Snapshot elements bake the name for runtime reads.
+     */
+    public static function tryGetName(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
+        if (null !== $tree) {
+            try {
+                $name = $tree->getName();
+            } catch (\Throwable) {
+                return null;
+            }
+
+            return self::boxConstantString($context, $name);
+        }
+
+        return self::readBakedStringProp($context, $args[0], self::BAKED_NAME_PROP);
+    }
+
+    /**
+     * Fold (string)$sxe / echo when a host tree is known (#26863).
+     * Exact match only — lastTree would mis-fold foreach values (#27535).
+     */
+    public static function tryToString(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
+        if (null !== $tree) {
+            $text = (string) $tree;
+
+            return self::boxConstantString($context, $text);
+        }
+
+        return self::readBakedStringProp($context, $args[0], self::BAKED_TEXT_PROP);
+    }
+
+    /**
+     * Fold string cast of a value-boxed / object SXE without a class hint (#26863).
+     * Exact match only (#27535).
+     */
+    public static function tryFoldStringCast(Context $context, JITVariable $var): ?JITVariable
+    {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookupExact($var);
+        if (null !== $tree) {
+            $text = (string) $tree;
+
+            return new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($text))
+            );
+        }
+        $boxed = self::readBakedStringProp($context, $var, self::BAKED_TEXT_PROP);
+        if (null === $boxed) {
+            return null;
+        }
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $boxed
+        );
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $str
+        );
+    }
+
+    /**
+     * Host tree for thin-AOT foreach snapshot (#27535).
+     * Prefer exact/token match; fall back to lastTree for load_string results
+     * before pending-assign propagation (same as {@see lookup()}).
+     */
+    public static function hostTreeForForeach(JITVariable $var): ?\SimpleXMLElement
+    {
+        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
+            return null;
+        }
+
+        return self::lookupExact($var) ?? self::$lastTree;
+    }
+
     /** SimpleXMLElement::__get — host child view (#26863). */
     public static function tryGet(Context $context, JITVariable ...$args): ?Value
     {
@@ -219,56 +417,6 @@ final class JitSimpleXmlUserScript
         }
 
         return $context->getTypeFromString('int64')->constInt(\count($tree), false);
-    }
-
-    /**
-     * Fold (string)$sxe / echo when a host tree is known (#26863).
-     */
-    public static function tryToString(Context $context, JITVariable ...$args): ?Value
-    {
-        if ([] === $args || !\extension_loaded('simplexml')) {
-            return null;
-        }
-        $tree = self::lookup($args[0]);
-        if (null === $tree) {
-            return null;
-        }
-        $text = (string) $tree;
-        $str = $context->builder->load($context->constantStringFromString($text));
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $owned
-        );
-
-        return JitValueBox::normalizeValuePtr($context, $slot);
-    }
-
-    /**
-     * Fold string cast of a value-boxed / object SXE without a class hint (#26863).
-     */
-    public static function tryFoldStringCast(Context $context, JITVariable $var): ?JITVariable
-    {
-        if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
-            return null;
-        }
-        $tree = self::lookup($var);
-        if (null === $tree) {
-            return null;
-        }
-        $text = (string) $tree;
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $context->builder->load($context->constantStringFromString($text))
-        );
     }
 
     /**
@@ -605,6 +753,11 @@ final class JitSimpleXmlUserScript
             $obj
         );
         self::store($receiver, $tree, $asRoot);
+        self::bakeElementScalars($context, $receiver, $tree);
+        $token = $receiver->compileTimeString;
+        if (null !== $token) {
+            self::$pendingElementAssign = ['token' => $token, 'tree' => $tree];
+        }
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
@@ -613,6 +766,29 @@ final class JitSimpleXmlUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /**
+     * Attach host SXE token after Call result assign so foreach/getName can resolve (#27535).
+     *
+     * @return bool true when a pending element was applied
+     */
+    public static function applyPendingElementAssign(JITVariable $result): bool
+    {
+        $pending = self::$pendingElementAssign;
+        self::$pendingElementAssign = null;
+        if (null === $pending) {
+            return false;
+        }
+        $result->compileTimeString = $pending['token'];
+        if (null === self::$trees) {
+            self::$trees = new \SplObjectStorage();
+        }
+        self::$trees[$result] = $pending['tree'];
+        self::$treesByToken[$pending['token']] = $pending['tree'];
+        self::$lastTree = $pending['tree'];
+
+        return true;
     }
 
     private static function store(JITVariable $receiver, \SimpleXMLElement $tree, bool $asRoot = false): void
@@ -628,6 +804,117 @@ final class JitSimpleXmlUserScript
         if ($asRoot) {
             self::$lastRoot = $tree;
         }
+    }
+
+    /**
+     * Bind a host SXE onto a foreach-snapshot element Variable and bake name/text (#27535).
+     *
+     * @return string compile-time token
+     */
+    public static function bindHostTreeForSnapshot(
+        Context $context,
+        JITVariable $receiver,
+        \SimpleXMLElement $tree
+    ): string {
+        // Isolate — host foreach reuses one SimpleXMLElement mutated each step.
+        $isolated = self::isolateHostElement($tree);
+        self::store($receiver, $isolated);
+        self::bakeElementScalars($context, $receiver, $isolated);
+
+        return (string) $receiver->compileTimeString;
+    }
+
+    private static function isolateHostElement(\SimpleXMLElement $tree): \SimpleXMLElement
+    {
+        $xml = $tree->asXML();
+        if (false === $xml || '' === $xml) {
+            return clone $tree;
+        }
+        $copy = \simplexml_load_string($xml);
+        if ($copy instanceof \SimpleXMLElement) {
+            return $copy;
+        }
+
+        return clone $tree;
+    }
+
+    private static function bakeElementScalars(Context $context, JITVariable $receiver, \SimpleXMLElement $tree): void
+    {
+        $obj = JITVariable::KIND_VALUE === $receiver->kind
+            ? $receiver->value
+            : $context->builder->load($receiver->value);
+        self::storeBakedStringProp($context, $obj, self::BAKED_NAME_PROP, $tree->getName());
+        self::storeBakedStringProp($context, $obj, self::BAKED_TEXT_PROP, (string) $tree);
+    }
+
+    private static function storeBakedStringProp(Context $context, Value $obj, string $prop, string $text): void
+    {
+        $str = $context->builder->load($context->constantStringFromString($text));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', $prop);
+        $voidPtr = $context->getTypeFromString('void*');
+        $context->builder->store(
+            $context->builder->pointerCast($owned, $voidPtr),
+            $slot
+        );
+    }
+
+    private static function readBakedStringProp(Context $context, JITVariable $receiver, string $prop): ?Value
+    {
+        if (JITVariable::TYPE_OBJECT !== $receiver->type && JITVariable::TYPE_VALUE !== $receiver->type) {
+            return null;
+        }
+        try {
+            if (JITVariable::TYPE_OBJECT === $receiver->type && JITVariable::KIND_VALUE === $receiver->kind) {
+                $obj = $receiver->value;
+            } elseif (JITVariable::TYPE_OBJECT === $receiver->type) {
+                $obj = $context->builder->load($receiver->value);
+            } elseif (JITVariable::TYPE_VALUE === $receiver->type) {
+                $obj = $context->builder->call(
+                    $context->lookupFunction('__value__readObject'),
+                    JitValueBox::valuePtrFromVariable($context, $receiver)
+                );
+            } else {
+                return null;
+            }
+            $slot = $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', $prop);
+            $raw = $context->builder->load($slot);
+            $strPtr = $context->builder->pointerCast($raw, $context->getTypeFromString('__string__*'));
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $strPtr
+            );
+
+            return self::boxOwnedString($context, $owned);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function boxConstantString(Context $context, string $text): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($text));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+
+        return self::boxOwnedString($context, $owned);
+    }
+
+    private static function boxOwnedString(Context $context, Value $owned): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function lookupExact(JITVariable $receiver): ?\SimpleXMLElement
@@ -678,6 +965,18 @@ final class JitSimpleXmlUserScript
         }
 
         return JitStringBuiltinArg::compileTimeLiteral($dim) ?? $dim->compileTimeString;
+    }
+
+    private static function compileTimeBool(Context $context, JITVariable $var): ?bool
+    {
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return 0 !== (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
+            }
+        }
+
+        return null;
     }
 
     private static function nullValue(Context $context): Value

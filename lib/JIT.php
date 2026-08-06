@@ -11826,6 +11826,10 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->scope->toCall
                     );
+                    $this->propagateSimpleXmlElementCompileTime(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     break;
                     } finally {
                         // Peer VM clearOutgoingCallState + restorePendingOutboundCall (#15217 / #27242).
@@ -13827,6 +13831,31 @@ class JIT {
         }
         $var = $this->context->getVariableFromOp($result);
         \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingXpathAssign($var);
+        $name = JIT\OperandName::resolve($result);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->context->resolveRefAliasName($name);
+            if (isset($this->context->namedVariableBindings[$resolved])
+                && $this->context->namedVariableBindings[$resolved] !== $var
+                && null !== $var->compileTimeString
+            ) {
+                $this->context->namedVariableBindings[$resolved]->compileTimeString = $var->compileTimeString;
+            }
+            $this->context->bindVariableByName($resolved, $var);
+        }
+    }
+
+    /**
+     * Attach host SXE token after children/attributes/load/__get/offsetGet (#27535).
+     */
+    private function propagateSimpleXmlElementCompileTime(Operand $result, mixed $toCall): void
+    {
+        if (!$this->context->hasVariableOp($result)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($result);
+        if (!\PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign($var)) {
+            return;
+        }
         $name = JIT\OperandName::resolve($result);
         if (null !== $name && '' !== $name) {
             $resolved = $this->context->resolveRefAliasName($name);
