@@ -1702,6 +1702,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ curl_close()/curl_share_close() #[\Deprecated] E_DEPRECATED on call (#28133).
+     *
+     * php-src: ext/curl/curl.stub.php — since 8.5, "as it has no effect since PHP 8.0".
+     * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsCurlCloseDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ deprecates non-canonical cast spellings (integer)/(boolean)/(double)/(binary).
      *
      * php-src: Zend/zend_language_scanner.l (#26281).

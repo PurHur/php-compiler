@@ -269,6 +269,7 @@ require_once __DIR__.'/../../../ext/ctype/ctype_upper.php';
 require_once __DIR__.'/../../../ext/ctype/ctype_xdigit.php';
 require_once __DIR__.'/../../../ext/curl/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/curl/CurlConstants.php';
+require_once __DIR__.'/../../../ext/curl/CurlCloseDeprecation.php';
 require_once __DIR__.'/../../../ext/curl/CurlExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/curl/CurlFileBuiltin.php';
 require_once __DIR__.'/../../../ext/curl/CurlFileSerializeDeny.php';
