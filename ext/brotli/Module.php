@@ -34,11 +34,18 @@ class Module extends ModuleAbstract
             'BROTLI_PROCESS' => VmBrotliContext::OP_PROCESS,
             'BROTLI_FLUSH' => VmBrotliContext::OP_FLUSH,
             'BROTLI_FINISH' => VmBrotliContext::OP_FINISH,
+            'BROTLI_VERSION_NUMBER' => VmBrotliNative::versionNumber(),
         ] as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        $versionText = new \PHPCompiler\VM\Variable();
+        $versionText->string(VmBrotliNative::versionText());
+        $runtime->vmContext->defineConstant('BROTLI_VERSION_TEXT', $versionText);
+        $dict = new \PHPCompiler\VM\Variable();
+        $dict->bool(VmBrotliNative::dictionarySupport());
+        $runtime->vmContext->defineConstant('BROTLI_DICTIONARY_SUPPORT', $dict);
     }
 
     public function getFunctions(): array
@@ -54,6 +61,12 @@ class Module extends ModuleAbstract
             new brotli_compress_add(),
             new brotli_uncompress_init(),
             new brotli_uncompress_add(),
+            new ns_compress(),
+            new ns_uncompress(),
+            new ns_compress_init(),
+            new ns_compress_add(),
+            new ns_uncompress_init(),
+            new ns_uncompress_add(),
         ];
     }
 }

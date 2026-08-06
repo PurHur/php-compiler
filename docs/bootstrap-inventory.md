@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7145 |
-| Phase A inventory files (M2 ratio SSOT) | 7145 |
+| PHP files on vm.php path | 7151 |
+| Phase A inventory files (M2 ratio SSOT) | 7151 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22925 |
+| Source constructs flagged (warnings) | 22943 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -88,7 +88,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/brotli/BrotliExtensionPolicy.php` | 0 | 1 |
 | `ext/brotli/BrotliJitHelper.php` | 0 | 1 |
 | `ext/brotli/JitBrotli.php` | 0 | 1 |
-| `ext/brotli/Module.php` | 0 | 7 |
+| `ext/brotli/Module.php` | 0 | 13 |
 | `ext/brotli/VmBrotliContext.php` | 0 | 9 |
 | `ext/brotli/VmBrotliNative.php` | 0 | 1 |
 | `ext/brotli/VmBrotliStream.php` | 0 | 1 |
@@ -98,6 +98,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/brotli/brotli_uncompress.php` | 0 | 1 |
 | `ext/brotli/brotli_uncompress_add.php` | 0 | 2 |
 | `ext/brotli/brotli_uncompress_init.php` | 0 | 2 |
+| `ext/brotli/ns_compress.php` | 0 | 2 |
+| `ext/brotli/ns_compress_add.php` | 0 | 2 |
+| `ext/brotli/ns_compress_init.php` | 0 | 2 |
+| `ext/brotli/ns_uncompress.php` | 0 | 2 |
+| `ext/brotli/ns_uncompress_add.php` | 0 | 2 |
+| `ext/brotli/ns_uncompress_init.php` | 0 | 2 |
 | `ext/bz2/Bz2ExtensionPolicy.php` | 0 | 1 |
 | `ext/bz2/Bz2JitHelper.php` | 0 | 1 |
 | `ext/bz2/Bz2StreamJitHelper.php` | 0 | 1 |
@@ -7523,12 +7529,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/brotli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new brotli_compress (line 51)
-- new brotli_uncompress (line 52)
-- new brotli_compress_init (line 53)
-- new brotli_compress_add (line 54)
-- new brotli_uncompress_init (line 55)
-- new brotli_uncompress_add (line 56)
+- new brotli_compress (line 58)
+- new brotli_uncompress (line 59)
+- new brotli_compress_init (line 60)
+- new brotli_compress_add (line 61)
+- new brotli_uncompress_init (line 62)
+- new brotli_uncompress_add (line 63)
+- new ns_compress (line 64)
+- new ns_uncompress (line 65)
+- new ns_compress_init (line 66)
+- new ns_compress_add (line 67)
+- new ns_uncompress_init (line 68)
+- new ns_uncompress_add (line 69)
 - 2 class method(s)
 
 ### `ext/brotli/VmBrotliContext.php`
@@ -7547,7 +7559,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/brotli/VmBrotliNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 10 class method(s)
 
 ### `ext/brotli/VmBrotliStream.php`
 
@@ -7586,6 +7598,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/brotli/ns_compress.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_compress (line 25)
+- 2 class method(s)
+
+### `ext/brotli/ns_compress_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_compress_add (line 21)
+- 2 class method(s)
+
+### `ext/brotli/ns_compress_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_compress_init (line 21)
+- 2 class method(s)
+
+### `ext/brotli/ns_uncompress.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_uncompress (line 21)
+- 2 class method(s)
+
+### `ext/brotli/ns_uncompress_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_uncompress_add (line 21)
+- 2 class method(s)
+
+### `ext/brotli/ns_uncompress_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new brotli_uncompress_init (line 21)
 - 2 class method(s)
 
 ### `ext/bz2/Bz2ExtensionPolicy.php`

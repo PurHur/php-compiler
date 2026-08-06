@@ -40,6 +40,46 @@ final class VmBrotliNative
         return null !== self::encoderFfi() && null !== self::decoderFfi();
     }
 
+    /**
+     * BrotliDecoderVersion() packed int — pecl brotli.c BROTLI_VERSION_NUMBER (#28092).
+     */
+    public static function versionNumber(): int
+    {
+        $dec = self::decoderFfi();
+        if (null === $dec) {
+            return 0;
+        }
+        try {
+            return (int) $dec->BrotliDecoderVersion();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * "%d.%d.%d" from packed version — pecl brotli.c BROTLI_VERSION_TEXT (#28092).
+     */
+    public static function versionText(): string
+    {
+        $n = self::versionNumber();
+        $major = $n >> 24;
+        $minor = ($n >> 12) & 0xfff;
+        $patch = $n & 0xfff;
+
+        return $major.'.'.$minor.'.'.$patch;
+    }
+
+    /**
+     * Dictionary APIs when libbrotli ≥ 1.1.0 — pecl USE_BROTLI_DICTIONARY (#28092).
+     *
+     * This build does not yet wire dict parameters through compress/uncompress;
+     * report false until that surface lands (constant still defined).
+     */
+    public static function dictionarySupport(): bool
+    {
+        return false;
+    }
+
     public static function compress(string $data, int $quality = self::DEFAULT_QUALITY, int $mode = self::MODE_GENERIC): string|false
     {
         $enc = self::encoderFfi();
@@ -218,11 +258,13 @@ CDEF;
 
         $cdef = <<<'CDEF'
 typedef int BrotliBOOL;
+typedef unsigned int uint32_t;
 BrotliBOOL BrotliDecoderDecompress(
     size_t encoded_size,
     const uint8_t* encoded_buffer,
     size_t* decoded_size,
     uint8_t* decoded_buffer);
+uint32_t BrotliDecoderVersion(void);
 CDEF;
 
         foreach (['libbrotlidec.so.1', 'libbrotlidec.so'] as $lib) {
