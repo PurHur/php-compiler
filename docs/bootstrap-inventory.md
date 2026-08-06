@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7137 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22919 |
+| Source constructs flagged (warnings) | 22923 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5148,7 +5148,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
-| `lib/JIT/ArrayFindLlvm.php` | 0 | 2 |
+| `lib/JIT/ArrayFindLlvm.php` | 0 | 6 |
 | `lib/JIT/ArrayFlipLlvm.php` | 0 | 4 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayMapLlvm.php` | 0 | 5 |
@@ -41283,11 +41283,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/LanguageScanner.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 57)
-- new ParseError (line 796)
-- new ParseError (line 801)
-- new ParseError (line 815)
-- 36 class method(s)
+- new self (line 48)
+- new ParseError (line 835)
+- new ParseError (line 840)
+- new ParseError (line 854)
+- 38 class method(s)
 - 1 closure(s)
 
 ### `ext/tokenizer/Module.php`
@@ -41338,12 +41338,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/TokenConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/tokenizer/TokenConstantsData.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `ext/tokenizer/TokenGetAllJitHelper.php`
 
@@ -45674,8 +45674,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayFindLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new NestedClosureInvoke (line 91)
-- 2 class method(s)
+- new Variable (line 101)
+- new NestedClosureInvoke (line 102)
+- new Variable (line 184)
+- new Variable (line 192)
+- new NestedClosureInvoke (line 193)
+- 3 class method(s)
 
 ### `lib/JIT/ArrayFlipLlvm.php`
 
