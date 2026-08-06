@@ -154,7 +154,11 @@ final class Sqlite3Constants
         'RECURSIVE' => 'RECURSIVE',
     ];
 
-    /** @var array<string, int> Storage keys lowercase (VM class-const lookup). */
+    /**
+     * Legacy lowercase map keys; VmSQLite3Stmt registers under CLASS_CONSTANT_NAMES (#28098 / #25929).
+     *
+     * @var array<string, int>
+     */
     public const STMT_CLASS_CONSTANTS = [
         'explain_mode_prepared' => self::EXPLAIN_MODE_PREPARED,
         'explain_mode_explain' => self::EXPLAIN_MODE_EXPLAIN,

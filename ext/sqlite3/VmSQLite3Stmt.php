@@ -33,11 +33,14 @@ final class VmSQLite3Stmt
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SQLite3Stmt');
         $entry->isInternal = true;
+        // Declared casing is the storage key (ClassConstName / #25929); STMT map
+        // keys are lowercase legacy labels — use CLASS_CONSTANT_NAMES (#28098).
         foreach (Sqlite3Constants::STMT_CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = Sqlite3Constants::STMT_CLASS_CONSTANT_NAMES[$name];
+            $canonical = Sqlite3Constants::STMT_CLASS_CONSTANT_NAMES[$name];
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         foreach ([
