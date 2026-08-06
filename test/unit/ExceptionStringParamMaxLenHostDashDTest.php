@@ -174,6 +174,33 @@ final class ExceptionStringParamMaxLenHostDashDTest extends TestCase
         );
     }
 
+    /** Distro php.ini max_len=0 must not override guest compiled default 15 (#28061). */
+    public function testHostPhpIniAloneKeepsCompiledDefaultMaxLen(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        $script = realpath($repoRoot.'/test/repro/issue_24486_exception_string_param_max_len_trace.php');
+        if (false === $vm || false === $script) {
+            $this->markTestSkipped('vm or repro missing');
+        }
+
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'zend.exception_ignore_args=0',
+            '-d',
+            'display_errors=0',
+            $vm,
+            $script,
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        $this->assertMatchesRegularExpression(
+            "/^#0 .+g\\('hello'\\)\\n15\\n\\z/",
+            $result['stdout']
+        );
+    }
+
     /**
      * @param list<string> $cmd
      *

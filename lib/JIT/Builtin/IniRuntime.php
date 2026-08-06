@@ -267,10 +267,10 @@ final class IniRuntime
         $context->builder->branchIf($isIgnore, $thinBb, $nestedBb);
 
         $context->builder->positionAtEnd($thinBb);
-        // php-src default On since PHP 8.0 (#21998).
+        // php-src compiled default Off (`"0"`) — Zend/zend.c (#28061).
         $i8 = $context->getTypeFromString('int8');
         $context->builder->store(
-            $i8->constInt(1, false),
+            $i8->constInt(0, false),
             self::globalPtr($context, self::G_EXCEPTION_IGNORE_ARGS, $i8)
         );
         $context->builder->branch($doneBb);
@@ -501,9 +501,9 @@ final class IniRuntime
         }
         $i8 = $context->getTypeFromString('int8');
         if (null === $context->module->getNamedGlobal(self::G_EXCEPTION_IGNORE_ARGS)) {
-            // php-src EG(exception_ignore_args) default On (#21998).
+            // php-src EG(exception_ignore_args) compiled default Off (#28061).
             $g = $context->module->addGlobal($i8, self::G_EXCEPTION_IGNORE_ARGS);
-            $g->setInitializer($i8->constInt(1, false));
+            $g->setInitializer($i8->constInt(0, false));
         }
     }
 
