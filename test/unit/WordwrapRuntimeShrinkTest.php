@@ -51,6 +51,14 @@ final class WordwrapRuntimeShrinkTest extends TestCase
             'super|calif|ragil|istic',
             WordwrapJitHelper::wordwrapArgv('supercalifragilistic', 5, '|', 1)
         );
+        // #27237 — issue repro (helper SSOT; AOT default cache covered by test/repro/issue_27237_aot_wordwrap.php)
+        $this->assertSame('hello|world|foo', WordwrapJitHelper::wordwrapArgv('hello world foo', 5, '|', 0));
+        $this->assertSame('hello|world|foo', WordwrapJitHelper::wordwrapArgv('hello world foo', 5, '|', 1));
+        $this->assertSame('veryl|ongwo|rd', WordwrapJitHelper::wordwrapArgv('verylongword', 5, '|', 1));
+        $this->assertSame(
+            'hello|world|foo',
+            VmString::wordwrap('hello world foo', 5, '|', true)
+        );
     }
 
     public function testSpineBundleOmitsDeletedJitWordwrap(): void

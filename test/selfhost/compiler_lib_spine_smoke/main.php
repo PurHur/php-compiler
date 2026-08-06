@@ -5793,6 +5793,7 @@ require_once __DIR__.'/../../../lib/JIT/HashTablePadLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableElemLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableFillLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableFillKeysLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/HashTableChangeKeyCaseLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableCombineLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableMergeLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableValuesLlvm.php';

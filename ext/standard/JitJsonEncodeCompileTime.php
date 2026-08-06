@@ -13,6 +13,7 @@ use PHPCompiler\OpCode;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
 use PHPLLVM\Value;
 
 /**
@@ -27,7 +28,8 @@ use PHPLLVM\Value;
  * `json_encode(array_merge(lit…))` (#27546),
  * `json_encode(array_reverse(lit…))` (#27130),
  * `json_encode(array_fill(lit, lit, lit))` (#27073),
- * `json_encode(array_fill_keys(lit, lit))` (#27127), and
+ * `json_encode(array_fill_keys(lit, lit))` (#27127),
+ * `json_encode(array_change_key_case(lit…))` (#27183), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
@@ -74,6 +76,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayFillKeys($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayChangeKeyCase($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromParseUrl($block, $operand);
@@ -578,6 +583,40 @@ final class JitJsonEncodeCompileTime
     }
 
     /**
+     * Resolve `json_encode(array_change_key_case(…))` when args are compile-time (#27183).
+     *
+     * Uses VM {@see VmArray::changeKeyCase()} SSOT (php-src array.c). Call-site
+     * {@see \PHPCompiler\JIT\HashTableChangeKeyCaseLlvm} builds a dim/count/isset-green HT;
+     * NestedJIT json_encode still cannot export runtime string-key tables (peer #27072 / #27127).
+     */
+    private static function tryCompileTimeArrayFromArrayChangeKeyCase(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_change_key_case');
+        if (null === $args || \count($args) < 1 || \count($args) > 2) {
+            return null;
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[0]->type) {
+            return null;
+        }
+        $case = StdlibConstants::CASE_LOWER;
+        if (2 === \count($args)) {
+            if (VmVariable::TYPE_INTEGER !== $args[1]->type) {
+                return null;
+            }
+            $case = $args[1]->toInt();
+        }
+        $changed = VmArray::changeKeyCase($args[0]->toArray(), $case);
+        $var = new VmVariable();
+        $var->array($changed);
+
+        return $var;
+    }
+
+    /**
      * Resolve `json_encode(parse_url(…))` when URL(/component) are compile-time (#27078).
      *
      * Uses {@see VmString::parseUrl()} SSOT (php-src url.c). parse_url call-site LLVM
@@ -793,6 +832,14 @@ final class JitJsonEncodeCompileTime
                 $args[] = $copy;
                 continue;
             }
+            // Core int constants (CASE_LOWER / CASE_UPPER / …) via CONST_FETCH (#27183).
+            $foldedInt = self::tryCompileTimeIntFromSlot($block, (int) $op->arg1);
+            if (null !== $foldedInt) {
+                $copy = new VmVariable();
+                $copy->int($foldedInt);
+                $args[] = $copy;
+                continue;
+            }
             // Concat / assign of string literals (parse_url URL from `"a"."b"`, #27078).
             $foldedString = self::tryCompileTimeStringFromSlot($block, (int) $op->arg1);
             if (null !== $foldedString) {
@@ -814,6 +861,53 @@ final class JitJsonEncodeCompileTime
         }
 
         return $args;
+    }
+
+    /**
+     * Fold CONST_FETCH of known core int constants (CASE_LOWER / PATHINFO_* / …).
+     *
+     * @param array<int, true> $visited
+     */
+    private static function tryCompileTimeIntFromSlot(Block $block, int $slot, array $visited = []): ?int
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        if (isset($block->constants[$slot]) && VmVariable::TYPE_INTEGER === $block->constants[$slot]->type) {
+            return $block->constants[$slot]->toInt();
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH !== $op->type || $op->arg1 !== $slot) {
+                continue;
+            }
+            $nameOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : $block->getOperand($op->arg2);
+            if (!$nameOp instanceof Literal) {
+                return null;
+            }
+            $lookup = \strtolower((string) $nameOp->value);
+
+            return StdlibConstants::CORE_INT_BY_NAME[$lookup] ?? null;
+        }
+        foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_ASSIGN === $prior->type && $prior->arg2 === $slot && null !== $prior->arg3) {
+                $resolved = self::tryCompileTimeIntFromSlot($block, (int) $prior->arg3, $visited);
+                if (null !== $resolved) {
+                    return $resolved;
+                }
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = self::tryCompileTimeIntFromSlot($parent, $slot, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
     }
 
     /**

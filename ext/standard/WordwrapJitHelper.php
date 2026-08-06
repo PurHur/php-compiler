@@ -13,6 +13,10 @@ namespace PHPCompiler\ext\standard;
  *
  * Logic mirrors VmString wordwrap() / php-src ext/standard/string.c PHP_FUNCTION(wordwrap).
  * NestedJIT: string concat only (no array mutation + implode); isset length; private helpers OK.
+ *
+ * Helper-runtime prelink must track NestedJIT string IR: a fingerprint-fresh unit.o can still
+ * garble / abort under default `phpc build` (HELPER_RUNTIME_O unset/1) while HELPER_RUNTIME_O=0
+ * NestedJIT matches Zend (#27217 peer class / #27237). Re-emit after string-lowering changes.
  */
 final class WordwrapJitHelper
 {
