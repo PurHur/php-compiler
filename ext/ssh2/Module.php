@@ -70,6 +70,7 @@ class Module extends ModuleAbstract
             new ssh2_keepalive_send(),
             new ssh2_set_timeout(),
             new ssh2_shell_resize(),
+            new ssh2_poll(),
             new ssh2_shell(),
             new ssh2_tunnel(),
             new ssh2_forward_listen(),
