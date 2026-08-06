@@ -1312,7 +1312,10 @@ class Context {
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
         $this->functionProxies['reflectionconstant::getname'] = new Call\ReflectionConstantGetName();
         $this->functionProxies['reflectionconstant::getvalue'] = new Call\ReflectionConstantGetValue();
-        $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
+        // PHP 8.5+ only — withhold on ≤8.4 profiles (#28157).
+        if (CompilerVersion::advertisesReflectionConstantGetAttributes()) {
+            $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
+        }
         // ReflectionClassConstant::$class+$name layout — not ReflectionConstant::$name+$constant (#25963).
         $this->functionProxies['reflectionclassconstant::getattributes'] = new Call\ReflectionClassConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();

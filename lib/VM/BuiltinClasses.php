@@ -1367,8 +1367,11 @@ final class BuiltinClasses
             }
             $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
             $rconst->methodVisibility['getvalue'] = $pub;
-            $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
-            $rconst->methodVisibility['getattributes'] = $pub;
+            // PHP 8.5+ only — absent on PHP-8.4 stubs (#28157).
+            if (CompilerVersion::advertisesReflectionConstantGetAttributes()) {
+                $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
+                $rconst->methodVisibility['getattributes'] = $pub;
+            }
             // php-src ReflectionConstant never exposes ReflectionClassConstant APIs
             // (getDeclaringClass/getModifiers/getType/is*/getDeprecatedMessage/Version) — #28156.
             if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {

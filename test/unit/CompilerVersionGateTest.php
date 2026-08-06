@@ -1172,6 +1172,7 @@ final class CompilerVersionGateTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::advertisesReflectionConstantClass());
             $this->assertFalse(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantGetAttributes());
             $this->assertFalse(CompilerVersion::advertisesReflectionConstantInNamespace());
         } finally {
             if (false === $prev) {
@@ -1189,6 +1190,7 @@ final class CompilerVersionGateTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::advertisesReflectionConstantClass());
             $this->assertFalse(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantGetAttributes());
             $this->assertFalse(CompilerVersion::advertisesReflectionConstantInNamespace());
         } finally {
             if (false === $prev) {
@@ -1205,6 +1207,7 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $this->assertTrue(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantGetAttributes());
             $this->assertFalse(CompilerVersion::advertisesReflectionConstantInNamespace());
         } finally {
             if (false === $prev) {
@@ -1222,6 +1225,7 @@ final class CompilerVersionGateTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::advertisesReflectionConstantInNamespace());
             $this->assertTrue(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantGetAttributes());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

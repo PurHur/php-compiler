@@ -740,6 +740,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ ReflectionConstant::getAttributes()
+     * (ext/reflection/php_reflection.stub.php — absent on PHP-8.4.x stubs; #28157).
+     *
+     * Withheld on ≤8.4 profiles (php-src-strict phantom gate). ReflectionClassConstant::getAttributes()
+     * is unrelated and remains available whenever that class is registered.
+     */
+    public static function advertisesReflectionConstantGetAttributes(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.6+ ReflectionConstant::inNamespace() (php/php-src#20902, master 2026-02-17).
      *
      * Absent on PHP-8.4 / PHP-8.5 stubs — withhold on ≤8.5 profiles (#22662).

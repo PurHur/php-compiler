@@ -120,4 +120,69 @@ PHP;
             }
         }
     }
+
+    public function testReflectionConstantGetAttributesAbsentOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantGetAttributes());
+
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$c = new ReflectionConstant('PHP_VERSION');
+echo method_exists($c, 'getAttributes') ? '1' : '0', "\n";
+class C28157 { public const X = 1; }
+$rcc = new ReflectionClassConstant(C28157::class, 'X');
+echo method_exists($rcc, 'getAttributes') ? '1' : '0', "\n";
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'reflection_constant_getattributes_84.php'));
+            $out = ob_get_clean();
+
+            $this->assertSame("0\n1", trim($out));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testReflectionConstantGetAttributesPresentOnProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantGetAttributes());
+
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+#[\Attribute]
+class Attr28157 {}
+#[Attr28157]
+const C28157_ATTR = 1;
+$c = new ReflectionConstant('C28157_ATTR');
+echo method_exists($c, 'getAttributes') ? '1' : '0', "\n";
+$attrs = $c->getAttributes();
+echo count($attrs), ':', $attrs[0]->getName(), "\n";
+$plain = new ReflectionConstant('PHP_VERSION');
+echo count($plain->getAttributes()), "\n";
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'reflection_constant_getattributes_85.php'));
+            $out = ob_get_clean();
+
+            $this->assertSame("1\n1:Attr28157\n0", trim($out));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
