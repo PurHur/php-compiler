@@ -3169,7 +3169,7 @@ final class VmReflection
         }
     }
 
-    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128, #22341, #28137). */
+    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128, #22341, #28137, #28248). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
     {
         $constants = [
@@ -3188,6 +3188,11 @@ final class VmReflection
             $constants['is_public_set'] = self::REFLECTION_IS_PUBLIC_SET;
             $constants['is_protected_set'] = self::REFLECTION_IS_PROTECTED_SET;
             $constants['is_private_set'] = self::REFLECTION_IS_PRIVATE_SET;
+        }
+        // php-src 8.4+ property-hook flags (ZEND_ACC_VIRTUAL / ZEND_ACC_ABSTRACT) — #28248.
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $constants['is_virtual'] = self::REFLECTION_IS_VIRTUAL;
+            $constants['is_abstract'] = self::REFLECTION_METHOD_IS_ABSTRACT;
         }
         self::registerIntClassConstants($entry, $constants);
     }
@@ -3388,9 +3393,9 @@ final class VmReflection
     }
 
     /**
-     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143, #22341, #28137).
+     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143, #22341, #28137, #28248).
      * Dynamic properties are public-only (ZEND_ACC_PUBLIC|ZEND_ACC_VIRTUAL).
-     * keep_flags includes ZEND_ACC_FINAL and ZEND_ACC_*_SET for PHP 8.4+.
+     * keep_flags includes ZEND_ACC_FINAL, ZEND_ACC_*_SET, ZEND_ACC_VIRTUAL, ZEND_ACC_ABSTRACT (8.4+).
      */
     public static function propertyReflectionModifiers(
         ClassEntry $entry,
@@ -3426,6 +3431,16 @@ final class VmReflection
             || \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($meta['setVisibility'])
         ) {
             $modifiers |= self::REFLECTION_IS_FINAL;
+        }
+        // php-src prop->flags & ZEND_ACC_VIRTUAL → ReflectionProperty::IS_VIRTUAL (#28248).
+        if (\PHPCompiler\VM\ReflectionPropertyHookSupport::isVirtual($entry, $instance, $property, $ctx)) {
+            $modifiers |= self::REFLECTION_IS_VIRTUAL;
+        }
+        // php-src prop->flags & ZEND_ACC_ABSTRACT → ReflectionProperty::IS_ABSTRACT (#28248).
+        if (null !== $instance
+            && \PHPCompiler\VM\AbstractPropertyHookCheck::isAbstractHookProperty($entry, $instance, $ctx)
+        ) {
+            $modifiers |= self::REFLECTION_METHOD_IS_ABSTRACT;
         }
 
         return $modifiers;
