@@ -62,4 +62,44 @@ final class DomParseSimpleHtmlJitHelper
 
         return $attrs['id'] ?? null;
     }
+
+    /**
+     * Body element textContent for Dom\HTMLDocument::createFromString AOT (#27300).
+     *
+     * Mirrors loadHTML wrapping: explicit {@code <body>} wins; otherwise the
+     * fragment (minus doctype / outer html) becomes the implied body content.
+     */
+    public static function bodyTextContentArgv(string $html): ?string
+    {
+        $trimmed = trim($html);
+        if ('' === $trimmed || '<' !== $trimmed[0]) {
+            return null;
+        }
+        if (1 === preg_match('/<body\b[^>]*>(.*?)<\/body>/is', $trimmed, $m)) {
+            return VmDom::decodeHtmlCharacterReferences(self::stripTagsToText($m[1]));
+        }
+        $withoutDoctype = preg_replace('/^<!DOCTYPE[^>]*>\s*/i', '', $trimmed) ?? $trimmed;
+        $withoutDoctype = trim($withoutDoctype);
+        if ('' === $withoutDoctype) {
+            return null;
+        }
+        if (1 === preg_match('/<html\b[^>]*>(.*?)<\/html>/is', $withoutDoctype, $m)) {
+            $inner = $m[1];
+            if (1 === preg_match('/<body\b[^>]*>(.*?)<\/body>/is', $inner, $bm)) {
+                return VmDom::decodeHtmlCharacterReferences(self::stripTagsToText($bm[1]));
+            }
+            // Strip head so title/script do not pollute implied body textContent.
+            $inner = preg_replace('/<head\b[^>]*>.*?<\/head>/is', '', $inner) ?? $inner;
+
+            return VmDom::decodeHtmlCharacterReferences(self::stripTagsToText($inner));
+        }
+
+        return VmDom::decodeHtmlCharacterReferences(self::stripTagsToText($withoutDoctype));
+    }
+
+    private static function stripTagsToText(string $markup): string
+    {
+        // php-src textContent concatenates descendant text nodes (no inter-element spaces).
+        return strip_tags($markup);
+    }
 }

@@ -30,6 +30,7 @@ use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
 use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
 use PHPCompiler\JIT\Builtin\DomXPathEvaluateRuntime;
 use PHPCompiler\JIT\Builtin\DomXPathQueryRuntime;
+use PHPCompiler\JIT\Builtin\DomHtmlDocumentCreateFromStringRuntime;
 use PHPCompiler\JIT\Builtin\DomXmlDocumentCreateFromStringRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -247,6 +248,23 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__object__*'),
             'PHPCompiler\\ext\\dom\\DomXmlDocumentCreateFromStringJitHelper::createFromStringArgv',
             '/ext/dom/DomXmlDocumentCreateFromStringJitHelper.php'
+        );
+    }
+
+    /** Dom\HTMLDocument::createFromString() — thin AOT (#27300). */
+    public static function ensureHtmlDocumentCreateFromStringBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomHtmlDocumentCreateFromStringRuntime::ABI_NAME,
+            'dom_html_document_create_from_string_user_script',
+            [
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomHtmlDocumentCreateFromStringJitHelper::createFromStringArgv',
+            '/ext/dom/DomHtmlDocumentCreateFromStringJitHelper.php'
         );
     }
 

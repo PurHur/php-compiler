@@ -3615,6 +3615,12 @@ class Object_ extends Type {
             $this->defineMethodVisibility($id, 'createfromstring', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
             $this->defineMethodVisibility($id, 'createattribute', \PHPCfg\Func::FLAG_PUBLIC);
         }
+        if ('dom\\htmldocument' === $lcname) {
+            // Living HTMLDocument body/documentElement slots for thin AOT createFromString (#27300).
+            $this->defineProperty($id, 'documentElement', Variable::TYPE_OBJECT);
+            $this->defineProperty($id, 'body', Variable::TYPE_OBJECT);
+            $this->defineMethodVisibility($id, 'createfromstring', \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC);
+        }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);

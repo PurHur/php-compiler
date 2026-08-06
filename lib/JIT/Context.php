@@ -1362,9 +1362,10 @@ class Context {
         // finfo::__construct / finfo::file — thin AOT MIME sniff (#27196, re-#3366).
         $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
         $this->functionProxies['finfo::file'] = new Call\FinfoFile();
-        // Dom\XMLDocument::createFromString — avoid ExternalMethod silent NULL (#27108).
+        // Dom\XMLDocument / Dom\HTMLDocument::createFromString — avoid ExternalMethod silent NULL (#27108, #27300).
         if (CompilerVersion::supportsDomLivingStandardNamespace()) {
             $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
+            $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
         }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
