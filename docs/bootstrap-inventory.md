@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7161 |
-| Phase A inventory files (M2 ratio SSOT) | 7161 |
+| PHP files on vm.php path | 7162 |
+| Phase A inventory files (M2 ratio SSOT) | 7162 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22970 |
+| Source constructs flagged (warnings) | 22971 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3110,6 +3110,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrtotime.php` | 0 | 1 |
 | `ext/standard/JitStrtr.php` | 0 | 1 |
 | `ext/standard/JitSubstrReplace.php` | 0 | 1 |
+| `ext/standard/JitSubstrReplaceArray.php` | 0 | 1 |
 | `ext/standard/JitSuperglobalName.php` | 0 | 1 |
 | `ext/standard/JitSuperglobalRefreshKernel.php` | 0 | 1 |
 | `ext/standard/JitSymlink.php` | 0 | 1 |
@@ -30730,6 +30731,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitSubstrReplaceArray.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/JitSuperglobalName.php`
 
 **Warnings** (review for bootstrap subset):
@@ -40415,8 +40421,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 257)
-- new Variable (line 301)
+- new HashTable (line 277)
+- new Variable (line 321)
 - 11 class method(s)
 
 ### `ext/standard/symlink_.php`
