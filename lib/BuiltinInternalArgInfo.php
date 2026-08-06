@@ -81,8 +81,8 @@ final class BuiltinInternalArgInfo
             'fsync', 'fdatasync' => 'bool',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says array (#25508)
             'stream_context_create' => '',
-            // ext/standard/basic_functions.stub.php — InternalArgInfo omits return (#25480)
-            'restore_error_handler' => 'true',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#25480, #28223)
+            'restore_error_handler', 'restore_exception_handler' => 'true',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits / empty (#25623)
             'preg_last_error_msg' => 'string',
             'error_clear_last' => 'void',

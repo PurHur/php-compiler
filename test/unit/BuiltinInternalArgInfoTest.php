@@ -249,6 +249,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('get_debug_type'));
     }
 
+    /** php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#28223). */
+    public function testRestoreExceptionHandlerReturnTypeIsTrue(): void
+    {
+        $this->assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('restore_exception_handler'));
+        $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction('restore_exception_handler'));
+        $this->assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('restore_error_handler'));
+        $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction('restore_error_handler'));
+    }
+
     /** php-src array.stub.php — InternalArgInfo return bool; Zend true (#26172). */
     public function testUsortKsortFamilyReturnTypeIsTrue(): void
     {
