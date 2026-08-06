@@ -19,8 +19,11 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__hashtable__setLongAt', $runtime);
         $this->assertStringContainsString('HashTableHelper::alloc', $runtime);
         $this->assertStringContainsString('__hashtable__setStringAt', $runtime);
+        $this->assertStringContainsString('__hashtable__setDoubleAt', $runtime);
         $this->assertStringContainsString('__range_char__copy', $runtime);
+        $this->assertStringContainsString('__range_float__copy', $runtime);
         $this->assertStringContainsString('charRange', $runtime);
+        $this->assertStringContainsString('floatRange', $runtime);
         $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('HashTableHelper::buildIntegerRange', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -32,7 +35,9 @@ final class RangeIntRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/range.php');
         $this->assertStringContainsString('RangeIntRuntime::intRange', $builtin);
         $this->assertStringContainsString('RangeIntRuntime::charRange', $builtin);
+        $this->assertStringContainsString('RangeIntRuntime::floatRange', $builtin);
         $this->assertStringContainsString('charLetterLiteral', $builtin);
+        $this->assertStringContainsString('callFloatRange', $builtin);
         $this->assertStringNotContainsString('HashTableHelper::buildIntegerRange', $builtin);
     }
 

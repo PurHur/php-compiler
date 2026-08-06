@@ -11,7 +11,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for range() int/char lowering (#13502, #27563).
+ * JIT/AOT link for range() int/char/float lowering (#13502, #27563, #27158).
  *
  * NestedJIT of {@see \PHPCompiler\ext\standard\RangeIntJitHelper} returns a PHP
  * {@see \PHPCompiler\VM\HashTable} that is not a thin-AOT `__hashtable__` — multi-element
@@ -20,6 +20,9 @@ use PHPLLVM\Value;
  *
  * Char path (#27563) uses the same loop shape with `__hashtable__setStringAt` and
  * single-byte `__string__alloc` (php-src char bounds via ord/chr).
+ *
+ * Float path (#27158) uses `__hashtable__setDoubleAt` with php-src's index×step size
+ * formula ({@see \PHPCompiler\ext\standard\VmRange} buildFloatRange).
  *
  * VM SSOT remains {@see \PHPCompiler\ext\standard\RangeIntJitHelper} / {@see \PHPCompiler\ext\standard\VmRange}.
  * Zero/oversized step ValueErrors are emitted in {@see \PHPCompiler\ext\standard\range}
@@ -31,6 +34,8 @@ final class RangeIntRuntime
     private const ABI_RANGE = '__range_int__copy';
 
     private const ABI_RANGE_CHAR = '__range_char__copy';
+
+    private const ABI_RANGE_FLOAT = '__range_float__copy';
 
     public static function intRange(Context $context, Value $start, Value $end, Value $step): Value
     {
@@ -57,6 +62,19 @@ final class RangeIntRuntime
         );
     }
 
+    /** Float endpoints/step → packed doubles (#27158). */
+    public static function floatRange(Context $context, Value $start, Value $end, Value $step): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_RANGE_FLOAT),
+            $start,
+            $end,
+            $step
+        );
+    }
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -71,6 +89,7 @@ final class RangeIntRuntime
     {
         self::implementInt($context);
         self::implementChar($context);
+        self::implementFloat($context);
     }
 
     private static function implementInt(Context $context): void
@@ -220,6 +239,121 @@ final class RangeIntRuntime
         self::restoreInsertBlock($context, $savedBlock);
     }
 
+    /**
+     * php-src float path: size = round((span/|step|)+1), element = start + i*step (#27158).
+     * Positive half-up via trunc(x+0.5) (size formula args are non-negative after guards).
+     */
+    private static function implementFloat(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_RANGE_FLOAT);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context, self::ABI_RANGE_FLOAT);
+
+            return;
+        }
+
+        $savedBlock = self::saveInsertBlock($context);
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $double = $context->getTypeFromString('double');
+        $ft = $context->context->functionType($htPtr, false, $double, $double, $double);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(self::ABI_RANGE_FLOAT, $ft);
+
+        $entry = $fn->appendBasicBlock('range_float_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $start = $fn->getParam(0);
+        $end = $fn->getParam(1);
+        $stepIn = $fn->getParam(2);
+        $step = self::normalizeFloatStepSign($context, $start, $end, $stepIn);
+
+        $ht = HashTableHelper::alloc($context);
+        $zeroD = $double->constReal(0.0);
+        $oneD = $double->constReal(1.0);
+        $halfD = $double->constReal(0.5);
+        $stepPos = $context->builder->fcmp(Builder::REAL_OGT, $step, $zeroD);
+        $emptyAsc = $context->builder->fcmp(Builder::REAL_OLT, $end, $start);
+        $emptyDesc = $context->builder->fcmp(Builder::REAL_OGT, $end, $start);
+        $isEmpty = $context->builder->select($stepPos, $emptyAsc, $emptyDesc);
+        $doneEmpty = BasicBlockHelper::append($context, 'range_float_empty');
+        $build = BasicBlockHelper::append($context, 'range_float_build');
+        $context->builder->branchIf($isEmpty, $doneEmpty, $build);
+
+        $context->builder->positionAtEnd($doneEmpty);
+        $context->builder->returnValue($ht);
+
+        $context->builder->positionAtEnd($build);
+        $spanAsc = $context->builder->fsub($end, $start);
+        $spanDesc = $context->builder->fsub($start, $end);
+        $span = $context->builder->select($stepPos, $spanAsc, $spanDesc);
+        $stepNeg = $context->builder->fcmp(Builder::REAL_OLT, $step, $zeroD);
+        $stepAbs = $context->builder->select(
+            $stepNeg,
+            $context->builder->fsub($zeroD, $step),
+            $step
+        );
+        $sizeExact = $context->builder->fadd(
+            $context->builder->fdiv($span, $stepAbs),
+            $oneD
+        );
+        // PHP_ROUND_HALF_UP on non-negative sizeExact.
+        $size = $context->builder->fptosi(
+            $context->builder->fadd($sizeExact, $halfD),
+            $i64
+        );
+
+        $iSlot = $context->builder->alloca($i64, 1, 'range_float_i');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'range_float_idx');
+        $context->builder->store($i64->constInt(0, false), $iSlot);
+        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
+
+        $setDouble = $context->lookupFunction('__hashtable__setDoubleAt');
+        $done = BasicBlockHelper::append($context, 'range_float_done');
+        $loopHead = BasicBlockHelper::append($context, 'range_float_head');
+        $loopBody = BasicBlockHelper::append($context, 'range_float_body');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $inSize = $context->builder->icmp(Builder::INT_SLT, $i, $size);
+        $context->builder->branchIf($inSize, $loopBody, $done);
+
+        $context->builder->positionAtEnd($loopBody);
+        $iAsDouble = $context->builder->sitofp($i, $double);
+        $element = $context->builder->fadd(
+            $start,
+            $context->builder->fmul($iAsDouble, $step)
+        );
+        $pastAsc = $context->builder->fcmp(Builder::REAL_OGT, $element, $end);
+        $pastDesc = $context->builder->fcmp(Builder::REAL_OLT, $element, $end);
+        $pastEnd = $context->builder->select($stepPos, $pastAsc, $pastDesc);
+        $storeBb = BasicBlockHelper::append($context, 'range_float_store');
+        $context->builder->branchIf($pastEnd, $done, $storeBb);
+
+        $context->builder->positionAtEnd($storeBb);
+        $idx = $context->builder->load($idxSlot);
+        $context->builder->call($setDouble, $ht, $idx, $element);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($i, $i64->constInt(1, false)),
+            $iSlot
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
+            $idxSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnValue($ht);
+
+        self::registerLinkedRuntime($context, self::ABI_RANGE_FLOAT);
+        self::restoreInsertBlock($context, $savedBlock);
+    }
+
     private static function normalizeStepSign(
         Context $context,
         Value $start,
@@ -238,6 +372,29 @@ final class RangeIntRuntime
             $stepIn
         );
         $stepNegAbs = $context->builder->sub($zero, $stepAbs);
+        $stepAsc = $context->builder->select($stepNeg, $stepAbs, $stepIn);
+        $stepDesc = $context->builder->select($stepPos, $stepNegAbs, $stepIn);
+
+        return $context->builder->select($asc, $stepAsc, $stepDesc);
+    }
+
+    private static function normalizeFloatStepSign(
+        Context $context,
+        Value $start,
+        Value $end,
+        Value $stepIn
+    ): Value {
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $asc = $context->builder->fcmp(Builder::REAL_OLE, $start, $end);
+        $stepNeg = $context->builder->fcmp(Builder::REAL_OLT, $stepIn, $zero);
+        $stepPos = $context->builder->fcmp(Builder::REAL_OGT, $stepIn, $zero);
+        $stepAbs = $context->builder->select(
+            $stepNeg,
+            $context->builder->fsub($zero, $stepIn),
+            $stepIn
+        );
+        $stepNegAbs = $context->builder->fsub($zero, $stepAbs);
         $stepAsc = $context->builder->select($stepNeg, $stepAbs, $stepIn);
         $stepDesc = $context->builder->select($stepPos, $stepNegAbs, $stepIn);
 
@@ -268,7 +425,7 @@ final class RangeIntRuntime
     {
         $fn = $context->module->getNamedFunction($abi);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException($abi.' missing after RangeIntRuntime bridge (#13502/#26956/#27563)');
+            throw new \LogicException($abi.' missing after RangeIntRuntime bridge (#13502/#26956/#27563/#27158)');
         }
         $context->registerFunction($abi, $fn);
     }

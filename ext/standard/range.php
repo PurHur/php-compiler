@@ -24,7 +24,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * range() — int/float/char bounds (php-src ext/standard/array.c; #4258 VM, #27563 AOT char).
+ * range() — int/float/char bounds (php-src ext/standard/array.c; #4258 VM, #27563 AOT char, #27158 AOT float).
  */
 final class range extends Internal
 {
@@ -57,6 +57,13 @@ final class range extends Internal
             throw new \LogicException('range() requires two or three arguments');
         }
 
+        // php-src: float path when any bound/step is double — before char (#24399 / #27158).
+        if (self::jitPrefersFloat($args[0])
+            || self::jitPrefersFloat($args[1])
+            || (3 === \count($args) && self::jitPrefersFloat($args[2]))) {
+            return self::callFloatRange($context, $args);
+        }
+
         $startChar = self::charLetterLiteral($args[0]);
         $endChar = self::charLetterLiteral($args[1]);
         if (null !== $startChar && null !== $endChar) {
@@ -85,6 +92,50 @@ final class range extends Internal
         self::emitOversizedStepGuard($context, $start, $end, $step);
 
         return RangeIntRuntime::intRange($context, $start, $end, $step);
+    }
+
+    /**
+     * Float bounds/step (#27158) — coerce native long/double to double, match VmRange float path.
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function callFloatRange(Context $context, array $args): Value
+    {
+        foreach ($args as $arg) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
+                && JITVariable::TYPE_NATIVE_DOUBLE !== $arg->type) {
+                throw new \LogicException('range() float path requires native numeric operands in this compiler build');
+            }
+        }
+        $double = $context->getTypeFromString('double');
+        $start = self::toJitDouble($context, $args[0], $double);
+        $end = self::toJitDouble($context, $args[1], $double);
+        if (3 === \count($args)) {
+            $step = self::toJitDouble($context, $args[2], $double);
+        } else {
+            $cmp = $context->builder->fcmp(Builder::REAL_OGT, $start, $end);
+            $one = $double->constReal(1.0);
+            $negOne = $double->constReal(-1.0);
+            $step = $context->builder->select($cmp, $negOne, $one);
+        }
+        self::emitZeroFloatStepGuard($context, $step);
+        self::emitOversizedFloatStepGuard($context, $start, $end, $step);
+
+        return RangeIntRuntime::floatRange($context, $start, $end, $step);
+    }
+
+    private static function jitPrefersFloat(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NATIVE_DOUBLE === $arg->type;
+    }
+
+    private static function toJitDouble(Context $context, JITVariable $arg, $double): Value
+    {
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+
+        return $context->builder->sitofp($context->helper->loadValue($arg), $double);
     }
 
     /**
@@ -152,6 +203,23 @@ final class range extends Internal
         $context->builder->positionAtEnd($ok);
     }
 
+    private static function emitZeroFloatStepGuard(Context $context, Value $step): void
+    {
+        $tag = 'rsf'.(string) ++self::$jitGuardSeq;
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $isZero = $context->builder->fcmp(Builder::REAL_OEQ, $step, $zero);
+        $ok = BasicBlockHelper::append($context, 'range_fstep_ok_'.$tag);
+        $err = BasicBlockHelper::append($context, 'range_fstep_err_'.$tag);
+        $context->builder->branchIf($isZero, $err, $ok);
+        $context->builder->positionAtEnd($err);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
+    }
+
     /**
      * php-src PHP_FUNCTION(range): when endpoints differ, |step| must be <= |end-start| (#26657).
      * Emit before RangeIntRuntime so AOT/JIT raise ValueError without relying on PHP helper throws.
@@ -183,6 +251,42 @@ final class range extends Internal
         $bad = $context->builder->and($endpointsDiffer, $stepTooBig);
         $ok = BasicBlockHelper::append($context, 'range_span_ok_'.$tag);
         $err = BasicBlockHelper::append($context, 'range_span_err_'.$tag);
+        $context->builder->branchIf($bad, $err, $ok);
+        $context->builder->positionAtEnd($err);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, self::STEP_RANGE_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
+    }
+
+    private static function emitOversizedFloatStepGuard(
+        Context $context,
+        Value $start,
+        Value $end,
+        Value $step
+    ): void {
+        $tag = 'rbf'.(string) ++self::$jitGuardSeq;
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $diff = $context->builder->fsub($end, $start);
+        $diffNeg = $context->builder->fcmp(Builder::REAL_OLT, $diff, $zero);
+        $diffAbs = $context->builder->select(
+            $diffNeg,
+            $context->builder->fsub($zero, $diff),
+            $diff
+        );
+        $stepNeg = $context->builder->fcmp(Builder::REAL_OLT, $step, $zero);
+        $stepAbs = $context->builder->select(
+            $stepNeg,
+            $context->builder->fsub($zero, $step),
+            $step
+        );
+        $endpointsDiffer = $context->builder->fcmp(Builder::REAL_ONE, $start, $end);
+        $stepTooBig = $context->builder->fcmp(Builder::REAL_OLT, $diffAbs, $stepAbs);
+        $bad = $context->builder->and($endpointsDiffer, $stepTooBig);
+        $ok = BasicBlockHelper::append($context, 'range_fspan_ok_'.$tag);
+        $err = BasicBlockHelper::append($context, 'range_fspan_err_'.$tag);
         $context->builder->branchIf($bad, $err, $ok);
         $context->builder->positionAtEnd($err);
         TypeErrorRaise::registerDeclarations($context);
