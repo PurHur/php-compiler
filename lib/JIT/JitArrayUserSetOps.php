@@ -8,7 +8,7 @@ use PHPCompiler\JIT\Builtin\ArrayUserSetOpsRuntime;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515).
+ * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515, #27228).
  *
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}.
  * JIT SSOT: {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper} via {@see ArrayUserSetOpsRuntime}.
@@ -44,5 +44,18 @@ final class JitArrayUserSetOps
         }
 
         return ArrayUserSetOpsRuntime::diffByKey($context, $callback, $first, ...$others);
+    }
+
+    public static function arrayIntersectUkey(
+        Context $context,
+        Variable $callback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_intersect_ukey() expects at least 3 arguments, 2 given');
+        }
+
+        return ArrayUserSetOpsRuntime::intersectByKey($context, $callback, $first, ...$others);
     }
 }

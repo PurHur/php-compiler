@@ -368,7 +368,7 @@ final class VmObjectPropertyForeach
 
     private static function indexSlot(Context $context, JitVariable $slotKey): Value
     {
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         if (isset($context->foreachIndexSlots[$key])) {
             return $context->foreachIndexSlots[$key];
         }

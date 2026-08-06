@@ -251,7 +251,7 @@ final class VmIteratorForeach
 
     private static function indexSlot(Context $context, JitVariable $slotKey): \PHPLLVM\Value
     {
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         if (isset($context->foreachIndexSlots[$key])) {
             return $context->foreachIndexSlots[$key];
         }
@@ -264,7 +264,7 @@ final class VmIteratorForeach
 
     private static function objNodeSlot(Context $context, JitVariable $slotKey): \PHPLLVM\Value
     {
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         if (isset($context->foreachObjNodeSlots[$key])) {
             return $context->foreachObjNodeSlots[$key];
         }
@@ -293,7 +293,7 @@ final class VmIteratorForeach
         if (self::canLowerAggregateInnerHt($context, $array, $containerUserType)) {
             $receiver = IteratorProtocolHelper::resolveForeachReceiver($context, $array, $containerUserType);
             IteratorProtocolHelper::storeReceiver($context, $slotKey, $receiver);
-            $context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)] = true;
+            $context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)] = true;
             self::initHashtableIndex($context, $slotKey);
 
             return;
@@ -325,12 +325,12 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValid($context, $slotKey, $containerUserType);
         }
-        if (isset($context->foreachDatePeriodSnapshotHts[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileValidHashtable($context, $ht, $slotKey);
         }
-        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileValidHashtable(
                 $context,
                 self::hashtableFromAggregateInner($context, $slotKey),
@@ -498,12 +498,12 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileKey($context, $slotKey, $containerUserType);
         }
-        if (isset($context->foreachDatePeriodSnapshotHts[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileKeyHashtable($context, $ht, $slotKey);
         }
-        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileKeyHashtable(
                 $context,
                 self::hashtableFromAggregateInner($context, $slotKey),
@@ -672,12 +672,12 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);
         }
-        if (isset($context->foreachDatePeriodSnapshotHts[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileValueHashtable($context, $ht, $slotKey);
         }
-        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileValueHashtable(
                 $context,
                 self::hashtableFromAggregateInner($context, $slotKey),
@@ -705,7 +705,7 @@ final class VmIteratorForeach
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             return ObjectPropertyForeachHelper::compileValueByRef($context, $slotKey, $containerUserType);
         }
-        if (isset($context->foreachAggregateInnerHtSlots[\spl_object_id($slotKey)])) {
+        if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             // Inner ArrayIterator `__spl_ht` — same FE_RESET_RW allow-list as ArrayIterator (#19444, #26785).
             return self::compileValueByRefHashtable(
                 $context,
