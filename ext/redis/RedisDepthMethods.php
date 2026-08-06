@@ -141,8 +141,17 @@ final class RedisAuth extends RedisClassMethod
         }
         $ok = (\is_string($reply) && 'OK' === $reply) || true === $reply;
         if (!$ok) {
+            VmRedis::noteError($receiver, 'AUTH failed');
             throw new \RedisException('AUTH failed');
         }
+        if ($argc >= 2) {
+            $state = VmRedis::state($receiver);
+            $state->auth = [$user, $pass];
+        } else {
+            $state = VmRedis::state($receiver);
+            $state->auth = $pass;
+        }
+        $state->lastError = null;
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -169,8 +178,11 @@ final class RedisSelect extends RedisClassMethod
         }
         $ok = (\is_string($reply) && 'OK' === $reply) || true === $reply;
         if (!$ok) {
+            VmRedis::noteError($receiver, 'SELECT failed');
             throw new \RedisException('SELECT failed');
         }
+        VmRedis::state($receiver)->dbNum = $db;
+        VmRedis::state($receiver)->lastError = null;
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
