@@ -120,7 +120,11 @@ final class JitVmHelperLink
                 $jit = new \PHPCompiler\JIT($context);
                 foreach ($paths as [$path, $basename]) {
                     $real = \realpath($path) ?: $path;
-                    if ($context->hasJitIncludedFileCompiled($real)) {
+                    // Module-global helper TU dedupe — per-activeFunction include keys (#878)
+                    // re-NestedJIT the same helper under a new scope and split statics (#27566).
+                    if ($context->hasJitHelperTuCompiled($real)
+                        || $context->hasJitIncludedFileCompiled($real)) {
+                        $context->markJitHelperTuCompiled($real);
                         continue;
                     }
                     $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
@@ -129,6 +133,7 @@ final class JitVmHelperLink
                     }
                     $jit->compile($block);
                     $context->markJitIncludedFileCompiled($real);
+                    $context->markJitHelperTuCompiled($real);
                 }
             }
         );
