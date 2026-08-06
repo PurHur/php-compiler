@@ -119,11 +119,27 @@ final class HashTableWriteLlvm
         $context->builder->branchIf($isEnumCase, $enumCaseBlock, $checkHt);
 
         $context->builder->positionAtEnd($checkHt);
-        $isHt = $context->builder->icmp(
+        // Accept JIT TYPE_HASHTABLE (7|IS_REFCOUNTED) and VM TYPE_ARRAY (6) — peer
+        // ArrayColumnLlvm (#26955). Masked kind 7 also matches when the refcounted bit
+        // is cleared. Silent fall-through left nested array_chunk slots empty for
+        // NestedJIT json_encode (#27182).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isJitHt = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_HASHTABLE, false)
         );
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+        );
+        $isKindHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isHt = $context->builder->or($isJitHt, $context->builder->or($isVmArray, $isKindHt));
         $context->builder->branchIf($isHt, $hashtableBlock, $done);
 
         $context->builder->positionAtEnd($stringBlock);
@@ -471,11 +487,24 @@ final class HashTableWriteLlvm
         $context->builder->branchIf($isEnumCase, $enumCaseBlock, $checkHt);
 
         $context->builder->positionAtEnd($checkHt);
-        $isHt = $context->builder->icmp(
+        // Same dual HT tag acceptance as setValueBoxAtIndex (#27182 / peer #26955).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isJitHt = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_HASHTABLE, false)
         );
+        $isVmArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
+        );
+        $isKindHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isHt = $context->builder->or($isJitHt, $context->builder->or($isVmArray, $isKindHt));
         $context->builder->branchIf($isHt, $hashtableBlock, $done);
 
         $context->builder->positionAtEnd($stringBlock);

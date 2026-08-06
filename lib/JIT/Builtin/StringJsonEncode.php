@@ -82,6 +82,8 @@ final class StringJsonEncode
         NestedVmHashTableMethodLlvm::ensureMethod($context, 'ispackedlist');
         NestedVmHashTableMethodLlvm::ensureMethod($context, 'getnumelements');
         NestedVmHashTableMethodLlvm::ensureMethod($context, 'find');
+        // Nested foreach on Variable array values may ref __compiler_is_resource (#27182).
+        \PHPCompiler\ext\standard\JitStreamLifecycleKernel::ensureLinkedForUserScriptLowering($context);
 
         $valueProbe = $context->module->getNamedFunction('__compiler_json_encode_value');
         $htProbe = $context->module->getNamedFunction('__compiler_json_encode_array');
