@@ -42002,47 +42002,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/VmXmlReader.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 53)
-- new XmlReaderOpen (line 54)
-- new XmlReaderXML (line 57)
-- new XmlReaderRead (line 60)
-- new XmlReaderClose (line 63)
-- new XmlReaderGetAttribute (line 66)
-- new XmlReaderGetAttributeNo (line 69)
-- new XmlReaderGetAttributeNs (line 72)
-- new XmlReaderIsValid (line 75)
-- new XmlReaderExpand (line 78)
-- new XmlReaderReadInnerXml (line 81)
-- new XmlReaderReadOuterXml (line 84)
-- new XmlReaderReadString (line 87)
-- new XmlReaderMoveToAttribute (line 90)
-- new XmlReaderMoveToAttributeNo (line 93)
-- new XmlReaderMoveToAttributeNs (line 96)
-- new XmlReaderMoveToFirstAttribute (line 99)
-- new XmlReaderMoveToNextAttribute (line 102)
-- new XmlReaderMoveToElement (line 105)
-- new XmlReaderNext (line 108)
-- new XmlReaderLookupNamespace (line 111)
-- new XmlReaderSetParserProperty (line 114)
-- new XmlReaderGetParserProperty (line 117)
-- new XmlReaderSetSchema (line 120)
-- new XmlReaderSetRelaxNGSchema (line 123)
-- new XmlReaderSetRelaxNGSchemaSource (line 126)
-- new XmlReaderFromString (line 131)
-- new XmlReaderFromUri (line 134)
-- new XmlReaderFromStream (line 137)
-- new ObjectEntry (line 182)
-- new Error (line 226)
-- new Error (line 255)
-- new Error (line 260)
-- new XmlReaderState (line 285)
-- new Error (line 676)
-- new Error (line 700)
-- new Error (line 720)
-- new Error (line 782)
-- new Error (line 846)
-- new Error (line 1029)
-- new XmlReaderEvent (line 1338)
+- new ClassEntry (line 54)
+- new XmlReaderOpen (line 55)
+- new XmlReaderXML (line 58)
+- new XmlReaderRead (line 61)
+- new XmlReaderClose (line 64)
+- new XmlReaderGetAttribute (line 67)
+- new XmlReaderGetAttributeNo (line 70)
+- new XmlReaderGetAttributeNs (line 73)
+- new XmlReaderIsValid (line 76)
+- new XmlReaderExpand (line 79)
+- new XmlReaderReadInnerXml (line 82)
+- new XmlReaderReadOuterXml (line 85)
+- new XmlReaderReadString (line 88)
+- new XmlReaderMoveToAttribute (line 91)
+- new XmlReaderMoveToAttributeNo (line 94)
+- new XmlReaderMoveToAttributeNs (line 97)
+- new XmlReaderMoveToFirstAttribute (line 100)
+- new XmlReaderMoveToNextAttribute (line 103)
+- new XmlReaderMoveToElement (line 106)
+- new XmlReaderNext (line 109)
+- new XmlReaderLookupNamespace (line 112)
+- new XmlReaderSetParserProperty (line 115)
+- new XmlReaderGetParserProperty (line 118)
+- new XmlReaderSetSchema (line 121)
+- new XmlReaderSetRelaxNGSchema (line 124)
+- new XmlReaderSetRelaxNGSchemaSource (line 127)
+- new XmlReaderFromString (line 132)
+- new XmlReaderFromUri (line 135)
+- new XmlReaderFromStream (line 138)
+- new ObjectEntry (line 190)
+- new Error (line 234)
+- new Error (line 263)
+- new Error (line 268)
+- new XmlReaderState (line 293)
+- new Error (line 684)
+- new Error (line 708)
+- new Error (line 728)
+- new Error (line 790)
+- new Error (line 854)
+- new Error (line 1037)
+- new XmlReaderEvent (line 1346)
 - 61 class method(s)
 
 ### `ext/xmlreader/XmlReaderClose.php`
@@ -44124,7 +44124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1108)
+- new InternalArgInfo (line 1150)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44140,8 +44140,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2270)
-- new ArgumentCountError (line 2281)
+- new ArgumentCountError (line 2271)
+- new ArgumentCountError (line 2282)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -50435,7 +50435,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 91)
+- new Variable (line 92)
 - 3 class method(s)
 
 ### `lib/JIT/Call/RuntimeIndirectStaticMethodCall.php`
@@ -52083,10 +52083,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/TypeCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 77)
-- new Variable (line 89)
-- new Variable (line 100)
-- new Variable (line 111)
+- new Variable (line 80)
+- new Variable (line 92)
+- new Variable (line 103)
+- new Variable (line 114)
 - 3 class method(s)
 
 ### `lib/JIT/TypedPropertyUninitGuard.php`
