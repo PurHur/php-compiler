@@ -180,9 +180,6 @@ use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetDeclaringClass;
-use PHPCompiler\VM\Builtin\ReflectionConstantGetDeprecatedMessage;
-use PHPCompiler\VM\Builtin\ReflectionConstantGetDeprecatedVersion;
-use PHPCompiler\VM\Builtin\ReflectionConstantGetModifiers;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetNamespaceName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetShortName;
@@ -191,15 +188,8 @@ use PHPCompiler\VM\Builtin\ReflectionConstantGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionConstantInNamespace;
-use PHPCompiler\VM\Builtin\ReflectionConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
-use PHPCompiler\VM\Builtin\ReflectionConstantHasType;
 use PHPCompiler\VM\Builtin\ReflectionConstantIsDeprecated;
-use PHPCompiler\VM\Builtin\ReflectionConstantIsEnumCase;
-use PHPCompiler\VM\Builtin\ReflectionConstantIsFinal;
-use PHPCompiler\VM\Builtin\ReflectionConstantIsPrivate;
-use PHPCompiler\VM\Builtin\ReflectionConstantIsProtected;
-use PHPCompiler\VM\Builtin\ReflectionConstantIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseGetBackingValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumBackedCaseIsBacked;
@@ -1378,33 +1368,12 @@ final class BuiltinClasses
             $rconst->methodVisibility['getvalue'] = $pub;
             $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
             $rconst->methodVisibility['getattributes'] = $pub;
-            $rconst->methods['getdeclaringclass'] = new ReflectionConstantGetDeclaringClass();
-            $rconst->methodVisibility['getdeclaringclass'] = $pub;
-            $rconst->methods['gettype'] = new ReflectionConstantGetType();
-            $rconst->methodVisibility['gettype'] = $pub;
-            $rconst->methods['hastype'] = new ReflectionConstantHasType();
-            $rconst->methodVisibility['hastype'] = $pub;
-            $rconst->methods['getmodifiers'] = new ReflectionConstantGetModifiers();
-            $rconst->methodVisibility['getmodifiers'] = $pub;
+            // php-src ReflectionConstant never exposes ReflectionClassConstant APIs
+            // (getDeclaringClass/getModifiers/getType/is*/getDeprecatedMessage/Version) — #28156.
             if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
                 $rconst->methods['isdeprecated'] = new ReflectionConstantIsDeprecated();
                 $rconst->methodVisibility['isdeprecated'] = $pub;
-                $rconst->methods['getdeprecatedmessage'] = new ReflectionConstantGetDeprecatedMessage();
-                $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
-                $rconst->methods['getdeprecatedversion'] = new ReflectionConstantGetDeprecatedVersion();
-                $rconst->methodVisibility['getdeprecatedversion'] = $pub;
             }
-            $rconst->methods['isfinal'] = new ReflectionConstantIsFinal();
-            $rconst->methodVisibility['isfinal'] = $pub;
-            $rconst->methods['isenumcase'] = new ReflectionConstantIsEnumCase();
-            $rconst->methodVisibility['isenumcase'] = $pub;
-            $rconst->methods['ispublic'] = new ReflectionConstantIsPublic();
-            $rconst->methodVisibility['ispublic'] = $pub;
-            $rconst->methods['isprotected'] = new ReflectionConstantIsProtected();
-            $rconst->methodVisibility['isprotected'] = $pub;
-            $rconst->methods['isprivate'] = new ReflectionConstantIsPrivate();
-            $rconst->methodVisibility['isprivate'] = $pub;
-            \PHPCompiler\ext\standard\VmReflection::registerReflectionClassConstantClassConstants($rconst);
             $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
         }
 

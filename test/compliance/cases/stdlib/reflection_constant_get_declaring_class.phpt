@@ -1,5 +1,5 @@
 --TEST--
-ReflectionConstant::getDeclaringClass() on forward profile (#17343, ext/reflection/php_reflection.c)
+ReflectionConstant lacks getDeclaringClass; ReflectionClassConstant keeps it (#28156, re-#17343)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -12,13 +12,13 @@ class C17343 {
 $rc = new ReflectionConstant(C17343::class, 'FOO');
 var_export(method_exists($rc, 'getDeclaringClass'));
 echo "\n";
-var_export($rc->getDeclaringClass()->getName());
-echo "\n";
 
 $rcc = new ReflectionClassConstant(C17343::class, 'BAR');
+var_export(method_exists($rcc, 'getDeclaringClass'));
+echo "\n";
 var_export($rcc->getDeclaringClass()->getName());
 echo "\n";
 --EXPECT--
+false
 true
-'C17343'
 'C17343'

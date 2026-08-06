@@ -1,5 +1,5 @@
 --TEST--
-ReflectionConstant global isDeprecated / type / modifiers (#21255, #26308, ext/reflection/php_reflection.c)
+ReflectionConstant global isDeprecated + getAttributes (#21255, #28156, ext/reflection/php_reflection.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.5
 --SKIPIF--
@@ -25,26 +25,9 @@ var_export($p->isDeprecated());
 echo "\n";
 var_export($o->isDeprecated());
 echo "\n";
-var_export($o->getDeprecatedMessage());
-echo "\n";
-var_export($o->getDeprecatedVersion());
-echo "\n";
-var_export($p->getType());
-echo "\n";
-var_export($p->hasType());
-echo "\n";
-var_export($p->getModifiers());
-echo "\n";
-var_export($p->isFinal());
-echo "\n";
-var_export($p->isEnumCase());
-echo "\n";
-var_export($p->isPublic());
-echo "\n";
-var_export($p->isProtected());
-echo "\n";
-var_export($p->isPrivate());
-echo "\n";
+// Class-constant-only APIs must stay absent on ReflectionConstant (#28156).
+echo 'getDeprecatedMessage=', method_exists($o, 'getDeprecatedMessage') ? '1' : '0', "\n";
+echo 'getModifiers=', method_exists($p, 'getModifiers') ? '1' : '0', "\n";
 var_export($p->getAttributes());
 echo "\n";
 
@@ -52,22 +35,15 @@ class C21255 { public const FOO = 7; }
 $c = new ReflectionConstant(C21255::class, 'FOO');
 var_export($c->isDeprecated());
 echo "\n";
-var_export($c->isPublic());
+$rcc = new ReflectionClassConstant(C21255::class, 'FOO');
+var_export($rcc->isPublic());
 echo "\n";
 --EXPECT--
 PLAIN_21255=2
 false
 true
-'old'
-'8.4'
-NULL
-false
-1
-false
-false
-true
-false
-false
+getDeprecatedMessage=0
+getModifiers=0
 array (
 )
 false

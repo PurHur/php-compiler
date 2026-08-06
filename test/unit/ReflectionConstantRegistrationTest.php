@@ -81,4 +81,43 @@ PHP;
             }
         }
     }
+
+    public function testReflectionConstantOmitsClassConstantApisOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+$c = new ReflectionConstant('PHP_VERSION');
+foreach ([
+    'getDeclaringClass', 'getModifiers', 'getType', 'hasType',
+    'isEnumCase', 'isFinal', 'isPrivate', 'isProtected', 'isPublic',
+    'getDeprecatedMessage', 'getDeprecatedVersion',
+] as $m) {
+    echo $m, '=', method_exists($c, $m) ? '1' : '0', "\n";
+}
+class C28156u { public const X = 1; }
+$rcc = new ReflectionClassConstant(C28156u::class, 'X');
+echo 'rcc_getDeclaringClass=', method_exists($rcc, 'getDeclaringClass') ? '1' : '0', "\n";
+echo 'isDeprecated=', method_exists($c, 'isDeprecated') ? '1' : '0', "\n";
+echo 'IS_PUBLIC=', defined('ReflectionConstant::IS_PUBLIC') ? '1' : '0', "\n";
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'reflection_constant_phantoms_28156.php'));
+            $out = ob_get_clean();
+
+            $this->assertSame(
+                "getDeclaringClass=0\ngetModifiers=0\ngetType=0\nhasType=0\nisEnumCase=0\nisFinal=0\nisPrivate=0\nisProtected=0\nisPublic=0\ngetDeprecatedMessage=0\ngetDeprecatedVersion=0\nrcc_getDeclaringClass=1\nisDeprecated=1\nIS_PUBLIC=0",
+                trim($out)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
