@@ -5765,6 +5765,7 @@ require_once __DIR__.'/../../../lib/JIT/ArrayReduceLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableSliceLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableChunkLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableKeysLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/HashTableKeysMatchingLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableReverseLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTablePadLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableElemLlvm.php';
