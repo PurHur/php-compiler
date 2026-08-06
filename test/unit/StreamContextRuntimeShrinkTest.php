@@ -85,6 +85,27 @@ final class StreamContextRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('VmHttpBuildQuery::export', $source);
     }
 
+    public function testThinAotImplementsSetSingleOptionAndGetOptions(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamContextThinAot.php');
+        $this->assertStringContainsString('HashTableDuplicateRuntime', $source);
+        $this->assertStringContainsString('HashTableMergeLlvm', $source);
+        $this->assertStringContainsString('implementThinIsResource', $source);
+        $this->assertStringContainsString('__hashtable__setStringKeyString', $source);
+        $this->assertStringContainsString('__hashtable__unsetStringKey', $source);
+        $this->assertStringContainsString('storeBoxedValueAtStringKey', $source);
+        $this->assertStringContainsString('sctx_thin_setopt_store', $source);
+        $this->assertStringContainsString('sctx_thin_getopts_body', $source);
+    }
+
+    public function testSetOptionBoxesNativeStringLiteralsForThinAot(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamContextSetOption.php');
+        $this->assertStringContainsString('TYPE_STRING === $arg->type', $source);
+        $this->assertStringContainsString('valuePtrFromVariable', $source);
+        $this->assertStringContainsString('#27295', $source);
+    }
+
     public function testStreamContextJitHelperDefaultRoundTrip(): void
     {
         $options = new HashTable();

@@ -96,7 +96,18 @@ final class JitStreamContextSetOption
 
     private static function loadValuePointer(Context $context, JITVariable $arg, int $position): Value
     {
-        if (JITVariable::TYPE_VALUE === $arg->type) {
+        // Thin AOT keeps string/scalar literals as native types; full JIT often boxes to TYPE_VALUE (#27295).
+        if (
+            JITVariable::TYPE_VALUE === $arg->type
+            || JITVariable::TYPE_STRING === $arg->type
+            || JITVariable::TYPE_NATIVE_LONG === $arg->type
+            || JITVariable::TYPE_NATIVE_BOOL === $arg->type
+            || JITVariable::TYPE_NATIVE_DOUBLE === $arg->type
+            || JITVariable::TYPE_NULL === $arg->type
+            || JITVariable::TYPE_OBJECT === $arg->type
+            || JITVariable::TYPE_HASHTABLE === $arg->type
+            || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
             return JitValueBox::valuePtrFromVariable($context, $arg);
         }
 
