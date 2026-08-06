@@ -195,6 +195,7 @@
         "ext/ctype/ctype_upper.php",
         "ext/ctype/ctype_xdigit.php",
         "ext/curl/BuiltinClasses.php",
+        "ext/curl/CurlCloseDeprecation.php",
         "ext/curl/CurlConstants.php",
         "ext/curl/CurlExtensionPolicy.php",
         "ext/curl/CurlFileBuiltin.php",
@@ -2677,7 +2678,6 @@
         "ext/standard/JitArrayKey.php",
         "ext/standard/JitArrayPointer.php",
         "ext/standard/JitArrayPush.php",
-        "ext/standard/JitAsinKernel.php",
         "ext/standard/JitAsinhKernel.php",
         "ext/standard/JitAssert.php",
         "ext/standard/JitAssertOptions.php",
@@ -4299,7 +4299,6 @@
         "ext/standard/phpc_acosh_kernel.php",
         "ext/standard/phpc_argon2_hash.php",
         "ext/standard/phpc_argon2_verify.php",
-        "ext/standard/phpc_asin_kernel.php",
         "ext/standard/phpc_asinh_kernel.php",
         "ext/standard/phpc_atan2_kernel.php",
         "ext/standard/phpc_atan_kernel.php",
@@ -7400,9 +7399,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7166,
+        "inventory_files": 7165,
         "excluded": 0,
-        "eligible": 7166,
+        "eligible": 7165,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
