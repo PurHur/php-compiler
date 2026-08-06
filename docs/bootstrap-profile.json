@@ -1990,6 +1990,7 @@
         "ext/redis/RedisGet.php",
         "ext/redis/RedisIntrospection.php",
         "ext/redis/RedisOptions.php",
+        "ext/redis/RedisPersistence.php",
         "ext/redis/RedisSet.php",
         "ext/redis/RedisState.php",
         "ext/redis/VmRedis.php",
@@ -7406,9 +7407,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7172,
+        "inventory_files": 7173,
         "excluded": 0,
-        "eligible": 7172,
+        "eligible": 7173,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
