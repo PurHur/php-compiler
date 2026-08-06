@@ -4937,6 +4937,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #27777 */
+    public function testStreamSelectStubReturnAndReadType(): void
+    {
+        self::assertSame(
+            'int|false',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_select')
+        );
+        self::assertSame(
+            '?array',
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_select', 0)
+        );
+        self::assertNull(
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_select', 1)
+        );
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {
