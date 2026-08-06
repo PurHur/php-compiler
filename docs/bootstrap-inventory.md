@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7151 |
-| Phase A inventory files (M2 ratio SSOT) | 7151 |
+| PHP files on vm.php path | 7159 |
+| Phase A inventory files (M2 ratio SSOT) | 7159 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22943 |
+| Source constructs flagged (warnings) | 22968 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4981,12 +4981,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zmq/zmq_send.php` | 0 | 3 |
 | `ext/zmq/zmq_socket.php` | 0 | 3 |
 | `ext/zstd/JitZstd.php` | 0 | 1 |
-| `ext/zstd/Module.php` | 0 | 10 |
+| `ext/zstd/Module.php` | 0 | 18 |
 | `ext/zstd/VmZstdContext.php` | 0 | 9 |
 | `ext/zstd/VmZstdCore.php` | 0 | 1 |
 | `ext/zstd/VmZstdNative.php` | 0 | 1 |
 | `ext/zstd/ZstdExtensionPolicy.php` | 0 | 1 |
 | `ext/zstd/ZstdJitHelper.php` | 0 | 1 |
+| `ext/zstd/ns_compress.php` | 0 | 2 |
+| `ext/zstd/ns_compress_add.php` | 0 | 2 |
+| `ext/zstd/ns_compress_dict.php` | 0 | 2 |
+| `ext/zstd/ns_compress_init.php` | 0 | 2 |
+| `ext/zstd/ns_uncompress.php` | 0 | 2 |
+| `ext/zstd/ns_uncompress_add.php` | 0 | 2 |
+| `ext/zstd/ns_uncompress_dict.php` | 0 | 2 |
+| `ext/zstd/ns_uncompress_init.php` | 0 | 2 |
 | `ext/zstd/zstd_compress.php` | 0 | 1 |
 | `ext/zstd/zstd_compress_add.php` | 0 | 2 |
 | `ext/zstd/zstd_compress_dict.php` | 0 | 2 |
@@ -43914,15 +43922,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zstd/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new zstd_compress (line 43)
-- new zstd_decompress (line 44)
-- new zstd_uncompress (line 45)
-- new zstd_compress_dict (line 46)
-- new zstd_uncompress_dict (line 47)
-- new zstd_compress_init (line 48)
-- new zstd_compress_add (line 49)
-- new zstd_uncompress_init (line 50)
-- new zstd_uncompress_add (line 51)
+- new zstd_compress (line 47)
+- new zstd_decompress (line 48)
+- new zstd_uncompress (line 49)
+- new zstd_compress_dict (line 50)
+- new zstd_uncompress_dict (line 51)
+- new zstd_compress_init (line 52)
+- new zstd_compress_add (line 53)
+- new zstd_uncompress_init (line 54)
+- new zstd_uncompress_add (line 55)
+- new ns_compress (line 56)
+- new ns_uncompress (line 57)
+- new ns_compress_dict (line 58)
+- new ns_uncompress_dict (line 59)
+- new ns_compress_init (line 60)
+- new ns_compress_add (line 61)
+- new ns_uncompress_init (line 62)
+- new ns_uncompress_add (line 63)
 - 2 class method(s)
 
 ### `ext/zstd/VmZstdContext.php`
@@ -43946,7 +43962,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zstd/VmZstdNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
 
 ### `ext/zstd/ZstdExtensionPolicy.php`
 
@@ -43957,6 +43973,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
+
+### `ext/zstd/ns_compress.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_compress (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_compress_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_compress_add (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_compress_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_compress_dict (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_compress_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_compress_init (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_uncompress.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_uncompress (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_uncompress_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_uncompress_add (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_uncompress_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_uncompress_dict (line 21)
+- 2 class method(s)
+
+### `ext/zstd/ns_uncompress_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new zstd_uncompress_init (line 21)
+- 2 class method(s)
 
 ### `ext/zstd/zstd_compress.php`
 
