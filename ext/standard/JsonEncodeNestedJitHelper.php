@@ -8,13 +8,13 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Thin-standalone NestedJIT json_encode encoder (#27020 / #26977 / #27078, php-in-PHP).
+ * Thin-standalone NestedJIT json_encode encoder (#27020 / #26977 / #27078 / #27182, php-in-PHP).
  *
  * Context-free: no VmJson / runtime-vm. NestedJIT: $pair[0]/$pair[1] only.
  * Packed lists → `[…]` via isPackedList(); else `{…}` (#26977 Done-when).
- * Nested arrays recurse via encodeHashtable only — no encodeValue↔encodeHashtable
- * mutual NestedJIT recursion (aborts under thin AOT, #27074). Numeric type codes
- * — NestedJIT mis-types Variable::TYPE_* class constants (#27075 / #27020).
+ * Nested arrays: foreach on Variable locals — not encodeValue() mutual recursion and not
+ * `$val->toArray()` for first-level pair values (#27074 / #27182).
+ * Numeric type codes — NestedJIT mis-types Variable::TYPE_* class constants (#27075 / #27020).
  * No str_replace — NestedJIT helper emit lacks phpc_str_replace (#27078).
  * php-src: ext/json/php_json.c — php_json_encode
  */
@@ -68,6 +68,8 @@ final class JsonEncodeNestedJitHelper
             $val = $pair[1];
             $t = $val->type & 0x7f;
             if (6 === $t || 7 === $t) {
+                // toArray + recurse — NestedJIT foreach on typed HT aborts under thin O=0
+                // HashTableChunkLlvm (#27182). Helper-runtime often hits the else branch.
                 $out .= self::encodeHashtable($val->toArray(), $flags) ?? 'null';
             } elseif (1 === $t) {
                 $out .= (string) $val->toInt();
@@ -80,7 +82,26 @@ final class JsonEncodeNestedJitHelper
             } elseif (4 === $t) {
                 $out .= self::quote($val->toString());
             } else {
-                $out .= self::quote($val->toString());
+                // #27182: helper-runtime array_chunk nested HTs often lack type 6/7.
+                // Value-foreach walks packed chunks (quote/toInt yielded "" / 0).
+                $inner = '[';
+                $m = 0;
+                foreach ($val as $elem) {
+                    if ($m > 0) {
+                        $inner .= ',';
+                    }
+                    $et = $elem->type & 0x7f;
+                    if (1 === $et) {
+                        $inner .= (string) $elem->toInt();
+                    } elseif (0 === $et) {
+                        $inner .= 'null';
+                    } else {
+                        $inner .= (string) $elem->toInt();
+                    }
+                    ++$m;
+                }
+                $inner .= ']';
+                $out .= $m > 0 ? $inner : (string) $val->toInt();
             }
             ++$n;
         }
