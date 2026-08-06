@@ -243,8 +243,8 @@ final class BuiltinInternalArgInfo
             'array_key_first', 'array_key_last' => 'string|int|null',
             // ext/standard/array.stub.php — InternalArgInfo return bool; Zend true (#26172)
             'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
-            // ext/imap/php_imap.stub.php — InternalArgInfo return string (missing |false) (#27681, #27764)
-            'imap_utf7_decode', 'imap_utf8_to_mutf7', 'imap_mutf7_to_utf8' => 'string|false',
+            // ext/imap/php_imap.stub.php — InternalArgInfo return string (missing |false) (#27681, #27764, #27765)
+            'imap_utf7_decode', 'imap_utf8_to_mutf7', 'imap_mutf7_to_utf8', 'imap_mail_compose' => 'string|false',
             default => null,
         };
     }
