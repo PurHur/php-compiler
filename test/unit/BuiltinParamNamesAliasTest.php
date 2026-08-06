@@ -4918,6 +4918,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #27739 */
+    public function testStreamCopyToStreamStubReturnAndLengthType(): void
+    {
+        self::assertSame(
+            'int|false',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_copy_to_stream')
+        );
+        self::assertSame(
+            '?int',
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_copy_to_stream', 2)
+        );
+        self::assertNull(
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_copy_to_stream', 0)
+        );
+        self::assertNull(
+            BuiltinInternalArgInfo::stubParamTypeOverride('stream_copy_to_stream', 3)
+        );
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {
