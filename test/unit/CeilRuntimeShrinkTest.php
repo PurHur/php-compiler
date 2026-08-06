@@ -63,7 +63,7 @@ final class CeilRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringNotContainsString('phpc_ceil_kernel', $source);
-        $this->assertStringContainsString('phpc_tan_kernel', $source);
+        $this->assertStringContainsString('phpc_exp_kernel', $source);
     }
 
     public function testSpineBundleIncludesCeilHelperWithoutKernel(): void

@@ -8,10 +8,12 @@ use PHPCompiler\ext\standard\TanJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** tan() JIT: always TanJitHelper via JitVmHelperLink + phpc_tan_kernel (#15088, #27048). */
+/**
+ * tan() NestedJIT via JitVmHelperLink::ensureBridge (#28226 / peer MathCos #28042).
+ */
 final class TanRuntimeShrinkTest extends TestCase
 {
-    public function testTanUsesJitHelperNotLibcLookup(): void
+    public function testTanUsesJitHelperNotKernel(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/tan.php');
         $this->assertStringContainsString('MathTan::invoke', $builtin);
@@ -20,51 +22,69 @@ final class TanRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathTan.php');
         $this->assertStringContainsString('TanJitHelper', $bridge);
         $this->assertStringContainsString('phpc_tan', $bridge);
-        $this->assertStringContainsString('JitTanKernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitTanKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
-    public function testTanJitHelperDelegatesToKernel(): void
+    public function testTanJitHelperInlinesNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/TanJitHelper.php');
-        $this->assertStringContainsString('phpc_tan_kernel', $source);
-        $this->assertMatchesRegularExpression(
-            '/function tanArgv\(.*?\{[^}]*phpc_tan_kernel/s',
+        $this->assertStringContainsString('39916800.0', $source);
+        $this->assertStringContainsString('3628800.0', $source);
+        $this->assertStringContainsString('$twoPi', $source);
+        $this->assertStringNotContainsString('phpc_tan_kernel', $source);
+        $this->assertStringNotContainsString('while (', $source);
+        $this->assertStringNotContainsString('pack(', $source);
+        $this->assertStringNotContainsString('unpack(', $source);
+        // Early-return if before Horner miscompiles under NestedJIT — keep straight-line body.
+        $this->assertDoesNotMatchRegularExpression(
+            '/function tanArgv\(.*?\{[^}]*\bif\s*\(/s',
             $source
         );
         $this->assertDoesNotMatchRegularExpression(
             '/function tanArgv\(.*?\{[^}]*VmMath::tan/s',
             $source
         );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function tanArgv\(.*?\{[^}]*\\\\tan\(/s',
+            $source
+        );
 
-        if (!\function_exists('phpc_tan_kernel')) {
-            $this->markTestSkipped('phpc_tan_kernel requires compiler runtime');
-        }
-        $this->assertSame(
-            VmMath::tan(0.0),
-            TanJitHelper::tanArgv(0.0)
-        );
-        $this->assertSame(
-            VmMath::tan(\deg2rad(45.0)),
-            TanJitHelper::tanArgv(\deg2rad(45.0))
-        );
+        $this->assertSame(VmMath::tan(0.0), TanJitHelper::tanArgv(0.0));
+        $this->assertEqualsWithDelta(VmMath::tan(1.0), TanJitHelper::tanArgv(1.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::tan(\M_PI / 4.0), TanJitHelper::tanArgv(\M_PI / 4.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::tan(0.5), TanJitHelper::tanArgv(0.5), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::tan(2.0), TanJitHelper::tanArgv(2.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::tan(100.0), TanJitHelper::tanArgv(100.0), 1e-12);
+        $this->assertTrue(\is_nan(TanJitHelper::tanArgv(\INF)));
+        $this->assertTrue(\is_nan(TanJitHelper::tanArgv(\NAN)));
     }
 
-    public function testContextAllowlistsTanKernelForNestedJit(): void
+    public function testKernelFilesRemoved(): void
+    {
+        $root = __DIR__.'/../..';
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitTanKernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_tan_kernel.php');
+    }
+
+    public function testContextNoLongerAllowlistsTanKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('phpc_tan_kernel', $source);
-        // Peer math NestedJIT leaf still allowlisted after cos shrink (#28042).
-        $this->assertStringContainsString('phpc_cosh_kernel', $source);
+        $this->assertStringNotContainsString('phpc_tan_kernel', $source);
+        // Peer math NestedJIT leaf still allowlisted after this shrink.
+        $this->assertStringContainsString('phpc_exp_kernel', $source);
+        $this->assertStringContainsString('phpc_fpow_kernel', $source);
+        $this->assertStringContainsString('phpc_nextafter_kernel', $source);
     }
 
-    public function testSpineBundleIncludesTanJitHelper(): void
+    public function testSpineBundleIncludesTanHelperWithoutKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('TanJitHelper.php', $spine);
         $this->assertStringContainsString('MathTan.php', $spine);
-        $this->assertStringContainsString('JitTanKernel.php', $spine);
-        $this->assertStringContainsString('phpc_tan_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitTanKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_tan_kernel.php', $spine);
     }
 }
