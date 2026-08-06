@@ -235,7 +235,12 @@ final class TryCatchHelper
         self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
         $savedTrySynthetic = $tryOp->block1->syntheticCfgBranch;
         $tryOp->block1->syntheticCfgBranch = true;
-        $jit->compileSubBlock($func, $tryOp->block1, ...$args);
+        // Prefer the live LLVM tail from compileSubBlock: property-store guards
+        // (DynamicObjectReadonlyGuard / ReadonlyClassGuard) terminate the original
+        // blockStorage[tryBody] entry, so sealing that entry alone leaves the real
+        // continuation unterminated and sealFunction later emits `ret void` — AOT
+        // then exits after a successful `$obj->prop = …` inside try (#28078).
+        $tryTail = $jit->compileSubBlock($func, $tryOp->block1, ...$args);
         $tryOp->block1->syntheticCfgBranch = $savedTrySynthetic;
         $elseExit = self::tryBodyTrailingJumpTarget($tryOp->block1);
         $elseEntryBb = null;
@@ -249,7 +254,13 @@ final class TryCatchHelper
                 $context->scope->blockEntryStorage[$elseExit] = $elseEntryBb;
             }
         }
-        $tryLlvm = $context->scope->blockStorage[$tryOp->block1] ?? null;
+        $tryLlvm = $tryTail;
+        if (null === $tryLlvm || null !== $tryLlvm->getTerminator()) {
+            $tryLlvm = $context->scope->blockStorage[$tryOp->block1] ?? null;
+        }
+        if (null === $tryLlvm || null !== $tryLlvm->getTerminator()) {
+            $tryLlvm = BasicBlockHelper::tryGetInsertBlock($context);
+        }
         if (null !== $tryLlvm && null === $tryLlvm->getTerminator()) {
             $builder->positionAtEnd($tryLlvm);
             if (null !== $handler->finallyBb) {
