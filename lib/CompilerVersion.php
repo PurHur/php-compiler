@@ -794,11 +794,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.5+ `(void)` cast (`T_VOID_CAST`) — absent from Zend 8.4 (#24946, #23037).
+     * `(void)` cast (`T_VOID_CAST`) — not in shipped php-src through 8.5.8 (#28183, re-#24946).
+     *
+     * Zend's NoDiscard warning text mentions casting as `(void)`, but the scanner still has no
+     * T_VOID_CAST token (Zend/zend_language_scanner.l). Keep off for all language profiles until
+     * php-src lands the cast; then gate on the matching profile.
      */
     public static function supportsVoidCast(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+        return false;
     }
 
     /** PHP 8.5+ #[\DelayedTargetValidation] builtin attribute class — absent from Zend 8.4 (#24946). */

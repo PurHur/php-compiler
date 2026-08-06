@@ -1,26 +1,24 @@
 --TEST--
-Language: (void) cast evaluates operand and yields null (#7421, zend_execute.c)
+Language: (void) cast rejected on PROFILE=8.5 — Zend 8.5.8 ParseError (#28183, Zend/zend_language_scanner.l)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+putenv('PHP_COMPILER_PROFILE=8.5');
+if (PHPCompiler\CompilerVersion::supportsVoidCast()) {
+    die('skip PROFILE=8.5 unexpectedly enables (void) cast (#28183)');
+}
+?>
 --ENV--
 PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
-$x = (void)(1 + 2);
-var_export($x);
-echo "\n";
-
-function side(): int {
-    echo "side\n";
-    return 99;
+try {
+    eval('$a = (void) strlen("x");');
+    echo "void_ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
 }
-$y = (void)side();
-var_export($y);
-echo "\n";
-
-ob_start();
-echo (void)1;
-echo strlen(ob_get_clean()) === 0 ? "silent\n" : "bad\n";
 --EXPECT--
-NULL
-side
-NULL
-silent
+ParseError
