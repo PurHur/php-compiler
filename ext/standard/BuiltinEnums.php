@@ -136,9 +136,10 @@ final class BuiltinEnums
     }
 
     /**
-     * PHP 8.4 PropertyHookType: int-backed enum for property hook reflection (#7222).
+     * PHP 8.4 PropertyHookType: string-backed enum for property hook reflection (#7222, #28345).
      *
-     * php-src: Zend/zend_enum.def — register_property_hook_type_enum
+     * php-src: ext/reflection/php_reflection.stub.php —
+     *   enum PropertyHookType: string { case Get = 'get'; case Set = 'set'; }
      */
     private static function registerPropertyHookType(Context $ctx): void
     {
@@ -148,10 +149,10 @@ final class BuiltinEnums
 
         $entry = new ClassEntry('PropertyHookType');
         $entry->isEnum = true;
-        $entry->backedType = 'int';
+        $entry->backedType = 'string';
 
-        self::registerBackedEnumCase($entry, 'Get', 0);
-        self::registerBackedEnumCase($entry, 'Set', 1);
+        self::registerStringBackedEnumCase($entry, 'Get', 'get');
+        self::registerStringBackedEnumCase($entry, 'Set', 'set');
 
         EnumSupport::ensureBuiltinCasesMethod($entry);
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
