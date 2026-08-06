@@ -130,6 +130,8 @@ final class BuiltinInternalArgInfo
             'getmyuid', 'getmygid', 'getmypid', 'getlastmod' => 'int|false',
             // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511, #26342)
             'gzencode', 'gzdecode', 'gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate' => 'string|false',
+            // pecl-file_formats-lzf lzf.stub.php — InternalArgInfo return int (missing |false) (#28063)
+            'lzf_optimized_for' => 'int|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)

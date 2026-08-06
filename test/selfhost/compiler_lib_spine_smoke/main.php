@@ -1210,6 +1210,7 @@ require_once __DIR__.'/../../../ext/lzf/VmLzf.php';
 require_once __DIR__.'/../../../ext/lzf/VmLzfCore.php';
 require_once __DIR__.'/../../../ext/lzf/lzf_compress.php';
 require_once __DIR__.'/../../../ext/lzf/lzf_decompress.php';
+require_once __DIR__.'/../../../ext/lzf/lzf_optimized_for.php';
 require_once __DIR__.'/../../../ext/lz4/JitLz4.php';
 require_once __DIR__.'/../../../ext/lz4/Lz4ExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/lz4/Lz4JitHelper.php';
