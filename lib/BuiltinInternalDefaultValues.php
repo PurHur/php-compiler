@@ -736,6 +736,10 @@ final class BuiltinInternalDefaultValues
         'libxml_use_internal_errors' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/libxml/libxml.stub.php — bool $disable = true (bool infer → false) (#28021)
+        'libxml_disable_entity_loader' => [
+            0 => ['kind' => 'bool', 'value' => true],
+        ],
     ];
 
     public static function isAvailable(

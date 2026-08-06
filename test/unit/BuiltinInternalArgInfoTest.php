@@ -700,16 +700,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_match_all'));
     }
 
-    /** php-src ext/libxml/libxml.stub.php — array return; ?bool $use_errors = null (#25844). */
+    /** php-src ext/libxml/libxml.stub.php — reflection return/default parity (#25844, #28021). */
     public function testLibxmlErrorControlReflectionStubs(): void
     {
         $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_errors'));
+        $this->assertSame('LibXMLError|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_last_error'));
+        $this->assertSame('?callable', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_external_entity_loader'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_clear_errors'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_set_streams_context'));
         $this->assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('libxml_use_internal_errors', 0));
         $info = BuiltinInternalArgInfo::paramInfoForFunction('libxml_use_internal_errors', 0);
         $this->assertNotNull($info);
         $this->assertSame('use_errors', $info['name']);
         $this->assertSame('?bool', $info['type']);
         $this->assertTrue($info['isOptional']);
+
+        $disableInfo = BuiltinInternalArgInfo::paramInfoForFunction('libxml_disable_entity_loader', 0);
+        $this->assertNotNull($disableInfo);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable('libxml_disable_entity_loader', 0, $disableInfo, false));
+        $dest = new \PHPCompiler\VM\Variable();
+        $this->assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'libxml_disable_entity_loader', 0, $disableInfo));
+        $this->assertTrue($dest->toBool());
     }
 
     /** php-src ext/standard/string.stub.php — array|string|null $allowed_tags (#25594). */

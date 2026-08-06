@@ -225,6 +225,10 @@ final class BuiltinInternalArgInfo
             'ob_get_status', 'ob_list_handlers' => 'array',
             // ext/libxml/libxml.stub.php — InternalArgInfo return object (#25844)
             'libxml_get_errors' => 'array',
+            // ext/libxml/libxml.stub.php — InternalArgInfo return object/empty; Zend unions + voids (#28021)
+            'libxml_get_last_error' => 'LibXMLError|false',
+            'libxml_get_external_entity_loader' => '?callable',
+            'libxml_clear_errors', 'libxml_set_streams_context' => 'void',
             // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / true (#26319)
             'xml_parser_create' => 'XMLParser',
             'xml_set_object' => 'true',
