@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableElemLlvm;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -13,7 +15,9 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_first()/array_last() via ArrayElemJitHelper PHP (#15063).
  *
- * Replaces ~150 LOC inline LLVM in ext/standard/JitArrayElem.php.
+ * Thin standalone AOT uses pure LLVM ({@see HashTableElemLlvm}) — NestedJIT Variable
+ * returns from ArrayElemJitHelper are broken under thin AOT (#27596, peer #24025).
+ *
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray}.
  * php-src: ext/standard/array.c — php_array_first, php_array_last
  */
@@ -37,8 +41,11 @@ final class ArrayElemRuntime
 
     public static function first(Context $context, JITVariable $array): Value
     {
-        self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        if ($context->isThinStandaloneAotMain()) {
+            return HashTableElemLlvm::valueFirst($context, $ht);
+        }
+        self::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_FIRST),
@@ -48,8 +55,11 @@ final class ArrayElemRuntime
 
     public static function last(Context $context, JITVariable $array): Value
     {
-        self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        if ($context->isThinStandaloneAotMain()) {
+            return HashTableElemLlvm::valueLast($context, $ht);
+        }
+        self::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_LAST),
