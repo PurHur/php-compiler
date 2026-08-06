@@ -271,16 +271,18 @@ final class JitDatePeriodCreateFromISO8601String
 
     private static function storeNullProperty(Context $context, Value $obj, string $className, string $prop): void
     {
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $slot)
+        // Null `__object__*` for object-typed DatePeriod slots (#27572).
+        $nullObj = $context->getTypeFromString('__object__*')->constNull();
+        $propVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $nullObj
         );
-        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $context->type->object->propertyStore(
             $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
-            JITVariable::TYPE_NULL
+            JITVariable::TYPE_OBJECT
         );
     }
 

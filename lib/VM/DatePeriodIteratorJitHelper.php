@@ -64,16 +64,14 @@ final class DatePeriodIteratorJitHelper
         $recurrences = self::loadLongProperty($context, $obj, 'recurrences');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $i8 = $context->getTypeFromString('int8');
-        // php-src date_period_it_has_more — end!=NULL selects end-date form (#22463).
+        // php-src date_period_it_has_more — end!=NULL selects end-date form (#22463, #27572).
         $endSlot = $objectType->propertyFetch($obj, self::CLASS_PERIOD, 'end');
-        $endPtr = JitValueBox::valuePtrFromVariable($context, $endSlot);
-        $map = $context->structFieldMap['__value__'];
-        $endType = $context->builder->load($context->builder->structGep($endPtr, $map['type']));
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $endPtr = self::loadObject($context, $endSlot);
         $isEndForm = $context->builder->icmp(
-            Builder::INT_EQ,
-            $endType,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
+            Builder::INT_NE,
+            $endPtr,
+            $objPtrTy->constNull()
         );
         $endBb = BasicBlockHelper::append($context, 'dp_valid_end');
         $countBb = BasicBlockHelper::append($context, 'dp_valid_count');
@@ -160,6 +158,120 @@ final class DatePeriodIteratorJitHelper
         self::addIntervalToDateTime($context, $currentSlot, $intervalSlot);
 
         return self::voidResult($context);
+    }
+
+    /** DatePeriod::getStartDate() — clone of stored start (#27572 / #16614). */
+    public static function compileGetStartDate(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $startSlot = $context->type->object->propertyFetch($obj, self::CLASS_PERIOD, 'start');
+        $cloned = self::cloneDateTimeVariable($context, $startSlot);
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            self::loadObject($context, $cloned)
+        );
+
+        return $slot;
+    }
+
+    /**
+     * DatePeriod::getEndDate() — clone of stored end, or null for recurrence-count form (#27572 / #17495).
+     */
+    public static function compileGetEndDate(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $endSlot = $context->type->object->propertyFetch($obj, self::CLASS_PERIOD, 'end');
+        $out = JitValueBox::alloc($context);
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $endPtr = self::loadObject($context, $endSlot);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $endPtr, $objPtrTy->constNull());
+        $nullBb = BasicBlockHelper::append($context, 'dp_getend_null');
+        $objBb = BasicBlockHelper::append($context, 'dp_getend_obj');
+        $done = BasicBlockHelper::append($context, 'dp_getend_done');
+        $context->builder->branchIf($isNull, $nullBb, $objBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($objBb);
+        $endObjVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $endPtr
+        );
+        $cloned = self::cloneDateTimeVariable($context, $endObjVar);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $out),
+            self::loadObject($context, $cloned)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $out;
+    }
+
+    /** DatePeriod::getDateInterval() — stored interval object (#27572 / #16614). */
+    public static function compileGetDateInterval(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $intervalSlot = $context->type->object->propertyFetch($obj, self::CLASS_PERIOD, 'interval');
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            self::loadObject($context, $intervalSlot)
+        );
+
+        return $slot;
+    }
+
+    /**
+     * DatePeriod::getRecurrences() — user count, or null for end-date form (#16614 / #22463).
+     */
+    public static function compileGetRecurrences(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $endSlot = $context->type->object->propertyFetch($obj, self::CLASS_PERIOD, 'end');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $i64 = $context->getTypeFromString('int64');
+        $endPtr = self::loadObject($context, $endSlot);
+        $isEndForm = $context->builder->icmp(
+            Builder::INT_NE,
+            $endPtr,
+            $objPtrTy->constNull()
+        );
+        $out = JitValueBox::alloc($context);
+        $nullBb = BasicBlockHelper::append($context, 'dp_getrec_null');
+        $countBb = BasicBlockHelper::append($context, 'dp_getrec_count');
+        $done = BasicBlockHelper::append($context, 'dp_getrec_done');
+        $context->builder->branchIf($isEndForm, $nullBb, $countBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($countBb);
+        // php-src stores userRecurrences+1; getter returns user count (#26852).
+        $stored = self::loadLongProperty($context, $obj, 'recurrences');
+        $user = $context->builder->sub($stored, $i64->constInt(1, false));
+        JitValueBox::writeLong($context, $out, $user);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $out;
     }
 
     private static function loadObject(Context $context, JITVariable $receiver): Value
