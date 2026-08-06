@@ -93,8 +93,10 @@ final class str_word_count extends Internal
             }
         }
 
-        if (null !== $literal && null !== $formatCt && (2 === $argc || null !== $charsCt)) {
-            $format = (int) $formatCt;
+        // Fold when the string is a compile-time literal and format/chars are known
+        // (1-arg defaults format=0; #27019 also covers the runtime NestedJIT path).
+        if (null !== $literal && (1 === $argc || (null !== $formatCt && (2 === $argc || null !== $charsCt)))) {
+            $format = 1 === $argc ? 0 : (int) $formatCt;
             $chars = $charsCt ?? '';
             $result = VmString::str_word_count($literal, $format, $chars);
             if (\is_int($result)) {
