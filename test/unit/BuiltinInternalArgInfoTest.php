@@ -640,6 +640,18 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gethostname'));
     }
 
+    /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
+    public function testIconvStrlenReflectionStubTypes(): void
+    {
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv_strlen'));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_strlen', 1));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('iconv_strlen', 1);
+        $this->assertNotNull($info);
+        // php-types still labels the param charset; Reflection uses BuiltinParamNames → encoding.
+        $this->assertSame('?string', $info['type']);
+        $this->assertTrue($info['isOptional']);
+    }
+
     /** php-src link.stub.php — InternalArgInfo return int; Zend bool (#26323). */
     public function testSymlinkReflectionReturnBool(): void
     {

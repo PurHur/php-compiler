@@ -170,6 +170,8 @@ final class BuiltinInternalArgInfo
             'mb_convert_encoding' => 'array|string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
+            // ext/iconv/iconv.stub.php — InternalArgInfo return int (missing |false) (#27629)
+            'iconv_strlen' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
@@ -601,6 +603,8 @@ final class BuiltinInternalArgInfo
             },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
+            // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#27629)
+            'iconv_strlen' => 1 === $index ? '?string' : null,
             // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25587)
             'resourcebundle_create' => ($index === 0 || $index === 1) ? '?string' : null,
             // ext/json/json.stub.php — ?bool $associative; mixed $value (#25458)
