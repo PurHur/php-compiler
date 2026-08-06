@@ -87,6 +87,11 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('tryCompileTimeArrayFromPregFilter', $fold);
         $this->assertStringContainsString('tryEncodePregFilterScalar', $fold);
         $this->assertStringContainsString("'preg_filter'", $fold);
+        // #27131 — json_encode(array_column(lit…)) fold (peer #27130 array_reverse).
+        $this->assertStringContainsString('tryCompileTimeArrayFromArrayColumn', $fold);
+        $this->assertStringContainsString("'array_column'", $fold);
+        $this->assertStringContainsString('ArrayColumnJitHelper::columnWithKey', $fold);
+        $this->assertFileExists(__DIR__.'/../../test/repro/array_column_aot_27131.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitPregReplaceCompileTime.php');
         $this->assertFileExists(__DIR__.'/../../test/repro/issue_27181_aot_preg_filter.php');
     }

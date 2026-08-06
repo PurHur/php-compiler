@@ -9,12 +9,17 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Call-site LLVM for array_column() string-key array-of-arrays path (#26955).
+ * Call-site LLVM for array_column() string-key array-of-arrays path (#26955, #27131).
  *
  * Thin AOT NestedJIT of ArrayColumnJitHelper fatals on EnumCaseEntry::fetchProperty
  * / ObjectEntry::hasProperty (mis-resolved onto the helper) and aborts on
  * HashTable::iterate (peer ArrayFlip #26970 / #21981). Walk packed + string-key
  * entries with HashTableHelper APIs instead.
+ *
+ * After appends, sync {@see numElements}/{@see nextFreeElement} like
+ * {@see HashTableWriteLlvm::materializeNativeArrayForCall()} / {@see HashTableReverseLlvm}
+ * so NestedJIT {@see isPackedList}/{@see exportKeyValuePairs} agree with index access —
+ * otherwise thin AOT {@see json_encode} prints `{}` (#27131; peer #27130).
  *
  * VM SSOT remains {@see \PHPCompiler\ext\standard\ArrayColumnJitHelper}.
  * php-src: ext/standard/array.c — php_array_column()
@@ -29,8 +34,29 @@ final class ArrayColumnLlvm
         $dest = HashTableHelper::alloc($context);
         self::walkPackedRows($context, $src, $dest, $keyStr);
         self::walkStringKeyRows($context, $src, $dest, $keyStr);
+        self::syncPackedListMetadata($context, $dest);
 
         return $dest;
+    }
+
+    /**
+     * Dense packed-list metadata for NestedJIT json_encode (#27131 / peer #27130).
+     * Do not rely solely on setAtIndex nextFree updates.
+     */
+    private static function syncPackedListMetadata(Context $context, Value $dest): void
+    {
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($dest, $htMap['nextFreeElement'])
+        );
+        $context->builder->store(
+            $nextFree,
+            $context->builder->structGep($dest, $htMap['numElements'])
+        );
+        $context->builder->store(
+            $nextFree,
+            $context->builder->structGep($dest, $htMap['nextFreeElement'])
+        );
     }
 
     private static function walkPackedRows(

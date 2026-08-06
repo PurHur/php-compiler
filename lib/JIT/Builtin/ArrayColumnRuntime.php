@@ -14,12 +14,14 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_column() (#14256, #14264, #17973, #26955).
+ * JIT/AOT link for array_column() (#14256, #14264, #17973, #26955, #27131).
  *
  * Thin AOT NestedJIT of ArrayColumnJitHelper fatals on fetchProperty/hasProperty and
  * aborts on HashTable::iterate (peer ArrayFlip #26970). Call-site LLVM via
  * {@see ArrayColumnLlvm} for string-key array-of-arrays; VM
  * {@see \PHPCompiler\ext\standard\ArrayColumnJitHelper} remains SSOT for execute().
+ * Inline {@see json_encode(array_column(lit…))} folds via
+ * {@see \PHPCompiler\ext\standard\JitJsonEncodeCompileTime} (peer #27130).
  *
  * php-src: ext/standard/array.c — php_array_column()
  */

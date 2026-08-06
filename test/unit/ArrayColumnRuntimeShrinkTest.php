@@ -30,6 +30,9 @@ final class ArrayColumnRuntimeShrinkTest extends TestCase
         $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayColumnLlvm.php');
         $this->assertStringContainsString('columnWithStringKey', $llvm);
         $this->assertStringContainsString('__hashtable__readStringKeyValue', $llvm);
+        // #27131 — NestedJIT json_encode needs dense packed metadata after appends.
+        $this->assertStringContainsString('syncPackedListMetadata', $llvm);
+        $this->assertStringContainsString('numElements', $llvm);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_column.php');
         $this->assertStringContainsString('ArrayColumnRuntime::column', $builtin);
