@@ -17017,11 +17017,16 @@ restart:
 
     protected function applyFunctionStaticTypeMetadata(Variable $storage, Frame $frame, OpCode $op): void
     {
+        $resolved = $storage->resolveIndirect();
+        // Always mark storage (typed or not) so frame teardown skips releaseRef (#28039).
+        $resolved->functionStaticStorage = true;
+        if (null !== $op->functionStaticVarName && '' !== $op->functionStaticVarName) {
+            $resolved->functionStaticVarName = $op->functionStaticVarName;
+        }
         if (null === $op->functionStaticTypeSlot || !isset($frame->block->constants[$op->functionStaticTypeSlot])) {
             return;
         }
         $proto = $frame->block->constants[$op->functionStaticTypeSlot];
-        $resolved = $storage->resolveIndirect();
         $resolved->typeConstraint = $proto->typeConstraint;
         $resolved->classConstraint = $proto->classConstraint;
         $resolved->literalBoolType = $proto->literalBoolType;
@@ -17029,9 +17034,6 @@ restart:
         $resolved->declaredTypeLabel = $proto->declaredTypeLabel;
         $resolved->genericArrayTypeSpec = $proto->genericArrayTypeSpec;
         $resolved->dnfArms = $proto->dnfArms;
-        if (null !== $op->functionStaticVarName && '' !== $op->functionStaticVarName) {
-            $resolved->functionStaticVarName = $op->functionStaticVarName;
-        }
     }
 
     protected function enforceFunctionStaticWrite(
@@ -21815,6 +21817,10 @@ restart:
             if ($this->variableAliasesObjectPropertyCell($slot)) {
                 continue;
             }
+            // DECLARE_FUNCTION_STATIC aliases Context/ClosureState static cells the same way (#28039).
+            if ($this->variableAliasesFunctionStaticCell($slot)) {
+                continue;
+            }
             // Bridged throwable delivered to catch must survive callee CV release (#22541).
             if ($this->variableHoldsPreservedExceptionObject($slot, $preserveIds)) {
                 continue;
@@ -21972,6 +21978,9 @@ restart:
                 continue;
             }
             if ($this->variableAliasesObjectPropertyCell($slot)) {
+                continue;
+            }
+            if ($this->variableAliasesFunctionStaticCell($slot)) {
                 continue;
             }
             if ($this->variableHoldsPreservedExceptionObject($slot, $this->exceptionObjectIdsToPreserve())) {
@@ -22160,6 +22169,9 @@ restart:
         if ($this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
             return;
         }
+        if ($this->variableAliasesFunctionStaticCell($frame->scope[$slot])) {
+            return;
+        }
         if ($this->variableIsGeneratorYieldStorage($frame->scope[$slot])) {
             return;
         }
@@ -22254,6 +22266,26 @@ restart:
         return null !== $resolved->objectPropertyOwner;
     }
 
+    /**
+     * True when a scope cell is (or aliases) Context/ClosureState function-local static storage (#28039).
+     *
+     * DECLARE_FUNCTION_STATIC installs an INDIRECT into the persistent cell; releasing through that
+     * alias on frame exit destroys Closures (and other objects) the static still holds.
+     */
+    private function variableAliasesFunctionStaticCell(Variable $var): bool
+    {
+        if ($var->functionStaticStorage) {
+            return true;
+        }
+        if (null !== $this->context->functionStaticKeyForStorage($var)) {
+            return true;
+        }
+        $resolved = $var->resolveIndirect();
+
+        return $resolved->functionStaticStorage
+            || null !== $this->context->functionStaticKeyForStorage($resolved);
+    }
+
     /** Generator yield key/value cells must survive fcall temp release (#18184). */
     private function variableIsGeneratorYieldStorage(Variable $var): bool
     {
@@ -22302,6 +22334,9 @@ restart:
                 continue;
             }
             if (isset($frame->scope[$slot]) && $this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
+                continue;
+            }
+            if (isset($frame->scope[$slot]) && $this->variableAliasesFunctionStaticCell($frame->scope[$slot])) {
                 continue;
             }
             if (isset($frame->scope[$slot]) && $this->variableIsGeneratorYieldStorage($frame->scope[$slot])) {
