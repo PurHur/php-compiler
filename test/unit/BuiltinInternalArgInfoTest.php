@@ -867,4 +867,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
             BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('splpriorityqueue', 'compare', 0)
         );
     }
+
+    /** php-src ext/zlib/zlib.stub.php — DeflateContext|false / InflateContext|false (#27627). */
+    public function testDeflateInflateInitReflectionStubTypes(): void
+    {
+        $this->assertSame('DeflateContext|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('deflate_init'));
+        $this->assertSame('InflateContext|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('inflate_init'));
+        $this->assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('inflate_init', 1));
+        $opts = BuiltinInternalArgInfo::paramInfoForFunction('inflate_init', 1);
+        $this->assertNotNull($opts);
+        $this->assertSame('options', $opts['name']);
+        $this->assertSame('array', $opts['type']);
+        $this->assertTrue($opts['isOptional']);
+        $deflateOpts = BuiltinInternalArgInfo::paramInfoForFunction('deflate_init', 1);
+        $this->assertNotNull($deflateOpts);
+        $this->assertSame('array', $deflateOpts['type']);
+        // Optionality for deflate_init $options is from BuiltinParamNames `options=` (#24568), not InternalArgInfo.
+    }
 }
