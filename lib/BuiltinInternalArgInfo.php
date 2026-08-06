@@ -919,6 +919,14 @@ final class BuiltinInternalArgInfo
                 2 => '?string',
                 default => null,
             },
+            // ext/dom/php_dom.stub.php — string $path / int $options = 0 / ?string $overrideEncoding = null (#27924)
+            'dom\\htmldocument::createfromfile',
+            'dom\\xmldocument::createfromfile' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                2 => '?string',
+                default => null,
+            },
             // ext/fileinfo/fileinfo.stub.php — ?string $magic_database = null (InternalArgInfo string) (#26181)
             'finfo::__construct' => 1 === $index ? '?string' : null,
             // ext/bcmath/bcmath.stub.php — string|int $num (InternalArgInfo empty) (#24626)

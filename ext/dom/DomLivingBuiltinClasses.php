@@ -464,6 +464,13 @@ final class DomLivingBuiltinClasses
         $htmlDocument->methods['createfromfile'] = new HtmlDocumentCreateFromFile();
         $htmlDocument->methodVisibility['createfromfile'] = $pubStatic;
         $htmlDocument->methodNames['createfromfile'] = 'createFromFile';
+        // php-src stub returns HTMLDocument (#26080 / #27924).
+        $htmlDocRet = ReflectionTypeSupport::cfgTypeFromLabel('Dom\\HTMLDocument');
+        if (null !== $htmlDocRet) {
+            $htmlDocument->methodReturnDeclaredTypes['createfromstring'] = $htmlDocRet;
+            $htmlDocument->methodReturnDeclaredTypes['createfromfile'] = $htmlDocRet;
+            $htmlDocument->methodReturnDeclaredTypes['createempty'] = $htmlDocRet;
+        }
         $htmlDocument->methods['getelementbyid'] = new HtmlDocumentGetElementById();
         $htmlDocument->methodVisibility['getelementbyid'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['getelementbyid'] = 'getElementById';
@@ -508,6 +515,13 @@ final class DomLivingBuiltinClasses
         $xmlDocument->methods['createempty'] = new XmlDocumentCreateEmpty();
         $xmlDocument->methodVisibility['createempty'] = $pubStatic;
         $xmlDocument->methodNames['createempty'] = 'createEmpty';
+        // php-src stub returns XMLDocument (#26080 / #27924).
+        $xmlDocRet = ReflectionTypeSupport::cfgTypeFromLabel('Dom\\XMLDocument');
+        if (null !== $xmlDocRet) {
+            $xmlDocument->methodReturnDeclaredTypes['createfromstring'] = $xmlDocRet;
+            $xmlDocument->methodReturnDeclaredTypes['createfromfile'] = $xmlDocRet;
+            $xmlDocument->methodReturnDeclaredTypes['createempty'] = $xmlDocRet;
+        }
         self::copySelectedMethods(
             $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
             $xmlDocument,

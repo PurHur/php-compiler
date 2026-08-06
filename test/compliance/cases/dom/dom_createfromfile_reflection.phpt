@@ -1,9 +1,9 @@
 --TEST--
-Dom\HTMLDocument/XMLDocument::createFromString Reflection arity/types (#26080, ext/dom/php_dom.stub.php)
+Dom\HTMLDocument/XMLDocument::createFromFile Reflection arity/types (#27924, ext/dom/php_dom.stub.php)
 --SKIPIF--
 <?php
 if (!\PHPCompiler\CompilerVersion::supportsDomLivingStandardNamespace()) {
-    die('skip Dom\\ living API requires PHP_COMPILER_PROFILE=8.4 (#26080)');
+    die('skip Dom\\ living API requires PHP_COMPILER_PROFILE=8.4 (#27924)');
 }
 ?>
 --ENV--
@@ -13,7 +13,7 @@ PHP_COMPILER_PROFILE=8.4
 declare(strict_types=1);
 
 foreach ([Dom\HTMLDocument::class, Dom\XMLDocument::class] as $c) {
-    $rf = new ReflectionMethod($c, 'createFromString');
+    $rf = new ReflectionMethod($c, 'createFromFile');
     $rt = $rf->getReturnType();
     echo $c, ' arity=', $rf->getNumberOfParameters(),
         ' req=', $rf->getNumberOfRequiredParameters(),
@@ -29,6 +29,6 @@ foreach ([Dom\HTMLDocument::class, Dom\XMLDocument::class] as $c) {
 }
 --EXPECT--
 Dom\HTMLDocument arity=3 req=1 ret=Dom\HTMLDocument
-  params=source:string:REQ,options:int:OPT,overrideEncoding:?string:OPT
+  params=path:string:REQ,options:int:OPT,overrideEncoding:?string:OPT
 Dom\XMLDocument arity=3 req=1 ret=Dom\XMLDocument
-  params=source:string:REQ,options:int:OPT,overrideEncoding:?string:OPT
+  params=path:string:REQ,options:int:OPT,overrideEncoding:?string:OPT

@@ -157,6 +157,9 @@ final class BuiltinParamNames
             // php-src ext/dom/php_dom.stub.php — createFromString(string $source, int $options = 0, ?string $overrideEncoding = null) (#26080)
             'dom\\htmldocument::createfromstring',
             'dom\\xmldocument::createfromstring' => ['source', 'options=', 'overrideEncoding='],
+            // php-src ext/dom/php_dom.stub.php — createFromFile(string $path, int $options = 0, ?string $overrideEncoding = null) (#27924)
+            'dom\\htmldocument::createfromfile',
+            'dom\\xmldocument::createfromfile' => ['path', 'options=', 'overrideEncoding='],
             'domdocument::appendchild' => ['node'],
             'domdocument::createattribute' => ['localName'],
             'domdocument::createattributens' => ['namespace', 'qualifiedName'],
