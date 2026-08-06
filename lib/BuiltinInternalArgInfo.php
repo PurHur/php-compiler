@@ -255,6 +255,8 @@ final class BuiltinInternalArgInfo
             'imap_utf7_decode', 'imap_utf8_to_mutf7', 'imap_mutf7_to_utf8', 'imap_mail_compose' => 'string|false',
             // ext/imap/php_imap.stub.php — InternalArgInfo return empty; Zend int|bool (#27680)
             'imap_timeout' => 'int|bool',
+            // ext/imap/php_imap.stub.php — PHP 8.3+; absent from InternalArgInfo (#27674)
+            'imap_is_open' => 'bool',
             // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
             'shm_attach' => 'SysvSharedMemory|false',
             'shm_get_var' => 'mixed',
@@ -838,6 +840,8 @@ final class BuiltinInternalArgInfo
                 1, 2 => '',
                 default => null,
             },
+            // ext/imap/php_imap.stub.php — PHP 8.3+; absent from InternalArgInfo (#27674)
+            'imap_is_open' => 0 === $index ? 'IMAP\\Connection' : null,
             default => null,
         };
     }

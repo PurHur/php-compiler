@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\imap;
 
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\CompilerVersion;
 
 /**
  * imap extension module entry (php-src ext/imap/php_imap.c; #3663).
@@ -82,7 +83,7 @@ class Module extends ModuleAbstract
             return [];
         }
 
-        return [
+        $fns = [
             new imap_open(),
             new imap_popen(),
             new imap_reopen(),
@@ -151,5 +152,11 @@ class Module extends ModuleAbstract
             new imap_mail_move(),
             new imap_timeout(),
         ];
+        // php-src 8.3+ imap_is_open() (#27674)
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.3.0', '>=')) {
+            $fns[] = new imap_is_open();
+        }
+
+        return $fns;
     }
 }

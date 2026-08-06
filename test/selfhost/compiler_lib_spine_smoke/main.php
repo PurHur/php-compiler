@@ -1639,6 +1639,7 @@ require_once __DIR__.'/../../../ext/imap/imap_getsubscribed.php';
 require_once __DIR__.'/../../../ext/imap/imap_header.php';
 require_once __DIR__.'/../../../ext/imap/imap_headerinfo.php';
 require_once __DIR__.'/../../../ext/imap/imap_headers.php';
+require_once __DIR__.'/../../../ext/imap/imap_is_open.php';
 require_once __DIR__.'/../../../ext/imap/imap_last_error.php';
 require_once __DIR__.'/../../../ext/imap/imap_list.php';
 require_once __DIR__.'/../../../ext/imap/imap_listmailbox.php';

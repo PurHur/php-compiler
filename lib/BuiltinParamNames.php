@@ -1112,6 +1112,9 @@ final class BuiltinParamNames
             case 'imap_listmailbox':
             case 'imap_listsubscribed':
                 return ['imap', 'reference', 'pattern'];
+            // php-src ext/imap/php_imap.stub.php — PHP 8.3+; absent from InternalArgInfo (#27674)
+            case 'imap_is_open':
+                return ['imap'];
             // php-src ext/opcache/opcache.stub.php — InternalArgInfo still says script (#23834)
             case 'opcache_compile_file':
             case 'opcache_is_script_cached':

@@ -46,4 +46,45 @@ final class VmImapArg
 
         return $object;
     }
+
+    /**
+     * IMAP\Connection arg that allows a closed stream (php-src imap_is_open; #27674).
+     *
+     * Unlike {@see requireConnectionObject}, closed connections do not throw — callers
+     * decide (imap_is_open returns false).
+     */
+    public static function requireConnectionObjectAllowClosed(
+        Variable $var,
+        string $functionName,
+        int $argNum = 1
+    ): ObjectEntry {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($imap) must be of type IMAP\\Connection, %s given',
+                $functionName,
+                $argNum,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($imap) must be of type IMAP\\Connection, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($var)
+            ));
+        }
+        $object = $var->toObject();
+        if (!VmImapCore::isConnectionObject($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($imap) must be of type IMAP\\Connection, %s given',
+                $functionName,
+                $argNum,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
 }
