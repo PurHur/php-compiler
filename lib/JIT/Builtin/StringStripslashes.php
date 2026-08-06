@@ -14,7 +14,9 @@ use PHPLLVM\Builder;
  * JIT/AOT link for stripslashes() (#14742, #18792, #26907).
  *
  * Embed/JIT: NestedJIT {@see \PHPCompiler\ext\standard\StripslashesJitHelper}.
- * Thin standalone AOT: pure LLVM (NestedJIT of VmString::stripslashes segfaults — #26907).
+ * Thin standalone AOT: pure LLVM — NestedJIT skip-2 / flag-param strip helpers truncate or
+ * segfault under thin AOT (#26907 / #28104); peer addslashes migrated to self-contained
+ * NestedJIT (#28104) because it only advances `$i+1` (htmlspecialchars shape).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString::stripslashes()}.
  * php-src: ext/standard/stripslashes.c — PHP_FUNCTION(stripslashes)
  */

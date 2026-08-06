@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\AddslashesJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** addslashes() JIT routes through AddslashesJitHelper PHP for embed + user-script AOT (#14741, #18391). */
+/** addslashes() JIT routes through AddslashesJitHelper PHP for embed + user-script AOT (#14741, #18391, #28104). */
 final class AddslashesRuntimeShrinkTest extends TestCase
 {
     public function testStringAddslashesUsesJitHelperNotLlvmMonolith(): void
@@ -16,9 +16,9 @@ final class AddslashesRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringAddslashes.php');
         $this->assertStringContainsString('AddslashesJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        // Thin AOT: pure LLVM inside StringAddslashes (no NestedJIT / no separate Llvm file) (#26907).
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('implementThinLlvm', $source);
+        // Always bridge — no thin hand LLVM (#28104; NestedJIT-safe self-contained helper).
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('implementThinLlvm', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringAddslashesLlvm', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringAddslashesLlvm.php');
@@ -30,15 +30,15 @@ final class AddslashesRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitAddslashes', $builtin);
     }
 
-    public function testAddslashesJitHelperDelegatesToVmString(): void
+    public function testAddslashesJitHelperMatchesVmStringWithoutVmStringDep(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/AddslashesJitHelper.php');
-        $this->assertStringContainsString('VmString::addslashes', $source);
+        $this->assertDoesNotMatchRegularExpression('/return\s+VmString::/', $source);
+        $this->assertStringContainsString('escapeFrom', $source);
 
-        $input = "a'b\\0c";
+        $input = "a'b\\\"\0c";
         $expected = VmString::addslashes($input);
         $this->assertSame($expected, AddslashesJitHelper::addslashesArgv($input));
-        $this->assertSame($expected, VmString::addslashes($input));
     }
 
     public function testSpineBundleOmitsDeletedAddslashesLlvm(): void
