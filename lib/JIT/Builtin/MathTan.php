@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitTanKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for tan() via TanJitHelper PHP (#15088, #27048).
+ * JIT/AOT link for tan() via TanJitHelper PHP (#15088, #27048, #28226).
  *
- * Embed + thin standalone AOT: {@see TanJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering TanJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathCos #28042 / MathSin #28016 shape).
+ * NestedJIT no longer needs a libc tan(3) kernel — helper uses NestedJIT-safe sin/cos Horner.
  * php-src: ext/standard/math.c — PHP_FUNCTION(tan)
  */
 final class MathTan
@@ -45,10 +42,6 @@ final class MathTan
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitTanKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathTan
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_TAN);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_TAN, $probe);
@@ -80,7 +69,7 @@ final class MathTan
             self::TAN_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27048'
+            '#28226'
         );
     }
 }

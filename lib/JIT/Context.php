@@ -889,7 +889,6 @@ class Context {
             'phpc_nextafter_kernel',
             'phpc_cosh_kernel',
             'phpc_sinh_kernel',
-            'phpc_tan_kernel',
             'phpc_tanh_kernel',
             'phpc_acos_kernel',
             'phpc_asin_kernel',

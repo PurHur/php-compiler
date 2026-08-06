@@ -73,7 +73,7 @@ final class SinRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringNotContainsString('phpc_sin_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
-        $this->assertStringContainsString('phpc_tan_kernel', $source);
+        $this->assertStringContainsString('phpc_exp_kernel', $source);
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
         $this->assertStringContainsString('phpc_nextafter_kernel', $source);
     }
