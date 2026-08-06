@@ -151,6 +151,7 @@ require_once __DIR__.'/../../../ext/brotli/JitBrotli.php';
 require_once __DIR__.'/../../../ext/brotli/Module.php';
 require_once __DIR__.'/../../../ext/brotli/VmBrotliNative.php';
 require_once __DIR__.'/../../../ext/brotli/VmBrotliContext.php';
+require_once __DIR__.'/../../../ext/brotli/VmBrotliStream.php';
 require_once __DIR__.'/../../../ext/brotli/brotli_compress.php';
 require_once __DIR__.'/../../../ext/brotli/brotli_uncompress.php';
 require_once __DIR__.'/../../../ext/brotli/brotli_compress_init.php';
