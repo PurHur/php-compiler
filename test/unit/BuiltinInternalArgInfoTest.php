@@ -516,6 +516,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src ext/xml/xml.stub.php — xml_parser_get_option XMLParser + string|int (#27743). */
+    public function testXmlParserGetOptionReflectionStubTypes(): void
+    {
+        $this->assertSame('string|int', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_parser_get_option'));
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parser_get_option', 0));
+        $parser = BuiltinInternalArgInfo::paramInfoForFunction('xml_parser_get_option', 0);
+        $this->assertNotNull($parser);
+        $this->assertSame('parser', $parser['name']);
+        $this->assertSame('XMLParser', $parser['type']);
+        $option = BuiltinInternalArgInfo::paramInfoForFunction('xml_parser_get_option', 1);
+        $this->assertNotNull($option);
+        $this->assertSame('option', $option['name']);
+        $this->assertSame('int', $option['type']);
+    }
+
     /** php-src ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687). */
     public function testXmlParserCreateNsAndIntoStructReflectionStubTypes(): void
     {
