@@ -330,6 +330,42 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $floatKeyBlock = $fn->appendBasicBlock('ht_read_vk_float');
+        $afterFloatKey = $fn->appendBasicBlock('ht_read_vk_after_float');
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isVmFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isNativeDouble, $isVmFloat),
+            $floatKeyBlock,
+            $afterFloatKey
+        );
+        $context->builder->positionAtEnd($floatKeyBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        // Dim read: INF/NAN E_DEPRECATED (#27926); finite fractional silence until #27948.
+        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithNonFinitePrecisionWarning(
+            $context,
+            $doubleVal
+        );
+        $floatIndex = $context->builder->truncOrBitCast(
+            $truncatedLong,
+            $context->getTypeFromString('size_t')
+        );
+        $floatBox = self::readIndexedToValueBox($context, $ht, $floatIndex);
+        JitValueBox::copyFromPointer(
+            $context,
+            $destPtr,
+            JitValueBox::pointer($context, $floatBox->value)
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterFloatKey);
         $nullKeyBlock = $fn->appendBasicBlock('ht_read_vk_null_key');
         $afterNullKey = $fn->appendBasicBlock('ht_read_vk_after_null_key');
         $context->builder->branchIf(

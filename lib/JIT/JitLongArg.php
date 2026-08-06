@@ -79,9 +79,9 @@ final class JitLongArg {
         $stringTy = $i8->constInt(Variable::TYPE_STRING, false);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy);
         $stringBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_string');
-        $numericBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_numeric');
+        $afterString = BasicBlockHelper::append($context, 'jit_long_arg_vbox_after_str');
         $doneBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_done');
-        $context->builder->branchIf($isString, $stringBlock, $numericBlock);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         $strPtr = $context->builder->call(
@@ -90,6 +90,37 @@ final class JitLongArg {
         );
         $stringLong = self::lowerStringToLong($context, $strPtr, $base);
         $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        // Boxed float/double: zend_dval_to_lval + E_DEPRECATED (#23533, #27926).
+        // Do not use silent __value__readLong — that skips INF/NAN and fractional warnings.
+        $context->builder->positionAtEnd($afterString);
+        $doubleBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_double');
+        $numericBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_numeric');
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        // Value-box writers may tag floats as VM TYPE_FLOAT (2) rather than NATIVE_DOUBLE (3).
+        $isVmFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+        );
+        $isFloat = $context->builder->or($isNativeDouble, $isVmFloat);
+        $context->builder->branchIf($isFloat, $doubleBlock, $numericBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $doubleLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+            $context,
+            $doubleVal
+        );
+        $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($numericBlock);
@@ -104,6 +135,7 @@ final class JitLongArg {
         $i64 = $context->getTypeFromString('int64');
         $phi = $context->builder->phi($i64, 'jit_long_arg_vbox_phi');
         $phi->addIncoming($stringLong, $stringEnd);
+        $phi->addIncoming($doubleLong, $doubleEnd);
         $phi->addIncoming($numericLong, $numericEnd);
 
         return $phi;

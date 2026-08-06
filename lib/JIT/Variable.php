@@ -1223,7 +1223,12 @@ final class Variable {
             if ($forWrite) {
                 $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal);
             } else {
-                $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+                // Read/isset/unset: finite fractional keys stay silent (#16739 / #27948);
+                // INF/NAN still E_DEPRECATED (#27926).
+                $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithNonFinitePrecisionWarning(
+                    $context,
+                    $doubleVal
+                );
             }
 
             return $context->builder->truncOrBitCast($truncated, $sizeT);

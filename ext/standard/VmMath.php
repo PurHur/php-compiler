@@ -95,11 +95,14 @@ final class VmMath
         return (int) ceil($value);
     }
 
-    /** php-src zend_operators.c — float→long precision loss (issue #10440). */
+    /**
+     * php-src zend_operators.c — float→long precision loss (issue #10440, #27926).
+     * Non-finite values also emit E_DEPRECATED (message still says “loses precision”).
+     */
     public static function floatLosesIntPrecision(float $value): bool
     {
         if (!\is_finite($value)) {
-            return false;
+            return true;
         }
 
         return $value !== (float) self::floatToZendLong($value);
@@ -107,7 +110,8 @@ final class VmMath
 
     public static function floatToIntPrecisionWarningMessage(float $value): string
     {
-        return \sprintf('Implicit conversion from float %s to int loses precision', $value);
+        // Cast (not %g): INF/NAN/-INF must match Zend’s uppercase spellings (#27926).
+        return \sprintf('Implicit conversion from float %s to int loses precision', (string) $value);
     }
 
     public static function warnFloatToIntPrecisionLoss(
