@@ -97,6 +97,9 @@ final class HashTableMutateNestedLlvm
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+        // setValueBoxKey / setStringKey may leave numElements stale under thin AOT (#27217).
+        // Pair list length is the authoritative post-reorder element count.
+        $context->builder->store($count, $context->builder->structGep($ht, $map['numElements']));
     }
 
     /** Drop packed + string/object keys; keep capacity/values buffer for reuse. */

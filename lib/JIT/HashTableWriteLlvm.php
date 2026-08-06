@@ -970,6 +970,8 @@ final class HashTableWriteLlvm
         $typeByte = $context->builder->load(
             $context->builder->structGep($valPtr, $valueMap['type'])
         );
+        // Mask IS_REFCOUNTED — value boxes from export/writeString may differ on the high bit (#27217).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $fn = $context->builder->getInsertBlock()->getParent();
         $stringBlock = $fn->appendBasicBlock('ht_set_vk_str');
         $longBlock = $fn->appendBasicBlock('ht_set_vk_long');
@@ -978,8 +980,8 @@ final class HashTableWriteLlvm
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_STRING, false)
+                $kind,
+                $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
             ),
             $stringBlock,
             $afterString
@@ -993,8 +995,8 @@ final class HashTableWriteLlvm
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+                $kind,
+                $i8->constInt(Variable::TYPE_NATIVE_LONG & 0x7f, false)
             ),
             $longBlock,
             $afterLong
@@ -1009,12 +1011,12 @@ final class HashTableWriteLlvm
         $context->builder->positionAtEnd($afterLong);
         $floatBlock = $fn->appendBasicBlock('ht_set_vk_float');
         $afterFloat = $fn->appendBasicBlock('ht_set_vk_after_float');
-        // Value-box type bytes use VM Variable constants (TYPE_FLOAT=2).
+        // Value-box type bytes use VM Variable constants (TYPE_FLOAT=2); mask IS_REFCOUNTED.
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+                $kind,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT & 0x7f, false)
             ),
             $floatBlock,
             $afterFloat
@@ -1034,8 +1036,8 @@ final class HashTableWriteLlvm
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_NULL, false)
+                $kind,
+                $i8->constInt(Variable::TYPE_NULL & 0x7f, false)
             ),
             $nullBlock,
             $afterNull
@@ -1051,8 +1053,8 @@ final class HashTableWriteLlvm
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_OBJECT, false)
+                $kind,
+                $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
             ),
             $illegalBlock,
             $afterObject
@@ -1060,16 +1062,16 @@ final class HashTableWriteLlvm
         $context->builder->positionAtEnd($afterObject);
         $isEnumCase = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE & 0x7f, false)
         );
         $afterEnumCase = $fn->appendBasicBlock('ht_set_vk_after_enum');
         $context->builder->branchIf($isEnumCase, $illegalBlock, $afterEnumCase);
         $context->builder->positionAtEnd($afterEnumCase);
         $isArray = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
         );
         $context->builder->branchIf($isArray, $illegalBlock, $done);
         $context->builder->positionAtEnd($illegalBlock);
