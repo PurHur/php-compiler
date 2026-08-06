@@ -8,11 +8,10 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * ob_get_status() numeric fields for compiled JIT/AOT modules (#9497, php-in-PHP).
+ * ob_get_status() status-row builder for VM + compiled JIT/AOT modules (#9497, #28153).
  *
- * Handler name string is attached in {@see \PHPCompiler\JIT\Builtin\ObStatusRuntime} bridge.
- * VM orchestration: {@see VmOb}.
- * php-src: ext/standard/output.c — PHP_FUNCTION(ob_get_status)
+ * Key insertion order matches php-src ext/standard/output.c — `name` first, then type/flags/….
+ * VM orchestration: {@see VmOb}. JIT bridge: {@see \PHPCompiler\JIT\Builtin\ObStatusRuntime}.
  */
 final class ObStatusJitHelper
 {
@@ -26,10 +25,15 @@ final class ObStatusJitHelper
 
     public const DEFAULT_BUFFER_SIZE = 16384;
 
-    /** Numeric/status fields only — compiled into JIT/AOT (no Variable::string in this file). */
-    public static function buildStatusEntryPartial(int $level, int $bufferUsed): HashTable
+    /**
+     * Full status row (php-src key order). Used by VM with the real handler display name.
+     */
+    public static function buildStatusEntry(int $level, int $bufferUsed, string $handlerName): HashTable
     {
         $ht = new HashTable();
+        $name = new Variable();
+        $name->string($handlerName);
+        $ht->add('name', $name);
         self::addInt($ht, 'type', self::HANDLER_TYPE);
         self::addInt($ht, 'flags', self::HANDLER_FLAGS);
         self::addInt($ht, 'level', $level);
@@ -38,6 +42,24 @@ final class ObStatusJitHelper
         self::addInt($ht, 'buffer_used', $bufferUsed);
 
         return $ht;
+    }
+
+    /**
+     * JIT/AOT compiled helper — default handler name baked in (no string arg ABI).
+     *
+     * @see buildStatusEntry
+     */
+    public static function buildStatusEntryDefault(int $level, int $bufferUsed): HashTable
+    {
+        return self::buildStatusEntry($level, $bufferUsed, self::HANDLER_NAME);
+    }
+
+    /**
+     * @deprecated Prefer {@see buildStatusEntryDefault()} — kept as alias for call-site churn.
+     */
+    public static function buildStatusEntryPartial(int $level, int $bufferUsed): HashTable
+    {
+        return self::buildStatusEntryDefault($level, $bufferUsed);
     }
 
     private static function addInt(HashTable $ht, string $key, int $value): void

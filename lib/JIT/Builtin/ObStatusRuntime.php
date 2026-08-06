@@ -25,7 +25,7 @@ final class ObStatusRuntime
 
     private const HELPER_PATH = '/ext/standard/ObStatusJitHelper.php';
 
-    private const BUILD_STATUS_PARTIAL = 'PHPCompiler\\ext\\standard\\ObStatusJitHelper::buildStatusEntryPartial';
+    private const BUILD_STATUS_DEFAULT = 'PHPCompiler\\ext\\standard\\ObStatusJitHelper::buildStatusEntryDefault';
 
     private const FN_GET_STATUS = '__phpc_ob_get_status_ht';
 
@@ -33,7 +33,7 @@ final class ObStatusRuntime
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::BUILD_STATUS_PARTIAL,
+        self::BUILD_STATUS_DEFAULT,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -186,23 +186,11 @@ final class ObStatusRuntime
 
     private static function emitStatusEntryWithName(Context $context, Value $levelIdx, Value $bufferUsed): Value
     {
-        $ht = $context->builder->call(
-            self::helperFunction($context, self::BUILD_STATUS_PARTIAL),
+        // name is first inside buildStatusEntryDefault (php-src key order; #28153).
+        return $context->builder->call(
+            self::helperFunction($context, self::BUILD_STATUS_DEFAULT),
             $context->builder->sext($levelIdx, $context->getTypeFromString('int64')),
             $bufferUsed
-        );
-        self::attachHandlerName($context, $ht);
-
-        return $ht;
-    }
-
-    private static function attachHandlerName(Context $context, Value $ht): void
-    {
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyString'),
-            $ht,
-            self::literalKeyString($context, 'name'),
-            self::literalValueString($context, self::HANDLER_NAME)
         );
     }
 

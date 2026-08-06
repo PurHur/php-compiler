@@ -16,7 +16,7 @@ final class ObStatusRuntimeShrinkTest extends TestCase
     public function testObStatusRuntimeUsesObStatusJitHelperNotLlvmHashtableBuilder(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObStatusRuntime.php');
-        $this->assertStringContainsString('buildStatusEntryPartial', $source);
+        $this->assertStringContainsString('buildStatusEntryDefault', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('__phpc_ob_status_entry', $source);
@@ -32,16 +32,26 @@ final class ObStatusRuntimeShrinkTest extends TestCase
     public function testVmObDelegatesToObStatusJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmOb.php');
-        $this->assertStringContainsString('ObStatusJitHelper::buildStatusEntryPartial', $source);
+        $this->assertStringContainsString('ObStatusJitHelper::buildStatusEntry', $source);
     }
 
-    public function testObStatusJitHelperBuildsExpectedPartialStatus(): void
+    public function testObStatusJitHelperBuildsExpectedStatusKeyOrder(): void
     {
-        $ht = ObStatusJitHelper::buildStatusEntryPartial(0, 3);
+        $ht = ObStatusJitHelper::buildStatusEntry(0, 3, ObStatusJitHelper::HANDLER_NAME);
+        $keys = [];
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $_]) {
+            $keys[] = $keyVar->resolveIndirect()->toString();
+        }
+        $this->assertSame(
+            ['name', 'type', 'flags', 'level', 'chunk_size', 'buffer_size', 'buffer_used'],
+            $keys
+        );
         $used = $ht->find('buffer_used');
         $this->assertNotNull($used);
         $this->assertSame(3, $used->toInt());
-        $this->assertNull($ht->find('name'));
+        $name = $ht->find('name');
+        $this->assertNotNull($name);
+        $this->assertSame(ObStatusJitHelper::HANDLER_NAME, $name->toString());
     }
 
     public function testSpineBundleIncludesObStatusJitHelper(): void

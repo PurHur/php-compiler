@@ -62,11 +62,6 @@ final class VmOb
 
     private static function buildStatusEntry(int $level, int $bufferUsed, string $handlerName): HashTable
     {
-        $ht = ObStatusJitHelper::buildStatusEntryPartial($level, $bufferUsed);
-        $slot = new Variable();
-        $slot->string($handlerName);
-        $ht->add('name', $slot);
-
-        return $ht;
+        return ObStatusJitHelper::buildStatusEntry($level, $bufferUsed, $handlerName);
     }
 }
