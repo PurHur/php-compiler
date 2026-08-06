@@ -1657,6 +1657,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('DatePeriod', '__construct'));
     }
 
+    /** @covers issue #27923 */
+    public function testDatePeriodCreateFromISO8601StringStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DatePeriod::createFromISO8601String');
+        self::assertSame(['specification', 'options='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'specification', 'DatePeriod::createFromISO8601String'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'DatePeriod::createFromISO8601String'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'isostr', 'DatePeriod::createFromISO8601String'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('DatePeriod', 'createFromISO8601String'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DatePeriod', 'createFromISO8601String'));
+        self::assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dateperiod', 'createfromiso8601string', 0));
+        self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dateperiod', 'createfromiso8601string', 1));
+        $info = ['name' => 'options', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('DatePeriod::createFromISO8601String', 1, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'DatePeriod::createFromISO8601String', 1, $info));
+        self::assertSame(Variable::TYPE_INTEGER, $dest->type);
+        self::assertSame(0, $dest->toInt());
+    }
+
     /** @covers issue #10059 */
     public function testArrayMultisortArraySpliceNamedParameters(): void
     {

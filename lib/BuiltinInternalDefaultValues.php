@@ -602,6 +602,10 @@ final class BuiltinInternalDefaultValues
         'datetimeimmutable::createfromformat' => [
             2 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — int $options = 0 (#27923)
+        'dateperiod::createfromiso8601string' => [
+            1 => ['kind' => 'int', 'value' => 0],
+        ],
         // php-src ext/date/php_date.stub.php — int $second = 0, int $microsecond = 0 (#25400)
         'datetime::settime' => [
             2 => ['kind' => 'int', 'value' => 0],

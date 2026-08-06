@@ -44,6 +44,8 @@ final class BuiltinParamNames
             'datetimezone::listidentifiers' => ['timezoneGroup=', 'countryCode='],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still recur; UNKNOWN optionals (#25164)
             'dateperiod::__construct' => ['start', 'interval=', 'end=', 'options='],
+            // php-src ext/date/php_date.stub.php — PHP 8.4+; absent from InternalArgInfo (#27923)
+            'dateperiod::createfromiso8601string' => ['specification', 'options='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
             // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+; absent from InternalArgInfo (#27599)
