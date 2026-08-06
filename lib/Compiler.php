@@ -25880,6 +25880,13 @@ class Compiler {
         if (null === $arg) {
             return false;
         }
+        // BoundVariable / named CV temps unwrap to Literal(name) via unwrapCfgLiteralOperand —
+        // that is the variable *name*, not an embedded call-arg literal. Treating them as
+        // literals forceFreshVarSlot's an empty slot and breaks function-static (and any named
+        // local) args to builtins like count/implode/json_encode (#28038, re-#15914).
+        if (null !== Block::resolveVariableName($arg)) {
+            return false;
+        }
         if (null !== $this->unwrapCfgLiteralOperand($arg)) {
             return true;
         }
@@ -53976,9 +53983,11 @@ class Compiler {
             return $valueSlot;
         }
         // Inline producer temp must not replace an unbound named local (#9973, #9924).
+        // Function-local statics bind via TYPE_DECLARE_FUNCTION_STATIC, not ASSIGN (#28038).
         if (
             !$this->blockHasAssignToSlot($block, (int) $namedSlot)
             && !$this->blockHasAssignToSlotInParentBlocks($block, (int) $namedSlot)
+            && !$this->blockHasFunctionStaticDeclareToSlot($block, (int) $namedSlot)
         ) {
             return $valueSlot;
         }
@@ -54162,6 +54171,18 @@ class Compiler {
     {
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === $destSlot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Function-local `static $x` binds the CV via DECLARE_FUNCTION_STATIC (#28038). */
+    private function blockHasFunctionStaticDeclareToSlot(Block $block, int $destSlot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_FUNCTION_STATIC === $op->type && (int) $op->arg1 === $destSlot) {
                 return true;
             }
         }
