@@ -92,14 +92,13 @@ final class VmLocale
 
         $monetaryUnset = self::isMonetaryLocaleUnset($lc);
 
+        // php-src ext/standard/locale.c — grouping/mon_grouping after n_sign_posn (#28154).
         self::writeStringField($ht, 'decimal_point', self::stringField($lc, 'decimal_point'));
         self::writeStringField($ht, 'thousands_sep', self::stringField($lc, 'thousands_sep'));
-        self::writeGroupingField($ht, 'grouping', self::groupingField($lc, 'grouping'));
         self::writeStringField($ht, 'int_curr_symbol', self::stringField($lc, 'int_curr_symbol'));
         self::writeStringField($ht, 'currency_symbol', self::stringField($lc, 'currency_symbol'));
         self::writeStringField($ht, 'mon_decimal_point', self::stringField($lc, 'mon_decimal_point'));
         self::writeStringField($ht, 'mon_thousands_sep', self::stringField($lc, 'mon_thousands_sep'));
-        self::writeGroupingField($ht, 'mon_grouping', self::groupingField($lc, 'mon_grouping'));
         self::writeStringField($ht, 'positive_sign', self::stringField($lc, 'positive_sign'));
         self::writeStringField($ht, 'negative_sign', self::stringField($lc, 'negative_sign'));
         self::writeCharField($ht, 'int_frac_digits', self::charField($lc, 'int_frac_digits', $monetaryUnset));
@@ -110,6 +109,8 @@ final class VmLocale
         self::writeCharField($ht, 'n_sep_by_space', self::charField($lc, 'n_sep_by_space', $monetaryUnset));
         self::writeCharField($ht, 'p_sign_posn', self::charField($lc, 'p_sign_posn', $monetaryUnset));
         self::writeCharField($ht, 'n_sign_posn', self::charField($lc, 'n_sign_posn', $monetaryUnset));
+        self::writeGroupingField($ht, 'grouping', self::groupingField($lc, 'grouping'));
+        self::writeGroupingField($ht, 'mon_grouping', self::groupingField($lc, 'mon_grouping'));
 
         return $ht;
     }
@@ -176,14 +177,15 @@ final class VmLocale
         ] as $key) {
             self::writeStringField($ht, $key, '');
         }
-        self::writeGroupingField($ht, 'grouping', []);
-        self::writeGroupingField($ht, 'mon_grouping', []);
         foreach ([
             'int_frac_digits', 'frac_digits', 'p_cs_precedes', 'p_sep_by_space',
             'n_cs_precedes', 'n_sep_by_space', 'p_sign_posn', 'n_sign_posn',
         ] as $key) {
             self::writeCharField($ht, $key, self::CHAR_MAX);
         }
+        // Match php-src insertion order: grouping fields after n_sign_posn (#28154).
+        self::writeGroupingField($ht, 'grouping', []);
+        self::writeGroupingField($ht, 'mon_grouping', []);
     }
 
     /** @param array<string, mixed> $lc */
