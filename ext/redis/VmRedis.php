@@ -50,6 +50,7 @@ final class VmRedis
         require_once __DIR__.'/RedisDepth20682.php';
         require_once __DIR__.'/RedisOptions.php';
         require_once __DIR__.'/RedisIntrospection.php';
+        require_once __DIR__.'/RedisPersistence.php';
         $methods = [
             'connect' => new RedisConnect(),
             'set' => new RedisSet(),
@@ -67,6 +68,12 @@ final class VmRedis
             'getlasterror' => new RedisGetLastError(),
             'clearlasterror' => new RedisClearLastError(),
             'getmode' => new RedisGetMode(),
+            'save' => new RedisSave(),
+            'bgsave' => new RedisBgSave(),
+            'lastsave' => new RedisLastSave(),
+            'wait' => new RedisWait(),
+            'waitaof' => new RedisWaitAof(),
+            'bgrewriteaof' => new RedisBgRewriteAof(),
             'del' => new RedisDel(),
             'exists' => new RedisExists(),
             'ping' => new RedisPing(),
@@ -138,6 +145,10 @@ final class VmRedis
                 'getlasterror' => 'getLastError',
                 'clearlasterror' => 'clearLastError',
                 'getmode' => 'getMode',
+                'bgsave' => 'bgSave',
+                'lastsave' => 'lastSave',
+                'waitaof' => 'waitaof',
+                'bgrewriteaof' => 'bgrewriteaof',
                 'hset' => 'hSet',
                 'hget' => 'hGet',
                 'hgetall' => 'hGetAll',
