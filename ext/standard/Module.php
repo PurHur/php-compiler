@@ -681,7 +681,6 @@ class Module extends ModuleAbstract
             new phpc_access_kernel(),
             new phpc_fpow_kernel(),
             new phpc_nextafter_kernel(),
-            new phpc_cos_kernel(),
             new phpc_cosh_kernel(),
             new phpc_sinh_kernel(),
             new phpc_tan_kernel(),
