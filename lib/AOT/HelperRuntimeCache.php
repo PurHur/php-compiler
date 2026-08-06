@@ -105,6 +105,10 @@ final class HelperRuntimeCache
         // and SIGSEGVd after c:main_before_php. Force NestedJIT of the self-contained
         // helper into the user AOT module.
         'phpcompiler\\ext\\standard\\strtrarrayjithelper::strtrarray' => true,
+        // #27019 — helper-runtime StrWordCountJitHelper unit.o returns 0 under thin AOT
+        // (default cache hit); NestedJIT of countArgv/wordsArgv matches VM/JIT.
+        'phpcompiler\\ext\\standard\\strwordcountjithelper::countargv' => true,
+        'phpcompiler\\ext\\standard\\strwordcountjithelper::wordsargv' => true,
         // #27069 — NestedJIT CsvStrGetcsvJitHelper (no VmFs) into user AOT; prelinked
         // CsvJitHelper TU + whole-file NestedJIT of fgetcsvArgv/VmFs SIGSEGVd.
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::strgetcsvargv' => true,
