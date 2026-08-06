@@ -80,6 +80,11 @@ final class substr_replace extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
         }
+        if (JitStrReplaceSubject::isKnownArray($args[1])) {
+            throw new \LogicException(
+                'substr_replace() array $replace with array $string is not supported in this compiler build'
+            );
+        }
 
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
@@ -101,15 +106,30 @@ final class substr_replace extends Internal
         }
 
         JitPregSubject::requireStringOrArray($context, $args[0], 'substr_replace', 0, 'string');
-        if (!JitPregSubject::isStringOrCoercibleNullSubject($args[0])) {
-            throw new \LogicException('substr_replace() array string operand is not supported in this compiler build');
+        // #23912 peer — AOT TYPE_VALUE string locals must not take the array $string path.
+        $stringIsStringish = JitPregSubject::isStringOrCoercibleNullSubject($args[0])
+            || (
+                JITVariable::TYPE_VALUE === $args[0]->type
+                && !JitStrReplaceSubject::isKnownArray($args[0])
+            );
+        $offset = $this->jitLong($context, $args[2], 'substr_replace() offset');
+        $replace = JitStringBuiltinArg::lower($context, $args[1], 'substr_replace', 1, 'replace');
+        if ($stringIsStringish) {
+            return JitSubstrReplace::replace(
+                $context,
+                self::jitStringArg($context, $args[0], 0, 'string', 'array|string'),
+                $replace,
+                $offset,
+                $lengthVal,
+                $hasLength
+            );
         }
 
-        return JitSubstrReplace::replace(
+        return JitSubstrReplaceArray::invoke(
             $context,
-            self::jitStringArg($context, $args[0], 0, 'string', 'array|string'),
-            JitStringBuiltinArg::lower($context, $args[1], 'substr_replace', 1, 'replace'),
-            $this->jitLong($context, $args[2], 'substr_replace() offset'),
+            $args[0],
+            $replace,
+            $offset,
             $lengthVal,
             $hasLength
         );

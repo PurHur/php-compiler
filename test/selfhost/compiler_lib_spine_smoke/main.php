@@ -2923,6 +2923,7 @@ require_once __DIR__.'/../../../ext/standard/JitStrtok.php';
 require_once __DIR__.'/../../../ext/standard/JitStrtotime.php';
 require_once __DIR__.'/../../../ext/standard/JitStrtr.php';
 require_once __DIR__.'/../../../ext/standard/JitSubstrReplace.php';
+require_once __DIR__.'/../../../ext/standard/JitSubstrReplaceArray.php';
 require_once __DIR__.'/../../../ext/standard/JitSuperglobalName.php';
 require_once __DIR__.'/../../../ext/standard/JitSuperglobalRefreshKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitSymlink.php';
