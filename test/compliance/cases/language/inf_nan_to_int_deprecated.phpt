@@ -35,7 +35,7 @@ echo 'finite_msg=', $seen[0][1] ?? '', "\n";
 $seen = [];
 $b = [1, 2, 3];
 $_ = $b[1.5] ?? 'miss';
-echo 'dim_finite_read_depr=', empty($seen) ? '0' : '1', "\n";
+echo 'dim_finite_read_depr=', (isset($seen[0]) && E_DEPRECATED === $seen[0][0]) ? '1' : '0', "\n";
 --EXPECT--
 bit=1
 bit_depr=1
@@ -49,4 +49,4 @@ nan=1
 nan_msg=Implicit conversion from float NAN to int loses precision
 finite=3
 finite_msg=Implicit conversion from float 1.5 to int loses precision
-dim_finite_read_depr=0
+dim_finite_read_depr=1

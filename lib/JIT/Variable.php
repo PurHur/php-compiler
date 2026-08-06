@@ -1220,16 +1220,11 @@ final class Variable {
         $sizeT = $context->getTypeFromString('size_t');
         if (self::TYPE_NATIVE_DOUBLE === $dim->type) {
             $doubleVal = $context->helper->loadValue($dim);
-            if ($forWrite) {
-                $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal);
-            } else {
-                // Read/isset/unset: finite fractional keys stay silent (#16739 / #27948);
-                // INF/NAN still E_DEPRECATED (#27926).
-                $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithNonFinitePrecisionWarning(
-                    $context,
-                    $doubleVal
-                );
-            }
+            // Read/isset/unset and write: Zend float→int precision-loss E_DEPRECATED (#19730, #27948).
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $doubleVal
+            );
 
             return $context->builder->truncOrBitCast($truncated, $sizeT);
         }
