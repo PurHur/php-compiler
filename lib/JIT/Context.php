@@ -2557,12 +2557,47 @@ class Context {
         }
         $slot = $block->slotForOperand($op);
         if (null !== $slot && isset($block->constants[$slot])) {
-            $this->scope->variables[$op] = VmConstantJit::toVariable($this, $block->constants[$slot]);
+            $constVm = $block->constants[$slot];
+            // #28038 stopped treating named CVs as embedded name-string literals. Call-arg
+            // lowering can still leave TYPE_STRING placeholders on the CV's real slot while
+            // the Operand's CFG type is int/float/bool — NestedJIT then binds NATIVE_LONG
+            // formals into STRING slots (MbNumericEntity encode4 $m0…$m3, #28053). Prefer
+            // the declared CFG type when it disagrees with the compile-time constant.
+            if ($this->slotConstantAgreesWithOperandType($constVm, $op)) {
+                $this->scope->variables[$op] = VmConstantJit::toVariable($this, $constVm);
 
-            return;
+                return;
+            }
         }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
+    }
+
+    /**
+     * True when {@see Block::$constants} may drive {@see makeVariableFromOp} for $op (#28053).
+     */
+    private function slotConstantAgreesWithOperandType(\PHPCompiler\VM\Variable $constVm, Operand $op): bool
+    {
+        $declared = Variable::getTypeFromType($op->type ?? null);
+        if (
+            Variable::TYPE_VALUE === $declared
+            || Variable::TYPE_NULL === $declared
+        ) {
+            return true;
+        }
+        $constJit = match ($constVm->type) {
+            \PHPCompiler\VM\Variable::TYPE_INTEGER => Variable::TYPE_NATIVE_LONG,
+            \PHPCompiler\VM\Variable::TYPE_STRING => Variable::TYPE_STRING,
+            \PHPCompiler\VM\Variable::TYPE_FLOAT => Variable::TYPE_NATIVE_DOUBLE,
+            \PHPCompiler\VM\Variable::TYPE_BOOLEAN => Variable::TYPE_NATIVE_BOOL,
+            \PHPCompiler\VM\Variable::TYPE_NULL => Variable::TYPE_NULL,
+            default => Variable::TYPE_VALUE,
+        };
+        if (Variable::TYPE_VALUE === $constJit) {
+            return true;
+        }
+
+        return $declared === $constJit;
     }
 
     public function setVariableOp(Operand $op, Variable $var) {
