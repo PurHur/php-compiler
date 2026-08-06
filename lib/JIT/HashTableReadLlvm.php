@@ -258,6 +258,8 @@ final class HashTableReadLlvm
         );
         $context->builder->positionAtEnd($floatBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        // floatToLongWithPrecisionWarning splits into warn/after blocks (#27926/#27948);
+        // PHI predecessor must be the insert block after that helper, not $floatBlock (#27985).
         $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
             $context,
             $doubleVal
@@ -271,6 +273,7 @@ final class HashTableReadLlvm
             $ht,
             $floatIndex
         );
+        $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterFloat);
         $context->builder->branchIf(
@@ -292,7 +295,7 @@ final class HashTableReadLlvm
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($strResult, $stringBlock);
         $phi->addIncoming($longResult, $longBlock);
-        $phi->addIncoming($floatResult, $floatBlock);
+        $phi->addIncoming($floatResult, $floatEnd);
         $phi->addIncoming($objResult, $objectBlock);
         $phi->addIncoming($i1->constInt(0, false), $falseBlock);
 
