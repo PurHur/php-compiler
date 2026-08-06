@@ -199,12 +199,6 @@ final class StringNetInterfacesJit
         );
         $up = $context->builder->trunc($upWide, $i1);
         $ifaceHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyBool'),
-            $ifaceHt,
-            self::literalKeyString($context, 'up'),
-            $up
-        );
 
         $uCountWide = $context->builder->call(
             self::helperFunction($context, self::UNICAST_COUNT),
@@ -319,11 +313,18 @@ final class StringNetInterfacesJit
         $context->builder->branch($uHead);
 
         $context->builder->positionAtEnd($uDoneBb);
+        // php-src net.c: unicast then up (#28140)
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyHashtable'),
             $ifaceHt,
             self::literalKeyString($context, 'unicast'),
             $unicastHt
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $ifaceHt,
+            self::literalKeyString($context, 'up'),
+            $up
         );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyHashtable'),

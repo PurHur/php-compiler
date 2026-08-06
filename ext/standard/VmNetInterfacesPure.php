@@ -47,6 +47,8 @@ final class VmNetInterfacesPure
         if (false === $names) {
             return false;
         }
+        // php-src walks getifaddrs — typically lo before others; listSorted is alpha (#28140)
+        $names = self::orderIfaceNamesLikeGetifaddrs($names);
         $ipv4 = self::ipv4ByIface();
         $ipv6 = self::ipv6ByIface();
         $root = [];
@@ -89,6 +91,27 @@ final class VmNetInterfacesPure
         }
 
         return [] === $root ? false : $root;
+    }
+
+    /**
+     * Approximate getifaddrs() first-seen order without libc FFI (#28140, #8988).
+     *
+     * @param list<string> $names
+     * @return list<string>
+     */
+    private static function orderIfaceNamesLikeGetifaddrs(array $names): array
+    {
+        $lo = [];
+        $rest = [];
+        foreach ($names as $name) {
+            if ('lo' === $name) {
+                $lo[] = $name;
+            } else {
+                $rest[] = $name;
+            }
+        }
+
+        return [...$lo, ...$rest];
     }
 
     private static function ifaFlags(string $base): int
