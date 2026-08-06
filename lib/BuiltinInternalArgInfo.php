@@ -208,6 +208,8 @@ final class BuiltinInternalArgInfo
             'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)
             'get_parent_class' => 'string|false',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo return string (missing |false) (#28004)
+            'phpversion' => 'string|false',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)
             'func_get_arg' => 'mixed',
             // ext/spl/php_spl.stub.php — InternalArgInfo false|array; Zend array only (#27902)
@@ -434,6 +436,8 @@ final class BuiltinInternalArgInfo
             'timezone_identifiers_list' => 1 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#25276)
             'ini_get_all' => 0 === $index ? '?string' : null,
+            // Zend/zend_builtin_functions.stub.php — ?string $extension = null (InternalArgInfo string) (#28004)
+            'phpversion' => 0 === $index ? '?string' : null,
             // ext/standard/basic_functions.stub.php — ini_alter absent; value union (#26465, #26187)
             'ini_set', 'ini_alter' => match ($index) {
                 0 => 'string',
