@@ -11332,6 +11332,8 @@ restart:
             return $this->dispatchVmInvalidUrlException($e, $callerFrame);
         } catch (\Uri\InvalidUriException $e) {
             return $this->dispatchVmInvalidUriException($e, $callerFrame);
+        } catch (\Filter\FilterFailedException $e) {
+            return $this->dispatchVmFilterFailedException($e, $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
             $callerFrame->call = null;
@@ -11428,6 +11430,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeInvalidUriException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge host Filter\FilterFailedException into VM catch handlers (#28131). */
+    private function dispatchVmFilterFailedException(\Filter\FilterFailedException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeFilterFailedException(
             $this->context,
             $error->getMessage(),
             $file,

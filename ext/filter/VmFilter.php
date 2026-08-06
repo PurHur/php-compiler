@@ -98,6 +98,13 @@ final class VmFilter
     public const INPUT_SERVER = 5;
 
     /**
+     * Active FILTER_* flags / identity for {@see failureResult()} THROW path (#28131).
+     *
+     * @var array{flags: int, filterName: string, valueRepr: string}|null
+     */
+    private static ?array $failureCtx = null;
+
+    /**
      * Profile-correct FILTER_FLAG_GLOBAL_RANGE bit (php-src filter_private.h; #24065).
      */
     public static function filterFlagGlobalRange(): int
@@ -105,6 +112,69 @@ final class VmFilter
         return CompilerVersion::supportsFilterThrowOnFailure()
             ? self::FILTER_FLAG_GLOBAL_RANGE_PHP85
             : self::FILTER_FLAG_GLOBAL_RANGE;
+    }
+
+    /** php-src php_filter_list name for exception messages (#28131). */
+    public static function nameForFilterId(int $filter): string
+    {
+        static $idToName = null;
+        if (null === $idToName) {
+            $idToName = [];
+            foreach (FilterConstants::NAME_TO_ID as $name => $id) {
+                if (!isset($idToName[$id])) {
+                    $idToName[$id] = $name;
+                }
+            }
+        }
+
+        return $idToName[$filter] ?? 'unknown';
+    }
+
+    /**
+     * php-src php_filter_call — NULL_ON_FAILURE and THROW_ON_FAILURE are mutually exclusive (#28131).
+     */
+    public static function assertThrowNullExclusive(int $flags, string $function, int $optionsArgNum): void
+    {
+        if (!CompilerVersion::supportsFilterThrowOnFailure()) {
+            return;
+        }
+        if (0 === ($flags & self::FILTER_NULL_ON_FAILURE) || 0 === ($flags & self::FILTER_THROW_ON_FAILURE)) {
+            return;
+        }
+
+        throw new \ValueError(sprintf(
+            '%s(): Argument #%d ($options) cannot use both FILTER_NULL_ON_FAILURE and FILTER_THROW_ON_FAILURE',
+            $function,
+            $optionsArgNum
+        ));
+    }
+
+    /** Stringify a filter subject for FILTER_THROW_ON_FAILURE messages (php-src copy_for_throwing). */
+    public static function valueReprForThrow(Variable $value): string
+    {
+        $resolved = $value->resolveIndirect();
+        if ($resolved->isUndefined() || Variable::TYPE_NULL === $resolved->type) {
+            return '';
+        }
+        $coerced = self::coerceFilterScalarString($resolved);
+        if (null !== $coerced) {
+            return $coerced;
+        }
+        if (Variable::TYPE_ARRAY === $resolved->type) {
+            return 'Array';
+        }
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            $obj = $resolved->toObject();
+            $class = (null !== $obj->class && '' !== $obj->class->name) ? $obj->class->name : 'stdClass';
+
+            return 'Object('.$class.')';
+        }
+
+        try {
+            return $resolved->toString();
+        } catch (\Throwable) {
+            return '';
+        }
     }
 
     public static function isSupportedFilter(int $filter): bool
@@ -157,25 +227,39 @@ final class VmFilter
         int $filter,
         ?Variable $options = null,
         ?Frame $frame = null,
-        int $defaultFlags = self::FILTER_REQUIRE_SCALAR
+        int $defaultFlags = self::FILTER_REQUIRE_SCALAR,
+        string $function = 'filter_var',
+        int $optionsArgNum = 3
     ): Variable {
         if (self::FILTER_CALLBACK === $filter) {
-            return self::applyCallbackFilter($value, $options, $frame, $defaultFlags);
+            return self::applyCallbackFilter($value, $options, $frame, $defaultFlags, $function, $optionsArgNum);
         }
 
         $parsed = self::parseFilterArgs($options);
         $flags = self::normalizeFilterFlags($parsed['flags'], $options, $defaultFlags);
+        self::assertThrowNullExclusive($flags, $function, $optionsArgNum);
         $value = $value->resolveIndirect();
 
         if (Variable::TYPE_ARRAY === $value->type) {
             if (0 !== ($flags & self::FILTER_REQUIRE_SCALAR)) {
-                return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+                return self::failureResult(
+                    0 !== ($flags & self::FILTER_NULL_ON_FAILURE),
+                    $flags,
+                    'filter validation failed: not a scalar value (got an array)'
+                );
             }
 
             return self::filterVarRecursive($value->toArray(), $filter, $options, $frame, $flags);
         }
         if (0 !== ($flags & self::FILTER_REQUIRE_ARRAY)) {
-            return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+            return self::failureResult(
+                0 !== ($flags & self::FILTER_NULL_ON_FAILURE),
+                $flags,
+                sprintf(
+                    'filter validation failed: not an array (got %s)',
+                    self::zendTypeName($value)
+                )
+            );
         }
 
         $filtered = self::filterVarScalar($value, $filter, $flags, $parsed['filterOptions']);
@@ -196,38 +280,48 @@ final class VmFilter
         ?HashTable $filterOptions
     ): Variable {
         $nullOnFailure = 0 !== ($flags & self::FILTER_NULL_ON_FAILURE);
-        if (self::FILTER_VALIDATE_INT === $filter) {
-            return self::validateInt($value, $nullOnFailure, $flags, $filterOptions);
-        }
-        if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
-            return self::validateBoolean($value, $nullOnFailure);
-        }
-        if (self::FILTER_VALIDATE_FLOAT === $filter) {
-            return self::validateFloat($value, $nullOnFailure, $filterOptions);
-        }
-        if (self::FILTER_VALIDATE_REGEXP === $filter) {
-            return self::validateRegexp($value, $filterOptions, $nullOnFailure);
-        }
-        if (self::FILTER_VALIDATE_DOMAIN === $filter) {
-            return self::validateDomain($value, $nullOnFailure, $flags);
-        }
-        if (self::FILTER_VALIDATE_URL === $filter) {
-            return self::validateUrl($value, $nullOnFailure, $flags);
-        }
-        if (self::FILTER_VALIDATE_EMAIL === $filter) {
-            return self::validateEmail($value, $nullOnFailure, $flags);
-        }
-        if (self::FILTER_VALIDATE_IP === $filter) {
-            return self::validateIp($value, $nullOnFailure, $flags);
-        }
-        if (self::FILTER_VALIDATE_MAC === $filter) {
-            return self::validateMac($value, $nullOnFailure, $filterOptions);
-        }
-        if (self::isSanitizeFilter($filter)) {
-            return self::sanitize($value, $filter, $flags, $filterOptions);
-        }
+        $prevCtx = self::$failureCtx;
+        self::$failureCtx = [
+            'flags' => $flags,
+            'filterName' => self::nameForFilterId($filter),
+            'valueRepr' => self::valueReprForThrow($value),
+        ];
+        try {
+            if (self::FILTER_VALIDATE_INT === $filter) {
+                return self::validateInt($value, $nullOnFailure, $flags, $filterOptions);
+            }
+            if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
+                return self::validateBoolean($value, $nullOnFailure);
+            }
+            if (self::FILTER_VALIDATE_FLOAT === $filter) {
+                return self::validateFloat($value, $nullOnFailure, $filterOptions);
+            }
+            if (self::FILTER_VALIDATE_REGEXP === $filter) {
+                return self::validateRegexp($value, $filterOptions, $nullOnFailure);
+            }
+            if (self::FILTER_VALIDATE_DOMAIN === $filter) {
+                return self::validateDomain($value, $nullOnFailure, $flags);
+            }
+            if (self::FILTER_VALIDATE_URL === $filter) {
+                return self::validateUrl($value, $nullOnFailure, $flags);
+            }
+            if (self::FILTER_VALIDATE_EMAIL === $filter) {
+                return self::validateEmail($value, $nullOnFailure, $flags);
+            }
+            if (self::FILTER_VALIDATE_IP === $filter) {
+                return self::validateIp($value, $nullOnFailure, $flags);
+            }
+            if (self::FILTER_VALIDATE_MAC === $filter) {
+                return self::validateMac($value, $nullOnFailure, $filterOptions);
+            }
+            if (self::isSanitizeFilter($filter)) {
+                return self::sanitize($value, $filter, $flags, $filterOptions);
+            }
 
-        return self::failureResult(false);
+            return self::failureResult(false, $flags);
+        } finally {
+            self::$failureCtx = $prevCtx;
+        }
     }
 
     /**
@@ -247,7 +341,11 @@ final class VmFilter
             $value = $valueVar->resolveIndirect();
             if (Variable::TYPE_ARRAY === $value->type) {
                 if (0 !== ($childFlags & self::FILTER_REQUIRE_SCALAR)) {
-                    $filtered = self::failureResult(0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE));
+                    $filtered = self::failureResult(
+                        0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE),
+                        $childFlags,
+                        'filter validation failed: not a scalar value (got an array)'
+                    );
                 } else {
                     $filtered = self::filterVarRecursive(
                         $value->toArray(),
@@ -258,7 +356,14 @@ final class VmFilter
                     );
                 }
             } elseif (0 !== ($childFlags & self::FILTER_REQUIRE_ARRAY)) {
-                $filtered = self::failureResult(0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE));
+                $filtered = self::failureResult(
+                    0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE),
+                    $childFlags,
+                    sprintf(
+                        'filter validation failed: not an array (got %s)',
+                        self::zendTypeName($value)
+                    )
+                );
             } else {
                 $filtered = self::filterVarScalar($value, $filter, $childFlags, $parsed['filterOptions']);
             }
@@ -277,9 +382,12 @@ final class VmFilter
         Variable $value,
         ?Variable $options,
         ?Frame $frame,
-        int $defaultFlags
+        int $defaultFlags,
+        string $function = 'filter_var',
+        int $optionsArgNum = 3
     ): Variable {
         [$callback, $flags] = self::parseCallbackArgs($options, $defaultFlags);
+        self::assertThrowNullExclusive($flags, $function, $optionsArgNum);
         $ctx = null !== $frame ? $frame->vmContext : null;
         if (null === $ctx
             || null === $callback
@@ -304,7 +412,11 @@ final class VmFilter
         $value = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY === $value->type) {
             if (0 !== ($flags & self::FILTER_REQUIRE_SCALAR)) {
-                return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+                return self::failureResult(
+                    0 !== ($flags & self::FILTER_NULL_ON_FAILURE),
+                    $flags,
+                    'filter validation failed: not a scalar value (got an array)'
+                );
             }
             $out = new HashTable();
             $childFlags = $flags & ~self::FILTER_FORCE_ARRAY;
@@ -324,7 +436,14 @@ final class VmFilter
             return $result;
         }
         if (0 !== ($flags & self::FILTER_REQUIRE_ARRAY)) {
-            return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+            return self::failureResult(
+                0 !== ($flags & self::FILTER_NULL_ON_FAILURE),
+                $flags,
+                sprintf(
+                    'filter validation failed: not an array (got %s)',
+                    self::zendTypeName($value)
+                )
+            );
         }
 
         $arg = new Variable();
@@ -899,8 +1018,30 @@ final class VmFilter
         return $out;
     }
 
-    private static function failureResult(bool $nullOnFailure): Variable
-    {
+    private static function failureResult(
+        bool $nullOnFailure,
+        ?int $flags = null,
+        ?string $explicitMessage = null
+    ): Variable {
+        $effectiveFlags = $flags;
+        if (null === $effectiveFlags && null !== self::$failureCtx) {
+            $effectiveFlags = self::$failureCtx['flags'];
+        }
+        if (null !== $effectiveFlags
+            && CompilerVersion::supportsFilterThrowOnFailure()
+            && 0 !== ($effectiveFlags & self::FILTER_THROW_ON_FAILURE)
+        ) {
+            if (null !== $explicitMessage) {
+                throw new \Filter\FilterFailedException($explicitMessage);
+            }
+            $name = self::$failureCtx['filterName'] ?? 'unknown';
+            $repr = self::$failureCtx['valueRepr'] ?? '';
+            throw new \Filter\FilterFailedException(sprintf(
+                "filter validation failed: filter %s not satisfied by '%s'",
+                $name,
+                $repr
+            ));
+        }
         $out = new Variable();
         if ($nullOnFailure) {
             $out->null();
@@ -909,6 +1050,21 @@ final class VmFilter
         }
 
         return $out;
+    }
+
+    /** php-src zend_zval_type_name subset for FILTER_THROW messages. */
+    private static function zendTypeName(Variable $value): string
+    {
+        return match ($value->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'boolean',
+            Variable::TYPE_INTEGER => 'integer',
+            Variable::TYPE_FLOAT => 'double',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'unknown type',
+        };
     }
 
     private static function validateBoolean(Variable $value, bool $nullOnFailure = false): Variable
@@ -1900,7 +2056,15 @@ final class VmFilter
                 }
                 continue;
             }
-            $filtered = self::filterVar($stored->resolveIndirect(), $filterId, $optionsVar, $frame);
+            $filtered = self::filterVar(
+                $stored->resolveIndirect(),
+                $filterId,
+                $optionsVar,
+                $frame,
+                self::FILTER_REQUIRE_SCALAR,
+                'filter_var_array',
+                2
+            );
             self::storeFilteredEntry($out, $defKeyVar, $filtered);
         }
 

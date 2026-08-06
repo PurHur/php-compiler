@@ -47,6 +47,8 @@ final class BuiltinExceptionSupport
     public const CLASS_INVALID_URI_EXCEPTION = 'uri\\invaliduriexception';
     /** php-src ext/uri — Uri\WhatWg\InvalidUrlException (#21468). */
     public const CLASS_INVALID_URL_EXCEPTION = 'uri\\whatwg\\invalidurlexception';
+    /** php-src ext/filter — Filter\FilterFailedException (#28131). */
+    public const CLASS_FILTER_FAILED_EXCEPTION = 'filter\\filterfailedexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
     /** php-src DateMalformedIntervalStringException (#20779). */
     public const CLASS_DATE_MALFORMED_INTERVAL_STRING_EXCEPTION = 'datemalformedintervalstringexception';
@@ -544,6 +546,28 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable(
             $ctx,
             self::CLASS_REQUEST_PARSE_BODY_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
+    /**
+     * Bridge host Filter\FilterFailedException into the VM builtin class (#28131).
+     */
+    public static function materializeFilterFailedException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_FILTER_FAILED_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable(
+            $ctx,
+            self::CLASS_FILTER_FAILED_EXCEPTION,
             $message,
             $file,
             $line
