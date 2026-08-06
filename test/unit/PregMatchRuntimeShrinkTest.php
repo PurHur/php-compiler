@@ -17,7 +17,9 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm::implement', $source);
         $this->assertStringNotContainsString('pcre2_match_8', $source);
         $this->assertStringNotContainsString('emitMatchEx', $source);
-        $this->assertLessThan(80, \substr_count($source, "\n") + 1);
+        // NestedJIT early-return for helper-TU emit (#26989 / #28096 regression) adds a few lines.
+        $this->assertLessThan(95, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
     }
 
     public function testPregMatchRuntimeAlwaysUsesJitHelperBridge(): void
