@@ -588,6 +588,14 @@ final class BuiltinInternalArgInfo
                 2 => 'mixed',
                 default => null,
             },
+            // ext/curl/curl.stub.php — CurlShareHandle $share_handle, mixed $value (#27704)
+            // InternalArgInfo still has untyped sh/value (param name sh → share_handle via BuiltinParamNames).
+            'curl_share_setopt' => match ($index) {
+                0 => 'CurlShareHandle',
+                2 => 'mixed',
+                default => null,
+            },
+            'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
             'filter_var' => match ($index) {
                 0 => 'mixed',

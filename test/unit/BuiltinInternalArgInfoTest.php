@@ -365,6 +365,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src ext/curl/curl.stub.php — CurlShareHandle + mixed $value (#27704). */
+    public function testCurlShareSetoptReflectionStubTypes(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('curl_share_setopt'));
+        $this->assertSame('CurlShareHandle', BuiltinInternalArgInfo::stubParamTypeOverride('curl_share_setopt', 0));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('curl_share_setopt', 2));
+        $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('curl_share_setopt', 1));
+        // InternalArgInfo still names $sh; Reflection uses BuiltinParamNames share_handle.
+        $this->assertSame(['share_handle', 'option', 'value'], BuiltinParamNames::forFunction('curl_share_setopt'));
+        $share = BuiltinInternalArgInfo::paramInfoForFunction('curl_share_setopt', 0);
+        $this->assertNotNull($share);
+        $this->assertSame('CurlShareHandle', $share['type']);
+        $value = BuiltinInternalArgInfo::paramInfoForFunction('curl_share_setopt', 2);
+        $this->assertNotNull($value);
+        $this->assertSame('mixed', $value['type']);
+        $this->assertSame('CurlShareHandle', BuiltinInternalArgInfo::stubParamTypeOverride('curl_share_close', 0));
+        $this->assertSame('CurlShareHandle', BuiltinInternalArgInfo::stubParamTypeOverride('curl_share_errno', 0));
+    }
+
     /** php-src ext/xml/xml.stub.php — XMLParser stubs; InternalArgInfo still resource/untyped/int (#26319). */
     public function testXmlParserReflectionStubTypes(): void
     {

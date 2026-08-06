@@ -290,6 +290,11 @@ final class VmCurlShare
 
     private static function unshare(ObjectEntry $share, int $lockData): int
     {
+        // libcurl rejects CURLSHOPT_UNSHARE + CURL_LOCK_DATA_PSL (CURLSHE_BAD_OPTION);
+        // Zend surfaces false + "Unknown share option" (#27704, php-src share.c / curl.h).
+        if (CurlConstants::CURL_LOCK_DATA_PSL === $lockData) {
+            return self::CURLSHE_BAD_OPTION;
+        }
         unset(self::$state[$share->id]['shared'][$lockData]);
 
         return self::CURLSHE_OK;
