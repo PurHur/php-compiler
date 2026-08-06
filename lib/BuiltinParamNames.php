@@ -1089,6 +1089,12 @@ final class BuiltinParamNames
             case 'openssl_cipher_iv_length':
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];
+            // php-src ext/imap/php_imap.stub.php — $string; InternalArgInfo still says buf/in (#27681, #27764)
+            case 'imap_utf7_encode':
+            case 'imap_utf7_decode':
+            case 'imap_utf8_to_mutf7':
+            case 'imap_mutf7_to_utf8':
+                return ['string'];
             // php-src ext/opcache/opcache.stub.php — InternalArgInfo still says script (#23834)
             case 'opcache_compile_file':
             case 'opcache_is_script_cached':
