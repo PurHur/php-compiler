@@ -4359,6 +4359,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['context'], BuiltinParamNames::paramNamesForInternalFunction('hash_copy'));
     }
 
+    /** @covers issue #27942 — ext/hash/hash.stub.php hash_hmac_algos(): array */
+    public function testHashHmacAlgosStubReturnArray(): void
+    {
+        self::assertSame('array', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('hash_hmac_algos'));
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_hmac_algos'));
+        self::assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_algos'));
+    }
+
     /** @covers issue #23786 */
     public function testHtmlHashObNamedParamsResolve(): void
     {

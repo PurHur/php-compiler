@@ -82,6 +82,7 @@
             <file>./test/compliance/FiberGetReturnReflectionVMTest.php</file>
             <file>./test/compliance/FuncGetArgReflectionMixedVMTest.php</file>
             <file>./test/compliance/GcControlReflectionReturnsVMTest.php</file>
+            <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>
             <file>./test/compliance/PhpSbindirConstant84VMTest.php</file>
         </testsuite>
