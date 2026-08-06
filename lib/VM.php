@@ -9401,7 +9401,7 @@ restart:
                             break;
                         }
                     }
-                    $this->warnForeachNonTraversable($container, $frame);
+                    $this->warnForeachNonTraversable($container, $frame, $op);
                     unset($this->context->foreachObjectAdvance[$op->arg1]);
                     unset($this->context->objectPropertyIterators[$op->arg1]);
                     unset($this->context->weakMapIterators[$op->arg1]);
@@ -16031,17 +16031,24 @@ restart:
 
     /**
      * Zend ZEND_FE_RESET_R invalid operand (zend_vm_def.h, #4879).
+     *
+     * Line comes from the ITER_RESET opcode's foreach site (#27953) — not the prior statement.
      */
-    private function warnForeachNonTraversable(Variable $container, Frame $frame): void
+    private function warnForeachNonTraversable(Variable $container, Frame $frame, ?OpCode $op = null): void
     {
         $resolved = $container->resolveIndirect();
+        $line = 0;
+        if (null !== $op?->sourceLocation && $op->sourceLocation->startLine > 0) {
+            $line = $op->sourceLocation->startLine;
+        }
         $this->context->errors->triggerErrorWithHandlerFirst(
             'foreach() argument must be of type array|object, '
             .TypeCheck::typeNameForConstraint($resolved->type).' given',
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $this->context,
-            $frame
+            $frame,
+            $line
         );
     }
 
