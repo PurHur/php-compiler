@@ -26,11 +26,15 @@ class Module extends ModuleAbstract
             'ZSTD_COMPRESS_LEVEL_MIN' => VmZstdContext::LEVEL_MIN,
             'ZSTD_COMPRESS_LEVEL_MAX' => VmZstdContext::LEVEL_MAX,
             'ZSTD_COMPRESS_LEVEL_DEFAULT' => VmZstdContext::LEVEL_DEFAULT,
+            'ZSTD_VERSION_NUMBER' => VmZstdNative::versionNumber(),
         ] as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        $versionText = new \PHPCompiler\VM\Variable();
+        $versionText->string(VmZstdNative::versionText());
+        $runtime->vmContext->defineConstant('ZSTD_VERSION_TEXT', $versionText);
     }
 
     public function getFunctions(): array
@@ -49,6 +53,14 @@ class Module extends ModuleAbstract
             new zstd_compress_add(),
             new zstd_uncompress_init(),
             new zstd_uncompress_add(),
+            new ns_compress(),
+            new ns_uncompress(),
+            new ns_compress_dict(),
+            new ns_uncompress_dict(),
+            new ns_compress_init(),
+            new ns_compress_add(),
+            new ns_uncompress_init(),
+            new ns_uncompress_add(),
         ];
     }
 }
