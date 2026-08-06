@@ -2265,6 +2265,7 @@ require_once __DIR__.'/../../../ext/standard/Crc32JitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CslashesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CsvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CsvStrGetcsvJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/CsvFputcsvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CyrConvertTables.php';
 require_once __DIR__.'/../../../ext/standard/DateConstants.php';
 require_once __DIR__.'/../../../ext/standard/DateIntervalFormatJitHelper.php';

@@ -33,9 +33,12 @@ final class StringStrGetcsv
 
     private const STR_GETCSV_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::strGetcsvArgv';
 
+    private const STRIP_LINE_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::stripLineTerminatorsArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::STR_GETCSV_HELPER,
+        self::STRIP_LINE_HELPER,
     ];
 
     /** @var list<string> */

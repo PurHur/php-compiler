@@ -15,6 +15,35 @@ namespace PHPCompiler\ext\standard;
 final class CsvStrGetcsvJitHelper
 {
     /**
+     * Strip trailing CR/LF before fgetcsv parse (php-src / {@see VmFs::fgetcsvNative}).
+     */
+    public static function stripLineTerminatorsArgv(string $line): string
+    {
+        $len = 0;
+        while (isset($line[$len])) {
+            ++$len;
+        }
+        while ($len > 0) {
+            $c = $line[$len - 1];
+            if ("\n" !== $c && "\r" !== $c) {
+                break;
+            }
+            --$len;
+        }
+        if (0 === $len) {
+            return '';
+        }
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            $out .= $line[$i];
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<string|null>
      */
     public static function strGetcsvArgv(

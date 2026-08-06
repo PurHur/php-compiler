@@ -112,6 +112,11 @@ final class HelperRuntimeCache
         // #27069 — NestedJIT CsvStrGetcsvJitHelper (no VmFs) into user AOT; prelinked
         // CsvJitHelper TU + whole-file NestedJIT of fgetcsvArgv/VmFs SIGSEGVd.
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::strgetcsvargv' => true,
+        'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::striplineterminatorsargv' => true,
+        // #27180 — NestedJIT CsvFputcsvJitHelper::formatFieldArgv (no HashTable::iterate /
+        // VmFputcsv); LLVM walks fields (peer JitImplode). Prelinked CsvJitHelper
+        // formatFieldsArgv SIGSEGVs under thin AOT.
+        'phpcompiler\\ext\\standard\\csvfputcsvjithelper::formatfieldargv' => true,
         // #27068 — NestedJIT FilterEmailValidate into user AOT (avoid stale
         // FilterEmailJitHelper ?string unit.o). Const emails fold in JitFilter.
         'phpcompiler\\ext\\filter\\filteremailvalidate::isvalidint' => true,

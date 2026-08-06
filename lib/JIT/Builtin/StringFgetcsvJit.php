@@ -11,45 +11,30 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_fgetcsv via CsvJitHelper PHP (#6750, #9444, #13440, #26135, #27069).
+ * JIT/AOT link for __compiler_fgetcsv via fgets + CsvStrGetcsvJitHelper (#6750, #9444, #13440, #27180).
  *
- * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle}
- * (VmCsv → VmFs → CsvJitHelper) in one NestedJIT scope (peer StringStrGetcsv #26135 / Unpack #25830).
- * Bridge coerces NestedJIT HashTable|null via {@see JitNestedHelperCoerce} before null icmp
- * (peer StringStrGetcsv — Module verify under thin AOT).
+ * Thin AOT must not NestedJIT CsvJitHelper fgetcsvArgv
+ * (VmFs::fgetcsv / builtinHandlerFrame missing under NestedJIT). Read one line via
+ * {@see __compiler_fgets} (libc FILE* under thin AOT) then parse with the NestedJIT-safe
+ * {@see \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper} (#27069).
+ *
  * php-src: ext/standard/file.c — PHP_FUNCTION(fgetcsv)
  */
 final class StringFgetcsvJit
 {
-    private const HELPER_PATH = '/ext/standard/CsvJitHelper.php';
+    private const FGETCSV_PARSE_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::strGetcsvArgv';
 
-    private const VM_FS_PATH = '/ext/standard/VmFs.php';
-
-    private const VM_CSV_PATH = '/ext/standard/VmCsv.php';
-
-    /**
-     * Ordered NestedJIT sources — VmCsv/VmFs before helper (#26135).
-     *
-     * @var list<string>
-     */
-    private const HELPER_BUNDLE = [
-        self::VM_CSV_PATH,
-        self::VM_FS_PATH,
-        self::HELPER_PATH,
-    ];
-
-    private const FGETCSV_HELPER = 'PHPCompiler\\ext\\standard\\CsvJitHelper::fgetcsvArgv';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::FGETCSV_HELPER,
-        'PHPCompiler\\ext\\standard\\CsvJitHelper::parseLineArgv',
-        'PHPCompiler\\ext\\standard\\CsvJitHelper::strGetcsvArgv',
-    ];
+    private const STRIP_LINE_HELPER = 'PHPCompiler\\ext\\standard\\CsvStrGetcsvJitHelper::stripLineTerminatorsArgv';
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
         '__compiler_fgetcsv',
+    ];
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::FGETCSV_PARSE_HELPER,
+        self::STRIP_LINE_HELPER,
     ];
 
     public static function implement(Context $context): void
@@ -68,7 +53,8 @@ final class StringFgetcsvJit
         }
 
         StringStrGetcsv::ensureLinked($context);
-        self::ensureJitHelperCompiled($context);
+        StreamReadRuntime::ensureLinked($context);
+        self::ensureStripHelperCompiled($context);
         self::implementFgetcsvBridge($context);
         self::registerLinkedRuntime($context);
 
@@ -108,42 +94,96 @@ final class StringFgetcsvJit
         $separator = $fn->getParam(2);
         $enclosure = $fn->getParam(3);
         $escape = $fn->getParam(4);
+
+        // php-src: length <= 0 means no limit; fgets ABI uses length as max (incl. NUL).
+        // Use a large positive cap when length < 1 (peer VmFs::fgetcsv null length).
+        $zero = $i64->constInt(0, false);
+        $defaultCap = $i64->constInt(8192, false);
+        $useDefault = $context->builder->icmp(Builder::INT_SLT, $length, $i64->constInt(1, false));
+        $fgetsLen = $context->builder->select($useDefault, $defaultCap, $length);
+
+        $lineRaw = $context->builder->call(
+            $context->lookupFunction('__compiler_fgets'),
+            $handle,
+            $fgetsLen
+        );
+        $lineIsNull = $context->builder->icmp(Builder::INT_EQ, $lineRaw, $strPtr->constNull());
+        $eofBb = $fn->appendBasicBlock('fgetcsv_bridge_eof');
+        $parseBb = $fn->appendBasicBlock('fgetcsv_bridge_parse');
+        $context->builder->branchIf($lineIsNull, $eofBb, $parseBb);
+
+        $context->builder->positionAtEnd($eofBb);
+        $context->builder->returnValue($htPtr->constNull());
+
+        $context->builder->positionAtEnd($parseBb);
+        $lineSep = $context->builder->call($context->lookupFunction('__string__separate'), $lineRaw);
+        $strippedRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::stripHelperFunction($context),
+            [$lineSep]
+        );
+        $stripped = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strippedRaw);
+        $strippedSep = $context->builder->call($context->lookupFunction('__string__separate'), $stripped);
         $sepSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $separator, ',');
         $encSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $enclosure, '"');
         $escSep = StringStrGetcsv::coerceOptionalCsvStringForFgetcsv($context, $escape, '\\');
         $htRaw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::FGETCSV_HELPER),
-            [$handle, $length, $sepSep, $encSep, $escSep]
+            self::parseHelperFunction($context),
+            [$strippedSep, $sepSep, $encSep, $escSep]
         );
         $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $nullBb = $fn->appendBasicBlock('fgetcsv_bridge_null');
+        // Line-terminator-only / empty helper [] → synthesize [null] (#27069 / #10623).
+        $sizeT = $context->getTypeFromString('size_t');
+        $htIsNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $num = $context->builder->select(
+            $htIsNull,
+            $sizeT->constInt(0, false),
+            $context->builder->call($context->lookupFunction('__hashtable__getNumElements'), $ht)
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $sizeT->constInt(0, false));
+        $emptyBb = $fn->appendBasicBlock('fgetcsv_bridge_empty_null_row');
         $retBb = $fn->appendBasicBlock('fgetcsv_bridge_ret');
-        $context->builder->branchIf($isNull, $nullBb, $retBb);
+        $context->builder->branchIf($isEmpty, $emptyBb, $retBb);
 
-        $context->builder->positionAtEnd($nullBb);
-        $context->builder->returnValue($htPtr->constNull());
+        $context->builder->positionAtEnd($emptyBb);
+        $nullRow = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $nullRow,
+            $sizeT->constInt(0, false)
+        );
+        $context->builder->returnValue($nullRow);
 
         $context->builder->positionAtEnd($retBb);
         $context->builder->returnValue($ht);
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function parseHelperFunction(Context $context): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        StringStrGetcsv::ensureLinked($context);
+        self::ensureStripHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#26135');
+        return JitVmHelperLink::lookupCompiled($context, self::FGETCSV_PARSE_HELPER, '#27180');
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function stripHelperFunction(Context $context): LlvmFunction
     {
+        self::ensureStripHelperCompiled($context);
+
+        return JitVmHelperLink::lookupCompiled($context, self::STRIP_LINE_HELPER, '#27180');
+    }
+
+    private static function ensureStripHelperCompiled(Context $context): void
+    {
+        // StringStrGetcsv NestedJITs strGetcsvArgv only; also compile stripLineTerminatorsArgv.
         JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_BUNDLE,
+            ['/ext/standard/CsvStrGetcsvJitHelper.php'],
             self::COMPILED_HELPERS,
-            '#26135'
+            '#27180',
+            true
         );
     }
 
@@ -152,7 +192,7 @@ final class StringFgetcsvJit
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringFgetcsvJit bridge (#13440)');
+                throw new \LogicException($name.' missing after StringFgetcsvJit bridge (#27180)');
             }
             $context->registerFunction($name, $fn);
         }

@@ -41,11 +41,14 @@ final class CsvRuntimeShrinkTest extends TestCase
     public function testStringFgetcsvJitUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFgetcsvJit.php');
-        $this->assertStringContainsString('CsvJitHelper::fgetcsvArgv', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
-        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('CsvStrGetcsvJitHelper::strGetcsvArgv', $source);
+        $this->assertStringContainsString('__compiler_fgets', $source);
         $this->assertStringContainsString('implementFgetcsvBridge', $source);
         $this->assertStringContainsString('JitNestedHelperCoerce::coerceToHashtablePtr', $source);
+        // #27180 — do not NestedJIT CsvJitHelper fgetcsvArgv / VmFs under thin AOT.
+        $this->assertStringNotContainsString('CsvJitHelper::fgetcsvArgv', $source);
+        $this->assertStringNotContainsString('/ext/standard/CsvJitHelper.php', $source);
+        $this->assertStringNotContainsString('/ext/standard/VmFs.php', $source);
         $this->assertStringNotContainsString('emitCompilerFgetcsvPhpParse', $source);
         $this->assertStringNotContainsString('lookupFunction(\'fgets\')', $source);
         $this->assertStringNotContainsString('lookupFunction(\'malloc\')', $source);
@@ -133,6 +136,50 @@ final class CsvRuntimeShrinkTest extends TestCase
         $ht->append($cell);
         $jitLine = CsvJitHelper::formatFieldsArgv($ht, ',', '"', '\\');
         $this->assertSame($line, $jitLine);
+        $field = \PHPCompiler\ext\standard\CsvFputcsvJitHelper::formatFieldArgv('a\b', ',', '"', '\\');
+        $this->assertSame('"a\b"', $field);
+    }
+
+    public function testCsvFputcsvJitHelperMatchesVmCsvFormatField(): void
+    {
+        $cases = [
+            ['a', 'a'],
+            ['b,c', '"b,c"'],
+            ['say "hi"', '"say ""hi"""'],
+            ["x\ny", "\"x\ny\""],
+        ];
+        foreach ($cases as [$in, $want]) {
+            $this->assertSame(
+                $want,
+                \PHPCompiler\ext\standard\CsvFputcsvJitHelper::formatFieldArgv($in, ',', '"', '\\'),
+                'field='.json_encode($in)
+            );
+        }
+        $this->assertSame(
+            \PHPCompiler\ext\standard\VmCsv::formatLine(['a', 'b,c', 'd']),
+            \PHPCompiler\ext\standard\CsvFputcsvJitHelper::formatFieldArgv('a', ',', '"', '\\')
+                .','
+                .\PHPCompiler\ext\standard\CsvFputcsvJitHelper::formatFieldArgv('b,c', ',', '"', '\\')
+                .','
+                .\PHPCompiler\ext\standard\CsvFputcsvJitHelper::formatFieldArgv('d', ',', '"', '\\')
+        );
+    }
+
+    public function testSpineBundleIncludesCsvFputcsvJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('CsvFputcsvJitHelper.php', $spine);
+        $this->assertStringContainsString('CsvStrGetcsvJitHelper.php', $spine);
+    }
+
+    public function testFputcsvRuntimeUsesCsvFputcsvJitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FputcsvRuntime.php');
+        $this->assertStringContainsString('CsvFputcsvJitHelper', $source);
+        $this->assertStringContainsString('formatFieldArgv', $source);
+        $this->assertStringContainsString('HashTableHelper::readIndexedToValueBox', $source);
+        $this->assertStringNotContainsString('CsvJitHelper::formatFieldsArgv', $source);
+        $this->assertStringNotContainsString('/ext/standard/CsvJitHelper.php', $source);
     }
 
     public function testSpineBundleIncludesCsvJitHelper(): void
