@@ -42,6 +42,9 @@ final class TypeCheck
             return;
         }
         $context->builder->call($context->lookupFunction('abort'));
+        // abort is noreturn — without unreachable the fail/edge block has no terminator
+        // and helper-unit verify fails (ArrayUserSetOpsJitHelper — #28053).
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 
     /**
@@ -144,6 +147,7 @@ final class TypeCheck
         );
         $context->builder->positionAtEnd($failBlock);
         $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
         $context->builder->positionAtEnd($okBlock);
     }
 }

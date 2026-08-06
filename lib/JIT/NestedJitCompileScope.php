@@ -76,6 +76,16 @@ final class NestedJitCompileScope
         // Nested helper compile of ErrorSilence/etc. can mutate tryCatch->handlerStack while
         // lowering inside an outer try — DEP then loses catchable ValueError (#22680).
         $savedHandlerStack = $context->tryCatch->handlerStack;
+        // Foreach alloca maps are keyed by Variable id but the LLVM slots belong to the
+        // function that created them. Reusing an outer (or sibling-helper) i64 index slot
+        // after clearInsertionPosition() → entryAlloca via activeFunction yields
+        // "Instruction does not dominate all uses" on ArrayUserSetOpsJitHelper (#28053).
+        $savedForeachIndexSlots = $context->foreachIndexSlots;
+        $savedForeachObjNodeSlots = $context->foreachObjNodeSlots;
+        $savedForeachIteratorReceiverSlots = $context->foreachIteratorReceiverSlots;
+        $savedForeachIteratorAdvanceSlots = $context->foreachIteratorAdvanceSlots;
+        $savedForeachDatePeriodSnapshotHts = $context->foreachDatePeriodSnapshotHts;
+        $savedForeachAggregateInnerHtSlots = $context->foreachAggregateInnerHtSlots;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
@@ -86,6 +96,15 @@ final class NestedJitCompileScope
         $context->scope->magicCallMethodName = null;
         $context->scope->magicCallIsStatic = false;
         $context->scope->preserveNewResultOnNullCall = false;
+        $context->foreachIndexSlots = [];
+        $context->foreachObjNodeSlots = [];
+        $context->foreachIteratorReceiverSlots = [];
+        $context->foreachIteratorAdvanceSlots = [];
+        $context->foreachDatePeriodSnapshotHts = [];
+        $context->foreachAggregateInnerHtSlots = [];
+        // Drop outer activeFunction while insert is cleared — otherwise parentFunction() /
+        // entryAlloca pin allocas into the outer fn and NestedJIT bodies load them (#28053).
+        $context->activeFunction = '';
         $prevStubEnv = self::clearStubEnvForNestedHelperCompile();
         try {
             $context->builder->clearInsertionPosition();
@@ -108,6 +127,12 @@ final class NestedJitCompileScope
             $context->scope->magicCallIsStatic = $savedMagicCallIsStatic;
             $context->scope->preserveNewResultOnNullCall = $savedPreserveNewResultOnNullCall;
             $context->tryCatch->handlerStack = $savedHandlerStack;
+            $context->foreachIndexSlots = $savedForeachIndexSlots;
+            $context->foreachObjNodeSlots = $savedForeachObjNodeSlots;
+            $context->foreachIteratorReceiverSlots = $savedForeachIteratorReceiverSlots;
+            $context->foreachIteratorAdvanceSlots = $savedForeachIteratorAdvanceSlots;
+            $context->foreachDatePeriodSnapshotHts = $savedForeachDatePeriodSnapshotHts;
+            $context->foreachAggregateInnerHtSlots = $savedForeachAggregateInnerHtSlots;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);
