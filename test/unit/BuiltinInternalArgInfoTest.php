@@ -500,6 +500,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('XMLParser', $parseParser['type']);
     }
 
+    /** php-src ext/xml/xml.stub.php — xml_get_current_* $parser: XMLParser (#27738). */
+    public function testXmlGetCurrentDiagnosticsReflectionStubTypes(): void
+    {
+        foreach ([
+            'xml_get_current_byte_index',
+            'xml_get_current_column_number',
+            'xml_get_current_line_number',
+        ] as $fn) {
+            $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 0), $fn);
+            $parser = BuiltinInternalArgInfo::paramInfoForFunction($fn, 0);
+            $this->assertNotNull($parser, $fn);
+            $this->assertSame('parser', $parser['name'], $fn);
+            $this->assertSame('XMLParser', $parser['type'], $fn);
+        }
+    }
+
     /** php-src ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687). */
     public function testXmlParserCreateNsAndIntoStructReflectionStubTypes(): void
     {

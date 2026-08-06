@@ -848,6 +848,10 @@ final class BuiltinInternalArgInfo
             'xml_set_object' => 0 === $index ? 'XMLParser' : null,
             'xml_parser_create' => 0 === $index ? '?string' : null,
             'xml_parse' => 0 === $index ? 'XMLParser' : null,
+            // ext/xml/xml.stub.php — XMLParser $parser; InternalArgInfo untyped (#27738)
+            'xml_get_current_byte_index',
+            'xml_get_current_column_number',
+            'xml_get_current_line_number' => 0 === $index ? 'XMLParser' : null,
             // ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687)
             'xml_parser_create_ns' => 0 === $index ? '?string' : null,
             'xml_parse_into_struct' => match ($index) {
