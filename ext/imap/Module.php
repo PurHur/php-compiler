@@ -108,6 +108,9 @@ class Module extends ModuleAbstract
             new imap_thread(),
             new imap_getacl(),
             new imap_setacl(),
+            new imap_get_quota(),
+            new imap_get_quotaroot(),
+            new imap_set_quota(),
             new imap_headers(),
             new imap_mailboxmsginfo(),
         ];
