@@ -1089,13 +1089,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ get_declared_* optional $exclude_deprecated (ext/standard/basic_functions.c, #12403).
+     * get_declared_* optional $exclude_deprecated — never shipped by Zend/php-src (#27900 / #12403).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects any argument like Zend 8.2.
+     * php-src Zend/zend_builtin_functions.stub.php keeps arity 0 through master
+     * (`function get_declared_classes(): array {}` and the interfaces/traits twins). Prior
+     * forward-profile gate (#4711 / #12177) was wrong-direction; always withhold.
      */
     public static function supportsGetDeclaredExcludeDeprecated(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

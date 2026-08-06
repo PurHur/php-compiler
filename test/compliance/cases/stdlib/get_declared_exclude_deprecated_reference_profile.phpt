@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: get_declared_* $exclude_deprecated rejected on PHP 8.2 reference profile (#12403, basic_functions.stub.php)
+Stdlib: get_declared_* $exclude_deprecated rejected on every profile (#27900 / #12403, zend_builtin_functions.stub.php)
 --FILE--
 <?php
 $ok = true;

@@ -54,9 +54,10 @@ final class VmReflection
     }
 
     /**
-     * Optional $exclude_deprecated for get_declared_* (PHP 8.4, #12177 / #4711).
+     * get_declared_* call arity — Zend arity 0; reject any argument (#27900 / #12403).
      *
-     * php-src: ext/standard/basic_functions.c — Z_PARAM_OPTIONAL Z_PARAM_BOOL
+     * php-src: Zend/zend_builtin_functions.stub.php — no $exclude_deprecated (feature never landed).
+     * {@see CompilerVersion::supportsGetDeclaredExcludeDeprecated()} is permanently false.
      */
     public static function parseExcludeDeprecatedArg(Frame $frame, string $function): bool
     {

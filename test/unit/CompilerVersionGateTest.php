@@ -2165,12 +2165,23 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsGetDeclaredExcludeDeprecated());
     }
 
-    public function testSupportsGetDeclaredExcludeDeprecatedTrueOnForwardProfile(): void
+    /** php-src never shipped $exclude_deprecated — withhold on PROFILE=8.4/8.5 too (#27900). */
+    public function testSupportsGetDeclaredExcludeDeprecatedFalseOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsGetDeclaredExcludeDeprecated());
+            $this->assertFalse(CompilerVersion::supportsGetDeclaredExcludeDeprecated());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGetDeclaredExcludeDeprecated());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -165,10 +165,6 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'get_class_allow_string_reference_profile')) {
                 continue;
             }
-            if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
-                && str_contains($name, 'get_declared_argument_count_error')) {
-                continue;
-            }
             if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
                 && str_contains($name, 'get_defined_functions_exclude_disabled')
                 && !str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
