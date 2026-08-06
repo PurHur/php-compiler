@@ -167,16 +167,20 @@ final class JitDatePeriodConstruct
 
     private static function storeNullProperty(Context $context, Value $period, string $prop): void
     {
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $slot)
+        // Object-typed DatePeriod slots (`end` / `current`) must store a null `__object__*`,
+        // not a null `__value__*` box — otherwise getEndDate cannot distinguish end-date vs
+        // recurrence forms (#27572).
+        $nullObj = $context->getTypeFromString('__object__*')->constNull();
+        $propVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $nullObj
         );
-        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
         $context->type->object->propertyStore(
             $context->type->object->propertySlotFor($period, self::CLASS_PERIOD, $prop),
             $propVar,
-            JITVariable::TYPE_NULL
+            JITVariable::TYPE_OBJECT
         );
     }
 

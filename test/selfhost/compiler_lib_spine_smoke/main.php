@@ -5578,6 +5578,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithCaptures.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ContextRunStackFramesNested.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateIntervalConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateIntervalCreateFromDateString.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodAccessorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodCreateFromISO8601String.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodIteratorMethod.php';
