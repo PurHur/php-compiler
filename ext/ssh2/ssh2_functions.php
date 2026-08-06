@@ -1058,6 +1058,166 @@ final class ssh2_shell_resize extends Ssh2Function
 }
 
 /**
+ * ssh2_poll(array &$events[, int $timeout = 30]): int
+ *
+ * Multiplex SSH2 channel/listener readiness (PECL ssh2_poll; #26735).
+ * Each $events element is an array with keys "resource" (SSH2\Stream|SSH2\Listener)
+ * and "events" (SSH2_POLL* bitmask); "revents" is written back.
+ */
+final class ssh2_poll extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_poll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_poll() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $descVar = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $descVar->type) {
+            throw new \TypeError(\sprintf(
+                'ssh2_poll(): Argument #1 ($events) must be of type array, %s given',
+                match ($descVar->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_OBJECT => 'object',
+                    default => 'mixed',
+                }
+            ));
+        }
+        $timeout = Ssh2Constants::DEFAULT_POLL_TIMEOUT;
+        if ($argc >= 2) {
+            $timeout = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ssh2_poll', 2, 'timeout');
+        }
+        $descHt = $descVar->toArray();
+        /** @var list<\PHPCompiler\VM\HashTable> $subMaps */
+        $subMaps = [];
+        /** @var list<array{type: int, native: \FFI\CData, events: int}> $nativeEntries */
+        $nativeEntries = [];
+        foreach ($descHt->iterateKeyed(true) as [$key, $subVal]) {
+            unset($key);
+            $sub = $subVal->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $sub->type) {
+                @\trigger_error('ssh2_poll(): Invalid element in poll array, not a sub array', \E_USER_WARNING);
+                continue;
+            }
+            $subHt = $sub->toArray();
+            $eventsSlot = $subHt->find('events');
+            if (null === $eventsSlot || Variable::TYPE_INTEGER !== $eventsSlot->resolveIndirect()->type) {
+                @\trigger_error(
+                    'ssh2_poll(): Invalid data in subarray, no events element, or not a bitmask',
+                    \E_USER_WARNING
+                );
+                continue;
+            }
+            $events = $eventsSlot->resolveIndirect()->toInt();
+            $resSlot = $subHt->find('resource');
+            if (null === $resSlot) {
+                @\trigger_error(
+                    'ssh2_poll(): Invalid data in subarray, no resource element, or not of type resource',
+                    \E_USER_WARNING
+                );
+                continue;
+            }
+            $res = $resSlot->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $res->type) {
+                @\trigger_error(
+                    'ssh2_poll(): Invalid data in subarray, no resource element, or not of type resource',
+                    \E_USER_WARNING
+                );
+                continue;
+            }
+            $object = $res->toObject();
+            $classLc = strtolower($object->class->name);
+            $native = null;
+            $pollType = 0;
+            if (VmSsh2Stream::CLASS_LC === $classLc) {
+                if (!VmSsh2Stream::isLive($object)) {
+                    @\trigger_error('ssh2_poll(): Invalid resource type in subarray: SSH2 Stream', \E_USER_WARNING);
+                    continue;
+                }
+                $native = VmSsh2Stream::nativeChannel($object);
+                $pollType = 2; // LIBSSH2_POLLFD_CHANNEL
+            } elseif (VmSsh2Listener::CLASS_LC === $classLc) {
+                if (!VmSsh2Listener::isLive($object)) {
+                    @\trigger_error('ssh2_poll(): Invalid resource type in subarray: SSH2 Listener', \E_USER_WARNING);
+                    continue;
+                }
+                $native = VmSsh2Listener::nativeListener($object);
+                $pollType = 3; // LIBSSH2_POLLFD_LISTENER
+            } else {
+                @\trigger_error(
+                    \sprintf('ssh2_poll(): Invalid resource type in subarray: %s', $object->class->name),
+                    \E_USER_WARNING
+                );
+                continue;
+            }
+            $subMaps[] = $subHt;
+            if (null !== $native) {
+                $nativeEntries[] = [
+                    'type' => $pollType,
+                    'native' => $native,
+                    'events' => $events,
+                    'mapIndex' => \count($subMaps) - 1,
+                ];
+            } else {
+                // Soft offline: no libssh2 channel — write revents=0.
+                $reventsVar = new Variable();
+                $reventsVar->int(0);
+                if (null !== $subHt->find('revents')) {
+                    $subHt->update('revents', $reventsVar);
+                } else {
+                    $subHt->add('revents', $reventsVar);
+                }
+            }
+        }
+
+        $ready = 0;
+        if ([] !== $nativeEntries) {
+            $pollArgs = [];
+            foreach ($nativeEntries as $e) {
+                $pollArgs[] = [
+                    'type' => $e['type'],
+                    'native' => $e['native'],
+                    'events' => $e['events'],
+                ];
+            }
+            $reventsList = null;
+            $pollReady = VmSsh2Native::poll($pollArgs, $timeout, $reventsList);
+            if (false === $pollReady || null === $reventsList) {
+                $frame->returnVar->int(0);
+
+                return;
+            }
+            $ready = $pollReady;
+            foreach ($nativeEntries as $i => $e) {
+                $rv = new Variable();
+                $rv->int($reventsList[$i] ?? 0);
+                $map = $subMaps[$e['mapIndex']];
+                if (null !== $map->find('revents')) {
+                    $map->update('revents', $rv);
+                } else {
+                    $map->add('revents', $rv);
+                }
+            }
+        }
+
+        $frame->returnVar->int($ready);
+    }
+}
+
+/**
  * ssh2_shell(resource $session, string $term_type = "vanilla", ?array $env = null, int $width = 80, int $height = 25, int $width_height_type = SSH2_TERM_UNIT_CHARS): resource|false
  */
 final class ssh2_shell extends Ssh2Function

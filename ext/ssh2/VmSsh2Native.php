@@ -1268,6 +1268,56 @@ final class VmSsh2Native
     }
 
     /**
+     * Multiplex channel/listener readiness (PECL ssh2_poll / libssh2_poll; #26735).
+     *
+     * @param list<array{type: int, native: \FFI\CData, events: int}> $entries
+     * @param-out list<int> $reventsOut
+     *
+     * @return int|false number of descriptors with revents, or false on FFI failure
+     */
+    public static function poll(array $entries, int $timeoutSec, ?array &$reventsOut = null)
+    {
+        $reventsOut = [];
+        $n = \count($entries);
+        if (0 === $n) {
+            return 0;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            for ($i = 0; $i < $n; ++$i) {
+                $reventsOut[] = 0;
+            }
+
+            return 0;
+        }
+        try {
+            $fds = $ffi->new('LIBSSH2_POLLFD['.$n.']');
+            for ($i = 0; $i < $n; ++$i) {
+                $fds[$i]->type = $entries[$i]['type'];
+                if (2 === $entries[$i]['type']) { // LIBSSH2_POLLFD_CHANNEL
+                    $fds[$i]->fd->channel = $entries[$i]['native'];
+                } else {
+                    $fds[$i]->fd->listener = $entries[$i]['native'];
+                }
+                $fds[$i]->events = $entries[$i]['events'];
+                $fds[$i]->revents = 0;
+            }
+            $ready = (int) $ffi->libssh2_poll($fds, $n, $timeoutSec * 1000);
+            for ($i = 0; $i < $n; ++$i) {
+                $reventsOut[] = (int) $fds[$i]->revents;
+            }
+
+            return $ready;
+        } catch (\Throwable) {
+            for ($i = 0; $i < $n; ++$i) {
+                $reventsOut[] = 0;
+            }
+
+            return 0;
+        }
+    }
+
+    /**
      * Open direct-tcpip tunnel channel (PECL ssh2_tunnel; #26677).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -1620,6 +1670,17 @@ int libssh2_sftp_statvfs(LIBSSH2_SFTP *sftp, const char *path, size_t path_len, 
 typedef struct _LIBSSH2_CHANNEL LIBSSH2_CHANNEL;
 typedef struct _LIBSSH2_LISTENER LIBSSH2_LISTENER;
 typedef struct _LIBSSH2_AGENT LIBSSH2_AGENT;
+typedef struct _LIBSSH2_POLLFD {
+    unsigned char type;
+    union {
+        int socket;
+        LIBSSH2_CHANNEL *channel;
+        LIBSSH2_LISTENER *listener;
+    } fd;
+    unsigned long events;
+    unsigned long revents;
+} LIBSSH2_POLLFD;
+int libssh2_poll(LIBSSH2_POLLFD *fds, unsigned int nfds, long timeout);
 struct libssh2_agent_publickey {
     unsigned int magic;
     void *node;

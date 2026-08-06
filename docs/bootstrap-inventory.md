@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7168 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23019 |
+| Source constructs flagged (warnings) | 23023 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2397,7 +2397,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/VmSqlite3BlobStream.php` | 0 | 2 |
 | `ext/sqlite3/VmSqlite3Native.php` | 0 | 13 |
 | `ext/sqlite3/VmSqlite3Udf.php` | 0 | 9 |
-| `ext/ssh2/Module.php` | 0 | 41 |
+| `ext/ssh2/Module.php` | 0 | 42 |
 | `ext/ssh2/Ssh2Constants.php` | 0 | 1 |
 | `ext/ssh2/Ssh2ExtensionPolicy.php` | 0 | 1 |
 | `ext/ssh2/VmSsh2Listener.php` | 0 | 4 |
@@ -2406,7 +2406,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ssh2/VmSsh2Session.php` | 0 | 4 |
 | `ext/ssh2/VmSsh2Sftp.php` | 0 | 4 |
 | `ext/ssh2/VmSsh2Stream.php` | 0 | 4 |
-| `ext/ssh2/ssh2_functions.php` | 0 | 52 |
+| `ext/ssh2/ssh2_functions.php` | 0 | 55 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -26761,28 +26761,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ssh2_keepalive_send (line 70)
 - new ssh2_set_timeout (line 71)
 - new ssh2_shell_resize (line 72)
-- new ssh2_shell (line 73)
-- new ssh2_tunnel (line 74)
-- new ssh2_forward_listen (line 75)
-- new ssh2_forward_accept (line 76)
-- new ssh2_sftp (line 77)
-- new ssh2_scp_recv (line 78)
-- new ssh2_scp_send (line 79)
-- new ssh2_sftp_stat (line 80)
-- new ssh2_sftp_lstat (line 81)
-- new ssh2_sftp_mkdir (line 82)
-- new ssh2_sftp_rmdir (line 83)
-- new ssh2_sftp_unlink (line 84)
-- new ssh2_sftp_rename (line 85)
-- new ssh2_sftp_chmod (line 86)
-- new ssh2_sftp_realpath (line 87)
-- new ssh2_sftp_statvfs (line 88)
-- new ssh2_sftp_symlink (line 89)
-- new ssh2_sftp_readlink (line 90)
-- new ssh2_publickey_init (line 91)
-- new ssh2_publickey_add (line 92)
-- new ssh2_publickey_remove (line 93)
-- new ssh2_publickey_list (line 94)
+- new ssh2_poll (line 73)
+- new ssh2_shell (line 74)
+- new ssh2_tunnel (line 75)
+- new ssh2_forward_listen (line 76)
+- new ssh2_forward_accept (line 77)
+- new ssh2_sftp (line 78)
+- new ssh2_scp_recv (line 79)
+- new ssh2_scp_send (line 80)
+- new ssh2_sftp_stat (line 81)
+- new ssh2_sftp_lstat (line 82)
+- new ssh2_sftp_mkdir (line 83)
+- new ssh2_sftp_rmdir (line 84)
+- new ssh2_sftp_unlink (line 85)
+- new ssh2_sftp_rename (line 86)
+- new ssh2_sftp_chmod (line 87)
+- new ssh2_sftp_realpath (line 88)
+- new ssh2_sftp_statvfs (line 89)
+- new ssh2_sftp_symlink (line 90)
+- new ssh2_sftp_readlink (line 91)
+- new ssh2_publickey_init (line 92)
+- new ssh2_publickey_add (line 93)
+- new ssh2_publickey_remove (line 94)
+- new ssh2_publickey_list (line 95)
 - 3 class method(s)
 
 ### `ext/ssh2/Ssh2Constants.php`
@@ -26806,7 +26807,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ssh2/VmSsh2Native.php`
 
 **Warnings** (review for bootstrap subset):
-- 53 class method(s)
+- 54 class method(s)
 - 2 closure(s)
 
 ### `ext/ssh2/VmSsh2Publickey.php`
@@ -26867,35 +26868,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 950)
 - new ArgumentCountError (line 991)
 - new ArgumentCountError (line 1030)
-- new ArgumentCountError (line 1074)
-- new ArgumentCountError (line 1151)
-- new ArgumentCountError (line 1209)
-- new ArgumentCountError (line 1272)
-- new ArgumentCountError (line 1317)
+- new ArgumentCountError (line 1078)
+- new Variable (line 1176)
+- new Variable (line 1205)
+- new ArgumentCountError (line 1234)
+- new ArgumentCountError (line 1311)
 - new ArgumentCountError (line 1369)
-- new ArgumentCountError (line 1404)
-- new ArgumentCountError (line 1451)
-- new Variable (line 1478)
-- new ArgumentCountError (line 1520)
-- new ArgumentCountError (line 1562)
-- new ArgumentCountError (line 1596)
-- new ArgumentCountError (line 1630)
-- new ArgumentCountError (line 1665)
-- new ArgumentCountError (line 1700)
-- new ArgumentCountError (line 1750)
-- new Variable (line 1776)
-- new ArgumentCountError (line 1798)
-- new ArgumentCountError (line 1833)
-- new ArgumentCountError (line 1883)
-- new ArgumentCountError (line 1935)
-- new ArgumentCountError (line 1996)
-- new ArgumentCountError (line 2038)
-- new Variable (line 2065)
-- new Variable (line 2068)
-- new Variable (line 2073)
-- new Variable (line 2077)
-- new Variable (line 2080)
-- 48 class method(s)
+- new ArgumentCountError (line 1432)
+- new ArgumentCountError (line 1477)
+- new ArgumentCountError (line 1529)
+- new ArgumentCountError (line 1564)
+- new ArgumentCountError (line 1611)
+- new Variable (line 1638)
+- new ArgumentCountError (line 1680)
+- new ArgumentCountError (line 1722)
+- new ArgumentCountError (line 1756)
+- new ArgumentCountError (line 1790)
+- new ArgumentCountError (line 1825)
+- new ArgumentCountError (line 1860)
+- new ArgumentCountError (line 1910)
+- new Variable (line 1936)
+- new ArgumentCountError (line 1958)
+- new ArgumentCountError (line 1993)
+- new ArgumentCountError (line 2043)
+- new ArgumentCountError (line 2095)
+- new ArgumentCountError (line 2156)
+- new ArgumentCountError (line 2198)
+- new Variable (line 2225)
+- new Variable (line 2228)
+- new Variable (line 2233)
+- new Variable (line 2237)
+- new Variable (line 2240)
+- 49 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
