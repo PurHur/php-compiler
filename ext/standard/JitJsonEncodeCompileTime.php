@@ -27,6 +27,7 @@ use PHPLLVM\Value;
  * `json_encode(array_combine(lit, lit))` (#27132),
  * `json_encode(array_merge(lit…))` (#27546),
  * `json_encode(array_reverse(lit…))` (#27130),
+ * `json_encode(array_column(lit…))` (#27131),
  * `json_encode(array_fill(lit, lit, lit))` (#27073),
  * `json_encode(array_fill_keys(lit, lit))` (#27127),
  * `json_encode(array_change_key_case(lit…))` (#27183), and
@@ -70,6 +71,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayReverse($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayColumn($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayFill($block, $operand);
@@ -516,6 +520,72 @@ final class JitJsonEncodeCompileTime
         $reversed = ArrayReverseJitHelper::reverseCopy($args[0]->toArray(), $preserve);
         $var = new VmVariable();
         $var->array($reversed);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_column(…))` when args are compile-time (#27131).
+     *
+     * Uses {@see ArrayColumnJitHelper} SSOT (php-src array.c). Call-site
+     * {@see \PHPCompiler\JIT\ArrayColumnLlvm} builds a dim/count/implode-green HT; NestedJIT
+     * json_encode still cannot export those runtime tables (peer #27130 / #27546 / #27072).
+     */
+    private static function tryCompileTimeArrayFromArrayColumn(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_column');
+        if (null === $args || \count($args) < 2 || \count($args) > 3) {
+            return null;
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[0]->type) {
+            return null;
+        }
+        $ht = $args[0]->toArray();
+        $column = $args[1];
+        $indexKey = 3 === \count($args) ? $args[2] : null;
+
+        $columnField = null;
+        if (VmVariable::TYPE_NULL !== $column->type) {
+            try {
+                $columnField = VmArrayColumnArg::requireStrIntArg(
+                    $column,
+                    'array_column',
+                    1,
+                    'column_key'
+                );
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+        $indexField = null;
+        if (null !== $indexKey && VmVariable::TYPE_NULL !== $indexKey->type) {
+            try {
+                $indexField = VmArrayColumnArg::requireStrIntArg(
+                    $indexKey,
+                    'array_column',
+                    2,
+                    'index_key'
+                );
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        if (null === $columnField) {
+            $out = null === $indexField
+                ? ArrayColumnJitHelper::columnNull($ht)
+                : ArrayColumnJitHelper::columnNullWithIndex($ht, $indexField);
+        } elseif (null !== $indexField) {
+            $out = ArrayColumnJitHelper::columnWithKeyAndIndex($ht, $columnField, $indexField);
+        } else {
+            $out = ArrayColumnJitHelper::columnWithKey($ht, $columnField);
+        }
+        $var = new VmVariable();
+        $var->array($out);
 
         return $var;
     }
