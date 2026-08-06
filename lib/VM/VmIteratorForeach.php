@@ -523,6 +523,9 @@ final class VmIteratorForeach
         if (self::usesAppendIteratorKeys($containerUserType)) {
             return self::compileKeyAppendIterator($context, $slotKey);
         }
+        if (self::usesRecursiveIteratorIteratorKeys($containerUserType)) {
+            return self::compileKeyRecursiveIteratorIterator($context, $slotKey);
+        }
 
         return self::compileKeyHashtable($context, $array, $slotKey);
     }
@@ -533,6 +536,12 @@ final class VmIteratorForeach
             && 'appenditerator' === strtolower(ltrim($containerUserType, '\\'));
     }
 
+    private static function usesRecursiveIteratorIteratorKeys(?string $containerUserType): bool
+    {
+        return null !== $containerUserType
+            && 'recursiveiteratoriterator' === strtolower(ltrim($containerUserType, '\\'));
+    }
+
     /** Read original inner keys from AppendIterator `__spl_keys` (#27312). */
     private static function compileKeyAppendIterator(Context $context, JitVariable $slotKey): JitVariable
     {
@@ -540,6 +549,28 @@ final class VmIteratorForeach
             ? $slotKey
             : VmIteratorProtocol::normalizeObjectReceiver($context, $slotKey);
         $keysHt = \PHPCompiler\JIT\Call\AppendIteratorMethod::keysHashtable($context, $receiver);
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
+        $keyBox = HashTableHelper::readIndexedToValueBox(
+            $context,
+            $context->helper->loadValue($keysHt),
+            $idx
+        );
+
+        return new JitVariable(
+            $context,
+            JitVariable::TYPE_VALUE,
+            JitVariable::KIND_VARIABLE,
+            $keyBox->value
+        );
+    }
+
+    /** Read original leaf keys from RecursiveIteratorIterator `__spl_keys` (#27257). */
+    private static function compileKeyRecursiveIteratorIterator(Context $context, JitVariable $slotKey): JitVariable
+    {
+        $receiver = JitVariable::TYPE_OBJECT === $slotKey->type
+            ? $slotKey
+            : VmIteratorProtocol::normalizeObjectReceiver($context, $slotKey);
+        $keysHt = \PHPCompiler\JIT\Call\RecursiveIteratorIteratorConstruct::keysHashtable($context, $receiver);
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $keyBox = HashTableHelper::readIndexedToValueBox(
             $context,

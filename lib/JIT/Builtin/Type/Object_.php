@@ -3979,6 +3979,8 @@ class Object_ extends Type {
                 'Iterator',
             ]);
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            // Parallel original leaf keys for iterator_to_array overwrite semantics (#27257).
+            $this->defineProperty($id, \PHPCompiler\JIT\Builtin\RecursiveLeavesFlattenRuntime::PROP_KEYS, Variable::TYPE_HASHTABLE);
             $this->seedExternalClassConstants($id, [
                 'LEAVES_ONLY' => 0,
                 'SELF_FIRST' => 1,
