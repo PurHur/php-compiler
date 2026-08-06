@@ -175,6 +175,121 @@ final class JitFilter
         );
     }
 
+    /**
+     * FILTER_THROW_ON_FAILURE bit — PROFILE≥8.5 only (same bit is GLOBAL_RANGE on ≤8.4; #28131).
+     */
+    public static function loadThrowOnFailureFlag(Context $context, ?JITVariable $options): Value
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsFilterThrowOnFailure()) {
+            return $context->constantFromBool(false);
+        }
+        if (null === $options || JITVariable::TYPE_NULL === $options->type) {
+            return $context->constantFromBool(false);
+        }
+
+        $optionsVal = self::loadFilterId($context, $options);
+        $i64 = $context->getTypeFromString('int64');
+        $flag = $i64->constInt(VmFilter::FILTER_THROW_ON_FAILURE, false);
+        $masked = $context->builder->and($optionsVal, $flag);
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $masked,
+            $i64->constInt(0, false)
+        );
+    }
+
+    /**
+     * Compile-time ValueError when NULL_ON_FAILURE and THROW_ON_FAILURE are both set (#28131).
+     */
+    public static function assertThrowNullExclusiveConst(
+        Context $context,
+        ?JITVariable $options,
+        string $function = 'filter_var',
+        int $optionsArgNum = 3
+    ): void {
+        if (!\PHPCompiler\CompilerVersion::supportsFilterThrowOnFailure()) {
+            return;
+        }
+        if (null === $options || JITVariable::TYPE_NULL === $options->type) {
+            return;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $options->type
+            || JITVariable::KIND_VALUE !== $options->kind
+            || null === $options->value) {
+            return;
+        }
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($options->value->value)) {
+            return;
+        }
+        $flags = (int) $lib->LLVMConstIntGetZExtValue($options->value->value);
+        if (0 === ($flags & VmFilter::FILTER_NULL_ON_FAILURE)
+            || 0 === ($flags & VmFilter::FILTER_THROW_ON_FAILURE)) {
+            return;
+        }
+        \PHPCompiler\JIT\ExceptionBridge::emitValueError(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($options) cannot use both FILTER_NULL_ON_FAILURE and FILTER_THROW_ON_FAILURE',
+                $function,
+                $optionsArgNum
+            )
+        );
+    }
+
+    /**
+     * When THROW_ON_FAILURE is set and the boxed result is boolean false, emit FilterFailedException (#28131).
+     */
+    public static function applyThrowOnFailure(
+        Context $context,
+        Value $resultPtr,
+        Value $throwOnFailure,
+        string $filterName = 'unknown',
+        string $valueRepr = ''
+    ): Value {
+        if (!\PHPCompiler\CompilerVersion::supportsFilterThrowOnFailure()) {
+            return $resultPtr;
+        }
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($resultPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $boolTag = $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $stored = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $resultPtr
+        );
+        $zero = $context->getTypeFromString('int64')->constInt(0, false);
+        $isFalse = $context->builder->icmp(Builder::INT_EQ, $stored, $zero);
+        $isBoolFalse = $context->builder->and($isBool, $isFalse);
+        $shouldThrow = $context->builder->and($throwOnFailure, $isBoolFalse);
+
+        $id = (string) (++self::$blockSerial);
+        $throwBlock = BasicBlockHelper::append($context, 'fv_throw_on_fail_'.$id);
+        $keepBlock = BasicBlockHelper::append($context, 'fv_throw_keep_'.$id);
+        $context->builder->branchIf($shouldThrow, $throwBlock, $keepBlock);
+
+        $context->builder->positionAtEnd($throwBlock);
+        $message = sprintf(
+            "filter validation failed: filter %s not satisfied by '%s'",
+            $filterName,
+            $valueRepr
+        );
+        \PHPCompiler\JIT\TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Filter\\FilterFailedException',
+            $message
+        );
+        // emitCatchableClassError terminates the insert block.
+
+        $context->builder->positionAtEnd($keepBlock);
+
+        return $resultPtr;
+    }
+
     public static function loadFilterFlags(Context $context, ?JITVariable $options): Value
     {
         if (null === $options || JITVariable::TYPE_NULL === $options->type) {

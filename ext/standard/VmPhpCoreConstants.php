@@ -218,7 +218,8 @@ final class VmPhpCoreConstants
     }
 
     /**
-     * Profile-gated Core constants (TENTATIVE_RETURN / PHP_SBINDIR on ≥8.4, PHP_BUILD_DATE on ≥8.5).
+     * Profile-gated Core constants (TENTATIVE_RETURN / PHP_SBINDIR / PHP_OUTPUT_HANDLER_PROCESSED on ≥8.4,
+     * PHP_BUILD_DATE on ≥8.5).
      *
      * @return array<string, int|string>
      */
@@ -230,6 +231,10 @@ final class VmPhpCoreConstants
         }
         if (CompilerVersion::supportsPhpSbindirConstant()) {
             $out['PHP_SBINDIR'] = self::phpSbindirValue();
+        }
+        // php-src main/php_output.h — PHP_OUTPUT_HANDLER_PROCESSED 0x4000 since 8.4 (#28169).
+        if (CompilerVersion::supportsPhpOutputHandlerProcessedConstant()) {
+            $out['PHP_OUTPUT_HANDLER_PROCESSED'] = 0x4000;
         }
         if (CompilerVersion::supportsPhpBuildDateConstant()) {
             $out['PHP_BUILD_DATE'] = CompilerVersion::phpBuildDateStamp();
