@@ -90,6 +90,7 @@
             <file>./test/compliance/StreamSocketClientReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorReflectionVMTest.php</file>
             <file>./test/compliance/XmlGetCurrentReflectionVMTest.php</file>
+            <file>./test/compliance/XmlParserGetOptionReflectionVMTest.php</file>
             <file>./test/compliance/PhpversionVMTest.php</file>
             <file>./test/compliance/PhpSbindirConstant84VMTest.php</file>
         </testsuite>
