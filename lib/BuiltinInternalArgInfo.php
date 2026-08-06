@@ -229,6 +229,8 @@ final class BuiltinInternalArgInfo
             'libxml_get_last_error' => 'LibXMLError|false',
             'libxml_get_external_entity_loader' => '?callable',
             'libxml_clear_errors', 'libxml_set_streams_context' => 'void',
+            // ext/libxml/libxml.stub.php — InternalArgInfo omits return; Zend bool (#27744)
+            'libxml_set_external_entity_loader' => 'bool',
             // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / true (#26319)
             'xml_parser_create' => 'XMLParser',
             'xml_set_object' => 'true',
@@ -810,6 +812,8 @@ final class BuiltinInternalArgInfo
             'getmxrr', 'dns_get_mx' => ($index >= 1 && $index <= 2) ? '' : null,
             // ext/libxml/libxml.stub.php — ?bool $use_errors = null (InternalArgInfo bool) (#25844)
             'libxml_use_internal_errors' => 0 === $index ? '?bool' : null,
+            // ext/libxml/libxml.stub.php — ?callable $resolver_function (InternalArgInfo callable) (#27744)
+            'libxml_set_external_entity_loader' => 0 === $index ? '?callable' : null,
             // ext/xml/xml.stub.php — XMLParser / ?string; InternalArgInfo untyped / string / resource (#26319)
             'xml_set_object' => 0 === $index ? 'XMLParser' : null,
             'xml_parser_create' => 0 === $index ? '?string' : null,
