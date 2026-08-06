@@ -25,6 +25,7 @@ final class VmSocket
     /** @var list<string> php-src stream_type values accepted by socket_import_stream */
     private const SOCKET_STREAM_TYPES = [
         'tcp_socket',
+        'tcp_socket/ssl',
         'unix_socket',
         'udp_socket',
         'ssl_socket',
@@ -143,7 +144,13 @@ final class VmSocket
             return false;
         }
 
-        return \is_resource(VmFs::lookupResource($handle));
+        // Host FILE* streams (stream_socket_*) or VmPhpFdStream from socket_export_stream (#28139).
+        if (\is_resource(VmFs::lookupResource($handle))) {
+            return true;
+        }
+
+        return VmPhpFdStream::isValidHandle($handle)
+            && null !== VmPhpFdStream::fdForHandle($handle);
     }
 
     /** php-src ext/sockets/sockets.c — import follows stream_type, not php:// URI alone (#19996). */
@@ -188,15 +195,10 @@ final class VmSocket
             return false;
         }
 
-        $stream = VmFs::lookupResource($handle);
-        if (!\is_resource($stream)) {
-            return false;
-        }
-
-        return self::wrapImportedStream($handle, $stream, $ctx);
+        return self::wrapImportedStream($handle, VmFs::lookupResource($handle), $ctx);
     }
 
-    /** Register JIT-allocated Socket object keyed by object address (#9217). */
+    /** Register JIT-allocated Socket object keyed by object address (#9217, #28139). */
     public static function registerJitImportedStream(int $objAddr, int $streamHandle): void
     {
         if ($objAddr <= 0 || !self::canImportStreamHandle($streamHandle)) {
@@ -204,11 +206,9 @@ final class VmSocket
         }
 
         $stream = VmFs::lookupResource($streamHandle);
-        if (!\is_resource($stream)) {
-            return;
+        if (\is_resource($stream)) {
+            self::$streamResources[$objAddr] = $stream;
         }
-
-        self::$streamResources[$objAddr] = $stream;
         self::$streamHandles[$objAddr] = $streamHandle;
         $fd = self::socketFdForImportableHandle($streamHandle);
         if (null !== $fd) {
@@ -232,7 +232,9 @@ final class VmSocket
         $var = new Variable(Variable::TYPE_OBJECT);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
-        self::$streamResources[$object->id] = $stream;
+        if (\is_resource($stream)) {
+            self::$streamResources[$object->id] = $stream;
+        }
         self::$streamHandles[$object->id] = $handle;
         $fd = self::socketFdForImportableHandle($handle);
         if (null !== $fd) {

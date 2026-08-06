@@ -26,7 +26,9 @@ final class VmStreamMeta
         $socketType = self::streamTypeForUri($uri);
         $phpNativeStreamType = self::phpNativeStreamType($uri);
         $stdioInheritedType = self::stdioInheritedStreamType($uri, $fp);
-        $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
+        $eof = null !== $eofOverride
+            ? $eofOverride
+            : (\is_resource($fp) ? \feof($fp) : false);
         $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
         // php-src php_stream_temp — no timed_out/blocked/eof keys (main/streams/php_stream_temp.c; #17928).
@@ -68,13 +70,26 @@ final class VmStreamMeta
             ];
         }
 
+        // php-src xport sockets (xp_socket.c / openssl xp_ssl.c) — no wrapper_type/uri (#28139).
+        if (null !== $socketType) {
+            return [
+                'timed_out' => false,
+                'blocked' => $blocked ?? true,
+                'eof' => $eof,
+                'stream_type' => $socketType,
+                'mode' => $reportedMode,
+                'unread_bytes' => 0,
+                'seekable' => false,
+            ];
+        }
+
         // php-src ext/standard/streams.c — array_add_next insertion order (#17428).
         return [
             'timed_out' => false,
             'blocked' => $blocked ?? true,
             'eof' => $eof,
             'wrapper_type' => self::wrapperTypeForUri($uri),
-            'stream_type' => $socketType ?? $stdioInheritedType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
+            'stream_type' => $stdioInheritedType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
             'mode' => $reportedMode,
             'unread_bytes' => 0,
             'seekable' => self::supportsSeekable($uri),
@@ -341,7 +356,10 @@ final class VmStreamMeta
     }
 
     /**
-     * php-src stream_type strings for socket transports (ext/standard/streams.c; #6203, #8202).
+     * php-src stream_type strings for socket transports (ext/standard/streams.c; #6203, #8202, #28139).
+     *
+     * When OpenSSL is loaded, tcp uses php_openssl_socket_ops labelled "tcp_socket/ssl"
+     * (ext/openssl/xp_ssl.c) even for plain TCP — match host Zend.
      */
     public static function streamTypeForUri(string $uri): ?string
     {
@@ -351,12 +369,22 @@ final class VmStreamMeta
         $scheme = \strtolower((string) \parse_url($uri, \PHP_URL_SCHEME));
 
         return match ($scheme) {
-            'tcp' => 'tcp_socket',
+            'tcp' => self::tcpSocketStreamType(),
             'udp' => 'udp_socket',
             'unix' => 'unix_socket',
             'ssl', 'tls' => 'ssl_socket',
             default => null,
         };
+    }
+
+    /** php-src: openssl overrides tcp factory → "tcp_socket/ssl" (#28139). */
+    private static function tcpSocketStreamType(): string
+    {
+        if (\extension_loaded('openssl')) {
+            return 'tcp_socket/ssl';
+        }
+
+        return 'tcp_socket';
     }
 
     /**
