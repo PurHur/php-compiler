@@ -52,6 +52,59 @@ PHP;
         $this->assertStringContainsString("} \n", $out);
     }
 
+    /** @covers issue #28002 — bootstrap must not precede bracketed multi-namespace */
+    public function testAppendsBootstrapForBracketedMultiNamespace(): void
+    {
+        $in = <<<'PHP'
+<?php
+namespace A {
+  function f(){ return 1; }
+}
+namespace {
+  echo \A\f(), PHP_EOL;
+}
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertMatchesRegularExpression(
+            '/^<\?php\s*\nnamespace A \{/s',
+            $out
+        );
+        $this->assertStringContainsString("namespace { class __phpc_mcjit_embed_bootstrap", $out);
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $block = $runtime->parseAndCompile($out, 'jit-ns-multi.php');
+        $this->assertNotNull($block);
+    }
+
+    /** @covers issue #28002 — unbracketed namespace: class lands in that namespace at EOF */
+    public function testAppendsBootstrapForUnbracketedNamespaceClassless(): void
+    {
+        $in = <<<'PHP'
+<?php
+namespace Foo;
+function g(){ return 2; }
+echo \Foo\g(), PHP_EOL;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertMatchesRegularExpression(
+            '/^<\?php\s*\nnamespace Foo;/s',
+            $out
+        );
+        $this->assertStringNotContainsString('namespace { class __phpc_mcjit_embed_bootstrap', $out);
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $block = $runtime->parseAndCompile($out, 'jit-ns-unbr.php');
+        $this->assertNotNull($block);
+    }
+
+    /** @covers issue #28002 — relative `namespace\Foo` is not a declaration */
+    public function testPrependsBootstrapWhenOnlyNamespaceNameQualifier(): void
+    {
+        $in = '<?php echo namespace\\strlen("ab");';
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringStartsWith('<?php class __phpc_mcjit_embed_bootstrap', $out);
+    }
+
     /** @covers issue #27156 — `$class` / get_class must not suppress embed bootstrap */
     public function testInjectsBootstrapWhenOnlyClassVariableOrGetClass(): void
     {
