@@ -110,4 +110,45 @@ final class VmPhpCoreConstantsTest extends TestCase
             }
         }
     }
+
+    /** @covers issue #28170 — PHP_SBINDIR Core path constant on PROFILE≥8.4 */
+    public function testPhpSbindirConstantWithForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhpSbindirConstant());
+            $exact = VmPhpCoreConstants::fetchExact('PHP_SBINDIR');
+            $this->assertNotNull($exact);
+            $val = $exact->toString();
+            $this->assertNotSame('', $val);
+            $this->assertSame($val, VmPhpCoreConstants::phpSbindirValue());
+            $this->assertArrayHasKey('PHP_SBINDIR', VmPhpCoreConstants::categorizedCoreEntries());
+            $this->assertNull(VmPhpCoreConstants::fetchExact('php_sbindir'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #28170 — PHP_SBINDIR withheld on ≤8.3 */
+    public function testPhpSbindirConstantWithheldOnProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPhpSbindirConstant());
+            $this->assertNull(VmPhpCoreConstants::fetchExact('PHP_SBINDIR'));
+            $this->assertArrayNotHasKey('PHP_SBINDIR', VmPhpCoreConstants::categorizedCoreEntries());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
