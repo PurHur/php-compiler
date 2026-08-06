@@ -34555,10 +34555,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPhpCoreConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 470)
-- new Variable (line 476)
-- new Variable (line 482)
-- new Variable (line 488)
+- new Variable (line 475)
+- new Variable (line 481)
+- new Variable (line 487)
+- new Variable (line 493)
 - 23 class method(s)
 
 ### `ext/standard/VmPhpFdStream.php`
@@ -45538,7 +45538,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 308 class method(s)
+- 309 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
