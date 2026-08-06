@@ -40,6 +40,8 @@ class Module extends ModuleAbstract
             'SORTCC' => VmImapCore::SORTCC,
             'SORTSIZE' => VmImapCore::SORTSIZE,
             'SE_UID' => VmImapCore::SE_UID,
+            'CP_UID' => VmImapCore::CP_UID,
+            'CP_MOVE' => VmImapCore::CP_MOVE,
             'IMAP_GC_ELT' => VmImapCore::IMAP_GC_ELT,
             'IMAP_GC_ENV' => VmImapCore::IMAP_GC_ENV,
             'IMAP_GC_TEXTS' => VmImapCore::IMAP_GC_TEXTS,
@@ -135,6 +137,8 @@ class Module extends ModuleAbstract
             new imap_utf8_to_mutf7(),
             new imap_mutf7_to_utf8(),
             new imap_mail_compose(),
+            new imap_mail_copy(),
+            new imap_mail_move(),
         ];
     }
 }

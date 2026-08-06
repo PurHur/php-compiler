@@ -1095,6 +1095,10 @@ final class BuiltinParamNames
             case 'imap_utf8_to_mutf7':
             case 'imap_mutf7_to_utf8':
                 return ['string'];
+            // php-src ext/imap/php_imap.stub.php — imap/message_nums/mailbox/flags; InternalArgInfo drift (#27780)
+            case 'imap_mail_copy':
+            case 'imap_mail_move':
+                return ['imap', 'message_nums', 'mailbox', 'flags='];
             // php-src ext/opcache/opcache.stub.php — InternalArgInfo still says script (#23834)
             case 'opcache_compile_file':
             case 'opcache_is_script_cached':

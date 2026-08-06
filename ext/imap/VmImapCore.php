@@ -1700,6 +1700,70 @@ final class VmImapCore
         return 'From '.$sender.' '.$date."\n";
     }
 
+    /** imap_mail_copy / mail_move CP_* flags (php_imap.h). */
+    public const CP_UID = 1;
+
+    public const CP_MOVE = 2;
+
+    /**
+     * imap_mail_copy() / imap_mail_move() — copy messages into another local mailbox (#27780).
+     *
+     * CP_UID: local mbox treats UIDs as sequence numbers. CP_MOVE: mark source deleted after copy.
+     */
+    public static function copyMessages(
+        ObjectEntry $object,
+        string $sequence,
+        string $mailbox,
+        int $flags = 0,
+        string $fn = 'imap_mail_copy'
+    ): bool {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        // CP_UID ignored for local mbox: UIDs == sequence numbers.
+        $indices = self::parseSequence($sequence, \count($st['messages']));
+        if ([] === $indices) {
+            return false;
+        }
+        $dest = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $dest) {
+            $msg = "Can't copy to {$mailbox}";
+            self::pushError($msg);
+            self::warnImap($fn.'(): '.$msg);
+
+            return false;
+        }
+        foreach ($indices as $idx) {
+            $raw = $st['messages'][$idx]['raw'] ?? '';
+            // Strip mbox From_ envelope so append() rebuilds a fresh one.
+            if (str_starts_with($raw, 'From ')) {
+                $nl = strpos($raw, "\n");
+                $raw = false === $nl ? '' : substr($raw, $nl + 1);
+            }
+            if (!self::append($object, $mailbox, $raw, null, null)) {
+                return false;
+            }
+        }
+        if (0 !== ($flags & self::CP_MOVE)) {
+            return self::deleteMessages($object, $sequence, 0);
+        }
+
+        return true;
+    }
+
+    /**
+     * imap_mail_move() — copy with CP_MOVE (#27780).
+     */
+    public static function moveMessages(
+        ObjectEntry $object,
+        string $sequence,
+        string $mailbox,
+        int $flags = 0
+    ): bool {
+        return self::copyMessages($object, $sequence, $mailbox, $flags | self::CP_MOVE, 'imap_mail_move');
+    }
+
     /**
      * imap_delete() — mark message sequence deleted (#27783).
      */

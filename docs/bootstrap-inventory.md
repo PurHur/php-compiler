@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7111 |
-| Phase A inventory files (M2 ratio SSOT) | 7111 |
+| PHP files on vm.php path | 7113 |
+| Phase A inventory files (M2 ratio SSOT) | 7113 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22849 |
+| Source constructs flagged (warnings) | 22853 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -980,7 +980,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/BuiltinClasses.php` | 0 | 1 |
 | `ext/imap/ImapExtensionPolicy.php` | 0 | 1 |
 | `ext/imap/ImapMboxEngine.php` | 0 | 1 |
-| `ext/imap/Module.php` | 0 | 59 |
+| `ext/imap/Module.php` | 0 | 61 |
 | `ext/imap/VmImapArg.php` | 0 | 1 |
 | `ext/imap/VmImapConnection.php` | 0 | 2 |
 | `ext/imap/VmImapCore.php` | 0 | 40 |
@@ -1017,6 +1017,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_lsub.php` | 0 | 1 |
 | `ext/imap/imap_mail.php` | 0 | 2 |
 | `ext/imap/imap_mail_compose.php` | 0 | 1 |
+| `ext/imap/imap_mail_copy.php` | 0 | 1 |
+| `ext/imap/imap_mail_move.php` | 0 | 1 |
 | `ext/imap/imap_mailboxmsginfo.php` | 0 | 1 |
 | `ext/imap/imap_msgno.php` | 0 | 1 |
 | `ext/imap/imap_mutf7_to_utf8.php` | 0 | 1 |
@@ -14059,64 +14061,66 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/imap/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new imap_open (line 80)
-- new imap_popen (line 81)
-- new imap_reopen (line 82)
-- new imap_close (line 83)
-- new imap_errors (line 84)
-- new imap_last_error (line 85)
-- new imap_num_msg (line 86)
-- new imap_num_recent (line 87)
-- new imap_uid (line 88)
-- new imap_msgno (line 89)
-- new imap_headerinfo (line 90)
-- new imap_fetchbody (line 91)
-- new imap_body (line 92)
-- new imap_fetchstructure (line 93)
-- new imap_fetchheader (line 94)
-- new imap_fetch_overview (line 95)
-- new imap_sort (line 96)
-- new imap_search (line 97)
-- new imap_list (line 98)
-- new imap_lsub (line 99)
-- new imap_listscan (line 100)
-- new imap_scan (line 101)
-- new imap_scanmailbox (line 102)
-- new imap_subscribe (line 103)
-- new imap_unsubscribe (line 104)
-- new imap_createmailbox (line 105)
-- new imap_deletemailbox (line 106)
-- new imap_renamemailbox (line 107)
-- new imap_getmailboxes (line 108)
-- new imap_getsubscribed (line 109)
-- new imap_append (line 110)
-- new imap_savebody (line 111)
-- new imap_bodystruct (line 112)
-- new imap_fetchmime (line 113)
-- new imap_delete (line 114)
-- new imap_undelete (line 115)
-- new imap_expunge (line 116)
-- new imap_ping (line 117)
-- new imap_check (line 118)
-- new imap_status (line 119)
-- new imap_setflag_full (line 120)
-- new imap_clearflag_full (line 121)
-- new imap_alerts (line 122)
-- new imap_gc (line 123)
-- new imap_thread (line 124)
-- new imap_getacl (line 125)
-- new imap_setacl (line 126)
-- new imap_get_quota (line 127)
-- new imap_get_quotaroot (line 128)
-- new imap_set_quota (line 129)
-- new imap_headers (line 130)
-- new imap_mailboxmsginfo (line 131)
-- new imap_mail (line 132)
-- new imap_utf7_encode (line 133)
-- new imap_utf7_decode (line 134)
-- new imap_utf8_to_mutf7 (line 135)
-- new imap_mutf7_to_utf8 (line 136)
-- new imap_mail_compose (line 137)
+- new imap_open (line 82)
+- new imap_popen (line 83)
+- new imap_reopen (line 84)
+- new imap_close (line 85)
+- new imap_errors (line 86)
+- new imap_last_error (line 87)
+- new imap_num_msg (line 88)
+- new imap_num_recent (line 89)
+- new imap_uid (line 90)
+- new imap_msgno (line 91)
+- new imap_headerinfo (line 92)
+- new imap_fetchbody (line 93)
+- new imap_body (line 94)
+- new imap_fetchstructure (line 95)
+- new imap_fetchheader (line 96)
+- new imap_fetch_overview (line 97)
+- new imap_sort (line 98)
+- new imap_search (line 99)
+- new imap_list (line 100)
+- new imap_lsub (line 101)
+- new imap_listscan (line 102)
+- new imap_scan (line 103)
+- new imap_scanmailbox (line 104)
+- new imap_subscribe (line 105)
+- new imap_unsubscribe (line 106)
+- new imap_createmailbox (line 107)
+- new imap_deletemailbox (line 108)
+- new imap_renamemailbox (line 109)
+- new imap_getmailboxes (line 110)
+- new imap_getsubscribed (line 111)
+- new imap_append (line 112)
+- new imap_savebody (line 113)
+- new imap_bodystruct (line 114)
+- new imap_fetchmime (line 115)
+- new imap_delete (line 116)
+- new imap_undelete (line 117)
+- new imap_expunge (line 118)
+- new imap_ping (line 119)
+- new imap_check (line 120)
+- new imap_status (line 121)
+- new imap_setflag_full (line 122)
+- new imap_clearflag_full (line 123)
+- new imap_alerts (line 124)
+- new imap_gc (line 125)
+- new imap_thread (line 126)
+- new imap_getacl (line 127)
+- new imap_setacl (line 128)
+- new imap_get_quota (line 129)
+- new imap_get_quotaroot (line 130)
+- new imap_set_quota (line 131)
+- new imap_headers (line 132)
+- new imap_mailboxmsginfo (line 133)
+- new imap_mail (line 134)
+- new imap_utf7_encode (line 135)
+- new imap_utf7_decode (line 136)
+- new imap_utf8_to_mutf7 (line 137)
+- new imap_mutf7_to_utf8 (line 138)
+- new imap_mail_compose (line 139)
+- new imap_mail_copy (line 140)
+- new imap_mail_move (line 141)
 - 3 class method(s)
 
 ### `ext/imap/VmImapArg.php`
@@ -14161,17 +14165,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1660)
 - new HashTable (line 1673)
 - new Variable (line 1675)
-- new ObjectEntry (line 1813)
-- new Variable (line 1828)
-- new ObjectEntry (line 1869)
-- new Variable (line 1894)
-- new ObjectEntry (line 1963)
-- new Variable (line 1984)
-- new HashTable (line 2071)
-- new Variable (line 2073)
-- new HashTable (line 2090)
-- new Variable (line 2092)
-- 74 class method(s)
+- new ObjectEntry (line 1877)
+- new Variable (line 1892)
+- new ObjectEntry (line 1933)
+- new Variable (line 1958)
+- new ObjectEntry (line 2027)
+- new Variable (line 2048)
+- new HashTable (line 2135)
+- new Variable (line 2137)
+- new HashTable (line 2154)
+- new Variable (line 2156)
+- 76 class method(s)
 - 12 closure(s)
 
 ### `ext/imap/VmImapMailCompose.php`
@@ -14342,6 +14346,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/imap/imap_mail_compose.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_mail_copy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_mail_move.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -44083,8 +44097,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2257)
-- new ArgumentCountError (line 2268)
+- new ArgumentCountError (line 2258)
+- new ArgumentCountError (line 2269)
 - 19 class method(s)
 - 1 closure(s)
 
