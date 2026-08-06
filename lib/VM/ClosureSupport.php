@@ -599,7 +599,7 @@ final class ClosureSupport
         $namedClass = $ctx->classes[$namedClassLc];
         try {
             [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc, $methodName);
-        } catch (\LogicException $e) {
+        } catch (\Error $e) {
             // Missing method + __callStatic → fake Closure (zend_closures.c / #25757).
             $magicState = self::tryMagicStaticCallable($ctx, $namedClassLc, $namedClass->name, $methodName);
             if (null !== $magicState) {
@@ -879,7 +879,7 @@ final class ClosureSupport
         }
         try {
             [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc, $methodName);
-        } catch (\LogicException $e) {
+        } catch (\Error $e) {
             if ($fromCallableApi) {
                 $displayClass = ($ctx->classes[$resolveFromLc] ?? $class)->name;
 
@@ -1236,11 +1236,11 @@ final class ClosureSupport
             $lcClass = $class->parentLc;
         }
 
-        // Zend zend_execute_API.c — no "static" token; preserve identifier casing (#27921).
+        // Zend zend_execute_API.c — catchable Error (no "static" token); preserve casing (#27921, #28003).
         $declClass = $ctx->classes[$requestedLc] ?? null;
         $classDisplay = null !== $declClass ? $declClass->name : $requestedLc;
         $methodDisplay = $displayMethodName ?? $methodLc;
-        throw new \LogicException("Call to undefined method {$classDisplay}::{$methodDisplay}()");
+        throw new \Error("Call to undefined method {$classDisplay}::{$methodDisplay}()");
     }
 
     private static function classDisplayName(Context $ctx, ?string $classLc): ?string

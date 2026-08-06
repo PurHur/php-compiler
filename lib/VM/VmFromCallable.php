@@ -362,8 +362,8 @@ final class VmFromCallable
         }
         $proxyName = strtolower($className.'::'.$methodName);
         if (!$context->functionIsRegistered($proxyName)) {
-            // Zend zend_execute_API.c — same wording as a direct static miss (#27921).
-            throw new \LogicException("Call to undefined method {$className}::{$methodName}()");
+            // Zend zend_execute_API.c — catchable Error, same wording as a direct miss (#27921, #28003).
+            throw new \Error("Call to undefined method {$className}::{$methodName}()");
         }
 
         return $proxyName;
@@ -405,7 +405,8 @@ final class VmFromCallable
             $current = $parentLc;
         }
 
-        throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
+        // Catchable Error for missing instance-method FCC (#28003, zend_execute_API.c).
+        throw new \Error("Call to undefined method {$className}::{$methodLc}()");
     }
 
     private static function nonEmptyString(?string $value): ?string

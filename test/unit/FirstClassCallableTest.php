@@ -432,6 +432,30 @@ echo $maker(42)->v, "\n";
 PHP, 'test.php');
     }
 
+    /** Issue #28003: ClassName::class(...) FCC throws catchable Error (zend_execute_API.c). */
+    public function testVmClassPseudoMethodFirstClassCallableCatchableError(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {}
+try {
+    $f = C::class(...);
+    echo "ok\n";
+} catch (Throwable $e) {
+    echo 'caught:', get_class($e), ':', $e->getMessage(), "\n";
+}
+echo "after\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame(
+            "caught:Error:Call to undefined method C::class()\nafter\n",
+            ob_get_clean()
+        );
+    }
+
     /** Issue #26188: PROFILE=8.4 still rejects new Class(...) FCC (php-src never accepts; re-#10130). */
     public function testVmNewExpressionFirstClassCallableProfile84(): void
     {
