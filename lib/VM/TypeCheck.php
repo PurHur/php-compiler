@@ -929,6 +929,7 @@ final class TypeCheck
                 // Zend weak mode: truncate toward zero; precision loss → E_DEPRECATED
                 // (zend_dval_to_lval_safe / zend_operators.c, #23533).
                 // Non-finite (INF/NAN) → TypeError — not the cast path (#27925).
+                // Untyped bitwise/dim E_DEPRECATED for INF/NAN is #27926 (VmMath / dim paths).
                 $float = $value->toFloat();
                 if (!\is_finite($float)) {
                     self::throwCoerceKindError(

@@ -426,7 +426,8 @@ final class JitIntdiv
     private static function maybeEmitFloatToIntPrecisionWarning(
         Context $context,
         Value $doubleVal,
-        Value $truncatedLong
+        Value $truncatedLong,
+        bool $nonFiniteOnly = false
     ): void {
         // StringTriggerErrorJit::implement clears the builder insert position after linking
         // bridges — without restore, sitofp/fcmp become orphan IR (module verify fails on
@@ -438,8 +439,18 @@ final class JitIntdiv
         } else {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'float_int_prec_warn_setup');
         }
-        $roundtrip = $context->builder->sitofp($truncatedLong, $doubleVal->typeOf());
-        $loses = $context->builder->fcmp(Builder::REAL_UNE, $doubleVal, $roundtrip);
+        // Round-trip fcmp alone misses INF/NAN: fptosi of non-finite is poison, so UNE is
+        // unreliable. Mirror VmMath::floatLosesIntPrecision — warn when !is_finite OR unequal (#27926).
+        $isFinite = JitIsFiniteKernel::invoke($context, $doubleVal);
+        $i1 = $context->getTypeFromString('int1');
+        $nonFinite = $context->builder->icmp(Builder::INT_EQ, $isFinite, $i1->constInt(0, false));
+        if ($nonFiniteOnly) {
+            $loses = $nonFinite;
+        } else {
+            $roundtrip = $context->builder->sitofp($truncatedLong, $doubleVal->typeOf());
+            $unequal = $context->builder->fcmp(Builder::REAL_UNE, $doubleVal, $roundtrip);
+            $loses = $context->builder->or($nonFinite, $unequal);
+        }
         $warnBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_warn');
         $afterWarn = BasicBlockHelper::append($context, 'intdiv_float_prec_after');
         $context->builder->branchIf($loses, $warnBlock, $afterWarn);
@@ -449,6 +460,46 @@ final class JitIntdiv
         $charPtr = $context->getTypeFromString('char*');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $nonFiniteMsg = BasicBlockHelper::append($context, 'intdiv_float_prec_nfin');
+        $finiteMsg = BasicBlockHelper::append($context, 'intdiv_float_prec_fin');
+        $context->builder->branchIf($nonFinite, $nonFiniteMsg, $finiteMsg);
+
+        // Zend spells non-finite as INF / -INF / NAN (not libc %g “inf”) (#27926).
+        $context->builder->positionAtEnd($nonFiniteMsg);
+        $isNan = JitIsNanKernel::invoke($context, $doubleVal);
+        $nanBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_nan');
+        $infBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_inf');
+        $context->builder->branchIf($isNan, $nanBlock, $infBlock);
+        $context->builder->positionAtEnd($nanBlock);
+        self::emitConstFloatToIntPrecisionDeprecated(
+            $context,
+            'Implicit conversion from float NAN to int loses precision',
+            $emptyFile
+        );
+        $context->builder->branch($afterWarn);
+        $context->builder->positionAtEnd($infBlock);
+        $zero = $doubleVal->typeOf()->constReal(0.0);
+        $isNeg = $context->builder->fcmp(Builder::REAL_OLT, $doubleVal, $zero);
+        $negInfBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_ninf');
+        $posInfBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_pinf');
+        $context->builder->branchIf($isNeg, $negInfBlock, $posInfBlock);
+        $context->builder->positionAtEnd($negInfBlock);
+        self::emitConstFloatToIntPrecisionDeprecated(
+            $context,
+            'Implicit conversion from float -INF to int loses precision',
+            $emptyFile
+        );
+        $context->builder->branch($afterWarn);
+        $context->builder->positionAtEnd($posInfBlock);
+        self::emitConstFloatToIntPrecisionDeprecated(
+            $context,
+            'Implicit conversion from float INF to int loses precision',
+            $emptyFile
+        );
+        $context->builder->branch($afterWarn);
+
+        $context->builder->positionAtEnd($finiteMsg);
         $bufSize = $sizeT->constInt(128, false);
         $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
@@ -467,7 +518,6 @@ final class JitIntdiv
             $suffixPtr
         );
         $msgPtr = $context->builder->pointerCast($bufChar, $i8p);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
@@ -482,6 +532,25 @@ final class JitIntdiv
         $context->builder->positionAtEnd($afterWarn);
     }
 
+    private static function emitConstFloatToIntPrecisionDeprecated(
+        Context $context,
+        string $message,
+        Value $emptyFile
+    ): void {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
     /**
      * Truncate float→long like Zend zend_dval_to_lval; emit E_DEPRECATED on precision loss (#19730).
      *
@@ -492,7 +561,20 @@ final class JitIntdiv
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'float_to_long_prec');
         $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
-        self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated);
+        self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated, false);
+
+        return $truncated;
+    }
+
+    /**
+     * Truncate float→long; warn only for INF/NAN/±Inf (dim read path — #27926).
+     * Finite fractional keys stay silent until #27948.
+     */
+    public static function floatToLongWithNonFinitePrecisionWarning(Context $context, Value $doubleVal): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'float_to_long_nfin');
+        $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+        self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated, true);
 
         return $truncated;
     }

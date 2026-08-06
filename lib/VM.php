@@ -5164,7 +5164,7 @@ restart:
                         }
                         $table = $container->toArray();
                         try {
-                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3, false, $frame)) {
+                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3, false, $frame, false)) {
                                 $this->context->errors->undefinedArrayKey(
                                     $arg3,
                                     $this->context,
