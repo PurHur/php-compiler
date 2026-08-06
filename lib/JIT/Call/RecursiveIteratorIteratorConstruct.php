@@ -7,15 +7,17 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Builtin\RecursiveLeavesFlattenRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * RecursiveIteratorIterator::__construct(Traversable $iterator, …) — thin AOT (#26775).
+ * RecursiveIteratorIterator::__construct(Traversable $iterator, …) — thin AOT (#26775, #27257).
  *
- * Flattens the inner RecursiveArrayIterator `__spl_ht` into LEAVES_ONLY order so foreach
- * can walk a packed table (php-src ext/spl/spl_iterators.c).
+ * Flattens the inner RecursiveArrayIterator `__spl_ht` into LEAVES_ONLY values (`__spl_ht`)
+ * plus parallel original leaf keys (`__spl_keys`) so foreach values and iterator_to_array
+ * key overwrites match Zend (php-src ext/spl/spl_iterators.c).
  */
 final class RecursiveIteratorIteratorConstruct implements Call
 {
@@ -35,9 +37,13 @@ final class RecursiveIteratorIteratorConstruct implements Call
         $inner = self::objectReceiver($context, $args[1]);
         $srcHtVar = $context->type->object->splBackingHashtable($inner);
         $srcHt = $context->helper->loadValue($srcHtVar);
-        $flatHt = $context->builder->call(
+        $flatHt = HashTableHelper::alloc($context);
+        $keysHt = HashTableHelper::alloc($context);
+        $context->builder->call(
             $context->lookupFunction(RecursiveLeavesFlattenRuntime::ABI),
-            $srcHt
+            $srcHt,
+            $flatHt,
+            $keysHt
         );
         $flatVar = new Variable(
             $context,
@@ -45,15 +51,54 @@ final class RecursiveIteratorIteratorConstruct implements Call
             Variable::KIND_VALUE,
             $flatHt
         );
-        $objPtr = $context->helper->loadValue($receiver);
-        $slot = $context->type->object->propertySlotFor(
-            $objPtr,
-            'RecursiveIteratorIterator',
-            '__spl_ht'
+        $keysVar = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $keysHt
         );
-        $context->type->object->propertyStore($slot, $flatVar, Variable::TYPE_HASHTABLE);
+        $objPtr = $context->helper->loadValue($receiver);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor(
+                $objPtr,
+                'RecursiveIteratorIterator',
+                '__spl_ht'
+            ),
+            $flatVar,
+            Variable::TYPE_HASHTABLE
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor(
+                $objPtr,
+                'RecursiveIteratorIterator',
+                RecursiveLeavesFlattenRuntime::PROP_KEYS
+            ),
+            $keysVar,
+            Variable::TYPE_HASHTABLE
+        );
 
         return self::voidResult($context);
+    }
+
+    public static function keysHashtable(Context $context, Variable $receiver): Variable
+    {
+        $obj = self::objectReceiver($context, $receiver);
+        $objPtr = $context->helper->loadValue($obj);
+        $slot = $context->type->object->propertyFetch(
+            $objPtr,
+            'RecursiveIteratorIterator',
+            RecursiveLeavesFlattenRuntime::PROP_KEYS
+        );
+        if (Variable::TYPE_HASHTABLE === $slot->type) {
+            return $slot;
+        }
+
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::valuePtrFromVariable($context, $slot)
+        );
+
+        return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
     }
 
     private static function objectReceiver(Context $context, Variable $receiver): Variable

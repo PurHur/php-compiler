@@ -256,6 +256,9 @@ final class JitIteratorToArray
             $context->builder->load($slot),
             $context->getTypeFromString('__hashtable__*')
         );
+        if ($preserveKeys && self::classUsesParallelSplKeys($className)) {
+            return self::materializeFromSplHtParallelKeys($context, $receiver, $className, $srcHt);
+        }
         if ($preserveKeys) {
             return self::copyHashtablePreserveKeys($context, $srcHt);
         }
@@ -267,6 +270,67 @@ final class JitIteratorToArray
         );
         $out->nextFreeElement = 0;
         self::reindexHashtable($context, $out, $srcHt);
+
+        return $context->helper->loadValue($out);
+    }
+
+    /**
+     * AppendIterator / RecursiveIteratorIterator store original keys in `__spl_keys` (#27312, #27257).
+     */
+    private static function classUsesParallelSplKeys(string $className): bool
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+
+        return 'appenditerator' === $lc || 'recursiveiteratoriterator' === $lc;
+    }
+
+    /**
+     * Rebuild array from packed values + parallel original keys (Zend ITA overwrite order).
+     */
+    private static function materializeFromSplHtParallelKeys(
+        Context $context,
+        Variable $receiver,
+        string $className,
+        Value $valuesHt
+    ): Value {
+        $lc = strtolower(ltrim($className, '\\'));
+        $keysHtVar = 'appenditerator' === $lc
+            ? \PHPCompiler\JIT\Call\AppendIteratorMethod::keysHashtable($context, $receiver)
+            : \PHPCompiler\JIT\Call\RecursiveIteratorIteratorConstruct::keysHashtable($context, $receiver);
+        $keysHt = $context->helper->loadValue($keysHtVar);
+        $out = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->builder->load($context->builder->structGep($valuesHt, $map['nextFreeElement']));
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $idxSlot);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $head = $fn->appendBasicBlock('ita_spl_keys_head');
+        $body = $fn->appendBasicBlock('ita_spl_keys_body');
+        $done = $fn->appendBasicBlock('ita_spl_keys_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $value = HashTableHelper::readIndexedToValueBox($context, $valuesHt, $idx);
+        $key = HashTableHelper::readIndexedToValueBox($context, $keysHt, $idx);
+        HashTableHelper::addElement($context, $out, $value, $key);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->refcount->addref($context->helper->loadValue($out));
 
         return $context->helper->loadValue($out);
     }
