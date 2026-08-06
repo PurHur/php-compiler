@@ -243,13 +243,7 @@ final class BuiltinClasses
             'IPvFuture',
             'RegisteredName',
         ]);
-        self::registerUnitEnum($ctx, 'Uri\\WhatWg\\UrlHostType', 'uri\\whatwg\\urlhosttype', [
-            'IPv4',
-            'IPv6',
-            'Domain',
-            'Opaque',
-            'Empty',
-        ]);
+        // UrlHostType is absent from php-src PHP-8.5 php_uri.stub.php (#28199); Rfc3986 UriHostType tracked in #28198.
         self::registerUnitEnum($ctx, 'Uri\\WhatWg\\UrlValidationErrorType', VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE, [
             'DomainToAscii',
             'DomainToUnicode',
@@ -444,8 +438,7 @@ final class BuiltinClasses
             'withport' => new WhatWgUrlWithPort(),
             'withusername' => new WhatWgUrlWithUsername(),
             'withpassword' => new WhatWgUrlWithPassword(),
-            'isspecialscheme' => new WhatWgUrlIsSpecialScheme(),
-            'gethosttype' => new WhatWgUrlGetHostType(),
+            // isSpecialScheme / getHostType absent from php-src PHP-8.5 WhatWg\Url stub (#28199)
             'resolve' => new WhatWgUrlResolve(),
             '__serialize' => new WhatWgUrlSerialize(),
             '__unserialize' => new WhatWgUrlUnserialize(),

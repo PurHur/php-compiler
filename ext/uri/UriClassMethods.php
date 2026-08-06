@@ -1645,47 +1645,6 @@ final class WhatWgUrlWithPassword extends WhatWgUrlGetter
     }
 }
 
-final class WhatWgUrlIsSpecialScheme extends WhatWgUrlGetter
-{
-    public function __construct()
-    {
-        parent::__construct('isSpecialScheme');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        $scheme = $this->receiverState($frame)['scheme'] ?? null;
-        $special = VmUri::isSpecialScheme(\is_string($scheme) ? $scheme : null);
-        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($special): void {
-            $ret->bool($special);
-        });
-    }
-}
-
-final class WhatWgUrlGetHostType extends WhatWgUrlGetter
-{
-    public function __construct()
-    {
-        parent::__construct('getHostType');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::getHostType() requires VM context');
-        $state = $this->receiverState($frame);
-        $host = \array_key_exists('host', $state) ? $state['host'] : null;
-        $scheme = isset($state['scheme']) && \is_string($state['scheme']) ? $state['scheme'] : null;
-        $case = VmUri::whatWgHostType(\is_string($host) || null === $host ? $host : null, $scheme);
-        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx, $case): void {
-            if (null === $case) {
-                $ret->null();
-            } else {
-                VmUri::writeEnumCase($ctx, VmUri::CLASS_WHATWG_URL_HOST_TYPE, $case, $ret);
-            }
-        });
-    }
-}
-
 final class WhatWgUrlResolve extends WhatWgUrlGetter
 {
     public function __construct()

@@ -25,7 +25,6 @@ final class VmUri
     public const CLASS_WHATWG_INVALID_URL = 'uri\\whatwg\\invalidurlexception';
     public const CLASS_WHATWG_URL_VALIDATION_ERROR = 'uri\\whatwg\\urlvalidationerror';
     public const CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE = 'uri\\whatwg\\urlvalidationerrortype';
-    public const CLASS_WHATWG_URL_HOST_TYPE = 'uri\\whatwg\\urlhosttype';
     public const CLASS_RFC3986_URI_BUILDER = 'uri\\rfc3986\\uribuilder';
     public const CLASS_RFC3986_URI_TYPE = 'uri\\rfc3986\\uritype';
     public const CLASS_RFC3986_URI_HOST_TYPE = 'uri\\rfc3986\\urihosttype';
@@ -282,32 +281,6 @@ final class VmUri
     public static function isSpecialScheme(?string $scheme): bool
     {
         return null !== $scheme && \in_array(strtolower($scheme), self::SPECIAL_SCHEMES, true);
-    }
-
-    /**
-     * Classify host for Uri\WhatWg\Url::getHostType() (#20949).
-     *
-     * @return 'IPv4'|'IPv6'|'Domain'|'Opaque'|'Empty'|null null when host component is missing
-     */
-    public static function whatWgHostType(?string $host, ?string $scheme): ?string
-    {
-        if (null === $host) {
-            return null;
-        }
-        if ('' === $host) {
-            return 'Empty';
-        }
-        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
-            return 'IPv6';
-        }
-        if (false !== filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
-            return 'IPv4';
-        }
-        if (self::isSpecialScheme($scheme)) {
-            return 'Domain';
-        }
-
-        return 'Opaque';
     }
 
     /**
