@@ -481,8 +481,9 @@ final class VmForwardStaticCall
             $lcClass = $class->parentLc;
         }
 
+        // Zend zend_execute_API.c — same wording as a direct static miss (#27921).
         throw new \LogicException(
-            "Call to undefined static method {$calledScopeClass}::{$methodName}()"
+            "Call to undefined method {$calledScopeClass}::{$methodName}()"
         );
     }
 

@@ -43,7 +43,7 @@ array_key_exists(\'k\', $o);
 stdClass::undefined();
 ', 'dispatch_vm_error_uncaught.php');
         $this->assertStringContainsString('Uncaught Error:', $stderr);
-        $this->assertStringContainsString('Call to undefined static method stdclass::undefined()', $stderr);
+        $this->assertStringContainsString('Call to undefined method stdClass::undefined()', $stderr);
         $this->assertStringContainsString('dispatch_vm_error_uncaught.php', $stderr);
         $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
         $this->assertStringNotContainsString('Variable::$string must not be accessed before initialization', $stderr);

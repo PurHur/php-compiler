@@ -362,7 +362,8 @@ final class VmFromCallable
         }
         $proxyName = strtolower($className.'::'.$methodName);
         if (!$context->functionIsRegistered($proxyName)) {
-            throw new \LogicException("Call to undefined static method {$className}::{$methodName}()");
+            // Zend zend_execute_API.c — same wording as a direct static miss (#27921).
+            throw new \LogicException("Call to undefined method {$className}::{$methodName}()");
         }
 
         return $proxyName;

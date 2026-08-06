@@ -11333,7 +11333,8 @@ class JIT {
                                     if ($this->tryResolveProgressStaticCall($staticClass, $staticMethod)) {
                                         break;
                                     }
-                                    throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
+                                    // Zend zend_execute_API.c — same wording as instance miss (#27921).
+                                    throw new \LogicException("Call to undefined method {$nameVar->compileTimeString}()");
                                 }
                                 // Preserve source spelling like Zend (#26690, zend_execute_API.c).
                                 throw new \LogicException(
@@ -20339,7 +20340,8 @@ class JIT {
             )) {
                 return;
             }
-            throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
+            // Zend zend_execute_API.c — no "static" token; keep source casing (#27921).
+            throw new \LogicException("Call to undefined method {$className}::{$nameOp->value}()");
         }
         // AOT/standalone: `static::method()` must dispatch from get_called_scope(), not the
         // declaring class baked in at compile time (#24169). Compile-time resolve of `static`
@@ -20351,7 +20353,7 @@ class JIT {
         ) {
             $candidates = $this->buildRuntimeStaticMethodCandidatesByClassId($methodLc);
             if ([] === $candidates) {
-                throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
+                throw new \LogicException("Call to undefined method {$className}::{$nameOp->value}()");
             }
             $this->context->scope->toCall = new JIT\Call\RuntimeIndirectStaticMethodCall(
                 $methodLc,
