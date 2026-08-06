@@ -56,21 +56,6 @@ final class parse_ini_string extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('parse_ini_string() expects between 1 and 3 arguments in this compiler build');
         }
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            if ($context->callerStrictTypes) {
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'parse_ini_string', 0, 'ini_string');
-                $slot = JitValueBox::alloc($context);
-
-                return JitValueBox::pointer($context, $slot);
-            }
-            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'parse_ini_string', 0, 'ini_string');
-            $literal = '';
-        } else {
-            $literal = JitStringArg::compileTimeLiteral($args[0]);
-            if (null === $literal) {
-                throw new \LogicException('parse_ini_string() requires compile-time ini_string in this compiler build');
-            }
-        }
         $processSections = false;
         if (isset($args[1])) {
             $sections = self::compileTimeBool($context, $args[1]);
@@ -86,6 +71,29 @@ final class parse_ini_string extends Internal
                 throw new \LogicException('parse_ini_string() requires compile-time scanner_mode in this compiler build');
             }
             $scannerMode = $mode;
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'parse_ini_string', 0, 'ini_string');
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'parse_ini_string', 0, 'ini_string');
+            $literal = '';
+        } else {
+            $literal = JitStringArg::compileTimeLiteral($args[0]);
+            if (null === $literal) {
+                // Runtime subject — NestedJIT NORMAL/flat via native HT (#26909).
+                // process_sections / non-NORMAL still need compile-time materialize.
+                if ($processSections || ParseIniEngine::SCANNER_NORMAL !== $scannerMode) {
+                    throw new \LogicException(
+                        'parse_ini_string() requires compile-time ini_string for process_sections/scanner_mode in this compiler build'
+                    );
+                }
+
+                return JitParseIni::parseRuntime($context, $args[0], $processSections, $scannerMode);
+            }
         }
         $parsed = VmParseIni::parseString($literal, $processSections, $scannerMode);
         if (false === $parsed) {
