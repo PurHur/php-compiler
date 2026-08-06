@@ -1379,7 +1379,7 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'get_attribute_names_phantom')) {
                 continue;
             }
-            // DOMTokenList / DOMElement::$classList — VM ext/dom method dispatch; JIT VM-only (#16876).
+            // Dom\TokenList / Dom\Element::$classList — VM ext/dom method dispatch; JIT VM-only (#16876, #28227).
             if (str_contains($name, 'dom_token_list')) {
                 continue;
             }

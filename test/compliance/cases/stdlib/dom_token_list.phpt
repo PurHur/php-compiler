@@ -1,16 +1,17 @@
 --TEST--
-stdlib DOMElement::$classList / DOMTokenList — PHP 8.4 profile (#16876, ext/dom/token_list.c)
+stdlib Dom\HTMLElement::$classList / Dom\TokenList — PHP 8.4 profile (#16876, #28227, ext/dom/token_list.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-if (!class_exists('DOMTokenList')) {
-    echo "skip: DOMTokenList not on profile\n";
+if (!class_exists('Dom\\TokenList') || !class_exists('Dom\\HTMLDocument')) {
+    echo "skip: Dom\\TokenList not on profile\n";
     exit(0);
 }
-$dom = new DOMDocument();
-$el = $dom->createElement('p');
-$dom->appendChild($el);
+$html = Dom\HTMLDocument::createFromString(
+    '<!DOCTYPE html><html><body><p id="p"></p></body></html>'
+);
+$el = $html->getElementById('p');
 $el->classList->add('one', 'two');
 echo $el->getAttribute('class'), "\n";
 echo (int) $el->classList->contains('one'), "\n";

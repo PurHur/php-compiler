@@ -158,7 +158,7 @@ final class DomNodeState
      */
     public array $liveAttributesMapIds = [];
 
-    /** Persistent DOMTokenList object id for element nodes (php-src ext/dom/token_list.c; #16876). */
+    /** Persistent Dom\TokenList object id for living element nodes (php-src ext/dom/token_list.c; #16876, #28227). */
     public ?int $classListId = null;
 
     /** Owning element object id for {@see DomConstants::XML_TOKENLIST} handles (#16876). */

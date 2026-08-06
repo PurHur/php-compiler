@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-// DOMTokenList is PHP 8.4+ (ext/dom/token_list.c). Run with:
+// Dom\TokenList is PHP 8.4+ (ext/dom/token_list.c). Run with:
 // PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/maintainer_gap_dom_element_class_list.php
-if (!class_exists('DOMTokenList')) {
-    fwrite(STDERR, "DOMTokenList class missing (requires PHP_COMPILER_PROFILE=8.4 forward profile)\n");
+if (!class_exists('Dom\\TokenList') || !class_exists('Dom\\HTMLDocument')) {
+    fwrite(STDERR, "Dom\\TokenList / Dom\\HTMLDocument missing (requires PHP_COMPILER_PROFILE=8.4)\n");
     exit(1);
 }
 
-$dom = new DOMDocument();
-$el = $dom->createElement('div');
-$dom->appendChild($el);
+$html = Dom\HTMLDocument::createFromString(
+    '<!DOCTYPE html><html><body><div id="d"></div></body></html>'
+);
+$el = $html->getElementById('d');
 
 $el->classList->add('a', 'b');
 if ($el->getAttribute('class') !== 'a b') {

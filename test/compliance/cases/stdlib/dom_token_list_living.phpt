@@ -1,5 +1,5 @@
 --TEST--
-stdlib Dom\TokenList — Dom\HTMLElement::$classList on PHP 8.4 profile (#20512, ext/dom/token_list.c)
+stdlib Dom\TokenList — Dom\HTMLElement::$classList on PHP 8.4 profile (#20512, #28227, ext/dom/token_list.c)
 --SKIPIF--
 <?php
 if (!class_exists('Dom\\TokenList') || !class_exists('Dom\\HTMLDocument')) {
@@ -25,15 +25,14 @@ $el->classList->remove('b');
 echo $el->getAttribute('class'), "\n";
 echo (int) $el->classList->toggle('x'), "\n";
 echo $el->getAttribute('class'), "\n";
-// Legacy DOMElement keeps DOMTokenList
+// Legacy DOMElement has no classList (php-src; #28227)
 $dom = new DOMDocument();
 $legacy = $dom->createElement('p');
-$dom->appendChild($legacy);
-echo get_class($legacy->classList), "\n";
+echo (new ReflectionClass(DOMElement::class))->hasProperty('classList') ? '1' : '0', "\n";
 ?>
 --EXPECT--
 1
-1
+0
 Dom\TokenList
 1
 a b c
@@ -41,4 +40,4 @@ a b c
 a c
 1
 a c x
-DOMTokenList
+0
