@@ -13278,24 +13278,33 @@ class Compiler {
             case Op\Expr\Throw_::class:
                 return $this->compileThrowExpression($expr, $block);
             case Op\Iterator\Valid::class:
-                return [new OpCode(
+                $iterValid = new OpCode(
                     OpCode::TYPE_ITER_VALID,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true)
-                )];
+                );
+                $this->assignSourceMetadata($iterValid, $expr);
+
+                return [$iterValid];
             case Op\Iterator\Key::class:
-                return [new OpCode(
+                $iterKey = new OpCode(
                     OpCode::TYPE_ITER_KEY,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true)
-                )];
+                );
+                $this->assignSourceMetadata($iterKey, $expr);
+
+                return [$iterKey];
             case Op\Iterator\Value::class:
-                return [new OpCode(
+                $iterValue = new OpCode(
                     OpCode::TYPE_ITER_VALUE,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true),
                     $expr->byRef ? 1 : 0
-                )];
+                );
+                $this->assignSourceMetadata($iterValue, $expr);
+
+                return [$iterValue];
             case Op\Expr\InstanceOf_::class:
                 return $this->compileInstanceOf($expr, $block);
             case Op\Expr\In_::class:
@@ -41895,10 +41904,14 @@ class Compiler {
                     $returnLineArg
                 )];
             case 'Iterator_Reset':
-                return [new OpCode(
+                // Stamp foreach site so FE_RESET E_WARNING cites the foreach line (#27953).
+                $iterReset = new OpCode(
                     OpCode::TYPE_ITER_RESET,
                     $this->compileOperand($terminal->var, $block, true)
-                )];
+                );
+                $this->assignSourceMetadata($iterReset, $terminal);
+
+                return [$iterReset];
             case 'Terminal_Throw':
                 if ($this->isBareRethrowThrow($terminal, $block)) {
                     return [new OpCode(OpCode::TYPE_RETHROW)];
