@@ -1033,6 +1033,12 @@ final class BuiltinInternalArgInfo
             'bcmath\\number::__construct' => 0 === $index ? 'string|int' : null,
             // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
             'dateperiod::__construct' => '',
+            // ext/date/php_date.stub.php — PHP 8.4+ createFromISO8601String (absent from InternalArgInfo) (#27923)
+            'dateperiod::createfromiso8601string' => match ($index) {
+                0 => 'string',
+                1 => 'int',
+                default => null,
+            },
             // ext/intl/resourcebundle/resourcebundle.stub.php — ?string $locale / ?string $bundle (#25056)
             'resourcebundle::__construct' => ($index === 0 || $index === 1) ? '?string' : null,
             'resourcebundle::create' => ($index === 0 || $index === 1) ? '?string' : null,

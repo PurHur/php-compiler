@@ -1901,6 +1901,12 @@ final class BuiltinClasses
         if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()) {
             $dp->methods['createfromiso8601string'] = new DatePeriodCreateFromISO8601String();
             $dp->methodVisibility['createfromiso8601string'] = $pubStatic;
+            $dp->methodNames['createfromiso8601string'] = 'createFromISO8601String';
+            // php-src stub returns static (#27923).
+            $staticRet = ReflectionTypeSupport::cfgTypeFromLabel('static');
+            if (null !== $staticRet) {
+                $dp->methodReturnDeclaredTypes['createfromiso8601string'] = $staticRet;
+            }
         }
         $dp->methods['__set_state'] = new DatePeriodSetState();
         $dp->methodVisibility['__set_state'] = $pubStatic;

@@ -80,6 +80,7 @@
             <file>./test/compliance/FiberStackOverflowProfileJITTest.php</file>
             <file>./test/compliance/FiberGetCurrentReflectionVMTest.php</file>
             <file>./test/compliance/FiberGetReturnReflectionVMTest.php</file>
+            <file>./test/compliance/DatePeriodCreateFromISO8601StringReflectionVMTest.php</file>
             <file>./test/compliance/FuncGetArgReflectionMixedVMTest.php</file>
             <file>./test/compliance/GcControlReflectionReturnsVMTest.php</file>
             <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
