@@ -1,7 +1,7 @@
 --TEST--
-ext/sqlite3 SQLite3Result::fetchAll + Stmt busy/explain (#20600, php-src sqlite3.c)
+ext/sqlite3 SQLite3Result::fetchAll + Stmt busy/explain (#20600, #27594, php-src sqlite3.c)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 $db = new SQLite3(':memory:');

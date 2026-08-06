@@ -35,15 +35,18 @@ final class VmSQLite3Stmt
         $entry->isInternal = true;
         // Declared casing is the storage key (ClassConstName / #25929); STMT map
         // keys are lowercase legacy labels — use CLASS_CONSTANT_NAMES (#28098).
-        foreach (Sqlite3Constants::STMT_CLASS_CONSTANTS as $name => $value) {
-            $const = new Variable(Variable::TYPE_INTEGER);
-            $const->int($value);
-            $canonical = Sqlite3Constants::STMT_CLASS_CONSTANT_NAMES[$name];
-            $entry->constants[$canonical] = $const;
-            $entry->constNames[$canonical] = $canonical;
+        // EXPLAIN_MODE_* are PHP 8.5+ (absent from PHP-8.4 stubs; #27594).
+        if (Sqlite3ExtensionPolicy::advertisesPhp85Apis()) {
+            foreach (Sqlite3Constants::STMT_CLASS_CONSTANTS as $name => $value) {
+                $const = new Variable(Variable::TYPE_INTEGER);
+                $const->int($value);
+                $canonical = Sqlite3Constants::STMT_CLASS_CONSTANT_NAMES[$name];
+                $entry->constants[$canonical] = $const;
+                $entry->constNames[$canonical] = $canonical;
+            }
         }
         $pub = CfgFunc::FLAG_PUBLIC;
-        foreach ([
+        $methods = [
             'bindparam' => new SQLite3StmtBindParam(),
             'bindvalue' => new SQLite3StmtBindValue(),
             'clear' => new SQLite3StmtClear(),
@@ -52,11 +55,15 @@ final class VmSQLite3Stmt
             'getsql' => new SQLite3StmtGetSQL(),
             'paramcount' => new SQLite3StmtParamCount(),
             'readonly' => new SQLite3StmtReadOnly(),
-            'busy' => new SQLite3StmtBusy(),
-            'explain' => new SQLite3StmtExplain(),
-            'setexplain' => new SQLite3StmtSetExplain(),
             'reset' => new SQLite3StmtReset(),
-        ] as $name => $method) {
+        ];
+        // busy/explain/setExplain — PHP 8.5+ only (#27594; migration85.new-functions).
+        if (Sqlite3ExtensionPolicy::advertisesPhp85Apis()) {
+            $methods['busy'] = new SQLite3StmtBusy();
+            $methods['explain'] = new SQLite3StmtExplain();
+            $methods['setexplain'] = new SQLite3StmtSetExplain();
+        }
+        foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
         }
@@ -65,7 +72,9 @@ final class VmSQLite3Stmt
         $entry->methodNames['getsql'] = 'getSQL';
         $entry->methodNames['paramcount'] = 'paramCount';
         $entry->methodNames['readonly'] = 'readOnly';
-        $entry->methodNames['setexplain'] = 'setExplain';
+        if (isset($entry->methods['setexplain'])) {
+            $entry->methodNames['setexplain'] = 'setExplain';
+        }
 
         self::$classEntry = $entry;
         $ctx->classes[self::CLASS_LC] = $entry;

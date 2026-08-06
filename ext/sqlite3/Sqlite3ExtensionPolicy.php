@@ -43,6 +43,19 @@ final class Sqlite3ExtensionPolicy
     }
 
     /**
+     * SQLite3Stmt::busy/explain/setExplain + EXPLAIN_MODE_* / SQLite3Result::fetchAll —
+     * PHP 8.5+ only (#27594; php-src sqlite3.stub.php PHP-8.5 vs PHP-8.4).
+     */
+    public static function advertisesPhp85Apis(): bool
+    {
+        if (!self::advertisesExtension()) {
+            return false;
+        }
+
+        return CompilerVersion::supportsSqlite3Php85Apis();
+    }
+
+    /**
      * SQLite3Exception hierarchy — PHP 8.3+ only when the extension is advertised (#7269, #22791).
      */
     public static function advertisesExceptionClass(): bool
