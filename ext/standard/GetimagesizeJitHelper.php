@@ -4,32 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\HashTable;
-
 /**
- * JIT/AOT runtime helper for getimagesize*() — reuses {@see VmImage} byte parser (#3271).
+ * Deprecated NestedJIT surface for getimagesize*() (#3271).
  *
- * php-src: ext/standard/image.c — PHP_FUNCTION(getimagesize), getimagesizefromstring
+ * Thin AOT uses {@see GetimagesizeParseLlvm} + {@see JitGetimagesize} instead:
+ * NestedJIT {@see __string__*} args and HashTable returns fail under user-script AOT
+ * (#27291 / #26829 / peer #27051 / #26910). Kept as a documentation stub so older
+ * require paths remain harmless.
  */
 final class GetimagesizeJitHelper
 {
-    public static function shouldEmitReadNoticeForPath(string $path): bool
-    {
-        return VmImage::shouldEmitImageReadNoticeForPath($path);
-    }
-
-    public static function shouldEmitReadNoticeForBytes(string $data): bool
-    {
-        return VmImage::shouldEmitImageReadNoticeForBytes($data);
-    }
-
-    public static function fromBytes(string $data): ?HashTable
-    {
-        $result = VmImage::getImageSizeFromBytes($data);
-        if (false === $result) {
-            return null;
-        }
-
-        return VmImage::imageSizeResultToHashTable($result);
-    }
 }
