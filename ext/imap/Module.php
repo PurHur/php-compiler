@@ -45,6 +45,10 @@ class Module extends ModuleAbstract
             'IMAP_GC_ELT' => VmImapCore::IMAP_GC_ELT,
             'IMAP_GC_ENV' => VmImapCore::IMAP_GC_ENV,
             'IMAP_GC_TEXTS' => VmImapCore::IMAP_GC_TEXTS,
+            'IMAP_OPENTIMEOUT' => VmImapCore::IMAP_OPENTIMEOUT,
+            'IMAP_READTIMEOUT' => VmImapCore::IMAP_READTIMEOUT,
+            'IMAP_WRITETIMEOUT' => VmImapCore::IMAP_WRITETIMEOUT,
+            'IMAP_CLOSETIMEOUT' => VmImapCore::IMAP_CLOSETIMEOUT,
             'TYPETEXT' => VmImapMailCompose::TYPETEXT,
             'TYPEMULTIPART' => VmImapMailCompose::TYPEMULTIPART,
             'TYPEMESSAGE' => VmImapMailCompose::TYPEMESSAGE,
@@ -145,6 +149,7 @@ class Module extends ModuleAbstract
             new imap_mail_compose(),
             new imap_mail_copy(),
             new imap_mail_move(),
+            new imap_timeout(),
         ];
     }
 }
