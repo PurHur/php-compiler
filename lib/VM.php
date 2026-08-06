@@ -8690,7 +8690,14 @@ restart:
                             (int) ($op->arg3 ?? 0)
                         );
                     } catch (\TypeError $e) {
+                        // TypeError extends Error — must precede catch (\Error) (#27952).
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;

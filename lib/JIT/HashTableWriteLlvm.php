@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\VM\ArraySpread;
 use PHPCompiler\VM\HashTableJitHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -1429,10 +1432,14 @@ final class HashTableWriteLlvm
 
     /**
      * Array-literal spread: append packed list then string keys (issue #141, #1361, #4453).
+     * Non-array / non-Traversable at runtime → catchable Error (#27952).
      */
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
     {
         $dest->compileTimeEmptyArrayLiteral = false;
+        if (self::emitArraySpreadNonTraversableGuard($context, $source)) {
+            return;
+        }
         if (self::needsTraversableMaterialization($context, $source)) {
             $srcPtr = \PHPCompiler\ext\standard\JitIteratorToArray::materializeHashtable(
                 $context,
@@ -1450,6 +1457,80 @@ final class HashTableWriteLlvm
         self::spreadPackedInto($context, $dest, $srcPtr);
         self::spreadStringKeysInto($context, $dest, $srcPtr);
         $dest->nextFreeElementFromRuntime = true;
+    }
+
+    /**
+     * Guard `[...$x]` when $x is known non-array at compile time, or boxed and not
+     * array/object at runtime. Scalars → catchable Error (zend_vm_def.h / #27952).
+     *
+     * @return bool true when the fail path already terminated this block
+     */
+    private static function emitArraySpreadNonTraversableGuard(Context $context, Variable $source): bool
+    {
+        if (ListUnpackHelper::isDefinitelyArrayAtCompileTime($source)) {
+            return false;
+        }
+        if (GeneratorHelper::isGeneratorVariable($source)) {
+            return false;
+        }
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $source, $source->userType ?? null)) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT === $source->type) {
+            // Traversable materialization path handles objects; non-Traversable → TypeError there.
+            return false;
+        }
+        if (ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($context, $source)) {
+            self::emitArraySpreadCatchableError($context);
+
+            return true;
+        }
+        if (Variable::TYPE_VALUE === $source->type || JitValueBox::isValueOperand($source)) {
+            $isArray = ListUnpackHelper::isArrayValue($context, $source);
+            // Also allow object boxes (Traversable / iterator materialization).
+            ListUnpackRuntime::ensureLinked($context);
+            $typeByte = ListUnpackRuntime::loadValueBoxTypeByte($context, $source);
+            $i8 = $context->getTypeFromString('int8');
+            $isObject = $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->and(
+                    $context->builder->trunc($typeByte, $i8),
+                    $i8->constInt(0x7f, false)
+                ),
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT & 0x7f, false)
+            );
+            $ok = $context->builder->or($isArray, $isObject);
+            $failBb = BasicBlockHelper::append($context, 'array_spread_non_traversable');
+            $okBb = BasicBlockHelper::append($context, 'array_spread_ok');
+            $context->builder->branchIf($ok, $okBb, $failBb);
+            $context->builder->positionAtEnd($failBb);
+            self::emitArraySpreadCatchableError($context);
+            $context->builder->positionAtEnd($okBb);
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static function emitArraySpreadCatchableError(Context $context): void
+    {
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError(
+                $context,
+                'Error',
+                ArraySpread::NON_TRAVERSABLE_MESSAGE,
+                null
+            );
+
+            return;
+        }
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::ensureStandaloneBodies($context);
+        ErrorRaise::emitRaise($context, ArraySpread::NON_TRAVERSABLE_MESSAGE);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 
     private static function needsTraversableMaterialization(Context $context, Variable $source): bool

@@ -1402,6 +1402,35 @@ class Compiler {
             && 'null' === strtolower((string) $name->value);
     }
 
+    /**
+     * Zend IS_CONST array-unpack of non-array (null/true/false/int/float/string) is
+     * compile-time E_ERROR; named consts and variables are runtime catchable (#27952).
+     */
+    private function isCompileTimeNonTraversableArrayUnpackOperand(Operand $operand): bool
+    {
+        if ($operand instanceof Operand\Literal) {
+            return !is_array($operand->value);
+        }
+        foreach ($operand->ops as $op) {
+            if (!$op instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = $op->name;
+            while ($name instanceof Operand\Temporary && null !== $name->original) {
+                $name = $name->original;
+            }
+            if (!$name instanceof Operand\Literal || !is_string($name->value)) {
+                continue;
+            }
+            $lc = strtolower($name->value);
+            if ('null' === $lc || 'true' === $lc || 'false' === $lc) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function branchCfgAssignsNonNullValue(CfgBlock $branchCfg): bool
     {
         foreach ($branchCfg->children as $child) {
@@ -54694,6 +54723,17 @@ class Compiler {
         $byRefFlags = property_exists($expr, 'byRef') ? $expr->byRef : [];
         for ($i = 0, $n = count($expr->values); $i < $n; ++$i) {
             if (!empty($unpackFlags[$i])) {
+                // Zend compile-time IS_CONST unpack of non-array → uncatchable Fatal
+                // (zend_compile.c); runtime variables throw catchable Error (#27952).
+                $spreadOperand = $expr->values[$i];
+                if ($this->isCompileTimeNonTraversableArrayUnpackOperand($spreadOperand)) {
+                    $sourceFile = $expr->getFile() ?: ($this->debugLastPhaseInputFile ?? 'unknown');
+                    throw new CompileFatal(
+                        $sourceFile,
+                        max(1, $expr->getLine()),
+                        VM\ArraySpread::NON_TRAVERSABLE_MESSAGE
+                    );
+                }
                 if (!$started) {
                     $return[] = new OpCode(OpCode::TYPE_INIT_ARRAY, $result);
                     $started = true;
@@ -54701,7 +54741,7 @@ class Compiler {
                 $return[] = new OpCode(
                     OpCode::TYPE_ARRAY_SPREAD,
                     $result,
-                    $this->compileOperand($expr->values[$i], $block, true),
+                    $this->compileOperand($spreadOperand, $block, true),
                     max(0, $expr->getLine())
                 );
                 continue;
