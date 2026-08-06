@@ -16,6 +16,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
@@ -137,6 +138,13 @@ final class VmXmlReader
             $entry->methods['fromstream'] = new XmlReaderFromStream();
             $entry->methodVisibility['fromstream'] = $pubStatic;
             $entry->methodNames['fromstream'] = 'fromStream';
+            // php-src stub returns static (#27713).
+            $staticRet = ReflectionTypeSupport::cfgTypeFromLabel('static');
+            if (null !== $staticRet) {
+                $entry->methodReturnDeclaredTypes['fromstring'] = $staticRet;
+                $entry->methodReturnDeclaredTypes['fromuri'] = $staticRet;
+                $entry->methodReturnDeclaredTypes['fromstream'] = $staticRet;
+            }
         }
 
         // php-src REGISTER_XMLREADER_CLASS_CONST_LONG — lc keys + constNames for

@@ -1497,6 +1497,42 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #27713 */
+    public function testXmlReaderFactoryNamedParameters(): void
+    {
+        self::assertSame(
+            ['source', 'encoding=', 'flags='],
+            BuiltinParamNames::forClassMethod('XMLReader::fromString')
+        );
+        self::assertSame(
+            ['uri', 'encoding=', 'flags='],
+            BuiltinParamNames::forClassMethod('XMLReader::fromUri')
+        );
+        $fromStream = BuiltinParamNames::forClassMethod('XMLReader::fromStream');
+        self::assertSame(['stream', 'encoding=', 'flags=', 'documentUri='], $fromStream);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fromStream, 'stream', 'XMLReader::fromStream'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($fromStream, 'documentUri', 'XMLReader::fromStream'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('XMLReader', 'fromString'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod('XMLReader', 'fromString'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('XMLReader', 'fromStream'));
+        self::assertSame(
+            'string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlreader', 'fromstring', 0)
+        );
+        self::assertSame(
+            '?string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlreader', 'fromstring', 1)
+        );
+        self::assertSame(
+            'int',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlreader', 'fromstring', 2)
+        );
+        self::assertSame(
+            '?string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlreader', 'fromstream', 3)
+        );
+    }
+
     /** @covers issue #23707 */
     public function testDateIntervalConstructStubNamedParamsResolve(): void
     {

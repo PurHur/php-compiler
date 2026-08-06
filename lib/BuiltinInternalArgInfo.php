@@ -927,6 +927,26 @@ final class BuiltinInternalArgInfo
                 2 => '?string',
                 default => null,
             },
+            // ext/xmlreader/php_xmlreader.stub.php — PHP 8.4+ factories (#27713)
+            'xmlreader::fromstring' => match ($index) {
+                0 => 'string',
+                1 => '?string',
+                2 => 'int',
+                default => null,
+            },
+            'xmlreader::fromuri' => match ($index) {
+                0 => 'string',
+                1 => '?string',
+                2 => 'int',
+                default => null,
+            },
+            // $stream is untyped (@param resource); encoding/?string, flags/int, documentUri/?string
+            'xmlreader::fromstream' => match ($index) {
+                1 => '?string',
+                2 => 'int',
+                3 => '?string',
+                default => null,
+            },
             // ext/dom/php_dom.stub.php — string $path / int $options = 0 / ?string $overrideEncoding = null (#27924)
             'dom\\htmldocument::createfromfile',
             'dom\\xmldocument::createfromfile' => match ($index) {
