@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7126 |
-| Phase A inventory files (M2 ratio SSOT) | 7126 |
+| PHP files on vm.php path | 7130 |
+| Phase A inventory files (M2 ratio SSOT) | 7130 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22887 |
+| Source constructs flagged (warnings) | 22902 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -980,12 +980,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/BuiltinClasses.php` | 0 | 1 |
 | `ext/imap/ImapExtensionPolicy.php` | 0 | 1 |
 | `ext/imap/ImapMboxEngine.php` | 0 | 1 |
-| `ext/imap/Module.php` | 0 | 69 |
+| `ext/imap/Module.php` | 0 | 72 |
 | `ext/imap/VmImapArg.php` | 0 | 1 |
 | `ext/imap/VmImapConnection.php` | 0 | 2 |
 | `ext/imap/VmImapCore.php` | 0 | 40 |
 | `ext/imap/VmImapMailCompose.php` | 0 | 1 |
 | `ext/imap/VmImapMutf7.php` | 0 | 1 |
+| `ext/imap/VmImapRfc822.php` | 0 | 9 |
 | `ext/imap/imap_alerts.php` | 0 | 2 |
 | `ext/imap/imap_append.php` | 0 | 1 |
 | `ext/imap/imap_body.php` | 0 | 1 |
@@ -1036,6 +1037,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_rename.php` | 0 | 1 |
 | `ext/imap/imap_renamemailbox.php` | 0 | 1 |
 | `ext/imap/imap_reopen.php` | 0 | 1 |
+| `ext/imap/imap_rfc822_parse_adrlist.php` | 0 | 1 |
+| `ext/imap/imap_rfc822_parse_headers.php` | 0 | 1 |
+| `ext/imap/imap_rfc822_write_address.php` | 0 | 1 |
 | `ext/imap/imap_savebody.php` | 0 | 1 |
 | `ext/imap/imap_scan.php` | 0 | 1 |
 | `ext/imap/imap_scanmailbox.php` | 0 | 1 |
@@ -14141,7 +14145,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imap_mail_copy (line 151)
 - new imap_mail_move (line 152)
 - new imap_timeout (line 153)
-- new imap_is_open (line 157)
+- new imap_rfc822_write_address (line 154)
+- new imap_rfc822_parse_adrlist (line 155)
+- new imap_rfc822_parse_headers (line 156)
+- new imap_is_open (line 160)
 - 3 class method(s)
 
 ### `ext/imap/VmImapArg.php`
@@ -14208,6 +14215,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
+
+### `ext/imap/VmImapRfc822.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 28)
+- new ObjectEntry (line 72)
+- new Variable (line 132)
+- new HashTable (line 144)
+- new ObjectEntry (line 146)
+- new Variable (line 155)
+- new Variable (line 159)
+- 10 class method(s)
+- 1 closure(s)
 
 ### `ext/imap/imap_alerts.php`
 
@@ -14466,6 +14486,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/imap/imap_reopen.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_rfc822_parse_adrlist.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_rfc822_parse_headers.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_rfc822_write_address.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -44162,7 +44197,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1164)
+- new InternalArgInfo (line 1171)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44178,8 +44213,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2274)
-- new ArgumentCountError (line 2285)
+- new ArgumentCountError (line 2281)
+- new ArgumentCountError (line 2292)
 - 19 class method(s)
 - 1 closure(s)
 

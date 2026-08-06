@@ -744,6 +744,10 @@ final class BuiltinInternalDefaultValues
         'imap_timeout' => [
             1 => ['kind' => 'int', 'value' => -1],
         ],
+        // php-src ext/imap/php_imap.stub.php — default_hostname="UNKNOWN" (string infer absent) (#27682)
+        'imap_rfc822_parse_headers' => [
+            1 => ['kind' => 'string', 'value' => 'UNKNOWN'],
+        ],
     ];
 
     public static function isAvailable(

@@ -1115,6 +1115,13 @@ final class BuiltinParamNames
             // php-src ext/imap/php_imap.stub.php — PHP 8.3+; absent from InternalArgInfo (#27674)
             case 'imap_is_open':
                 return ['imap'];
+            // php-src ext/imap/php_imap.stub.php — host→hostname, address_string→string (#27682)
+            case 'imap_rfc822_write_address':
+                return ['mailbox', 'hostname', 'personal'];
+            case 'imap_rfc822_parse_adrlist':
+                return ['string', 'default_hostname'];
+            case 'imap_rfc822_parse_headers':
+                return ['headers', 'default_hostname='];
             // php-src ext/opcache/opcache.stub.php — InternalArgInfo still says script (#23834)
             case 'opcache_compile_file':
             case 'opcache_is_script_cached':

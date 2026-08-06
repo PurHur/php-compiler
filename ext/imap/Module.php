@@ -151,6 +151,9 @@ class Module extends ModuleAbstract
             new imap_mail_copy(),
             new imap_mail_move(),
             new imap_timeout(),
+            new imap_rfc822_write_address(),
+            new imap_rfc822_parse_adrlist(),
+            new imap_rfc822_parse_headers(),
         ];
         // php-src 8.3+ imap_is_open() (#27674)
         if (version_compare(CompilerVersion::languageProfileVersion(), '8.3.0', '>=')) {

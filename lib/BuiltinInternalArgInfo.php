@@ -259,6 +259,9 @@ final class BuiltinInternalArgInfo
             'imap_timeout' => 'int|bool',
             // ext/imap/php_imap.stub.php — PHP 8.3+; absent from InternalArgInfo (#27674)
             'imap_is_open' => 'bool',
+            // ext/imap/php_imap.stub.php — InternalArgInfo string/object; Zend string|false / stdClass (#27682)
+            'imap_rfc822_write_address' => 'string|false',
+            'imap_rfc822_parse_headers' => 'stdClass',
             // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
             'shm_attach' => 'SysvSharedMemory|false',
             'shm_get_var' => 'mixed',
