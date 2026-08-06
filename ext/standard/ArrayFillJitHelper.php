@@ -8,8 +8,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_fill() for compiled JIT/AOT modules (#13501, php-in-PHP).
+ * array_fill() VM / NestedJIT helper (#13501, php-in-PHP).
  *
+ * Thin AOT/JIT call sites use {@see \PHPCompiler\JIT\HashTableFillLlvm} (#27073).
  * SSOT: {@see array_fill::execute()}
  * php-src: ext/standard/array.c — php_array_fill()
  */

@@ -9,15 +9,20 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_fill() JIT routes through ArrayFillJitHelper PHP not HashTableHelper LLVM (#13501, #14297). */
+/** array_fill() AOT/JIT uses HashTableFillLlvm; VM SSOT remains ArrayFillJitHelper (#13501, #27073). */
 final class ArrayFillRuntimeShrinkTest extends TestCase
 {
-    public function testArrayFillRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayFillRuntimeUsesHashTableFillLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFillRuntime.php');
+        $this->assertStringContainsString('HashTableFillLlvm', $runtime);
         $this->assertStringContainsString('ArrayFillJitHelper', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('HashTableHelper::buildArrayFill', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableFillLlvm.php');
+        $this->assertStringContainsString('HashTableHelper::setAtIndex', $llvm);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_fill.php');
         $this->assertStringContainsString('ArrayFillRuntime::fill', $builtin);

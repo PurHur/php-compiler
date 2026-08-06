@@ -59,4 +59,13 @@ final class ArrayElemRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayElemJitHelper.php', $spine);
         $this->assertStringContainsString('ArrayElemRuntime.php', $spine);
     }
+
+    public function testThinAotRoutesThroughHashTableElemLlvm(): void
+    {
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayElemRuntime.php');
+        $this->assertStringContainsString('HashTableElemLlvm::valueFirst', $runtime);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $runtime);
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableElemLlvm.php');
+        $this->assertStringContainsString('#27596', $llvm);
+    }
 }

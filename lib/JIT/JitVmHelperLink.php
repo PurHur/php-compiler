@@ -19,9 +19,16 @@ final class JitVmHelperLink
         Context $context,
         string $relativeHelperPath,
         array $compiledHelpers,
-        string $compileLabel
+        string $compileLabel,
+        bool $skipHelperRuntimeCache = false
     ): void {
-        self::ensureCompiledBundle($context, [$relativeHelperPath], $compiledHelpers, $compileLabel);
+        self::ensureCompiledBundle(
+            $context,
+            [$relativeHelperPath],
+            $compiledHelpers,
+            $compileLabel,
+            $skipHelperRuntimeCache
+        );
     }
 
     /**
@@ -232,7 +239,8 @@ final class JitVmHelperLink
         string $helperLogical,
         string $relativeHelperPath,
         array $compiledHelpers,
-        string $issueTag
+        string $issueTag,
+        bool $skipHelperRuntimeCache = false
     ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (self::hasNamedBridgeEntry($probe, $entryBlockName)) {
@@ -247,7 +255,13 @@ final class JitVmHelperLink
         } catch (\Throwable) {
         }
 
-        self::ensureCompiled($context, $relativeHelperPath, $compiledHelpers, $issueTag);
+        self::ensureCompiled(
+            $context,
+            $relativeHelperPath,
+            $compiledHelpers,
+            $issueTag,
+            $skipHelperRuntimeCache
+        );
 
         $helperFn = self::lookupCompiled($context, $helperLogical, $issueTag);
         $ft = $context->context->functionType($returnType, false, ...$paramTypes);
