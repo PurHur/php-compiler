@@ -625,7 +625,7 @@ final class VmGrapheme
             'grapheme_strimwidth',
             3
         );
-        VmMbstring::assertSubstrCountEncoding($encoding, 'grapheme_strimwidth');
+        VmMbstring::assertSubstrCountEncoding($encoding, 'grapheme_strimwidth', 3);
         if ('' === $string) {
             return '';
         }
