@@ -52,11 +52,30 @@ final class InfoJitHelper
         return CompilerVersion::zendVersion();
     }
 
+    /**
+     * @param string|null $mode null = omitted arg (default "a"); string = full Z_PARAM_STRING
+     *                          including empty / multi-char for PROFILE≥8.4 ValueError (#28136)
+     */
     public static function php_uname(?string $mode): string
     {
-        $letter = (null === $mode || '' === $mode) ? 'a' : $mode[0];
+        if (null === $mode) {
+            return VmUnameNative::php_uname('a');
+        }
 
-        return VmUnameNative::php_uname($letter);
+        return VmUnameNative::php_uname($mode);
+    }
+
+    /**
+     * PROFILE≥8.4 entry — assert mode then uname (no getenv; NestedJIT-safe, #28136).
+     */
+    public static function php_unameStrict(?string $mode): string
+    {
+        if (null === $mode) {
+            return VmUnameNative::php_uname('a');
+        }
+        VmUnamePure::assertValidMode($mode);
+
+        return VmUnameNative::php_uname($mode);
     }
 
     public static function extension_loaded(string $name): bool

@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -32,7 +36,18 @@ final class php_uname extends Internal
         }
         $mode = 'a';
         if (1 === $argc) {
-            $mode = self::coerceModeArg($frame->calledArgs[0]);
+            // Z_PARAM_STRING: strict_types TypeError; else soft-null then mode ValueError (#28136).
+            $mode = VmString::stringBuiltinArgForFrame(
+                $frame,
+                0,
+                'php_uname',
+                0,
+                'mode',
+                false
+            );
+        }
+        if (VmUnamePure::requiresStrictModeValidation()) {
+            VmUnamePure::assertValidMode($mode);
         }
         $frame->returnVar->string(VmInfo::php_uname($mode));
     }
@@ -45,13 +60,26 @@ final class php_uname extends Internal
         if (!isset($args[0])) {
             return JitInfo::php_uname($context, null);
         }
+        $lit = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         if ($context->isUserScriptAot()) {
-            $lit = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
-            if (null !== $lit) {
-                return JitInfo::emitUserScriptStringLiteral($context, InfoJitHelper::php_uname($lit));
+            // Fold valid letters. Invalid constants under PROFILE≥8.4: pending ValueError
+            // (NestedJIT throw from php_unameStrict is not catchable in thin AOT, #28136).
+            if (null !== $lit && VmUnamePure::canFoldMode($lit)) {
+                $result = VmUnamePure::requiresStrictModeValidation()
+                    ? InfoJitHelper::php_unameStrict($lit)
+                    : InfoJitHelper::php_uname($lit);
+
+                return JitInfo::emitUserScriptStringLiteral($context, $result);
+            }
+            if (null !== $lit
+                && VmUnamePure::requiresStrictModeValidation()
+                && null !== ($message = VmUnamePure::invalidModeValueErrorMessage($lit))
+            ) {
+                return self::emitConstantModeValueError($context, $message);
             }
         }
-        $mode = JitStringBuiltinArg::lower(
+        // Z_PARAM_STRING soft-null (DEP+coerce); ValueError from strict helper when PROFILE≥8.4.
+        $mode = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $args[0],
             'php_uname',
@@ -59,47 +87,36 @@ final class php_uname extends Internal
             'mode',
             'string',
             null,
-            self::forwardsProfile84()
+            false
         );
 
         return JitInfo::php_uname($context, $mode);
     }
 
-    private static function forwardsProfile84(): bool
+    /** Catchable ValueError for compile-time-invalid $mode under PROFILE≥8.4 AOT (#28136). */
+    private static function emitConstantModeValueError(Context $context, string $message): Value
     {
-        return version_compare(self::effectiveProfileVersion(), '8.4.0', '>=');
-    }
-
-    private static function effectiveProfileVersion(): string
-    {
-        $raw = VmEnv::getenv('PHP_COMPILER_PROFILE');
-        if (false === $raw || '' === $raw) {
-            return CompilerVersion::languageProfileVersion();
+        ExceptionBridge::ensureLinked($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            TypeErrorRaise::ensureStandaloneBodies($context);
         }
-        $raw = trim($raw);
-        if (preg_match('/^\d+\.\d+$/', $raw)) {
-            return $raw.'.0';
-        }
-        if (preg_match('/^\d+\.\d+\.\d+/', $raw, $m)) {
-            return $m[0];
-        }
-
-        return CompilerVersion::languageProfileVersion();
-    }
-
-    private static function coerceModeArg(\PHPCompiler\VM\Variable $arg): string
-    {
-        if (self::forwardsProfile84()) {
-            return VmString::coerceTypedStringBuiltinArg($arg, 'php_uname', 0, 'mode');
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'ValueError', $message);
+            // emitCatchableClassError terminates the block; open a dead insert point for callers.
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'php_uname_mode_valueerror_dead');
+        } else {
+            TypeErrorRaise::emitValueError($context, $message);
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+            } else {
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'php_uname_mode_valueerror_dead');
         }
 
-        return VmString::coerceStringBuiltinArg(
-            $arg,
-            'php_uname',
-            0,
-            'mode',
-            'string',
-            false
-        );
+        return $context->getTypeFromString('__string__*')->constNull();
     }
 }

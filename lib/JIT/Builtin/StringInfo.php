@@ -28,6 +28,8 @@ final class StringInfo
 
     private const PHP_UNAME_HELPER = 'PHPCompiler\\ext\\standard\\InfoJitHelper::php_uname';
 
+    private const PHP_UNAME_STRICT_HELPER = 'PHPCompiler\\ext\\standard\\InfoJitHelper::php_unameStrict';
+
     private const EXTENSION_LOADED_ARGV_HELPER = 'PHPCompiler\\ext\\standard\\InfoJitHelper::extensionLoadedArgv';
 
     private const GET_LOADED_EXTENSIONS_HELPER = 'PHPCompiler\\ext\\standard\\InfoJitHelper::getLoadedExtensionsArgv';
@@ -43,6 +45,7 @@ final class StringInfo
         self::PHPVERSION_ARGV_HELPER,
         self::ZEND_VERSION_HELPER,
         self::PHP_UNAME_HELPER,
+        self::PHP_UNAME_STRICT_HELPER,
         self::EXTENSION_LOADED_ARGV_HELPER,
         self::GET_LOADED_EXTENSIONS_HELPER,
         self::GET_EXTENSION_FUNCS_HELPER,
@@ -56,6 +59,7 @@ final class StringInfo
         '__compiler_php_sapi_name',
         '__compiler_zend_version',
         '__compiler_php_uname',
+        '__compiler_php_uname_strict',
         '__compiler_posix_uname',
         '__compiler_extension_loaded',
         '__compiler_get_loaded_extensions',
@@ -134,6 +138,17 @@ final class StringInfo
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#13803'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_php_uname_strict',
+            'info_php_uname_strict_entry',
+            [$strPtr],
+            $strPtr,
+            self::PHP_UNAME_STRICT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#28136'
         );
         JitVmHelperLink::ensureBridge(
             $context,
