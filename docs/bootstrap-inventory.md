@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7159 |
-| Phase A inventory files (M2 ratio SSOT) | 7159 |
+| PHP files on vm.php path | 7160 |
+| Phase A inventory files (M2 ratio SSOT) | 7160 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22968 |
+| Source constructs flagged (warnings) | 22966 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3365,7 +3365,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UrlScannerEx.php` | 0 | 1 |
 | `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlencodeJitHelper.php` | 0 | 1 |
-| `ext/standard/UsortJitHelper.php` | 0 | 4 |
+| `ext/standard/UsortJitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8EndecDeprecation.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
@@ -6318,6 +6318,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/UnsetHelperLlvm.php` | 0 | 4 |
 | `lib/JIT/UserScriptAotEnv.php` | 0 | 1 |
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
+| `lib/JIT/UsortKeyedLlvm.php` | 0 | 1 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 2 |
 | `lib/JIT/VarFetchHelper.php` | 0 | 1 |
 | `lib/JIT/Variable.php` | 0 | 33 |
@@ -33033,10 +33034,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UsortJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 103)
-- new Variable (line 105)
-- new HashTable (line 118)
-- 5 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/Utf8EndecDeprecation.php`
 
@@ -51635,20 +51633,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 807)
-- new Variable (line 1421)
-- new Variable (line 1459)
-- new Variable (line 1656)
-- new Variable (line 1663)
-- new Variable (line 1723)
-- new Variable (line 1739)
-- new Variable (line 1755)
-- new Variable (line 1797)
-- new Variable (line 1840)
+- new Variable (line 1423)
+- new Variable (line 1461)
+- new Variable (line 1658)
+- new Variable (line 1665)
+- new Variable (line 1725)
+- new Variable (line 1741)
+- new Variable (line 1757)
+- new Variable (line 1799)
 - new Variable (line 1842)
-- new Variable (line 1963)
-- new Variable (line 1987)
-- new Variable (line 2100)
-- new Variable (line 2118)
+- new Variable (line 1844)
+- new Variable (line 1965)
+- new Variable (line 1989)
+- new Variable (line 2102)
+- new Variable (line 2120)
 - 42 class method(s)
 
 ### `lib/JIT/HeaderCallbackPolicy.php`
@@ -52439,6 +52437,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `lib/JIT/UsortKeyedLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `lib/JIT/ValueEchoHelper.php`
 

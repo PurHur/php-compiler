@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\UsortCallbackPolicy;
+use PHPCompiler\JIT\UsortKeyedLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
@@ -19,6 +20,9 @@ use PHPLLVM\Value;
 
 /**
  * JIT/AOT link for usort()/uksort()/uasort() closure comparators via UsortJitHelper PHP (#15518).
+ *
+ * Packed usort Closures: NestedJIT {@see \PHPCompiler\ext\standard\UsortJitHelper::sortPackedWithClosure}.
+ * uksort/uasort Closures: pure LLVM {@see UsortKeyedLlvm} — NestedJIT of keyed helpers aborts (#27217).
  *
  * strcmp string callbacks route through {@see SortRuntime} (packed lists),
  * {@see KeySortRuntime} (uksort keys), and {@see HashTable}::__hashtable__sortStringKeyValues
@@ -31,25 +35,13 @@ final class UsortRuntime
 {
     private const ABI_USORT_CLOSURE = '__usort__packed_closure';
 
-    private const ABI_UKSORT_CLOSURE = '__uksort__keys_closure';
-
-    private const ABI_UASORT_CLOSURE = '__uasort__values_closure';
-
     private const HELPER_PATH = '/ext/standard/UsortJitHelper.php';
 
-    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
-
     private const USORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortPackedWithClosure';
-
-    private const UKSORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortKeysWithClosure';
-
-    private const UASORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortValuesWithClosure';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::USORT_CLOSURE_HELPER,
-        self::UKSORT_CLOSURE_HELPER,
-        self::UASORT_CLOSURE_HELPER,
     ];
 
     public static function usortPacked(Context $context, JITVariable $array, JITVariable $callback): Value
@@ -127,7 +119,7 @@ final class UsortRuntime
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        // Helpers return a rebuilt HT (NestedJIT-safe append/add) — #24142.
+        // Packed usort only — uksort/uasort Closures use UsortKeyedLlvm (#27217).
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_USORT_CLOSURE,
@@ -135,28 +127,6 @@ final class UsortRuntime
             [$htPtr, $valuePtr],
             $htPtr,
             self::USORT_CLOSURE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#15518'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_UKSORT_CLOSURE,
-            'uksort_keys_closure_bridge_entry',
-            [$htPtr, $valuePtr],
-            $htPtr,
-            self::UKSORT_CLOSURE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#15518'
-        );
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_UASORT_CLOSURE,
-            'uasort_values_closure_bridge_entry',
-            [$htPtr, $valuePtr],
-            $htPtr,
-            self::UASORT_CLOSURE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#15518'
@@ -196,14 +166,11 @@ final class UsortRuntime
             );
         }
 
-        self::ensureLinked($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        SpaceshipRuntime::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $sorted = $context->builder->call(
-            $context->lookupFunction(self::ABI_UKSORT_CLOSURE),
-            $ht,
-            JitValueBox::valuePtrFromVariable($context, $callback)
-        );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $sorted);
+        UsortKeyedLlvm::sortKeysWithClosure($context, $ht, $callback);
     }
 
     private static function sortValuesWithClosure(Context $context, JITVariable $array, JITVariable $callback): void
@@ -214,14 +181,11 @@ final class UsortRuntime
             );
         }
 
-        self::ensureLinked($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        SpaceshipRuntime::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $sorted = $context->builder->call(
-            $context->lookupFunction(self::ABI_UASORT_CLOSURE),
-            $ht,
-            JitValueBox::valuePtrFromVariable($context, $callback)
-        );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $sorted);
+        UsortKeyedLlvm::sortValuesWithClosure($context, $ht, $callback);
     }
 
     /** uasort() strcmp — string-key value sort in LLVM (#5698, asort_ parity). */
@@ -239,24 +203,17 @@ final class UsortRuntime
 
     private static function bridgesComplete(Context $context): bool
     {
-        foreach ([self::ABI_USORT_CLOSURE, self::ABI_UKSORT_CLOSURE, self::ABI_UASORT_CLOSURE] as $name) {
-            $probe = $context->module->getNamedFunction($name);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
-                return false;
-            }
-        }
+        $probe = $context->module->getNamedFunction(self::ABI_USORT_CLOSURE);
 
-        return true;
+        return null !== $probe && 0 !== $probe->countBasicBlocks();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach ([self::ABI_USORT_CLOSURE, self::ABI_UKSORT_CLOSURE, self::ABI_UASORT_CLOSURE] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after UsortRuntime bridge (#15518)');
-            }
-            $context->registerFunction($name, $fn);
+        $fn = $context->module->getNamedFunction(self::ABI_USORT_CLOSURE);
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            throw new \LogicException(self::ABI_USORT_CLOSURE.' missing after UsortRuntime bridge (#15518)');
         }
+        $context->registerFunction(self::ABI_USORT_CLOSURE, $fn);
     }
 }

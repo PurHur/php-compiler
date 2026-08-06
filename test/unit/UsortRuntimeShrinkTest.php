@@ -19,6 +19,11 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('KeySortRuntime::ksortByKey', $runtime);
         $this->assertStringContainsString('__hashtable__sortStringKeyValues', $runtime);
         $this->assertStringContainsString('sortValuesWithClosure', $runtime);
+        // Thin AOT uksort/uasort Closures — UsortKeyedLlvm, not NestedJIT keyed helpers (#27217).
+        $this->assertStringContainsString('UsortKeyedLlvm::sortKeysWithClosure', $runtime);
+        $this->assertStringContainsString('UsortKeyedLlvm::sortValuesWithClosure', $runtime);
+        $this->assertStringNotContainsString('__uksort__keys_closure', $runtime);
+        $this->assertStringNotContainsString('__uasort__values_closure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPackedWithClosure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortStringKeysWithClosure', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
