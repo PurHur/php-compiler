@@ -146,6 +146,35 @@ abstract class Ssh2Function extends Internal
 
         return VmSsh2Publickey::requireLive($object, $fn);
     }
+
+    protected function requireChannel(Variable $var, string $fn, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($channel) must be of type SSH2\\Stream, %s given',
+                $fn,
+                $argNum,
+                match ($var->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_INTEGER => 'int',
+                    default => 'mixed',
+                }
+            ));
+        }
+        $object = $var->toObject();
+        if (VmSsh2Stream::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($channel) must be of type SSH2\\Stream, %s given',
+                $fn,
+                $argNum,
+                $object->class->name
+            ));
+        }
+
+        return VmSsh2Stream::requireLive($object, $fn);
+    }
 }
 
 /**
@@ -766,6 +795,94 @@ final class ssh2_fetch_stream extends Ssh2Function
         VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ssh2_fetch_stream', 2, 'streamid');
         // v1: return the same channel object (PECL returns stderr/stdio sibling stream).
         $frame->returnVar->object($object);
+    }
+}
+
+/**
+ * ssh2_send_eof(resource $channel): bool
+ *
+ * Send EOF on a channel stream (PECL ssh2_send_eof; #26736).
+ */
+final class ssh2_send_eof extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_send_eof');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_send_eof() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $channel = $this->requireChannel($frame->calledArgs[0], 'ssh2_send_eof', 1);
+        $native = VmSsh2Stream::nativeChannel($channel);
+        if (null === $native) {
+            @\trigger_error('ssh2_send_eof(): Couldn\'t send EOF to channel (Return code -1)', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ok = VmSsh2Native::channelSendEof($native);
+        if (!$ok) {
+            @\trigger_error('ssh2_send_eof(): Couldn\'t send EOF to channel (Return code -1)', \E_USER_WARNING);
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/**
+ * ssh2_send_signal(resource $channel, string $signal): bool
+ *
+ * Send a signal to a remote process on a channel (PECL ssh2_send_signal; #26736).
+ * Signal name without SIG prefix (e.g. "TERM", "HUP").
+ */
+final class ssh2_send_signal extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_send_signal');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_send_signal() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $channel = $this->requireChannel($frame->calledArgs[0], 'ssh2_send_signal', 1);
+        $signal = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ssh2_send_signal', 2, 'signal');
+        $native = VmSsh2Stream::nativeChannel($channel);
+        if (null === $native) {
+            @\trigger_error(\sprintf(
+                'ssh2_send_signal(): Couldn\'t send signal %s to channel (Return code -1)',
+                $signal
+            ), \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ok = VmSsh2Native::channelSendSignal($native, $signal);
+        if (!$ok) {
+            @\trigger_error(\sprintf(
+                'ssh2_send_signal(): Couldn\'t send signal %s to channel (Return code -1)',
+                $signal
+            ), \E_USER_WARNING);
+        }
+        $frame->returnVar->bool($ok);
     }
 }
 

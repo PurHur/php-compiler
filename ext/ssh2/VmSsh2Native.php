@@ -1144,6 +1144,45 @@ final class VmSsh2Native
     }
 
     /**
+     * Send EOF on a channel (PECL ssh2_send_eof; #26736).
+     *
+     * @param \FFI\CData $channel LIBSSH2_CHANNEL*
+     */
+    public static function channelSendEof(\FFI\CData $channel): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            return 0 === (int) $ffi->libssh2_channel_send_eof($channel);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Send a signal to a remote process on a channel (PECL ssh2_send_signal; #26736).
+     *
+     * @param \FFI\CData $channel LIBSSH2_CHANNEL*
+     */
+    public static function channelSendSignal(\FFI\CData $channel, string $signal): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            // libssh2_channel_signal_ex(channel, signalname, signalname_len)
+            $rc = (int) $ffi->libssh2_channel_signal_ex($channel, $signal, \strlen($signal));
+
+            return $rc >= 0;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Open direct-tcpip tunnel channel (PECL ssh2_tunnel; #26677).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -1509,6 +1548,7 @@ int libssh2_channel_request_pty_ex(LIBSSH2_CHANNEL *channel, const char *term, u
 ssize_t libssh2_channel_read_ex(LIBSSH2_CHANNEL *channel, int stream_id, char *buf, size_t buflen);
 int libssh2_channel_eof(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_send_eof(LIBSSH2_CHANNEL *channel);
+int libssh2_channel_signal_ex(LIBSSH2_CHANNEL *channel, const char *signame, size_t signame_len);
 int libssh2_channel_close(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_wait_closed(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_free(LIBSSH2_CHANNEL *channel);
