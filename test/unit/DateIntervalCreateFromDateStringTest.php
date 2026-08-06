@@ -62,6 +62,32 @@ PHP;
         $this->assertSame("ok\n1\n1:2\n1:2\n1:-2\n", $this->runBin('bin/vm.php', self::CODE_VM_STATIC));
     }
 
+    /** Relative day vocabulary — next/last day, yesterday, tomorrow (#27954). */
+    public function testVmRelativeDayWordsCreateFromDateString(): void
+    {
+        $code = <<<'PHP'
+foreach (['next day', 'last day', 'yesterday', 'tomorrow', '1 day', 'previous day', 'this day'] as $s) {
+    $i = @DateInterval::createFromDateString($s);
+    if ($i === false) {
+        echo $s, " => false\n";
+    } else {
+        echo $s, ' => d=', $i->d, ' invert=', $i->invert, "\n";
+    }
+}
+$fn = @date_interval_create_from_date_string('tomorrow');
+echo 'fn tomorrow => d=', $fn->d, ' invert=', $fn->invert, "\n";
+PHP;
+        $expect = "next day => d=1 invert=0\n"
+            ."last day => d=-1 invert=0\n"
+            ."yesterday => d=-1 invert=0\n"
+            ."tomorrow => d=1 invert=0\n"
+            ."1 day => d=1 invert=0\n"
+            ."previous day => d=-1 invert=0\n"
+            ."this day => d=0 invert=0\n"
+            ."fn tomorrow => d=1 invert=0\n";
+        $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
+    }
+
     private function assertAotCompileOk(string $relativeTarget): void
     {
         $repo = dirname(__DIR__, 2);

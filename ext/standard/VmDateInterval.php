@@ -383,16 +383,43 @@ final class VmDateInterval
     }
 
     /**
-     * Map timelib relative phrases to DateInterval bags (php-src createFromDateString; #23936).
+     * Map timelib relative phrases to DateInterval bags (php-src createFromDateString; #23936, #27954).
      *
      * Observable Zend 8.2: "last day of next month" / "next month" → m=1; weekday/"this week"
-     * phrases → zero bag (special weekday stored internally; public props stay 0).
+     * phrases → zero bag (special weekday stored internally; public props stay 0). Bare
+     * yesterday/tomorrow/next|last|previous day use signed $d with invert=0 (#27954).
      *
      * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int}|null
      */
     private static function tryParseRelativeTextInterval(string $spec): ?array
     {
         $zero = ['y' => 0, 'm' => 0, 'd' => 0, 'h' => 0, 'i' => 0, 's' => 0, 'f' => 0.0, 'invert' => 0];
+
+        // Bare day words — timelib parse_date.re yesterday/tomorrow (#27954).
+        if (1 === preg_match('/^tomorrow$/i', $spec)) {
+            $bag = $zero;
+            $bag['d'] = 1;
+
+            return $bag;
+        }
+        if (1 === preg_match('/^yesterday$/i', $spec)) {
+            $bag = $zero;
+            $bag['d'] = -1;
+
+            return $bag;
+        }
+        // "next/last/previous/this day(s)" — signed $d, invert stays 0 (Zend; #27954).
+        if (1 === preg_match('/^(next|last|this|previous)\s+days?$/i', $spec, $matches)) {
+            $when = strtolower($matches[1]);
+            if ('this' === $when) {
+                return $zero;
+            }
+            $bag = $zero;
+            $bag['d'] = ('last' === $when || 'previous' === $when) ? -1 : 1;
+
+            return $bag;
+        }
+
         if (1 === preg_match(
             '/^(?:(?:first|last)\s+day\s+of\s+)?(next|last|this|previous)\s+month$/i',
             $spec,
