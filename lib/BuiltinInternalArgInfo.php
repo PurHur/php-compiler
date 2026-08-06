@@ -245,6 +245,9 @@ final class BuiltinInternalArgInfo
             'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
             // ext/imap/php_imap.stub.php — InternalArgInfo return string (missing |false) (#27681, #27764, #27765)
             'imap_utf7_decode', 'imap_utf8_to_mutf7', 'imap_mutf7_to_utf8', 'imap_mail_compose' => 'string|false',
+            // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
+            'shm_attach' => 'SysvSharedMemory|false',
+            'shm_get_var' => 'mixed',
             default => null,
         };
     }
@@ -598,6 +601,25 @@ final class BuiltinInternalArgInfo
                 default => null,
             },
             'curl_share_close', 'curl_share_errno' => 0 === $index ? 'CurlShareHandle' : null,
+            // ext/sysvshm/sysvshm.stub.php — SysvSharedMemory + ?int $size; InternalArgInfo int/untyped (#27943, re-#24640)
+            'shm_attach' => match ($index) {
+                0 => 'int',
+                1 => '?int',
+                2 => 'int',
+                default => null,
+            },
+            'shm_detach', 'shm_remove' => 0 === $index ? 'SysvSharedMemory' : null,
+            'shm_put_var' => match ($index) {
+                0 => 'SysvSharedMemory',
+                1 => 'int',
+                2 => 'mixed',
+                default => null,
+            },
+            'shm_get_var', 'shm_has_var', 'shm_remove_var' => match ($index) {
+                0 => 'SysvSharedMemory',
+                1 => 'int',
+                default => null,
+            },
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
             'filter_var' => match ($index) {
                 0 => 'mixed',
