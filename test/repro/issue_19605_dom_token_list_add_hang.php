@@ -2,23 +2,24 @@
 
 declare(strict_types=1);
 
-// PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/issue_19605_dom_token_list_add_hang.php
-if (!class_exists('DOMTokenList')) {
-    fwrite(STDERR, "DOMTokenList class missing (requires PHP_COMPILER_PROFILE=8.4)\n");
+// #19605 — Dom\TokenList add/remove/toggle/replace must not hang
+if (!class_exists('Dom\\TokenList') || !class_exists('Dom\\HTMLDocument')) {
+    fwrite(STDERR, "Dom\\TokenList / Dom\\HTMLDocument missing (requires PHP_COMPILER_PROFILE=8.4)\n");
     exit(1);
 }
 
-$doc = new DOMDocument();
-$doc->loadXML('<root><e class="a"/></root>');
-$e = $doc->documentElement->firstChild;
+$html = Dom\HTMLDocument::createFromString(
+    '<!DOCTYPE html><html><body><e class="a" id="e"></e></body></html>'
+);
+$e = $html->getElementById('e');
 $e->classList->add('b');
 if ($e->getAttribute('class') !== 'a b') {
-    fwrite(STDERR, 'expected "a b", got ' . var_export($e->getAttribute('class'), true) . "\n");
+    fwrite(STDERR, 'add failed: ' . var_export($e->getAttribute('class'), true) . "\n");
     exit(1);
 }
 $e->classList->remove('a');
 if ($e->getAttribute('class') !== 'b') {
-    fwrite(STDERR, 'expected "b" after remove, got ' . var_export($e->getAttribute('class'), true) . "\n");
+    fwrite(STDERR, 'remove failed: ' . var_export($e->getAttribute('class'), true) . "\n");
     exit(1);
 }
 if (!$e->classList->toggle('c')) {
@@ -26,7 +27,7 @@ if (!$e->classList->toggle('c')) {
     exit(1);
 }
 if ($e->getAttribute('class') !== 'b c') {
-    fwrite(STDERR, 'expected "b c" after toggle, got ' . var_export($e->getAttribute('class'), true) . "\n");
+    fwrite(STDERR, 'toggle failed: ' . var_export($e->getAttribute('class'), true) . "\n");
     exit(1);
 }
 if (!$e->classList->replace('b', 'd')) {
@@ -34,8 +35,7 @@ if (!$e->classList->replace('b', 'd')) {
     exit(1);
 }
 if ($e->getAttribute('class') !== 'd c') {
-    fwrite(STDERR, 'expected "d c" after replace, got ' . var_export($e->getAttribute('class'), true) . "\n");
+    fwrite(STDERR, 'replace failed: ' . var_export($e->getAttribute('class'), true) . "\n");
     exit(1);
 }
-
 echo "ok\n";

@@ -3997,7 +3997,12 @@ final class CompilerVersion
         return self::supportsDomApiSince('8.3.0');
     }
 
-    /** PHP 8.4+ DOMElement::$classList / DOMTokenList and Dom\TokenList (#16876, #16974, #20512). */
+    /**
+     * PHP 8.4+ Dom\Element::$classList / Dom\TokenList
+     * (php-src php_dom.stub.php / token_list.c; #16876, #16974, #20512, #28227).
+     *
+     * Legacy DOMElement has no $classList and there is no DOMTokenList class.
+     */
     public static function supportsDomTokenList(): bool
     {
         return self::supportsDomApiSince('8.4.0');

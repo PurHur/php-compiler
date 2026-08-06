@@ -360,7 +360,7 @@ final class DomLivingBuiltinClasses
         $ctx->classes[VmDomLiving::CLASS_HTML_ELEMENT] = $htmlElement;
 
         if (CompilerVersion::supportsDomTokenList()) {
-            // Dom\TokenList is parallel to legacy DOMTokenList (php-src php_dom.stub.php; #20512, #20884).
+            // php-src Dom\TokenList only — no legacy DOMTokenList class (#28227, re-#20512, #20884).
             $tokenList = new ClassEntry('Dom\\TokenList');
             $tokenList->isInternal = true;
             $tokenList->interfaces[] = 'countable';
@@ -372,7 +372,27 @@ final class DomLivingBuiltinClasses
             }
             $tokenList->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
             $tokenList->properties[] = new ClassProperty(VmDom::PROP_VALUE, null, new Variable(Variable::TYPE_STRING));
-            self::copyMethods($ctx->classes[VmDom::CLASS_TOKEN_LIST] ?? null, $tokenList);
+            // php-src php_dom.stub.php Dom\TokenList — getIterator only; no entries/keys/values/forEach
+            // and no __toString ((string) throws Error on Zend 8.4/8.5; #26721, re-#24545).
+            $tokenList->methods['add'] = new TokenListAdd();
+            $tokenList->methodVisibility['add'] = $pub;
+            $tokenList->methods['remove'] = new TokenListRemove();
+            $tokenList->methodVisibility['remove'] = $pub;
+            $tokenList->methods['contains'] = new TokenListContains();
+            $tokenList->methodVisibility['contains'] = $pub;
+            $tokenList->methods['toggle'] = new TokenListToggle();
+            $tokenList->methodVisibility['toggle'] = $pub;
+            $tokenList->methods['item'] = new TokenListItem();
+            $tokenList->methodVisibility['item'] = $pub;
+            $tokenList->methods['replace'] = new TokenListReplace();
+            $tokenList->methodVisibility['replace'] = $pub;
+            $tokenList->methods['supports'] = new TokenListSupports();
+            $tokenList->methodVisibility['supports'] = $pub;
+            $tokenList->methods['count'] = new TokenListCount();
+            $tokenList->methodVisibility['count'] = $pub;
+            $tokenList->methods['getiterator'] = new TokenListGetIterator();
+            $tokenList->methodVisibility['getiterator'] = $pub;
+            $tokenList->methodNames['getiterator'] = 'getIterator';
             // php-src php_dom.stub.php — private __construct (not final; #26059).
             self::installPrivateConstruct($tokenList, false);
             $ctx->classes[VmDomLiving::CLASS_TOKEN_LIST] = $tokenList;

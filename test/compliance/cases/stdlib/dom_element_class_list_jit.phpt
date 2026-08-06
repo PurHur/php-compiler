@@ -1,13 +1,14 @@
 --TEST--
-stdlib DOMTokenList / createElement JIT — living DOM (#17130, ext/dom)
+stdlib Dom\TokenList / createElement JIT — living DOM (#17130, #28227, ext/dom)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
-$dom = new DOMDocument();
-$el = $dom->createElement('div');
-$dom->appendChild($el);
+$html = Dom\HTMLDocument::createFromString(
+    '<!DOCTYPE html><html><body><div id="d"></div></body></html>'
+);
+$el = $html->getElementById('d');
 $el->classList->add('a', 'b');
 echo $el->classList->contains('a') ? '1' : '0', $el->classList->item(0), "\n";
 ?>

@@ -508,42 +508,8 @@ final class VmDom
         $namedNodeMap->methodNames['getiterator'] = 'getIterator';
         $ctx->classes[self::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
 
-        if (CompilerVersion::supportsDomTokenList()) {
-            // IteratorAggregate + Countable (php-src Dom\TokenList / php_dom.stub.php; #20884, #26721).
-            $tokenList = new ClassEntry('DOMTokenList');
-            $tokenList->isInternal = true;
-            $tokenList->interfaces[] = 'countable';
-            if (isset($ctx->classes['iteratoraggregate'])) {
-                $tokenList->interfaces[] = 'iteratoraggregate';
-            }
-            if (isset($ctx->classes['traversable'])) {
-                $tokenList->interfaces[] = 'traversable';
-            }
-            $tokenList->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
-            $tokenList->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
-            $tokenList->methods['add'] = new TokenListAdd();
-            $tokenList->methodVisibility['add'] = $pub;
-            $tokenList->methods['remove'] = new TokenListRemove();
-            $tokenList->methodVisibility['remove'] = $pub;
-            $tokenList->methods['contains'] = new TokenListContains();
-            $tokenList->methodVisibility['contains'] = $pub;
-            $tokenList->methods['toggle'] = new TokenListToggle();
-            $tokenList->methodVisibility['toggle'] = $pub;
-            $tokenList->methods['item'] = new TokenListItem();
-            $tokenList->methodVisibility['item'] = $pub;
-            $tokenList->methods['replace'] = new TokenListReplace();
-            $tokenList->methodVisibility['replace'] = $pub;
-            $tokenList->methods['supports'] = new TokenListSupports();
-            $tokenList->methodVisibility['supports'] = $pub;
-            $tokenList->methods['count'] = new TokenListCount();
-            $tokenList->methodVisibility['count'] = $pub;
-            $tokenList->methods['getiterator'] = new TokenListGetIterator();
-            $tokenList->methodVisibility['getiterator'] = $pub;
-            $tokenList->methodNames['getiterator'] = 'getIterator';
-            // php-src php_dom.stub.php Dom\TokenList — getIterator only; no entries/keys/values/forEach
-            // and no __toString ((string) throws Error on Zend 8.4/8.5; #26721, re-#24545).
-            $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
-        }
+        // Dom\TokenList only — php-src has no legacy DOMTokenList / DOMElement::$classList
+        // (php_dom.stub.php; #28227, re-#16876 / #20512). Methods install in DomLivingBuiltinClasses.
 
         $xpath = new ClassEntry('DOMXPath');
         $xpath->isInternal = true;
@@ -827,9 +793,7 @@ final class VmDom
             $element->methodVisibility['getouterhtml'] = $pub;
             $element->methodNames['getouterhtml'] = 'getOuterHTML';
         }
-        if (CompilerVersion::supportsDomTokenList()) {
-            $element->properties[] = new ClassProperty(self::PROP_CLASS_LIST, $nullProto, $objProto);
-        }
+        // DOMElement has no $classList — living Dom\Element only (php_dom.stub.php; #28227).
         // DOMParentNode + DOMChildNode (php_dom.stub.php; #23155).
         self::registerParentNodeMutationMethods($element, $pub);
         self::registerChildNodeMutationMethods($element, $pub);
@@ -10292,16 +10256,10 @@ final class VmDom
 
     public static function createTokenList(Context $ctx, ObjectEntry $element): Variable
     {
-        // Dom\HTMLElement::$classList → Dom\TokenList; legacy DOMElement → DOMTokenList (#20512).
-        $classLc = VmDomLiving::isLivingElement($element)
-            ? VmDomLiving::CLASS_TOKEN_LIST
-            : self::CLASS_TOKEN_LIST;
-        $class = $ctx->classes[$classLc] ?? null;
-        if (null === $class && VmDomLiving::CLASS_TOKEN_LIST === $classLc) {
-            $class = $ctx->classes[self::CLASS_TOKEN_LIST] ?? null;
-        }
+        // php-src: Dom\Element::$classList → Dom\TokenList only (#28227, re-#20512).
+        $class = $ctx->classes[VmDomLiving::CLASS_TOKEN_LIST] ?? null;
         if (null === $class) {
-            throw new \LogicException('DOMTokenList is not registered in this compiler build');
+            throw new \LogicException('Dom\\TokenList is not registered in this compiler build');
         }
 
         $entry = new ObjectEntry($class);
@@ -10345,7 +10303,11 @@ final class VmDom
 
     public static function syncElementClassList(Context $ctx, ObjectEntry $element): void
     {
-        if (!CompilerVersion::supportsDomTokenList() || !self::isElement($element)) {
+        // Legacy DOMElement has no classList (php-src php_dom.stub.php; #28227).
+        if (!CompilerVersion::supportsDomTokenList()
+            || !self::isElement($element)
+            || !VmDomLiving::isLivingElement($element)
+        ) {
             return;
         }
         self::initElementPropertySlots($element);
@@ -10483,7 +10445,10 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_ATTRIBUTES)) {
             $entry->allocateProperty(self::PROP_ATTRIBUTES)->null();
         }
-        if (CompilerVersion::supportsDomTokenList() && !$entry->hasProperty(self::PROP_CLASS_LIST)) {
+        if (CompilerVersion::supportsDomTokenList()
+            && VmDomLiving::isLivingElement($entry)
+            && !$entry->hasProperty(self::PROP_CLASS_LIST)
+        ) {
             $entry->allocateProperty(self::PROP_CLASS_LIST)->null();
         }
     }
@@ -13416,8 +13381,10 @@ final class VmDom
             if (VmDomLiving::CLASS_DTD_NAMED_NODE_MAP === $classLc && self::isDtdNamedNodeMap($object)) {
                 return $object;
             }
-            // Dom\TokenList shares DOMTokenList method handlers (#20512).
-            if (self::CLASS_TOKEN_LIST === $classLc && self::isTokenList($object)) {
+            // Dom\TokenList method handlers (#20512, #28227).
+            if ((self::CLASS_TOKEN_LIST === $classLc || VmDomLiving::CLASS_TOKEN_LIST === $classLc)
+                && self::isTokenList($object)
+            ) {
                 return $object;
             }
             // Dom\HTMLCollection / Dom\NodeList share DOMNodeList item/count/iterator handlers (#20709, #20757).

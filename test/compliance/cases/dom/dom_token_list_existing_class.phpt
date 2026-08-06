@@ -1,18 +1,19 @@
 --TEST--
-ext/dom DOMTokenList add/remove/toggle/replace on loadXML class attr (#19605, ext/dom/token_list.c)
+ext/dom Dom\TokenList add/remove/toggle/replace on HTML class attr (#19605, #28227, ext/dom/token_list.c)
 --SKIPIF--
 <?php
-if (!class_exists('DOMTokenList')) {
-    die('skip DOMTokenList not advertised on PHP 8.2 reference profile (#19605, ext/dom/token_list.c)');
+if (!class_exists('Dom\\TokenList') || !class_exists('Dom\\HTMLDocument')) {
+    die('skip Dom\\TokenList / Dom\\HTMLDocument require PHP_COMPILER_PROFILE=8.4 (#19605)');
 }
 ?>
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$doc = new DOMDocument();
-$doc->loadXML('<root><e class="a"/></root>');
-$e = $doc->documentElement->firstChild;
+$html = Dom\HTMLDocument::createFromString(
+    '<!DOCTYPE html><html><body><e class="a" id="e"></e></body></html>'
+);
+$e = $html->getElementById('e');
 echo $e->classList->length, "\n";
 echo $e->classList->item(0), "\n";
 $e->classList->add('b');
