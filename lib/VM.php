@@ -21817,7 +21817,8 @@ restart:
             if ($this->variableAliasesObjectPropertyCell($slot)) {
                 continue;
             }
-            // DECLARE_FUNCTION_STATIC aliases Context/ClosureState static cells the same way (#28039).
+            // DECLARE_FUNCTION_STATIC / global / class-static CVs are INDIRECT into context-owned
+            // storage (#28039 Closures, #28040 object property persistence).
             if ($this->variableAliasesFunctionStaticCell($slot)) {
                 continue;
             }
@@ -22267,23 +22268,34 @@ restart:
     }
 
     /**
-     * True when a scope cell is (or aliases) Context/ClosureState function-local static storage (#28039).
+     * True when a scope cell is (or aliases) context-owned long-lived storage (#28039, #28040).
      *
-     * DECLARE_FUNCTION_STATIC installs an INDIRECT into the persistent cell; releasing through that
-     * alias on frame exit destroys Closures (and other objects) the static still holds.
+     * DECLARE_FUNCTION_STATIC / global / class-static install an INDIRECT into a persistent cell;
+     * releasing through that alias on frame exit destroys Closures and wipes object properties
+     * the static still holds (destroyForGc while the cell pointer survives).
      */
     private function variableAliasesFunctionStaticCell(Variable $var): bool
     {
-        if ($var->functionStaticStorage) {
-            return true;
+        $candidates = [$var];
+        if ($var->isIndirect()) {
+            $candidates[] = $var->resolveIndirect();
         }
-        if (null !== $this->context->functionStaticKeyForStorage($var)) {
-            return true;
+        foreach ($candidates as $cell) {
+            if ($cell->functionStaticStorage) {
+                return true;
+            }
+            if (null !== $this->context->functionStaticKeyForStorage($cell)) {
+                return true;
+            }
+            if ($this->context->isGlobalStorage($cell)) {
+                return true;
+            }
+            if ($this->isStaticPropertyStorageCell($cell)) {
+                return true;
+            }
         }
-        $resolved = $var->resolveIndirect();
 
-        return $resolved->functionStaticStorage
-            || null !== $this->context->functionStaticKeyForStorage($resolved);
+        return false;
     }
 
     /** Generator yield key/value cells must survive fcall temp release (#18184). */
