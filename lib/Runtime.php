@@ -53,6 +53,8 @@ use PHPCompiler\BareThrowSyntaxRejector;
 use PHPCompiler\TryCatchElseSyntaxRejector;
 use PHPCompiler\Ast\TryCatchElseSupport;
 use PHPCompiler\Ast\TryCatchElseAttacher;
+use PHPCompiler\Ast\CatchIntersectionSupport;
+use PHPCompiler\Ast\CatchIntersectionAttacher;
 use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
@@ -65,6 +67,7 @@ use PHPCompiler\VM\MemoryAccounting;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\ext\standard\VmObGzhandler;
+use PHPCompiler\ext\standard\VmMemory;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Variable;
 
@@ -161,6 +164,7 @@ class Runtime {
         $astTraverser->addVisitor(new Ast\GeneratorYieldSourceMarker());
         $astTraverser->addVisitor(new ReadonlyFunctionAnnotator());
         $astTraverser->addVisitor(new TryCatchElseAttacher());
+        $astTraverser->addVisitor(new CatchIntersectionAttacher());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -377,6 +381,7 @@ class Runtime {
         if (\PHPCompiler\JIT\NestedJitCompileScope::isActive() || null !== $this->jitContext) {
             // Nested JIT parses multi-megabyte lib/ units — skip reference-profile token scans (#17150).
             TryCatchElseSupport::beginCompilationUnit();
+            CatchIntersectionSupport::beginCompilationUnit();
 
             return [$code, []];
         }
@@ -395,7 +400,9 @@ class Runtime {
         PropertyHookSyntaxRejector::reject($code, $filename);
         FinalPromotedPropertySyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
+        CatchIntersectionSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();
+        CatchIntersectionSupport::beginCompilationUnit();
         $code = TryCatchElseSupport::extract($code);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
@@ -515,6 +522,7 @@ class Runtime {
         $code = GlobalTypedConstRewriter::rewrite($code);
         $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
+        $code = CatchIntersectionSupport::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = FinalPromotedPropertyRewriter::rewrite($code);
         $code = LazyPropertyRewriter::rewrite($code);
@@ -1073,6 +1081,7 @@ class Runtime {
     public function run(?Block $block, bool $bubbleUncaught = true) {
         $this->ensureVm();
         MemoryAccounting::beginRequest();
+        VmMemory::beginRequest();
         Superglobals::setActiveContext($this->vmContext);
         OutputBuffer::setActiveContext($this->vmContext);
         $prevBubble = $this->vmContext->bubbleUncaughtToNative;

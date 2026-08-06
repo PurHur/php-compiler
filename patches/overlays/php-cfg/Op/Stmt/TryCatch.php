@@ -25,7 +25,7 @@ class TryCatch extends Stmt
     /** @var Block */
     public $end;
 
-    /** @var list<list<string>> exception type names per catch (union = multiple per catch, issue #1362) */
+    /** @var list<list<string>> exception type names per catch (union = multiple per catch, issue #1362; intersection = single `A&B` member, #28205) */
     public array $catchTypes;
 
     /** @var list<Operand|null> catch variable operands per catch */
