@@ -551,7 +551,13 @@ final class VmMath
             ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
-            return self::floatToZendLong($var->toFloat());
+            $f = $var->toFloat();
+            // Z_PARAM_LONG / zend_dval_to_lval_safe: INF/NAN → TypeError (#27925).
+            if (!\is_finite($f)) {
+                throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'float'));
+            }
+
+            return self::floatToZendLong($f);
         }
         if (Variable::TYPE_NULL === $var->type) {
             // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 on forward profile (#19756, #21222).

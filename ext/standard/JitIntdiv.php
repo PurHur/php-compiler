@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Builtin\MathIsFinite;
 use PHPCompiler\JIT\JitLongArg;
@@ -483,6 +484,9 @@ final class JitIntdiv
 
     /**
      * Truncate float→long like Zend zend_dval_to_lval; emit E_DEPRECATED on precision loss (#19730).
+     *
+     * Untyped / cast / array-key path — non-finite still truncates (no TypeError). Typed int
+     * coerce uses {@see floatToLongTypedSafe} (#27925).
      */
     public static function floatToLongWithPrecisionWarning(Context $context, Value $doubleVal): Value
     {
@@ -491,6 +495,27 @@ final class JitIntdiv
         self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated);
 
         return $truncated;
+    }
+
+    /**
+     * zend_dval_to_lval_safe for typed int / Z_PARAM_LONG: INF/NAN → TypeError; else truncate
+     * with E_DEPRECATED on precision loss (#27925, #23533).
+     */
+    public static function floatToLongTypedSafe(Context $context, Value $doubleVal, string $typeErrorMessage): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'float_to_long_typed');
+        $isFinite = MathIsFinite::invoke($context, $doubleVal);
+        $okBlock = BasicBlockHelper::append($context, 'float_to_long_typed_ok');
+        $errBlock = BasicBlockHelper::append($context, 'float_to_long_typed_err');
+        $context->builder->branchIf($isFinite, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        ExceptionBridge::emitTypeErrorAndAbort($context, $typeErrorMessage);
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->builder->call($context->lookupFunction('abort'));
+        }
+        $context->builder->positionAtEnd($okBlock);
+
+        return self::floatToLongWithPrecisionWarning($context, $doubleVal);
     }
 
     private static function lowerStringOperandFromPtr(
