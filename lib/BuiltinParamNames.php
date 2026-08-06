@@ -1022,9 +1022,8 @@ final class BuiltinParamNames
             case 'get_declared_classes':
             case 'get_declared_interfaces':
             case 'get_declared_traits':
-                return \PHPCompiler\CompilerVersion::supportsGetDeclaredExcludeDeprecated()
-                    ? ['exclude_deprecated']
-                    : [];
+                // php-src Zend/zend_builtin_functions.stub.php — arity 0 on every version (#27900).
+                return [];
             case 'get_defined_functions':
                 return \PHPCompiler\CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
                     ? ['exclude_disabled=']

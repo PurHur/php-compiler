@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 
-/** Shared JIT arg parsing for get_declared_* $exclude_deprecated (#12177). */
+/** Shared JIT arg parsing for get_declared_* — arity 0 on every profile (#27900 / #12177). */
 final class GetDeclaredExcludeDeprecatedJit
 {
     /**
