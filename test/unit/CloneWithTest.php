@@ -44,24 +44,24 @@ final class CloneWithTest extends TestCase
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
-    /** Issue #12939 — PHP 8.4+ `clone ($obj, with: ['prop' => $val])` named argument form. */
-    public function testDesugarRewritesCloneCallWithNamedWithArg(): void
+    /** Issue #28182 — Zend 8.5.8 rejects named `with:` on clone() (reverts #12939 over-accept). */
+    public function testDesugarRewritesNamedWithArgToUnknownNamedParameterError(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone ($c, with: [\'x\' => 2]);';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
+        $expected = '<?php $d = (function () { throw new \\Error(\'Unknown named parameter $with\'); })();';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
-    public function testDesugarRewritesCloneCallWithNamedWithReinitList(): void
+    public function testDesugarRewritesNamedWithReinitListToUnknownNamedParameterError(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone ($c, with: [\'a\']);';
-        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
+        $expected = '<?php $d = (function () { throw new \\Error(\'Unknown named parameter $with\'); })();';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
-    public function testVmCloneCallWithNamedWithArg(): void
+    public function testVmCloneCallWithNamedWithArgThrows(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $code = <<<'PHP'
@@ -71,14 +71,18 @@ class Point {
     public int $y = 2;
 }
 $p = new Point();
-$q = clone ($p, with: ['x' => 9]);
-echo $q->x, ',', $q->y, "\n";
+try {
+    $q = clone ($p, with: ['x' => 9]);
+    echo 'OK';
+} catch (\Throwable $e) {
+    echo get_class($e), ':', $e->getMessage();
+}
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        $this->assertSame("9,2\n", ob_get_clean());
+        $this->assertSame('Error:Unknown named parameter $with', ob_get_clean());
     }
 
     /** Issue #23877 — clone-with must not emit Undefined variable $__phpc_r under E_ALL. */

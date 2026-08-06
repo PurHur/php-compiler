@@ -592,7 +592,8 @@ final class VmFs
             || VmFsStdio::isStdioUri($path)
             || VmPhpFilterStream::isSupportedUri($path)
             || VmHttpLastResponseHeaders::isHttpUrl($path)
-            || VmStreamWrapperRegistry::isCustomProtocol($path);
+            || VmStreamWrapperRegistry::isCustomProtocol($path)
+            || \PHPCompiler\ext\brotli\VmBrotliStream::isSupportedUri($path);
     }
 
     private static function copyViaStreamOpen(string $from, string $to): bool
@@ -771,6 +772,17 @@ final class VmFs
 
             return $data;
         }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isSupportedUri($path)) {
+            $data = self::readPathContentsViaOpen($path, $ctx);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
             $data = VmHttpFetchNative::fetch($path, $httpOptions);
             if (false === $data) {
@@ -891,7 +903,8 @@ final class VmFs
             $data = implode('', $data);
         }
         if (VmPhpMemoryStream::isSupportedUri($path)
-            || VmStreamWrapperRegistry::isCustomProtocol($path)) {
+            || VmStreamWrapperRegistry::isCustomProtocol($path)
+            || \PHPCompiler\ext\brotli\VmBrotliStream::isSupportedUri($path)) {
             return self::filePutContentsViaOpen($path, $data, $flags);
         }
 
@@ -998,6 +1011,12 @@ final class VmFs
 
             return self::finalizeStreamOpen(
                 VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode),
+                $mode
+            );
+        }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isSupportedUri($path)) {
+            return self::finalizeStreamOpen(
+                \PHPCompiler\ext\brotli\VmBrotliStream::open($path, $mode),
                 $mode
             );
         }
@@ -1352,6 +1371,13 @@ final class VmFs
         if (VmUserStream::isValidHandle($handle)) {
             return self::freadMergePushback($handle, $fromPushback, VmUserStream::read($handle, $length));
         }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            return self::freadMergePushback(
+                $handle,
+                $fromPushback,
+                \PHPCompiler\ext\brotli\VmBrotliStream::read($handle, $length)
+            );
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return self::freadMergePushback($handle, $fromPushback, VmPhpMemoryStream::read($handle, $length));
         }
@@ -1468,6 +1494,11 @@ final class VmFs
 
             return VmUserStream::write($handle, $data, $length);
         }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
+
+            return \PHPCompiler\ext\brotli\VmBrotliStream::write($handle, $data, $length);
+        }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
 
@@ -1511,6 +1542,11 @@ final class VmFs
         unset(self::$readPushback[$handle]);
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::close($handle);
+        }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
+
+            return \PHPCompiler\ext\brotli\VmBrotliStream::close($handle);
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
@@ -1631,6 +1667,9 @@ final class VmFs
     {
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::feof($handle);
+        }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            return \PHPCompiler\ext\brotli\VmBrotliStream::eof($handle);
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::eof($handle);
@@ -2093,6 +2132,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::tell($handle);
         }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            return \PHPCompiler\ext\brotli\VmBrotliStream::tell($handle);
+        }
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::tell($handle);
         }
@@ -2120,6 +2162,8 @@ final class VmFs
     public static function fgetc(int $handle) {
         if (VmUserStream::isValidHandle($handle)) {
             $byte = VmUserStream::read($handle, 1);
+        } elseif (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            $byte = \PHPCompiler\ext\brotli\VmBrotliStream::read($handle, 1);
         } elseif (VmPhpMemoryStream::isValidHandle($handle)) {
             $byte = VmPhpMemoryStream::read($handle, 1);
         } elseif (VmPhpInputOutputStream::isValidHandle($handle)) {
@@ -2322,6 +2366,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::seek($handle, $offset, $whence);
         }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            return \PHPCompiler\ext\brotli\VmBrotliStream::seek($handle, $offset, $whence);
+        }
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::seek($handle, $offset, $whence);
         }
@@ -2346,6 +2393,9 @@ final class VmFs
     {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 0 === VmPhpMemoryStream::seek($handle, 0, \SEEK_SET);
+        }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            return 0 === \PHPCompiler\ext\brotli\VmBrotliStream::seek($handle, 0, \SEEK_SET);
         }
         if (VmUserStream::isValidHandle($handle)) {
             return 0 === VmUserStream::seek($handle, 0, \SEEK_SET);
@@ -2395,6 +2445,14 @@ final class VmFs
         }
         if (VmUserStream::isValidHandle($handle)) {
             $data = VmUserStream::streamGetContents($handle, $maxlength, $offset);
+            if (false === $data) {
+                return false;
+            }
+
+            return VmStreamFilterChain::applyReadFilters($handle, $data);
+        }
+        if (\PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
+            $data = \PHPCompiler\ext\brotli\VmBrotliStream::streamGetContents($handle, $maxlength, $offset);
             if (false === $data) {
                 return false;
             }
@@ -2720,7 +2778,7 @@ final class VmFs
      */
     public static function getResourceType(int $handle): ?string
     {
-        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle) || \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle) || VmPhpInputOutputStream::isValidHandle($handle) || VmPhpFdStream::isValidHandle($handle)) {
+        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle) || \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle) || VmPhpInputOutputStream::isValidHandle($handle) || VmPhpFdStream::isValidHandle($handle) || \PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle)) {
             return 'stream';
         }
 
@@ -2776,7 +2834,8 @@ final class VmFs
             || VmPhpMemoryStream::isValidHandle($handle)
             || \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)
             || VmPhpInputOutputStream::isValidHandle($handle)
-            || VmPhpFdStream::isValidHandle($handle);
+            || VmPhpFdStream::isValidHandle($handle)
+            || \PHPCompiler\ext\brotli\VmBrotliStream::isValidHandle($handle);
     }
 
     /**

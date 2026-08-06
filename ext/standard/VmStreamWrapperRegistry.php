@@ -37,7 +37,34 @@ final class VmStreamWrapperRegistry
     /** @var array<string, true> built-in protocols removed via stream_wrapper_unregister() */
     private static array $removedBuiltins = [];
 
+    /**
+     * Extension-gated builtins (e.g. compress.brotli when brotli advertised; #28115).
+     *
+     * @var list<string>
+     */
+    private static array $extensionBuiltins = [];
+
     public const NOTICE_RESTORE_UNCHANGED = 'stream_wrapper_restore(): "%s" was never changed, nothing to restore';
+
+    /**
+     * Register a built-in scheme owned by an optional extension (PECL php_register_url_stream_wrapper).
+     */
+    public static function registerExtensionBuiltin(string $protocol): bool
+    {
+        $key = self::normalizeProtocol($protocol);
+        if ('' === $key) {
+            return false;
+        }
+        if (\in_array($key, self::BUILTIN_PROTOCOLS, true) || \in_array($key, self::$extensionBuiltins, true)) {
+            return false;
+        }
+        if (isset(self::$custom[$key])) {
+            return false;
+        }
+        self::$extensionBuiltins[] = $key;
+
+        return true;
+    }
 
     /**
      * php-src user_stream_register_wrapper — reject unknown class names (#12534).
@@ -126,11 +153,23 @@ final class VmStreamWrapperRegistry
                 $all[] = $protocol;
             }
         }
+        foreach (self::$extensionBuiltins as $protocol) {
+            if (!isset(self::$removedBuiltins[$protocol])) {
+                $all[] = $protocol;
+            }
+        }
         foreach (\array_keys(self::$custom) as $protocol) {
             $all[] = $protocol;
         }
 
         return $all;
+    }
+
+    public static function isExtensionBuiltin(string $protocol): bool
+    {
+        $key = self::normalizeProtocol($protocol);
+
+        return '' !== $key && \in_array($key, self::$extensionBuiltins, true);
     }
 
     public static function lookupClass(string $protocol): ?string
@@ -175,7 +214,8 @@ final class VmStreamWrapperRegistry
 
     private static function isBuiltin(string $protocol): bool
     {
-        return \in_array($protocol, self::BUILTIN_PROTOCOLS, true);
+        return \in_array($protocol, self::BUILTIN_PROTOCOLS, true)
+            || \in_array($protocol, self::$extensionBuiltins, true);
     }
 
     private static function triggerRestoreUnchangedNotice(?Frame $frame, string $protocol): void
@@ -199,5 +239,6 @@ final class VmStreamWrapperRegistry
         self::$custom = [];
         self::$restoreStack = [];
         self::$removedBuiltins = [];
+        self::$extensionBuiltins = [];
     }
 }

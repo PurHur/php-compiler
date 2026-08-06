@@ -387,6 +387,16 @@ class Context {
     /** @var list<string> require_once dedupe while lowering literal includes (#8559) */
     public array $jitAotIncludedCompileDone = [];
 
+    /**
+     * Module-global NestedJIT helper TU dedupe (#27566).
+     *
+     * Unlike {@see $jitAotIncludedCompileDone} (keyed by activeFunction for user includes, #878),
+     * helper statics (e.g. OutputRewriteVarsJitHelper::$tags) must be NestedJIT'd once per module.
+     *
+     * @var array<string, true> normalized helper path → compiled
+     */
+    public array $jitHelperTuCompiled = [];
+
     /** Normalized realpath of the outer {main} TU being JIT-compiled (#8559). */
     public string $jitAotEntryScriptPath = '';
 
@@ -499,6 +509,34 @@ class Context {
         if ('' !== $normalized) {
             $this->jitAotIncludedCompileDone[$this->jitIncludeCompileScopeKey($normalized)] = true;
         }
+    }
+
+    /**
+     * Module-global helper NestedJIT dedupe — statics must not split across activeFunction (#27566).
+     */
+    public function hasJitHelperTuCompiled(string $path): bool
+    {
+        $normalized = $this->normalizeJitHelperTuPath($path);
+
+        return '' !== $normalized && isset($this->jitHelperTuCompiled[$normalized]);
+    }
+
+    public function markJitHelperTuCompiled(string $path): void
+    {
+        $normalized = $this->normalizeJitHelperTuPath($path);
+        if ('' !== $normalized) {
+            $this->jitHelperTuCompiled[$normalized] = true;
+        }
+    }
+
+    private function normalizeJitHelperTuPath(string $path): string
+    {
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            $resolved = $path;
+        }
+
+        return \PHPCompiler\VM\ScriptStack::normalize($resolved);
     }
 
     /** Per-LLVM-function include dedupe (#878): same path in different methods must re-inline. */
@@ -842,6 +880,8 @@ class Context {
 
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',
+            'phpc_url_rewriter_apply_kernel',
+            'phpc_rewrite_vars_set_tags_kernel',
             'phpc_random_bytes_kernel',
             // Password NestedJIT leaves (#26773) — peer random_bytes (#21186) / hash crypto (#21026).
             'phpc_libcrypt_kernel',
@@ -1680,10 +1720,12 @@ class Context {
                 $emitInStandaloneMain(fn () => ErrorBridge::registerDeclarations($this));
                 $emitInStandaloneMain(fn () => ErrorBridge::ensureLinked($this));
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
+                // Thin AOT: still flush OB when stack was linked (URL-Rewriter endAll, #27566).
+                // emitEndAllForStandalone no-ops unless __phpc_ob_end_all has a body (#13571).
+                $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
                 if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
-                    $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
                 }
             }
             if (!$this->isThinStandaloneAotMain()) {

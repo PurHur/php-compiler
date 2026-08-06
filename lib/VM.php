@@ -2932,6 +2932,10 @@ class VM {
     /**
      * All declared + dynamic properties for plain-object serialize() — mangled visibility keys (#15751, var.c).
      *
+     * php-src: serialize uses raw property-table values (ZEND_PROP_PURPOSE_SERIALIZE), not get hooks.
+     * Virtual hooked props have no slot and are omitted; backed hooks serialize the backing field
+     * under its mangled name (#28184, re-#6474 — #6474 wrongly matched json_encode get-hook semantics).
+     *
      * @return array<string, Variable>
      */
     public function collectObjectPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
@@ -2940,8 +2944,6 @@ class VM {
             return SplArrayStorage::collectJsonEncodeProperties($object);
         }
         $ctx = $this->context;
-        $hookFrame = $this->resolvePropertyHookParentFrame($frame);
-        $hookBackingLc = $this->separatePropertyHookBackingNameSet($object);
         /** @var array<string, Variable> $result */
         $result = [];
         /** @var array<string, true> $seenLc */
@@ -2957,25 +2959,26 @@ class VM {
                 $seenDeclaredLc[$lc] = true;
                 if ($isPrivate) {
                     $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
-                    if (isset($seenPrivate[$privKey]) || isset($hookBackingLc[$lc])) {
+                    if (isset($seenPrivate[$privKey])) {
                         continue;
                     }
                     $seenPrivate[$privKey] = true;
                 } else {
-                    if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
+                    if (isset($seenLc[$lc])) {
                         continue;
                     }
                     $seenLc[$lc] = true;
                 }
-                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                // Virtual hooked properties: no backing store — omit from serialize (#28184).
+                if ($meta->propertyHookVirtual) {
                     continue;
                 }
-                if (null !== $meta->getHookMethodLc) {
-                    $hookValue = $this->fetchPropertyWithHooks($object, $meta->name, $hookFrame);
-                    if (null === $hookValue) {
+                // Non-virtual hooked property: serialize raw backing slot, never invoke get (#28184).
+                if (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc) {
+                    if (!$object->hasPropertyForMeta($meta)) {
                         continue;
                     }
-                    $value = $hookValue->resolveIndirect();
+                    $value = $object->getPropertyForMeta($meta)->resolveIndirect();
                     if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
                         continue;
                     }
@@ -2999,7 +3002,7 @@ class VM {
         }
         foreach ($object->getRawProperties() as $name => $prop) {
             $nameLc = strtolower($name);
-            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
+            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc])) {
                 continue;
             }
             $value = $prop->resolveIndirect();

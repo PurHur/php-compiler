@@ -145,6 +145,8 @@ final class BuiltinInternalArgInfo
             'hash_pbkdf2' => 'string',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits the function (#25845)
             'hash_hkdf' => 'string',
+            // ext/hash/hash.stub.php — return array; InternalArgInfo omits the function (#27942)
+            'hash_hmac_algos' => 'array',
             // ext/hash/hash.stub.php — InternalArgInfo return resource; Zend HashContext (#27745)
             'hash_copy' => 'HashContext',
             // ext/sodium/sodium_*.stub.php — absent from InternalArgInfo (#24490)
@@ -212,6 +214,9 @@ final class BuiltinInternalArgInfo
             'phpversion' => 'string|false',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)
             'func_get_arg' => 'mixed',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty / absent; Zend void / int (#28022)
+            'gc_disable', 'gc_enable' => 'void',
+            'gc_mem_caches' => 'int',
             // ext/spl/php_spl.stub.php — InternalArgInfo false|array; Zend array only (#27902)
             'spl_autoload_functions' => 'array',
             // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\CompilerVersion;
+
 /**
- * xml extension constants (php-src ext/xml/xml.c; #17799).
+ * xml extension constants (php-src ext/xml/xml.c; #17799, #28171).
  */
 final class XmlConstants
 {
@@ -35,11 +37,13 @@ final class XmlConstants
     public const XML_OPTION_TARGET_ENCODING = 2;
     public const XML_OPTION_SKIP_TAGSTART = 3;
     public const XML_OPTION_SKIP_WHITE = 4;
+    /** PHP 8.4+ — php-src PHP_XML_OPTION_PARSE_HUGE (#28171). */
+    public const XML_OPTION_PARSE_HUGE = 5;
 
     /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
-        return [
+        $constants = [
             'XML_ERROR_NONE' => self::XML_ERROR_NONE,
             'XML_ERROR_NO_MEMORY' => self::XML_ERROR_NO_MEMORY,
             'XML_ERROR_SYNTAX' => self::XML_ERROR_SYNTAX,
@@ -68,5 +72,11 @@ final class XmlConstants
             'XML_OPTION_SKIP_WHITE' => self::XML_OPTION_SKIP_WHITE,
             'XML_SAX_IMPL' => 'libxml',
         ];
+        // PHP 8.4+ only — absent from php-src ≤8.3 stubs (#28171).
+        if (CompilerVersion::supportsXmlOptionParseHuge()) {
+            $constants['XML_OPTION_PARSE_HUGE'] = self::XML_OPTION_PARSE_HUGE;
+        }
+
+        return $constants;
     }
 }

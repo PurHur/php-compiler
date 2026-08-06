@@ -37,6 +37,8 @@ final class IniJitHelper
         'date.timezone',
         'cfg_file_path',
         'user_agent',
+        'url_rewriter.tags',
+        'url_rewriter.hosts',
         'pcre.backtrack_limit',
         'pcre.jit',
         'pcre.recursion_limit',
@@ -367,6 +369,12 @@ final class IniJitHelper
         if ('user_agent' === $key) {
             return self::$userAgent;
         }
+        if ('url_rewriter.tags' === $key) {
+            return OutputRewriteVarsJitHelper::getTags();
+        }
+        if ('url_rewriter.hosts' === $key) {
+            return OutputRewriteVarsJitHelper::getHosts();
+        }
         if ('pcre.backtrack_limit' === $key) {
             return (string) self::$pcreBacktrackLimit;
         }
@@ -458,6 +466,19 @@ final class IniJitHelper
         }
         if ('user_agent' === $key) {
             return self::setUserAgent($newValue);
+        }
+        if ('url_rewriter.tags' === $key) {
+            $old = OutputRewriteVarsJitHelper::getTags();
+            \phpc_rewrite_vars_set_tags_kernel($newValue);
+            OutputRewriteVarsJitHelper::setTags($newValue);
+
+            return $old;
+        }
+        if ('url_rewriter.hosts' === $key) {
+            $old = OutputRewriteVarsJitHelper::getHosts();
+            OutputRewriteVarsJitHelper::setHosts($newValue);
+
+            return $old;
         }
         if ('pcre.backtrack_limit' === $key) {
             return self::setPcreBacktrackLimit($newValue);

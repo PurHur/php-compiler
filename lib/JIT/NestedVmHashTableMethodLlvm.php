@@ -10,8 +10,9 @@ namespace PHPCompiler\JIT;
  * JitHelper PHP receives {@see __hashtable__*} bitcast as HashTable; method bodies must
  * lower to LLVM — not compile lib/VM/HashTable.php in nested scope (#12910 pattern).
  *
- * keysCopy / valuesCopy lower via {@see HashTableKeysLlvm} / {@see HashTableValuesLlvm}
- * (peer reverse/slice) — not ArrayKeys/ArrayValues NestedJIT bridges (#27211 / #27212).
+ * keysCopy / keysMatchingCopy / valuesCopy lower via {@see HashTableKeysLlvm} /
+ * {@see HashTableKeysMatchingLlvm} / {@see HashTableValuesLlvm} (peer reverse/slice) —
+ * not ArrayKeys/ArrayValues NestedJIT bridges (#27211 / #27212 / #27544).
  *
  * COW: `duplicate` / `unionCopy` (#23548) lower via {@see HashTableCowLlvm} — not the
  * HashTable*Runtime bridges that NestedJIT-compile HashTableJitHelper (would recurse).

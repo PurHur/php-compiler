@@ -794,11 +794,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.5+ `(void)` cast (`T_VOID_CAST`) — absent from Zend 8.4 (#24946, #23037).
+     * `(void)` cast (`T_VOID_CAST`) — not in shipped php-src through 8.5.8 (#28183, re-#24946).
+     *
+     * Zend's NoDiscard warning text mentions casting as `(void)`, but the scanner still has no
+     * T_VOID_CAST token (Zend/zend_language_scanner.l). Keep off for all language profiles until
+     * php-src lands the cast; then gate on the matching profile.
      */
     public static function supportsVoidCast(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+        return false;
     }
 
     /** PHP 8.5+ #[\DelayedTargetValidation] builtin attribute class — absent from Zend 8.4 (#24946). */
@@ -1228,9 +1232,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.5+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`, `clone ($obj, with: [...])`).
+     * PHP 8.5+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`).
      *
      * Zend landed clone-with in 8.5 (RFC); PROFILE=8.4 must reject like Zend 8.4 (#23877, re-#16676/#12987).
+     * Named `clone($obj, with: [...])` is rejected on PROFILE≥8.5 like Zend 8.5.8 (#28182).
      * Forward profile via {@see languageProfileVersion()} enables clone-with on 8.5+.
      * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_vm_def.h ZEND_CLONE.
      */
@@ -2807,6 +2812,30 @@ final class CompilerVersion
      * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      */
     public static function supportsLibxmlRecoverConstant(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ XML_OPTION_PARSE_HUGE (ext/xml/xml.stub.php; PHP_XML_OPTION_PARSE_HUGE; #28171).
+     *
+     * Withheld on 8.4.0-dev reference / PROFILE≤8.3 (Zend 8.2/8.3 defined() false). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` / `8.5` forward profile.
+     */
+    public static function supportsXmlOptionParseHuge(): bool
     {
         if (version_compare(self::VERSION, '8.4', '<')) {
             return false;

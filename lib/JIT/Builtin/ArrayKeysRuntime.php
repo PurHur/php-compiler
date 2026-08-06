@@ -8,19 +8,20 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableKeysLlvm;
+use PHPCompiler\JIT\HashTableKeysMatchingLlvm;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_keys() (#12340, #27211).
+ * JIT/AOT link for array_keys() (#12340, #27211, #27544).
  *
  * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayKeysJitHelper} returned
  * empty hashtables because NestedVmHashTableMethodLlvm skipped keysCopy (#20533).
  * Call-site LLVM via {@see HashTableKeysLlvm} (peer ArrayReverseRuntime / #27067).
  *
- * Filtered form (`search_value`) still NestedJIT-compiles ArrayKeysJitHelper::keysMatching.
+ * Filtered form (`search_value`) uses {@see HashTableKeysMatchingLlvm} — NestedJIT of the
+ * filtered helper segfaulted under thin AOT (#27544).
  *
  * VM SSOT: {@see \PHPCompiler\VM\HashTable::keysCopy()} / {@see keysMatchingCopy()}
  * php-src: ext/standard/array.c — php_array_keys()
@@ -30,15 +31,6 @@ final class ArrayKeysRuntime
     private const ABI_KEYS = '__array_keys__copy';
 
     private const ABI_KEYS_FILTERED = '__array_keys__matching';
-
-    private const HELPER_PATH = '/ext/standard/ArrayKeysJitHelper.php';
-
-    private const KEYS_MATCHING_HELPER = 'PHPCompiler\\ext\\standard\\ArrayKeysJitHelper::keysMatching';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::KEYS_MATCHING_HELPER,
-    ];
 
     public static function keys(Context $context, JITVariable $array): Value
     {
@@ -132,27 +124,40 @@ final class ArrayKeysRuntime
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_KEYS_FILTERED,
-            'array_keys_matching_bridge_entry',
-            [$htPtr, $valuePtr, $i1],
-            $htPtr,
-            self::KEYS_MATCHING_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12340'
-        );
+        self::emitKeysFilteredBridge($context);
         self::registerLinked($context, self::ABI_KEYS_FILTERED);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitKeysFilteredBridge(Context $context): void
+    {
+        // identicalValueToValue → nativeLongIsResource needs a body (#27544 / peer SettypeRuntime).
+        StreamGlobalsJit::implementThinIsResource($context);
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i1 = $context->getTypeFromString('int1');
+        $probe = $context->module->getNamedFunction(self::ABI_KEYS_FILTERED);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_KEYS_FILTERED,
+                $context->context->functionType($htPtr, false, $htPtr, $valuePtr, $i1)
+            );
+
+        $entry = $fn->appendBasicBlock('array_keys_matching_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $src = $fn->getParam(0);
+        $search = $fn->getParam(1);
+        $strict = $fn->getParam(2);
+        $keys = HashTableKeysMatchingLlvm::keysMatching($context, $src, $search, $strict);
+        $context->builder->returnValue($keys);
+        $context->registerFunction(self::ABI_KEYS_FILTERED, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinked(Context $context, string $abiName): void

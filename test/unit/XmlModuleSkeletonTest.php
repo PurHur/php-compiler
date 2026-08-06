@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
@@ -86,6 +87,47 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("start:root\nstart:a\nend:a\nend:root\ndone\n", ob_get_clean());
+    }
+
+    /**
+     * PHP 8.4+ XML_OPTION_PARSE_HUGE — PROFILE gate + set/get + mid-parse Error (#28171).
+     *
+     * @runInSeparateProcess
+     */
+    public function test_xml_option_parse_huge_forward_profile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertTrue(CompilerVersion::supportsXmlOptionParseHuge());
+        $runtime = new Runtime();
+        $code = file_get_contents(__DIR__.'/../repro/issue_28171_xml_option_parse_huge.php');
+        self::assertNotFalse($code);
+        $block = $runtime->parseAndCompile($code, 'xml_option_parse_huge.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("HUGE=5\ntrue\ntrue\n", ob_get_clean());
+    }
+
+    /**
+     * XML_OPTION_PARSE_HUGE withheld on reference / PROFILE≤8.3 (#28171).
+     *
+     * @runInSeparateProcess
+     */
+    public function test_xml_option_parse_huge_reference_profile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(CompilerVersion::supportsXmlOptionParseHuge());
+        $runtime = new Runtime();
+        $code = file_get_contents(__DIR__.'/../repro/issue_28171_xml_option_parse_huge.php');
+        self::assertNotFalse($code);
+        $block = $runtime->parseAndCompile($code, 'xml_option_parse_huge_ref.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "HUGE=UNDEF\nValueError:xml_parser_set_option(): Argument #2 (\$option) must be a XML_OPTION_* constant\n",
+            ob_get_clean()
+        );
     }
 
     /** php-src ext/xml/xml.c — xml_parser_free is a no-op since PHP 8.0 (#22813). */

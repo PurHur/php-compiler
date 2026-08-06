@@ -8,8 +8,11 @@ use PHPCompiler\CompilerVersion;
 
 /**
  * Desugar PHP 8.5+ `clone $obj with { prop: $value, ... }` /
- * `clone($obj, ['prop' => $value, ...])` / `clone ($obj, with: [...])` /
- * `clone $obj with ['prop', ...]` before nikic/php-parser (#4513, #9743, #9995, #12939, #23877).
+ * `clone($obj, ['prop' => $value, ...])` / `clone $obj with ['prop', ...]`
+ * before nikic/php-parser (#4513, #9743, #9995, #23877, #28182).
+ *
+ * Named `clone($obj, with: [...])` is **not** valid on Zend 8.5.8 — rewrite to
+ * `Error: Unknown named parameter $with` (#28182; reverts over-accept from #12939).
  *
  * Rewrites to a nested IIFE: outer binds the operand, inner receives `clone $o` as a
  * parameter so `$__phpc_r` is an ARG_RECV (not a post-assign local). Assigned locals
@@ -26,6 +29,9 @@ final class CloneWithDesugar
 
     /** Zend 8.2 profile message for `clone $obj with { }` / `clone $obj with [...]` (#12987). */
     public const REFERENCE_PROFILE_UNEXPECTED_WITH = 'syntax error, unexpected identifier "with"';
+
+    /** Zend 8.5.8 runtime message for `clone($obj, with: [...])` named arg (#28182). */
+    public const UNKNOWN_NAMED_WITH_PARAMETER = 'Unknown named parameter $with';
 
     /**
      * @return array{line: int, message: string}|null
@@ -106,11 +112,12 @@ final class CloneWithDesugar
     }
 
     /**
-     * PHP 8.4+ `clone($obj, ['prop' => $val])` / `clone ($obj, with: [...])` (#9743, #12939).
+     * PHP 8.5+ positional `clone($obj, ['prop' => $val])` (#9743).
+     * Named `with:` is rejected like Zend 8.5.8 (#28182).
      *
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
      *
-     * @return array{start: int, end: int, exprText: string, arrayText: string}|null
+     * @return array{start: int, end: int, exprText?: string, arrayText?: string, namedWithReject?: bool}|null
      */
     private static function findCloneCallSpan(string $code, array $tokens): ?array
     {
@@ -156,12 +163,15 @@ final class CloneWithDesugar
                 continue;
             }
 
+            $namedWithReject = false;
             if (self::isWithKeyword($tokens, $arrayStart)) {
                 $colonIdx = $arrayStart + 1;
                 self::skipForwardIgnorable($tokens, $colonIdx);
                 if ($colonIdx >= $c || ':' !== $tokens[$colonIdx]) {
                     continue;
                 }
+                // Zend 8.5.8: clone() has no named parameter $with (#28182).
+                $namedWithReject = true;
                 $arrayStart = $colonIdx + 1;
                 self::skipForwardIgnorable($tokens, $arrayStart);
                 if ($arrayStart >= $c) {
@@ -187,11 +197,23 @@ final class CloneWithDesugar
 
             $start = self::tokenByteOffset($tokens, $spanStartIdx);
             $end = self::tokenByteEnd($tokens, $closeIdx);
+            if (null === $start || null === $end) {
+                continue;
+            }
+
+            if ($namedWithReject) {
+                return [
+                    'start' => $start,
+                    'end' => $end,
+                    'namedWithReject' => true,
+                ];
+            }
+
             $exprTextStart = self::tokenByteOffset($tokens, $exprStart);
             $exprTextEnd = self::tokenByteEnd($tokens, $exprEnd);
             $arrayTextStart = self::tokenByteOffset($tokens, $arrayStart);
             $arrayTextEnd = self::tokenByteEnd($tokens, $arrayEnd);
-            if (null === $start || null === $end || null === $exprTextStart || null === $exprTextEnd
+            if (null === $exprTextStart || null === $exprTextEnd
                 || null === $arrayTextStart || null === $arrayTextEnd) {
                 continue;
             }
@@ -208,16 +230,20 @@ final class CloneWithDesugar
     }
 
     /**
-     * @param array{start: int, end: int, exprText: string, arrayText: string} $span
+     * @param array{start: int, end: int, exprText?: string, arrayText?: string, namedWithReject?: bool} $span
      */
     private static function rewriteCloneCallSpan(array $span): string
     {
-        $assignments = self::parseCloneWithArrayAssignments($span['arrayText']);
-        if ([] === $assignments) {
-            return 'clone '.$span['exprText'];
+        if (!empty($span['namedWithReject'])) {
+            return '(function () { throw new \\Error('.var_export(self::UNKNOWN_NAMED_WITH_PARAMETER, true).'); })()';
         }
 
-        return self::buildCloneWithIife($span['exprText'], $assignments);
+        $assignments = self::parseCloneWithArrayAssignments($span['arrayText'] ?? '');
+        if ([] === $assignments) {
+            return 'clone '.($span['exprText'] ?? '');
+        }
+
+        return self::buildCloneWithIife($span['exprText'] ?? '', $assignments);
     }
 
     /**
