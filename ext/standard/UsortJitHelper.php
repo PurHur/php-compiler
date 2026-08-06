@@ -10,18 +10,19 @@ use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * usort()/uksort()/uasort() closure comparators for compiled JIT/AOT modules (#15518, php-in-PHP).
+ * usort()/uksort()/uasort() closure comparators (#15518 / #27217, php-in-PHP).
  *
- * Packed usort: NestedJIT `new HashTable()` segfaults under thin standalone AOT (#24156).
- * Writeback must call {@see HashTable::assignPackedList} on the receiver — NestedJIT of
- * {@see VmArray::writeReindexedValues} / {@see HashTable::replacePackedValues} leaves the
- * user array unsorted under thin AOT (#26954). Compare via {@see Variable::toInt()} on the
- * invoke result — {@see VmClosureCall::coerceUserSortCallbackResult} reads VM type tags that
- * NestedClosureInvoke value-boxes do not populate.
+ * Packed usort: NestedJIT into thin AOT via {@see \PHPCompiler\JIT\Builtin\UsortRuntime}
+ * + {@see HashTable::assignPackedList} (#26954 / #24156).
+ *
+ * uksort/uasort Closures under thin AOT: pure LLVM {@see \PHPCompiler\JIT\UsortKeyedLlvm}
+ * — NestedJIT of these methods aborts (#27217). Host/VM still uses these PHP bodies via
+ * {@see uksort_} / {@see uasort_} execute() paths that call {@see VmClosureCall} instead.
+ *
+ * Compare via {@see Variable::toInt()} on NestedClosureInvoke results when NestedJIT'd.
  *
  * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391).
  *
- * SSOT shared with {@see usort_} / {@see uksort_} / {@see uasort_} VM execute() closure paths
  * php-src: ext/standard/array.c — php_array_usort / php_array_uksort / php_array_uasort
  */
 final class UsortJitHelper
@@ -63,6 +64,9 @@ final class UsortJitHelper
         return $ht;
     }
 
+    /**
+     * Host/unit SSOT for keyed sorts; thin AOT uses {@see \PHPCompiler\JIT\UsortKeyedLlvm}.
+     */
     public static function sortKeysWithClosure(HashTable $ht, Variable $closure): HashTable
     {
         if ($ht->getNumElements() < 2) {
@@ -72,12 +76,30 @@ final class UsortJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
-        $pairs = self::collectKeyedPairs($ht);
-        VmClosureCall::sortKeyedPairsByKeyViaTarget($pairs, $closure);
+        $pairs = [];
+        foreach ($ht->exportKeyValuePairs(true) as $pair) {
+            $pairs[] = $pair;
+        }
+        $n = \count($pairs);
+        for ($i = 0; $i < $n - 1; ++$i) {
+            for ($j = 0; $j < $n - $i - 1; ++$j) {
+                $left = $pairs[$j];
+                $right = $pairs[$j + 1];
+                $cmpVar = VmClosureInvoke::invokeVariable($closure, $left[0], $right[0]);
+                if ($cmpVar->toInt() > 0) {
+                    $pairs[$j] = $right;
+                    $pairs[$j + 1] = $left;
+                }
+            }
+        }
+        $ht->reorderKeyedPairs($pairs);
 
-        return self::fromKeyedPairs($pairs);
+        return $ht;
     }
 
+    /**
+     * Host/unit SSOT for value-preserving sorts; thin AOT uses {@see \PHPCompiler\JIT\UsortKeyedLlvm}.
+     */
     public static function sortValuesWithClosure(HashTable $ht, Variable $closure): HashTable
     {
         if ($ht->getNumElements() < 2) {
@@ -87,43 +109,24 @@ final class UsortJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
-        $pairs = self::collectKeyedPairs($ht);
-        VmClosureCall::sortKeyedPairsByValueViaTarget($pairs, $closure);
-
-        return self::fromKeyedPairs($pairs);
-    }
-
-    /**
-     * @return list<array{0: Variable, 1: Variable}>
-     */
-    private static function collectKeyedPairs(HashTable $ht): array
-    {
         $pairs = [];
-        foreach ($ht->exportKeyValuePairs(true) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->duplicateFrom($key);
-            $valCopy = new Variable();
-            $valCopy->duplicateFrom($value);
-            $pairs[] = [$keyCopy, $valCopy];
+        foreach ($ht->exportKeyValuePairs(true) as $pair) {
+            $pairs[] = $pair;
         }
-
-        return $pairs;
-    }
-
-    /**
-     * @param list<array{0: Variable, 1: Variable}> $pairs
-     */
-    private static function fromKeyedPairs(array $pairs): HashTable
-    {
-        $out = new HashTable();
-        foreach ($pairs as [$key, $value]) {
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $value);
-            } else {
-                $out->add($key->toString(), $value);
+        $n = \count($pairs);
+        for ($i = 0; $i < $n - 1; ++$i) {
+            for ($j = 0; $j < $n - $i - 1; ++$j) {
+                $left = $pairs[$j];
+                $right = $pairs[$j + 1];
+                $cmpVar = VmClosureInvoke::invokeVariable($closure, $left[1], $right[1]);
+                if ($cmpVar->toInt() > 0) {
+                    $pairs[$j] = $right;
+                    $pairs[$j + 1] = $left;
+                }
             }
         }
+        $ht->reorderKeyedPairs($pairs);
 
-        return $out;
+        return $ht;
     }
 }

@@ -19,6 +19,11 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('KeySortRuntime::ksortByKey', $runtime);
         $this->assertStringContainsString('__hashtable__sortStringKeyValues', $runtime);
         $this->assertStringContainsString('sortValuesWithClosure', $runtime);
+        // Thin AOT uksort/uasort Closures — UsortKeyedLlvm, not NestedJIT keyed helpers (#27217).
+        $this->assertStringContainsString('UsortKeyedLlvm::sortKeysWithClosure', $runtime);
+        $this->assertStringContainsString('UsortKeyedLlvm::sortValuesWithClosure', $runtime);
+        $this->assertStringNotContainsString('__uksort__keys_closure', $runtime);
+        $this->assertStringNotContainsString('__uasort__values_closure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPackedWithClosure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortStringKeysWithClosure', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -27,9 +32,10 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('sortPackedWithClosure', $helper);
         $this->assertStringContainsString('sortKeysWithClosure', $helper);
         $this->assertStringContainsString('sortValuesWithClosure', $helper);
-        // Thin AOT writeback: direct assignPackedList (#26954).
+        // Thin AOT writeback: assignPackedList (#26954); keyed uses reorderKeyedPairs (#27217).
         $this->assertStringContainsString('$ht->assignPackedList($values)', $helper);
-        $this->assertStringContainsString('VmClosureCall', $helper);
+        $this->assertStringContainsString('$ht->reorderKeyedPairs($pairs)', $helper);
+        $this->assertStringContainsString('VmClosureInvoke', $helper);
 
         $usort = (string) file_get_contents(__DIR__.'/../../ext/standard/usort_.php');
         $this->assertStringContainsString('UsortRuntime::usortPacked', $usort);
