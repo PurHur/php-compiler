@@ -41,7 +41,8 @@ final class VmImapCore
      *     subscribed: array<string, true>,
      *     deleted: array<int, true>,
      *     flags: array<int, array{seen: bool, flagged: bool, answered: bool, draft: bool}>,
-     *     acl: array<string, array<string, string>>
+     *     acl: array<string, array<string, string>>,
+     *     quota: array<string, int>
      * }>
      */
     private static array $state = [];
@@ -224,6 +225,7 @@ final class VmImapCore
             'deleted' => [],
             'flags' => [],
             'acl' => [],
+            'quota' => [],
         ];
         $var->object($object);
 
@@ -1458,6 +1460,125 @@ final class VmImapCore
     }
 
     /**
+     * imap_set_quota() — store STORAGE limit (KB) for a quota root (#27816).
+     */
+    public static function setQuota(ObjectEntry $object, string $quotaRoot, int $mailboxSize): bool
+    {
+        $st = self::liveStateMutable($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($quotaRoot, $st['mailbox']);
+        if (null === $path) {
+            $msg = "Can't set quota for {$quotaRoot}";
+            self::pushError($msg);
+            self::warnImap('imap_set_quota(): '.$msg);
+
+            return false;
+        }
+        if ($mailboxSize < 0) {
+            $msg = "Can't set quota for {$quotaRoot}";
+            self::pushError($msg);
+            self::warnImap('imap_set_quota(): '.$msg);
+
+            return false;
+        }
+        self::$state[$object->id]['quota'][$path] = $mailboxSize;
+
+        return true;
+    }
+
+    /**
+     * imap_get_quota() — STORAGE usage/limit for a quota root (#27816).
+     */
+    public static function getQuota(ObjectEntry $object, string $quotaRoot): Variable|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($quotaRoot, $st['mailbox']);
+        if (null === $path || !isset($st['quota'][$path])) {
+            self::warnImap('imap_get_quota(): C-client imap_getquota failed');
+
+            return false;
+        }
+
+        return self::quotaResultVariable(self::quotaUsageKb($path), $st['quota'][$path]);
+    }
+
+    /**
+     * imap_get_quotaroot() — quota for the root owning a mailbox (#27816).
+     *
+     * Local-mbox: the mailbox path itself is the quota root when set; otherwise false.
+     */
+    public static function getQuotaRoot(ObjectEntry $object, string $mailbox): Variable|false
+    {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $path = self::normalizeLocalMailboxPath($mailbox, $st['mailbox']);
+        if (null === $path) {
+            self::warnImap('imap_get_quotaroot(): C-client imap_getquotaroot failed');
+
+            return false;
+        }
+        if (isset($st['quota'][$path])) {
+            return self::quotaResultVariable(self::quotaUsageKb($path), $st['quota'][$path]);
+        }
+        // Fall back to open mailbox quota root when the named mailbox has none.
+        $open = $st['mailbox'];
+        if (isset($st['quota'][$open])) {
+            return self::quotaResultVariable(self::quotaUsageKb($open), $st['quota'][$open]);
+        }
+        self::warnImap('imap_get_quotaroot(): C-client imap_getquotaroot failed');
+
+        return false;
+    }
+
+    private static function quotaUsageKb(string $path): int
+    {
+        if (!is_file($path)) {
+            return 0;
+        }
+        $size = @filesize($path);
+        if (false === $size || $size < 0) {
+            return 0;
+        }
+
+        return (int) intdiv($size + 1023, 1024);
+    }
+
+    private static function quotaResultVariable(int $usage, int $limit): Variable
+    {
+        $storage = new HashTable();
+        $su = new Variable();
+        $su->int($usage);
+        $storage->add('usage', $su);
+        $sl = new Variable();
+        $sl->int($limit);
+        $storage->add('limit', $sl);
+
+        $ht = new HashTable();
+        // Back-compat top-level keys (php-src mail_getquota for STORAGE).
+        $u = new Variable();
+        $u->int($usage);
+        $ht->add('usage', $u);
+        $l = new Variable();
+        $l->int($limit);
+        $ht->add('limit', $l);
+        $stVar = new Variable(Variable::TYPE_ARRAY);
+        $stVar->array($storage);
+        $ht->add('STORAGE', $stVar);
+
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
      * imap_headers() — one summary line per message (#27800).
      *
      * @return list<string>|false
@@ -1884,7 +2005,8 @@ final class VmImapCore
      *     subscribed: array<string, true>,
      *     deleted: array<int, true>,
      *     flags: array<int, array{seen: bool, flagged: bool, answered: bool, draft: bool}>,
-     *     acl: array<string, array<string, string>>
+     *     acl: array<string, array<string, string>>,
+     *     quota: array<string, int>
      * }|null
      */
     private static function liveState(ObjectEntry $object): ?array
@@ -1904,7 +2026,8 @@ final class VmImapCore
      *     subscribed: array<string, true>,
      *     deleted: array<int, true>,
      *     flags: array<int, array{seen: bool, flagged: bool, answered: bool, draft: bool}>,
-     *     acl: array<string, array<string, string>>
+     *     acl: array<string, array<string, string>>,
+     *     quota: array<string, int>
      * }|null
      */
     private static function liveStateMutable(ObjectEntry $object): ?array
