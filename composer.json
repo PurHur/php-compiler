@@ -33,6 +33,7 @@
             "PHPCompiler\\": "lib/",
             "PHPCompiler\\ext\\": "ext/",
             "Uri\\": "ext/uri/Uri/",
+            "Filter\\": "ext/filter/Filter/",
             "php\\": "php/"
         },
         "files": [

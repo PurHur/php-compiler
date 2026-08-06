@@ -70,7 +70,10 @@ final class filter_input extends Internal
 
             return;
         }
-        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options, $frame));
+        filter_var::writeReturn(
+            $frame,
+            VmFilter::filterVar($value, $filterId, $options, $frame, VmFilter::FILTER_REQUIRE_SCALAR, 'filter_input', 4)
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value

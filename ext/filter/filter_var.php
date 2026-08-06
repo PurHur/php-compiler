@@ -116,6 +116,8 @@ final class filter_var extends Internal
         }
         $filterVal = JitFilter::loadFilterId($context, $filterArg);
         $nullOnFailure = JitFilter::loadNullOnFailureFlag($context, $optionsArg);
+        JitFilter::assertThrowNullExclusiveConst($context, $optionsArg);
+        $throwOnFailure = JitFilter::loadThrowOnFailureFlag($context, $optionsArg);
         $i64 = $context->getTypeFromString('int64');
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
@@ -289,7 +291,7 @@ final class filter_var extends Internal
         $phi->addIncoming($sanitizeResult, $sanitizeTail);
         $phi->addIncoming($falseResult, $failTail);
 
-        return $phi;
+        return JitFilter::applyThrowOnFailure($context, $phi, $throwOnFailure, 'unknown');
     }
 
     public static function writeReturn(Frame $frame, Variable $result): void
@@ -364,8 +366,11 @@ final class filter_var extends Internal
         ?JITVariable $optionsArg
     ): Value {
         $nullOnFailure = JitFilter::loadNullOnFailureFlag($context, $optionsArg);
+        JitFilter::assertThrowNullExclusiveConst($context, $optionsArg);
+        $throwOnFailure = JitFilter::loadThrowOnFailureFlag($context, $optionsArg);
         $flags = JitFilter::loadFilterFlags($context, $optionsArg);
         $applyNull = null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type;
+        $filterName = VmFilter::nameForFilterId($filterId);
 
         switch ($filterId) {
             case VmFilter::FILTER_DEFAULT:
@@ -373,54 +378,68 @@ final class filter_var extends Internal
                 return JitFilter::boxFilterDefault($context, $value);
             case VmFilter::FILTER_VALIDATE_INT:
                 $result = JitFilter::validateInt($context, $value, $flags);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_BOOLEAN:
-                return JitFilter::validateBoolean($context, $value, $nullOnFailure);
+                $result = JitFilter::validateBoolean($context, $value, $nullOnFailure);
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_FLOAT:
                 $result = JitFilter::validateFloat($context, $value);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_DOMAIN:
                 $result = JitFilter::validateDomain($context, $value, $flags);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_EMAIL:
                 $result = JitFilter::validateEmail($context, $value);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_URL:
                 $result = JitFilter::validateUrl($context, $value);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_IP:
                 $result = JitFilter::validateIp($context, $value, $flags);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             case VmFilter::FILTER_VALIDATE_MAC:
                 $result = JitFilter::validateMac($context, $value);
-
-                return $applyNull
+                $result = $applyNull
                     ? JitFilter::applyNullOnFailure($context, $result, $nullOnFailure)
                     : $result;
+
+                return JitFilter::applyThrowOnFailure($context, $result, $throwOnFailure, $filterName);
             default:
                 if (VmFilter::isSanitizeFilter($filterId)) {
                     return JitFilter::sanitize($context, $value, $context->getTypeFromString('int64')->constInt($filterId, false), $flags);
                 }
 
-                return JitFilter::boxedFalse($context);
+                return JitFilter::applyThrowOnFailure(
+                    $context,
+                    JitFilter::boxedFalse($context),
+                    $throwOnFailure,
+                    $filterName
+                );
         }
     }
 }
