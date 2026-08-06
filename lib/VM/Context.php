@@ -1043,6 +1043,8 @@ class Context {
         if (!isset($this->functionStaticVars[$storageKey])) {
             $this->functionStaticVars[$storageKey] = new Variable(Variable::TYPE_NULL);
         }
+        // Persist across calls: frame teardown must not releaseRef through CV aliases (#28039).
+        $this->functionStaticVars[$storageKey]->functionStaticStorage = true;
 
         return $this->functionStaticVars[$storageKey];
     }

@@ -103,6 +103,12 @@ final class Variable {
     public ?string $functionStaticVarName = null;
 
     /**
+     * True for Context / ClosureState function-local static storage cells (#28039).
+     * Frame teardown must not releaseRef() objects through INDIRECT aliases into these cells.
+     */
+    public bool $functionStaticStorage = false;
+
+    /**
      * True when this INDIRECT alias was created by ASSIGN_REF to a typed property
      * (`$r = &$obj->prop` / `&Class::$prop`). TypeError messages then use Zend's
      * "reference held by property" wording (#25622, zend_execute.c).

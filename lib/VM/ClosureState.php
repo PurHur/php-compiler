@@ -80,6 +80,8 @@ final class ClosureState
         if (!isset($this->staticVars[$varName])) {
             $this->staticVars[$varName] = new Variable(Variable::TYPE_NULL);
         }
+        // Closure-body statics share the same frame-teardown hazard as Context statics (#28039).
+        $this->staticVars[$varName]->functionStaticStorage = true;
 
         return $this->staticVars[$varName];
     }
