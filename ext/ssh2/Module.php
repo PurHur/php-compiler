@@ -64,6 +64,8 @@ class Module extends ModuleAbstract
             new ssh2_fingerprint(),
             new ssh2_exec(),
             new ssh2_fetch_stream(),
+            new ssh2_send_eof(),
+            new ssh2_send_signal(),
             new ssh2_shell(),
             new ssh2_tunnel(),
             new ssh2_forward_listen(),
