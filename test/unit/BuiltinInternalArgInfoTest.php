@@ -267,6 +267,15 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; PHP 8.4+: true (#28222). */
+    public function testTriggerErrorUserErrorReturnTypeIsTrue(): void
+    {
+        foreach (['trigger_error', 'user_error'] as $f) {
+            $this->assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($f), $f);
+            $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+    }
+
     /** php-src basic_functions.stub.php — InternalArgInfo return bool (missing string|) (#25472). */
     public function testHighlightFamilyReturnTypeIsStringOrBool(): void
     {

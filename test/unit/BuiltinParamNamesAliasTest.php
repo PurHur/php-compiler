@@ -407,6 +407,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         // php-src Zend/zend_builtin_functions.stub.php (#28223)
         self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('restore_exception_handler'));
         self::assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction('restore_exception_handler'));
+        // Zend/zend_builtin_functions.stub.php (#28222)
+        foreach (['trigger_error', 'user_error'] as $fn) {
+            self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
+            self::assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+        }
         // php-src ext/standard/array.stub.php (#26172)
         foreach (['usort', 'uasort', 'uksort', 'ksort', 'krsort'] as $fn) {
             self::assertSame('true', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction($fn), $fn);
