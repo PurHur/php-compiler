@@ -2769,7 +2769,6 @@
         "ext/standard/JitExec.php",
         "ext/standard/JitExecutionLimits.php",
         "ext/standard/JitExifTagname.php",
-        "ext/standard/JitExpKernel.php",
         "ext/standard/JitExplode.php",
         "ext/standard/JitExpm1Kernel.php",
         "ext/standard/JitFastcgiFinishRequest.php",
@@ -4312,7 +4311,6 @@
         "ext/standard/phpc_cosh_kernel.php",
         "ext/standard/phpc_deploy_path.php",
         "ext/standard/phpc_destruct_try_invoke_native.php",
-        "ext/standard/phpc_exp_kernel.php",
         "ext/standard/phpc_expm1_kernel.php",
         "ext/standard/phpc_file_get_contents_kernel.php",
         "ext/standard/phpc_file_put_contents_kernel.php",
@@ -7402,9 +7400,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7168,
+        "inventory_files": 7166,
         "excluded": 0,
-        "eligible": 7168,
+        "eligible": 7166,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
