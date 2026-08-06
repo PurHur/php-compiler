@@ -132,6 +132,9 @@ final class BuiltinInternalArgInfo
             'gzencode', 'gzdecode', 'gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate' => 'string|false',
             // pecl-file_formats-lzf lzf.stub.php — InternalArgInfo return int (missing |false) (#28063)
             'lzf_optimized_for' => 'int|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo return resource; Zend DeflateContext|false / InflateContext|false (#27627)
+            'deflate_init' => 'DeflateContext|false',
+            'inflate_init' => 'InflateContext|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
             // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
@@ -566,6 +569,8 @@ final class BuiltinInternalArgInfo
                 0, 1 => 'string',
                 default => null,
             },
+            // ext/zlib/zlib.stub.php — inflate_init $options omitted from InternalArgInfo (#27627)
+            'inflate_init' => 1 === $index ? 'array' : null,
             // ext/hash/hash.stub.php — HashContext $context; InternalArgInfo untyped / resource (#27745, #27737)
             'hash_copy', 'hash_update', 'hash_final' => 0 === $index ? 'HashContext' : null,
             'hash_update_file' => 0 === $index ? 'HashContext' : null,
