@@ -246,6 +246,22 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_html_createfromstring_doctype_null.phpt',
             'dom_html_createfromstring_doctype_null.phpt'
         );
+        yield 'dom_createfromstring_reflection.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_createfromstring_reflection.phpt',
+            'dom_createfromstring_reflection.phpt'
+        );
+        yield 'dom_createfromstring_named.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_createfromstring_named.phpt',
+            'dom_createfromstring_named.phpt'
+        );
+        yield 'dom_createfromfile_reflection.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_createfromfile_reflection.phpt',
+            'dom_createfromfile_reflection.phpt'
+        );
+        yield 'dom_createfromfile_named.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_createfromfile_named.phpt',
+            'dom_createfromfile_named.phpt'
+        );
         yield 'dom_document_schema_validate_arity_message.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_document_schema_validate_arity_message.phpt',
             'dom_document_schema_validate_arity_message.phpt'

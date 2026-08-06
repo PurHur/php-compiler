@@ -61,8 +61,9 @@ class JITTest extends BaseTest {
             }
             // Dom\HTMLDocument/XMLDocument ReflectionMethod — VM-only (JIT StreamLibcHandle
             // pointerCast abort on any living Dom\* ReflectionMethod; named-arg runtime covered by
-            // dom_createfromstring_named; #26080).
-            if (str_contains($name, 'dom_createfromstring_reflection')) {
+            // dom_createfromstring_named / dom_createfromfile_named; #26080 / #27924).
+            if (str_contains($name, 'dom_createfromstring_reflection')
+                || str_contains($name, 'dom_createfromfile_reflection')) {
                 continue;
             }
             // Dom\Element getAttribute* Reflection returns — same JIT ReflectionMethod abort (#26065).

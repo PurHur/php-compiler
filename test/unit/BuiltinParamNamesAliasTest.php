@@ -1465,6 +1465,38 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #27924 */
+    public function testDomCreateFromFileNamedParameters(): void
+    {
+        $expected = ['path', 'options=', 'overrideEncoding='];
+        foreach (['Dom\\HTMLDocument::createFromFile', 'Dom\\XMLDocument::createFromFile'] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame($expected, $names, $qual);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'path', $qual), $qual);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'options', $qual), $qual);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'overrideEncoding', $qual), $qual);
+        }
+        foreach (['Dom\\HTMLDocument', 'Dom\\XMLDocument'] as $class) {
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod($class, 'createFromFile'), $class);
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod($class, 'createFromFile'), $class);
+            self::assertSame(
+                'string',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'createfromfile', 0),
+                $class
+            );
+            self::assertSame(
+                'int',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'createfromfile', 1),
+                $class
+            );
+            self::assertSame(
+                '?string',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(strtolower($class), 'createfromfile', 2),
+                $class
+            );
+        }
+    }
+
     /** @covers issue #23707 */
     public function testDateIntervalConstructStubNamedParamsResolve(): void
     {
