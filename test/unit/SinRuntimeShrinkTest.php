@@ -8,10 +8,12 @@ use PHPCompiler\ext\standard\SinJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** sin() JIT: always SinJitHelper via JitVmHelperLink + phpc_sin_kernel (#15086, #27048). */
+/**
+ * sin() NestedJIT via JitVmHelperLink::ensureBridge (#28016 / peer MathHypot #27909).
+ */
 final class SinRuntimeShrinkTest extends TestCase
 {
-    public function testSinUsesJitHelperNotLibcLookup(): void
+    public function testSinUsesJitHelperNotKernel(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/sin.php');
         $this->assertStringContainsString('MathSin::invoke', $builtin);
@@ -20,50 +22,68 @@ final class SinRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSin.php');
         $this->assertStringContainsString('SinJitHelper', $bridge);
         $this->assertStringContainsString('phpc_sin', $bridge);
-        $this->assertStringContainsString('JitSinKernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitSinKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
-    public function testSinJitHelperDelegatesToKernel(): void
+    public function testSinJitHelperInlinesNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SinJitHelper.php');
-        $this->assertStringContainsString('phpc_sin_kernel', $source);
-        $this->assertMatchesRegularExpression(
-            '/function sinArgv\(.*?\{[^}]*phpc_sin_kernel/s',
+        $this->assertStringContainsString('39916800.0', $source);
+        $this->assertStringContainsString('$twoPi', $source);
+        $this->assertStringNotContainsString('phpc_sin_kernel', $source);
+        $this->assertStringNotContainsString('while (', $source);
+        $this->assertStringNotContainsString('pack(', $source);
+        $this->assertStringNotContainsString('unpack(', $source);
+        // Early-return if before Horner miscompiles under NestedJIT — keep straight-line body.
+        $this->assertDoesNotMatchRegularExpression(
+            '/function sinArgv\(.*?\{[^}]*\bif\s*\(/s',
             $source
         );
         $this->assertDoesNotMatchRegularExpression(
             '/function sinArgv\(.*?\{[^}]*VmMath::sin/s',
             $source
         );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function sinArgv\(.*?\{[^}]*\\\\sin\(/s',
+            $source
+        );
 
-        if (!\function_exists('phpc_sin_kernel')) {
-            $this->markTestSkipped('phpc_sin_kernel requires compiler runtime');
-        }
-        $this->assertSame(
-            VmMath::sin(0.0),
-            SinJitHelper::sinArgv(0.0)
-        );
-        $this->assertSame(
-            VmMath::sin(\deg2rad(90.0)),
-            SinJitHelper::sinArgv(\deg2rad(90.0))
-        );
+        $this->assertSame(VmMath::sin(0.0), SinJitHelper::sinArgv(0.0));
+        $this->assertSame(VmMath::sin(1.0), SinJitHelper::sinArgv(1.0));
+        $this->assertSame(VmMath::sin(\M_PI / 2.0), SinJitHelper::sinArgv(\M_PI / 2.0));
+        $this->assertEqualsWithDelta(VmMath::sin(0.5), SinJitHelper::sinArgv(0.5), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::sin(2.0), SinJitHelper::sinArgv(2.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::sin(100.0), SinJitHelper::sinArgv(100.0), 1e-12);
+        $this->assertTrue(\is_nan(SinJitHelper::sinArgv(\INF)));
+        $this->assertTrue(\is_nan(SinJitHelper::sinArgv(\NAN)));
     }
 
-    public function testContextAllowlistsSinKernelForNestedJit(): void
+    public function testKernelFilesRemoved(): void
+    {
+        $root = __DIR__.'/../..';
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitSinKernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_sin_kernel.php');
+    }
+
+    public function testContextNoLongerAllowlistsSinKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('phpc_sin_kernel', $source);
+        $this->assertStringNotContainsString('phpc_sin_kernel', $source);
+        // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringContainsString('phpc_cos_kernel', $source);
+        $this->assertStringContainsString('phpc_fpow_kernel', $source);
+        $this->assertStringContainsString('phpc_nextafter_kernel', $source);
     }
 
-    public function testSpineBundleIncludesSinJitHelper(): void
+    public function testSpineBundleIncludesSinHelperWithoutKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('SinJitHelper.php', $spine);
         $this->assertStringContainsString('MathSin.php', $spine);
-        $this->assertStringContainsString('JitSinKernel.php', $spine);
-        $this->assertStringContainsString('phpc_sin_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitSinKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_sin_kernel.php', $spine);
     }
 }
