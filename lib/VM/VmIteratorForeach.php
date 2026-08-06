@@ -445,7 +445,7 @@ final class VmIteratorForeach
         $isDefined = $context->builder->icmp(
             Builder::INT_NE,
             $typeByte,
-            $i8->constInt(Variable::TYPE_UNDEFINED, false)
+            $i8->constInt(Variable::TYPE_UNDEFINED & 0xff, false)
         );
         $context->builder->branchIf($isDefined, $found, $packedHead);
 

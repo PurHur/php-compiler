@@ -41,13 +41,9 @@ final class CountCharsJitHelper
     private static function histogramToHashTable(array $histogram): HashTable
     {
         $ht = new HashTable();
-        $maxKey = 0;
-        foreach (\array_keys($histogram) as $byte) {
-            if ($byte > $maxKey) {
-                $maxKey = $byte;
-            }
-        }
-        $ht->ensureHashSlotCapacity($maxKey);
+        // Sparse int keys (mode 1/2): NestedJIT lowers addIndex → packed setAtIndex,
+        // which grows capacity itself. ensureHashSlotCapacity is VM-hash-index only and
+        // is not NestedJIT-safe (#27536).
         foreach ($histogram as $byte => $count) {
             $slot = new Variable();
             $slot->int((int) $count);

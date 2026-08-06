@@ -368,11 +368,16 @@ class HashTable extends Type
         $afterBb = $fn->appendBasicBlock('grow_after');
         $this->context->builder->branchIf($isNull, $mallocBb, $reallocBb);
 
-        $zeroI8 = $this->context->getTypeFromString('int8')->constInt(0, false);
+        // Packed holes must be TYPE_UNDEFINED (0xff), not TYPE_NULL (0). Foreach
+        // skips UNDEFINED only; NULL is a real element (#27536 / peer #27581).
+        $undefI8 = $this->context->getTypeFromString('int8')->constInt(
+            \PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff,
+            false
+        );
 
         $this->context->builder->positionAtEnd($mallocBb);
         $malloced = $this->context->builder->call($this->context->lookupFunction('__mm__malloc'), $bytes);
-        $this->context->intrinsic->memset($malloced, $zeroI8, $bytes, false);
+        $this->context->intrinsic->memset($malloced, $undefI8, $bytes, false);
         $this->context->builder->branch($afterBb);
 
         $this->context->builder->positionAtEnd($reallocBb);
@@ -384,7 +389,7 @@ class HashTable extends Type
         $oldBytes = $this->context->builder->mulNoSignedWrap($cap, $valueSize);
         $tailBytes = $this->context->builder->subNoSignedWrap($bytes, $oldBytes);
         $tailStart = $this->context->builder->inBoundsGEP($realloced, $oldBytes);
-        $this->context->intrinsic->memset($tailStart, $zeroI8, $tailBytes, false);
+        $this->context->intrinsic->memset($tailStart, $undefI8, $tailBytes, false);
         $this->context->builder->branch($afterBb);
 
         $this->context->builder->positionAtEnd($afterBb);
@@ -718,8 +723,20 @@ class HashTable extends Type
         $typeByte = $this->context->builder->load(
             $this->context->builder->structGep($entry, $this->context->structFieldMap['__value__']['type'])
         );
-        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
-        $set = $this->context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $i8 = $this->context->getTypeFromString('int8');
+        // isset / wasSet: both TYPE_NULL and packed TYPE_UNDEFINED holes are unset
+        // (#27536 — grow fills UNDEFINED; explicit null stays isset-false).
+        $isNull = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false)
+        );
+        $isUndef = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED & 0xff, false)
+        );
+        $set = $this->context->builder->not($this->context->builder->or($isNull, $isUndef));
         $this->context->builder->branch($merge);
         $this->context->builder->positionAtEnd($merge);
         $result = $this->context->builder->phi($i1);
