@@ -7,6 +7,7 @@ class C
 }
 
 $r = new ReflectionProperty(C::class, 'p');
+// php-src has isPrivateSet/isProtectedSet only — no isPublicSet (#28185).
 foreach (['isPrivateSet', 'isProtectedSet', 'isPublicSet', 'isPrivateGet'] as $method) {
     echo $method, ': ', method_exists($r, $method) ? 'yes' : 'no', "\n";
 }
