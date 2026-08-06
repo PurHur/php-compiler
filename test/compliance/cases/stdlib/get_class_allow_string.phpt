@@ -1,19 +1,19 @@
 --TEST--
-Stdlib: get_class() optional $allow_string on forward profile (#17395)
---SKIPIF--
-<?php
-if (getenv('PHP_COMPILER_PROFILE') !== '8.4' && getenv('PHP_COMPILER_PROFILE') !== 'forward') {
-    die('skip requires PHP_COMPILER_PROFILE=8.4');
-}
-?>
+Stdlib: get_class() rejects 2nd arg under PROFILE=8.4 — no phantom allow_string (#28310 / was #17395)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo get_class(new stdClass(), false), "\n";
-echo get_class(new stdClass(), true), "\n";
-echo get_class('stdClass', true), "\n";
+try {
+    echo get_class(new stdClass(), false), "\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    echo get_class('stdClass', true), "\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-stdClass
-stdClass
-stdClass
+get_class() expects at most 1 argument, 2 given
+get_class() expects at most 1 argument, 2 given

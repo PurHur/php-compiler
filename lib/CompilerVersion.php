@@ -1152,15 +1152,15 @@ final class CompilerVersion
     }
 
     /**
-     * Forward-profile gate historically used for get_class() optional $allow_string (#17395).
+     * Historical forward-profile gate for get_class() optional $allow_string (#17395).
      *
      * php-src Zend/zend_builtin_functions.stub.php (incl. PHP 8.4) does **not** give get_class()
      * or get_parent_class() an $allow_string parameter — that belongs to is_a / is_subclass_of.
-     * get_parent_class() must stay arity 1 on every profile (#23948); do not reuse this gate for it.
+     * Always withhold: get_parent_class (#23948) and get_class (#28310) stay arity 1 on every profile.
      */
     public static function supportsGetClassAllowString(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

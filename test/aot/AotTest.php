@@ -216,15 +216,7 @@ class AotTest extends BaseTest
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
-            if (!CompilerVersion::supportsGetClassAllowString()
-                && str_contains($name, 'get_class_allow_string')
-                && !str_contains($name, 'get_class_allow_string_reference_profile')) {
-                continue;
-            }
-            if (CompilerVersion::supportsGetClassAllowString()
-                && str_contains($name, 'get_class_allow_string_reference_profile')) {
-                continue;
-            }
+            // get_class $allow_string gate retired (#28310) — both allow_string*.phpt cases always run.
             if (!CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled()
                 && str_contains($name, 'get_defined_functions_exclude_disabled')
                 && !str_contains($name, 'get_defined_functions_exclude_disabled_reference_profile')) {
