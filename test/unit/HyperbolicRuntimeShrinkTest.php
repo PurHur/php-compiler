@@ -117,10 +117,10 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_cosh_kernel.php', $spine);
         $this->assertStringContainsString('phpc_sinh_kernel.php', $spine);
         $this->assertStringContainsString('phpc_tanh_kernel.php', $spine);
-        $this->assertStringContainsString('JitAcoshKernel.php', $spine);
         $this->assertStringContainsString('JitAsinhKernel.php', $spine);
         $this->assertStringContainsString('JitAtanhKernel.php', $spine);
-        $this->assertStringContainsString('phpc_acosh_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitAcoshKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_acosh_kernel.php', $spine);
         $this->assertStringContainsString('phpc_asinh_kernel.php', $spine);
         $this->assertStringContainsString('phpc_atanh_kernel.php', $spine);
     }
