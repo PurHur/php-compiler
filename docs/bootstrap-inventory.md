@@ -27008,7 +27008,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/Crc32JitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/CslashesJitHelper.php`
 

@@ -9,10 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for crc32()/crc32c() via Crc32JitHelper PHP (#15759).
+ * JIT/AOT link for crc32()/crc32c() via NestedJIT-safe Crc32JitHelper PHP (#15759, #27077).
  *
  * Replaces inline CRC table LLVM in ext/standard/JitCrcCore.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmCrc32}, {@see \PHPCompiler\ext\standard\VmCrc32c}.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathSqrt #27888 / Bin2hex #20452 shape).
+ * SSOT parity: {@see \PHPCompiler\ext\standard\VmCrc32}, {@see \PHPCompiler\ext\standard\VmCrc32c}
+ * (algorithms inlined into the helper — NestedJIT must not call Vm* under thin AOT).
  */
 final class Crc32Runtime
 {
@@ -31,6 +33,10 @@ final class Crc32Runtime
         self::CRC32_HELPER,
         self::CRC32C_HELPER,
     ];
+
+    private const CRC32_BRIDGE_ENTRY = 'crc32_bridge_entry';
+
+    private const CRC32C_BRIDGE_ENTRY = 'crc32c_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -61,35 +67,49 @@ final class Crc32Runtime
 
     private static function implementCrc32(Context $context): void
     {
+        $probe = $context->module->getNamedFunction(self::ABI_CRC32);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::CRC32_BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_CRC32, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_CRC32,
-            'crc32_bridge_entry',
+            self::CRC32_BRIDGE_ENTRY,
             [$strPtr, $i64],
             $i64,
             self::CRC32_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15759'
+            '#27077'
         );
     }
 
     private static function implementCrc32c(Context $context): void
     {
+        $probe = $context->module->getNamedFunction(self::ABI_CRC32C);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::CRC32C_BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_CRC32C, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_CRC32C,
-            'crc32c_bridge_entry',
+            self::CRC32C_BRIDGE_ENTRY,
             [$strPtr],
             $i64,
             self::CRC32C_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15759'
+            '#27077'
         );
     }
 }
