@@ -357,6 +357,31 @@ final class VmRange
     }
 
     /**
+     * php-src ext/standard/array.c — non-finite start/end → ValueError (#27927).
+     * Zend 8.2 formats ±INF as "inf" and finite floats via %0.0f.
+     */
+    private static function rejectNonFiniteBounds(float $start, float $end): void
+    {
+        if (\is_finite($start) && \is_finite($end)) {
+            return;
+        }
+        throw new \ValueError(\sprintf(
+            'Invalid range supplied: start=%s end=%s',
+            self::formatBoundForInvalidRange($start),
+            self::formatBoundForInvalidRange($end)
+        ));
+    }
+
+    private static function formatBoundForInvalidRange(float $value): string
+    {
+        if (!\is_finite($value)) {
+            return 'inf';
+        }
+
+        return \sprintf('%0.0f', $value);
+    }
+
+    /**
      * php-src PHP_FUNCTION(range) / boundary_error: when endpoints differ, |step| must be
      * <= |end - start| (equality allowed). Equal endpoints always yield a singleton (#26657).
      */
@@ -394,6 +419,7 @@ final class VmRange
 
     private static function buildFloatRange(float $start, float $end, float $step): HashTable
     {
+        self::rejectNonFiniteBounds($start, $end);
         self::rejectOversizedFloatStep($start, $end, $step);
         $ht = new HashTable();
         $index = 0;
