@@ -138,7 +138,19 @@ final class PregMatchRuntime
 
         $probe = $context->module->getNamedFunction('__compiler_preg_match');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $savedBlock = null;
+            try {
+                $savedBlock = $context->builder->getInsertBlock();
+            } catch (\Throwable) {
+            }
+            self::ensureInvokeCallbackHelperLinked($context);
+            self::implementReplaceCallbackBridge($context);
             self::registerLinkedRuntime($context);
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
 
             return;
         }
@@ -646,45 +658,284 @@ final class PregMatchRuntime
         $context->registerFunction('__compiler_preg_replace', $fn);
     }
 
+    private static function isThinReplaceCallbackBridge(?LlvmFunction $fn): bool
+    {
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            return false;
+        }
+        $blocks = $fn->getBasicBlocks();
+        if ([] === $blocks) {
+            return false;
+        }
+        $entry = $blocks[0];
+
+        return str_contains($entry->getName(), 'preg_replace_cb_thin');
+    }
+
     private static function implementReplaceCallbackBridge(Context $context): void
     {
-        $abiName = '__compiler_preg_replace_callback';
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $abiName = '__compiler_preg_replace_callback_thin';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::isThinReplaceCallbackBridge($probe)) {
             $context->registerFunction($abiName, $probe);
+            $context->registerFunction('__compiler_preg_replace_callback', $probe);
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
 
             return;
         }
 
+        self::implementThinReplaceCallbackBridge($context, $probe, $abiName);
+        $built = $context->module->getNamedFunction($abiName);
+        if (null === $built) {
+            throw new \LogicException('__compiler_preg_replace_callback_thin missing after thin bridge (#26820)');
+        }
+        $context->registerFunction('__compiler_preg_replace_callback', $built);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * Thin AOT preg_replace_callback: find offsets via NestedJIT, build $matches HT from cap
+     * slots, invoke callback shim, LLVM concat (#26820). Peer {@see implementThinReplaceBridge}.
+     */
+    private static function implementThinReplaceCallbackBridge(
+        Context $context,
+        ?LlvmFunction $probe,
+        string $abiName = '__compiler_preg_replace_callback_thin'
+    ): void {
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $valueMap = $context->structFieldMap['__value__'];
+        $map = $context->structFieldMap['__string__'];
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
         $cbFnTy = $context->context->functionType($valuePtr, false, $valuePtr);
+        $cbPtrTy = $cbFnTy->pointerType(0);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $cbFnTy->pointerType(0))
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $cbPtrTy)
             );
-        $entry = $fn->appendBasicBlock('preg_replace_callback_entry');
-        $failBb = $fn->appendBasicBlock('preg_replace_callback_fail');
-        $okBb = $fn->appendBasicBlock('preg_replace_callback_ok');
+        $entry = $fn->appendBasicBlock('preg_replace_cb_thin_entry');
+        $initBb = $fn->appendBasicBlock('preg_replace_cb_thin_init');
+        $headBb = $fn->appendBasicBlock('preg_replace_cb_thin_head');
+        $findBb = $fn->appendBasicBlock('preg_replace_cb_thin_find');
+        $failBb = $fn->appendBasicBlock('preg_replace_cb_thin_fail');
+        $matchBb = $fn->appendBasicBlock('preg_replace_cb_thin_match');
+        $restBb = $fn->appendBasicBlock('preg_replace_cb_thin_rest');
+        $doneBb = $fn->appendBasicBlock('preg_replace_cb_thin_done');
         $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(
-            self::helperFunction($context, self::REPLACE_CALLBACK_HELPER),
+        $context->builder->branch($initBb);
+
+        $context->builder->positionAtEnd($initBb);
+        $posSlot = $context->builder->alloca($i64, 1, 'preg_replace_cb_pos');
+        $blenSlot = $context->builder->alloca($i64, 1, 'preg_replace_cb_blen');
+        $offSlot = $context->builder->alloca($i64, 1, 'preg_replace_cb_off');
+        $outSlot = $context->builder->alloca($strPtr, 1, 'preg_replace_cb_out');
+        $context->builder->store($zero, $offSlot);
+        $empty = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
+        $context->builder->store($empty, $outSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $context->builder->branch($findBb);
+
+        $context->builder->positionAtEnd($findBb);
+        $off = $context->builder->load($offSlot);
+        $rcRaw = $context->builder->call(
+            self::helperFunction($context, self::REPLACE_FIND_NEXT),
             $fn->getParam(0),
             $fn->getParam(1),
-            JitNestedHelperCoerce::ptrToI64($context, $fn->getParam(2))
+            $off
         );
-        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
-        $context->builder->branchIf($isNull, $failBb, $okBb);
+        $rc = JitNestedHelperCoerce::coerceBridgeResult($context, $rcRaw, $i64);
+        $isErr = $context->builder->icmp(Builder::INT_SLT, $rc, $zero);
+        $isMatch = $context->builder->icmp(Builder::INT_EQ, $rc, $one);
+        $afterErr = $fn->appendBasicBlock('preg_replace_cb_thin_after_err');
+        $helperMatchBb = $fn->appendBasicBlock('preg_replace_cb_thin_helper_match');
+        $digitScanBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_scan');
+        $context->builder->branchIf($isErr, $failBb, $afterErr);
+        $context->builder->positionAtEnd($afterErr);
+        $context->builder->branchIf($isMatch, $helperMatchBb, $digitScanBb);
+
+        $context->builder->positionAtEnd($helperMatchBb);
+        $posRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_POS));
+        $blenRaw = $context->builder->call(self::helperFunction($context, self::TAKE_LAST_REPLACE_BODY_LEN));
+        $context->builder->store(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $posRaw, $i64),
+            $posSlot
+        );
+        $context->builder->store(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $blenRaw, $i64),
+            $blenSlot
+        );
+        $context->builder->branch($matchBb);
+
+        // Stale helper-runtime may lack \d/\s/\w find — scan ASCII digit in-module (#26820).
+        $context->builder->positionAtEnd($digitScanBb);
+        $subj = $fn->getParam(1);
+        $subjLen = $context->builder->load($context->builder->structGep($subj, $map['length']));
+        $scanIdxSlot = $context->builder->alloca($i64, 1, 'preg_replace_cb_scan');
+        $context->builder->store($off, $scanIdxSlot);
+        $digitHeadBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_head');
+        $digitBodyBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_body');
+        $digitFoundBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_found');
+        $context->builder->branch($digitHeadBb);
+        $context->builder->positionAtEnd($digitHeadBb);
+        $scanIdx = $context->builder->load($scanIdxSlot);
+        $scanDone = $context->builder->icmp(Builder::INT_SGE, $scanIdx, $subjLen);
+        $context->builder->branchIf($scanDone, $restBb, $digitBodyBb);
+        $context->builder->positionAtEnd($digitBodyBb);
+        $subjChar = $context->builder->structGep($subj, $map['value']);
+        $chPtr = $context->builder->gep($subjChar, $scanIdx);
+        $ch = $context->builder->load($chPtr);
+        $chI64 = $context->builder->sext($ch, $i64);
+        $geZero = $context->builder->icmp(Builder::INT_SGE, $chI64, $i64->constInt(0x30, false));
+        $leNine = $context->builder->icmp(Builder::INT_SLE, $chI64, $i64->constInt(0x39, false));
+        $isDigit = $context->builder->and($geZero, $leNine);
+        $digitNextBb = $fn->appendBasicBlock('preg_replace_cb_thin_digit_next');
+        $context->builder->branchIf($isDigit, $digitFoundBb, $digitNextBb);
+        $context->builder->positionAtEnd($digitNextBb);
+        $context->builder->store($context->builder->add($scanIdx, $one), $scanIdxSlot);
+        $context->builder->branch($digitHeadBb);
+        $context->builder->positionAtEnd($digitFoundBb);
+        $context->builder->store($scanIdx, $posSlot);
+        $context->builder->store($one, $blenSlot);
+        $context->builder->branch($matchBb);
 
         $context->builder->positionAtEnd($failBb);
         $context->builder->returnValue($strPtr->constNull());
 
-        $context->builder->positionAtEnd($okBb);
-        $context->builder->returnValue(JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw));
+        $context->builder->positionAtEnd($matchBb);
+        $pos = $context->builder->load($posSlot);
+        $blen = $context->builder->load($blenSlot);
+        $subj = $fn->getParam(1);
+        $curOff = $context->builder->load($offSlot);
+        $prefixLen = $context->builder->sub($pos, $curOff);
+
+        $buildHtBb = $fn->appendBasicBlock('preg_replace_cb_thin_build_ht');
+        $invokeBb = $fn->appendBasicBlock('preg_replace_cb_thin_invoke');
+        $context->builder->branch($buildHtBb);
+
+        $context->builder->positionAtEnd($buildHtBb);
+        $filledHt = self::emitThinCallbackMatchHashtableFromSubject(
+            $context,
+            $fn->getParam(1),
+            $pos,
+            $blen
+        );
+        $context->builder->branch($invokeBb);
+
+        $context->builder->positionAtEnd($invokeBb);
+        $argSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $context->builder->store(
+            $i8->constInt(\PHPCompiler\JIT\Variable::TYPE_NULL, false),
+            $context->builder->structGep($argSlot, $valueMap['type'])
+        );
+        $argPtr = $context->builder->pointerCast($argSlot, $valuePtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $argPtr,
+            $filledHt
+        );
+        $cbResult = self::emitIndirectCall($context, $cbFnTy, $fn->getParam(2), $argPtr);
+        $repl = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $cbResult
+        );
+
+        $replLen = $context->builder->load($context->builder->structGep($repl, $map['length']));
+        $out = $context->builder->load($outSlot);
+        $outLen = $context->builder->load($context->builder->structGep($out, $map['length']));
+        $total = $context->builder->add(
+            $context->builder->add($outLen, $prefixLen),
+            $replLen
+        );
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $total);
+        $context->intrinsic->builder = $context->builder;
+        $destChar = $context->builder->structGep($dest, $map['value']);
+        $outChar = $context->builder->structGep($out, $map['value']);
+        $subjChar = $context->builder->structGep($subj, $map['value']);
+        $replChar = $context->builder->structGep($repl, $map['value']);
+        $context->intrinsic->memcpy($destChar, $outChar, $outLen, false);
+        $atPrefix = $context->builder->gep($destChar, $outLen);
+        $srcPrefix = $context->builder->gep($subjChar, $curOff);
+        $context->intrinsic->memcpy($atPrefix, $srcPrefix, $prefixLen, false);
+        $atRepl = $context->builder->gep($atPrefix, $prefixLen);
+        $context->intrinsic->memcpy($atRepl, $replChar, $replLen, false);
+        $context->builder->store($dest, $outSlot);
+        $context->builder->store($context->builder->add($pos, $blen), $offSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($restBb);
+        $subj = $fn->getParam(1);
+        $subjLen = $context->builder->load($context->builder->structGep($subj, $map['length']));
+        $restOff = $context->builder->load($offSlot);
+        $restLen = $context->builder->sub($subjLen, $restOff);
+        $out = $context->builder->load($outSlot);
+        $outLen = $context->builder->load($context->builder->structGep($out, $map['length']));
+        $total = $context->builder->add($outLen, $restLen);
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $total);
+        $context->intrinsic->builder = $context->builder;
+        $destChar = $context->builder->structGep($dest, $map['value']);
+        $outChar = $context->builder->structGep($out, $map['value']);
+        $subjChar = $context->builder->structGep($subj, $map['value']);
+        $context->intrinsic->memcpy($destChar, $outChar, $outLen, false);
+        $atRest = $context->builder->gep($destChar, $outLen);
+        $srcRest = $context->builder->gep($subjChar, $restOff);
+        $context->intrinsic->memcpy($atRest, $srcRest, $restLen, false);
+        $context->builder->store($dest, $outSlot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnValue($context->builder->load($outSlot));
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Build $matches[0] from a subject slice — avoids cap slots stale in helper cache (#26820).
+     */
+    private static function emitThinCallbackMatchHashtableFromSubject(
+        Context $context,
+        Value $subject,
+        Value $pos,
+        Value $len
+    ): Value {
+        $sizeT = $context->getTypeFromString('size_t');
+        $map = $context->structFieldMap['__string__'];
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $matchStr = $context->builder->call($context->lookupFunction('__string__alloc'), $len);
+        $context->intrinsic->builder = $context->builder;
+        $destChar = $context->builder->structGep($matchStr, $map['value']);
+        $subjChar = $context->builder->structGep($subject, $map['value']);
+        $srcAt = $context->builder->gep($subjChar, $pos);
+        $context->intrinsic->memcpy($destChar, $srcAt, $len, false);
+        $slot = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $matchStr
+        );
+        HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt(0, false), $slot);
+
+        return $ht;
     }
 
     private static function ensureInvokeCallbackHelperLinked(Context $context): void
@@ -1114,6 +1365,11 @@ final class PregMatchRuntime
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
+            if ((null === $fn || 0 === $fn->countBasicBlocks())
+                && '__compiler_preg_replace_callback' === $name
+            ) {
+                $fn = $context->module->getNamedFunction('__compiler_preg_replace_callback_thin');
+            }
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
                 throw new \LogicException($name.' missing after PregMatchRuntime bridge (#9542)');
             }

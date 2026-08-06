@@ -28,32 +28,28 @@ final class StringPregMatchJit
 
     public static function implement(Context $context): void
     {
-        if (self::allRuntimeFunctionsLinked($context)) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
+        // Always refresh — prelinked helper-runtime may ship a replaceCallbackArgv stub (#26820).
         PregMatchRuntime::ensureLinked($context);
+        self::registerLinkedRuntime($context);
     }
 
-    private static function allRuntimeFunctionsLinked(Context $context): bool
+    private static function resolveRuntimeFunction(Context $context, string $name): ?\PHPLLVM\Value\Function_
     {
-        foreach (self::RUNTIME_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                return false;
-            }
+        $fn = $context->module->getNamedFunction($name);
+        if ((null === $fn || 0 === $fn->countBasicBlocks())
+            && '__compiler_preg_replace_callback' === $name
+        ) {
+            $fn = $context->module->getNamedFunction('__compiler_preg_replace_callback_thin');
         }
 
-        return true;
+        return $fn;
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
+            $fn = self::resolveRuntimeFunction($context, $name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
                 throw new \LogicException($name.' missing after StringPregMatchJit dispatch (#9542)');
             }
             $context->registerFunction($name, $fn);
