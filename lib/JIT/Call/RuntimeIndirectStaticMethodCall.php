@@ -31,11 +31,14 @@ final class RuntimeIndirectStaticMethodCall implements Call
 
     /**
      * @param array<int, Call> $candidatesByClassId class id => lowered static method proxy
+     * @param bool             $bindCallerThis      Prepend enclosing $this for non-static
+     *                                              candidates (static:: from instance, #28050)
      */
     public function __construct(
         public readonly string $methodLc,
         public readonly array $candidatesByClassId,
         public readonly Block $enclosingBlock,
+        public readonly bool $bindCallerThis = false,
     ) {
     }
 
