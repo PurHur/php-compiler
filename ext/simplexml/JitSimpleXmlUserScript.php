@@ -167,6 +167,14 @@ final class JitSimpleXmlUserScript
         if (\count($args) < 2 || !\extension_loaded('simplexml')) {
             return null;
         }
+        // XPath node-sets are arrays. Never dim-fold them as the last host element (#27413).
+        if (self::isArrayShapedCountOperand($args[0])) {
+            return null;
+        }
+        $token = $args[0]->compileTimeString;
+        if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
         $tree = self::lookup($args[0]);
         if (null === $tree) {
             return null;
@@ -187,7 +195,7 @@ final class JitSimpleXmlUserScript
         return self::materializeElement($context, $child);
     }
 
-    /** SimpleXMLElement::count / count($sxe) fold (#26863). */
+    /** SimpleXMLElement::count / count($sxe) fold (#26863, #27413). */
     public static function tryCount(Context $context, JITVariable ...$args): ?Value
     {
         if ([] === $args || !\extension_loaded('simplexml')) {
@@ -200,7 +208,12 @@ final class JitSimpleXmlUserScript
                 false
             );
         }
-        $tree = self::lookup($args[0]);
+        // XPath node-sets are arrays. Never fall back to lastTree — a missing list
+        // token + last matched element yields the element's child count (#27413).
+        if (self::isArrayShapedCountOperand($args[0])) {
+            return null;
+        }
+        $tree = self::lookupExact($args[0]);
         if (null === $tree) {
             return null;
         }
@@ -260,7 +273,7 @@ final class JitSimpleXmlUserScript
 
     /**
      * Fold count($sxe) when a host tree is known (#26863).
-     * XPath node-set Variables must count the list, not fall back to lastTree (#26911).
+     * XPath node-set Variables must count the list, not fall back to lastTree (#26911, #27413).
      */
     public static function tryFoldCount(Context $context, JITVariable $var): ?Value
     {
@@ -274,7 +287,14 @@ final class JitSimpleXmlUserScript
                 false
             );
         }
-        $tree = self::lookup($var);
+        // Ternary/PHI paths often lose the xpath list token on the count() arg while
+        // `$n[$i]` still folds via the named binding. Falling through to lastTree then
+        // reports the last matched element's child count (0 for a text leaf, N for a
+        // parent) instead of the node-set length — AOT `0|y` / `2|…` vs Zend `1|y` (#27413).
+        if (self::isArrayShapedCountOperand($var)) {
+            return null;
+        }
+        $tree = self::lookupExact($var);
         if (null === $tree) {
             return null;
         }
@@ -626,6 +646,22 @@ final class JitSimpleXmlUserScript
     private static function lookup(JITVariable $receiver): ?\SimpleXMLElement
     {
         return self::lookupExact($receiver) ?? self::$lastTree;
+    }
+
+    /** Array / value-box operands are never host SXE trees for count() folds (#27413). */
+    private static function isArrayShapedCountOperand(JITVariable $var): bool
+    {
+        if (JITVariable::TYPE_HASHTABLE === $var->type) {
+            return true;
+        }
+        if (0 !== ($var->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return true;
+        }
+        if (JITVariable::TYPE_VALUE === $var->type) {
+            return true;
+        }
+
+        return JitValueBox::isValueOperand($var);
     }
 
     /** @return int|string|null */
