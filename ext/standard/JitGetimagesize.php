@@ -5,18 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\GetimagesizeJit;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
+use PHPLLVM\Type;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getimagesize() / getimagesizefromstring() (#3271). */
+/**
+ * LLVM lowering for getimagesize() / getimagesizefromstring() (#3271, #27291).
+ *
+ * Thin AOT: header parse + HT assemble in LLVM ({@see GetimagesizeParseLlvm}).
+ * NestedJIT {@see __string__*} args / HashTable returns are empty or crash under
+ * user-script AOT (peer #27051 / #26910 / #26829).
+ */
 final class JitGetimagesize
 {
     private static int $seq = 0;
@@ -58,7 +63,6 @@ final class JitGetimagesize
         if ($argc >= 2) {
             throw new \LogicException('getimagesizefromstring() imageinfo by-ref is VM-only in this compiler build (#3271)');
         }
-        // Soft-null DEP+coerce on PROFILE=8.4 (php-src image.c; #21492, reverts #20353 TypeError).
         $data = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'getimagesizefromstring', 0, 'string');
 
         return self::lowerBytesValue($context, $data, null, 'getimagesizefromstring', $data);
@@ -71,12 +75,13 @@ final class JitGetimagesize
         string $function = 'getimagesize',
         ?Value $noticeSource = null
     ): Value {
-        GetimagesizeJit::ensureLinked($context);
         StringTriggerErrorJit::implement($context);
 
         $tag = 'getimagesize'.(string) ++self::$seq;
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
         $falseVal = $i1->constInt(0, false);
         $noticeSource ??= $pathForOpenWarning ?? $data;
 
@@ -93,14 +98,9 @@ final class JitGetimagesize
         }
 
         $context->builder->positionAtEnd($parseBlock);
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            GetimagesizeJit::helperFunction($context),
-            [$data]
-        );
-        $parseFailed = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
+        $parsed = GetimagesizeParseLlvm::parse($context, $data);
         $okBlock = BasicBlockHelper::append($context, $tag.'_ok');
-        $context->builder->branchIf($parseFailed, $readFailBlock, $okBlock);
+        $context->builder->branchIf($parsed['ok'], $okBlock, $readFailBlock);
 
         if (null !== $pathForOpenWarning) {
             $context->builder->positionAtEnd($openFailBlock);
@@ -111,14 +111,12 @@ final class JitGetimagesize
         }
 
         $context->builder->positionAtEnd($readFailBlock);
-        $shouldNoticeFn = null !== $pathForOpenWarning
-            ? GetimagesizeJit::shouldNoticeForPathHelper($context)
-            : GetimagesizeJit::shouldNoticeForBytesHelper($context);
-        $shouldNotice = $context->builder->call($shouldNoticeFn, $noticeSource);
-        $shouldNoticeBool = $context->builder->icmp(Builder::INT_NE, $shouldNotice, $i1->constInt(0, false));
+        $shouldNotice = null !== $pathForOpenWarning
+            ? GetimagesizeParseLlvm::shouldNoticePath($context, $noticeSource)
+            : GetimagesizeParseLlvm::shouldNoticeBytes($context, $noticeSource);
         $noticeEmitBlock = BasicBlockHelper::append($context, $tag.'_notice_emit');
         $readFailTailBlock = BasicBlockHelper::append($context, $tag.'_read_fail_tail');
-        $context->builder->branchIf($shouldNoticeBool, $noticeEmitBlock, $readFailTailBlock);
+        $context->builder->branchIf($shouldNotice, $noticeEmitBlock, $readFailTailBlock);
 
         $context->builder->positionAtEnd($noticeEmitBlock);
         JitBuiltinWarning::emitImageReadFailed($context, $noticeSource, $function);
@@ -128,7 +126,7 @@ final class JitGetimagesize
         $readFailTail = self::writeFalseAndBranch($context, $doneBlock, $falseVal);
 
         $context->builder->positionAtEnd($okBlock);
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $ht = self::assembleResultHashtable($context, $parsed, $i64, $sizeT);
         $context->refcount->addref($ht);
         $okSlot = JitValueBox::alloc($context);
         $okPtr = JitValueBox::pointer($context, $okSlot);
@@ -146,6 +144,57 @@ final class JitGetimagesize
         $result->addIncoming($okPtr, $okTail);
 
         return $result;
+    }
+
+    /**
+     * @param array{ok:Value,width:Value,height:Value,type:Value,bits:Value,channels:Value,mime:Value,attr:Value} $parsed
+     */
+    private static function assembleResultHashtable(Context $context, array $parsed, Type $i64, Type $sizeT): Value
+    {
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $setLongAt = $context->lookupFunction('__hashtable__setLongAt');
+        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
+        $setKeyLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $setKeyString = $context->lookupFunction('__hashtable__setStringKeyString');
+
+        $context->builder->call($setLongAt, $ht, $sizeT->constInt(0, false), $parsed['width']);
+        $context->builder->call($setLongAt, $ht, $sizeT->constInt(1, false), $parsed['height']);
+        $context->builder->call($setLongAt, $ht, $sizeT->constInt(2, false), $parsed['type']);
+        $context->builder->call($setStringAt, $ht, $sizeT->constInt(3, false), $parsed['attr']);
+        $context->builder->call(
+            $setKeyLong,
+            $ht,
+            $context->builder->load($context->constantStringFromString('bits')),
+            $parsed['bits']
+        );
+        $context->builder->call(
+            $setKeyString,
+            $ht,
+            $context->builder->load($context->constantStringFromString('mime')),
+            $parsed['mime']
+        );
+
+        $hasChannels = $context->builder->icmp(
+            Builder::INT_SGE,
+            $parsed['channels'],
+            $i64->constInt(0, true)
+        );
+        $withCh = BasicBlockHelper::append($context, 'getimagesize_with_channels');
+        $afterCh = BasicBlockHelper::append($context, 'getimagesize_after_channels');
+        $context->builder->branchIf($hasChannels, $withCh, $afterCh);
+
+        $context->builder->positionAtEnd($withCh);
+        $context->builder->call(
+            $setKeyLong,
+            $ht,
+            $context->builder->load($context->constantStringFromString('channels')),
+            $parsed['channels']
+        );
+        $context->builder->branch($afterCh);
+
+        $context->builder->positionAtEnd($afterCh);
+
+        return $ht;
     }
 
     private static function writeFalseAndBranch(Context $context, \PHPLLVM\BasicBlock $doneBlock, Value $falseVal): Value
