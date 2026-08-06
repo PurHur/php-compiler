@@ -1,13 +1,13 @@
 {
     "version": 1,
-    "generated_at": "2026-08-05T23:06:07+00:00",
+    "generated_at": "2026-08-06T03:28:15+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "aa095c4c11625938c149",
     "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
     "unit_count": 360,
-    "published_fresh": 2,
+    "published_fresh": 8,
     "kept_live_unpublished": 0,
-    "total_bytes": 600746142,
-    "refresh": "VALIDATE_PATH discovery + HtmlspecialcharsDecode refresh after #27911-13 (Pillar 1)"
+    "total_bytes": 601368037,
+    "refresh": "refresh 8 class-introspection helper units (#28007)"
 }
