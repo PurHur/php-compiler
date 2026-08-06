@@ -740,6 +740,10 @@ final class BuiltinInternalDefaultValues
         'libxml_disable_entity_loader' => [
             0 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/imap/php_imap.stub.php — int $timeout = -1 (int infer → 0) (#27680)
+        'imap_timeout' => [
+            1 => ['kind' => 'int', 'value' => -1],
+        ],
     ];
 
     public static function isAvailable(

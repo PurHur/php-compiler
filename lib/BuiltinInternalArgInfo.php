@@ -253,6 +253,8 @@ final class BuiltinInternalArgInfo
             'usort', 'uasort', 'uksort', 'ksort', 'krsort' => 'true',
             // ext/imap/php_imap.stub.php — InternalArgInfo return string (missing |false) (#27681, #27764, #27765)
             'imap_utf7_decode', 'imap_utf8_to_mutf7', 'imap_mutf7_to_utf8', 'imap_mail_compose' => 'string|false',
+            // ext/imap/php_imap.stub.php — InternalArgInfo return empty; Zend int|bool (#27680)
+            'imap_timeout' => 'int|bool',
             // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
             'shm_attach' => 'SysvSharedMemory|false',
             'shm_get_var' => 'mixed',

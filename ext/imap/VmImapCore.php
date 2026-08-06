@@ -28,6 +28,22 @@ final class VmImapCore
     /** @var list<string> */
     private static array $alerts = [];
 
+    /** php-src PHP_IMAP_*TIMEOUT (ext/imap/php_imap.c). */
+    public const IMAP_OPENTIMEOUT = 1;
+
+    public const IMAP_READTIMEOUT = 2;
+
+    public const IMAP_WRITETIMEOUT = 3;
+
+    public const IMAP_CLOSETIMEOUT = 4;
+
+    /**
+     * Process-wide c-client timeouts (seconds); seeded from default_socket_timeout (#27680).
+     *
+     * @var array{1: int, 2: int, 3: int, 4: int}|null
+     */
+    private static ?array $timeouts = null;
+
     /** c-client LATT_* bits used by imap_getmailboxes() (php_imap.h). */
     public const LATT_NOINFERIORS = 0x01;
 
@@ -89,6 +105,54 @@ final class VmImapCore
     {
         self::$errors = [];
         self::$lastError = null;
+    }
+
+    /**
+     * imap_timeout() — get/set process-wide open/read/write/close timeouts (php_imap.c; #27680).
+     *
+     * @return int|bool int on get ($timeout === -1), true on successful set, false on bad type/value
+     */
+    public static function timeout(int $timeoutType, int $timeout = -1): int|bool
+    {
+        self::ensureTimeouts();
+        if (-1 === $timeout) {
+            if (!isset(self::$timeouts[$timeoutType])) {
+                return false;
+            }
+
+            return self::$timeouts[$timeoutType];
+        }
+        if ($timeout < 0) {
+            return false;
+        }
+        if (!isset(self::$timeouts[$timeoutType])) {
+            return false;
+        }
+        self::$timeouts[$timeoutType] = $timeout;
+
+        return true;
+    }
+
+    /** Seconds for remote open TCP probe (php-src SET_OPENTIMEOUT / FG(default_socket_timeout)). */
+    public static function openTimeoutSeconds(): float
+    {
+        self::ensureTimeouts();
+
+        return (float) self::$timeouts[self::IMAP_OPENTIMEOUT];
+    }
+
+    private static function ensureTimeouts(): void
+    {
+        if (null !== self::$timeouts) {
+            return;
+        }
+        $default = (int) (\ini_get('default_socket_timeout') ?: 60);
+        self::$timeouts = [
+            self::IMAP_OPENTIMEOUT => $default,
+            self::IMAP_READTIMEOUT => $default,
+            self::IMAP_WRITETIMEOUT => $default,
+            self::IMAP_CLOSETIMEOUT => $default,
+        ];
     }
 
     /**
@@ -189,7 +253,14 @@ final class VmImapCore
 
         $errno = 0;
         $errstr = '';
-        $sock = @fsockopen($host, $port, $errno, $errstr, 0.5);
+        // php-src uses SET_OPENTIMEOUT (default_socket_timeout); keep a floor so probes stay snappy.
+        $openTo = self::openTimeoutSeconds();
+        if ($openTo <= 0.0) {
+            $openTo = 0.5;
+        } elseif ($openTo > 2.0) {
+            $openTo = 2.0;
+        }
+        $sock = @fsockopen($host, $port, $errno, $errstr, $openTo);
         if (false !== $sock) {
             fclose($sock);
             // TCP up but no IMAP client yet — treat as open failure (no c-client).
