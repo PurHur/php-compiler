@@ -3169,7 +3169,7 @@ final class VmReflection
         }
     }
 
-    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128, #22341). */
+    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128, #22341, #28137). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
     {
         $constants = [
@@ -3182,6 +3182,12 @@ final class VmReflection
         // php-src 8.4+ ReflectionProperty::IS_FINAL (ZEND_ACC_FINAL) — absent on 8.2 reference.
         if (CompilerVersion::supportsFinalProperties()) {
             $constants['is_final'] = self::REFLECTION_IS_FINAL;
+        }
+        // php-src 8.4+ asymmetric set-visibility constants (ZEND_ACC_*_SET) — #28137.
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $constants['is_public_set'] = self::REFLECTION_IS_PUBLIC_SET;
+            $constants['is_protected_set'] = self::REFLECTION_IS_PROTECTED_SET;
+            $constants['is_private_set'] = self::REFLECTION_IS_PRIVATE_SET;
         }
         self::registerIntClassConstants($entry, $constants);
     }
@@ -3356,6 +3362,25 @@ final class VmReflection
         return self::REFLECTION_IS_PUBLIC;
     }
 
+    /**
+     * Map asymmetric set-visibility CFG flags to ReflectionProperty::IS_*_SET (#28137).
+     * Symmetric properties store setVisibility=0 and contribute no SET bits (php-src prop->flags).
+     */
+    public static function setVisibilityToReflectionBitmask(int $setVisibility): int
+    {
+        if (0 === $setVisibility) {
+            return 0;
+        }
+        if (($setVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return self::REFLECTION_IS_PRIVATE_SET;
+        }
+        if (($setVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return self::REFLECTION_IS_PROTECTED_SET;
+        }
+
+        return self::REFLECTION_IS_PUBLIC_SET;
+    }
+
     /** True when $property is a static property on $class or an ancestor (#22143). */
     public static function propertyIsStatic(ClassEntry $class, string $property, Context $ctx): bool
     {
@@ -3363,9 +3388,9 @@ final class VmReflection
     }
 
     /**
-     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143, #22341).
+     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143, #22341, #28137).
      * Dynamic properties are public-only (ZEND_ACC_PUBLIC|ZEND_ACC_VIRTUAL).
-     * keep_flags includes ZEND_ACC_FINAL for PHP 8.4 final properties.
+     * keep_flags includes ZEND_ACC_FINAL and ZEND_ACC_*_SET for PHP 8.4+.
      */
     public static function propertyReflectionModifiers(
         ClassEntry $entry,
@@ -3384,6 +3409,7 @@ final class VmReflection
             return self::REFLECTION_IS_PUBLIC;
         }
         $modifiers = self::visibilityToReflectionBitmask($meta['visibility']);
+        $modifiers |= self::setVisibilityToReflectionBitmask((int) $meta['setVisibility']);
         if (self::propertyIsStatic($entry, $property, $ctx)) {
             $modifiers |= self::REFLECTION_IS_STATIC;
         }
