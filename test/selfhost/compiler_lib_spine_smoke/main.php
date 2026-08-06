@@ -1732,6 +1732,7 @@ require_once __DIR__.'/../../../ext/redis/RedisExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/redis/RedisGet.php';
 require_once __DIR__.'/../../../ext/redis/RedisIntrospection.php';
 require_once __DIR__.'/../../../ext/redis/RedisOptions.php';
+require_once __DIR__.'/../../../ext/redis/RedisPersistence.php';
 require_once __DIR__.'/../../../ext/redis/RedisSet.php';
 require_once __DIR__.'/../../../ext/redis/RedisState.php';
 require_once __DIR__.'/../../../ext/redis/VmRedis.php';
