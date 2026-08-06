@@ -29,6 +29,27 @@ final class NestedJitCompileScopeRestoreTest extends TestCase
         );
     }
 
+    public function testNestedJitClearsForeachSlotsAndActiveFunction(): void
+    {
+        $root = \dirname(__DIR__, 3);
+        $source = (string) \file_get_contents($root.'/lib/JIT/NestedJitCompileScope.php');
+        $this->assertStringContainsString(
+            '$context->foreachIndexSlots = []',
+            $source,
+            'NestedJIT must isolate foreach index allocas from the outer function (#28053)'
+        );
+        $this->assertStringContainsString(
+            "\$context->activeFunction = ''",
+            $source,
+            'NestedJIT must drop outer activeFunction while insert is cleared (#28053)'
+        );
+        $this->assertStringContainsString(
+            '$context->foreachIndexSlots = $savedForeachIndexSlots',
+            $source,
+            'NestedJIT must restore outer foreach index slots on exit (#28053)'
+        );
+    }
+
     public function testEntryAllocaRestoresViaBasicBlockHelper(): void
     {
         $root = \dirname(__DIR__, 3);

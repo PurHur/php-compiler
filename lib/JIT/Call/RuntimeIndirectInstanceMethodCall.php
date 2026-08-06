@@ -73,6 +73,7 @@ final class RuntimeIndirectInstanceMethodCall implements Call
         $context->builder->branchIf($isObject, $okBlock, $failBlock);
         $context->builder->positionAtEnd($failBlock);
         $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
         $context->builder->positionAtEnd($okBlock);
 
         return $context->builder->call(
