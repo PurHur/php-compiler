@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7089 |
-| Phase A inventory files (M2 ratio SSOT) | 7089 |
+| PHP files on vm.php path | 7090 |
+| Phase A inventory files (M2 ratio SSOT) | 7090 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22780 |
+| Source constructs flagged (warnings) | 22783 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2458,6 +2458,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/CountCharsJitHelper.php` | 0 | 3 |
 | `ext/standard/Crc32JitHelper.php` | 0 | 1 |
 | `ext/standard/CslashesJitHelper.php` | 0 | 1 |
+| `ext/standard/CsvFputcsvJitHelper.php` | 0 | 1 |
 | `ext/standard/CsvJitHelper.php` | 0 | 3 |
 | `ext/standard/CsvStrGetcsvJitHelper.php` | 0 | 1 |
 | `ext/standard/DateConstants.php` | 0 | 1 |
@@ -5262,7 +5263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FilterInputTypeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/FilterVarArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FinfoFileRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/FputcsvRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/FputcsvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FrenchtojdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsDirRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsGlobVecRuntime.php` | 0 | 1 |
@@ -27089,6 +27090,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/CsvFputcsvJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/CsvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -27099,7 +27105,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/CsvStrGetcsvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/DateConstants.php`
 
@@ -46187,7 +46193,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/FputcsvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- new strval (line 64)
+- new Variable (line 210)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/FrenchtojdRuntime.php`
 
@@ -47839,7 +47847,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFgetcsvJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 

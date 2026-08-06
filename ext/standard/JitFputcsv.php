@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fputcsv() via CsvJitHelper + __compiler_fwrite (#1193, #12447). */
+/** LLVM lowering for fputcsv() via CsvFputcsvJitHelper + __compiler_fwrite (#1193, #12447, #27180). */
 final class JitFputcsv
 {
     /** @return Value (int bytes written, or boolean false on failure) */
