@@ -6,14 +6,14 @@ namespace PHPCompiler\Test\Unit\JIT;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\ObOutputJitBridge;
 use PHPCompiler\JIT\Builtin\RewriteVarsRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9753: AOT standalone output rewrite vars must use OutputRewriteVarsJitHelper PHP, not phpc_rewrite_vars LLVM global.
- * Issue #21965: NestedJIT must lower VmUrlRewriterOb under PHP_COMPILER_EMIT_HELPER_LINK=1.
+ * Issue #9753 / #27566: AOT rewrite vars via OutputRewriteVarsJitHelper; no NestedJIT ensureRegistered.
  *
  * @group aot-lint
  */
@@ -26,18 +26,32 @@ final class RewriteVarsRuntimeStandaloneTest extends TestCase
         RewriteVarsRuntime::ensureLinked($ctx);
 
         foreach ([
-            'phpcompiler\\ext\\standard\\vmurlrewriterob::ensureregistered',
-            'phpcompiler\\ext\\standard\\vmurlrewriterob::resetstate',
             'phpcompiler\\ext\\standard\\outputrewritevarsjithelper::add',
             'phpcompiler\\ext\\standard\\outputrewritevarsjithelper::reset',
+            'phpcompiler\\ext\\standard\\outputrewritevarsjithelper::settags',
+            'phpcompiler\\ext\\standard\\outputrewritevarsjithelper::gettags',
         ] as $name) {
             $this->assertArrayHasKey($name, $ctx->functions);
         }
 
         $this->assertNull($ctx->module->getNamedGlobal('phpc_rewrite_vars'));
+        $this->assertArrayNotHasKey(
+            'phpcompiler\\ext\\standard\\vmurlrewriterob::ensureregistered',
+            $ctx->functions
+        );
     }
 
-    public function testEnsureLinkedUnderEmitHelperLinkRegistersUrlRewriterMethods(): void
+    public function testEnsureUrlRewriterStackLinksObStartWithUrlRewriterAbi(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        ObOutputJitBridge::ensureUrlRewriterStack($ctx);
+        $urlAbi = $ctx->module->getNamedFunction('__phpc_ob_start_with_url_rewriter');
+        $this->assertNotNull($urlAbi);
+        $this->assertGreaterThan(0, $urlAbi->countBasicBlocks());
+    }
+
+    public function testEnsureLinkedUnderEmitHelperLinkRegistersRewriteHelpers(): void
     {
         $prev = \getenv('PHP_COMPILER_EMIT_HELPER_LINK');
         \putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
@@ -55,14 +69,9 @@ final class RewriteVarsRuntimeStandaloneTest extends TestCase
 
             RewriteVarsRuntime::ensureLinked($ctx);
             $this->assertArrayHasKey(
-                'phpcompiler\\ext\\standard\\vmurlrewriterob::ensureregistered',
-                $ctx->functions
-            );
-            $this->assertArrayHasKey(
                 'phpcompiler\\ext\\standard\\outputrewritevarsjithelper::add',
                 $ctx->functions
             );
-            // Must not throw LogicException("Current basic block has no parent function") (#21972).
             JIT\BasicBlockHelper::parentFunction($ctx);
             $this->assertNotNull(JIT\BasicBlockHelper::append($ctx, 'after_rewrite_vars'));
         } finally {

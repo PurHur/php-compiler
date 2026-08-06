@@ -9,8 +9,10 @@ use PHPCompiler\VM\OutputBuffer;
 /**
  * URL-Rewriter output-buffer registration (ext/standard/url.c, #12854, #24370).
  *
- * Flush rewriting lives in {@see UrlScannerEx} / {@see VmUrlRewriterFlush} so NestedJIT of
- * registration helpers stays free of the scanner (#21965 / #24370).
+ * Tags/hosts storage SSOT: {@see OutputRewriteVarsJitHelper} so AOT Ini + flush share
+ * one NestedJIT static (#27566). Flush rewriting lives in {@see UrlScannerEx} /
+ * {@see VmUrlRewriterFlush} so NestedJIT of registration helpers stays free of the
+ * scanner (#21965 / #24370).
  */
 final class VmUrlRewriterOb
 {
@@ -18,13 +20,7 @@ final class VmUrlRewriterOb
 
     private static bool $registered = false;
 
-    /** Mutable url_rewriter.tags (php-src PHP_INI_ALL default form=). */
-    private static string $tags = 'form=';
-
-    /** Mutable url_rewriter.hosts (php-src PHP_INI_ALL default empty). */
-    private static string $hosts = '';
-
-    /** Ensure URL-Rewriter ob handler is active (idempotent). */
+    /** Ensure URL-Rewriter ob handler is active (idempotent) — VM OutputBuffer only. */
     public static function ensureRegistered(): void
     {
         if (self::$registered) {
@@ -49,21 +45,21 @@ final class VmUrlRewriterOb
 
     public static function getTags(): string
     {
-        return self::$tags;
+        return OutputRewriteVarsJitHelper::getTags();
     }
 
     public static function setTags(string $tags): void
     {
-        self::$tags = $tags;
+        OutputRewriteVarsJitHelper::setTags($tags);
     }
 
     public static function getHosts(): string
     {
-        return self::$hosts;
+        return OutputRewriteVarsJitHelper::getHosts();
     }
 
     public static function setHosts(string $hosts): void
     {
-        self::$hosts = $hosts;
+        OutputRewriteVarsJitHelper::setHosts($hosts);
     }
 }

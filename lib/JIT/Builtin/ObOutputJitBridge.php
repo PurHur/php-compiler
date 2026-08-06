@@ -38,6 +38,8 @@ final class ObOutputJitBridge
 
     private const START_GZ_HELPER = 'PHPCompiler\\ext\\standard\\ObOutputJitHelper::startWithGzhandler';
 
+    private const START_URL_REWRITER_HELPER = 'PHPCompiler\\ext\\standard\\ObOutputJitHelper::startWithUrlRewriter';
+
     private const LEVEL_HELPER = 'PHPCompiler\\ext\\standard\\ObOutputJitHelper::getLevel';
 
     private const BUFFER_USED_HELPER = 'PHPCompiler\\ext\\standard\\ObOutputJitHelper::bufferUsedAt';
@@ -69,9 +71,31 @@ final class ObOutputJitBridge
     private const FLUSH_STDOUT_HELPER = 'PHPCompiler\\ext\\standard\\ObOutputJitHelper::flushStdout';
 
     /** @var list<string> */
+    private const COMPILED_HELPERS_BASE = [
+        self::START_HELPER,
+        self::START_GZ_HELPER,
+        self::LEVEL_HELPER,
+        self::BUFFER_USED_HELPER,
+        self::APPEND_HELPER,
+        self::HAS_BUFFER_HELPER,
+        self::CONTENTS_HELPER,
+        self::LENGTH_HELPER,
+        self::END_CLEAN_HELPER,
+        self::GET_CLEAN_HELPER,
+        self::END_FLUSH_HELPER,
+        self::GET_FLUSH_HELPER,
+        self::FLUSH_BUFFER_HELPER,
+        self::CLEAN_HELPER,
+        self::END_ALL_HELPER,
+        self::IMPLICIT_FLUSH_HELPER,
+        self::FLUSH_STDOUT_HELPER,
+    ];
+
+    /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::START_HELPER,
         self::START_GZ_HELPER,
+        self::START_URL_REWRITER_HELPER,
         self::LEVEL_HELPER,
         self::BUFFER_USED_HELPER,
         self::APPEND_HELPER,
@@ -110,35 +134,63 @@ final class ObOutputJitBridge
             return;
         }
 
+        // Storage-backed LLVM stack — NestedJIT PHP string slots abort under thin AOT (#27566).
+        ObStorageLlvm::implement($context);
         self::ensureExtraGlobals($context);
         self::ensureLibc($context);
         self::ensureValueHelpers($context);
         StringTriggerErrorJit::implement($context);
+        // Keep NestedJIT ObOutputJitHelper available for helper-cache / spine (#22049);
+        // ABI bodies above already come from ObStorageLlvm.
         self::ensureJitHelperCompiled($context);
-
-        self::implementVoidBridge($context, '__phpc_ob_start', self::START_HELPER);
-        self::implementVoidBridge($context, '__phpc_ob_start_with_gzhandler', self::START_GZ_HELPER);
-        self::implementI32Bridge($context, '__phpc_ob_get_level', self::LEVEL_HELPER);
-        self::implementI64FromI64Bridge($context, '__phpc_ob_buffer_used_at', self::BUFFER_USED_HELPER);
-        self::implementAppendBytes($context);
         ObOutputEchoJitEmit::implementAll($context);
-        self::implementContentsBridge($context, '__phpc_ob_get_contents', self::CONTENTS_HELPER, false, null);
-        self::implementLengthBridge($context);
-        self::implementBoolResultBridge($context, '__phpc_ob_end_clean', self::END_CLEAN_HELPER, ob_end_clean::NO_BUFFER_NOTICE);
-        self::implementContentsBridge($context, '__phpc_ob_get_clean', self::GET_CLEAN_HELPER, true, null);
-        self::implementBoolResultBridge($context, '__phpc_ob_end_flush', self::END_FLUSH_HELPER, ob_end_flush::NO_BUFFER_NOTICE);
-        self::implementContentsBridge($context, '__phpc_ob_get_flush', self::GET_FLUSH_HELPER, true, ob_get_flush::NO_BUFFER_NOTICE);
-        self::implementBoolResultBridge($context, '__phpc_ob_flush', self::FLUSH_BUFFER_HELPER, ob_flush::NO_BUFFER_NOTICE);
-        self::implementBoolResultBridge($context, '__phpc_ob_clean', self::CLEAN_HELPER, null);
-        self::implementVoidBridge($context, '__phpc_ob_end_all', self::END_ALL_HELPER);
-        self::implementVoidBridge($context, '__phpc_flush', self::FLUSH_STDOUT_HELPER);
         self::implementImplicitFlush($context);
         self::implementShutdownMarkRegistered($context);
-        self::registerLinkedRuntime($context);
+        self::registerLinkedRuntime($context, false);
         self::restoreInsertBlock($context, $restore);
         if (null === $restore) {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    /**
+     * Full ObOutput stack with URL-Rewriter into this module (#27566).
+     * Call before any helper-cache ObOutput bind.
+     */
+    public static function ensureUrlRewriterStack(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction('__phpc_ob_start_with_url_rewriter');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__phpc_ob_start_with_url_rewriter', $probe);
+            self::registerLinkedRuntime($context, false);
+
+            return;
+        }
+        $restore = self::captureInsertBlock($context);
+        // Force ObStorage LLVM into this module (skip NestedJIT PHP string slots).
+        ObStorageLlvm::implement($context);
+        ObStorageLlvm::ensureUrlRewriterStart($context);
+        self::ensureExtraGlobals($context);
+        self::ensureLibc($context);
+        self::ensureValueHelpers($context);
+        StringTriggerErrorJit::implement($context);
+        UrlRewriterApplyRuntime::ensureLinked($context);
+        // Rewrite-vars NestedJIT only (not ObOutput string stack) — module-global TU dedupe (#27566).
+        self::ensureJitHelperCompiled($context, true);
+        ObOutputEchoJitEmit::implementAll($context);
+        self::implementImplicitFlush($context);
+        self::implementShutdownMarkRegistered($context);
+        self::registerLinkedRuntime($context, false);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    /**
+     * Ensure `__phpc_ob_start_with_url_rewriter` when the rest of the ob stack
+     * was already linked (early return / ensureObStackLinked, #27566).
+     */
+    public static function ensureUrlRewriterAbi(Context $context): void
+    {
+        self::ensureUrlRewriterStack($context);
     }
 
     private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical): void
@@ -551,16 +603,23 @@ final class ObOutputJitBridge
         return $fn;
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function ensureJitHelperCompiled(Context $context, bool $withUrlRewriter = false): void
     {
         // Echo ABI must exist before NestedJIT ObOutputJitHelper compile (#12999).
         ObOutputEchoJitEmit::ensureEchoAbiDeclared($context);
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#22049'
-        );
+        if (!$withUrlRewriter) {
+            // Plain ob_* — helper-runtime unit.o (working getLevel).
+            JitVmHelperLink::ensureCompiled(
+                $context,
+                self::HELPER_PATH,
+                self::COMPILED_HELPERS_BASE,
+                '#22049'
+            );
+
+            return;
+        }
+        // URL-Rewriter: scanner/apply NestedJIT only — rewrite vars live in LLVM BSS (#27566).
+        UrlRewriterApplyRuntime::ensureLinked($context);
     }
 
     /**
@@ -572,6 +631,7 @@ final class ObOutputJitBridge
             [
                 '__phpc_ob_start',
                 '__phpc_ob_start_with_gzhandler',
+                '__phpc_ob_start_with_url_rewriter',
                 '__phpc_ob_get_level',
                 '__phpc_ob_buffer_used_at',
                 '__phpc_ob_append_bytes',

@@ -31,6 +31,7 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
         $this->assertStringContainsString('ensureEchoAbiDeclared', $bridge);
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
+        $this->assertStringContainsString('ObStorageLlvm::implement', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
         $this->assertStringNotContainsString('parseAndCompile', $bridge);
         $this->assertStringNotContainsString('new JIT(', $bridge);
@@ -42,10 +43,14 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('ObOutputUserScriptLlvm', $bridge);
-        $this->assertStringNotContainsString('ObStorageGlobals::ensureGlobals', $bridge);
-        $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
-        $this->assertStringNotContainsString('implementPopBuffer', $bridge);
         $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $bridge);
+        $this->assertStringNotContainsString('implementPopBuffer', $bridge);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ObStorageLlvm.php');
+        $storage = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObStorageLlvm.php');
+        $this->assertStringContainsString('ObStorageGlobals::ensureGlobals', $storage);
+        $this->assertStringContainsString('GLOBAL_STORAGE', $storage);
+        $this->assertStringContainsString('HANDLER_URL_REWRITER', $storage);
+        $this->assertStringContainsString('memcpy', $storage);
         $bridgeLines = \substr_count($bridge, "\n") + 1;
         $this->assertLessThan(820, $bridgeLines, 'ObOutputJitBridge LOC (#12999 echo ABI forward declare)');
         $this->assertDoesNotMatchRegularExpression(

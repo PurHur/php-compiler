@@ -97,10 +97,22 @@ final class IniRuntime
             SilenceRuntime::ensureLinked($context);
             self::ensureGlobals($context);
             // Pick up newly-listed helpers (e.g. getPrecisionInt #21963) without rebuilding bridges.
-            JitVmHelperLink::ensureCompiled(
+            // url_rewriter.* tags/hosts on OutputRewriteVarsJitHelper (#27566).
+            JitVmHelperLink::ensureCompiledBundle(
                 $context,
-                self::HELPER_PATH,
-                self::COMPILED_HELPERS,
+                [
+                    '/ext/standard/OutputRewriteVarsJitHelper.php',
+                    self::HELPER_PATH,
+                ],
+                array_merge(
+                    [
+                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getTags',
+                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setTags',
+                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getHosts',
+                        'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setHosts',
+                    ],
+                    self::COMPILED_HELPERS
+                ),
                 '#21200'
             );
             self::registerLinkedRuntime($context);
@@ -111,10 +123,21 @@ final class IniRuntime
         $restoreBlock = self::captureInsertBlock($context);
         SilenceRuntime::ensureLinked($context);
         self::ensureGlobals($context);
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
+            [
+                '/ext/standard/OutputRewriteVarsJitHelper.php',
+                self::HELPER_PATH,
+            ],
+            array_merge(
+                [
+                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getTags',
+                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setTags',
+                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getHosts',
+                    'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::setHosts',
+                ],
+                self::COMPILED_HELPERS
+            ),
             '#21200'
         );
         self::ensureValueWriters($context);
