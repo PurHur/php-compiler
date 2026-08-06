@@ -1024,7 +1024,7 @@ final class SprintfJitHelper
             }
             $result = self::insertThousands((string) $intPart, $thousandsSeparator);
 
-            return 1 === $negative ? '-'.$result : $result;
+            return 1 === $negative ? self::prependMinus($result) : $result;
         }
         $scale = 1.0;
         $i = 0;
@@ -1050,9 +1050,25 @@ final class SprintfJitHelper
         }
         $fracDigits = self::padLeftZeros((string) $fracPart, $decimals);
         $result = self::insertThousands((string) $intPart, $thousandsSeparator);
-        $result .= $decimalSeparator.$fracDigits;
+        // NestedJIT: do not `$a .= $param.$other` — wholesale concat of separator
+        // params aliases/corrupts default constant separators under thin AOT (#26991).
+        $result = self::appendString($result, $decimalSeparator);
+        $result = self::appendString($result, $fracDigits);
 
-        return 1 === $negative ? '-'.$result : $result;
+        return 1 === $negative ? self::prependMinus($result) : $result;
+    }
+
+    /** NestedJIT-safe "-".$s (#26991). */
+    private static function prependMinus(string $s): string
+    {
+        $out = '-';
+        $i = 0;
+        while (isset($s[$i])) {
+            $out .= $s[$i];
+            ++$i;
+        }
+
+        return $out;
     }
 
     private static function readPackedLong(string $packed, int $packLen): ?int
@@ -1140,6 +1156,25 @@ final class SprintfJitHelper
         return $s;
     }
 
+    /**
+     * Append $suffix onto $prefix one byte at a time (NestedJIT-safe, #26991).
+     *
+     * Thin AOT NestedJIT mishandles `$a .= $param` / `$a.$b` when $param is a
+     * helper string argument that originated as a module string constant (default
+     * number_format separators). Byte-wise append matches padLeftZeros style.
+     */
+    private static function appendString(string $prefix, string $suffix): string
+    {
+        $out = $prefix;
+        $i = 0;
+        while (isset($suffix[$i])) {
+            $out .= $suffix[$i];
+            ++$i;
+        }
+
+        return $out;
+    }
+
     private static function insertThousands(string $digits, string $separator): string
     {
         $len = 0;
@@ -1160,7 +1195,7 @@ final class SprintfJitHelper
             ++$i;
         }
         while ($i < $len) {
-            $out .= $separator;
+            $out = self::appendString($out, $separator);
             $j = 0;
             while ($j < 3 && $i < $len) {
                 $out .= $digits[$i];
