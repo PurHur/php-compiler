@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
  * preg_* dispatch — embed + standalone AOT via PregMatchRuntime PHP (#5289, #9542, #12982).
@@ -28,9 +29,32 @@ final class StringPregMatchJit
 
     public static function implement(Context $context): void
     {
-        // Always refresh — prelinked helper-runtime may ship a replaceCallbackArgv stub (#26820).
+        // Always refresh outside NestedJIT — prelinked helper-runtime may ship a
+        // replaceCallbackArgv stub (#26820). Inside NestedJIT (helper TU emit),
+        // PregMatchRuntime cannot NestedJIT PregJitHelper; leave __compiler_preg_*
+        // as externs for runtime_unsafe units such as PendingHeaders (#26989).
+        if (NestedJitCompileScope::isActive()) {
+            if (self::allRuntimeFunctionsLinked($context)) {
+                self::registerLinkedRuntime($context);
+            }
+
+            return;
+        }
+
         PregMatchRuntime::ensureLinked($context);
         self::registerLinkedRuntime($context);
+    }
+
+    private static function allRuntimeFunctionsLinked(Context $context): bool
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = self::resolveRuntimeFunction($context, $name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static function resolveRuntimeFunction(Context $context, string $name): ?\PHPLLVM\Value\Function_

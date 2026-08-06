@@ -42,7 +42,8 @@ final class PendingHeadersJitHelper
 
     public static function addHeader(string $line, int $replace): void
     {
-        if ('' === $line || preg_match('/[\r\n]/', $line)) {
+        // Avoid preg_* here — helper-TU NestedJIT cannot link PregMatchRuntime (#26989 / #9542).
+        if ('' === $line || false !== strpbrk($line, "\r\n")) {
             return;
         }
         self::maybeSetLocationStatus($line);
@@ -157,14 +158,53 @@ final class PendingHeadersJitHelper
         if (0 === strncasecmp($line, 'Location:', 9)) {
             HttpResponseJitHelper::setStatusValidated(302);
         }
-        if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#', $line, $m)) {
-            HttpResponseJitHelper::setStatusValidated((int) $m[1]);
+        // Parse ^HTTP/\d(?:\.\d)?\s+(\d{3}) without PCRE (#26989 helper-TU).
+        $status = self::statusCodeFromHttpVersionLine($line);
+        if (null !== $status) {
+            HttpResponseJitHelper::setStatusValidated($status);
         }
+    }
+
+    /**
+     * Match status lines like HTTP/1.1 200 / HTTP/2 302 (same shape as former preg).
+     * Kept free of preg_* so helper-runtime emit does not require PregMatchRuntime (#26989).
+     */
+    private static function statusCodeFromHttpVersionLine(string $line): ?int
+    {
+        if (0 !== strncasecmp($line, 'HTTP/', 5)) {
+            return null;
+        }
+        $len = \strlen($line);
+        $i = 5;
+        // Former pattern: ^HTTP/\d(?:\.\d)?\s+(\d{3})
+        if ($i >= $len || $line[$i] < '0' || $line[$i] > '9') {
+            return null;
+        }
+        ++$i;
+        if ($i < $len && '.' === $line[$i]) {
+            ++$i;
+            if ($i >= $len || $line[$i] < '0' || $line[$i] > '9') {
+                return null;
+            }
+            ++$i;
+        }
+        while ($i < $len && (' ' === $line[$i] || "\t" === $line[$i])) {
+            ++$i;
+        }
+        if ($i + 2 >= $len
+            || $line[$i] < '0' || $line[$i] > '9'
+            || $line[$i + 1] < '0' || $line[$i + 1] > '9'
+            || $line[$i + 2] < '0' || $line[$i + 2] > '9'
+        ) {
+            return null;
+        }
+
+        return (int) substr($line, $i, 3);
     }
 
     private static function headerNameFromLine(string $line): ?string
     {
-        if (preg_match('#^HTTP/#i', $line)) {
+        if (0 === strncasecmp($line, 'HTTP/', 5)) {
             return null;
         }
         $colon = strpos($line, ':');
