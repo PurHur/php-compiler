@@ -2096,4 +2096,39 @@ final class VmImapCore
 
         return $ht;
     }
+
+    /** imap_mail() empty-body warning (php-src ext/imap/php_imap.c; #27819). */
+    public static function warnMailEmptyMessage(): void
+    {
+        self::warnImap('imap_mail(): No message string in mail command');
+    }
+
+    /**
+     * Build additional headers for imap_mail() (Cc/Bcc/From from return_path).
+     */
+    public static function buildMailHeaders(
+        ?string $headers,
+        ?string $cc,
+        ?string $bcc,
+        ?string $returnPath
+    ): ?string {
+        $parts = [];
+        if (null !== $returnPath && '' !== $returnPath) {
+            $parts[] = 'From: '.$returnPath;
+        }
+        if (null !== $cc && '' !== $cc) {
+            $parts[] = 'Cc: '.$cc;
+        }
+        if (null !== $bcc && '' !== $bcc) {
+            $parts[] = 'Bcc: '.$bcc;
+        }
+        if (null !== $headers && '' !== trim($headers)) {
+            $parts[] = rtrim($headers);
+        }
+        if ([] === $parts) {
+            return null;
+        }
+
+        return implode("\r\n", $parts);
+    }
 }
