@@ -125,8 +125,8 @@ final class HashTableSliceLlvm
         );
 
         $dest = HashTableHelper::alloc($context);
-        // Tracks int keys written under preserveKeys so grow-memset NULL holes can
-        // be marked UNDEFINED (foreach skips UNDEFINED, not NULL — #27581).
+        // Tracks int keys written under preserveKeys. Grow now fills UNDEFINED (#27536);
+        // still rewrite any residual NULL holes so foreach skips them (#27581).
         $written = HashTableHelper::alloc($context);
         $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $outIdxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
@@ -193,8 +193,9 @@ final class HashTableSliceLlvm
     }
 
     /**
-     * Grow memset zeroes new slots as TYPE_NULL; foreach treats NULL as a real
-     * element. Mark slots that preserveKeys never wrote as TYPE_UNDEFINED (#27581).
+     * Mark preserveKeys slots that were never written as TYPE_UNDEFINED so foreach
+     * skips them (#27581). Grow now fills UNDEFINED (#27536); this still rewrites
+     * residual TYPE_NULL holes from older paths.
      *
      * Public for RegexIterator / ParentIterator preserve-keys snapshots (#27313).
      */
