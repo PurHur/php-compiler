@@ -45,6 +45,11 @@ final class TypeCheck
         // abort is noreturn — without unreachable the fail/edge block has no terminator
         // and helper-unit verify fails (ArrayUserSetOpsJitHelper — #28053).
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        // Callers (Native::call) keep lowering after a static mismatch — park the builder
+        // in a fresh block so subsequent IR is not appended after the terminator
+        // (json_encode NestedJIT encodehashtable + array_fill/reverse — #27073).
+        $dead = BasicBlockHelper::append($context, 'typecheck_mismatch_dead');
+        $context->builder->positionAtEnd($dead);
     }
 
     /**

@@ -4,31 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableFillLlvm;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_fill() via ArrayFillJitHelper PHP (#13501).
+ * JIT/AOT link for array_fill() (#13501, #14297, #27073).
  *
- * Standalone AOT compiles {@see ArrayFillJitHelper} via JitVmHelperLink (#14297).
- * SSOT: {@see \PHPCompiler\ext\standard\array_fill}
+ * Thin AOT NestedJIT of {@see \PHPCompiler\ext\standard\ArrayFillJitHelper} bitcasts the
+ * `__value__*` fill value to a Variable `__object__*` and stores garbage object slots —
+ * gettype object / segfault after `c:main_before_php` (#27073). Call-site LLVM via
+ * {@see HashTableFillLlvm} (peer ArrayPadRuntime / #26971, ArrayReverseRuntime / #27067).
+ *
+ * VM SSOT: {@see \PHPCompiler\ext\standard\array_fill} /
+ * {@see \PHPCompiler\ext\standard\ArrayFillJitHelper}
  * php-src: ext/standard/array.c — php_array_fill()
+ *
+ * Call-site {@see ensureLinked} restores the caller insert block after bridge emit
+ * (thin AOT orphan insert block, peer #26943 / #26884).
  */
 final class ArrayFillRuntime
 {
     private const ABI_FILL = '__array_fill__copy';
-
-    private const HELPER_PATH = '/ext/standard/ArrayFillJitHelper.php';
-
-    private const FILL_HELPER = 'PHPCompiler\\ext\\standard\\ArrayFillJitHelper::fillCopy';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::FILL_HELPER,
-    ];
 
     public static function fill(
         Context $context,
@@ -66,40 +66,47 @@ final class ArrayFillRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i64 = $context->getTypeFromString('int64');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_FILL,
-            'array_fill_bridge_entry',
-            [$i64, $i64, $valuePtr],
-            $htPtr,
-            self::FILL_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#13501'
-        );
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::emitFillBridge($context);
         self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function emitFillBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $probe = $context->module->getNamedFunction(self::ABI_FILL);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_FILL,
+                $context->context->functionType($htPtr, false, $i64, $i64, $valuePtr)
+            );
+
+        $entry = $fn->appendBasicBlock('array_fill_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $filled = HashTableFillLlvm::fill(
+            $context,
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
+        );
+        $context->builder->returnValue($filled);
+        $context->registerFunction(self::ABI_FILL, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction(self::ABI_FILL);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_FILL.' missing after ArrayFillRuntime bridge (#13501)');
+            throw new \LogicException(self::ABI_FILL.' missing after ArrayFillRuntime bridge (#27073)');
         }
         $context->registerFunction(self::ABI_FILL, $fn);
     }
