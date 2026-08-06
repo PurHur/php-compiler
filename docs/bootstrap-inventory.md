@@ -44197,7 +44197,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1167)
+- new InternalArgInfo (line 1171)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
