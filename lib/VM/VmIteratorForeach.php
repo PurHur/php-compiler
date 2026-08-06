@@ -53,26 +53,10 @@ final class VmIteratorForeach
             && 'splobjectstorage' === strtolower($containerUserType);
     }
 
-    /** ArrayIterator / RAI / RII store iteration data in `__spl_ht` (#26783, #26775). */
+    /** HT-backed SPL — foreach walks `__spl_ht` (#26783, #26775, #27311). */
     private static function usesArrayIteratorHt(?string $containerUserType): bool
     {
-        if (null === $containerUserType) {
-            return false;
-        }
-        $ut = strtolower($containerUserType);
-
-        return 'arrayiterator' === $ut
-            || 'recursivearrayiterator' === $ut
-            || 'recursiveiteratoriterator' === $ut
-            || 'arrayobject' === $ut
-            || 'limititerator' === $ut
-            || 'appenditerator' === $ut
-            || 'regexiterator' === $ut
-            || 'callbackfilteriterator' === $ut
-            || 'cachingiterator' === $ut
-            || 'parentiterator' === $ut
-            || 'multipleiterator' === $ut
-            || 'recursivetreeiterator' === $ut;
+        return SplOuterIteratorHt::isHtBacked($containerUserType);
     }
 
     /**
