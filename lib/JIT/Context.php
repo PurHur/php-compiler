@@ -387,6 +387,16 @@ class Context {
     /** @var list<string> require_once dedupe while lowering literal includes (#8559) */
     public array $jitAotIncludedCompileDone = [];
 
+    /**
+     * Module-global NestedJIT helper TU dedupe (#27566).
+     *
+     * Unlike {@see $jitAotIncludedCompileDone} (keyed by activeFunction for user includes, #878),
+     * helper statics (e.g. OutputRewriteVarsJitHelper::$tags) must be NestedJIT'd once per module.
+     *
+     * @var array<string, true> normalized helper path → compiled
+     */
+    public array $jitHelperTuCompiled = [];
+
     /** Normalized realpath of the outer {main} TU being JIT-compiled (#8559). */
     public string $jitAotEntryScriptPath = '';
 
@@ -499,6 +509,34 @@ class Context {
         if ('' !== $normalized) {
             $this->jitAotIncludedCompileDone[$this->jitIncludeCompileScopeKey($normalized)] = true;
         }
+    }
+
+    /**
+     * Module-global helper NestedJIT dedupe — statics must not split across activeFunction (#27566).
+     */
+    public function hasJitHelperTuCompiled(string $path): bool
+    {
+        $normalized = $this->normalizeJitHelperTuPath($path);
+
+        return '' !== $normalized && isset($this->jitHelperTuCompiled[$normalized]);
+    }
+
+    public function markJitHelperTuCompiled(string $path): void
+    {
+        $normalized = $this->normalizeJitHelperTuPath($path);
+        if ('' !== $normalized) {
+            $this->jitHelperTuCompiled[$normalized] = true;
+        }
+    }
+
+    private function normalizeJitHelperTuPath(string $path): string
+    {
+        $resolved = realpath($path);
+        if (false === $resolved) {
+            $resolved = $path;
+        }
+
+        return \PHPCompiler\VM\ScriptStack::normalize($resolved);
     }
 
     /** Per-LLVM-function include dedupe (#878): same path in different methods must re-inline. */
