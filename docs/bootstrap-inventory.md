@@ -3197,7 +3197,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ObGzhandlerServerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObOutputExecCaptureJitHelper.php` | 0 | 1 |
 | `ext/standard/ObOutputJitHelper.php` | 0 | 1 |
-| `ext/standard/ObStatusJitHelper.php` | 0 | 3 |
+| `ext/standard/ObStatusJitHelper.php` | 0 | 4 |
 | `ext/standard/OpendirJitHelper.php` | 0 | 1 |
 | `ext/standard/OutputRewriteVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/PackEngine.php` | 0 | 1 |
@@ -3569,7 +3569,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmNullNumberParamDeprecation.php` | 0 | 1 |
 | `ext/standard/VmNullStringParamDeprecation.php` | 0 | 1 |
 | `ext/standard/VmNumberFormat.php` | 0 | 3 |
-| `ext/standard/VmOb.php` | 0 | 5 |
+| `ext/standard/VmOb.php` | 0 | 4 |
 | `ext/standard/VmObGzhandler.php` | 0 | 1 |
 | `ext/standard/VmObOutput.php` | 0 | 9 |
 | `ext/standard/VmObjectDebugType.php` | 0 | 1 |
@@ -32116,9 +32116,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ObStatusJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 32)
-- new Variable (line 45)
-- 2 class method(s)
+- new HashTable (line 33)
+- new Variable (line 34)
+- new Variable (line 67)
+- 4 class method(s)
 
 ### `ext/standard/OpendirJitHelper.php`
 
@@ -34463,7 +34464,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 36)
 - new HashTable (line 49)
 - new Variable (line 51)
-- new Variable (line 66)
 - 3 class method(s)
 
 ### `ext/standard/VmObGzhandler.php`
@@ -47457,7 +47457,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObStatusRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 16 class method(s)
 
 ### `lib/JIT/Builtin/ObStorageGlobals.php`
 
