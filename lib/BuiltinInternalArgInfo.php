@@ -451,6 +451,8 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)
             'idate' => 1 === $index ? '?int' : null,
             'getdate' => 0 === $index ? '?int' : null,
+            // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int → 0) (#27980)
+            'localtime' => 0 === $index ? '?int' : null,
             // ext/date/php_date.stub.php — absent from InternalArgInfo (#25392)
             'date_create', 'date_create_immutable' => match ($index) {
                 0 => 'string',
