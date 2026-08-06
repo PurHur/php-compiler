@@ -3717,6 +3717,45 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('xmlreader' === $lcname) {
+            // Thin AOT: pull-parser cursor + virtual props as real slots (#27299).
+            $this->defineProperty(
+                $id,
+                \PHPCompiler\ext\xmlreader\JitXmlReaderUserScript::PROP_POS,
+                Variable::TYPE_NATIVE_LONG
+            );
+            $this->defineProperty($id, 'nodeType', Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'value', Variable::TYPE_STRING);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
+            foreach (['read', 'close', 'next'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+            foreach (['open', 'xml', 'fromstring', 'fromuri', 'fromstream'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pubStatic);
+            }
+            $this->seedExternalClassConstants($id, [
+                'none' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::NONE,
+                'element' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ELEMENT,
+                'attribute' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ATTRIBUTE,
+                'text' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::TEXT,
+                'cdata' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::CDATA,
+                'entity_ref' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ENTITY_REF,
+                'entity' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::ENTITY,
+                'pi' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::PI,
+                'comment' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::COMMENT,
+                'doc' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::DOC,
+                'doc_type' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::DOC_TYPE,
+                'doc_fragment' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::DOC_FRAGMENT,
+                'notation' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::NOTATION,
+                'whitespace' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::WHITESPACE,
+                'significant_whitespace' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::SIGNIFICANT_WHITESPACE,
+                'end_element' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::END_ELEMENT,
+                'end_entity' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::END_ENTITY,
+                'xml_declaration' => \PHPCompiler\ext\xmlreader\XmlReaderConstants::XML_DECLARATION,
+            ]);
+        }
         if (
             'limititerator' === $lcname
             || 'appenditerator' === $lcname

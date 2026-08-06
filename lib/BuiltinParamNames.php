@@ -247,6 +247,9 @@ final class BuiltinParamNames
             'xmlreader::next' => ['name'],
             'xmlreader::open' => ['uri', 'encoding', 'flags'],
             'xmlreader::xml' => ['source', 'encoding', 'flags'],
+            'xmlreader::fromstring' => ['source', 'encoding=', 'flags='],
+            'xmlreader::fromuri' => ['uri', 'encoding=', 'flags='],
+            'xmlreader::fromstream' => ['stream', 'encoding=', 'flags='],
             // php-src ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo still has pre-stub names (#23407)
             'xmlwriter::setindent' => ['enable'],
             'xmlwriter::setindentstring' => ['indentation'],

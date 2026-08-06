@@ -762,6 +762,15 @@ class Context {
                 return $this->functionProxies[$lc];
             }
         }
+        if (XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($lc)
+            && XmlReaderInstanceMethodJit::isUserScriptAot()
+        ) {
+            XmlReaderInstanceMethodJit::ensureProxy($this, $lc);
+            if (isset($this->functionProxies[$lc])
+                && !($this->functionProxies[$lc] instanceof Call\ExternalMethod)) {
+                return $this->functionProxies[$lc];
+            }
+        }
 
         return null;
     }
@@ -921,6 +930,11 @@ class Context {
             && UserScriptAotEnv::isActive()
         ) {
             SimpleXmlInstanceMethodJit::ensureProxy($this, $lc);
+        }
+        if (XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($lc)
+            && XmlReaderInstanceMethodJit::isUserScriptAot()
+        ) {
+            XmlReaderInstanceMethodJit::ensureProxy($this, $lc);
         }
         if ($this->functionProxyIsCallable($lc)) {
             return true;
@@ -1366,6 +1380,11 @@ class Context {
         if (CompilerVersion::supportsDomLivingStandardNamespace()) {
             $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
             $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
+        }
+        // XMLReader::fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299).
+        if (CompilerVersion::supportsXmlReaderFactories()) {
+            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
+            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);

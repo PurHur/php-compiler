@@ -19200,6 +19200,12 @@ class JIT {
         ) {
             JIT\XmlWriterInstanceMethodJit::ensureProxy($this->context, $proxyName);
         }
+        // Register XMLReader user-script AOT proxies before functionIsRegistered (#27299).
+        if (JIT\XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($proxyName)
+            && JIT\XmlReaderInstanceMethodJit::isUserScriptAot()
+        ) {
+            JIT\XmlReaderInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
         // Register XSLTProcessor user-script AOT proxies before functionIsRegistered (#20392).
         if (JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
             && JIT\XsltInstanceMethodJit::isUserScriptAot()
@@ -19227,6 +19233,8 @@ class JIT {
                 || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')));
         $xmlWriterUserScript = JIT\XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($proxyName)
             && JIT\XmlWriterInstanceMethodJit::isUserScriptAot();
+        $xmlReaderUserScript = JIT\XmlReaderInstanceMethodJit::isXmlReaderInstanceMethodProxy($proxyName)
+            && JIT\XmlReaderInstanceMethodJit::isUserScriptAot();
         $xsltUserScript = JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
             && JIT\XsltInstanceMethodJit::isUserScriptAot();
         // NestedJIT VM\Variable params are `__value__*` (#16565) — never run object lazy-init on them (#20785).
@@ -19246,6 +19254,7 @@ class JIT {
             && !$splObjectStorageMethod
             && !$simpleXmlUserScript
             && !$xmlWriterUserScript
+            && !$xmlReaderUserScript
             && !$xsltUserScript
         ) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
@@ -19346,6 +19355,19 @@ class JIT {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnodelist::item');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtokenlist::item');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\tokenlist::item');
+                }
+                // while ($r->read()) widens XMLReader receivers to :object (#27299).
+                if (
+                    'read' === $methodLc
+                    && JIT\XmlReaderInstanceMethodJit::isUserScriptAot()
+                ) {
+                    JIT\XmlReaderInstanceMethodJit::ensureProxy($this->context, 'xmlreader::read');
+                    if ($this->context->functionIsRegistered('xmlreader::read')) {
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy('xmlreader::read');
+                        $this->context->scope->args = [$receiverVar];
+
+                        return;
+                    }
                 }
                 if ('getnameditem' === $methodLc || 'getnameditemns' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnamednodemap::'.$methodLc);
