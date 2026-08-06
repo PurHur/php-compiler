@@ -410,6 +410,22 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('SysvSharedMemory', $shm['type']);
     }
 
+    /** php-src ext/sockets/sockets.stub.php — Socket stubs; InternalArgInfo resource/untyped (#27854). */
+    public function testSocketExportImportReflectionStubTypes(): void
+    {
+        $this->assertSame('Socket|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('socket_import_stream'));
+        $this->assertSame('Socket|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('socket_create'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('socket_close'));
+        $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('socket_export_stream'));
+        $this->assertSame('Socket', BuiltinInternalArgInfo::stubParamTypeOverride('socket_export_stream', 0));
+        $export = BuiltinInternalArgInfo::paramInfoForFunction('socket_export_stream', 0);
+        $this->assertNotNull($export);
+        $this->assertSame('Socket', $export['type']);
+        $this->assertSame('socket', $export['name']);
+        $this->assertSame(['socket'], BuiltinParamNames::forFunction('socket_export_stream'));
+        $this->assertSame(['stream'], BuiltinParamNames::forFunction('socket_import_stream'));
+    }
+
     /** php-src ext/curl/curl.stub.php — CurlShareHandle + mixed $value (#27704). */
     public function testCurlShareSetoptReflectionStubTypes(): void
     {

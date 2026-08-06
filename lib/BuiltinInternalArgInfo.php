@@ -271,6 +271,9 @@ final class BuiltinInternalArgInfo
             // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
             'shm_attach' => 'SysvSharedMemory|false',
             'shm_get_var' => 'mixed',
+            // ext/sockets/sockets.stub.php — InternalArgInfo resource / empty; Zend Socket|false / void (#27854)
+            'socket_create', 'socket_create_listen', 'socket_accept', 'socket_import_stream' => 'Socket|false',
+            'socket_close' => 'void',
             default => null,
         };
     }
@@ -645,6 +648,8 @@ final class BuiltinInternalArgInfo
                 1 => 'int',
                 default => null,
             },
+            // ext/sockets/sockets.stub.php — Socket $socket; InternalArgInfo untyped / absent (#27854)
+            'socket_export_stream', 'socket_close', 'socket_accept' => 0 === $index ? 'Socket' : null,
             // ext/filter/filter.stub.php — mixed $value; array|int $options (InternalArgInfo variable/untyped) (#25046)
             'filter_var' => match ($index) {
                 0 => 'mixed',
