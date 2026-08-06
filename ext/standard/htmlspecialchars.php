@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringHtmlspecialchars;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -26,6 +27,8 @@ use PHPLLVM\Value;
 
 /**
  * htmlspecialchars() for strings (subset of PHP; JIT UTF-8 + flags + double_encode — #27290).
+ *
+ * php-src: ext/standard/html.stub.php / html.c — PHP_FUNCTION(htmlspecialchars)
  */
 final class htmlspecialchars extends Internal
 {
@@ -33,10 +36,8 @@ final class htmlspecialchars extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = count($frame->calledArgs);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('htmlspecialchars() requires one to four arguments');
-        }
+        // php-src zend_API.c / html.stub.php — ArgumentCountError (#28285, peer #28284).
+        $this->requireArgCountRange($frame, 'htmlspecialchars', 1, 4);
         $string = self::vmStringArg($frame, 0, 'string');
         $flags = self::DEFAULT_FLAGS;
         $encoding = 'UTF-8';
@@ -72,8 +73,18 @@ final class htmlspecialchars extends Internal
     {
         $this->context = $context;
         $argc = count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer array_search #28284 / #28285.
+        // Allocate typed return before AndAbort (constNull after a sealed block is invalid IR).
         if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('htmlspecialchars() requires one to four arguments');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('htmlspecialchars() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('htmlspecialchars() expects at most 4 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
 
         $folded = self::tryCompileTimeHtmlspecialchars($context, $args);
