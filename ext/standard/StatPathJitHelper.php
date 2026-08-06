@@ -16,11 +16,19 @@ final class StatPathJitHelper
 {
     public static function exists(string $path): bool
     {
+        if (!VmOpenBasedir::check($path, true, 'file_exists')) {
+            return false;
+        }
+
         return \phpc_stat_mode_kernel($path, 0) >= 0;
     }
 
     public static function isFile(string $path): bool
     {
+        if (!VmOpenBasedir::check($path, true, 'is_file')) {
+            return false;
+        }
+
         $mode = \phpc_stat_mode_kernel($path, 0);
 
         // S_IFMT=0xF000, S_IFREG=0x8000 — literals so nested JIT folds cleanly (#19215).
@@ -29,6 +37,10 @@ final class StatPathJitHelper
 
     public static function isDir(string $path): bool
     {
+        if (!VmOpenBasedir::check($path, true, 'is_dir')) {
+            return false;
+        }
+
         $mode = \phpc_stat_mode_kernel($path, 0);
 
         return $mode >= 0 && ($mode & 0xF000) === 0x4000;
@@ -36,6 +48,10 @@ final class StatPathJitHelper
 
     public static function isLink(string $path): bool
     {
+        if (!VmOpenBasedir::check($path, true, 'is_link')) {
+            return false;
+        }
+
         $mode = \phpc_stat_mode_kernel($path, 1);
 
         return $mode >= 0 && ($mode & 0xF000) === 0xA000;

@@ -24,6 +24,11 @@ final class is_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (!VmOpenBasedir::check($path, true, 'is_file', $frame->vmContext, $frame)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->bool(VmStatPath::isFile($path));
     }
 

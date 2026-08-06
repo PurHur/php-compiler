@@ -22,6 +22,11 @@ final class file_exists extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (!VmOpenBasedir::check($path, true, 'file_exists', $frame->vmContext, $frame)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->bool(VmStatPath::exists($path));
     }
 

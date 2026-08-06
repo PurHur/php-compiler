@@ -72,6 +72,10 @@ final class VmStreamOpenFailure
                 return $httpDetail;
             }
         }
+        $basedirDenied = VmOpenBasedir::consumeDeniedOpenDetail();
+        if (null !== $basedirDenied) {
+            return $basedirDenied;
+        }
 
         return 'No such file or directory';
     }

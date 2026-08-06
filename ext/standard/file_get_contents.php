@@ -78,6 +78,21 @@ final class file_get_contents extends Internal
 
         $contextVar = isset($frame->calledArgs[2]) ? $frame->calledArgs[2]->resolveIndirect() : null;
 
+        if (!VmFsStdio::isStdioUri($filename)
+            && 'php://output' !== $filename
+            && 'php://input' !== $filename
+            && !VmPhpMemoryStream::isSupportedUri($filename)
+            && !VmPhpFilterStream::isSupportedUri($filename)
+            && !VmDataUri::isDataUri($filename)
+            && !VmHttpLastResponseHeaders::isHttpUrl($filename)
+            && !VmOpenBasedir::check($filename, true, 'file_get_contents', $frame->vmContext, $frame)
+        ) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'file_get_contents', $filename);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+
         $data = VmFs::fileGetContents(
             $filename,
             $useIncludePath,

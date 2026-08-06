@@ -28,6 +28,7 @@ final class IniJitHelper
         'session.save_path',
         'session.use_strict_mode',
         'include_path',
+        'open_basedir',
         'short_open_tag',
         'register_argc_argv',
         'zend.enable_gc',
@@ -95,7 +96,6 @@ final class IniJitHelper
         'user_dir',
         'disable_functions',
         'disable_classes',
-        'open_basedir',
         'mail.add_x_header',
         'error_append_string',
         'error_prepend_string',
@@ -355,6 +355,9 @@ final class IniJitHelper
         if ('include_path' === $key) {
             return IncludePathJitHelper::get();
         }
+        if ('open_basedir' === $key) {
+            return VmOpenBasedir::get();
+        }
         if ('default_charset' === $key) {
             return self::$defaultCharset;
         }
@@ -441,6 +444,11 @@ final class IniJitHelper
         }
         if ('include_path' === $key) {
             return IncludePathJitHelper::push($newValue);
+        }
+        if ('open_basedir' === $key) {
+            $old = VmOpenBasedir::set($newValue);
+
+            return false === $old ? null : $old;
         }
         if ('default_charset' === $key) {
             return self::setDefaultCharset($newValue);
@@ -610,6 +618,9 @@ final class IniJitHelper
                 break;
             case 'session.use_strict_mode':
                 VmSession::setUseStrictMode(false);
+                break;
+            case 'open_basedir':
+                VmOpenBasedir::restore();
                 break;
             case 'user_agent':
                 self::$userAgent = '';
