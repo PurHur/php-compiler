@@ -81,6 +81,8 @@ final class BuiltinInternalArgInfo
             'fsync', 'fdatasync' => 'bool',
             // ext/standard/basic_functions.stub.php — no return type; InternalArgInfo says array (#25508)
             'stream_context_create' => '',
+            // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#27848)
+            'stream_socket_client' => '',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#25480, #28223)
             'restore_error_handler', 'restore_exception_handler' => 'true',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; PHP 8.4+: true (#28222)
@@ -796,6 +798,12 @@ final class BuiltinInternalArgInfo
             'stream_copy_to_stream' => 2 === $index ? '?int' : null,
             // ext/standard/streamsfuncs.stub.php — ?array &$read (InternalArgInfo array) (#27777)
             'stream_select' => 0 === $index ? '?array' : null,
+            // ext/standard/streamsfuncs.stub.php — untyped &$error_* outs + ?float $timeout (#27848)
+            'stream_socket_client' => match ($index) {
+                1, 2 => '',
+                3 => '?float',
+                default => null,
+            },
             // ext/standard/file.stub.php — ?int $length = null (#24826)
             'fgetcsv' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
