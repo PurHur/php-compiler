@@ -1213,11 +1213,12 @@ final class BuiltinClasses
             $rp->methodVisibility['getsettabletype'] = $pub;
         }
         if (CompilerVersion::supportsAsymmetricVisibility()) {
+            // php-src ReflectionProperty exposes isPrivateSet/isProtectedSet only — no isPublicSet
+            // (#28185, ext/reflection/php_reflection.stub.php).
             foreach (
                 [
                     'isprivateset' => ReflectionPropertyAsymmetricProbe::isPrivateSet(),
                     'isprotectedset' => ReflectionPropertyAsymmetricProbe::isProtectedSet(),
-                    'ispublicset' => ReflectionPropertyAsymmetricProbe::isPublicSet(),
                     'isprivateget' => ReflectionPropertyAsymmetricProbe::isPrivateGet(),
                     'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
                     'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),

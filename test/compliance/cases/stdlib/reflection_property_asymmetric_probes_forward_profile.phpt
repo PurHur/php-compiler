@@ -1,5 +1,5 @@
 --TEST--
-ReflectionProperty asymmetric set/get probes on 8.4 forward profile (#17939, ext/reflection/php_reflection.c)
+ReflectionProperty asymmetric set/get probes on 8.4 forward profile (#17939, #28185, ext/reflection/php_reflection.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -10,7 +10,7 @@ foreach (['isPrivateSet', 'isProtectedSet', 'isPublicSet', 'isPrivateGet', 'isPr
 --EXPECT--
 isPrivateSet=yes
 isProtectedSet=yes
-isPublicSet=yes
+isPublicSet=no
 isPrivateGet=yes
 isProtectedGet=yes
 isPublicGet=yes

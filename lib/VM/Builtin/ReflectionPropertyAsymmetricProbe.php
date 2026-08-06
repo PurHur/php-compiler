@@ -12,8 +12,10 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * ReflectionProperty::{isPrivateSet,isProtectedSet,isPublicSet,isPrivateGet,isProtectedGet,isPublicGet}
- * — VM (#6977, ext/reflection/php_reflection.c).
+ * ReflectionProperty::{isPrivateSet,isProtectedSet,isPrivateGet,isProtectedGet,isPublicGet}
+ * — VM (#6977, #28185, ext/reflection/php_reflection.c).
+ *
+ * php-src registers isPrivateSet/isProtectedSet only on the set side — no isPublicSet.
  */
 final class ReflectionPropertyAsymmetricProbe extends VmClassMethod
 {
@@ -28,11 +30,6 @@ final class ReflectionPropertyAsymmetricProbe extends VmClassMethod
     public static function isProtectedSet(): self
     {
         return new self('isProtectedSet', self::SIDE_SET, CfgFunc::FLAG_PROTECTED);
-    }
-
-    public static function isPublicSet(): self
-    {
-        return new self('isPublicSet', self::SIDE_SET, 0);
     }
 
     public static function isPrivateGet(): self
