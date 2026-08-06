@@ -2230,17 +2230,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsGetClassAllowStringFalseOnReferenceProfile(): void
+    public function testSupportsGetClassAllowStringAlwaysFalse(): void
     {
         $this->assertFalse(CompilerVersion::supportsGetClassAllowString());
-    }
-
-    public function testSupportsGetClassAllowStringTrueOnForwardProfile(): void
-    {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsGetClassAllowString());
+            $this->assertFalse(CompilerVersion::supportsGetClassAllowString());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

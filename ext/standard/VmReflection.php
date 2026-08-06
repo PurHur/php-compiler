@@ -68,10 +68,15 @@ final class VmReflection
         );
     }
 
-    /** Max positional arity for get_class() on the active profile (ext/standard/basic_functions.c, #17395). */
+    /**
+     * Max positional arity for get_class() — always 1 (php-src stub, #28310).
+     *
+     * Prior PROFILE=8.4 path wrongly advertised optional $allow_string (#17395);
+     * Zend never registered that parameter on get_class (only on is_a / is_subclass_of).
+     */
     public static function getClassMaxArgCount(): int
     {
-        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+        return 1;
     }
 
     /**
@@ -108,9 +113,9 @@ final class VmReflection
     }
 
     /**
-     * get_class() optional $allow_string operand (forward profile gate #17395).
+     * is_a() / is_subclass_of() $allow_string operand (php-src zend_builtin_functions).
      *
-     * Not used by get_parent_class() — php-src arity is 1 (#23948).
+     * Not used by get_class() / get_parent_class() — php-src arity is 1 (#23948, #28310).
      */
     public static function parseAllowStringArg(Frame $frame, string $function, int $argIndex): bool
     {
