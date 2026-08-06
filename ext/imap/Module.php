@@ -115,6 +115,10 @@ class Module extends ModuleAbstract
             new imap_headers(),
             new imap_mailboxmsginfo(),
             new imap_mail(),
+            new imap_utf7_encode(),
+            new imap_utf7_decode(),
+            new imap_utf8_to_mutf7(),
+            new imap_mutf7_to_utf8(),
         ];
     }
 }

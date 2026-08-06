@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7104 |
-| Phase A inventory files (M2 ratio SSOT) | 7104 |
+| PHP files on vm.php path | 7109 |
+| Phase A inventory files (M2 ratio SSOT) | 7109 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22837 |
+| Source constructs flagged (warnings) | 22846 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -980,10 +980,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/BuiltinClasses.php` | 0 | 1 |
 | `ext/imap/ImapExtensionPolicy.php` | 0 | 1 |
 | `ext/imap/ImapMboxEngine.php` | 0 | 1 |
-| `ext/imap/Module.php` | 0 | 54 |
+| `ext/imap/Module.php` | 0 | 58 |
 | `ext/imap/VmImapArg.php` | 0 | 1 |
 | `ext/imap/VmImapConnection.php` | 0 | 2 |
 | `ext/imap/VmImapCore.php` | 0 | 40 |
+| `ext/imap/VmImapMutf7.php` | 0 | 1 |
 | `ext/imap/imap_alerts.php` | 0 | 2 |
 | `ext/imap/imap_append.php` | 0 | 1 |
 | `ext/imap/imap_body.php` | 0 | 1 |
@@ -1016,6 +1017,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_mail.php` | 0 | 2 |
 | `ext/imap/imap_mailboxmsginfo.php` | 0 | 1 |
 | `ext/imap/imap_msgno.php` | 0 | 1 |
+| `ext/imap/imap_mutf7_to_utf8.php` | 0 | 1 |
 | `ext/imap/imap_num_msg.php` | 0 | 2 |
 | `ext/imap/imap_num_recent.php` | 0 | 1 |
 | `ext/imap/imap_open.php` | 0 | 2 |
@@ -1037,6 +1039,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_uid.php` | 0 | 1 |
 | `ext/imap/imap_undelete.php` | 0 | 1 |
 | `ext/imap/imap_unsubscribe.php` | 0 | 1 |
+| `ext/imap/imap_utf7_decode.php` | 0 | 1 |
+| `ext/imap/imap_utf7_encode.php` | 0 | 1 |
+| `ext/imap/imap_utf8_to_mutf7.php` | 0 | 1 |
 | `ext/inotify/InotifyConstants.php` | 0 | 1 |
 | `ext/inotify/InotifyExtensionPolicy.php` | 0 | 1 |
 | `ext/inotify/InotifyLibcThinAbi.php` | 0 | 1 |
@@ -14105,6 +14110,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imap_headers (line 115)
 - new imap_mailboxmsginfo (line 116)
 - new imap_mail (line 117)
+- new imap_utf7_encode (line 118)
+- new imap_utf7_decode (line 119)
+- new imap_utf8_to_mutf7 (line 120)
+- new imap_mutf7_to_utf8 (line 121)
 - 3 class method(s)
 
 ### `ext/imap/VmImapArg.php`
@@ -14161,6 +14170,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2092)
 - 74 class method(s)
 - 12 closure(s)
+
+### `ext/imap/VmImapMutf7.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/imap/imap_alerts.php`
 
@@ -14329,6 +14343,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/imap/imap_mutf7_to_utf8.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/imap/imap_num_msg.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14434,6 +14453,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/imap/imap_unsubscribe.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_utf7_decode.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_utf7_encode.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_utf8_to_mutf7.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -33873,13 +33907,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 1067)
-- new HashTable (line 1098)
-- new HashTable (line 1105)
-- new Variable (line 1116)
-- new Variable (line 1225)
-- new Variable (line 1233)
-- new Variable (line 1241)
+- new HashTable (line 1070)
+- new HashTable (line 1101)
+- new HashTable (line 1108)
+- new Variable (line 1119)
+- new Variable (line 1228)
+- new Variable (line 1236)
+- new Variable (line 1244)
 - 71 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
@@ -44020,7 +44054,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1106)
+- new InternalArgInfo (line 1108)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44036,8 +44070,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2248)
-- new ArgumentCountError (line 2259)
+- new ArgumentCountError (line 2254)
+- new ArgumentCountError (line 2265)
 - 19 class method(s)
 - 1 closure(s)
 
