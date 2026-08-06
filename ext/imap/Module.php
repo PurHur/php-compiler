@@ -43,6 +43,21 @@ class Module extends ModuleAbstract
             'IMAP_GC_ELT' => VmImapCore::IMAP_GC_ELT,
             'IMAP_GC_ENV' => VmImapCore::IMAP_GC_ENV,
             'IMAP_GC_TEXTS' => VmImapCore::IMAP_GC_TEXTS,
+            'TYPETEXT' => VmImapMailCompose::TYPETEXT,
+            'TYPEMULTIPART' => VmImapMailCompose::TYPEMULTIPART,
+            'TYPEMESSAGE' => VmImapMailCompose::TYPEMESSAGE,
+            'TYPEAPPLICATION' => VmImapMailCompose::TYPEAPPLICATION,
+            'TYPEAUDIO' => VmImapMailCompose::TYPEAUDIO,
+            'TYPEIMAGE' => VmImapMailCompose::TYPEIMAGE,
+            'TYPEVIDEO' => VmImapMailCompose::TYPEVIDEO,
+            'TYPEMODEL' => VmImapMailCompose::TYPEMODEL,
+            'TYPEOTHER' => VmImapMailCompose::TYPEOTHER,
+            'ENC7BIT' => VmImapMailCompose::ENC7BIT,
+            'ENC8BIT' => VmImapMailCompose::ENC8BIT,
+            'ENCBINARY' => VmImapMailCompose::ENCBINARY,
+            'ENCBASE64' => VmImapMailCompose::ENCBASE64,
+            'ENCQUOTEDPRINTABLE' => VmImapMailCompose::ENCQUOTEDPRINTABLE,
+            'ENCOTHER' => VmImapMailCompose::ENCOTHER,
         ] as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
             $var->int($value);
@@ -119,6 +134,7 @@ class Module extends ModuleAbstract
             new imap_utf7_decode(),
             new imap_utf8_to_mutf7(),
             new imap_mutf7_to_utf8(),
+            new imap_mail_compose(),
         ];
     }
 }
