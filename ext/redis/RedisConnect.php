@@ -39,11 +39,21 @@ final class RedisConnect extends RedisClassMethod
             $state->connected = false;
         }
 
-        $socket = VmRedisNative::connect($host, $port, $timeout);
+        try {
+            $socket = VmRedisNative::connect($host, $port, $timeout);
+        } catch (\RedisException $e) {
+            VmRedis::noteError($receiver, $e->getMessage());
+            throw $e;
+        }
         $state->socket = $socket;
         $state->connected = true;
         $state->host = $host;
         $state->port = $port;
+        $state->timeout = $timeout;
+        $state->persistentId = null;
+        $state->dbNum = 0;
+        $state->auth = null;
+        $state->lastError = null;
 
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);

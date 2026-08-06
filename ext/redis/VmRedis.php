@@ -49,6 +49,7 @@ final class VmRedis
 
         require_once __DIR__.'/RedisDepth20682.php';
         require_once __DIR__.'/RedisOptions.php';
+        require_once __DIR__.'/RedisIntrospection.php';
         $methods = [
             'connect' => new RedisConnect(),
             'set' => new RedisSet(),
@@ -56,6 +57,16 @@ final class VmRedis
             'close' => new RedisClose(),
             'setoption' => new RedisSetOption(),
             'getoption' => new RedisGetOption(),
+            'gethost' => new RedisGetHost(),
+            'getport' => new RedisGetPort(),
+            'getdbnum' => new RedisGetDBNum(),
+            'gettimeout' => new RedisGetTimeout(),
+            'getreadtimeout' => new RedisGetReadTimeout(),
+            'getpersistentid' => new RedisGetPersistentID(),
+            'getauth' => new RedisGetAuth(),
+            'getlasterror' => new RedisGetLastError(),
+            'clearlasterror' => new RedisClearLastError(),
+            'getmode' => new RedisGetMode(),
             'del' => new RedisDel(),
             'exists' => new RedisExists(),
             'ping' => new RedisPing(),
@@ -117,6 +128,16 @@ final class VmRedis
                 'isconnected' => 'isConnected',
                 'setoption' => 'setOption',
                 'getoption' => 'getOption',
+                'gethost' => 'getHost',
+                'getport' => 'getPort',
+                'getdbnum' => 'getDBNum',
+                'gettimeout' => 'getTimeout',
+                'getreadtimeout' => 'getReadTimeout',
+                'getpersistentid' => 'getPersistentID',
+                'getauth' => 'getAuth',
+                'getlasterror' => 'getLastError',
+                'clearlasterror' => 'clearLastError',
+                'getmode' => 'getMode',
                 'hset' => 'hSet',
                 'hget' => 'hGet',
                 'hgetall' => 'hGetAll',
@@ -322,10 +343,17 @@ final class VmRedis
     {
         $state = self::state($entry);
         if (!$state->connected || null === $state->socket) {
-            throw new \RedisException(\sprintf('%s(): Connection lost or not established', $label));
+            $message = \sprintf('%s(): Connection lost or not established', $label);
+            self::noteError($entry, $message);
+            throw new \RedisException($message);
         }
 
         return $state->socket;
+    }
+
+    public static function noteError(ObjectEntry $entry, string $message): void
+    {
+        self::state($entry)->lastError = $message;
     }
 
     public static function coerceStringArg(Variable $var, string $label, int $index, string $paramName): string
