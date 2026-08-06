@@ -14,12 +14,15 @@ final class RewriteVarsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/RewriteVarsRuntime.php');
         $this->assertStringContainsString('OutputRewriteVarsJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('VmUrlRewriterOb', $source);
+        $this->assertStringContainsString('__phpc_ob_start_with_url_rewriter', $source);
+        $this->assertStringContainsString('ensureUrlRewriterStack', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString("addGlobal(\$htPtrTy, 'phpc_rewrite_vars')", $source);
         $this->assertStringNotContainsString('HashTableHelper', $source);
         $this->assertStringNotContainsString('__hashtable__setStringKeyString', $source);
+        $this->assertStringNotContainsString('VmUrlRewriterOb::ensureRegistered', $source);
+        $this->assertStringNotContainsString('ENSURE_URL_REWRITER', $source);
     }
 
     public function testResponseContextDelegatesToOutputRewriteVarsJitHelper(): void

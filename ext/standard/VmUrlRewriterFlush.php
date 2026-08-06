@@ -22,8 +22,8 @@ final class VmUrlRewriterFlush
         return UrlScannerEx::adapt(
             $content,
             $pairs,
-            self::parseTags(VmUrlRewriterOb::getTags()),
-            self::parseHosts(VmUrlRewriterOb::getHosts()),
+            self::parseTags(OutputRewriteVarsJitHelper::getTags()),
+            self::parseHosts(OutputRewriteVarsJitHelper::getHosts()),
             '&'
         );
     }

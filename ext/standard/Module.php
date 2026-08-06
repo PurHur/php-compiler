@@ -665,6 +665,7 @@ class Module extends ModuleAbstract
             new phpc_native_environ_mirror_into_ht(),
             new phpc_rename_kernel(),
             new phpc_ob_write_stdout_kernel(),
+            new phpc_url_rewriter_apply_kernel(),
             new phpc_random_bytes_kernel(),
             new phpc_libcrypt_kernel(),
             new phpc_libcrypt_verify(),

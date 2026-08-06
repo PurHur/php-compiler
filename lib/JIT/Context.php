@@ -842,6 +842,7 @@ class Context {
 
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',
+            'phpc_url_rewriter_apply_kernel',
             'phpc_random_bytes_kernel',
             // Password NestedJIT leaves (#26773) — peer random_bytes (#21186) / hash crypto (#21026).
             'phpc_libcrypt_kernel',
@@ -1680,10 +1681,12 @@ class Context {
                 $emitInStandaloneMain(fn () => ErrorBridge::registerDeclarations($this));
                 $emitInStandaloneMain(fn () => ErrorBridge::ensureLinked($this));
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
+                // Thin AOT: still flush OB when stack was linked (URL-Rewriter endAll, #27566).
+                // emitEndAllForStandalone no-ops unless __phpc_ob_end_all has a body (#13571).
+                $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
                 if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
-                    $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
                 }
             }
             if (!$this->isThinStandaloneAotMain()) {

@@ -195,6 +195,8 @@ final class ResponseContext
     /** output_add_rewrite_var() — register mod_rewrite pair; same name replaces prior value (#6031). */
     public static function addRewriteVar(string $name, string $value): bool
     {
+        // VM OutputBuffer registration (AOT/JIT uses __phpc_ob_start_with_url_rewriter, #27566).
+        \PHPCompiler\ext\standard\VmUrlRewriterOb::ensureRegistered();
         OutputRewriteVarsJitHelper::add($name, $value);
 
         return true;

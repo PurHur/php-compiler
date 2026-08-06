@@ -27,6 +27,7 @@ final class ObOutput
         $decls = [
             '__phpc_ob_start' => [$void, false, []],
             '__phpc_ob_start_with_gzhandler' => [$void, false, []],
+            '__phpc_ob_start_with_url_rewriter' => [$void, false, []],
             '__compiler_ob_gzhandler' => [$strPtr, false, [$strPtr, $i64]],
             '__phpc_ob_gzhandler_flush' => [$strPtr, false, [$strPtr]],
             '__phpc_ob_get_level' => [$i32, false, []],
@@ -77,8 +78,10 @@ final class ObOutput
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        $userScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        if ('1' === $userScriptAot || 'true' === strtolower((string) $userScriptAot)) {
+        // User-script / thin AOT: only when ob stack was linked (ob_* / rewrite vars).
+        // Full ensureLinked on hello-world SIGSEGVs (#13571); URL-Rewriter needs endAll (#27566).
+        $endAll = $context->module->getNamedFunction('__phpc_ob_end_all');
+        if (null === $endAll || 0 === $endAll->countBasicBlocks()) {
             return;
         }
         $savedBlock = null;

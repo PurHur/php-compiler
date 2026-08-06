@@ -28,10 +28,14 @@ final class ObOutputJitHelper
 
     private static bool $implicitFlush = false;
 
+    /** Idempotent URL-Rewriter registration (#27566). */
+    private static bool $urlRewriterRegistered = false;
+
     public static function reset(): void
     {
         self::$stack = [];
         self::$implicitFlush = false;
+        self::$urlRewriterRegistered = false;
     }
 
     public static function getLevel(): int
@@ -56,6 +60,19 @@ final class ObOutputJitHelper
     public static function startWithGzhandler(): void
     {
         self::pushLevel(self::HANDLER_GZHANDLER);
+    }
+
+    /**
+     * Register URL-Rewriter OB level (idempotent) for AOT/JIT (#27566).
+     * Shares {@see $stack} with echo — via `__phpc_ob_start_with_url_rewriter`.
+     */
+    public static function startWithUrlRewriter(): void
+    {
+        if (self::$urlRewriterRegistered) {
+            return;
+        }
+        self::pushLevel('URL-Rewriter');
+        self::$urlRewriterRegistered = true;
     }
 
     public static function setImplicitFlush(int $enabled): void
@@ -251,6 +268,11 @@ final class ObOutputJitHelper
             }
 
             return $compressed;
+        }
+        if ('URL-Rewriter' === \$handlerName) {
+            // Flush via separate NestedJIT in ensureUrlRewriterStack user module (#27566).
+            // Identity here keeps helper-unit emit healthy for getLevel.
+            return \$content;
         }
 
         return $content;

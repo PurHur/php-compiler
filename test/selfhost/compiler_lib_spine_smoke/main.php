@@ -4096,6 +4096,7 @@ require_once __DIR__.'/../../../ext/standard/phpc_object_is_constructed_native.p
 require_once __DIR__.'/../../../ext/standard/phpc_object_release_storage_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_readfile_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_ob_write_stdout_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_url_rewriter_apply_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_putenv_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_rename_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
