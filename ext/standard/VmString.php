@@ -47,7 +47,7 @@ final class VmString
      * preg_match/preg_replace/preg_split/preg_match_all/preg_replace_callback*
      * $subject (and str_replace family $subject) soft-null likewise (#21198, #21318).
      * preg_match/preg_match_all/preg_split/preg_grep $pattern soft-null (#21479, reverts #20226).
-     * json_decode/json_validate $json, unserialize $data soft-null (#21223).
+     * json_decode $json soft-null (#21223); json_validate $json Z_PARAM_STRING TypeError on 8.4 (#27995).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * parse_str $string soft-null (#21480, reverts #21380 TypeError).
      * trigger_error/user_error $message soft-null (#21480, reverts #21035 TypeError).

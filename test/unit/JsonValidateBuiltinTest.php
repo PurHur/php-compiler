@@ -88,6 +88,29 @@ final class JsonValidateBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
+    public function testNullJsonThrowsTypeErrorOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $fn = new json_validate();
+            $frame = $fn->getFrame($runtime->vmContext);
+            $jsonVar = new VMVariable();
+            $jsonVar->null();
+            $frame->calledArgs = [$jsonVar];
+            $frame->returnVar = new VMVariable();
+            $this->expectException(\TypeError::class);
+            $fn->execute($frame);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     private function runValidate(string $json, int $depth = 512, int $flags = 0): bool
     {
         $runtime = new Runtime();
