@@ -43,4 +43,22 @@ final class GethostnameBuiltinTest extends TestCase
             $this->assertSame($expected, $resolved->toString());
         }
     }
+
+    /** Zend basic_functions.stub.php: gethostname(): string|false (#28000). */
+    public function testReflectionReturnIsStringOrFalse(): void
+    {
+        $code = <<<'PHP'
+<?php
+$r = new ReflectionFunction('gethostname');
+echo 'return=', $r->hasReturnType() ? (string) $r->getReturnType() : '-', "\n";
+echo 'argc=', $r->getNumberOfParameters(), "\n";
+$h = gethostname();
+echo 'runtime=', (is_string($h) || $h === false) ? 'ok' : gettype($h), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'gethostname_reflect.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("return=string|false\nargc=0\nruntime=ok\n", ob_get_clean());
+    }
 }

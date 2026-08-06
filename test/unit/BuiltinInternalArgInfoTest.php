@@ -518,13 +518,14 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('ftell'));
     }
 
-    /** php-src dir.stub.php / file.stub.php / basic_functions.stub.php — missing |false (#26320). */
+    /** php-src dir.stub.php / file.stub.php / basic_functions.stub.php — missing |false (#26320, #28000). */
     public function testReaddirTempnamHostLookupReflectionReturnUnions(): void
     {
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('readdir'));
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('tempnam'));
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gethostbynamel'));
         $this->assertSame('array|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('sys_getloadavg'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gethostname'));
     }
 
     /** php-src link.stub.php — InternalArgInfo return int; Zend bool (#26323). */
