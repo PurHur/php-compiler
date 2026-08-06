@@ -631,6 +631,39 @@ final class HashTableWriteLlvm
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterLong);
+        $floatBlock = $fn->appendBasicBlock('ht_unset_vk_float');
+        $afterFloat = $fn->appendBasicBlock('ht_unset_vk_after_float');
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isVmFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isNativeDouble, $isVmFloat),
+            $floatBlock,
+            $afterFloat
+        );
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+            $context,
+            $doubleVal
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetLongAt'),
+            $ht,
+            $context->builder->truncOrBitCast(
+                $truncatedLong,
+                $context->getTypeFromString('size_t')
+            )
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterFloat);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
@@ -669,6 +702,22 @@ final class HashTableWriteLlvm
                 $context->lookupFunction('__hashtable__unsetLongAt'),
                 $ht,
                 $index
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($dim)
+            );
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__unsetLongAt'),
+                $ht,
+                $context->builder->truncOrBitCast(
+                    $truncated,
+                    $context->getTypeFromString('size_t')
+                )
             );
 
             return;

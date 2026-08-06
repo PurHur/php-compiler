@@ -508,10 +508,8 @@ final class HashTable {
     /**
      * php-src: null array keys coerce to empty string; bool keys to int (zend_hash.c; #5269, #5275).
      *
-    /**
-     * Float→int: finite fractional keys silent on read/isset/unset (#5123, #16739 / #27948).
-     * Non-finite keys: callers emit E_DEPRECATED once (#27926). Writes use
-     * {@see normalizeIndexKeyForWrite} (#19730).
+     * Float→int: callers emit E_DEPRECATED on precision loss for read/isset/unset (#27948)
+     * and INF/NAN (#27926). Writes use {@see normalizeIndexKeyForWrite} (#19730).
      *
      * Under PROFILE≥8.5, null→"" also emits {@see NULL_ARRAY_OFFSET_DEPRECATED_MESSAGE} unless
      * {@param $emitNullOffsetDeprecation} is false (array_key_exists uses a distinct message; #26276).
@@ -542,8 +540,8 @@ final class HashTable {
             return $intKey;
         }
         if (Variable::TYPE_FLOAT === $index->type) {
-            // Silent coerce for read/isset/unset finite keys (#5123, #16739 / #27948).
-            // Non-finite E_DEPRECATED is emitted once by findVariable / keyExists / write (#27926).
+            // Truncate only — E_DEPRECATED is emitted once by findVariable / keyExists /
+            // offsetIsSet / offsetUnset / write (#27926, #27948).
             $intKey = new Variable();
             $intKey->int(VmMath::floatToZendLong($index->toFloat()));
 
@@ -643,9 +641,9 @@ final class HashTable {
     }
 
     /**
-     * Emit non-finite float→int E_DEPRECATED once for dim read/isset (#27926).
+     * Emit float→int E_DEPRECATED once for dim read/isset/unset (finite + INF/NAN; #27926, #27948).
      */
-    private static function warnNonFiniteFloatKeyIfNeeded(
+    private static function warnFloatKeyPrecisionLossIfNeeded(
         Variable $index,
         ?Context $vmContext = null,
         ?Frame $frame = null
@@ -657,10 +655,6 @@ final class HashTable {
         if (Variable::TYPE_FLOAT !== $resolved->type) {
             return;
         }
-        $float = $resolved->toFloat();
-        if (\is_finite($float)) {
-            return;
-        }
         $ctx = $vmContext;
         if (null === $ctx) {
             $vm = VmEngine::running();
@@ -669,17 +663,17 @@ final class HashTable {
         if (null === $ctx) {
             return;
         }
-        VmMath::warnFloatToIntPrecisionLoss($float, $ctx, $frame);
+        VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $ctx, $frame);
     }
 
     public function keyExists(
         Variable $index,
         bool $emitNullOffsetDeprecation = true,
         ?Frame $frame = null,
-        bool $emitNonFiniteFloatKeyDeprecation = true
+        bool $emitFloatKeyDeprecation = true
     ): bool {
-        if ($emitNonFiniteFloatKeyDeprecation) {
-            self::warnNonFiniteFloatKeyIfNeeded($index, null, $frame);
+        if ($emitFloatKeyDeprecation) {
+            self::warnFloatKeyPrecisionLossIfNeeded($index, null, $frame);
         }
         $index = self::normalizeIndexKey($index, 'Illegal offset type', $emitNullOffsetDeprecation, $frame);
         switch ($index->type) {
@@ -698,7 +692,7 @@ final class HashTable {
         if ($forWrite && null !== $vmContext) {
             $index = self::normalizeIndexKeyForWrite($index, $vmContext, $frame);
         } else {
-            self::warnNonFiniteFloatKeyIfNeeded($index, $vmContext, $frame);
+            self::warnFloatKeyPrecisionLossIfNeeded($index, $vmContext, $frame);
             $index = self::normalizeIndexKey($index, 'Illegal offset type', true, $frame);
         }
         switch ($index->type) {
@@ -2133,6 +2127,7 @@ final class HashTable {
      */
     public function offsetIsSet(Variable $index, ?Frame $frame = null): bool
     {
+        self::warnFloatKeyPrecisionLossIfNeeded($index, null, $frame);
         $index = self::normalizeIndexKey($index, 'Illegal offset type in isset or empty', true, $frame);
         $stored = null;
         switch ($index->type) {
@@ -2165,6 +2160,7 @@ final class HashTable {
         $this->assertSeparatedForWrite();
         $bucket = null;
         $bucketIndex = self::INVALID_INDEX;
+        self::warnFloatKeyPrecisionLossIfNeeded($index, null, $frame);
         $index = self::normalizeIndexKey($index, 'Illegal offset type in unset', true, $frame);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:

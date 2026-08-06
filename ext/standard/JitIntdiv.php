@@ -567,16 +567,12 @@ final class JitIntdiv
     }
 
     /**
-     * Truncate float→long; warn only for INF/NAN/±Inf (dim read path — #27926).
-     * Finite fractional keys stay silent until #27948.
+     * Truncate float→long; emit E_DEPRECATED on any precision loss (dim read/isset/unset; #27948).
+     * Prefer {@see floatToLongWithPrecisionWarning} — kept as an alias for call-site clarity.
      */
     public static function floatToLongWithNonFinitePrecisionWarning(Context $context, Value $doubleVal): Value
     {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'float_to_long_nfin');
-        $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
-        self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated, true);
-
-        return $truncated;
+        return self::floatToLongWithPrecisionWarning($context, $doubleVal);
     }
 
     /**

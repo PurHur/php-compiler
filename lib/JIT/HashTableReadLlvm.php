@@ -239,6 +239,40 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $floatBlock = $fn->appendBasicBlock('ht_isset_vk_float');
+        $afterFloat = $fn->appendBasicBlock('ht_isset_vk_after_float');
+        $isNativeDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isVmFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isNativeDouble, $isVmFloat),
+            $floatBlock,
+            $afterFloat
+        );
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+            $context,
+            $doubleVal
+        );
+        $floatIndex = $context->builder->truncOrBitCast(
+            $truncatedLong,
+            $sizeT
+        );
+        $floatResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $floatIndex
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterFloat);
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -258,6 +292,7 @@ final class HashTableReadLlvm
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($strResult, $stringBlock);
         $phi->addIncoming($longResult, $longBlock);
+        $phi->addIncoming($floatResult, $floatBlock);
         $phi->addIncoming($objResult, $objectBlock);
         $phi->addIncoming($i1->constInt(0, false), $falseBlock);
 
@@ -349,8 +384,8 @@ final class HashTableReadLlvm
         );
         $context->builder->positionAtEnd($floatKeyBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
-        // Dim read: INF/NAN E_DEPRECATED (#27926); finite fractional silence until #27948.
-        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithNonFinitePrecisionWarning(
+        // Dim read: float→int E_DEPRECATED for finite fractional + INF/NAN (#27926, #27948).
+        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
             $context,
             $doubleVal
         );
@@ -498,6 +533,22 @@ final class HashTableReadLlvm
                 $index
             );
         }
+        if (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($dim)
+            );
+            $index = $context->builder->truncOrBitCast(
+                $truncated,
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
         if (Variable::TYPE_OBJECT === $dim->type) {
             HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
 
@@ -543,6 +594,18 @@ final class HashTableReadLlvm
         if (Variable::TYPE_NATIVE_LONG === $dim->type) {
             $index = $context->builder->truncOrBitCast(
                 $context->helper->loadValue($dim),
+                $context->getTypeFromString('size_t')
+            );
+
+            return self::readIndexedToValueBox($context, $ht, $index);
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $dim->type) {
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($dim)
+            );
+            $index = $context->builder->truncOrBitCast(
+                $truncated,
                 $context->getTypeFromString('size_t')
             );
 
