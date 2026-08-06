@@ -12,7 +12,12 @@
             foreach ($catch->types as $type) {
                 $types[] = $type->toString();
             }
-            $catchTypes[] = $types;
+            // Intersection catch rewritten to union for php-parser; restore `&` encoding (#28205).
+            if ($catch->getAttribute(\PHPCompiler\Ast\CatchIntersectionSupport::ATTRIBUTE)) {
+                $catchTypes[] = [implode('&', $types)];
+            } else {
+                $catchTypes[] = $types;
+            }
             $catchVars[] = null !== $catch->var
                 ? $this->writeVariable($this->parseExprNode($catch->var))
                 : null;

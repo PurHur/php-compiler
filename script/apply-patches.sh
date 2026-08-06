@@ -5919,7 +5919,8 @@ apply_php_cfg_trycatch_overlay() {
   fi
   if grep -q 'new Op\\Stmt\\TryCatch' "$parser" 2>/dev/null; then
     if grep -q '\$elseBlock ?? \$endBlock' "$parser" 2>/dev/null \
-      && grep -q 'public \$else;' "$op" 2>/dev/null; then
+      && grep -q 'public \$else;' "$op" 2>/dev/null \
+      && grep -q 'CatchIntersectionSupport::ATTRIBUTE' "$parser" 2>/dev/null; then
       echo "Skip php-cfg-trycatch.patch (already applied)"
       return 0
     fi
@@ -5940,7 +5941,7 @@ if not m:
     sys.exit(1)
 parser_path.write_text(text[:m.start()] + new + "\n\n    protected function parseStmt_Unset" + text[m.end():])
 PY
-    echo "Refreshed php-cfg-trycatch.patch (try/catch/else overlay #15817)"
+    echo "Refreshed php-cfg-trycatch.patch (try/catch/else + catch intersection #28205)"
     return 0
   fi
   mkdir -p "$(dirname "$op")"

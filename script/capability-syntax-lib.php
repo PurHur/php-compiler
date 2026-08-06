@@ -751,10 +751,13 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'multi_catch',
-            'construct' => 'Multi-type catch `catch (A|B $e)`',
+            'construct' => 'Multi-type catch `catch (A|B $e)` / intersection `catch (A&B $e)`',
             'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_THROW'],
             'issue' => 1362,
-            'notes' => ['php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes'],
+            'notes' => [
+                'php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes',
+                'Intersection catch (#28205): CatchIntersectionSupport rewrites `&`→`|` for php-parser 4.x; encode `a&b`',
+            ],
             'probe' => 'class A {} class B {} try { throw new A(); } catch (A|B $e) { echo "ok"; }',
         ],
         [
