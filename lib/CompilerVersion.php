@@ -1232,9 +1232,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.5+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`, `clone ($obj, with: [...])`).
+     * PHP 8.5+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`).
      *
      * Zend landed clone-with in 8.5 (RFC); PROFILE=8.4 must reject like Zend 8.4 (#23877, re-#16676/#12987).
+     * Named `clone($obj, with: [...])` is rejected on PROFILE≥8.5 like Zend 8.5.8 (#28182).
      * Forward profile via {@see languageProfileVersion()} enables clone-with on 8.5+.
      * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_vm_def.h ZEND_CLONE.
      */

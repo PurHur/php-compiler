@@ -21,7 +21,7 @@ class Src {
 
 $src = new Src();
 $copy = clone $src with { x: 2 };
-$copy2 = clone ($src, with: ['x' => 3]);
+$copy2 = clone ($src, ['x' => 3]);
 echo $copy->x, ',', $copy2->x, "\n";
 --EXPECT--
 2,3
