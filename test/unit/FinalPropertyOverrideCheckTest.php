@@ -169,6 +169,56 @@ PHP;
     }
 
     /**
+     * @covers issue #28149 — issue-body profile table: reference reject + PROFILE≥8.4
+     * isFinal=1 + child override Fatal (test/repro/maintainer_gap_final_plain_property_profile.php).
+     */
+    public function testIssue28149ProfileTableReferenceRejectAndProfile84IsFinalOverride(): void
+    {
+        $repro = dirname(__DIR__) . '/repro/maintainer_gap_final_plain_property_profile.php';
+        self::assertFileExists($repro);
+        $code = file_get_contents($repro);
+        self::assertNotFalse($code);
+
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+        $runtimeRef = new Runtime();
+        try {
+            $runtimeRef->parseAndCompile($code, 'issue28149_profile_ref.php');
+            $this->fail('Expected CompileFatal on reference profile for #28149 table');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString(
+                'Cannot declare property A::$x final, the final modifier is allowed only for methods, classes, and class constants',
+                $e->getMessage()
+            );
+        }
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+        $runtime84 = new Runtime();
+        $block = $runtime84->parseAndCompile($code, 'issue28149_profile_84.php');
+        try {
+            ob_start();
+            $runtime84->run($block, false);
+            ob_end_clean();
+            $this->fail('Expected Fatal on final property override under PROFILE=8.4 (#28149)');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $out = ob_get_clean();
+            self::assertStringContainsString("parsed\n", (string) $out);
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+            self::assertStringNotContainsString('child_ok', (string) $out);
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $out = ob_get_clean();
+            self::assertSame(255, $e->status);
+            self::assertStringContainsString("parsed\n", (string) $out);
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringNotContainsString('child_ok', (string) $out);
+        }
+    }
+
+    /**
      * @covers issue #25535 — eval() must not accept final plain properties on reference profile
      */
     public function testEvalPlainFinalPropertyRejectedOnReferenceProfile(): void
