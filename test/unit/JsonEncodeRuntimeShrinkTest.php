@@ -76,6 +76,10 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('tryCompileTimeArrayFromArrayFlip', $fold);
         $this->assertStringContainsString("'array_flip'", $fold);
         $this->assertStringContainsString('VmArray::flip', $fold);
+        $this->assertStringContainsString('tryCompileTimeArrayFromArrayChangeKeyCase', $fold);
+        $this->assertStringContainsString("'array_change_key_case'", $fold);
+        $this->assertStringContainsString('VmArray::changeKeyCase', $fold);
+        $this->assertStringContainsString('tryCompileTimeIntFromSlot', $fold);
         $this->assertStringContainsString('tryCompileTimeArrayFromParseUrl', $fold);
         $this->assertStringContainsString("'parse_url'", $fold);
         $this->assertStringContainsString('VmString::parseUrl', $fold);

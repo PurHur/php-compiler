@@ -10,19 +10,28 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_change_key_case() JIT routes all operands through ArrayChangeKeyCaseJitHelper PHP not ArrayBuiltinHelper native LLVM (#12371, #14530, #18024). */
+/**
+ * array_change_key_case() AOT/JIT uses HashTableChangeKeyCaseLlvm; VM SSOT remains
+ * ArrayChangeKeyCaseJitHelper (#12371, #14530, #18024, #27183).
+ */
 final class ArrayChangeKeyCaseRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 8801;
 
-    public function testArrayChangeKeyCaseRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayChangeKeyCaseRuntimeUsesHashTableChangeKeyCaseLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php');
+        $this->assertStringContainsString('HashTableChangeKeyCaseLlvm', $runtime);
         $this->assertStringContainsString('ArrayChangeKeyCaseJitHelper', $runtime);
         $this->assertStringContainsString('loadHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('nativeListToHashTable', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildChangeKeyCaseArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableChangeKeyCaseLlvm.php');
+        $this->assertStringContainsString('transformAllAsciiDynamic', $llvm);
+        $this->assertStringContainsString('setAtStringKey', $llvm);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_change_key_case.php');
         $this->assertStringContainsString('ArrayChangeKeyCaseRuntime::changeKeyCase', $builtin);
