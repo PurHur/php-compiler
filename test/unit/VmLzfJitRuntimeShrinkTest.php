@@ -27,6 +27,13 @@ final class VmLzfJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('not implemented for JIT', $source);
     }
 
+    public function testLzfOptimizedForCallUsesJitLzf(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/lzf/lzf_optimized_for.php');
+        $this->assertStringContainsString('JitLzf::optimizedFor', $source);
+        $this->assertStringNotContainsString('not implemented for JIT', $source);
+    }
+
     public function testStringLzfCompilesLzfJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLzf.php');

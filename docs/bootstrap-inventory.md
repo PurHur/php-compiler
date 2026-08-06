@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7165 |
-| Phase A inventory files (M2 ratio SSOT) | 7165 |
+| PHP files on vm.php path | 7166 |
+| Phase A inventory files (M2 ratio SSOT) | 7166 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23015 |
+| Source constructs flagged (warnings) | 23016 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1402,11 +1402,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/lzf/JitLzf.php` | 0 | 1 |
 | `ext/lzf/LzfExtensionPolicy.php` | 0 | 1 |
 | `ext/lzf/LzfJitHelper.php` | 0 | 1 |
-| `ext/lzf/Module.php` | 0 | 3 |
+| `ext/lzf/Module.php` | 0 | 4 |
 | `ext/lzf/VmLzf.php` | 0 | 1 |
 | `ext/lzf/VmLzfCore.php` | 0 | 1 |
 | `ext/lzf/lzf_compress.php` | 0 | 1 |
 | `ext/lzf/lzf_decompress.php` | 0 | 1 |
+| `ext/lzf/lzf_optimized_for.php` | 0 | 2 |
 | `ext/mailparse/MailparseExtensionPolicy.php` | 0 | 1 |
 | `ext/mailparse/MailparseExtract.php` | 0 | 4 |
 | `ext/mailparse/MailparseFunction.php` | 0 | 1 |
@@ -1792,7 +1793,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/PdoSerializeDeny.php` | 0 | 3 |
-| `ext/pdo/VmPDO.php` | 0 | 96 |
+| `ext/pdo/VmPDO.php` | 0 | 94 |
 | `ext/pdo/VmPDORow.php` | 0 | 5 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 67 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
@@ -18043,7 +18044,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/lzf/JitLzf.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/lzf/LzfExtensionPolicy.php`
 
@@ -18060,12 +18061,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new lzf_compress (line 24)
 - new lzf_decompress (line 25)
+- new lzf_optimized_for (line 26)
 - 1 class method(s)
 
 ### `ext/lzf/VmLzf.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/lzf/VmLzfCore.php`
 
@@ -18080,6 +18082,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/lzf/lzf_decompress.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/lzf/lzf_optimized_for.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/mailparse/MailparseExtensionPolicy.php`
@@ -21134,102 +21142,100 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/VmPDO.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 57)
-- new Variable (line 61)
-- new Variable (line 64)
-- new PDOConstruct (line 72)
-- new PDOExec (line 78)
-- new PDOPrepare (line 79)
-- new PDOQuery (line 80)
-- new PDOSetAttribute (line 81)
-- new PDOGetAttribute (line 82)
-- new PDOGetAvailableDrivers (line 83)
-- new PDOLastInsertId (line 84)
-- new PDOQuote (line 85)
-- new PDOBeginTransaction (line 86)
-- new PDOCommit (line 87)
-- new PDORollBack (line 88)
-- new PDOInTransaction (line 89)
-- new PDOErrorCode (line 90)
-- new PDOErrorInfo (line 91)
-- new PDOConnect (line 95)
-- new PDOSqliteCreateFunction (line 142)
-- new PDOSqliteCreateAggregate (line 143)
-- new PDOSqliteCreateCollation (line 144)
-- new PDOPgsqlCopyFromArrayLegacy (line 190)
-- new PDOPgsqlCopyFromFileLegacy (line 191)
-- new PDOPgsqlCopyToArrayLegacy (line 192)
-- new PDOPgsqlCopyToFileLegacy (line 193)
-- new PDOPgsqlLobCreateLegacy (line 194)
-- new PDOPgsqlLobOpenLegacy (line 195)
-- new PDOPgsqlLobUnlinkLegacy (line 196)
-- new PDOPgsqlGetNotifyLegacy (line 197)
-- new PDOPgsqlGetPidLegacy (line 198)
-- new ClassEntry (line 238)
-- new PDOSqliteCreateFunction (line 251)
-- new PDOSqliteCreateAggregate (line 252)
-- new PDOSqliteCreateCollation (line 253)
-- new ClassEntry (line 295)
-- new Variable (line 300)
-- new PDOMysqlGetWarningCount (line 312)
-- new ClassEntry (line 351)
-- new Variable (line 356)
-- new PDOPgsqlEscapeIdentifier (line 369)
-- new PDOPgsqlCopyFromArray (line 370)
-- new PDOPgsqlCopyFromFile (line 371)
-- new PDOPgsqlCopyToArray (line 372)
-- new PDOPgsqlCopyToFile (line 373)
-- new PDOPgsqlLobCreate (line 374)
-- new PDOPgsqlLobOpen (line 375)
-- new PDOPgsqlLobUnlink (line 376)
-- new PDOPgsqlGetNotify (line 377)
-- new PDOPgsqlGetPid (line 378)
-- new PDOPgsqlSetNoticeCallback (line 379)
-- new PDOException (line 482)
-- new ObjectEntry (line 489)
-- new ObjectEntry (line 499)
-- new HashTable (line 521)
-- new Variable (line 524)
-- new Variable (line 530)
-- new PDOException (line 551)
-- new PDOException (line 554)
-- new PDOException (line 560)
-- new PdoState (line 562)
-- new PDOException (line 585)
-- new PDOException (line 588)
-- new PDOException (line 600)
-- new PdoState (line 602)
-- new PDOException (line 621)
-- new PDOException (line 657)
-- new PDOException (line 666)
-- new PDOException (line 693)
-- new HashTable (line 764)
-- new Variable (line 766)
-- new ArgumentCountError (line 859)
-- new ArgumentCountError (line 918)
-- new ArgumentCountError (line 960)
-- new ArgumentCountError (line 997)
-- new ArgumentCountError (line 1034)
-- new ArgumentCountError (line 1086)
-- new ArgumentCountError (line 1122)
-- new ArgumentCountError (line 1205)
-- new HashTable (line 1354)
-- new Variable (line 1355)
-- new Variable (line 1358)
-- new Variable (line 1365)
-- new ArgumentCountError (line 1388)
-- new ArgumentCountError (line 1441)
-- new ArgumentCountError (line 1501)
-- new PDOException (line 1545)
-- new PDOException (line 1570)
-- new ArgumentCountError (line 1675)
-- new ArgumentCountError (line 1704)
-- new PDOException (line 1710)
-- new ArgumentCountError (line 1781)
-- new PDOException (line 1793)
-- new ArgumentCountError (line 1810)
-- new PDOException (line 1816)
-- 56 class method(s)
+- new Variable (line 68)
+- new Variable (line 71)
+- new ClassEntry (line 91)
+- new PDOConstruct (line 100)
+- new PDOExec (line 106)
+- new PDOPrepare (line 107)
+- new PDOQuery (line 108)
+- new PDOSetAttribute (line 109)
+- new PDOGetAttribute (line 110)
+- new PDOGetAvailableDrivers (line 111)
+- new PDOLastInsertId (line 112)
+- new PDOQuote (line 113)
+- new PDOBeginTransaction (line 114)
+- new PDOCommit (line 115)
+- new PDORollBack (line 116)
+- new PDOInTransaction (line 117)
+- new PDOErrorCode (line 118)
+- new PDOErrorInfo (line 119)
+- new PDOConnect (line 123)
+- new PDOSqliteCreateFunction (line 170)
+- new PDOSqliteCreateAggregate (line 171)
+- new PDOSqliteCreateCollation (line 172)
+- new PDOPgsqlCopyFromArrayLegacy (line 218)
+- new PDOPgsqlCopyFromFileLegacy (line 219)
+- new PDOPgsqlCopyToArrayLegacy (line 220)
+- new PDOPgsqlCopyToFileLegacy (line 221)
+- new PDOPgsqlLobCreateLegacy (line 222)
+- new PDOPgsqlLobOpenLegacy (line 223)
+- new PDOPgsqlLobUnlinkLegacy (line 224)
+- new PDOPgsqlGetNotifyLegacy (line 225)
+- new PDOPgsqlGetPidLegacy (line 226)
+- new ClassEntry (line 266)
+- new PDOSqliteCreateFunction (line 279)
+- new PDOSqliteCreateAggregate (line 280)
+- new PDOSqliteCreateCollation (line 281)
+- new ClassEntry (line 323)
+- new PDOMysqlGetWarningCount (line 339)
+- new ClassEntry (line 378)
+- new PDOPgsqlEscapeIdentifier (line 395)
+- new PDOPgsqlCopyFromArray (line 396)
+- new PDOPgsqlCopyFromFile (line 397)
+- new PDOPgsqlCopyToArray (line 398)
+- new PDOPgsqlCopyToFile (line 399)
+- new PDOPgsqlLobCreate (line 400)
+- new PDOPgsqlLobOpen (line 401)
+- new PDOPgsqlLobUnlink (line 402)
+- new PDOPgsqlGetNotify (line 403)
+- new PDOPgsqlGetPid (line 404)
+- new PDOPgsqlSetNoticeCallback (line 405)
+- new PDOException (line 508)
+- new ObjectEntry (line 515)
+- new ObjectEntry (line 525)
+- new HashTable (line 547)
+- new Variable (line 550)
+- new Variable (line 556)
+- new PDOException (line 577)
+- new PDOException (line 580)
+- new PDOException (line 586)
+- new PdoState (line 588)
+- new PDOException (line 611)
+- new PDOException (line 614)
+- new PDOException (line 626)
+- new PdoState (line 628)
+- new PDOException (line 647)
+- new PDOException (line 683)
+- new PDOException (line 692)
+- new PDOException (line 719)
+- new HashTable (line 790)
+- new Variable (line 792)
+- new ArgumentCountError (line 885)
+- new ArgumentCountError (line 944)
+- new ArgumentCountError (line 986)
+- new ArgumentCountError (line 1023)
+- new ArgumentCountError (line 1060)
+- new ArgumentCountError (line 1112)
+- new ArgumentCountError (line 1148)
+- new ArgumentCountError (line 1231)
+- new HashTable (line 1380)
+- new Variable (line 1381)
+- new Variable (line 1384)
+- new Variable (line 1391)
+- new ArgumentCountError (line 1414)
+- new ArgumentCountError (line 1467)
+- new ArgumentCountError (line 1527)
+- new PDOException (line 1571)
+- new PDOException (line 1596)
+- new ArgumentCountError (line 1701)
+- new ArgumentCountError (line 1730)
+- new PDOException (line 1736)
+- new ArgumentCountError (line 1807)
+- new PDOException (line 1819)
+- new ArgumentCountError (line 1836)
+- new PDOException (line 1842)
+- 57 class method(s)
 
 ### `ext/pdo/VmPDORow.php`
 
@@ -28058,7 +28064,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/InfoJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/IniIntrospectionJitHelper.php`
 
@@ -35572,7 +35578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmUnamePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 18 class method(s)
 
 ### `ext/standard/VmUnserializeFormat.php`
 
@@ -38803,7 +38809,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/php_uname.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/phpc_access_kernel.php`
 
@@ -39541,7 +39547,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/round.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 42)
+- new Variable (line 41)
 - 3 class method(s)
 
 ### `ext/standard/rsort_.php`
@@ -44430,7 +44436,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1191)
+- new InternalArgInfo (line 1193)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
