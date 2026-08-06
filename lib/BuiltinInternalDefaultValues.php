@@ -379,6 +379,11 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0777],
             3 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — filename="" (#27998)
+        // InternalArgInfo string= does not infer empty string for Reflection.
+        'clearstatcache' => [
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
         // php-src ext/standard/string.stub.php — &$count = null (InternalArgInfo int → 0) (#24886)
         'str_replace' => [
             3 => ['kind' => 'null'],

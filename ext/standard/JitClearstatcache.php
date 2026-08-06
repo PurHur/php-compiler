@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -25,13 +26,18 @@ final class JitClearstatcache
         $i1 = $context->getTypeFromString('int1');
         $strPtr = $context->getTypeFromString('__string__*');
 
-        $clearRealpath = $i1->constInt(1, false);
+        $hasFilename = 2 === $argc
+            && isset($args[1])
+            && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
+        $hasClearRealpath = isset($args[0]) && !NamedOptionalCallArgs::isOmittedOptional($args[0]);
+
+        $clearRealpath = $i1->constInt(0, false);
         $filename = $strPtr->constNull();
 
-        if ($argc >= 1) {
+        if ($hasClearRealpath) {
             $clearRealpath = self::lowerClearRealpathFlag($context, $args[0]);
         }
-        if ($argc >= 2) {
+        if ($hasFilename) {
             $filename = JitStringBuiltinArg::lower($context, $args[1], 'clearstatcache', 1, 'filename');
         }
 

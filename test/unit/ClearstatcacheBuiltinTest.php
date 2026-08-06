@@ -46,6 +46,36 @@ PHP;
 
     private const AOT_EXPECT = 'ok';
 
+    private const NAMED_FILENAME_CODE = <<<'PHP'
+$path = tempnam(sys_get_temp_dir(), 'phpc_clearstatcache_named_');
+if (!is_string($path)) {
+    echo "notemp\n";
+    return;
+}
+touch($path);
+filesize($path);
+clearstatcache(filename: $path);
+echo "named_filename_ok\n";
+@unlink($path);
+PHP;
+
+    public function testVmNamedFilenameOnlyArg(): void
+    {
+        $this->assertSame('named_filename_ok', $this->runBin('bin/vm.php', self::NAMED_FILENAME_CODE));
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotNamedFilenameOnlyArg(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertSame('named_filename_ok', $this->runAotBinary(self::NAMED_FILENAME_CODE));
+    }
+
     public function testVmAcceptsOptionalArgs(): void
     {
         $this->assertSame('ok', $this->runBin('bin/vm.php', self::OPTIONAL_CODE));
@@ -68,13 +98,13 @@ PHP;
         $this->assertSame(self::AOT_EXPECT, $this->runAotBinary());
     }
 
-    private function runAotBinary(): string
+    private function runAotBinary(string $code = self::AOT_CODE): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_clearstatcache_');
         $out = $tmp.'_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::AOT_CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(
