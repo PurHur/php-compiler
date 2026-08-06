@@ -4949,6 +4949,7 @@ require_once __DIR__.'/../../../lib/JIT/ArrayUniqueLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayWalkLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/UsortKeyedLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayUserSetOpsKeyLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayUserSetOpsUassocLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayCountValuesLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayColumnLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayMapCallbackPolicy.php';

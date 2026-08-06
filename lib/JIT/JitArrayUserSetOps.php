@@ -8,7 +8,7 @@ use PHPCompiler\JIT\Builtin\ArrayUserSetOpsRuntime;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515, #27228).
+ * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515, #27228, #27243).
  *
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}.
  * JIT SSOT: {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper} via {@see ArrayUserSetOpsRuntime}.
@@ -57,5 +57,45 @@ final class JitArrayUserSetOps
         }
 
         return ArrayUserSetOpsRuntime::intersectByKey($context, $callback, $first, ...$others);
+    }
+
+    public static function arrayUdiffUassoc(
+        Context $context,
+        Variable $valueCallback,
+        Variable $keyCallback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_udiff_uassoc() expects at least 4 arguments, 3 given');
+        }
+
+        return ArrayUserSetOpsRuntime::diffByKeyValue(
+            $context,
+            $valueCallback,
+            $keyCallback,
+            $first,
+            ...$others
+        );
+    }
+
+    public static function arrayUintersectUassoc(
+        Context $context,
+        Variable $valueCallback,
+        Variable $keyCallback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_uintersect_uassoc() expects at least 4 arguments, 3 given');
+        }
+
+        return ArrayUserSetOpsRuntime::intersectByKeyValue(
+            $context,
+            $valueCallback,
+            $keyCallback,
+            $first,
+            ...$others
+        );
     }
 }

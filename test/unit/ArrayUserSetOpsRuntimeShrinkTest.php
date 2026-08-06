@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /** array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey() JIT routes through ArrayUserSetOpsJitHelper PHP (#18515, #27228). */
 final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
 {
-    private const JIT_HELPER_MAX_LINES = 70;
+    private const JIT_HELPER_MAX_LINES = 120;
 
     public function testJitArrayUserSetOpsDelegatesToArrayUserSetOpsRuntime(): void
     {
@@ -17,6 +17,8 @@ final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayUserSetOpsRuntime::diffByValue', $helper);
         $this->assertStringContainsString('ArrayUserSetOpsRuntime::diffByKey', $helper);
         $this->assertStringContainsString('ArrayUserSetOpsRuntime::intersectByKey', $helper);
+        $this->assertStringContainsString('ArrayUserSetOpsRuntime::diffByKeyValue', $helper);
+        $this->assertStringContainsString('ArrayUserSetOpsRuntime::intersectByKeyValue', $helper);
         $this->assertStringNotContainsString('filterFirstHashTableByValueCompare', $helper);
         $this->assertStringNotContainsString('scanHashTableValuesWithClosure', $helper);
         $this->assertStringNotContainsString('closureCompareToI32', $helper);
@@ -36,6 +38,7 @@ final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('diffByValueWithClosure', $runtime);
         $this->assertStringContainsString('intersectByValueWithClosure', $runtime);
         $this->assertStringContainsString('ArrayUserSetOpsKeyLlvm::filterByKey', $runtime);
+        $this->assertStringContainsString('ArrayUserSetOpsUassocLlvm::filterByKeyValue', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope', $runtime);
     }

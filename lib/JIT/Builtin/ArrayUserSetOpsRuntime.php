@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayUserSetOpsKeyLlvm;
+use PHPCompiler\JIT\ArrayUserSetOpsUassocLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -15,10 +16,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey() (#18515, #27228).
+ * JIT/AOT link for array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey()/uassoc (#18515, #27228, #27243).
  *
  * Value comparators: NestedJIT {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper}.
- * Key comparators: pure LLVM {@see ArrayUserSetOpsKeyLlvm} — NestedJIT key filters abort under thin AOT.
+ * Key / dual key+value comparators: pure LLVM {@see ArrayUserSetOpsKeyLlvm} / {@see ArrayUserSetOpsUassocLlvm}
+ * — NestedJIT key filters abort under thin AOT.
  *
  * SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}
  * php-src: ext/standard/array.c
@@ -77,6 +79,47 @@ final class ArrayUserSetOpsRuntime
         JITVariable ...$others
     ): Value {
         return self::filterByKey($context, true, $callback, $first, ...$others);
+    }
+
+    public static function diffByKeyValue(
+        Context $context,
+        JITVariable $valueCallback,
+        JITVariable $keyCallback,
+        JITVariable $first,
+        JITVariable ...$others
+    ): Value {
+        return self::filterByKeyValue($context, false, $valueCallback, $keyCallback, $first, ...$others);
+    }
+
+    public static function intersectByKeyValue(
+        Context $context,
+        JITVariable $valueCallback,
+        JITVariable $keyCallback,
+        JITVariable $first,
+        JITVariable ...$others
+    ): Value {
+        return self::filterByKeyValue($context, true, $valueCallback, $keyCallback, $first, ...$others);
+    }
+
+    private static function filterByKeyValue(
+        Context $context,
+        bool $intersect,
+        JITVariable $valueCallback,
+        JITVariable $keyCallback,
+        JITVariable $first,
+        JITVariable ...$others
+    ): Value {
+        self::requireClosureCallback($context, $valueCallback);
+        self::requireClosureCallback($context, $keyCallback);
+        $src = self::argToHashtable($context, $first);
+        $packed = self::packOtherHashTables($context, $others);
+
+        return ArrayUserSetOpsUassocLlvm::filterByKeyValue(
+            $context,
+            $intersect,
+            $src,
+            HashTableHelper::loadHashtablePointer($context, $packed)
+        );
     }
 
     private static function filterByKey(
