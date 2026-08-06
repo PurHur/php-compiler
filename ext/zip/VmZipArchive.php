@@ -67,6 +67,9 @@ final class VmZipArchive
             $entry->interfaces[] = 'countable';
         }
 
+        // Declared casing is the storage key (ClassConstName / #25929). Map keys in
+        // ZipArchiveConstants::CLASS_CONSTANTS are lowercase legacy labels; use
+        // CLASS_CONSTANT_NAMES so ZipArchive::CREATE / defined() resolve (#28110).
         foreach (ZipArchiveConstants::CLASS_CONSTANTS as $name => $value) {
             if (\is_string($value)) {
                 $const = new Variable(Variable::TYPE_STRING);
@@ -75,8 +78,9 @@ final class VmZipArchive
                 $const = new Variable(Variable::TYPE_INTEGER);
                 $const->int($value);
             }
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = ZipArchiveConstants::CLASS_CONSTANT_NAMES[$name];
+            $canonical = ZipArchiveConstants::CLASS_CONSTANT_NAMES[$name];
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
 
         $entry->constructor = new ZipArchiveConstruct();
