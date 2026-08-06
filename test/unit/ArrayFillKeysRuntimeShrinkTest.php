@@ -9,17 +9,23 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_fill_keys() JIT routes through ArrayFillKeysJitHelper PHP not ArrayBuiltinHelper LLVM (#12487, #14439, #18407). */
+/** array_fill_keys() AOT/JIT uses HashTableFillKeysLlvm; VM SSOT remains ArrayFillKeysJitHelper (#12487, #27127). */
 final class ArrayFillKeysRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1920;
-    public function testArrayFillKeysRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+
+    public function testArrayFillKeysRuntimeUsesHashTableFillKeysLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFillKeysRuntime.php');
+        $this->assertStringContainsString('HashTableFillKeysLlvm', $runtime);
         $this->assertStringContainsString('ArrayFillKeysJitHelper', $runtime);
-        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::fillKeys', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableFillKeysLlvm.php');
+        $this->assertStringContainsString('HashTableCombineLlvm::storeCombineKey', $llvm);
+        $this->assertStringContainsString('HashTableValuesLlvm::values', $llvm);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_fill_keys.php');
         $this->assertStringContainsString('ArrayFillKeysRuntime::fillKeys', $builtin);

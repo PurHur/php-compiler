@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7123 |
-| Phase A inventory files (M2 ratio SSOT) | 7123 |
+| PHP files on vm.php path | 7126 |
+| Phase A inventory files (M2 ratio SSOT) | 7126 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22875 |
+| Source constructs flagged (warnings) | 22887 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2851,7 +2851,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitIteratorWalk.php` | 0 | 3 |
 | `ext/standard/JitJsonDecode.php` | 0 | 1 |
 | `ext/standard/JitJsonEncode.php` | 0 | 1 |
-| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 19 |
+| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 20 |
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
 | `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitJsonThrow.php` | 0 | 1 |
@@ -2903,6 +2903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitOutputRewriteVars.php` | 0 | 1 |
 | `ext/standard/JitPack.php` | 0 | 2 |
 | `ext/standard/JitPackNumericGuard.php` | 0 | 1 |
+| `ext/standard/JitParseIni.php` | 0 | 8 |
 | `ext/standard/JitParseIniMaterializer.php` | 0 | 1 |
 | `ext/standard/JitParseStr.php` | 0 | 1 |
 | `ext/standard/JitParseStrMaterializer.php` | 0 | 1 |
@@ -3185,6 +3186,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PackJitHelper.php` | 0 | 2 |
 | `ext/standard/ParamSensitiveJitHelper.php` | 0 | 1 |
 | `ext/standard/ParseIniEngine.php` | 0 | 1 |
+| `ext/standard/ParseIniNativeJitHelper.php` | 0 | 1 |
 | `ext/standard/ParseStrEngine.php` | 0 | 2 |
 | `ext/standard/ParseStrJitHelper.php` | 0 | 1 |
 | `ext/standard/ParseStrNativeJitHelper.php` | 0 | 1 |
@@ -6139,6 +6141,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableCombineLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableCowLlvm.php` | 0 | 4 |
 | `lib/JIT/HashTableElemLlvm.php` | 0 | 1 |
+| `lib/JIT/HashTableFillKeysLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableFillLlvm.php` | 0 | 2 |
 | `lib/JIT/HashTableHelper.php` | 0 | 10 |
 | `lib/JIT/HashTableKeyFilterLlvm.php` | 0 | 1 |
@@ -29279,25 +29282,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitJsonEncodeCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 96)
-- new VmVariable (line 156)
-- new HashTable (line 174)
-- new VmVariable (line 176)
+- new JsonException (line 100)
+- new VmVariable (line 160)
+- new HashTable (line 178)
 - new VmVariable (line 180)
-- new HashTable (line 238)
-- new VmVariable (line 240)
-- new VmVariable (line 246)
+- new VmVariable (line 184)
+- new HashTable (line 242)
+- new VmVariable (line 244)
 - new VmVariable (line 250)
-- new VmVariable (line 373)
-- new VmVariable (line 400)
-- new VmVariable (line 432)
-- new VmVariable (line 466)
-- new VmVariable (line 500)
-- new VmVariable (line 523)
-- new VmVariable (line 531)
-- new VmVariable (line 717)
-- new VmVariable (line 725)
-- 23 class method(s)
+- new VmVariable (line 254)
+- new VmVariable (line 377)
+- new VmVariable (line 404)
+- new VmVariable (line 436)
+- new VmVariable (line 470)
+- new VmVariable (line 504)
+- new VmVariable (line 532)
+- new VmVariable (line 555)
+- new VmVariable (line 563)
+- new VmVariable (line 749)
+- new VmVariable (line 757)
+- 24 class method(s)
 
 ### `ext/standard/JitJsonLastError.php`
 
@@ -29564,6 +29568,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/JitParseIni.php`
+
+**Warnings** (review for bootstrap subset):
+- new phpc_native_ht_alloc (line 103)
+- new phpc_native_ht_set_string_key (line 104)
+- new phpc_native_ht_set_string_key_ht (line 105)
+- new phpc_native_ht_set_string_key_long (line 106)
+- new phpc_native_ht_set_string_at (line 107)
+- new phpc_native_ht_set_long_at (line 108)
+- new phpc_native_ht_set_hashtable_at (line 109)
+- 2 class method(s)
 
 ### `ext/standard/JitParseIniMaterializer.php`
 
@@ -31940,6 +31956,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 20 class method(s)
+
+### `ext/standard/ParseIniNativeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/ParseStrEngine.php`
 
@@ -45745,7 +45766,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayFillKeysRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayFillRuntime.php`
 
@@ -51239,6 +51260,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/HashTableElemLlvm.php`
 
 **Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `lib/JIT/HashTableFillKeysLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 82)
 - 3 class method(s)
 
 ### `lib/JIT/HashTableFillLlvm.php`
