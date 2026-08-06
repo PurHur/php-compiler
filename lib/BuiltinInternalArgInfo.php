@@ -262,6 +262,10 @@ final class BuiltinInternalArgInfo
             // ext/imap/php_imap.stub.php — InternalArgInfo string/object; Zend string|false / stdClass (#27682)
             'imap_rfc822_write_address' => 'string|false',
             'imap_rfc822_parse_headers' => 'stdClass',
+            // ext/imap/php_imap.stub.php — codecs + mime header decode (#27683)
+            'imap_base64', 'imap_qprint', 'imap_8bit', 'imap_binary' => 'string|false',
+            'imap_utf8' => 'string',
+            'imap_mime_header_decode' => 'array|false',
             // ext/sysvshm/sysvshm.stub.php — InternalArgInfo return int / empty; Zend SysvSharedMemory|false / mixed (#27943)
             'shm_attach' => 'SysvSharedMemory|false',
             'shm_get_var' => 'mixed',

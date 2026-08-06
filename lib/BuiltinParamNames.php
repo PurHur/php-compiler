@@ -1122,6 +1122,15 @@ final class BuiltinParamNames
                 return ['string', 'default_hostname'];
             case 'imap_rfc822_parse_headers':
                 return ['headers', 'default_hostname='];
+            // php-src ext/imap/php_imap.stub.php — $string / $mime_encoded_text (#27683)
+            case 'imap_base64':
+            case 'imap_qprint':
+            case 'imap_8bit':
+            case 'imap_binary':
+            case 'imap_mime_header_decode':
+                return ['string'];
+            case 'imap_utf8':
+                return ['mime_encoded_text'];
             // php-src ext/opcache/opcache.stub.php — InternalArgInfo still says script (#23834)
             case 'opcache_compile_file':
             case 'opcache_is_script_cached':

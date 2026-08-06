@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7130 |
-| Phase A inventory files (M2 ratio SSOT) | 7130 |
+| PHP files on vm.php path | 7137 |
+| Phase A inventory files (M2 ratio SSOT) | 7137 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22902 |
+| Source constructs flagged (warnings) | 22919 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -980,15 +980,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/BuiltinClasses.php` | 0 | 1 |
 | `ext/imap/ImapExtensionPolicy.php` | 0 | 1 |
 | `ext/imap/ImapMboxEngine.php` | 0 | 1 |
-| `ext/imap/Module.php` | 0 | 72 |
+| `ext/imap/Module.php` | 0 | 78 |
 | `ext/imap/VmImapArg.php` | 0 | 1 |
 | `ext/imap/VmImapConnection.php` | 0 | 2 |
 | `ext/imap/VmImapCore.php` | 0 | 40 |
 | `ext/imap/VmImapMailCompose.php` | 0 | 1 |
+| `ext/imap/VmImapMime.php` | 0 | 5 |
 | `ext/imap/VmImapMutf7.php` | 0 | 1 |
 | `ext/imap/VmImapRfc822.php` | 0 | 9 |
+| `ext/imap/imap_8bit.php` | 0 | 1 |
 | `ext/imap/imap_alerts.php` | 0 | 2 |
 | `ext/imap/imap_append.php` | 0 | 1 |
+| `ext/imap/imap_base64.php` | 0 | 1 |
+| `ext/imap/imap_binary.php` | 0 | 1 |
 | `ext/imap/imap_body.php` | 0 | 1 |
 | `ext/imap/imap_bodystruct.php` | 0 | 1 |
 | `ext/imap/imap_check.php` | 0 | 1 |
@@ -1027,6 +1031,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_mail_copy.php` | 0 | 1 |
 | `ext/imap/imap_mail_move.php` | 0 | 1 |
 | `ext/imap/imap_mailboxmsginfo.php` | 0 | 1 |
+| `ext/imap/imap_mime_header_decode.php` | 0 | 1 |
 | `ext/imap/imap_msgno.php` | 0 | 1 |
 | `ext/imap/imap_mutf7_to_utf8.php` | 0 | 1 |
 | `ext/imap/imap_num_msg.php` | 0 | 2 |
@@ -1034,6 +1039,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_open.php` | 0 | 2 |
 | `ext/imap/imap_ping.php` | 0 | 1 |
 | `ext/imap/imap_popen.php` | 0 | 2 |
+| `ext/imap/imap_qprint.php` | 0 | 1 |
 | `ext/imap/imap_rename.php` | 0 | 1 |
 | `ext/imap/imap_renamemailbox.php` | 0 | 1 |
 | `ext/imap/imap_reopen.php` | 0 | 1 |
@@ -1057,6 +1063,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/imap/imap_unsubscribe.php` | 0 | 1 |
 | `ext/imap/imap_utf7_decode.php` | 0 | 1 |
 | `ext/imap/imap_utf7_encode.php` | 0 | 1 |
+| `ext/imap/imap_utf8.php` | 0 | 1 |
 | `ext/imap/imap_utf8_to_mutf7.php` | 0 | 1 |
 | `ext/inotify/InotifyConstants.php` | 0 | 1 |
 | `ext/inotify/InotifyExtensionPolicy.php` | 0 | 1 |
@@ -14148,7 +14155,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imap_rfc822_write_address (line 154)
 - new imap_rfc822_parse_adrlist (line 155)
 - new imap_rfc822_parse_headers (line 156)
-- new imap_is_open (line 160)
+- new imap_base64 (line 157)
+- new imap_qprint (line 158)
+- new imap_8bit (line 159)
+- new imap_binary (line 160)
+- new imap_utf8 (line 161)
+- new imap_mime_header_decode (line 162)
+- new imap_is_open (line 166)
 - 3 class method(s)
 
 ### `ext/imap/VmImapArg.php`
@@ -14211,6 +14224,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
 
+### `ext/imap/VmImapMime.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 184)
+- new ObjectEntry (line 186)
+- new Variable (line 192)
+- new Variable (line 196)
+- 11 class method(s)
+
 ### `ext/imap/VmImapMutf7.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14229,6 +14251,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 10 class method(s)
 - 1 closure(s)
 
+### `ext/imap/imap_8bit.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/imap/imap_alerts.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14239,6 +14266,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/imap/imap_base64.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_binary.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/imap/imap_body.php`
 
@@ -14437,6 +14474,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/imap/imap_mime_header_decode.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/imap/imap_msgno.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14473,6 +14515,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
+- 2 class method(s)
+
+### `ext/imap/imap_qprint.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/imap/imap_rename.php`
@@ -14587,6 +14634,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/imap/imap_utf7_encode.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/imap/imap_utf8.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -43418,67 +43470,67 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 62)
 - new ClassProperty (line 63)
 - new ClassProperty (line 64)
-- new Variable (line 72)
 - new Variable (line 75)
-- new ZipArchiveConstruct (line 82)
-- new ZipArchiveOpen (line 87)
-- new ZipArchiveClose (line 88)
-- new ZipArchiveAddFile (line 89)
-- new ZipArchiveAddFromString (line 90)
-- new ZipArchiveGetFromName (line 91)
-- new ZipArchiveExtractTo (line 92)
-- new ZipArchiveGetStatusString (line 93)
-- new ZipArchiveCount (line 94)
-- new ZipArchiveStatName (line 95)
-- new ZipArchiveSetPassword (line 96)
-- new ZipArchiveSetEncryptionName (line 97)
-- new ZipArchiveStatIndex (line 99)
-- new ZipArchiveLocateName (line 100)
-- new ZipArchiveGetFromIndex (line 101)
-- new ZipArchiveGetNameIndex (line 102)
-- new ZipArchiveDeleteName (line 103)
-- new ZipArchiveDeleteIndex (line 104)
-- new ZipArchiveAddEmptyDir (line 105)
-- new ZipArchiveRenameName (line 106)
-- new ZipArchiveRenameIndex (line 107)
-- new ZipArchiveGetStream (line 108)
-- new ZipArchiveSetMtimeName (line 110)
-- new ZipArchiveSetMtimeIndex (line 111)
-- new ZipArchiveSetExternalAttributesName (line 112)
-- new ZipArchiveSetExternalAttributesIndex (line 113)
-- new ZipArchiveGetExternalAttributesName (line 114)
-- new ZipArchiveGetExternalAttributesIndex (line 115)
-- new ZipArchiveSetCompressionName (line 116)
-- new ZipArchiveSetCompressionIndex (line 117)
-- new ZipArchiveIsCompressionMethodSupported (line 118)
-- new ZipArchiveIsEncryptionMethodSupported (line 120)
-- new ZipArchiveRegisterProgressCallback (line 121)
-- new ZipArchiveRegisterCancelCallback (line 122)
-- new ZipArchiveGetStreamIndex (line 123)
-- new ZipArchiveGetStreamName (line 124)
-- new ZipArchiveClearError (line 125)
-- new ZipArchiveSetEncryptionIndex (line 126)
-- new ZipArchiveSetCommentName (line 128)
-- new ZipArchiveSetCommentIndex (line 129)
-- new ZipArchiveGetCommentName (line 130)
-- new ZipArchiveGetCommentIndex (line 131)
-- new ZipArchiveSetArchiveComment (line 132)
-- new ZipArchiveGetArchiveComment (line 133)
-- new ZipArchiveUnchangeAll (line 135)
-- new ZipArchiveUnchangeArchive (line 136)
-- new ZipArchiveUnchangeIndex (line 137)
-- new ZipArchiveUnchangeName (line 138)
-- new ZipArchiveReplaceFile (line 139)
-- new ZipArchiveAddGlob (line 140)
-- new ZipArchiveAddPattern (line 141)
-- new ZipArchiveIsWritable (line 143)
-- new ZipArchiveSetReadOnly (line 144)
-- new ZipArchiveSetArchiveFlag (line 146)
-- new ZipArchiveGetArchiveFlag (line 147)
-- new ZipArchiveState (line 163)
-- new Variable (line 883)
-- new Variable (line 898)
-- new Variable (line 913)
+- new Variable (line 78)
+- new ZipArchiveConstruct (line 86)
+- new ZipArchiveOpen (line 91)
+- new ZipArchiveClose (line 92)
+- new ZipArchiveAddFile (line 93)
+- new ZipArchiveAddFromString (line 94)
+- new ZipArchiveGetFromName (line 95)
+- new ZipArchiveExtractTo (line 96)
+- new ZipArchiveGetStatusString (line 97)
+- new ZipArchiveCount (line 98)
+- new ZipArchiveStatName (line 99)
+- new ZipArchiveSetPassword (line 100)
+- new ZipArchiveSetEncryptionName (line 101)
+- new ZipArchiveStatIndex (line 103)
+- new ZipArchiveLocateName (line 104)
+- new ZipArchiveGetFromIndex (line 105)
+- new ZipArchiveGetNameIndex (line 106)
+- new ZipArchiveDeleteName (line 107)
+- new ZipArchiveDeleteIndex (line 108)
+- new ZipArchiveAddEmptyDir (line 109)
+- new ZipArchiveRenameName (line 110)
+- new ZipArchiveRenameIndex (line 111)
+- new ZipArchiveGetStream (line 112)
+- new ZipArchiveSetMtimeName (line 114)
+- new ZipArchiveSetMtimeIndex (line 115)
+- new ZipArchiveSetExternalAttributesName (line 116)
+- new ZipArchiveSetExternalAttributesIndex (line 117)
+- new ZipArchiveGetExternalAttributesName (line 118)
+- new ZipArchiveGetExternalAttributesIndex (line 119)
+- new ZipArchiveSetCompressionName (line 120)
+- new ZipArchiveSetCompressionIndex (line 121)
+- new ZipArchiveIsCompressionMethodSupported (line 122)
+- new ZipArchiveIsEncryptionMethodSupported (line 124)
+- new ZipArchiveRegisterProgressCallback (line 125)
+- new ZipArchiveRegisterCancelCallback (line 126)
+- new ZipArchiveGetStreamIndex (line 127)
+- new ZipArchiveGetStreamName (line 128)
+- new ZipArchiveClearError (line 129)
+- new ZipArchiveSetEncryptionIndex (line 130)
+- new ZipArchiveSetCommentName (line 132)
+- new ZipArchiveSetCommentIndex (line 133)
+- new ZipArchiveGetCommentName (line 134)
+- new ZipArchiveGetCommentIndex (line 135)
+- new ZipArchiveSetArchiveComment (line 136)
+- new ZipArchiveGetArchiveComment (line 137)
+- new ZipArchiveUnchangeAll (line 139)
+- new ZipArchiveUnchangeArchive (line 140)
+- new ZipArchiveUnchangeIndex (line 141)
+- new ZipArchiveUnchangeName (line 142)
+- new ZipArchiveReplaceFile (line 143)
+- new ZipArchiveAddGlob (line 144)
+- new ZipArchiveAddPattern (line 145)
+- new ZipArchiveIsWritable (line 147)
+- new ZipArchiveSetReadOnly (line 148)
+- new ZipArchiveSetArchiveFlag (line 150)
+- new ZipArchiveGetArchiveFlag (line 151)
+- new ZipArchiveState (line 167)
+- new Variable (line 887)
+- new Variable (line 902)
+- new Variable (line 917)
 - 81 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
@@ -44197,7 +44249,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1171)
+- new InternalArgInfo (line 1175)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44213,8 +44265,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2281)
-- new ArgumentCountError (line 2292)
+- new ArgumentCountError (line 2290)
+- new ArgumentCountError (line 2301)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -51412,21 +51464,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/HashTableWriteLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 778)
-- new Variable (line 1392)
-- new Variable (line 1430)
-- new Variable (line 1627)
-- new Variable (line 1634)
-- new Variable (line 1694)
-- new Variable (line 1710)
-- new Variable (line 1726)
-- new Variable (line 1768)
-- new Variable (line 1811)
-- new Variable (line 1813)
-- new Variable (line 1934)
-- new Variable (line 1958)
-- new Variable (line 2071)
-- new Variable (line 2089)
+- new Variable (line 807)
+- new Variable (line 1421)
+- new Variable (line 1459)
+- new Variable (line 1656)
+- new Variable (line 1663)
+- new Variable (line 1723)
+- new Variable (line 1739)
+- new Variable (line 1755)
+- new Variable (line 1797)
+- new Variable (line 1840)
+- new Variable (line 1842)
+- new Variable (line 1963)
+- new Variable (line 1987)
+- new Variable (line 2100)
+- new Variable (line 2118)
 - 42 class method(s)
 
 ### `lib/JIT/HeaderCallbackPolicy.php`

@@ -154,6 +154,12 @@ class Module extends ModuleAbstract
             new imap_rfc822_write_address(),
             new imap_rfc822_parse_adrlist(),
             new imap_rfc822_parse_headers(),
+            new imap_base64(),
+            new imap_qprint(),
+            new imap_8bit(),
+            new imap_binary(),
+            new imap_utf8(),
+            new imap_mime_header_decode(),
         ];
         // php-src 8.3+ imap_is_open() (#27674)
         if (version_compare(CompilerVersion::languageProfileVersion(), '8.3.0', '>=')) {
