@@ -106,6 +106,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['position'], BuiltinParamNames::forFunction('func_get_arg'));
     }
 
+    /** Zend/zend_builtin_functions.stub.php — phpversion(?string $extension = null): string|false (#28004). */
+    public function testPhpversionReflectionStub(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('phpversion'));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('phpversion', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('phpversion', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('extension', $info['name']);
+        $this->assertSame('?string', $info['type']);
+        $this->assertTrue($info['isOptional']);
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('phpversion', 0, $info, false)
+        );
+    }
+
     /** Zend/zend_builtin_functions.stub.php — mixed $object_or_class (InternalArgInfo empty) (#26359). */
     public function testIsAIsSubclassOfObjectOrClassIsMixed(): void
     {
