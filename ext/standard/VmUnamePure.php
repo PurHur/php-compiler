@@ -4,19 +4,76 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * php_uname() without libc uname(2) FFI — /proc, /etc/os-release, PHP_OS (#8904, #1492).
  *
  * php-src: ext/standard/info.c — php_get_uname / PHP_FUNCTION(php_uname)
+ *
+ * PROFILE≥8.4 ValueError is {@see assertValidMode()} — callers gate it so NestedJIT AOT
+ * never calls raw getenv() from this helper (#21888 / #28136).
  */
 final class VmUnamePure
 {
+    /** Valid single-letter modes (php_is_valid_uname_mode, ext/standard/info.c). */
+    private const VALID_MODES = 'amnrsv';
+
     /** @var array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}|null */
     private static ?array $cached = null;
 
     public static function available(): bool
     {
         return '' !== self::utsname()['sysname'];
+    }
+
+    /**
+     * Host/compile-time PROFILE≥8.4 gate. Do not call from NestedJIT AOT helpers (raw getenv SEGVs).
+     */
+    public static function requiresStrictModeValidation(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * Host compile-time fold gate (#28136). Soft profile may fold any single char (incl. unknown).
+     */
+    public static function canFoldMode(string $mode): bool
+    {
+        if (1 !== \strlen($mode)) {
+            return false;
+        }
+        if (self::requiresStrictModeValidation()) {
+            return false !== \strpos(self::VALID_MODES, $mode);
+        }
+
+        return true;
+    }
+
+    /**
+     * Zend 8.4 mode checks (ext/standard/info.c). No getenv — NestedJIT-safe (#28136).
+     *
+     * @throws \ValueError
+     */
+    public static function assertValidMode(string $mode): void
+    {
+        $message = self::invalidModeValueErrorMessage($mode);
+        if (null !== $message) {
+            throw new \ValueError($message);
+        }
+    }
+
+    /** @return non-empty-string|null ValueError message, or null when $mode is valid */
+    public static function invalidModeValueErrorMessage(string $mode): ?string
+    {
+        if (1 !== \strlen($mode)) {
+            return 'php_uname(): Argument #1 ($mode) must be a single character';
+        }
+        if (false === \strpos(self::VALID_MODES, $mode)) {
+            return 'php_uname(): Argument #1 ($mode) must be one of "a", "m", "n", "r", "s", or "v"';
+        }
+
+        return null;
     }
 
     public static function php_uname(string $mode = 'a'): string

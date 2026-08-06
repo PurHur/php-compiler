@@ -1,16 +1,17 @@
 --TEST--
-stdlib php_uname(null) TypeError on 8.4 forward profile (#19201, ext/standard/info.c)
+stdlib php_uname(null) soft-null then ValueError on 8.4 forward profile (#28136, Zend 8.4)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-putenv('PHP_COMPILER_PROFILE=8.4');
-$_ENV['PHP_COMPILER_PROFILE'] = '8.4';
-$_SERVER['PHP_COMPILER_PROFILE'] = '8.4';
 try {
     php_uname(null);
     echo "fail\n";
-} catch (TypeError $e) {
+} catch (ValueError $e) {
     echo $e->getMessage(), "\n";
+} catch (TypeError $e) {
+    echo "TypeError:", $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
-php_uname(): Argument #1 ($mode) must be of type string, null given
+php_uname(): Argument #1 ($mode) must be a single character

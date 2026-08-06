@@ -37,6 +37,7 @@ final class StringInfoRuntimeStandaloneTest extends TestCase
             '__compiler_php_sapi_name',
             '__compiler_zend_version',
             '__compiler_php_uname',
+            '__compiler_php_uname_strict',
             '__compiler_extension_loaded',
             '__compiler_get_loaded_extensions',
             '__compiler_get_extension_funcs',

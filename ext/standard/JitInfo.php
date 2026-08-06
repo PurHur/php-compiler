@@ -107,8 +107,12 @@ final class JitInfo
         if (null === $mode) {
             $mode = $context->constantStringFromString('a');
         }
+        // Compile-time PROFILE picks NestedJIT-safe strict entry (no getenv in helper, #28136).
+        $symbol = VmUnamePure::requiresStrictModeValidation()
+            ? '__compiler_php_uname_strict'
+            : '__compiler_php_uname';
         $raw = $context->builder->call(
-            $context->lookupFunction('__compiler_php_uname'),
+            $context->lookupFunction($symbol),
             $mode
         );
         $slot = JitValueBox::alloc($context);
