@@ -83,6 +83,8 @@ final class BuiltinInternalArgInfo
             'stream_context_create' => '',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#25480, #28223)
             'restore_error_handler', 'restore_exception_handler' => 'true',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; PHP 8.4+: true (#28222)
+            'trigger_error', 'user_error' => 'true',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits / empty (#25623)
             'preg_last_error_msg' => 'string',
             'error_clear_last' => 'void',
