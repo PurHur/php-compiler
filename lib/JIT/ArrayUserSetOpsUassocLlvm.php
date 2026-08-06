@@ -9,34 +9,29 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM array_diff_ukey()/array_intersect_ukey() for thin standalone AOT (#27228).
+ * Pure LLVM array_udiff_uassoc()/array_uintersect_uassoc() for thin standalone AOT (#27243).
  *
- * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper} key filters aborts
- * under thin AOT (peer uksort {@see UsortKeyedLlvm} / #27217). Walk exported key/value pairs
- * and compare keys with spaceship-equivalent strcmp (strings) / int64 icmp (otherwise) —
- * NestedClosureInvoke string spaceship returns 0 under thin AOT.
+ * Dual key+value match with spaceship-equivalent strcmp (strings) / int64 icmp (otherwise),
+ * mirroring {@see ArrayUserSetOpsKeyLlvm}. NestedJIT of dual-closure helpers aborts under thin
+ * AOT (same class as ukey NestedJIT — #27228).
  *
- * Comparison mirrors {@see UsortKeyedLlvm}: string → strcmp; otherwise → int64 icmp.
- * Do not call NestedClosureInvoke here — that path hangs / returns 0 for string spaceship.
- *
- * php-src: ext/standard/array.c — php_array_diff_ukey / php_array_intersect_ukey
+ * php-src: ext/standard/array.c — php_array_udiff_uassoc / php_array_uintersect_uassoc
  */
-final class ArrayUserSetOpsKeyLlvm
+final class ArrayUserSetOpsUassocLlvm
 {
     private static int $seq = 0;
 
-    public static function filterByKey(
+    public static function filterByKeyValue(
         Context $context,
         bool $intersect,
         Value $firstHt,
         Value $othersPackedHt
     ): Value {
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'array_ukey_llvm_cont');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'array_uassoc_llvm_cont');
         $tag = (string) (++self::$seq);
-        $prefix = ($intersect ? 'uintersect_ukey' : 'udiff_ukey').'_'.$tag;
+        $prefix = ($intersect ? 'uintersect_uassoc' : 'udiff_uassoc').'_'.$tag;
         $htMap = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
@@ -65,9 +60,10 @@ final class ArrayUserSetOpsKeyLlvm
         $context->builder->positionAtEnd($body);
         $keyBox = self::pairOperand($context, $firstPairs, $i, $zero);
         $valBox = self::pairOperand($context, $firstPairs, $i, $one);
-        $present = self::keyPresentInOthers(
+        $present = self::pairPresentInOthers(
             $context,
             $keyBox,
+            $valBox,
             $othersPackedHt,
             $otherCount,
             $intersect,
@@ -93,10 +89,11 @@ final class ArrayUserSetOpsKeyLlvm
         return $dest;
     }
 
-    /** @return Value int1 — true if key is in all others ($requireAll) or any other (!$requireAll) */
-    private static function keyPresentInOthers(
+    /** @return Value int1 — true if key+value pair is in all others ($requireAll) or any other (!$requireAll) */
+    private static function pairPresentInOthers(
         Context $context,
         Variable $needleKey,
+        Variable $needleVal,
         Value $othersPackedHt,
         Value $otherCount,
         bool $requireAll,
@@ -136,9 +133,10 @@ final class ArrayUserSetOpsKeyLlvm
         $otherPairsCount = $context->builder->load(
             $context->builder->structGep($otherPairs, $htMap['nextFreeElement'])
         );
-        $inThis = self::keyInPairList(
+        $inThis = self::pairInPairList(
             $context,
             $needleKey,
+            $needleVal,
             $otherPairs,
             $otherPairsCount,
             $prefix.'_scan'
@@ -163,9 +161,10 @@ final class ArrayUserSetOpsKeyLlvm
     }
 
     /** @return Value int1 */
-    private static function keyInPairList(
+    private static function pairInPairList(
         Context $context,
         Variable $needleKey,
+        Variable $needleVal,
         Value $pairs,
         Value $pairCount,
         string $prefix
@@ -183,9 +182,9 @@ final class ArrayUserSetOpsKeyLlvm
         $jSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->builder->store($zero, $jSlot);
 
-        $head = BasicBlockHelper::append($context, $prefix.'_key_head');
-        $body = BasicBlockHelper::append($context, $prefix.'_key_body');
-        $done = BasicBlockHelper::append($context, $prefix.'_key_done');
+        $head = BasicBlockHelper::append($context, $prefix.'_pair_head');
+        $body = BasicBlockHelper::append($context, $prefix.'_pair_body');
+        $done = BasicBlockHelper::append($context, $prefix.'_pair_done');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -195,17 +194,29 @@ final class ArrayUserSetOpsKeyLlvm
 
         $context->builder->positionAtEnd($body);
         $otherKey = self::pairOperand($context, $pairs, $j, $zero);
-        $cmp = self::compareValueBoxes($context, $needleKey, $otherKey);
-        $eq = $context->builder->icmp(Builder::INT_EQ, $cmp, $i64->constInt(0, false));
-        $hit = BasicBlockHelper::append($context, $prefix.'_key_hit');
-        $miss = BasicBlockHelper::append($context, $prefix.'_key_miss');
-        $context->builder->branchIf($eq, $hit, $miss);
+        $otherVal = self::pairOperand($context, $pairs, $j, $one);
+        $keyCmp = ArrayUserSetOpsKeyLlvm::compareValueBoxesPublic($context, $needleKey, $otherKey);
+        $keyEq = $context->builder->icmp(Builder::INT_EQ, $keyCmp, $i64->constInt(0, false));
+        $keyHit = BasicBlockHelper::append($context, $prefix.'_key_hit');
+        $keyMiss = BasicBlockHelper::append($context, $prefix.'_key_miss');
+        $context->builder->branchIf($keyEq, $keyHit, $keyMiss);
 
-        $context->builder->positionAtEnd($hit);
+        $context->builder->positionAtEnd($keyHit);
+        $valCmp = ArrayUserSetOpsKeyLlvm::compareValueBoxesPublic($context, $needleVal, $otherVal);
+        $valEq = $context->builder->icmp(Builder::INT_EQ, $valCmp, $i64->constInt(0, false));
+        $bothHit = BasicBlockHelper::append($context, $prefix.'_both_hit');
+        $valMiss = BasicBlockHelper::append($context, $prefix.'_val_miss');
+        $context->builder->branchIf($valEq, $bothHit, $valMiss);
+
+        $context->builder->positionAtEnd($bothHit);
         $context->builder->store($i1->constInt(1, false), $foundSlot);
         $context->builder->branch($done);
 
-        $context->builder->positionAtEnd($miss);
+        $context->builder->positionAtEnd($valMiss);
+        $context->builder->store($context->builder->addNoSignedWrap($j, $one), $jSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($keyMiss);
         $context->builder->store($context->builder->addNoSignedWrap($j, $one), $jSlot);
         $context->builder->branch($head);
 
@@ -227,64 +238,5 @@ final class ArrayUserSetOpsKeyLlvm
         );
 
         return HashTableReadLlvm::readIndexedToValueBox($context, $pairHt, $cmpIndex);
-    }
-
-    /** @return Value int64 spaceship-equivalent — shared with {@see ArrayUserSetOpsUassocLlvm} (#27243) */
-    public static function compareValueBoxesPublic(Context $context, Variable $left, Variable $right): Value
-    {
-        return self::compareValueBoxes($context, $left, $right);
-    }
-
-    /** @return Value int64 spaceship-equivalent */
-    private static function compareValueBoxes(Context $context, Variable $left, Variable $right): Value
-    {
-        $tag = (string) (++self::$seq);
-        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
-        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
-        $valueMap = $context->structFieldMap['__value__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i64 = $context->getTypeFromString('int64');
-        $leftKind = $context->builder->and(
-            $context->builder->load($context->builder->structGep($leftPtr, $valueMap['type'])),
-            $i8->constInt(0x7f, false)
-        );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        $strBb = $fn->appendBasicBlock('ukey_filter_cmp_str_'.$tag);
-        $longBb = $fn->appendBasicBlock('ukey_filter_cmp_long_'.$tag);
-        $join = $fn->appendBasicBlock('ukey_filter_cmp_join_'.$tag);
-        $resultSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $zero = $i64->constInt(0, false);
-
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $leftKind,
-            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
-        );
-        $context->builder->branchIf($isString, $strBb, $longBb);
-
-        $context->builder->positionAtEnd($strBb);
-        $lStr = $context->builder->call($context->lookupFunction('__value__readString'), $leftPtr);
-        $rStr = $context->builder->call($context->lookupFunction('__value__readString'), $rightPtr);
-        $context->builder->store(JitStringCompare::strcmp($context, $lStr, $rStr), $resultSlot);
-        $context->builder->branch($join);
-
-        $context->builder->positionAtEnd($longBb);
-        $lLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
-        $rLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
-        $lt = $context->builder->icmp(Builder::INT_SLT, $lLong, $rLong);
-        $gt = $context->builder->icmp(Builder::INT_SGT, $lLong, $rLong);
-        $context->builder->store(
-            $context->builder->select(
-                $lt,
-                $i64->constInt(-1, true),
-                $context->builder->select($gt, $i64->constInt(1, false), $zero)
-            ),
-            $resultSlot
-        );
-        $context->builder->branch($join);
-
-        $context->builder->positionAtEnd($join);
-
-        return $context->builder->load($resultSlot);
     }
 }
