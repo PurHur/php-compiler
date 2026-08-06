@@ -7,10 +7,10 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar PHP 8.4+ `(void)` cast for nikic/php-parser on PHP < 8.5 hosts (#7346, #23037).
+ * Desugar `(void)` cast for nikic/php-parser when the language profile enables it (#7346).
  *
- * php-src: Zend/zend_language_scanner.l — T_VOID_CAST; pairs #[\NoDiscard] suppression.
- * Gated on {@see CompilerVersion::supportsVoidCast()} (language profile), not bare VERSION.
+ * php-src through 8.5.8 has no T_VOID_CAST (Zend/zend_language_scanner.l) — see #28183.
+ * Gated on {@see CompilerVersion::supportsVoidCast()} (currently always false).
  */
 final class VoidCastDesugar
 {
