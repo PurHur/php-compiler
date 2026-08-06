@@ -186,25 +186,44 @@ final class UnsetHelperLlvm
         $afterArray = BasicBlockHelper::append($context, 'unset_dim_vb_after_array_'.$tag);
         $afterObject = BasicBlockHelper::append($context, 'unset_dim_vb_after_object_'.$tag);
         $afterString = BasicBlockHelper::append($context, 'unset_dim_vb_after_string_'.$tag);
+        // Continue the caller (main) after a successful unset — returnVoid would end the script (#28051 AOT).
+        $doneBb = BasicBlockHelper::append($context, 'unset_dim_vb_done_'.$tag);
 
-        $isArray = $context->builder->icmp(
+        // Value-box arrays are tagged TYPE_HASHTABLE (7); VM TYPE_ARRAY (6) also appears.
+        $baseType = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isVmArray = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $baseType,
             $i8->constInt(VmVariable::TYPE_ARRAY, false)
         );
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isArray = $context->builder->or($isVmArray, $isHt);
         $context->builder->branchIf($isArray, $arrayBb, $afterArray);
 
         $context->builder->positionAtEnd($arrayBb);
         HashTableHelper::offsetUnset($context, $container, $dim);
-        $context->builder->returnVoid();
+        $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($afterArray);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $baseType,
             $i8->constInt(VmVariable::TYPE_OBJECT, false)
         );
-        $context->builder->branchIf($isObject, $objectBb, $afterObject);
+        $isJitObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isObject, $isJitObject),
+            $objectBb,
+            $afterObject
+        );
 
         $context->builder->positionAtEnd($objectBb);
         $objVar = new Variable(
@@ -219,34 +238,47 @@ final class UnsetHelperLlvm
         );
         if ($unsetOnProperty) {
             self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
-            $context->builder->returnVoid();
+            $context->builder->branch($doneBb);
         } elseif (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
-            $context->builder->returnVoid();
+            $context->builder->branch($doneBb);
         } else {
             self::emitCannotUseObjectAsArray($context, $objVar, $containerOp);
-            $context->builder->returnVoid();
+            $context->builder->branch($doneBb);
         }
 
         $context->builder->positionAtEnd($afterObject);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $baseType,
             $i8->constInt(VmVariable::TYPE_STRING, false)
         );
-        $context->builder->branchIf($isString, $stringBb, $afterString);
+        $isJitString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $baseType,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($isString, $isJitString),
+            $stringBb,
+            $afterString
+        );
 
         $context->builder->positionAtEnd($stringBb);
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, VmUnset::ERROR_STRING_OFFSET);
-        $context->builder->returnVoid();
+        $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($afterString);
         $context->builder->branch($scalarBb);
 
         $context->builder->positionAtEnd($scalarBb);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, VmUnset::ERROR_NON_ARRAY);
-        $context->builder->returnVoid();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function compilePropertyUnset(

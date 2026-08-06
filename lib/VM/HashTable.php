@@ -2194,6 +2194,31 @@ final class HashTable {
         if ($this->internalPointer === $bucketIndex) {
             $this->updateInternalPointerAfterUnsetCurrent($bucketIndex);
         }
+        // Zend packed del of a trailing element shrinks nNumUsed / nNextFreeElement so a
+        // later write at the same index appends cleanly — otherwise FETCH_DIM_W reuses the
+        // tombstone without bumping nNumOfElements and array_is_list() stays false (#28051).
+        $this->compactTrailingUndefinedBuckets();
+    }
+
+    /**
+     * Drop trailing IS_UNDEF buckets and rebuild the hash index (zend_hash packed shrink).
+     */
+    private function compactTrailingUndefinedBuckets(): void
+    {
+        $shrunk = false;
+        while ($this->numUsed > 0) {
+            $last = $this->buckets->read($this->numUsed - 1);
+            if (!$last->value->isUndefined()) {
+                break;
+            }
+            --$this->numUsed;
+            $shrunk = true;
+        }
+        if (!$shrunk) {
+            return;
+        }
+        $this->rehash();
+        $this->recalcNextFreeElementFromBuckets();
     }
 
     /**
@@ -2394,7 +2419,16 @@ final class HashTable {
                         $bucketData = $bucketData->resolveIndirect();
                     }
                 }
+                // Reclaim only if a live lookup still surfaces an undef cell (should be rare
+                // after findBucketIndex skips tombstones); keep nNumOfElements honest (#28051).
+                $reclaim = $bucketData->isUndefined();
                 $bucketData->copyFrom($data);
+                if ($reclaim) {
+                    ++$this->numElements;
+                    if (null === $key) {
+                        $this->bumpNextFreeElementForIndex($hash);
+                    }
+                }
                 return $bucketData;
             }
         }
@@ -2447,7 +2481,12 @@ final class HashTable {
                 return self::INVALID_INDEX;
             }
             $bucket = $this->buckets->read($idx);
-            if ($bucket->key === $key && (null !== $key || $bucket->hash === $hash)) {
+            // Tombstones stay on the collision chain until rehash/compact; skip them so a
+            // later write appends (Zend insertion order) instead of silent reclaim (#28051).
+            if (!$bucket->value->isUndefined()
+                && $bucket->key === $key
+                && (null !== $key || $bucket->hash === $hash)
+            ) {
                 return $idx;
             }
             $idx = $bucket->value->next;
