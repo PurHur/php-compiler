@@ -4729,7 +4729,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/XmlConstants.php` | 0 | 1 |
 | `ext/xml/XmlFunction.php` | 0 | 1 |
 | `ext/xml/XmlHandlerDeprecation.php` | 0 | 3 |
-| `ext/xml/XmlParserHandlers.php` | 0 | 7 |
+| `ext/xml/XmlParserHandlers.php` | 0 | 8 |
 | `ext/xml/XmlParserSerializeDeny.php` | 0 | 3 |
 | `ext/xml/XmlParserSupport.php` | 0 | 4 |
 | `ext/xml/XmlSetHandlerFunction.php` | 0 | 4 |
@@ -41951,7 +41951,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 48 class method(s)
+- 49 class method(s)
 
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
@@ -42014,13 +42014,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlParserHandlers.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 237)
-- new Variable (line 239)
-- new Variable (line 242)
-- new Variable (line 247)
-- new Variable (line 255)
-- new Variable (line 276)
-- 15 class method(s)
+- new Error (line 151)
+- new HashTable (line 281)
+- new Variable (line 283)
+- new Variable (line 286)
+- new Variable (line 291)
+- new Variable (line 299)
+- new Variable (line 320)
+- 17 class method(s)
 
 ### `ext/xml/XmlParserSerializeDeny.php`
 
@@ -45415,7 +45416,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 306 class method(s)
+- 307 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

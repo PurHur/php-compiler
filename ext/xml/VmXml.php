@@ -164,6 +164,31 @@ final class VmXml
             return 0;
         }
 
+        // Mark isparsing so XML_OPTION_PARSE_HUGE cannot change mid-parse (php-src; #28171).
+        $state['isParsing'] = true;
+        self::$parsers[$parser] = $state;
+
+        try {
+            return self::parseWhileParsing($ctx, $parser, $data, $isFinal, $frame, $parserObject);
+        } finally {
+            if (isset(self::$parsers[$parser])) {
+                self::$parsers[$parser]['isParsing'] = false;
+            }
+        }
+    }
+
+    /**
+     * Body of {@see parse()} while {@code isParsing} is true (#28171).
+     */
+    private static function parseWhileParsing(
+        Context $ctx,
+        int $parser,
+        string $data,
+        bool $isFinal,
+        ?Frame $frame,
+        ?ObjectEntry $parserObject
+    ): int {
+        $state = self::$parsers[$parser];
         $state['buffer'] = ($state['buffer'] ?? '').$data;
         self::$parsers[$parser] = $state;
         $accumulated = $state['buffer'];
