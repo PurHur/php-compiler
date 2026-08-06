@@ -247,10 +247,6 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsCrc32c() && str_contains($name, 'crc32c')) {
                 continue;
             }
-            // crc32c AOT native execute via helper bridge returns 0 (#15759); VM+JIT compliance covers parity.
-            if (CompilerVersion::supportsCrc32c() && str_contains($name, 'crc32c')) {
-                continue;
-            }
             // AOT mb_str_pad_*_forward* / json_validate_*_forward* fixtures set PROFILE via --ENV--; always include (#22373, #22544).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
