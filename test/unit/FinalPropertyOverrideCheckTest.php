@@ -550,6 +550,34 @@ PHP;
     }
 
     /**
+     * @covers issue #28078 — PROFILE=8.4 issue-body: try/catch post-construct write
+     * still reaches isFinal=1 (AOT previously ret-void'd after the write).
+     */
+    public function testPlainFinalPropertyTryWriteThenIsFinalUnderProfile84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    final public string $x;
+    public function __construct(string $x) { $this->x = $x; }
+}
+$a = new A('a');
+try { $a->x = 'b'; echo "wrote\n"; } catch (Throwable $e) { echo "write_err\n"; }
+$r = new ReflectionProperty(A::class, 'x');
+echo 'isFinal=', $r->isFinal() ? '1' : '0', "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_plain_try_profile84.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("wrote\nisFinal=1\n", ob_get_clean());
+    }
+
+    /**
      * @covers issue #27818 — trait-imported final plain property: isFinal=1 + child
      * override CompileFatal (same Zend inheritance rules as class-declared finals).
      */
