@@ -34,4 +34,4 @@ try {
 --EXPECT--
 string(4) "lazy"
 string(4) "init"
-Error: Call to undefined static method plain::createlazyghost()
+Error: Call to undefined method Plain::createLazyGhost()

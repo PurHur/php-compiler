@@ -598,7 +598,7 @@ final class ClosureSupport
         $namedClassLc = $lcClass;
         $namedClass = $ctx->classes[$namedClassLc];
         try {
-            [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
+            [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc, $methodName);
         } catch (\LogicException $e) {
             // Missing method + __callStatic → fake Closure (zend_closures.c / #25757).
             $magicState = self::tryMagicStaticCallable($ctx, $namedClassLc, $namedClass->name, $methodName);
@@ -878,7 +878,7 @@ final class ClosureSupport
             }
         }
         try {
-            [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc);
+            [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, $resolveFromLc, $methodLc, $methodName);
         } catch (\LogicException $e) {
             if ($fromCallableApi) {
                 $displayClass = ($ctx->classes[$resolveFromLc] ?? $class)->name;
@@ -1213,8 +1213,13 @@ final class ClosureSupport
     /**
      * @return array{0: ClassEntry, 1: string}
      */
-    private static function resolveStaticMethod(Context $ctx, string $lcClass, string $methodLc): array
-    {
+    private static function resolveStaticMethod(
+        Context $ctx,
+        string $lcClass,
+        string $methodLc,
+        ?string $displayMethodName = null
+    ): array {
+        $requestedLc = $lcClass;
         $visited = [];
         while (!isset($visited[$lcClass])) {
             $visited[$lcClass] = true;
@@ -1231,7 +1236,11 @@ final class ClosureSupport
             $lcClass = $class->parentLc;
         }
 
-        throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
+        // Zend zend_execute_API.c — no "static" token; preserve identifier casing (#27921).
+        $declClass = $ctx->classes[$requestedLc] ?? null;
+        $classDisplay = null !== $declClass ? $declClass->name : $requestedLc;
+        $methodDisplay = $displayMethodName ?? $methodLc;
+        throw new \LogicException("Call to undefined method {$classDisplay}::{$methodDisplay}()");
     }
 
     private static function classDisplayName(Context $ctx, ?string $classLc): ?string

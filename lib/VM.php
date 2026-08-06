@@ -19296,14 +19296,11 @@ restart:
             throw new \LogicException("Cannot call abstract method {$abstractDecl->name}::{$declName}()");
         }
 
-        if ('closure' === $requestedLc) {
-            $declClass = $this->context->classes['closure'] ?? null;
-            $classDisplay = null !== $declClass ? $declClass->name : 'Closure';
-            $methodDisplay = $displayMethodName ?? $methodLc;
-            throw new \LogicException("Call to undefined method {$classDisplay}::{$methodDisplay}()");
-        }
-
-        throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
+        // Zend zend_execute_API.c — same wording for static and instance misses; keep source casing (#27921).
+        $declClass = $this->context->classes[$requestedLc] ?? null;
+        $classDisplay = null !== $declClass ? $declClass->name : $requestedLc;
+        $methodDisplay = $displayMethodName ?? $methodLc;
+        throw new \LogicException("Call to undefined method {$classDisplay}::{$methodDisplay}()");
     }
 
     protected function initArrayCallable(Frame $frame, Variable $callable): ?Frame
