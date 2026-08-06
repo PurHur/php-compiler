@@ -1,19 +1,13 @@
 --TEST--
-stdlib SessionStatus enum for session_status() (#7321, ext/session/session.c)
+stdlib SessionStatus phantom absent; session_status() returns int (#28203, re-#7321)
 --FILE--
 <?php
 ob_start();
 var_export(enum_exists('SessionStatus', false));
 echo "\n";
-var_export(SessionStatus::None->name);
-echo "\n";
-var_export(SessionStatus::Active->value);
-echo "\n";
 var_export(session_status());
 echo "\n";
 var_export(session_status() === PHP_SESSION_NONE);
-echo "\n";
-var_export(session_status() === SessionStatus::None);
 echo "\n";
 session_start();
 var_export(session_status() === PHP_SESSION_ACTIVE);
@@ -22,11 +16,8 @@ session_write_close();
 var_export(session_status() === PHP_SESSION_NONE);
 echo "\n";
 --EXPECT--
-true
-'None'
-2
+false
 1
 true
-false
 true
 true

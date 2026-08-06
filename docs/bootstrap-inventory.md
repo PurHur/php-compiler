@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7168 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23003 |
+| Source constructs flagged (warnings) | 23002 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2471,7 +2471,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BrowscapEngine.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 22 |
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
-| `ext/standard/BuiltinEnums.php` | 0 | 23 |
+| `ext/standard/BuiltinEnums.php` | 0 | 22 |
 | `ext/standard/BuiltinIntrospectionPolicy.php` | 0 | 1 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
 | `ext/standard/CaseCompareJitHelper.php` | 0 | 1 |
@@ -27297,29 +27297,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 66)
-- new ClassEntry (line 109)
-- new ClassEntry (line 129)
-- new ClassEntry (line 151)
-- new ClassEntry (line 177)
-- new ClassEntry (line 203)
-- new ClassEntry (line 230)
-- new ClassEntry (line 257)
-- new ClassEntry (line 283)
-- new ClassEntry (line 310)
-- new ClassEntry (line 337)
-- new ClassEntry (line 364)
-- new ClassEntry (line 390)
-- new ClassEntry (line 415)
-- new ClassEntry (line 440)
-- new ClassEntry (line 476)
-- new ClassEntry (line 508)
-- new ClassEntry (line 535)
-- new ClassEntry (line 567)
-- new Variable (line 585)
-- new Variable (line 599)
-- new Variable (line 613)
-- 23 class method(s)
+- new ClassEntry (line 64)
+- new ClassEntry (line 107)
+- new ClassEntry (line 127)
+- new ClassEntry (line 149)
+- new ClassEntry (line 175)
+- new ClassEntry (line 201)
+- new ClassEntry (line 228)
+- new ClassEntry (line 255)
+- new ClassEntry (line 281)
+- new ClassEntry (line 308)
+- new ClassEntry (line 335)
+- new ClassEntry (line 361)
+- new ClassEntry (line 386)
+- new ClassEntry (line 411)
+- new ClassEntry (line 447)
+- new ClassEntry (line 479)
+- new ClassEntry (line 506)
+- new ClassEntry (line 538)
+- new Variable (line 556)
+- new Variable (line 570)
+- new Variable (line 584)
+- 22 class method(s)
 
 ### `ext/standard/BuiltinIntrospectionPolicy.php`
 
