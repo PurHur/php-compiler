@@ -100,6 +100,8 @@ final class BuiltinInternalArgInfo
             'file_put_contents', 'fwrite' => 'int|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25750)
             'stream_get_contents' => 'string|false',
+            // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |false) (#27739)
+            'stream_copy_to_stream' => 'int|false',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#26357, re-#23921)
             'stream_get_line' => 'string|false',
             // ext/standard/file.stub.php — InternalArgInfo return int (missing |false) (#26322)
@@ -788,6 +790,8 @@ final class BuiltinInternalArgInfo
             'fgets' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — ?int $length = null (#25750)
             'stream_get_contents' => 1 === $index ? '?int' : null,
+            // ext/standard/streamsfuncs.stub.php — ?int $length = null (#27739)
+            'stream_copy_to_stream' => 2 === $index ? '?int' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24826)
             'fgetcsv' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — string $eol = "\n" (missing from InternalArgInfo) (#25135)
