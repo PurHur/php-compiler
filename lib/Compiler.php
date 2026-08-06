@@ -16062,6 +16062,13 @@ class Compiler {
 
     protected function vmVariableFromCfgLiteralOperand(Operand $operand): ?Variable
     {
+        // Named CVs / BoundVariable($this) unwrap to Literal(name) via unwrapCfgLiteralOperand —
+        // that is the variable *name*, not a compile-time value. Folding it registers string
+        // constants on the CV slot (e.g. const "this" on $this) so call-arg reads see a string
+        // instead of the object (#28049, #28038, #22923).
+        if (null !== Block::resolveVariableName($operand)) {
+            return null;
+        }
         $literal = $this->unwrapCfgLiteralOperand($operand);
         if (null === $literal) {
             return null;
@@ -46399,6 +46406,10 @@ class Compiler {
             return null;
         }
         if ($this->callArgIsNewExpression($arg)) {
+            return null;
+        }
+        // Defense in depth with vmVariableFromCfgLiteralOperand (#28049): never fold $this / CVs.
+        if (null !== Block::resolveVariableName($arg)) {
             return null;
         }
         $vm = $this->vmVariableFromCfgLiteralOperand($arg);
