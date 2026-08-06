@@ -42,6 +42,25 @@ PHP;
         );
     }
 
+    /** Issue #27946 — unknown flag bits masked; DELIM_CAPTURE without () is a no-op. */
+    public function testVmUnknownFlagsMaskedLikeZend(): void
+    {
+        $code = <<<'PHP'
+echo json_encode(preg_split('/a/', 'a', -1, 999)), "\n";
+echo json_encode(preg_grep('/a/', [1, 'a'], 999)), "\n";
+echo json_encode(preg_grep('/a/', [1, 'a'], 998)), "\n";
+try {
+    $m = null;
+    preg_match('/a/', 'a', $m, 999);
+    echo "match:ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+}
+PHP;
+        $expect = "[]\n[1]\n{\"1\":\"a\"}\nValueError\n";
+        $this->assertSame($expect, $this->runBin('bin/vm.php', $code));
+    }
+
     /**
      * @group llvm
      * @group jit

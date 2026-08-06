@@ -482,15 +482,7 @@ final class VmPreg
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
-        $allowed = StdlibConstants::PREG_SPLIT_NO_EMPTY
-            | StdlibConstants::PREG_SPLIT_DELIM_CAPTURE
-            | StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE;
-        if (0 !== ($flags & ~$allowed)) {
-            throw new \LogicException(
-                'preg_split() flags must be a combination of PREG_SPLIT_* constants in this compiler build'
-            );
-        }
-
+        // php-src php_pcre.c PHP_FUNCTION(preg_split) — unknown flag bits ignored; no throw (#27946).
         $result = VmPregNative::pregSplit($pattern, $subject, $limit, $flags);
         self::syncLastErrorFromNative();
         if (false === $result) {

@@ -290,9 +290,10 @@ final class VmPregPure
                 }
             }
             if ($delimCapture) {
+                // php-src: PREG_SPLIT_DELIM_CAPTURE only emits capturing subgroups (gi>=1), never
+                // the full match — patterns without () are a no-op for this flag (#27946).
                 $groupCount = (int) (\count($ovector) / 2);
-                $startGi = $groupCount > 1 ? 1 : 0;
-                for ($gi = $startGi; $gi < $groupCount; ++$gi) {
+                for ($gi = 1; $gi < $groupCount; ++$gi) {
                     $gStart = $ovector[$gi * 2] ?? -1;
                     $gEnd = $ovector[$gi * 2 + 1] ?? -1;
                     if ($gStart < 0 || $gEnd < 0) {

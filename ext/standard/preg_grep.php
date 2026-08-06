@@ -41,12 +41,8 @@ final class preg_grep extends Internal
             if (Variable::TYPE_INTEGER !== $flags->type) {
                 throw new \LogicException('preg_grep() flags must be an integer in this compiler build');
             }
-            if (0 !== $flags->toInt() && 1 !== $flags->toInt()) {
-                throw new \LogicException(
-                    'preg_grep() flags must be 0 or PREG_GREP_INVERT (1) in this compiler build'
-                );
-            }
-            $invert = 1 === $flags->toInt();
+            // php-src php_pcre.c PHP_FUNCTION(preg_grep) — mask PREG_GREP_INVERT; unknown bits ignored (#27946).
+            $invert = 0 !== ($flags->toInt() & StdlibConstants::PREG_GREP_INVERT);
         }
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
@@ -101,8 +97,12 @@ final class preg_grep extends Internal
         if (3 === $argc) {
             $flags = JitLongArg::lower($context, $args[2], 'preg_grep() flags');
             $i64 = $context->getTypeFromString('int64');
-            $one = $i64->constInt(1, true);
-            $invert = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $flags, $one);
+            $masked = $context->builder->and($flags, $i64->constInt(StdlibConstants::PREG_GREP_INVERT, true));
+            $invert = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $masked,
+                $i64->constInt(0, true)
+            );
         }
 
         // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226).
