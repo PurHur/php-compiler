@@ -3285,6 +3285,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strlen, 'encoding', 'iconv_strlen'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strlen, 'str', 'iconv_strlen'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strlen, 'charset', 'iconv_strlen'));
+        // php-src iconv.stub.php — ?string $encoding = null → int|false (#27629)
+        self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('iconv_strlen'));
+        $enc = BuiltinInternalArgInfo::paramInfoForFunction('iconv_strlen', 1);
+        self::assertNotNull($enc);
+        self::assertSame('?string', $enc['type']);
+        self::assertTrue($enc['isOptional']);
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('iconv_strlen', 1));
 
         $substr = BuiltinParamNames::forFunction('iconv_substr');
         self::assertSame(['string', 'offset', 'length', 'encoding'], $substr);
