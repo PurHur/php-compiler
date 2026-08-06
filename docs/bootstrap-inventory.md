@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7166 |
-| Phase A inventory files (M2 ratio SSOT) | 7166 |
+| PHP files on vm.php path | 7167 |
+| Phase A inventory files (M2 ratio SSOT) | 7167 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23016 |
+| Source constructs flagged (warnings) | 23017 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5180,6 +5180,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ArrayUniqueLlvm.php` | 0 | 8 |
 | `lib/JIT/ArrayUserSetOpsKeyLlvm.php` | 0 | 1 |
 | `lib/JIT/ArrayUserSetOpsUassocLlvm.php` | 0 | 1 |
+| `lib/JIT/ArrayUserSetOpsValueLlvm.php` | 0 | 1 |
 | `lib/JIT/ArrayWalkLlvm.php` | 0 | 8 |
 | `lib/JIT/AsymmetricVisibilityGuard.php` | 0 | 2 |
 | `lib/JIT/BackedEnumDuplicateJitGuard.php` | 0 | 1 |
@@ -27206,9 +27207,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArrayUserSetOpsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 74)
-- new HashTable (line 98)
-- new Variable (line 200)
+- new HashTable (line 77)
+- new HashTable (line 101)
+- new Variable (line 203)
 - 14 class method(s)
 - 1 closure(s)
 
@@ -44436,7 +44437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1193)
+- new InternalArgInfo (line 1198)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -45951,6 +45952,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/ArrayUserSetOpsValueLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/ArrayWalkLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46230,8 +46236,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayUserSetOpsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 209)
-- 15 class method(s)
+- new JITVariable (line 160)
+- 13 class method(s)
 
 ### `lib/JIT/Builtin/ArrayValuesRuntime.php`
 

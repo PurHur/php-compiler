@@ -7,42 +7,25 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayUserSetOpsKeyLlvm;
 use PHPCompiler\JIT\ArrayUserSetOpsUassocLlvm;
+use PHPCompiler\JIT\ArrayUserSetOpsValueLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey()/uassoc (#18515, #27228, #27243).
+ * JIT/AOT link for array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey()/uassoc (#18515, #27228, #27243, #27533).
  *
- * Value comparators: NestedJIT {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper}.
- * Key / dual key+value comparators: pure LLVM {@see ArrayUserSetOpsKeyLlvm} / {@see ArrayUserSetOpsUassocLlvm}
- * — NestedJIT key filters abort under thin AOT.
+ * Value / key / dual comparators: pure LLVM {@see ArrayUserSetOpsValueLlvm} /
+ * {@see ArrayUserSetOpsKeyLlvm} / {@see ArrayUserSetOpsUassocLlvm} — NestedJIT of the PHP
+ * helper aborts under thin AOT (cross-HT NestedClosureInvoke — #26976 / #27533).
  *
  * SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}
  * php-src: ext/standard/array.c
  */
 final class ArrayUserSetOpsRuntime
 {
-    private const ABI_UDIFF_CLOSURE = '__array_udiff__closure';
-
-    private const ABI_UINTERSECT_CLOSURE = '__array_uintersect__closure';
-
-    private const HELPER_PATH = '/ext/standard/ArrayUserSetOpsJitHelper.php';
-
-    private const UDIFF_CLOSURE = 'PHPCompiler\\ext\\standard\\ArrayUserSetOpsJitHelper::diffByValueWithClosure';
-
-    private const UINTERSECT_CLOSURE = 'PHPCompiler\\ext\\standard\\ArrayUserSetOpsJitHelper::intersectByValueWithClosure';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::UDIFF_CLOSURE,
-        self::UINTERSECT_CLOSURE,
-    ];
-
     public static function diffByValue(
         Context $context,
         bool $intersect,
@@ -50,17 +33,7 @@ final class ArrayUserSetOpsRuntime
         JITVariable $first,
         JITVariable ...$others
     ): Value {
-        self::requireClosureCallback($context, $callback);
-        self::ensureLinked($context);
-        $src = self::argToHashtable($context, $first);
-        $packed = self::packOtherHashTables($context, $others);
-
-        return $context->builder->call(
-            $context->lookupFunction($intersect ? self::ABI_UINTERSECT_CLOSURE : self::ABI_UDIFF_CLOSURE),
-            $src,
-            HashTableHelper::loadHashtablePointer($context, $packed),
-            JitValueBox::valuePtrFromVariable($context, $callback)
-        );
+        return self::filterByValue($context, $intersect, $callback, $first, ...$others);
     }
 
     public static function diffByKey(
@@ -99,6 +72,25 @@ final class ArrayUserSetOpsRuntime
         JITVariable ...$others
     ): Value {
         return self::filterByKeyValue($context, true, $valueCallback, $keyCallback, $first, ...$others);
+    }
+
+    private static function filterByValue(
+        Context $context,
+        bool $intersect,
+        JITVariable $callback,
+        JITVariable $first,
+        JITVariable ...$others
+    ): Value {
+        self::requireClosureCallback($context, $callback);
+        $src = self::argToHashtable($context, $first);
+        $packed = self::packOtherHashTables($context, $others);
+
+        return ArrayUserSetOpsValueLlvm::filterByValue(
+            $context,
+            $intersect,
+            $src,
+            HashTableHelper::loadHashtablePointer($context, $packed)
+        );
     }
 
     private static function filterByKeyValue(
@@ -143,53 +135,12 @@ final class ArrayUserSetOpsRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        // Pure LLVM paths — no NestedJIT bridge (#27533).
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
-    }
-
-    public static function implement(Context $context): void
-    {
-        if (self::bridgesComplete($context)) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        foreach ([
-            [self::ABI_UDIFF_CLOSURE, 'array_udiff_closure_bridge_entry', self::UDIFF_CLOSURE],
-            [self::ABI_UINTERSECT_CLOSURE, 'array_uintersect_closure_bridge_entry', self::UINTERSECT_CLOSURE],
-        ] as [$abi, $entry, $helper]) {
-            JitVmHelperLink::ensureBridge(
-                $context,
-                $abi,
-                $entry,
-                [$htPtr, $htPtr, $valuePtr],
-                $htPtr,
-                $helper,
-                self::HELPER_PATH,
-                self::COMPILED_HELPERS,
-                '#18515'
-            );
-        }
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Pure LLVM paths — no NestedJIT bridge (#27533).
     }
 
     private static function requireClosureCallback(Context $context, JITVariable $callback): void
@@ -224,34 +175,5 @@ final class ArrayUserSetOpsRuntime
         }
 
         return ArrayBuiltinHelper::loadHashTable($context, $arg);
-    }
-
-    private static function bridgesComplete(Context $context): bool
-    {
-        foreach ([
-            self::ABI_UDIFF_CLOSURE,
-            self::ABI_UINTERSECT_CLOSURE,
-        ] as $name) {
-            $probe = $context->module->getNamedFunction($name);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach ([
-            self::ABI_UDIFF_CLOSURE,
-            self::ABI_UINTERSECT_CLOSURE,
-        ] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayUserSetOpsRuntime bridge (#18515)');
-            }
-            $context->registerFunction($name, $fn);
-        }
     }
 }

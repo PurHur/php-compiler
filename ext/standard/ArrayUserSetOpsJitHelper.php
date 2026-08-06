@@ -9,9 +9,12 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey() closure paths for JIT/AOT (#18515, #27228, php-in-PHP).
+ * array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey() NestedJIT helpers (#18515).
  *
- * SSOT shared with {@see VmArrayUserSetOps} VM execute()
+ * Thin standalone AOT uses pure LLVM {@see \PHPCompiler\JIT\ArrayUserSetOpsValueLlvm} /
+ * {@see \PHPCompiler\JIT\ArrayUserSetOpsKeyLlvm} instead — NestedJIT of these methods aborts
+ * (#26976 / #27533). Host/VM execute stays on {@see VmArrayUserSetOps}.
+ *
  * php-src: ext/standard/array.c — php_array_udiff(), php_array_uintersect(), php_array_diff_ukey(), php_array_intersect_ukey()
  */
 final class ArrayUserSetOpsJitHelper
