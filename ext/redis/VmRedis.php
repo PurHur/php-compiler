@@ -32,11 +32,14 @@ final class VmRedis
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('Redis');
         $entry->isInternal = true;
+        // Declared casing is the storage key (ClassConstName / #25929). Do not
+        // lowercase — Redis::OPT_SERIALIZER / defined('Redis::OPT_SERIALIZER') (#28099).
         foreach (RedisConstants::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = RedisConstants::CLASS_CONSTANT_NAMES[$name];
+            $canonical = RedisConstants::CLASS_CONSTANT_NAMES[$name];
+            $entry->constants[$canonical] = $const;
+            $entry->constNames[$canonical] = $canonical;
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
@@ -45,11 +48,14 @@ final class VmRedis
         $entry->methodVisibility['__construct'] = $pub;
 
         require_once __DIR__.'/RedisDepth20682.php';
+        require_once __DIR__.'/RedisOptions.php';
         $methods = [
             'connect' => new RedisConnect(),
             'set' => new RedisSet(),
             'get' => new RedisGet(),
             'close' => new RedisClose(),
+            'setoption' => new RedisSetOption(),
+            'getoption' => new RedisGetOption(),
             'del' => new RedisDel(),
             'exists' => new RedisExists(),
             'ping' => new RedisPing(),
@@ -109,6 +115,8 @@ final class VmRedis
             $entry->methodVisibility[$name] = $pub;
             $entry->methodNames[$name] = match ($name) {
                 'isconnected' => 'isConnected',
+                'setoption' => 'setOption',
+                'getoption' => 'getOption',
                 'hset' => 'hSet',
                 'hget' => 'hGet',
                 'hgetall' => 'hGetAll',

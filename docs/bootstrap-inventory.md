@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7172 |
-| Phase A inventory files (M2 ratio SSOT) | 7172 |
+| PHP files on vm.php path | 7173 |
+| Phase A inventory files (M2 ratio SSOT) | 7173 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23026 |
+| Source constructs flagged (warnings) | 23031 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1973,8 +1973,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/redis/RedisDepthMethods.php` | 0 | 70 |
 | `ext/redis/RedisExtensionPolicy.php` | 0 | 1 |
 | `ext/redis/RedisGet.php` | 0 | 3 |
+| `ext/redis/RedisOptions.php` | 0 | 3 |
 | `ext/redis/RedisSet.php` | 0 | 3 |
-| `ext/redis/VmRedis.php` | 0 | 68 |
+| `ext/redis/VmRedis.php` | 0 | 70 |
 | `ext/redis/VmRedisNative.php` | 0 | 36 |
 | `ext/reflection/IsAnonymousClassJitHelper.php` | 0 | 1 |
 | `ext/reflection/JitIsAnonymousClass.php` | 0 | 1 |
@@ -23088,6 +23089,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RedisException (line 37)
 - 1 class method(s)
 
+### `ext/redis/RedisOptions.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 87)
+- 3 class method(s)
+
 ### `ext/redis/RedisSet.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23099,72 +23107,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 33)
-- new Variable (line 36)
-- new RedisConstruct (line 43)
-- new RedisConnect (line 49)
-- new RedisSet (line 50)
-- new RedisGet (line 51)
-- new RedisClose (line 52)
-- new RedisDel (line 53)
-- new RedisExists (line 54)
-- new RedisPing (line 55)
-- new RedisAuth (line 56)
-- new RedisSelect (line 57)
-- new RedisIsConnected (line 58)
-- new RedisHSet (line 59)
-- new RedisHGet (line 60)
-- new RedisHGetAll (line 61)
-- new RedisLPush (line 62)
-- new RedisLPop (line 63)
-- new RedisRPush (line 64)
-- new RedisRPop (line 65)
-- new RedisLRange (line 66)
-- new RedisSAdd (line 67)
-- new RedisSRem (line 68)
-- new RedisSMembers (line 69)
-- new RedisSIsMember (line 70)
-- new RedisZAdd (line 71)
-- new RedisZRange (line 72)
-- new RedisZRem (line 73)
-- new RedisMulti (line 74)
-- new RedisPipeline (line 75)
-- new RedisExec (line 76)
-- new RedisEval (line 77)
-- new RedisExpire (line 78)
-- new RedisTtl (line 79)
-- new RedisIncr (line 80)
-- new RedisDecr (line 81)
-- new RedisKeys (line 82)
-- new RedisMGet (line 83)
-- new RedisMSet (line 84)
-- new RedisPublish (line 86)
-- new RedisSubscribe (line 87)
-- new RedisPSubscribe (line 88)
-- new RedisScan (line 89)
-- new RedisHScan (line 90)
-- new RedisSScan (line 91)
-- new RedisZScan (line 92)
-- new RedisXAdd (line 93)
-- new RedisXRead (line 94)
-- new RedisXGroup (line 95)
-- new RedisPConnect (line 96)
-- new RedisRawCommand (line 97)
-- new RedisSetEx (line 98)
-- new RedisSetNx (line 99)
-- new RedisBlPop (line 100)
-- new RedisBrPop (line 101)
-- new RedisInfo (line 102)
-- new RedisFlushAll (line 103)
-- new RedisWatch (line 104)
-- new RedisUnwatch (line 105)
-- new HashTable (line 151)
-- new Variable (line 153)
-- new HashTable (line 164)
-- new Variable (line 166)
-- new Variable (line 177)
-- new HashTable (line 199)
-- new RedisState (line 273)
-- new RedisException (line 317)
+- new Variable (line 38)
+- new RedisConstruct (line 46)
+- new RedisConnect (line 53)
+- new RedisSet (line 54)
+- new RedisGet (line 55)
+- new RedisClose (line 56)
+- new RedisSetOption (line 57)
+- new RedisGetOption (line 58)
+- new RedisDel (line 59)
+- new RedisExists (line 60)
+- new RedisPing (line 61)
+- new RedisAuth (line 62)
+- new RedisSelect (line 63)
+- new RedisIsConnected (line 64)
+- new RedisHSet (line 65)
+- new RedisHGet (line 66)
+- new RedisHGetAll (line 67)
+- new RedisLPush (line 68)
+- new RedisLPop (line 69)
+- new RedisRPush (line 70)
+- new RedisRPop (line 71)
+- new RedisLRange (line 72)
+- new RedisSAdd (line 73)
+- new RedisSRem (line 74)
+- new RedisSMembers (line 75)
+- new RedisSIsMember (line 76)
+- new RedisZAdd (line 77)
+- new RedisZRange (line 78)
+- new RedisZRem (line 79)
+- new RedisMulti (line 80)
+- new RedisPipeline (line 81)
+- new RedisExec (line 82)
+- new RedisEval (line 83)
+- new RedisExpire (line 84)
+- new RedisTtl (line 85)
+- new RedisIncr (line 86)
+- new RedisDecr (line 87)
+- new RedisKeys (line 88)
+- new RedisMGet (line 89)
+- new RedisMSet (line 90)
+- new RedisPublish (line 92)
+- new RedisSubscribe (line 93)
+- new RedisPSubscribe (line 94)
+- new RedisScan (line 95)
+- new RedisHScan (line 96)
+- new RedisSScan (line 97)
+- new RedisZScan (line 98)
+- new RedisXAdd (line 99)
+- new RedisXRead (line 100)
+- new RedisXGroup (line 101)
+- new RedisPConnect (line 102)
+- new RedisRawCommand (line 103)
+- new RedisSetEx (line 104)
+- new RedisSetNx (line 105)
+- new RedisBlPop (line 106)
+- new RedisBrPop (line 107)
+- new RedisInfo (line 108)
+- new RedisFlushAll (line 109)
+- new RedisWatch (line 110)
+- new RedisUnwatch (line 111)
+- new HashTable (line 159)
+- new Variable (line 161)
+- new HashTable (line 172)
+- new Variable (line 174)
+- new Variable (line 185)
+- new HashTable (line 207)
+- new RedisState (line 281)
+- new RedisException (line 325)
 - 15 class method(s)
 
 ### `ext/redis/VmRedisNative.php`
@@ -38257,9 +38267,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/is_iterable.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 102)
-- new JITVariable (line 113)
-- new JITVariable (line 188)
+- new JITVariable (line 109)
+- new JITVariable (line 120)
+- new JITVariable (line 195)
 - 7 class method(s)
 
 ### `ext/standard/is_link.php`
