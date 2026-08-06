@@ -4953,6 +4953,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #27848 */
+    public function testStreamSocketClientStubReturnAndErrorOutTypes(): void
+    {
+        self::assertNull(
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_socket_client')
+        );
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('stream_socket_client', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('stream_socket_client', 2));
+        self::assertSame('?float', BuiltinInternalArgInfo::stubParamTypeOverride('stream_socket_client', 3));
+        self::assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('stream_socket_client', 0));
+    }
+
     /** @covers issue #25845 */
     public function testHashHkdfStubReturnAndStreamContextSetOptionSignature(): void
     {
