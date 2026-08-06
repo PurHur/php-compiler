@@ -76,6 +76,39 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
         }
     }
 
+    public function testDowngradeStaleVerifiedFreshWhenLoweringDriftsButBlobsMatch(): void
+    {
+        require_once self::$root.'/script/bootstrap-gen0-manifest-lib.php';
+
+        $manifestPath = bootstrap_gen0_manifest_path(self::$root);
+        $origManifest = (string) file_get_contents($manifestPath);
+
+        try {
+            $manifest = bootstrap_gen0_manifest_read(self::$root);
+            $this->assertIsArray($manifest);
+            $this->assertSame([], bootstrap_gen0_manifest_blob_sync_errors(self::$root, $manifest));
+
+            $live = bootstrap_gen0_manifest_live_lowering_fingerprint(self::$root);
+            $stale = str_repeat('cd', 32);
+            if ($stale === $live) {
+                $stale = str_repeat('ef', 32);
+            }
+
+            $manifest['provenance'] = 'verified-fresh';
+            $manifest['lowering_source_fingerprint'] = $stale;
+            file_put_contents($manifestPath, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
+
+            $this->assertNotSame([], bootstrap_gen0_manifest_lowering_fingerprint_errors(self::$root));
+            $this->assertTrue(bootstrap_gen0_manifest_downgrade_stale_verified_fresh_provenance(self::$root));
+            $downgraded = bootstrap_gen0_manifest_read(self::$root);
+            $this->assertSame('unverified-restamp', $downgraded['provenance'] ?? null);
+            $this->assertSame($stale, $downgraded['lowering_source_fingerprint'] ?? null);
+            $this->assertSame([], bootstrap_gen0_manifest_lowering_fingerprint_errors(self::$root));
+        } finally {
+            file_put_contents($manifestPath, $origManifest);
+        }
+    }
+
     public function testStampLoweringFingerprintRoundTrip(): void
     {
         require_once self::$root.'/script/bootstrap-gen0-manifest-lib.php';
