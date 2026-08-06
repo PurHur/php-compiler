@@ -700,7 +700,7 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('preg_match_all'));
     }
 
-    /** php-src ext/libxml/libxml.stub.php — reflection return/default parity (#25844, #28021). */
+    /** php-src ext/libxml/libxml.stub.php — reflection return/default parity (#25844, #28021, #27744). */
     public function testLibxmlErrorControlReflectionStubs(): void
     {
         $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_errors'));
@@ -708,12 +708,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('?callable', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_get_external_entity_loader'));
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_clear_errors'));
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_set_streams_context'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('libxml_set_external_entity_loader'));
         $this->assertSame('?bool', BuiltinInternalArgInfo::stubParamTypeOverride('libxml_use_internal_errors', 0));
+        $this->assertSame('?callable', BuiltinInternalArgInfo::stubParamTypeOverride('libxml_set_external_entity_loader', 0));
         $info = BuiltinInternalArgInfo::paramInfoForFunction('libxml_use_internal_errors', 0);
         $this->assertNotNull($info);
         $this->assertSame('use_errors', $info['name']);
         $this->assertSame('?bool', $info['type']);
         $this->assertTrue($info['isOptional']);
+
+        $setLoader = BuiltinInternalArgInfo::paramInfoForFunction('libxml_set_external_entity_loader', 0);
+        $this->assertNotNull($setLoader);
+        $this->assertSame('resolver_function', $setLoader['name']);
+        $this->assertSame('?callable', $setLoader['type']);
+        $this->assertFalse($setLoader['isOptional']);
 
         $disableInfo = BuiltinInternalArgInfo::paramInfoForFunction('libxml_disable_entity_loader', 0);
         $this->assertNotNull($disableInfo);
