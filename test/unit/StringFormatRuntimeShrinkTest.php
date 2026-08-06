@@ -187,6 +187,18 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         // Helper assumes non-negative $decimals; negative places are pre-rounded by
         // VmNumberFormat / JitNumberFormat (#27899).
         $this->assertSame('1,235', SprintfJitHelper::numberFormat(1234.567, -1, '.', ','));
+        $this->assertSame('1 234,57', SprintfJitHelper::numberFormat(1234.567, 2, ',', ' '));
+        $this->assertSame('-1 234,57', SprintfJitHelper::numberFormat(-1234.567, 2, ',', ' '));
+        $this->assertSame('-1,000', SprintfJitHelper::numberFormat(-1000, 0, '.', ','));
+    }
+
+    public function testSprintfJitHelperNumberFormatUsesBytewiseConcat(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SprintfJitHelper.php');
+        $this->assertStringContainsString('appendString', $source);
+        $this->assertStringContainsString('prependMinus', $source);
+        $this->assertStringNotContainsString('$result .= $decimalSeparator.$fracDigits', $source);
+        $this->assertStringNotContainsString("'-'.\$result", $source);
     }
 
     public function testSpineBundleIncludesStringFormatPhpJitPath(): void
