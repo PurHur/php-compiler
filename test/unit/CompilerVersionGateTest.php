@@ -1790,6 +1790,41 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsPhpBuildDateConstant());
     }
 
+    public function testSupportsPhpSbindirConstantFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhpSbindirConstant());
+    }
+
+    public function testSupportsPhpSbindirConstantFalseWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPhpSbindirConstant());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsPhpSbindirConstantTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhpSbindirConstant());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsPhpBuildDateConstantFalseWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

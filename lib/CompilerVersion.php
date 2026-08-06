@@ -901,6 +901,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ PHP_SBINDIR Core path constant (php-src main/main.c REGISTER_MAIN_STRINGL_CONSTANT; #28170).
+     *
+     * Withheld on ≤8.3 profiles (matches Zend — constant landed in 8.4). Enable via stable 8.4.0+
+     * or explicit {@code PHP_COMPILER_PROFILE=8.4} / {@code 8.5} forward profile.
+     */
+    public static function supportsPhpSbindirConstant(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ PHP_BUILD_DATE Core constant (php-src main/php_version.h / main/main.c; #23231).
      *
      * Withheld on ≤8.4 profiles (matches Zend — constant landed in 8.5). Enable via stable 8.5.0+

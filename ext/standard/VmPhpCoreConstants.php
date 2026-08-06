@@ -218,7 +218,7 @@ final class VmPhpCoreConstants
     }
 
     /**
-     * Profile-gated Core constants (TENTATIVE_RETURN on ≥8.4, PHP_BUILD_DATE on ≥8.5).
+     * Profile-gated Core constants (TENTATIVE_RETURN / PHP_SBINDIR on ≥8.4, PHP_BUILD_DATE on ≥8.5).
      *
      * @return array<string, int|string>
      */
@@ -228,11 +228,47 @@ final class VmPhpCoreConstants
         if (CompilerVersion::supportsTentativeReturnConstant()) {
             $out['TENTATIVE_RETURN'] = self::TENTATIVE_RETURN;
         }
+        if (CompilerVersion::supportsPhpSbindirConstant()) {
+            $out['PHP_SBINDIR'] = self::phpSbindirValue();
+        }
         if (CompilerVersion::supportsPhpBuildDateConstant()) {
             $out['PHP_BUILD_DATE'] = CompilerVersion::phpBuildDateStamp();
         }
 
         return $out;
+    }
+
+    /**
+     * Configure {@code --sbindir} path for {@see PHP_SBINDIR} (main/main.c; #28170).
+     *
+     * Prefer host {@code PHP_SBINDIR} when the engine defines it (PHP 8.4+ / php-config
+     * {@code --sbindir}). Otherwise derive from {@code PHP_BINDIR} / {@code PHP_PREFIX}
+     * ({@code …/bin} → {@code …/sbin}), matching Autoconf {@code sbindir} vs {@code bindir}.
+     */
+    public static function phpSbindirValue(): string
+    {
+        if (\defined('PHP_SBINDIR')) {
+            $host = (string) \constant('PHP_SBINDIR');
+            if ('' !== $host) {
+                return $host;
+            }
+        }
+        if (\defined('PHP_BINDIR')) {
+            $bindir = (string) \constant('PHP_BINDIR');
+            if (str_ends_with($bindir, '/bin')) {
+                return substr($bindir, 0, -4).'/sbin';
+            }
+            if (str_ends_with($bindir, '\\bin')) {
+                return substr($bindir, 0, -4).'\\sbin';
+            }
+        }
+        if (\defined('PHP_PREFIX')) {
+            $prefix = rtrim((string) \constant('PHP_PREFIX'), '/\\');
+
+            return $prefix.(self::isWindowsPlatform() ? '\\sbin' : '/sbin');
+        }
+
+        return self::isWindowsPlatform() ? 'C:\\php\\sbin' : '/usr/sbin';
     }
 
     /** @return array<string, int> */
