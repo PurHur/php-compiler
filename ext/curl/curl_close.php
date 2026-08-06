@@ -12,6 +12,8 @@ use PHPLLVM\Value;
 
 /**
  * curl_close() — release easy handle (php-src ext/curl/interface.c; #6322).
+ *
+ * PHP 8.5+ emits E_DEPRECATED (curl.stub.php #[\Deprecated]; #28133).
  */
 final class curl_close extends Internal
 {
@@ -29,6 +31,8 @@ final class curl_close extends Internal
             ));
         }
         $easy = VmCurlArg::requireEasyObject($frame->calledArgs[0], 'curl_close', 1);
+        // After Z_PARAM_OBJECT — stub #[\Deprecated] side-effect (curl.c / curl.stub.php; #28133).
+        CurlCloseDeprecation::emitClose($frame);
         VmCurlEasy::close($easy);
     }
 
