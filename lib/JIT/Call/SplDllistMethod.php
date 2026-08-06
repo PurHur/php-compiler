@@ -41,6 +41,13 @@ final class SplDllistMethod implements Call
                     $this->className.'::'.$this->method.'() expects exactly 1 argument, 0 given'
                 )
             ),
+            'unshift' => SplDllistJitHelper::compileUnshift(
+                $context,
+                $args[0],
+                $args[1] ?? throw new \ArgumentCountError(
+                    $this->className.'::unshift() expects exactly 1 argument, 0 given'
+                )
+            ),
             'pop' => SplDllistJitHelper::compilePop($context, $args[0]),
             'shift', 'dequeue' => SplDllistJitHelper::compileShift($context, $args[0]),
             default => throw new \LogicException(

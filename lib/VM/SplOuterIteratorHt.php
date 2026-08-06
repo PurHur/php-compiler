@@ -29,6 +29,9 @@ final class SplOuterIteratorHt
             'parentiterator',
             'multipleiterator',
             'recursivetreeiterator',
+            // FIFO packed `__spl_ht` deque — not SplStack (LIFO foreach) (#27311 / #26790).
+            'spldoublylinkedlist',
+            'splqueue',
         ];
     }
 

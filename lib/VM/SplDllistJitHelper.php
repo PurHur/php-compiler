@@ -50,6 +50,53 @@ final class SplDllistJitHelper
         return self::compilePush($context, $receiver, $value);
     }
 
+    /**
+     * Insert at front of packed `__spl_ht` (php-src spl_ptr_llist_unshift / #27311).
+     *
+     * Grow with push, then rotate slots right so index 0 holds $value.
+     */
+    public static function compileUnshift(Context $context, JITVariable $receiver, JITVariable $value): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $htVar = self::htVar($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $oldN = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+
+        // Append a slot (becomes temporary last element), then slide [0..oldN) → [1..oldN].
+        $htVar->nextFreeElementFromRuntime = true;
+        HashTableHelper::addElement($context, $htVar, $value, null);
+
+        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($oldN, $iSlot);
+        $condBb = BasicBlockHelper::append($context, 'spldllist_unshift_cond');
+        $moveBb = BasicBlockHelper::append($context, 'spldllist_unshift_move');
+        $headBb = BasicBlockHelper::append($context, 'spldllist_unshift_head');
+        $context->builder->branch($condBb);
+
+        $context->builder->positionAtEnd($condBb);
+        $i = $context->builder->load($iSlot);
+        $more = $context->builder->icmp(
+            Builder::INT_UGT,
+            $i,
+            $sizeT->constInt(0, false)
+        );
+        $context->builder->branchIf($more, $moveBb, $headBb);
+
+        $context->builder->positionAtEnd($moveBb);
+        $prev = $context->builder->sub($i, $sizeT->constInt(1, false));
+        $elem = HashTableHelper::readIndexedToValueBox($context, $ht, $prev);
+        HashTableHelper::setAtIndex($context, $ht, $i, $elem);
+        $context->builder->store($prev, $iSlot);
+        $context->builder->branch($condBb);
+
+        $context->builder->positionAtEnd($headBb);
+        HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt(0, false), $value);
+
+        return self::voidResult($context);
+    }
+
     public static function compilePop(Context $context, JITVariable $receiver): Value
     {
         $obj = self::loadObject($context, $receiver);

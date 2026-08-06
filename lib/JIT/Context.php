@@ -1162,13 +1162,13 @@ class Context {
         foreach (['__construct', 'insert', 'extract', 'top', 'count'] as $pqMethod) {
             $this->functionProxies['splpriorityqueue::'.$pqMethod] = new Call\SplPriorityQueueMethod($pqMethod);
         }
-        // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790).
+        // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790, #27311).
         foreach ([
             'spldoublylinkedlist' => 'SplDoublyLinkedList',
             'splqueue' => 'SplQueue',
             'splstack' => 'SplStack',
         ] as $dllLc => $dllClass) {
-            $dllMethods = ['__construct', 'push', 'pop', 'shift'];
+            $dllMethods = ['__construct', 'push', 'pop', 'shift', 'unshift'];
             if ('splqueue' === $dllLc) {
                 $dllMethods = array_merge($dllMethods, ['enqueue', 'dequeue']);
             }
