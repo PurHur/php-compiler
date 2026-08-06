@@ -15692,12 +15692,16 @@ class Compiler {
         $continueBlock->func = $block->func;
         $continueBlock->inheritScopeFrom($block);
 
+        // JUMPIF must precede New_/Array_ rematerialization. Compiling the defaultBlock first
+        // left TYPE_NEW ahead of the initialized check, so every call allocated a discarded object
+        // (#28040 companion — wastes work; frame-teardown refcount fix is in VM.php).
         $skipOp = new OpCode(
             OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED,
             null,
             $keySlot
         );
         $skipOp->block1 = $continueBlock;
+        $block->addOpCode($skipOp);
 
         if (null !== $terminal->defaultBlock) {
             // php-cfg places Array_/New_ in defaultBlock, not the function body. Rematerialize
@@ -15726,7 +15730,7 @@ class Compiler {
         ));
         $continueBlock->parents[] = $block;
 
-        return [[$skipOp, $storeOp, $jumpOp], $continueBlock];
+        return [[$storeOp, $jumpOp], $continueBlock];
     }
 
     protected function staticVarDeclaredType(Op\Terminal\StaticVar $terminal): ?Op\Type
