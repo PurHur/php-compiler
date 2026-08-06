@@ -34,20 +34,26 @@ final class VmSQLite3Result
             : new ClassEntry('SQLite3Result');
         $entry->isInternal = true;
         $pub = CfgFunc::FLAG_PUBLIC;
-        foreach ([
+        $methods = [
             'fetcharray' => new SQLite3ResultFetchArray(),
-            'fetchall' => new SQLite3ResultFetchAll(),
             'numcolumns' => new SQLite3ResultNumColumns(),
             'columnname' => new SQLite3ResultColumnName(),
             'columntype' => new SQLite3ResultColumnType(),
             'reset' => new SQLite3ResultReset(),
             'finalize' => new SQLite3ResultFinalize(),
-        ] as $name => $method) {
+        ];
+        // fetchAll — PHP 8.5+ only (absent from PHP-8.4 stubs; peer of #27594 / #20600).
+        if (Sqlite3ExtensionPolicy::advertisesPhp85Apis()) {
+            $methods['fetchall'] = new SQLite3ResultFetchAll();
+        }
+        foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
         }
         $entry->methodNames['fetcharray'] = 'fetchArray';
-        $entry->methodNames['fetchall'] = 'fetchAll';
+        if (isset($entry->methods['fetchall'])) {
+            $entry->methodNames['fetchall'] = 'fetchAll';
+        }
         $entry->methodNames['numcolumns'] = 'numColumns';
         $entry->methodNames['columnname'] = 'columnName';
         $entry->methodNames['columntype'] = 'columnType';

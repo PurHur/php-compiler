@@ -3786,6 +3786,23 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ SQLite3Stmt::busy() / explain() / setExplain() + EXPLAIN_MODE_* and
+     * SQLite3Result::fetchAll() (php-src ext/sqlite3/sqlite3.stub.php; #27594, #20600).
+     *
+     * Absent from PHP-8.4 stubs; migration85 lists Sqlite3Stmt::busy. Withheld on
+     * PROFILE≤8.4 so method_exists matches Zend 8.4. Enable via stable 8.5.0+ or
+     * explicit {@code PHP_COMPILER_PROFILE=8.5}.
+     */
+    public static function supportsSqlite3Php85Apis(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * ext/bcmath + BcMath\Number OOP (ext/bcmath/bcmath.c; #7220, #12131, #15705).
      *
      * Withheld on 8.4.0-dev reference profile; enabled when {@see languageProfileVersion()} is
