@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\pdo;
 
 /**
- * PDO class constants (php-src ext/pdo/pdo.stub.php; #3367, #20393).
+ * PDO class constants (php-src ext/pdo/pdo.stub.php; #3367, #20393, #28097).
  *
- * Storage keys are lowercase (VmReflection::findClassConstantKey / defined()/constant()).
- * Display names stay Zend casing via CLASS_CONSTANT_NAMES.
+ * Value tables keep legacy lowercase keys; VmPDO registration stores them on
+ * ClassEntry under exact Zend casing ({@see ClassConstName::key}, #25910).
+ * Display names stay in CLASS_CONSTANT_NAMES.
  */
 final class PdoConstants
 {

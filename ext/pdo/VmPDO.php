@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\pdo;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ClassConstName;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -42,6 +43,39 @@ final class VmPDO
     /** @var array<int, PdoState> */
     private static array $store = [];
 
+    /**
+     * Store PDO family class constants under exact Zend casing (#28097 / #25910).
+     *
+     * Tables still index values by legacy lowercase keys; {@see ClassConstName::key}
+     * + CLASS_CONSTANT_NAMES supply the case-sensitive ClassEntry storage key that
+     * defined()/constant()/hasConstant expect after #25929.
+     *
+     * @param array<string, int|string> $constants
+     * @param array<string, string>     $names     lowercase key => php-src casing
+     */
+    private static function registerExactCaseClassConstants(
+        ClassEntry $entry,
+        array $constants,
+        array $names
+    ): void {
+        foreach ($names as $legacyKey => $display) {
+            if (!\array_key_exists($legacyKey, $constants)) {
+                continue;
+            }
+            $value = $constants[$legacyKey];
+            $key = ClassConstName::key($display);
+            if (\is_string($value)) {
+                $const = new Variable(Variable::TYPE_STRING);
+                $const->string($value);
+            } else {
+                $const = new Variable(Variable::TYPE_INTEGER);
+                $const->int((int) $value);
+            }
+            $entry->constants[$key] = $const;
+            $entry->constNames[$key] = $display;
+        }
+    }
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['exec'])) {
@@ -56,17 +90,11 @@ final class VmPDO
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('PDO');
         $entry->isInternal = true;
-        foreach (PdoConstants::CLASS_CONSTANTS as $name => $value) {
-            if (\is_string($value)) {
-                $const = new Variable(Variable::TYPE_STRING);
-                $const->string($value);
-            } else {
-                $const = new Variable(Variable::TYPE_INTEGER);
-                $const->int($value);
-            }
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = PdoConstants::CLASS_CONSTANT_NAMES[$name];
-        }
+        self::registerExactCaseClassConstants(
+            $entry,
+            PdoConstants::CLASS_CONSTANTS,
+            PdoConstants::CLASS_CONSTANT_NAMES
+        );
 
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->constructor = new PDOConstruct();
@@ -296,12 +324,11 @@ final class VmPDO
         $mysql->isInternal = true;
         $mysql->parentLc = self::CLASS_LC;
         self::inheritPdoConstructor($mysql, $ctx->classes[self::CLASS_LC]);
-        foreach (PdoMysqlConstants::CLASS_CONSTANTS as $name => $value) {
-            $const = new Variable(Variable::TYPE_INTEGER);
-            $const->int($value);
-            $mysql->constants[$name] = $const;
-            $mysql->constNames[$name] = PdoMysqlConstants::CLASS_CONSTANT_NAMES[$name];
-        }
+        self::registerExactCaseClassConstants(
+            $mysql,
+            PdoMysqlConstants::CLASS_CONSTANTS,
+            PdoMysqlConstants::CLASS_CONSTANT_NAMES
+        );
         self::finalizeMysqlSubclassMethods($mysql);
         $ctx->classes[self::MYSQL_CLASS_LC] = $mysql;
     }
@@ -352,12 +379,11 @@ final class VmPDO
         $pgsql->isInternal = true;
         $pgsql->parentLc = self::CLASS_LC;
         self::inheritPdoConstructor($pgsql, $ctx->classes[self::CLASS_LC]);
-        foreach (PdoPgsqlConstants::CLASS_CONSTANTS as $name => $value) {
-            $const = new Variable(Variable::TYPE_INTEGER);
-            $const->int($value);
-            $pgsql->constants[$name] = $const;
-            $pgsql->constNames[$name] = PdoPgsqlConstants::CLASS_CONSTANT_NAMES[$name];
-        }
+        self::registerExactCaseClassConstants(
+            $pgsql,
+            PdoPgsqlConstants::CLASS_CONSTANTS,
+            PdoPgsqlConstants::CLASS_CONSTANT_NAMES
+        );
         self::finalizePgsqlSubclassMethods($pgsql);
         $ctx->classes[self::PGSQL_CLASS_LC] = $pgsql;
     }
