@@ -63,4 +63,13 @@ final class StrIncdecRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StrIncdecJitHelper.php', $spine);
         $this->assertStringContainsString('StringStrIncdec.php', $spine);
     }
+
+    /** #27436 — user-script AOT must NestedJIT StrIncdec (not IR-stale helper unit.o). */
+    public function testHelperRuntimeInlineOnlyIncludesStrIncdec(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/AOT/HelperRuntimeCache.php');
+        $this->assertStringContainsString('#27436', $source);
+        $this->assertStringContainsString("strincdecjithelper::incrementargv' => true", $source);
+        $this->assertStringContainsString("strincdecjithelper::decrementargv' => true", $source);
+    }
 }
