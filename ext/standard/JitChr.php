@@ -57,9 +57,10 @@ final class JitChr
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            return $context->builder->fptosi(
+            return JitIntdiv::floatToLongTypedSafe(
+                $context,
                 $context->helper->loadValue($arg),
-                $context->getTypeFromString('int64')
+                self::intTypeError($function, $userArgIndex, $paramName, 'float')
             );
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
@@ -165,7 +166,11 @@ final class JitChr
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
-        $truncated = $context->builder->fptosi($doubleVal, $i64);
+        $truncated = JitIntdiv::floatToLongTypedSafe(
+            $context,
+            $doubleVal,
+            self::intTypeError($function, $userArgIndex, $paramName, 'float')
+        );
         $doubleEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 

@@ -73,6 +73,19 @@ final class TypeCheck
                 }
             case Variable::TYPE_NATIVE_LONG:
                 try {
+                    if (Variable::TYPE_NATIVE_DOUBLE === $var->type) {
+                        return new Variable(
+                            $context,
+                            Variable::TYPE_NATIVE_LONG,
+                            Variable::KIND_VALUE,
+                            \PHPCompiler\ext\standard\JitIntdiv::floatToLongTypedSafe(
+                                $context,
+                                $context->helper->loadValue($var),
+                                'Argument must be of type int, float given'
+                            )
+                        );
+                    }
+
                     return new Variable(
                         $context,
                         Variable::TYPE_NATIVE_LONG,

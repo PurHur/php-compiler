@@ -112,6 +112,19 @@ final class ScalarReturnCheck
                     return null;
                 }
             case Variable::TYPE_NATIVE_LONG:
+                if (Variable::TYPE_NATIVE_DOUBLE === $return->type) {
+                    return new Variable(
+                        $context,
+                        Variable::TYPE_NATIVE_LONG,
+                        Variable::KIND_VALUE,
+                        \PHPCompiler\ext\standard\JitIntdiv::floatToLongTypedSafe(
+                            $context,
+                            $context->helper->loadValue($return),
+                            'Return value must be of type int, float returned'
+                        )
+                    );
+                }
+
                 return new Variable(
                     $context,
                     Variable::TYPE_NATIVE_LONG,

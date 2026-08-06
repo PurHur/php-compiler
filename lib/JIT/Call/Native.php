@@ -573,10 +573,12 @@ class Native implements Call {
                     case Variable::TYPE_STRING:
                         return (new \PHPCompiler\ext\standard\intval())->call($context, $arg);
                     case Variable::TYPE_NATIVE_DOUBLE:
-                        // Weak typed int params: zend_dval_to_lval_safe + E_DEPRECATED (#23533).
-                        return \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                        // Weak typed int: zend_dval_to_lval_safe — INF/NAN → TypeError (#27925);
+                        // finite precision loss → E_DEPRECATED (#23533).
+                        return \PHPCompiler\ext\standard\JitIntdiv::floatToLongTypedSafe(
                             $context,
-                            $value
+                            $value,
+                            'Argument must be of type int, float given'
                         );
                 }
                 break;

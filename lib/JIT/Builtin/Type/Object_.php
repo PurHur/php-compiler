@@ -7310,9 +7310,11 @@ class Object_ extends Type {
                     $valuePtr
                 );
             } elseif (Variable::TYPE_NATIVE_DOUBLE === $value->type) {
-                $longVal = $this->context->builder->truncOrBitCast(
+                // Typed int property: zend_dval_to_lval_safe — INF/NAN → TypeError (#27925).
+                $longVal = \PHPCompiler\ext\standard\JitIntdiv::floatToLongTypedSafe(
+                    $this->context,
                     $this->context->helper->loadValue($value),
-                    $this->context->getTypeFromString('int64')
+                    'Cannot assign float to property of type int'
                 );
             } elseif (Variable::TYPE_NATIVE_BOOL === $value->type) {
                 $longVal = $this->context->builder->zExt(
