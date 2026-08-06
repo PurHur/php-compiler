@@ -109,6 +109,11 @@ final class HelperRuntimeCache
         // (default cache hit); NestedJIT of countArgv/wordsArgv matches VM/JIT.
         'phpcompiler\\ext\\standard\\strwordcountjithelper::countargv' => true,
         'phpcompiler\\ext\\standard\\strwordcountjithelper::wordsargv' => true,
+        // #27436 / re-#27345 — helper-runtime StrIncdecJitHelper unit.o can return "" under
+        // default cache hit (fingerprint-fresh but IR-stale vs NestedJIT into user AOT);
+        // NestedJIT of NestedJIT-safe incrementArgv/decrementArgv matches VM/JIT (O=0 OK).
+        'phpcompiler\\ext\\standard\\strincdecjithelper::incrementargv' => true,
+        'phpcompiler\\ext\\standard\\strincdecjithelper::decrementargv' => true,
         // #27069 — NestedJIT CsvStrGetcsvJitHelper (no VmFs) into user AOT; prelinked
         // CsvJitHelper TU + whole-file NestedJIT of fgetcsvArgv/VmFs SIGSEGVd.
         'phpcompiler\\ext\\standard\\csvstrgetcsvjithelper::strgetcsvargv' => true,

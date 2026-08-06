@@ -1,7 +1,8 @@
 --TEST--
-AOT str_increment()/str_decrement() PROFILE=8.4 (#27345)
+AOT str_increment()/str_decrement() PROFILE=8.4 default helper-runtime cache (#27345, #27436)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_HELPER_RUNTIME_O=1
 --FILE--
 <?php
 echo str_increment('a'), "\n";
