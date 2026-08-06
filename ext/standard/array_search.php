@@ -15,22 +15,24 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArraySearchRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * array_search() for arrays of scalar values (subset of PHP).
+ *
+ * php-src: ext/standard/array.stub.php / array.c — PHP_FUNCTION(array_search)
  */
 final class array_search extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src zend_API.c / array.stub.php — ArgumentCountError (#28284, peer #25407).
+        $this->requireArgCountRange($frame, 'array_search', 2, 3);
         $argc = \count($frame->calledArgs);
-        if (2 !== $argc && 3 !== $argc) {
-            throw new \LogicException('array_search() requires two or three arguments');
-        }
         $needle = $frame->calledArgs[0]->resolveIndirect();
         $haystack = VmArray::requireArrayParam(
             $frame->calledArgs[1],
@@ -53,9 +55,18 @@ final class array_search extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer array_find #28284 / round #28229.
         $argc = \count($args);
-        if (2 !== $argc && 3 !== $argc) {
-            throw new \LogicException('array_search() requires two or three arguments');
+        if ($argc < 2 || $argc > 3) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 2
+                    ? \sprintf('array_search() expects at least 2 arguments, %d given', $argc)
+                    : \sprintf('array_search() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
         $strict = $context->constantFromBool(false);
         if (3 === $argc) {
