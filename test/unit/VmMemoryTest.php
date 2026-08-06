@@ -43,4 +43,21 @@ final class VmMemoryTest extends TestCase
         MemoryAccounting::noteBytes(6);
         $this->assertSame(0, MemoryAccounting::usageAfterPeakQuery());
     }
+
+    /** Real peak must drop after free + reset — Zend AG(real_peak), not sticky RSS (#26769). */
+    public function testRealPeakLowersAfterFreeAndReset(): void
+    {
+        VmMemory::beginRequest();
+        MemoryAccounting::beginRequest();
+
+        MemoryAccounting::noteBytes(5 * 1024 * 1024);
+        $peak1 = VmMemory::getPeakUsage(true);
+        MemoryAccounting::noteBytes(-(5 * 1024 * 1024));
+        VmMemory::resetPeakUsage();
+        $peak2 = VmMemory::getPeakUsage(true);
+
+        $this->assertGreaterThan(0, $peak1);
+        $this->assertLessThan($peak1, $peak2);
+        $this->assertGreaterThan(0, VmMemory::getUsage(true));
+    }
 }

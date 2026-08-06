@@ -65,6 +65,7 @@ use PHPCompiler\VM\MemoryAccounting;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\ext\standard\VmObGzhandler;
+use PHPCompiler\ext\standard\VmMemory;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Variable;
 
@@ -1073,6 +1074,7 @@ class Runtime {
     public function run(?Block $block, bool $bubbleUncaught = true) {
         $this->ensureVm();
         MemoryAccounting::beginRequest();
+        VmMemory::beginRequest();
         Superglobals::setActiveContext($this->vmContext);
         OutputBuffer::setActiveContext($this->vmContext);
         $prevBubble = $this->vmContext->bubbleUncaughtToNative;

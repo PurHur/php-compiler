@@ -11,12 +11,30 @@ use PHPCompiler\VM\Variable;
 /**
  * VM memory introspection without host Zend memory_get_* (issue #4862, #3134).
  *
- * php-src: ext/standard/basic_functions.c, Zend/zend_alloc.c (emalloc subset).
+ * php-src: ext/standard/basic_functions.c, Zend/zend_alloc.c (emalloc + real_size).
  * JIT/AOT: ext/standard/MemoryJitHelper.php via lib/JIT/Builtin/MemoryRuntime.php.
+ *
+ * $real_usage=true tracks Zend AG(real_size)/AG(real_peak): a sticky process baseline
+ * (RSS once) plus live emalloc delta — not live /proc RSS, which does not shrink on
+ * unset() (#26769 / re-#7310).
  */
 final class VmMemory
 {
+    /** Process baseline for real_usage (captured once per request from /proc RSS). */
+    private static int $realBase = -1;
+
+    /** MemoryAccounting::currentBytes() when $realBase was captured. */
+    private static int $emallocAtRealBase = 0;
+
     private static int $peakReal = 0;
+
+    /** Reset real counters at request start (peer MemoryAccounting::beginRequest). */
+    public static function beginRequest(): void
+    {
+        self::$realBase = -1;
+        self::$emallocAtRealBase = 0;
+        self::$peakReal = 0;
+    }
 
     public static function resolveUsageArg(Variable $var, string $fn): bool
     {
@@ -85,7 +103,7 @@ final class VmMemory
     public static function getUsage(bool $realUsage = false): int
     {
         if ($realUsage) {
-            $usage = self::readRssBytes();
+            $usage = self::currentRealBytes();
             if ($usage > self::$peakReal) {
                 self::$peakReal = $usage;
             }
@@ -108,20 +126,45 @@ final class VmMemory
     }
 
     /**
-     * php-src: zend_memory_reset_peak_usage — baseline emalloc + real peaks (#26104).
+     * php-src: zend_memory_reset_peak_usage — baseline emalloc + real peaks (#26104, #26769).
      *
      * No $real_usage flag: Zend takes zero args and resets both peaks.
      */
     public static function resetPeakUsage(): void
     {
         MemoryAccounting::resetPeakToCurrent();
-        self::$peakReal = self::readRssBytes();
+        self::$peakReal = self::currentRealBytes();
+    }
+
+    /**
+     * Zend AG(real_size): sticky RSS baseline + live emalloc delta (#26769).
+     *
+     * Live /proc RSS does not drop when PHP frees heap strings; emalloc does.
+     */
+    private static function currentRealBytes(): int
+    {
+        self::ensureRealBase();
+        $delta = MemoryAccounting::currentBytes() - self::$emallocAtRealBase;
+
+        return max(self::pageSize(), self::$realBase + $delta);
+    }
+
+    private static function ensureRealBase(): void
+    {
+        if (self::$realBase >= 0) {
+            return;
+        }
+        $rss = self::readRssBytes();
+        self::$realBase = $rss > 0 ? $rss : self::pageSize();
+        self::$emallocAtRealBase = MemoryAccounting::currentBytes();
+        self::$peakReal = self::$realBase;
     }
 
     /**
      * RSS via /proc/self/statm only (VmFsReadNative; #7287, #4862, #8426).
      *
-     * JIT/AOT use the same source via MemoryJitHelper (#9377).
+     * Used once per request as the real_usage baseline — not as the live counter.
+     * JIT/AOT share this path via MemoryJitHelper (#9377).
      */
     private static function readRssBytes(): int
     {
