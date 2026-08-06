@@ -5,57 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * ABI `__phpc_url_rewriter_apply` + NestedJIT {@see \PHPCompiler\ext\standard\VmUrlRewriterFlush} (#27566).
+ * ABI `__phpc_url_rewriter_apply` — LLVM href query rewrite (#27566).
  *
- * ObOutput NestedJIT must only *call* the ABI (via {@see emitApplyCall} / kernel) — implementing
- * the body here NestedJITs UrlScannerEx separately so it does not break ObOutput::$stack.
+ * NestedJIT UrlScannerEx / substr / str_replace miscompile under thin AOT.
+ * Build {@see OutputRewriteVarsStorage} url_app at emitAdd time; apply injects
+ * `?url_app` / `&url_app` into `href="…"` attribute values (php-src
+ * ext/standard/url_scanner_ex.re — subset sufficient for a=href).
  */
 final class UrlRewriterApplyRuntime
 {
     private const ABI = '__phpc_url_rewriter_apply';
-
-    private const FLUSH_PATH = '/ext/standard/VmUrlRewriterFlush.php';
-
-    private const SCANNER_PATH = '/ext/standard/UrlScannerEx.php';
-
-    private const OUTPUT_VARS_PATH = '/ext/standard/VmOutputRewriteVars.php';
-
-    private const REWRITE_HELPER_PATH = '/ext/standard/OutputRewriteVarsJitHelper.php';
-
-    private const APPLY_HELPER = 'PHPCompiler\\ext\\standard\\VmUrlRewriterFlush::applyHandler';
-
-    private const ADAPT_HELPER = 'PHPCompiler\\ext\\standard\\UrlScannerEx::adapt';
-
-    private const LIST_PAIRS = 'PHPCompiler\\ext\\standard\\VmOutputRewriteVars::listPairs';
-
-    private const EXPORT_BLOB = 'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::exportBlob';
-
-    private const GET_TAGS = 'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getTags';
-
-    private const GET_HOSTS = 'PHPCompiler\\ext\\standard\\OutputRewriteVarsJitHelper::getHosts';
-
-    /** @var list<string> */
-    private const BUNDLE = [
-        self::REWRITE_HELPER_PATH,
-        self::OUTPUT_VARS_PATH,
-        self::SCANNER_PATH,
-        self::FLUSH_PATH,
-    ];
-
-    /** @var list<string> */
-    private const HELPERS = [
-        self::EXPORT_BLOB,
-        self::GET_TAGS,
-        self::GET_HOSTS,
-        self::LIST_PAIRS,
-        self::ADAPT_HELPER,
-        self::APPLY_HELPER,
-    ];
 
     /** Declare ABI only (no body) — safe during ObOutput NestedJIT. */
     public static function declareAbi(Context $context): void
@@ -79,7 +43,7 @@ final class UrlRewriterApplyRuntime
         return $context->builder->call($context->lookupFunction(self::ABI), $contentStr);
     }
 
-    /** NestedJIT scanner/flush and implement ABI body. */
+    /** Implement ABI body with libc scan (no NestedJIT). */
     public static function ensureLinked(Context $context): void
     {
         self::declareAbi($context);
@@ -89,17 +53,6 @@ final class UrlRewriterApplyRuntime
 
             return;
         }
-        StringUrlencode::ensureLinked($context);
-        \PHPCompiler\ext\standard\JitStreamLifecycleKernel::ensureLinked($context);
-        // Force thin is_resource body — NestedJitCompileScope early-return can skip it (#27566).
-        StreamGlobalsJit::implementThinIsResource($context);
-        JitVmHelperLink::ensureCompiledBundle(
-            $context,
-            self::BUNDLE,
-            self::HELPERS,
-            '#27566'
-        );
-        $helper = self::helperFunction($context, self::APPLY_HELPER);
         $fn = $context->lookupFunction(self::ABI);
         if ($fn->countBasicBlocks() > 0) {
             return;
@@ -109,10 +62,15 @@ final class UrlRewriterApplyRuntime
             $restore = $context->builder->getInsertBlock();
         } catch (\Throwable) {
         }
+        OutputRewriteVarsStorage::ensureGlobals($context);
+        OutputRewriteVarsStorage::ensureLibc($context);
+        self::ensureLibc($context);
+        self::ensureStringInit($context);
+
         $entry = $fn->appendBasicBlock('url_rewriter_apply_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call($helper, $fn->getParam(0));
-        $context->builder->returnValue($result);
+        self::emitLlvmHrefApplyBody($context, $fn);
+
         if (null !== $restore) {
             $context->builder->positionAtEnd($restore);
         } else {
@@ -126,14 +84,203 @@ final class UrlRewriterApplyRuntime
         self::ensureLinked($context);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function emitLlvmHrefApplyBody(Context $context, LlvmFunction $fn): void
     {
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after UrlRewriterApplyRuntime compile (#27566)');
-        }
+        $map = $context->structFieldMap['__string__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
 
-        return $fn;
+        $content = $fn->getParam(0);
+        $contentLen = $context->builder->load($context->builder->structGep($content, $map['length']));
+        $contentPtr = $context->builder->pointerCast($context->builder->structGep($content, $map['value']), $i8p);
+
+        $appLen = $context->builder->load(
+            OutputRewriteVarsStorage::lenPtrPublic($context, OutputRewriteVarsStorage::GLOBAL_URL_APP_LEN)
+        );
+        $appRow = OutputRewriteVarsStorage::bufPtrPublic($context, OutputRewriteVarsStorage::GLOBAL_URL_APP);
+
+        $emptyApp = $context->builder->icmp(Builder::INT_EQ, $appLen, $i64->constInt(0, false));
+        $passthrough = $fn->appendBasicBlock('ura_passthrough');
+        $work = $fn->appendBasicBlock('ura_work');
+        $context->builder->branchIf($emptyApp, $passthrough, $work);
+
+        $context->builder->positionAtEnd($passthrough);
+        $context->builder->returnValue($content);
+
+        $context->builder->positionAtEnd($work);
+        // Budget: content + up to 8 query injections.
+        $extra = $context->builder->mul($appLen, $i64->constInt(8, false));
+        $budget = $context->builder->add(
+            $context->builder->add($contentLen, $extra),
+            $i64->constInt(16, false)
+        );
+        $outBuf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->trunc($budget, $sizeT)
+        );
+        $outBase = $context->builder->pointerCast($outBuf, $i8p);
+        $needle = $context->builder->pointerCast($context->constantFromString('href="'), $i8p);
+
+        // Locals via alloca
+        $posAlloca = $context->builder->alloca($i8p, 1, 'ura_pos');
+        $outPosAlloca = $context->builder->alloca($i64, 1, 'ura_outpos');
+        $context->builder->store($contentPtr, $posAlloca);
+        $context->builder->store($i64->constInt(0, false), $outPosAlloca);
+
+        $loop = $fn->appendBasicBlock('ura_loop');
+        $found = $fn->appendBasicBlock('ura_found');
+        $finish = $fn->appendBasicBlock('ura_finish');
+        $context->builder->branch($loop);
+
+        $context->builder->positionAtEnd($loop);
+        $pos = $context->builder->load($posAlloca);
+        $hit = $context->builder->call($context->lookupFunction('strstr'), $pos, $needle);
+        $miss = $context->builder->icmp(Builder::INT_EQ, $hit, $i8p->constNull());
+        $context->builder->branchIf($miss, $finish, $found);
+
+        $context->builder->positionAtEnd($found);
+        // Copy bytes from pos through end of href=" (6 chars).
+        $toNeedle = $context->builder->sub(
+            $context->builder->ptrToInt($hit, $i64),
+            $context->builder->ptrToInt($pos, $i64)
+        );
+        $chunkLen = $context->builder->add($toNeedle, $i64->constInt(6, false));
+        $outPos = $context->builder->load($outPosAlloca);
+        $dest = $context->builder->inBoundsGEP($outBase, $outPos);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $dest,
+            $pos,
+            $context->builder->trunc($chunkLen, $sizeT)
+        );
+        $outPos2 = $context->builder->add($outPos, $chunkLen);
+        $urlStart = $context->builder->inBoundsGEP($hit, $i64->constInt(6, false));
+        $i32 = $context->getTypeFromString('int32');
+        $quote = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $urlStart,
+            $i32->constInt(\ord('"'), false)
+        );
+        $noQuote = $context->builder->icmp(Builder::INT_EQ, $quote, $i8p->constNull());
+        $badQuote = $fn->appendBasicBlock('ura_bad_quote');
+        $goodQuote = $fn->appendBasicBlock('ura_good_quote');
+        $context->builder->branchIf($noQuote, $badQuote, $goodQuote);
+
+        $context->builder->positionAtEnd($badQuote);
+        // Copy remaining from urlStart and finish.
+        $context->builder->store($urlStart, $posAlloca);
+        $context->builder->store($outPos2, $outPosAlloca);
+        $context->builder->branch($finish);
+
+        $context->builder->positionAtEnd($goodQuote);
+        $urlLen = $context->builder->sub(
+            $context->builder->ptrToInt($quote, $i64),
+            $context->builder->ptrToInt($urlStart, $i64)
+        );
+        $destUrl = $context->builder->inBoundsGEP($outBase, $outPos2);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $destUrl,
+            $urlStart,
+            $context->builder->trunc($urlLen, $sizeT)
+        );
+        $outPos3 = $context->builder->add($outPos2, $urlLen);
+
+        // sep = '?' if url has no '?', else '&'
+        $qmark = $context->builder->call(
+            $context->lookupFunction('memchr'),
+            $urlStart,
+            $i32->constInt(\ord('?'), false),
+            $context->builder->trunc($urlLen, $sizeT)
+        );
+        $hasQ = $context->builder->icmp(Builder::INT_NE, $qmark, $i8p->constNull());
+        $sep = $context->builder->select(
+            $hasQ,
+            $i8->constInt(\ord('&'), false),
+            $i8->constInt(\ord('?'), false)
+        );
+        $sepDest = $context->builder->inBoundsGEP($outBase, $outPos3);
+        $context->builder->store($sep, $sepDest);
+        $outPos4 = $context->builder->add($outPos3, $i64->constInt(1, false));
+        $appDest = $context->builder->inBoundsGEP($outBase, $outPos4);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $appDest,
+            $appRow,
+            $context->builder->trunc($appLen, $sizeT)
+        );
+        $outPos5 = $context->builder->add($outPos4, $appLen);
+        // closing quote
+        $qd = $context->builder->inBoundsGEP($outBase, $outPos5);
+        $context->builder->store($i8->constInt(\ord('"'), false), $qd);
+        $outPos6 = $context->builder->add($outPos5, $i64->constInt(1, false));
+        $context->builder->store($outPos6, $outPosAlloca);
+        // continue after quote
+        $context->builder->store(
+            $context->builder->inBoundsGEP($quote, $i64->constInt(1, false)),
+            $posAlloca
+        );
+        $context->builder->branch($loop);
+
+        $context->builder->positionAtEnd($finish);
+        $posF = $context->builder->load($posAlloca);
+        $restLen = $context->builder->call($context->lookupFunction('strlen'), $posF);
+        $outPosF = $context->builder->load($outPosAlloca);
+        $restDest = $context->builder->inBoundsGEP($outBase, $outPosF);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $restDest,
+            $posF,
+            $restLen
+        );
+        $finalLen = $context->builder->add($outPosF, $context->builder->zExt($restLen, $i64));
+        $term = $context->builder->inBoundsGEP($outBase, $finalLen);
+        $context->builder->store($i8->constInt(0, false), $term);
+        $result = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $finalLen,
+            $outBase
+        );
+        $context->builder->returnValue($result);
+    }
+
+    private static function ensureLibc(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        self::ensureExternal($context, 'strstr', $context->context->functionType($i8p, false, $i8p, $i8p));
+        self::ensureExternal($context, 'strchr', $context->context->functionType($i8p, false, $i8p, $i32));
+        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
+        self::ensureExternal(
+            $context,
+            'memchr',
+            $context->context->functionType($i8p, false, $i8p, $i32, $sizeT)
+        );
+    }
+
+    private static function ensureStringInit(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        self::ensureExternal(
+            $context,
+            '__string__init',
+            $context->context->functionType($strPtr, false, $i64, $i8p)
+        );
+    }
+
+    private static function ensureExternal(Context $context, string $name, $ft): void
+    {
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 }

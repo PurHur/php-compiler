@@ -56,13 +56,9 @@ final class RewriteVarsRuntime
         // NestedJIT full ObOutput+flush into this module BEFORE any helper-cache ObOutput
         // bind — otherwise startWithUrlRewriter and getLevel split across TUs (#27566).
         ObOutputJitBridge::ensureUrlRewriterStack($context);
-        self::ensureBlobHelpers($context);
+        OutputRewriteVarsStorage::ensureGlobals($context);
         $context->builder->call($context->lookupFunction('__phpc_ob_start_with_url_rewriter'));
-        $context->builder->call(
-            self::helperFunction($context, self::ADD_HELPER),
-            $nameStr,
-            $valueStr
-        );
+        OutputRewriteVarsStorage::emitAdd($context, $nameStr, $valueStr);
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);
@@ -70,8 +66,8 @@ final class RewriteVarsRuntime
 
     public static function emitReset(Context $context): Value
     {
-        self::ensureBlobHelpers($context);
-        $context->builder->call(self::helperFunction($context, self::RESET_HELPER));
+        OutputRewriteVarsStorage::ensureGlobals($context);
+        OutputRewriteVarsStorage::emitReset($context);
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);

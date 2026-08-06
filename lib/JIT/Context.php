@@ -881,6 +881,7 @@ class Context {
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',
             'phpc_url_rewriter_apply_kernel',
+            'phpc_rewrite_vars_set_tags_kernel',
             'phpc_random_bytes_kernel',
             // Password NestedJIT leaves (#26773) — peer random_bytes (#21186) / hash crypto (#21026).
             'phpc_libcrypt_kernel',

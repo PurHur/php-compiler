@@ -469,6 +469,7 @@ final class IniJitHelper
         }
         if ('url_rewriter.tags' === $key) {
             $old = OutputRewriteVarsJitHelper::getTags();
+            \phpc_rewrite_vars_set_tags_kernel($newValue);
             OutputRewriteVarsJitHelper::setTags($newValue);
 
             return $old;
