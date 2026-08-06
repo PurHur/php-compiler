@@ -13383,6 +13383,21 @@ restart:
     }
 
     /**
+     * Zend zend_vm_def.h ZEND_INIT_STATIC_METHOD_CALL: bind non-static methods when
+     * EX(This) is set and instanceof the called class CE (#28050).
+     */
+    private function instanceThisAllowsNonStaticCall(Frame $frame, string $calledClassLc): bool
+    {
+        $thisVar = $this->resolveCallerThis($frame);
+        if (null === $thisVar || Variable::TYPE_OBJECT !== $thisVar->type) {
+            return false;
+        }
+        $objectClassLc = strtolower($thisVar->toObject()->class->name);
+
+        return $this->isClassSameOrSubclassOf($objectClassLc, strtolower($calledClassLc));
+    }
+
+    /**
      * Zend zend_std_get_static_method: instance methods are not callable via Class::name() (#5339).
      */
     private function assertMethodCallableStatically(ClassEntry $declaringClass, string $methodLc): void
@@ -17554,15 +17569,10 @@ restart:
         }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc, $methodName);
-            $hasInstanceScope = null !== $frame->block->func
-                && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
-                && (
-                    null !== $frame->block->func->class
-                    || null !== $this->boundClosureScopeClassLc($frame)
-                );
-            $parentScopeInstanceCall = ($parentKeywordScope && $hasInstanceScope)
-                || $this->isDirectParentScopeInstanceCall($frame, $lcClass);
-            if (!$parentScopeInstanceCall) {
+            // Zend INIT_STATIC_METHOD_CALL: non-static Class::method() is allowed when
+            // EX(This) is an object instanceof the called class (self::/static::/parent::
+            // and compatible named Class:: from instance methods) (#28050, #1858).
+            if (!$this->instanceThisAllowsNonStaticCall($frame, $lcClass)) {
                 $this->assertMethodCallableStatically($class, $methodLc);
             }
         } catch (\LogicException $e) {

@@ -20254,15 +20254,17 @@ class JIT {
         $directParentLc = null !== $callerClassLc
             ? $this->context->type->object->parentClassLc($callerClassLc)
             : null;
-        // Compiler staticCallParentScope + php-cfg lowered parent class (#1858, #6735).
-        $parentScopeInstanceCall = ($parentScope && $callerInstanceMethod)
-            || ($callerInstanceMethod
-                && null !== $directParentLc
-                && $directParentLc === $declaringClassLc);
-        if (!$parentScopeInstanceCall) {
+        // Zend INIT_STATIC_METHOD_CALL: allow non-static when caller $this is instanceof
+        // the called class (self::/static::/parent:: + compatible named Class::) (#28050, #1858).
+        $instanceScopeAllowsNonStatic = $callerInstanceMethod
+            && null !== $callerClassLc
+            && $this->jitIsClassSameOrSubclassOf($callerClassLc, $declaringClassLc);
+        if (!$instanceScopeAllowsNonStatic) {
             $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
         }
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
+        $bindCallerThisForNonStatic = $instanceScopeAllowsNonStatic
+            && (0 === ($visFlags & \PHPCfg\Func::FLAG_STATIC));
         $parentScopeAllows = false;
         if (null !== $callerClassLc) {
             if (null !== $directParentLc && $directParentLc === $declaringClassLc) {
@@ -20373,14 +20375,18 @@ class JIT {
             && !$parentScope
             && JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)
         ) {
-            $candidates = $this->buildRuntimeStaticMethodCandidatesByClassId($methodLc);
+            $candidates = $this->buildRuntimeStaticMethodCandidatesByClassId(
+                $methodLc,
+                $bindCallerThisForNonStatic
+            );
             if ([] === $candidates) {
                 throw new \LogicException("Call to undefined method {$className}::{$nameOp->value}()");
             }
             $this->context->scope->toCall = new JIT\Call\RuntimeIndirectStaticMethodCall(
                 $methodLc,
                 $candidates,
-                $block
+                $block,
+                $bindCallerThisForNonStatic
             );
             $this->context->scope->args = [];
 
@@ -20398,10 +20404,15 @@ class JIT {
     /**
      * Map every known class id to the static method proxy resolved from that class (#24169).
      *
+     * @param bool $allowInstanceMethods Include non-static methods when caller has compatible
+     *                                   $this (static:: from instance method, #28050).
+     *
      * @return array<int, JIT\Call>
      */
-    private function buildRuntimeStaticMethodCandidatesByClassId(string $methodLc): array
-    {
+    private function buildRuntimeStaticMethodCandidatesByClassId(
+        string $methodLc,
+        bool $allowInstanceMethods = false
+    ): array {
         $methodLc = strtolower($methodLc);
         $candidates = [];
         foreach ($this->context->type->object->allClassNamesById() as $classId => $className) {
@@ -20411,11 +20422,26 @@ class JIT {
                 continue;
             }
             // Prefer static methods; skip instance-only names that share a short name.
+            // When $allowInstanceMethods (static:: from instance, #28050), invert: only
+            // non-static proxies (caller $this is prepended at the call site).
             if ($this->context->type->object->hasDeclaredClass($classLc)) {
                 $ownerId = $this->context->type->object->lookup($classLc);
                 if ($this->context->type->object->hasMethod($ownerId, $methodLc)) {
                     $vis = $this->context->type->object->methodVisibility($ownerId, $methodLc);
-                    if (0 === ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                    $ownerIsStatic = (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC));
+                    if ($allowInstanceMethods) {
+                        if ($ownerIsStatic) {
+                            continue;
+                        }
+                        $resolvedLc = explode('::', $proxyName, 2)[0];
+                        if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
+                            $resolvedId = $this->context->type->object->lookup($resolvedLc);
+                            $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
+                            if (0 !== ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
+                                continue;
+                            }
+                        }
+                    } elseif (!$ownerIsStatic) {
                         // May still be inherited as static from a parent — check resolved owner.
                         $resolvedLc = explode('::', $proxyName, 2)[0];
                         if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
@@ -20905,13 +20931,23 @@ class JIT {
     }
 
     /**
-     * Static parent::instanceMethod() from an instance method passes implicit $this (#1858).
+     * Static parent::instanceMethod() / self:: / static:: from an instance method passes
+     * implicit $this (#1858, #28050).
      */
     private function prependImplicitThisForStaticInstanceCall(
         Block $block,
         JIT\Call $toCall,
         array $args
     ): array {
+        if ($toCall instanceof JIT\Call\RuntimeIndirectStaticMethodCall && $toCall->bindCallerThis) {
+            $thisVar = $this->resolveThisVariable($block);
+            if (null === $thisVar) {
+                return $args;
+            }
+            array_unshift($args, $thisVar);
+
+            return $args;
+        }
         if (!$toCall instanceof JIT\Call\Native) {
             return $args;
         }

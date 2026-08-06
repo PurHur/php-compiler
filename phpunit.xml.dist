@@ -61,6 +61,8 @@
             <file>./test/compliance/ClassConstPrivateSelfChildVMTest.php</file>
             <file>./test/compliance/TraitParentScopeVMTest.php</file>
             <file>./test/compliance/TraitParentScopeJITTest.php</file>
+            <file>./test/compliance/SelfStaticInstanceMethodCallVMTest.php</file>
+            <file>./test/compliance/SelfStaticInstanceMethodCallJITTest.php</file>
             <file>./test/compliance/ClassStaticMethodVMTest.php</file>
             <file>./test/compliance/SplAutoloadRegisterJITTest.php</file>
             <file>./test/compliance/GethostnameJITTest.php</file>
