@@ -61,14 +61,11 @@ final class XmlParserHandlers
             'saxOpenStack' => [],
             // After is_final=true Expat rejects further XML_Parse (php-src; #24647).
             'finished' => false,
+            // True while xml_parse() is on the stack (php-src xml_parser.isparsing; #28171).
+            'isParsing' => false,
             'nsAware' => false,
             'nsSeparator' => ':',
-            'options' => [
-                XmlConstants::XML_OPTION_CASE_FOLDING => 1,
-                XmlConstants::XML_OPTION_TARGET_ENCODING => 'UTF-8',
-                XmlConstants::XML_OPTION_SKIP_TAGSTART => 0,
-                XmlConstants::XML_OPTION_SKIP_WHITE => 0,
-            ],
+            'options' => self::defaultOptionSlots(),
             'handlers' => [
                 self::HANDLER_ELEMENT_START => null,
                 self::HANDLER_ELEMENT_END => null,
@@ -116,6 +113,27 @@ final class XmlParserHandlers
         return true;
     }
 
+    /**
+     * Default XML_OPTION_* slots for a fresh parser (php-src ext/xml/xml.c; #28171).
+     *
+     * @return array<int, int|string>
+     */
+    public static function defaultOptionSlots(): array
+    {
+        $options = [
+            XmlConstants::XML_OPTION_CASE_FOLDING => 1,
+            XmlConstants::XML_OPTION_TARGET_ENCODING => 'UTF-8',
+            XmlConstants::XML_OPTION_SKIP_TAGSTART => 0,
+            XmlConstants::XML_OPTION_SKIP_WHITE => 0,
+        ];
+        // Default false for BC & DoS protection (php-src xml.c parser->parsehuge).
+        if (\PHPCompiler\CompilerVersion::supportsXmlOptionParseHuge()) {
+            $options[XmlConstants::XML_OPTION_PARSE_HUGE] = 0;
+        }
+
+        return $options;
+    }
+
     public static function setOption(ObjectEntry $parser, int $option, mixed $value): bool
     {
         $state = VmXml::parserState($parser->id);
@@ -123,9 +141,20 @@ final class XmlParserHandlers
             return false;
         }
         if (!\array_key_exists($option, $state['options'])) {
-            return false;
+            throw new \ValueError('xml_parser_set_option(): Argument #2 ($option) must be a XML_OPTION_* constant');
         }
-        if (XmlConstants::XML_OPTION_CASE_FOLDING === $option) {
+        // php-src: Cannot change XML_OPTION_PARSE_HUGE while parsing (#28171).
+        if (
+            XmlConstants::XML_OPTION_PARSE_HUGE === $option
+            && !empty($state['isParsing'])
+        ) {
+            throw new \Error('Cannot change option XML_OPTION_PARSE_HUGE while parsing');
+        }
+        if (
+            XmlConstants::XML_OPTION_CASE_FOLDING === $option
+            || XmlConstants::XML_OPTION_SKIP_WHITE === $option
+            || XmlConstants::XML_OPTION_PARSE_HUGE === $option
+        ) {
             $state['options'][$option] = (int) (bool) $value;
         } elseif (XmlConstants::XML_OPTION_TARGET_ENCODING === $option) {
             if (!\is_string($value)) {
@@ -147,10 +176,25 @@ final class XmlParserHandlers
             throw new \ValueError('xml_parser_get_option(): Argument #1 ($parser) must be a valid XML parser');
         }
         if (!\array_key_exists($option, $state['options'])) {
-            return false;
+            throw new \ValueError('xml_parser_get_option(): Argument #2 ($option) must be a XML_OPTION_* constant');
+        }
+        $value = $state['options'][$option];
+        // php-src RETURN_BOOL for PARSE_HUGE (#28171). CASE_FOLDING/SKIP_WHITE stay int for
+        // existing VM callers (pre-#28171 shape); Zend also returns bool for those.
+        if (XmlConstants::XML_OPTION_PARSE_HUGE === $option) {
+            return (bool) $value;
         }
 
-        return $state['options'][$option];
+        return $value;
+    }
+
+    /** Whether XML_PARSE_HUGE is enabled for this parser (PROFILE≥8.4; #28171). */
+    public static function parseHugeEnabled(ObjectEntry $parser): bool
+    {
+        $state = VmXml::parserState($parser->id);
+
+        return null !== $state
+            && 0 !== ($state['options'][XmlConstants::XML_OPTION_PARSE_HUGE] ?? 0);
     }
 
     public static function caseFoldingEnabled(ObjectEntry $parser): bool
