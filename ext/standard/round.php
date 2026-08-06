@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -27,10 +28,8 @@ final class round extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('round() requires one to three arguments');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#28229, peer #25407).
+        $this->requireArgCountRange($frame, 'round', 1, 3);
 
         $num = VmMath::parseNumberBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
@@ -71,6 +70,18 @@ final class round extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
+        // Catchable ArgumentCountError (AOT try/catch) — peer sort() #23855 / #28229.
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('round() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('round() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $context->getTypeFromString('double')->constReal(0.0);
+        }
 
         return JitRound::round($context, ...$args);
     }
