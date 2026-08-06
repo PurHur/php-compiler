@@ -305,6 +305,73 @@ final class VmImapCore
         if (false === $names) {
             return false;
         }
+
+        return self::mailboxNamesToObjectList($names, $ctx);
+    }
+
+    /**
+     * imap_getsubscribed() — subscribed subset as getmailboxes()-shaped objects (#27817).
+     */
+    public static function getSubscribed(
+        ObjectEntry $object,
+        string $reference,
+        string $pattern,
+        Context $ctx
+    ): Variable|false {
+        $names = self::listSubscribed($object, $reference, $pattern);
+        if (false === $names) {
+            return false;
+        }
+
+        return self::mailboxNamesToObjectList($names, $ctx);
+    }
+
+    /**
+     * imap_listscan() / imap_scan() / imap_scanmailbox() — mailboxes matching pattern whose
+     * file contents contain $content (php-src mail_scan; #27817).
+     *
+     * @return list<string>|false
+     */
+    public static function listScan(
+        ObjectEntry $object,
+        string $reference,
+        string $pattern,
+        string $content,
+        string $warnFn = 'imap_listscan'
+    ): array|false {
+        $st = self::liveState($object);
+        if (null === $st) {
+            return false;
+        }
+        $names = self::scanLocalMailboxes($st['mailbox'], $reference, $pattern, $warnFn);
+        if (null === $names) {
+            return false;
+        }
+        $out = [];
+        foreach ($names as $name) {
+            if (!is_file($name) || !is_readable($name)) {
+                continue;
+            }
+            $raw = @file_get_contents($name);
+            if (false === $raw) {
+                continue;
+            }
+            if ('' === $content || false !== strpos($raw, $content)) {
+                $out[] = $name;
+            }
+        }
+        if ([] === $out) {
+            return false;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private static function mailboxNamesToObjectList(array $names, Context $ctx): Variable
+    {
         if (!isset($ctx->classes['stdclass'])) {
             $ce = new \PHPCompiler\VM\ClassEntry('stdClass');
             $ce->isInternal = true;
