@@ -206,6 +206,8 @@ final class BuiltinInternalArgInfo
             'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)
             'get_parent_class' => 'string|false',
+            // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend : mixed (#28023)
+            'func_get_arg' => 'mixed',
             // ext/spl/php_spl.stub.php — InternalArgInfo false|array; Zend array only (#27902)
             'spl_autoload_functions' => 'array',
             // Zend/zend_builtin_functions.stub.php — exit/die : never; InternalArgInfo empty / die absent (#26056)

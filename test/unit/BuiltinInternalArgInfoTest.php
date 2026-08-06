@@ -95,6 +95,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('spl_autoload_functions', 0));
     }
 
+    /** Zend/zend_builtin_functions.stub.php — func_get_arg(): mixed; InternalArgInfo empty (#28023). */
+    public function testFuncGetArgReflectionReturnIsMixed(): void
+    {
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('func_get_arg'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('func_get_arg'));
+        // Siblings already match Zend via InternalArgInfo.
+        $this->assertSame('array', BuiltinInternalArgInfo::returnTypeLabelForFunction('func_get_args'));
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('func_num_args'));
+        $this->assertSame(['position'], BuiltinParamNames::forFunction('func_get_arg'));
+    }
+
     /** Zend/zend_builtin_functions.stub.php — mixed $object_or_class (InternalArgInfo empty) (#26359). */
     public function testIsAIsSubclassOfObjectOrClassIsMixed(): void
     {
