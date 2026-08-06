@@ -142,7 +142,6 @@ final class ObOutputJitBridge
 
         self::implementVoidBridge($context, '__phpc_ob_start', self::START_HELPER);
         self::implementVoidBridge($context, '__phpc_ob_start_with_gzhandler', self::START_GZ_HELPER);
-        self::implementVoidBridge($context, '__phpc_ob_start_with_url_rewriter', self::START_URL_REWRITER_HELPER);
         self::implementI32Bridge($context, '__phpc_ob_get_level', self::LEVEL_HELPER);
         self::implementI64FromI64Bridge($context, '__phpc_ob_buffer_used_at', self::BUFFER_USED_HELPER);
         self::implementAppendBytes($context);
@@ -159,7 +158,7 @@ final class ObOutputJitBridge
         self::implementVoidBridge($context, '__phpc_flush', self::FLUSH_STDOUT_HELPER);
         self::implementImplicitFlush($context);
         self::implementShutdownMarkRegistered($context);
-        self::registerLinkedRuntime($context);
+        self::registerLinkedRuntime($context, false);
         self::restoreInsertBlock($context, $restore);
         if (null === $restore) {
             $context->builder->clearInsertionPosition();
