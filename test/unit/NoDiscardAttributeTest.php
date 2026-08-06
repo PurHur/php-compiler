@@ -92,7 +92,7 @@ PHP;
         }
     }
 
-    public function testVoidCastSuppressesWarning(): void
+    public function testVoidCastParseErrorsOnProfile85(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.5');
@@ -100,19 +100,16 @@ PHP;
             $runtime = new Runtime();
             $code = <<<'PHP'
 <?php
-ini_set('error_reporting', '32767');
-#[\NoDiscard]
-function must_use(): int {
-    return 1;
+try {
+    eval('$b = (void)1;');
+    echo "void_ok\n";
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
 }
-error_clear_last();
-(void) must_use();
-$last = error_get_last();
-echo null === $last ? 'none' : 'warn';
 PHP;
             ob_start();
-            $runtime->run($runtime->parseAndCompile($code, 'nodiscard_void_cast.php'));
-            $this->assertSame('none', ob_get_clean());
+            $runtime->run($runtime->parseAndCompile($code, 'void_cast_profile85.php'));
+            $this->assertSame("ParseError\n", ob_get_clean());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
