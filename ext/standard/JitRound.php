@@ -23,11 +23,7 @@ final class JitRound
 {
     public static function round(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('round() requires one to three arguments');
-        }
-
+        // Arity is enforced at round::call via requireArgCountRangeJit (#28229).
         $folded = self::tryFoldCompileTime($context, $args);
         if (null !== $folded) {
             return $folded;
