@@ -63,6 +63,7 @@ class Module extends ModuleAbstract
 
         return [
             new imap_open(),
+            new imap_popen(),
             new imap_reopen(),
             new imap_close(),
             new imap_errors(),
@@ -113,6 +114,7 @@ class Module extends ModuleAbstract
             new imap_set_quota(),
             new imap_headers(),
             new imap_mailboxmsginfo(),
+            new imap_mail(),
         ];
     }
 }
