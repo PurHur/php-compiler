@@ -21,6 +21,9 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::offsetget' => true,
         'simplexmlelement::count' => true,
         'simplexmlelement::__tostring' => true,
+        'simplexmlelement::children' => true,
+        'simplexmlelement::attributes' => true,
+        'simplexmlelement::getname' => true,
     ];
 
     public static function isSimpleXmlInstanceMethodProxy(string $proxyName): bool
@@ -83,6 +86,21 @@ final class SimpleXmlInstanceMethodJit
         }
         if ('simplexmlelement::__tostring' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementToString();
+
+            return;
+        }
+        if ('simplexmlelement::children' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementChildren();
+
+            return;
+        }
+        if ('simplexmlelement::attributes' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementAttributes();
+
+            return;
+        }
+        if ('simplexmlelement::getname' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementGetName();
         }
     }
 }

@@ -15,6 +15,7 @@ use PHPCompiler\JIT\DatePeriodForeachSnapshot;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ObjectPropertyForeachHelper;
+use PHPCompiler\JIT\SimpleXmlForeachSnapshot;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\Variable;
@@ -278,6 +279,12 @@ final class VmIteratorForeach
     public static function compileReset(Context $context, JitVariable $array, ?string $containerUserType = null): void
     {
         $slotKey = $array;
+        // SimpleXMLElement host-tree snapshot before object-property / Iterator stubs (#27535).
+        if (SimpleXmlForeachSnapshot::canLower($array)) {
+            SimpleXmlForeachSnapshot::compileReset($context, $array, $slotKey);
+
+            return;
+        }
         if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
             ObjectPropertyForeachHelper::compileReset($context, $array, $slotKey);
 
@@ -322,13 +329,13 @@ final class VmIteratorForeach
         ?string $containerUserType = null
     ): \PHPLLVM\Value {
         $slotKey = $array;
-        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
-            return ObjectPropertyForeachHelper::compileValid($context, $slotKey, $containerUserType);
-        }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileValidHashtable($context, $ht, $slotKey);
+        }
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileValid($context, $slotKey, $containerUserType);
         }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileValidHashtable(
@@ -495,13 +502,13 @@ final class VmIteratorForeach
         ?string $containerUserType = null
     ): JitVariable {
         $slotKey = $array;
-        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
-            return ObjectPropertyForeachHelper::compileKey($context, $slotKey, $containerUserType);
-        }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileKeyHashtable($context, $ht, $slotKey);
+        }
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileKey($context, $slotKey, $containerUserType);
         }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileKeyHashtable(
@@ -669,13 +676,13 @@ final class VmIteratorForeach
         ?string $containerUserType = null
     ): JitVariable {
         $slotKey = $array;
-        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
-            return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);
-        }
         if (isset($context->foreachDatePeriodSnapshotHts[$context->foreachSlotMapKey($slotKey)])) {
             $ht = DatePeriodForeachSnapshot::hashtableFor($context, $slotKey);
 
             return self::compileValueHashtable($context, $ht, $slotKey);
+        }
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);
         }
         if (isset($context->foreachAggregateInnerHtSlots[$context->foreachSlotMapKey($slotKey)])) {
             return self::compileValueHashtable(
