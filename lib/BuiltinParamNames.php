@@ -250,9 +250,10 @@ final class BuiltinParamNames
             'xmlreader::next' => ['name'],
             'xmlreader::open' => ['uri', 'encoding', 'flags'],
             'xmlreader::xml' => ['source', 'encoding', 'flags'],
+            // php-src ext/xmlreader/php_xmlreader.stub.php — PHP 8.4+ factories (#27713)
             'xmlreader::fromstring' => ['source', 'encoding=', 'flags='],
             'xmlreader::fromuri' => ['uri', 'encoding=', 'flags='],
-            'xmlreader::fromstream' => ['stream', 'encoding=', 'flags='],
+            'xmlreader::fromstream' => ['stream', 'encoding=', 'flags=', 'documentUri='],
             // php-src ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo still has pre-stub names (#23407)
             'xmlwriter::setindent' => ['enable'],
             'xmlwriter::setindentstring' => ['indentation'],
