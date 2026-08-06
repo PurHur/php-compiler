@@ -69,7 +69,7 @@ final class SqrtRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringNotContainsString('phpc_sqrt_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
-        $this->assertStringContainsString('phpc_sin_kernel', $source);
+        $this->assertStringContainsString('phpc_cos_kernel', $source);
     }
 
     public function testSpineBundleIncludesSqrtHelperWithoutKernel(): void

@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitSinKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for sin() via SinJitHelper PHP (#15086, #27048).
+ * JIT/AOT link for sin() via SinJitHelper PHP (#15086, #27048, #28016).
  *
- * Embed + thin standalone AOT: {@see SinJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering SinJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathHypot #27909 / MathSqrt #27888 shape).
+ * NestedJIT no longer needs a libc sin(3) kernel — helper uses NestedJIT-safe Cody–Waite + polynomial.
  * php-src: ext/standard/math.c — PHP_FUNCTION(sin)
  */
 final class MathSin
@@ -45,10 +42,6 @@ final class MathSin
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitSinKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathSin
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_SIN);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_SIN, $probe);
@@ -80,7 +69,7 @@ final class MathSin
             self::SIN_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27048'
+            '#28016'
         );
     }
 }
