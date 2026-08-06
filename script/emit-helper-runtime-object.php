@@ -290,6 +290,9 @@ if (null !== $unitPath) {
         // unit.o returns "" for method-return / dynamic string args; NestedJIT recursive
         // escapeFrom works (#25345 MiniWebApp $appName). Re-enable when unit.o matches.
         '/ext/standard/HtmlspecialcharsJitHelper.php' => true,
+        // #28104 — self-contained NestedJIT escapeFrom is green in-process; helper-runtime
+        // unit.o still segfaults under HELPER_RUNTIME_O=1 (peer htmlspecialchars #25345).
+        '/ext/standard/AddslashesJitHelper.php' => true,
         // Peer always-helper (#20589); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/VarExportJitHelper.php' => true,
         // var_dump/print_r need consumer-module NestedJIT + live VM (#16075 / #23540).
