@@ -309,10 +309,12 @@ final class HashTableCombineLlvm
     }
 
     /**
-     * Zend array_combine key coercion — peer {@see \PHPCompiler\ext\standard\VmArray::storeCombineKey()}.
+     * Zend array_combine / array_fill_keys key coercion — peer
+     * {@see \PHPCompiler\ext\standard\VmArray::storeCombineKey()}.
      * String/int paths mirror {@see ArrayFlipLlvm::storeFlipped()}.
+     * Public for {@see HashTableFillKeysLlvm} (#27127).
      */
-    private static function storeCombineKey(
+    public static function storeCombineKey(
         Context $context,
         Value $dest,
         Variable $keyVar,

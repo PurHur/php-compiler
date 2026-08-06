@@ -25,7 +25,8 @@ use PHPLLVM\Value;
  * `json_encode(array_flip(lit…))` (#27072),
  * `json_encode(array_combine(lit, lit))` (#27132),
  * `json_encode(array_merge(lit…))` (#27546),
- * `json_encode(array_fill(lit, lit, lit))` (#27073), and
+ * `json_encode(array_fill(lit, lit, lit))` (#27073),
+ * `json_encode(array_fill_keys(lit, lit))` (#27127), and
  * `json_encode(parse_url(lit…))` (#27078) — thin AOT NestedJIT cannot yet
  * export runtime string-key hashtables for `__compiler_json_encode_array`.
  *
@@ -66,6 +67,9 @@ final class JitJsonEncodeCompileTime
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromArrayFill($block, $operand);
+        }
+        if (null === $vmArray) {
+            $vmArray = self::tryCompileTimeArrayFromArrayFillKeys($block, $operand);
         }
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromParseUrl($block, $operand);
@@ -497,6 +501,34 @@ final class JitJsonEncodeCompileTime
             return null;
         }
         $filled = ArrayFillJitHelper::fillCopy($start, $count, $args[2]);
+        $var = new VmVariable();
+        $var->array($filled);
+
+        return $var;
+    }
+
+    /**
+     * Resolve `json_encode(array_fill_keys(…))` when keys/value are compile-time (#27127).
+     *
+     * Uses {@see ArrayFillKeysJitHelper::fillKeysCopy()} / {@see VmArray::fillKeys()} SSOT
+     * (php-src array.c). Call-site {@see \PHPCompiler\JIT\HashTableFillKeysLlvm} builds a
+     * dim/count-green HT; NestedJIT json_encode still cannot export runtime string-key
+     * tables (peer #27132 / #27073 / #27072).
+     */
+    private static function tryCompileTimeArrayFromArrayFillKeys(
+        Block $block,
+        Operand $operand
+    ): ?VmVariable {
+        $slot = $block->getVarSlot($operand, true);
+        $slot = self::followAssignSourceSlot($block, $slot);
+        $args = self::literalArgsForFuncCallResult($block, $slot, 'array_fill_keys');
+        if (null === $args || 2 !== \count($args)) {
+            return null;
+        }
+        if (VmVariable::TYPE_ARRAY !== $args[0]->type) {
+            return null;
+        }
+        $filled = ArrayFillKeysJitHelper::fillKeysCopy($args[0]->toArray(), $args[1]);
         $var = new VmVariable();
         $var->array($filled);
 
