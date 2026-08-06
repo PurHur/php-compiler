@@ -171,6 +171,17 @@ final class DomDocumentVMTest extends BaseTest
                 'php84_dom_element_insert_adjacent_html_phantom.phpt'
             );
         }
+        if (CompilerVersion::supportsDomElementGetElementsByClassName()) {
+            yield 'dom_element_get_elements_by_class_name_85.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/dom_element_get_elements_by_class_name_85.phpt',
+                'dom_element_get_elements_by_class_name_85.phpt'
+            );
+        } else {
+            yield 'php84_dom_element_get_elements_by_class_name_phantom.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/php84_dom_element_get_elements_by_class_name_phantom.phpt',
+                'php84_dom_element_get_elements_by_class_name_phantom.phpt'
+            );
+        }
         if (CompilerVersion::supportsDomElementInsertAdjacentElement()) {
             yield 'dom_element_insert_adjacent_element.phpt' => self::parsePHPT(
                 __DIR__.'/cases/stdlib/dom_element_insert_adjacent_element.phpt',

@@ -3803,6 +3803,36 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsDomElementGetElementsByClassNameOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomElementGetElementsByClassName());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomElementGetElementsByClassNameWithheldOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDomElementGetElementsByClassName());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsDomNodeIsEqualNodeOnReferenceProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -3914,6 +3944,48 @@ final class CompilerVersionGateTest extends TestCase
             $living = $runtime->vmContext->classes['dom\\element'] ?? null;
             $this->assertNotNull($living);
             $this->assertFalse(isset($living->methods['insertadjacenthtml']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersDomElementGetElementsByClassNameOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $runtime = new Runtime();
+            $living = $runtime->vmContext->classes['dom\\element'] ?? null;
+            $this->assertNotNull($living);
+            $this->assertTrue(isset($living->methods['getelementsbyclassname']));
+            $document = $runtime->vmContext->classes['dom\\document'] ?? null;
+            $this->assertNotNull($document);
+            $this->assertTrue(isset($document->methods['getelementsbyclassname']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmWithholdsDomElementGetElementsByClassNameOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $living = $runtime->vmContext->classes['dom\\element'] ?? null;
+            $this->assertNotNull($living);
+            $this->assertFalse(isset($living->methods['getelementsbyclassname']));
+            $document = $runtime->vmContext->classes['dom\\document'] ?? null;
+            $this->assertNotNull($document);
+            $this->assertFalse(isset($document->methods['getelementsbyclassname']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

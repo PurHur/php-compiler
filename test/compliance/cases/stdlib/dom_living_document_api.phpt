@@ -1,5 +1,5 @@
 --TEST--
-stdlib Dom\HTMLDocument / Dom\XMLDocument Document API — create/query/import/adopt/save (#20556)
+stdlib Dom\HTMLDocument / Dom\XMLDocument Document API — create/query/import/adopt/save (#20556, #27593)
 --SKIPIF--
 <?php
 if (!class_exists('Dom\\HTMLDocument') || !class_exists('Dom\\XMLDocument')) {
@@ -22,7 +22,8 @@ echo "\n";
 $el = $d->createElement('span');
 echo 'el=', $el->nodeName, ':', get_class($el), "\n";
 echo 'tags=', $d->getElementsByTagName('p')->length, "\n";
-echo 'class=', $d->getElementsByClassName('x')->length, "\n";
+// getElementsByClassName is PHP 8.5+ only (#27593) — withheld on PROFILE=8.4.
+echo 'class_method=', method_exists($d, 'getElementsByClassName') ? '1' : '0', "\n";
 $xml = $d->saveXml();
 echo 'saveXml=', (is_string($xml) && str_contains($xml, '<html') && str_contains($xml, '<p')) ? 'ok' : 'fail', "\n";
 $src = Dom\HTMLDocument::createFromString('<div id="imp">z</div>');
@@ -52,10 +53,10 @@ $adopted = $x->adoptNode($other->documentElement);
 echo 'xml_adopt=', $adopted->nodeName, "\n";
 ?>
 --EXPECT--
-createElement=1 getElementsByTagName=1 getElementsByClassName=1 importNode=1 adoptNode=1 saveXml=1 saveXmlFile=1 saveHtmlFile=1 append=1 prepend=1 replaceChildren=1 
+createElement=1 getElementsByTagName=1 getElementsByClassName=0 importNode=1 adoptNode=1 saveXml=1 saveXmlFile=1 saveHtmlFile=1 append=1 prepend=1 replaceChildren=1 
 el=SPAN:Dom\HTMLElement
 tags=1
-class=1
+class_method=0
 saveXml=ok
 import=DIV
 saveXmlFile=ok

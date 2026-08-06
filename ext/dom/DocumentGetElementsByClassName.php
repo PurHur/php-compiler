@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 
 /**
- * Dom\Document::getElementsByClassName() — VM (php-src ext/dom/php_dom.stub.php; #20556).
+ * Dom\Document::getElementsByClassName() — VM PHP 8.5+ alias (php-src ext/dom/php_dom.stub.php; #20556, #27593).
  */
 final class DocumentGetElementsByClassName extends DomClassMethod
 {

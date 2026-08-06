@@ -1,13 +1,14 @@
 --TEST--
-Dom\HTMLCollection from getElementsByClassName — live length/item/namedItem (#20709)
+Dom\HTMLCollection from getElementsByClassName — live length/item/namedItem (#20709, #27593)
 --SKIPIF--
 <?php
-if (!class_exists('Dom\\HTMLDocument')) {
-    die('skip Dom\\HTMLDocument requires PHP_COMPILER_PROFILE=8.4 (#20709)');
+putenv('PHP_COMPILER_PROFILE=8.5');
+if (!\PHPCompiler\CompilerVersion::supportsDomElementGetElementsByClassName()) {
+    die('skip Dom\\Document::getElementsByClassName requires PHP_COMPILER_PROFILE=8.5 (#27593)');
 }
 ?>
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 echo class_exists('Dom\\HTMLCollection') ? "has\n" : "miss\n";
