@@ -8,7 +8,11 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM;
 
 /**
- * Array-literal spread (`[...$x]`) for arrays and Traversables (Zend zend_execute.c parity, #4453).
+ * Array-literal spread (`[...$x]`) for arrays and Traversables (Zend zend_execute.c / zend_vm_def.h parity).
+ *
+ * Runtime non-array / non-Traversable unpack throws catchable {@see \Error} (scalars) or
+ * {@see \TypeError} (objects) — #27952. Compile-time literal unpack stays an uncatchable
+ * compile fatal via {@see \PHPCompiler\Compiler}.
  */
 final class ArraySpread
 {
@@ -21,6 +25,7 @@ final class ArraySpread
         Variable $source,
         int $sourceLine = 0
     ): void {
+        unset($sourceLine);
         $source = $source->resolveIndirect();
 
         if (Variable::TYPE_ARRAY === $source->type) {
@@ -39,7 +44,8 @@ final class ArraySpread
             try {
                 $iterable = ForeachIterator::resolveTraversableObject($vm, $frame, $source);
             } catch (\TypeError) {
-                self::throwNonTraversableFatal($frame, $sourceLine);
+                // Zend: non-Traversable object → catchable TypeError (zend_vm_def.h ADD_ARRAY_UNPACK).
+                throw new \TypeError(self::NON_TRAVERSABLE_MESSAGE);
             }
             if (null !== $iterable->toObject()->generatorState) {
                 self::spreadFromGenerator($vm, $iterable, $dest);
@@ -51,24 +57,8 @@ final class ArraySpread
             return;
         }
 
-        self::throwNonTraversableFatal($frame, $sourceLine);
-    }
-
-    /**
-     * Zend zend_execute.c array-literal unpack: E_ERROR fatal, not catchable TypeError (#4812).
-     *
-     * @return never
-     */
-    private static function throwNonTraversableFatal(Frame $frame, int $sourceLine): void
-    {
-        $file = '' !== $frame->scriptPath ? $frame->scriptPath : 'Standard input code';
-        $line = $sourceLine > 0 ? $sourceLine : 0;
-        throw new \LogicException(sprintf(
-            'PHP Fatal error:  %s in %s on line %d',
-            self::NON_TRAVERSABLE_MESSAGE,
-            $file,
-            $line
-        ));
+        // Scalars / null — catchable Error (not E_ERROR fatal) (#27952, re-#4812).
+        throw new \Error(self::NON_TRAVERSABLE_MESSAGE);
     }
 
     private static function spreadFromGenerator(VM $vm, Variable $genVar, HashTable $dest): void
