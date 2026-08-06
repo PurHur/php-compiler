@@ -21295,7 +21295,10 @@ class JIT {
             }
             $namedLocalSlot = $block->slotForOperand($operand);
             if (null !== $namedLocalSlot && $block->isNamedVariableSlot((int) $namedLocalSlot)) {
-                $args[$idx] = JIT\ClosureHelper::referenceCapture($this->context, $args[$idx]);
+                // Same promote as the generic path — bare referenceCapture left other SSA
+                // operands for the slot on the pre-call native binding under thin AOT (#27090 /
+                // peer #24162 ensureValueBoxLvalueForByRefPass).
+                $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
                 continue;
             }
             if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {

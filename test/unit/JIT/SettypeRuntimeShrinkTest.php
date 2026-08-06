@@ -30,9 +30,11 @@ final class SettypeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSettype.php');
         $this->assertStringContainsString('final class JitSettype', $source);
         $this->assertStringContainsString('SettypeRuntime::applyInPlace', $source);
+        $this->assertStringContainsString('promoteNativeLvalueToValueBox', $source);
+        $this->assertStringContainsString('tryFoldCompileTime', $source);
         $this->assertStringNotContainsString('convertInPlace', $source);
         $this->assertStringNotContainsString('emitTargetFromString', $source);
-        $this->assertLessThanOrEqual(75, substr_count($source, "\n") + 1);
+        $this->assertLessThanOrEqual(220, substr_count($source, "\n") + 1);
     }
 
     public function testSettypeRuntimeUsesJitVmHelperLink(): void
@@ -40,6 +42,19 @@ final class SettypeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SettypeRuntime.php');
         $this->assertStringContainsString('SettypeJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
+    }
+
+    /** Issue #27090: type name must be `%__string__*`, not raw cstr (`constantFromString`). */
+    public function testSettypeRuntimePassesLoadedStringConstNotCstr(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SettypeRuntime.php');
+        $this->assertStringContainsString('constantStringFromString', $source);
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
+        $this->assertStringNotContainsString('constantFromString($typeName)', $source);
+        $this->assertMatchesRegularExpression(
+            '/constantStringFromString\(\$typeName\)/',
+            $source
+        );
     }
 
     public function testSettypeJitHelperDelegatesToVmSettype(): void

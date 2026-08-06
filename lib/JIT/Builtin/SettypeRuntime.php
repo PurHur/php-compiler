@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
@@ -41,10 +42,22 @@ final class SettypeRuntime
     public static function applyInPlace(Context $context, Value $valuePtr, string $typeName): void
     {
         self::ensureLinked($context);
+        // ABI is `%__string__*` (JitVmHelperLink bridge) — raw `constantFromString` is
+        // `[N x i8]*` / cstr and fails module verify under user-script AOT (#27090 / peer #26884).
+        // constantStringFromString may emit on a temp init builder / leave insert on __init__
+        // under thin AOT — resume the caller's BB before load+call or the cast never runs in main.
+        $resume = BasicBlockHelper::tryGetInsertBlock($context);
+        $typeGlobal = $context->constantStringFromString($typeName);
+        if (null !== $resume) {
+            BasicBlockHelper::restoreInsertBlock($context, $resume);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'settype_type_str_cont');
+        }
+        $typeStr = $context->builder->load($typeGlobal);
         $context->builder->call(
             $context->lookupFunction(self::ABI),
             $valuePtr,
-            $context->constantFromString($typeName)
+            $typeStr
         );
     }
 
@@ -66,6 +79,13 @@ final class SettypeRuntime
         $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $void = $context->getTypeFromString('void');
+        // NestedJIT of SettypeJitHelper / value-box promote can reference
+        // `__compiler_is_resource` while JitStreamLifecycleKernel::implement no-ops under
+        // NestedJitCompileScope — emit the thin body before the bridge (#27090).
+        if ($context->isThinStandaloneAotMain()) {
+            StreamGlobalsJit::implementThinIsResource($context);
+        }
+        StreamLifecycle::ensureLinked($context);
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI,
