@@ -171,13 +171,51 @@ if (!function_exists('php_compiler_cli_sync_host_error_reporting')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_host_cmdline_has_dash_d')) {
+    /**
+     * True when the host PHP process was started with {@code -d <key>=...} (#28061 / #23408).
+     *
+     * Distro php.ini (e.g. Ubuntu production {@code zend.exception_ignore_args=On}) must not
+     * override the guest compiled default (php-src {@code "0"}); only an explicit host {@code -d}
+     * is mirrored so {@code php -d zend.exception_ignore_args=0 bin/vm.php} keeps working.
+     */
+    function php_compiler_cli_host_cmdline_has_dash_d(string $iniKey): bool
+    {
+        $cmdline = @file_get_contents('/proc/self/cmdline');
+        if (false === $cmdline || '' === $cmdline) {
+            return false;
+        }
+        $args = explode("\0", $cmdline);
+        $want = strtolower($iniKey).'=';
+        $n = count($args);
+        for ($i = 0; $i < $n; ++$i) {
+            $arg = $args[$i];
+            if ('-d' === $arg) {
+                $next = $args[$i + 1] ?? '';
+                if (is_string($next) && 0 === strncasecmp($next, $want, strlen($want))) {
+                    return true;
+                }
+                continue;
+            }
+            if (is_string($arg) && str_starts_with($arg, '-d') && strlen($arg) > 2) {
+                $rest = substr($arg, 2);
+                if (0 === strncasecmp($rest, $want, strlen($want))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('php_compiler_cli_sync_host_exception_ignore_args')) {
     /**
-     * Inherit host {@code php -d zend.exception_ignore_args=...} into the guest VM (#23408).
+     * Inherit host {@code php -d zend.exception_ignore_args=...} into the guest VM (#23408 / #28061).
      *
      * Guest argv {@code bin/vm.php -d zend.exception_ignore_args=0} wins via
-     * {@see php_compiler_cli_apply_ini_overrides}; otherwise mirror host {@code ini_get}
-     * so issue repros that pass {@code -d} to the host PHP binary match Zend.
+     * {@see php_compiler_cli_apply_ini_overrides}. Host php.ini alone is ignored so the guest
+     * keeps php-src's compiled default Off (SensitiveParameter getTrace args present).
      *
      * @param array<string, mixed> $options
      */
@@ -191,6 +229,9 @@ if (!function_exists('php_compiler_cli_sync_host_exception_ignore_args')) {
                 }
             }
         }
+        if (!php_compiler_cli_host_cmdline_has_dash_d('zend.exception_ignore_args')) {
+            return;
+        }
         $raw = @\ini_get('zend.exception_ignore_args');
         if (false === $raw) {
             return;
@@ -201,12 +242,11 @@ if (!function_exists('php_compiler_cli_sync_host_exception_ignore_args')) {
 
 if (!function_exists('php_compiler_cli_sync_host_exception_string_param_max_len')) {
     /**
-     * Inherit host {@code php -d zend.exception_string_param_max_len=...} into the guest VM (#24486, #24487).
+     * Inherit host {@code php -d zend.exception_string_param_max_len=...} into the guest VM (#24486 / #28061).
      *
      * Guest argv {@code bin/vm.php -d zend.exception_string_param_max_len=0} wins via
-     * {@see php_compiler_cli_apply_ini_overrides}; otherwise mirror host {@code ini_get}
-     * (php.ini or host {@code -d}) so UnhandledMatchError / getTraceAsString truncation
-     * matches Zend when the override is applied to the host PHP binary.
+     * {@see php_compiler_cli_apply_ini_overrides}. Host php.ini alone is ignored so the guest
+     * keeps php-src's compiled default 15 (Ubuntu production sets 0).
      *
      * @param array<string, mixed> $options
      */
@@ -219,6 +259,9 @@ if (!function_exists('php_compiler_cli_sync_host_exception_string_param_max_len'
                     return;
                 }
             }
+        }
+        if (!php_compiler_cli_host_cmdline_has_dash_d('zend.exception_string_param_max_len')) {
+            return;
         }
         $raw = @\ini_get('zend.exception_string_param_max_len');
         if (false === $raw) {

@@ -139,8 +139,11 @@ final class IniJitHelper
 
     private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
 
-    /** php-src EG(exception_ignore_args) compiled default On (#21998). */
-    private const CFG_EXCEPTION_IGNORE_ARGS = true;
+    /**
+     * php-src compiled default Off (`"0"`) — Zend/zend.c STD_ZEND_INI_BOOLEAN (#28061).
+     * php.ini-production sets On; `php -n` / php:8.x-cli keep Off.
+     */
+    private const CFG_EXCEPTION_IGNORE_ARGS = false;
 
     private static bool $displayErrors = false;
 

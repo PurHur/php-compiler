@@ -159,8 +159,11 @@ final class VmIni
     /** php-src hard ceiling for zend.exception_string_param_max_len. */
     private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
 
-    /** php-src EG(exception_ignore_args) compiled default On since PHP 8.0 (Zend/zend_exceptions.c, #21998). */
-    private const CFG_EXCEPTION_IGNORE_ARGS = true;
+    /**
+     * php-src compiled default Off (`"0"`) — Zend/zend.c STD_ZEND_INI_BOOLEAN (#28061).
+     * php.ini-production sets On; php.ini-development and `php -n` keep Off.
+     */
+    private const CFG_EXCEPTION_IGNORE_ARGS = false;
 
     /** php-src PG(pcre.backtrack_limit) default 1000000 (ext/pcre/php_pcre.c). */
     private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
