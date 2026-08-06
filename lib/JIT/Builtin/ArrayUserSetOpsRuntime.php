@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayUserSetOpsKeyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -14,7 +15,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_udiff()/array_uintersect()/array_diff_ukey() via ArrayUserSetOpsJitHelper PHP (#18515).
+ * JIT/AOT link for array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey() (#18515, #27228).
+ *
+ * Value comparators: NestedJIT {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper}.
+ * Key comparators: pure LLVM {@see ArrayUserSetOpsKeyLlvm} — NestedJIT key filters abort under thin AOT.
  *
  * SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}
  * php-src: ext/standard/array.c
@@ -25,21 +29,16 @@ final class ArrayUserSetOpsRuntime
 
     private const ABI_UINTERSECT_CLOSURE = '__array_uintersect__closure';
 
-    private const ABI_DIFF_UKEY_CLOSURE = '__array_diff_ukey__closure';
-
     private const HELPER_PATH = '/ext/standard/ArrayUserSetOpsJitHelper.php';
 
     private const UDIFF_CLOSURE = 'PHPCompiler\\ext\\standard\\ArrayUserSetOpsJitHelper::diffByValueWithClosure';
 
     private const UINTERSECT_CLOSURE = 'PHPCompiler\\ext\\standard\\ArrayUserSetOpsJitHelper::intersectByValueWithClosure';
 
-    private const DIFF_UKEY_CLOSURE = 'PHPCompiler\\ext\\standard\\ArrayUserSetOpsJitHelper::diffByKeyWithClosure';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::UDIFF_CLOSURE,
         self::UINTERSECT_CLOSURE,
-        self::DIFF_UKEY_CLOSURE,
     ];
 
     public static function diffByValue(
@@ -68,16 +67,34 @@ final class ArrayUserSetOpsRuntime
         JITVariable $first,
         JITVariable ...$others
     ): Value {
+        return self::filterByKey($context, false, $callback, $first, ...$others);
+    }
+
+    public static function intersectByKey(
+        Context $context,
+        JITVariable $callback,
+        JITVariable $first,
+        JITVariable ...$others
+    ): Value {
+        return self::filterByKey($context, true, $callback, $first, ...$others);
+    }
+
+    private static function filterByKey(
+        Context $context,
+        bool $intersect,
+        JITVariable $callback,
+        JITVariable $first,
+        JITVariable ...$others
+    ): Value {
         self::requireClosureCallback($context, $callback);
-        self::ensureLinked($context);
         $src = self::argToHashtable($context, $first);
         $packed = self::packOtherHashTables($context, $others);
 
-        return $context->builder->call(
-            $context->lookupFunction(self::ABI_DIFF_UKEY_CLOSURE),
+        return ArrayUserSetOpsKeyLlvm::filterByKey(
+            $context,
+            $intersect,
             $src,
-            HashTableHelper::loadHashtablePointer($context, $packed),
-            JitValueBox::valuePtrFromVariable($context, $callback)
+            HashTableHelper::loadHashtablePointer($context, $packed)
         );
     }
 
@@ -110,7 +127,6 @@ final class ArrayUserSetOpsRuntime
         foreach ([
             [self::ABI_UDIFF_CLOSURE, 'array_udiff_closure_bridge_entry', self::UDIFF_CLOSURE],
             [self::ABI_UINTERSECT_CLOSURE, 'array_uintersect_closure_bridge_entry', self::UINTERSECT_CLOSURE],
-            [self::ABI_DIFF_UKEY_CLOSURE, 'array_diff_ukey_closure_bridge_entry', self::DIFF_UKEY_CLOSURE],
         ] as [$abi, $entry, $helper]) {
             JitVmHelperLink::ensureBridge(
                 $context,
@@ -172,7 +188,6 @@ final class ArrayUserSetOpsRuntime
         foreach ([
             self::ABI_UDIFF_CLOSURE,
             self::ABI_UINTERSECT_CLOSURE,
-            self::ABI_DIFF_UKEY_CLOSURE,
         ] as $name) {
             $probe = $context->module->getNamedFunction($name);
             if (null === $probe || 0 === $probe->countBasicBlocks()) {
@@ -188,7 +203,6 @@ final class ArrayUserSetOpsRuntime
         foreach ([
             self::ABI_UDIFF_CLOSURE,
             self::ABI_UINTERSECT_CLOSURE,
-            self::ABI_DIFF_UKEY_CLOSURE,
         ] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {

@@ -98,7 +98,7 @@ final class VmIteratorProtocol
 
     public static function receiverSlot(Context $context, JitVariable $slotKey): Value
     {
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         if (isset($context->foreachIteratorReceiverSlots[$key])) {
             return $context->foreachIteratorReceiverSlots[$key];
         }
@@ -111,7 +111,7 @@ final class VmIteratorProtocol
 
     public static function advanceSlot(Context $context, JitVariable $slotKey): Value
     {
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         if (isset($context->foreachIteratorAdvanceSlots[$key])) {
             return $context->foreachIteratorAdvanceSlots[$key];
         }

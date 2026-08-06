@@ -321,32 +321,58 @@ class Context {
 
     public array $attributes;
 
-    /** @var array<int, PHPLLVM\Value> foreach index alloca slots keyed by array Variable id */
+    /**
+     * Foreach index alloca slots keyed by {@see foreachSlotMapKey()} (activeFunction + Variable id).
+     *
+     * @var array<string, PHPLLVM\Value>
+     */
     public array $foreachIndexSlots = [];
 
-    /** @var array<int, PHPLLVM\Value> foreach object-key walk slots keyed by array Variable id */
+    /**
+     * Foreach object-key walk slots keyed by {@see foreachSlotMapKey()}.
+     *
+     * @var array<string, PHPLLVM\Value>
+     */
     public array $foreachObjNodeSlots = [];
 
-    /** @var array<int, PHPLLVM\Value> Iterator protocol receiver (__object__*) per foreach container (#4011) */
+    /**
+     * Iterator protocol receiver (__object__*) per foreach container (#4011).
+     *
+     * @var array<string, PHPLLVM\Value>
+     */
     public array $foreachIteratorReceiverSlots = [];
 
-    /** @var array<int, PHPLLVM\Value> Iterator protocol advance flag (int1) per foreach container (#4011) */
+    /**
+     * Iterator protocol advance flag (int1) per foreach container (#4011).
+     *
+     * @var array<string, PHPLLVM\Value>
+     */
     public array $foreachIteratorAdvanceSlots = [];
 
     /**
      * DatePeriod compile-time foreach snapshot hashtables (#26772).
      *
-     * @var array<int, Variable>
+     * @var array<string, Variable>
      */
     public array $foreachDatePeriodSnapshotHts = [];
 
     /**
      * IteratorAggregate foreach slots that unwrap getIterator() then walk `__spl_ht`
-     * on the inner ArrayIterator (#26785). Keyed by container Variable id.
+     * on the inner ArrayIterator (#26785). Keyed by {@see foreachSlotMapKey()}.
      *
-     * @var array<int, true>
+     * @var array<string, true>
      */
     public array $foreachAggregateInnerHtSlots = [];
+
+    /**
+     * Map key for foreach alloca tables — include activeFunction so NestedJIT of a
+     * multi-method helper cannot reuse a sibling method's entry alloca when
+     * spl_object_id values collide after GC (#28053 / #27228).
+     */
+    public function foreachSlotMapKey(object $slotKey): string
+    {
+        return $this->activeFunction."\0".\spl_object_id($slotKey);
+    }
 
     /** @var array<string, Variable> */
     public array $jitGlobalVariables = [];

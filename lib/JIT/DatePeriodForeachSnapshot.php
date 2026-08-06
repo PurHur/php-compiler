@@ -48,7 +48,7 @@ final class DatePeriodForeachSnapshot
         );
 
         $htVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         $context->foreachDatePeriodSnapshotHts[$key] = $htVar;
 
         if (!isset($context->foreachIndexSlots[$key])) {
@@ -97,7 +97,7 @@ final class DatePeriodForeachSnapshot
 
     public static function hashtableFor(Context $context, Variable $slotKey): Variable
     {
-        $key = \spl_object_id($slotKey);
+        $key = $context->foreachSlotMapKey($slotKey);
         if (!isset($context->foreachDatePeriodSnapshotHts[$key])) {
             throw new \LogicException('DatePeriod foreach snapshot HT missing after RESET (#26772)');
         }
