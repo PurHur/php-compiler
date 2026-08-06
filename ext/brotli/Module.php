@@ -21,6 +21,8 @@ class Module extends ModuleAbstract
         if (!BrotliExtensionPolicy::advertisesExtension()) {
             return;
         }
+        // PECL brotli.c — php_register_url_stream_wrapper("compress.brotli", …) (#28115).
+        \PHPCompiler\ext\standard\VmStreamWrapperRegistry::registerExtensionBuiltin(VmBrotliStream::PROTOCOL);
         VmBrotliContext::registerClasses($runtime->vmContext);
         foreach ([
             'BROTLI_GENERIC' => VmBrotliNative::MODE_GENERIC,

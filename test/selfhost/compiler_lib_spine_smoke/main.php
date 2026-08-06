@@ -151,6 +151,7 @@ require_once __DIR__.'/../../../ext/brotli/JitBrotli.php';
 require_once __DIR__.'/../../../ext/brotli/Module.php';
 require_once __DIR__.'/../../../ext/brotli/VmBrotliNative.php';
 require_once __DIR__.'/../../../ext/brotli/VmBrotliContext.php';
+require_once __DIR__.'/../../../ext/brotli/VmBrotliStream.php';
 require_once __DIR__.'/../../../ext/brotli/brotli_compress.php';
 require_once __DIR__.'/../../../ext/brotli/brotli_uncompress.php';
 require_once __DIR__.'/../../../ext/brotli/brotli_compress_init.php';
@@ -7266,5 +7267,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfStrtolApply.php';
-require_once __DIR__.'/../../../ext/standard/VmOpenBasedir.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

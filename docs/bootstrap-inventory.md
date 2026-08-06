@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7144 |
-| Phase A inventory files (M2 ratio SSOT) | 7144 |
+| PHP files on vm.php path | 7145 |
+| Phase A inventory files (M2 ratio SSOT) | 7145 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22924 |
+| Source constructs flagged (warnings) | 22925 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -91,6 +91,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/brotli/Module.php` | 0 | 7 |
 | `ext/brotli/VmBrotliContext.php` | 0 | 9 |
 | `ext/brotli/VmBrotliNative.php` | 0 | 1 |
+| `ext/brotli/VmBrotliStream.php` | 0 | 1 |
 | `ext/brotli/brotli_compress.php` | 0 | 1 |
 | `ext/brotli/brotli_compress_add.php` | 0 | 2 |
 | `ext/brotli/brotli_compress_init.php` | 0 | 2 |
@@ -7522,12 +7523,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/brotli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new brotli_compress (line 49)
-- new brotli_uncompress (line 50)
-- new brotli_compress_init (line 51)
-- new brotli_compress_add (line 52)
-- new brotli_uncompress_init (line 53)
-- new brotli_uncompress_add (line 54)
+- new brotli_compress (line 51)
+- new brotli_uncompress (line 52)
+- new brotli_compress_init (line 53)
+- new brotli_compress_add (line 54)
+- new brotli_uncompress_init (line 55)
+- new brotli_uncompress_add (line 56)
 - 2 class method(s)
 
 ### `ext/brotli/VmBrotliContext.php`
@@ -7547,6 +7548,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/brotli/VmBrotliStream.php`
+
+**Warnings** (review for bootstrap subset):
+- 15 class method(s)
 
 ### `ext/brotli/brotli_compress.php`
 
@@ -33722,14 +33728,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 346)
 - new Variable (line 421)
 - new Variable (line 462)
-- new HashTable (line 1898)
-- new Variable (line 1900)
-- new HashTable (line 2792)
-- new Variable (line 2795)
-- new Variable (line 2801)
-- new Variable (line 2807)
-- new Variable (line 2813)
-- new Variable (line 2820)
+- new HashTable (line 1937)
+- new Variable (line 1939)
+- new HashTable (line 2851)
+- new Variable (line 2854)
+- new Variable (line 2860)
+- new Variable (line 2866)
+- new Variable (line 2872)
+- new Variable (line 2879)
 - 151 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -35402,7 +35408,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamWrapperRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/VmString.php`
 

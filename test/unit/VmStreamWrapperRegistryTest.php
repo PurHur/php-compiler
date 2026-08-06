@@ -10,6 +10,12 @@ use PHPUnit\Framework\TestCase;
 /** VmStreamWrapperRegistry built-in unregister/restore (#12620, #12621). */
 final class VmStreamWrapperRegistryTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        VmStreamWrapperRegistry::resetForTests();
+    }
+
     protected function tearDown(): void
     {
         VmStreamWrapperRegistry::resetForTests();
