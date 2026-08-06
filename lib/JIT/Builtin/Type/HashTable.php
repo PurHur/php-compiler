@@ -3654,6 +3654,33 @@ class HashTable extends Type
             $entry
         );
         $this->decrementNumElements($ht);
+        // Trailing packed unset: shrink nextFreeElement past any trailing holes so a later
+        // write at the same index bumps numElements (Zend packed del / #28051).
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nextFreePtr = $this->context->builder->structGep($ht, $map['nextFreeElement']);
+        $shrinkHead = $fn->appendBasicBlock('unset_long_shrink_head');
+        $shrinkBody = $fn->appendBasicBlock('unset_long_shrink_body');
+        $afterShrink = $fn->appendBasicBlock('unset_long_after_shrink');
+        $this->context->builder->branch($shrinkHead);
+        $this->context->builder->positionAtEnd($shrinkHead);
+        $nextFree = $this->context->builder->load($nextFreePtr);
+        $canShrink = $this->context->builder->icmp(Builder::INT_UGT, $nextFree, $zero);
+        $this->context->builder->branchIf($canShrink, $shrinkBody, $afterShrink);
+        $this->context->builder->positionAtEnd($shrinkBody);
+        $lastIdx = $this->context->builder->sub($nextFree, $one);
+        $lastSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $lastIdx
+        );
+        $doShrink = $fn->appendBasicBlock('unset_long_do_shrink');
+        $this->context->builder->branchIf($lastSet, $afterShrink, $doShrink);
+        $this->context->builder->positionAtEnd($doShrink);
+        $this->context->builder->store($lastIdx, $nextFreePtr);
+        $this->context->builder->branch($shrinkHead);
+        $this->context->builder->positionAtEnd($afterShrink);
         $this->context->builder->branch($done);
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();

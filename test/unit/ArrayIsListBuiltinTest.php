@@ -73,4 +73,32 @@ final class ArrayIsListBuiltinTest extends TestCase
         $fn->execute($frame);
         $this->assertFalse($frame->returnVar->resolveIndirect()->toBool());
     }
+
+    /** Unset last key then restore — still a list (php-src packed shrink / #28051). */
+    public function testUnsetRestoreTrailingKeyIsList(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_is_list();
+        $ht = new HashTable();
+        foreach ([1, 2] as $i => $val) {
+            $cell = new VMVariable();
+            $cell->int($val);
+            $ht->addIndex($i, $cell);
+        }
+        $idx = new VMVariable();
+        $idx->int(1);
+        $ht->offsetUnset($idx);
+        $restored = new VMVariable();
+        $restored->int(3);
+        $ht->updateIndex(1, $restored);
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->array($ht);
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $this->assertSame(2, $ht->getNumElements());
+        $this->assertTrue($frame->returnVar->resolveIndirect()->toBool());
+    }
 }

@@ -32,6 +32,10 @@ final class ArrayIsListJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_is_list_enum_operand_jit.phpt',
             'array_is_list_enum_operand_jit.phpt'
         );
+        yield 'array_is_list_unset_restore_28051.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_is_list_unset_restore_28051.phpt',
+            'array_is_list_unset_restore_28051.phpt'
+        );
     }
 
     public function setUp(): void
