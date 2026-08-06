@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringUrlencode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -17,9 +18,8 @@ final class urlencode extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('urlencode() requires exactly one argument');
-        }
+        // php-src ext/standard/url.stub.php — ArgumentCountError (#28316).
+        $this->requireExactArgCount($frame, 'urlencode', 1);
         // Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/url.c)
         $subject = VmString::trimFamilyStringArgForFrame(
             $frame,
@@ -36,8 +36,15 @@ final class urlencode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer #28317 / #28316.
         if (1 !== \count($args)) {
-            throw new \LogicException('urlencode() requires exactly one argument');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('urlencode() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
 
         // Null → soft-coerce to "" without helper IR (urlencode("") === ""; #21188).

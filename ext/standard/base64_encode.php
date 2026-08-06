@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringBase64Encode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -25,9 +26,8 @@ final class base64_encode extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('base64_encode() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/base64.stub.php — ArgumentCountError (#28316).
+        $this->requireExactArgCount($frame, 'base64_encode', 1);
         $data = self::vmStringArg($frame);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($data): void {
             $ret->string(VmString::base64_encode($data));
@@ -36,8 +36,15 @@ final class base64_encode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer #28317 / #28316.
         if (1 !== \count($args)) {
-            throw new \LogicException('base64_encode() requires exactly one argument in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('base64_encode() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
         // Null → soft-coerce to "" without helper IR (base64_encode("") === ""; #21188).
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {

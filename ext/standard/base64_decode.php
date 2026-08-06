@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringBase64Decode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -26,10 +27,9 @@ final class base64_decode extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/base64.stub.php — ArgumentCountError (#28316).
+        $this->requireArgCountRange($frame, 'base64_decode', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('base64_decode() requires one or two arguments in this compiler build');
-        }
         $data = self::vmStringArg($frame);
         $strict = false;
         if (2 === $argc) {
@@ -52,8 +52,17 @@ final class base64_decode extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer #28317 / #28316.
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('base64_decode() requires one or two arguments in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('base64_decode() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('base64_decode() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
         $strict = null;
         $strictConst = false;
