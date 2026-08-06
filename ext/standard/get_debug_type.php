@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -43,9 +44,8 @@ final class get_debug_type extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('get_debug_type() requires exactly one argument');
-        }
+        // php-src ext/standard/type.c — ArgumentCountError (#28317).
+        $this->requireExactArgCount($frame, 'get_debug_type', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
@@ -80,8 +80,15 @@ final class get_debug_type extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
         if (1 !== \count($args)) {
-            throw new \LogicException('get_debug_type() requires exactly one argument');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('get_debug_type() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);

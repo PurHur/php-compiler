@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringUcwords;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -22,10 +23,9 @@ final class ucwords extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28317).
+        $this->requireArgCountRange($frame, 'ucwords', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('ucwords() requires one or two arguments');
-        }
         $string = self::vmStringArg($frame, 0, 'string');
         $separators = VmString::TRIM_DEFAULT;
         if (2 === $argc) {
@@ -43,8 +43,17 @@ final class ucwords extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('ucwords() requires one or two arguments');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('ucwords() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('ucwords() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         // Empty / soft-null → '' without linking or calling __string__ucwords (#24598).

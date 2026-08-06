@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringQuotemeta;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -22,9 +23,8 @@ final class quotemeta extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28317).
+        $this->requireExactArgCount($frame, 'quotemeta', 1);
         $str = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
@@ -34,8 +34,15 @@ final class quotemeta extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
         if (1 !== \count($args)) {
-            throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('quotemeta() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
         // Null → soft-coerce to "" without helper IR (quotemeta("") === ""; #21180 / #20007).
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {

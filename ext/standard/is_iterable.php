@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectType;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -32,9 +33,8 @@ final class is_iterable extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('is_iterable() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28317).
+        $this->requireExactArgCount($frame, 'is_iterable', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,8 +46,15 @@ final class is_iterable extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
         if (1 !== \count($args)) {
-            throw new \LogicException('is_iterable() requires exactly one argument');
+            $unreachable = $context->constantFromBool(false);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('is_iterable() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool(true);

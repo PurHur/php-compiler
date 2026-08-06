@@ -26,16 +26,15 @@ final class html_entity_decode extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('html_entity_decode() requires one to three arguments in this compiler build');
-        }
+        // php-src ext/standard/html.stub.php — ArgumentCountError (#28317, peer #28285).
+        $this->requireArgCountRange($frame, 'html_entity_decode', 1, 3);
         $string = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
+        $argc = \count($frame->calledArgs);
         if ($argc >= 2) {
             $flags = VmMath::parseZParamLongBuiltinArg(
                 $frame->calledArgs[1],
@@ -57,8 +56,17 @@ final class html_entity_decode extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
         if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('html_entity_decode() requires one to three arguments in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('html_entity_decode() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('html_entity_decode() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
 
         $effectiveArgc = self::jitEffectiveArgc($argc, $args);

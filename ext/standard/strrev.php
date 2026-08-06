@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrrev;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -34,9 +35,8 @@ final class strrev extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('strrev() requires exactly one argument');
-        }
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28317).
+        $this->requireExactArgCount($frame, 'strrev', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,8 +46,15 @@ final class strrev extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== count($args)) {
-            throw new \LogicException('strrev() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
+        if (1 !== \count($args)) {
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('strrev() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
 
         // Null operand: TypeError under strict_types; soft-null coerces to "" without

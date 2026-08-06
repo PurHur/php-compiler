@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -30,9 +31,8 @@ final class lcfirst extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('lcfirst() requires exactly one argument');
-        }
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28317).
+        $this->requireExactArgCount($frame, 'lcfirst', 1);
         $subject = self::vmStringArg($frame);
         BuiltinExecute::writeReturn(
             $frame,
@@ -45,8 +45,15 @@ final class lcfirst extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('lcfirst() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
+        if (1 !== \count($args)) {
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('lcfirst() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
         $str = self::jitStringArg($context, $args[0]);
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);

@@ -27,10 +27,8 @@ final class htmlentities extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
-        }
+        // php-src ext/standard/html.stub.php — ArgumentCountError (#28317, peer #28285).
+        $this->requireArgCountRange($frame, 'htmlentities', 1, 4);
         $string = self::vmStringArg($frame, 0, 'string');
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
@@ -66,8 +64,17 @@ final class htmlentities extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer htmlspecialchars #28285 / #28317.
         if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('htmlentities() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('htmlentities() expects at most 4 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
         if (self::jitEffectiveArgc($argc, $args) >= 3) {
             throw new \LogicException(
