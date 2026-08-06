@@ -54,7 +54,10 @@ final class JitPregReplaceCallback
         }
 
         $strPtrTy = $context->getTypeFromString('__string__*');
-        $replaceCallbackFn = $context->lookupFunction('__compiler_preg_replace_callback');
+        $replaceCallbackFn = $context->lookupFunction('__compiler_preg_replace_callback_thin');
+        if (null === $replaceCallbackFn) {
+            $replaceCallbackFn = $context->lookupFunction('__compiler_preg_replace_callback');
+        }
         $callbackPtrTy = $replaceCallbackFn->getParam(2)->typeOf();
         $shimFn = self::callbackShim($context, $proxy, $name, $callbackPtrTy);
         $callbackPtr = $context->builder->pointerCast($shimFn, $callbackPtrTy);
@@ -119,11 +122,46 @@ final class JitPregReplaceCallback
             $arg,
             $context->getTypeFromString('__value__*')
         );
-        $matches = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $argForRead
-        );
-        $replacement = $context->builder->call($userFn->function, $matches);
+        $userParamTy = $userFn->function->getParam(0)->typeOf();
+        $userParamTyName = $context->getStringFromType($userParamTy);
+        if ('__hashtable__*' === $userParamTyName) {
+            $callArg = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $argForRead
+            );
+        } elseif ('__value__*' === $userParamTyName) {
+            $callArg = $argForRead;
+        } elseif ('__value__' === $userParamTyName) {
+            $callArg = $context->builder->load($argForRead);
+        } else {
+            throw new \LogicException(
+                "preg_replace_callback() shim: unsupported callback param LLVM type {$userParamTyName} (#26820)"
+            );
+        }
+        $replacement = $context->builder->call($userFn->function, $callArg);
+        $userFnTy = $userFn->function->typeOf();
+        if (\PHPLLVM\Type::KIND_POINTER === $userFnTy->getKind()) {
+            $userFnTy = $userFnTy->getElementType();
+        }
+        if (!$userFnTy instanceof LlvmType\Function_) {
+            throw new \LogicException('preg_replace_callback() callback is not an LLVM function (#26820)');
+        }
+        $userRetTyName = $context->getStringFromType($userFnTy->getReturnType());
+        if ('__string__*' === $userRetTyName) {
+            $replStr = $replacement;
+        } else {
+            $retSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+            if ('__value__*' === $userRetTyName) {
+                $context->builder->store($context->builder->load($replacement), $retSlot);
+            } else {
+                $context->builder->store($replacement, $retSlot);
+            }
+            $retPtr = $context->builder->pointerCast($retSlot, $valuePtrTy);
+            $replStr = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $retPtr
+            );
+        }
         $slot = JitValueBox::alloc($context);
         $writeStringFn = $context->lookupFunction('__value__writeString');
         $outSlotTy = $writeStringFn->getParam(0)->typeOf();
@@ -131,7 +169,7 @@ final class JitPregReplaceCallback
         $context->builder->call(
             $writeStringFn,
             $slotPtr,
-            $replacement
+            $replStr
         );
         $returnPtr = $context->builder->pointerCast($slot, $valuePtrTy);
         $context->builder->returnValue($returnPtr);
