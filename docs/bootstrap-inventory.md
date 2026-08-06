@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7137 |
-| Phase A inventory files (M2 ratio SSOT) | 7137 |
+| PHP files on vm.php path | 7138 |
+| Phase A inventory files (M2 ratio SSOT) | 7138 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 22923 |
+| Source constructs flagged (warnings) | 22924 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3564,6 +3564,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmObGzhandler.php` | 0 | 1 |
 | `ext/standard/VmObOutput.php` | 0 | 9 |
 | `ext/standard/VmObjectDebugType.php` | 0 | 1 |
+| `ext/standard/VmOpenBasedir.php` | 0 | 1 |
 | `ext/standard/VmOutputRewriteVars.php` | 0 | 1 |
 | `ext/standard/VmPack.php` | 0 | 3 |
 | `ext/standard/VmParseIni.php` | 0 | 1 |
@@ -34102,14 +34103,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 1070)
-- new HashTable (line 1101)
-- new HashTable (line 1108)
-- new Variable (line 1119)
-- new Variable (line 1228)
-- new Variable (line 1236)
-- new Variable (line 1244)
-- 71 class method(s)
+- new HashTable (line 1087)
+- new HashTable (line 1118)
+- new HashTable (line 1125)
+- new Variable (line 1136)
+- new Variable (line 1245)
+- new Variable (line 1253)
+- new Variable (line 1261)
+- 72 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -34374,6 +34375,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/VmOpenBasedir.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/standard/VmOutputRewriteVars.php`
 
@@ -34825,49 +34831,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 3093)
 - new Variable (line 3145)
 - new Variable (line 3164)
-- new Variable (line 3549)
-- new ClassProperty (line 3551)
-- new Variable (line 3574)
-- new ClassProperty (line 3576)
-- new Variable (line 3816)
-- new Variable (line 3820)
-- new Variable (line 3840)
-- new Variable (line 3851)
-- new Variable (line 3876)
-- new Variable (line 3891)
-- new Variable (line 3916)
-- new Variable (line 3932)
-- new Variable (line 3946)
-- new Variable (line 4044)
-- new Variable (line 4058)
-- new Variable (line 4225)
-- new Variable (line 4230)
-- new Error (line 4250)
-- new Error (line 4254)
-- new Variable (line 4339)
-- new Variable (line 4345)
-- new Variable (line 4351)
-- new Variable (line 4397)
-- new Variable (line 4402)
-- new Variable (line 4431)
-- new Variable (line 4441)
-- new Variable (line 4447)
-- new Variable (line 4469)
-- new Variable (line 4490)
-- new HashTable (line 4524)
-- new Variable (line 4541)
-- new Variable (line 4543)
-- new HashTable (line 4644)
-- new Variable (line 4676)
-- new Variable (line 4678)
-- new HashTable (line 4691)
-- new Variable (line 4698)
-- new Variable (line 4709)
-- new HashTable (line 4724)
-- new Variable (line 4727)
-- new HashTable (line 4746)
-- new Variable (line 4749)
-- 204 class method(s)
+- new Variable (line 3575)
+- new ClassProperty (line 3577)
+- new Variable (line 3600)
+- new ClassProperty (line 3602)
+- new Variable (line 3842)
+- new Variable (line 3846)
+- new Variable (line 3866)
+- new Variable (line 3877)
+- new Variable (line 3902)
+- new Variable (line 3917)
+- new Variable (line 3942)
+- new Variable (line 3958)
+- new Variable (line 3972)
+- new Variable (line 4070)
+- new Variable (line 4084)
+- new Variable (line 4251)
+- new Variable (line 4256)
+- new Error (line 4276)
+- new Error (line 4280)
+- new Variable (line 4365)
+- new Variable (line 4371)
+- new Variable (line 4377)
+- new Variable (line 4423)
+- new Variable (line 4428)
+- new Variable (line 4457)
+- new Variable (line 4467)
+- new Variable (line 4473)
+- new Variable (line 4495)
+- new Variable (line 4516)
+- new HashTable (line 4550)
+- new Variable (line 4567)
+- new Variable (line 4569)
+- new HashTable (line 4670)
+- new Variable (line 4702)
+- new Variable (line 4704)
+- new HashTable (line 4717)
+- new Variable (line 4724)
+- new Variable (line 4735)
+- new HashTable (line 4750)
+- new Variable (line 4753)
+- new HashTable (line 4772)
+- new Variable (line 4775)
+- 205 class method(s)
 - 2 closure(s)
 
 ### `ext/standard/VmRound.php`

@@ -100,7 +100,6 @@ final class VmIni
         'user_dir',
         'disable_functions',
         'disable_classes',
-        'open_basedir',
         'error_append_string',
         'error_prepend_string',
         'upload_tmp_dir',
@@ -137,6 +136,7 @@ final class VmIni
         'session.serialize_handler',
         'session.use_strict_mode',
         'include_path',
+        'open_basedir',
         'short_open_tag',
         'register_argc_argv',
         'zend.enable_gc',
@@ -235,6 +235,8 @@ final class VmIni
                 return self::setSessionUseStrictMode($newValue);
             case 'include_path':
                 return VmIncludePath::push($newValue);
+            case 'open_basedir':
+                return self::setOpenBasedir($newValue);
             case 'default_charset':
                 return self::setDefaultCharset($newValue);
             case 'date.timezone':
@@ -330,6 +332,8 @@ final class VmIni
                 return self::formatBoolIniGet(VmSession::isUseStrictMode());
             case 'include_path':
                 return VmIncludePath::get();
+            case 'open_basedir':
+                return VmOpenBasedir::get();
             case 'default_charset':
                 return self::$defaultCharset;
             case 'date.timezone':
@@ -813,6 +817,16 @@ final class VmIni
         return $old;
     }
 
+    /**
+     * php-src OnUpdateBaseDir — runtime tighten-only (#28138, main/fopen_wrappers.c).
+     *
+     * @return string|false
+     */
+    private static function setOpenBasedir(string $newValue): string|false
+    {
+        return VmOpenBasedir::set($newValue);
+    }
+
     private static function setDefaultCharset(string $newValue): string
     {
         $old = self::$defaultCharset;
@@ -937,6 +951,9 @@ final class VmIni
                 break;
             case 'session.use_strict_mode':
                 VmSession::setUseStrictMode(false);
+                break;
+            case 'open_basedir':
+                VmOpenBasedir::restore();
                 break;
             case 'user_agent':
                 self::$userAgent = '';

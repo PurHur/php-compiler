@@ -37,6 +37,13 @@ final class phpc_file_get_contents_kernel extends Internal
             throw new \LogicException('phpc_file_get_contents_kernel() expects exactly 1 argument, '.$argc.' given');
         }
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'phpc_file_get_contents_kernel', 0, 'filename', $frame);
+        if (!VmOpenBasedir::check($path, true, 'file_get_contents', $frame->vmContext, $frame)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->null();
+            }
+
+            return;
+        }
         $data = VmFs::fileGetContents($path);
         if (null !== $frame->returnVar) {
             if (false === $data) {
