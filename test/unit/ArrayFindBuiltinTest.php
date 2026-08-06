@@ -125,8 +125,8 @@ TXT;
     }
 
     /**
-     * User-script AOT execute for Closure predicates (#26824) — NestedJIT helper path
-     * previously crashed at emit; ArrayFindLlvm must match VM.
+     * User-script AOT execute for Closure predicates (#26824, #27296) — NestedJIT helper path
+     * previously crashed at emit; ArrayFindLlvm must match VM for packed and string keys.
      *
      * @group llvm
      * @group aot
@@ -147,8 +147,13 @@ echo array_find_key($a, fn ($x) => $x > 15), "\n";
 echo array_any($a, fn ($x) => $x > 25) ? "any\n" : "noany\n";
 echo array_all($a, fn ($x) => $x > 5) ? "all\n" : "noall\n";
 echo array_find([1, 2], fn ($x) => $x > 5) === null ? "null\n" : "bad\n";
+$b = ['a' => 1, 'b' => 2];
+echo array_find_key($b, fn ($v) => $v === 2), "\n";
+echo array_find($b, fn ($v) => $v === 2), "\n";
+echo array_any($b, fn ($v) => $v === 2) ? "sany\n" : "nosany\n";
+echo array_find_key($b, fn ($v, $k) => $k === 'b'), "\n";
 PHP;
-        $expect = "20\n1\nany\nall\nnull\n";
+        $expect = "20\n1\nany\nall\nnull\nb\n2\nsany\nb\n";
         $src = tempnam(sys_get_temp_dir(), 'phpc_af_src_');
         $bin = tempnam(sys_get_temp_dir(), 'phpc_af_bin_');
         $this->assertNotFalse($src);
