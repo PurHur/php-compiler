@@ -11,7 +11,7 @@ use PHPLLVM\Value;
  * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515, #27228, #27243).
  *
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}.
- * JIT SSOT: {@see \PHPCompiler\ext\standard\ArrayUserSetOpsJitHelper} via {@see ArrayUserSetOpsRuntime}.
+ * JIT/AOT: {@see ArrayUserSetOpsRuntime} → Value/Key/Uassoc LLVM (#27533); VM SSOT {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}.
  */
 final class JitArrayUserSetOps
 {

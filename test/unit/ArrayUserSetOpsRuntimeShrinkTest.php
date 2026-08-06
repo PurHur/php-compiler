@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** array_udiff()/array_uintersect()/array_diff_ukey()/array_intersect_ukey() JIT routes through ArrayUserSetOpsJitHelper PHP (#18515, #27228). */
+/** array_udiff()/array_uintersect()/ukey/uassoc JIT routes (#18515, #27228, #27243, #27533). */
 final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
 {
     private const JIT_HELPER_MAX_LINES = 120;
@@ -31,20 +31,30 @@ final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testArrayUserSetOpsRuntimeLinksJitHelper(): void
+    public function testArrayUserSetOpsRuntimeUsesPureLlvmValueKeyUassoc(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayUserSetOpsRuntime.php');
-        $this->assertStringContainsString('ArrayUserSetOpsJitHelper', $runtime);
-        $this->assertStringContainsString('diffByValueWithClosure', $runtime);
-        $this->assertStringContainsString('intersectByValueWithClosure', $runtime);
+        $this->assertStringContainsString('ArrayUserSetOpsValueLlvm::filterByValue', $runtime);
         $this->assertStringContainsString('ArrayUserSetOpsKeyLlvm::filterByKey', $runtime);
         $this->assertStringContainsString('ArrayUserSetOpsUassocLlvm::filterByKeyValue', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureBridge', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope', $runtime);
+        $this->assertStringNotContainsString('diffByValueWithClosure', $runtime);
+        $this->assertStringNotContainsString('ArrayUserSetOpsJitHelper', $runtime);
+    }
+
+    public function testArrayUserSetOpsValueLlvmAvoidsNestedClosureInvoke(): void
+    {
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayUserSetOpsValueLlvm.php');
+        $this->assertStringContainsString('ArrayUserSetOpsKeyLlvm::compareValueBoxesPublic', $llvm);
+        $this->assertStringNotContainsString('new NestedClosureInvoke', $llvm);
+        $this->assertStringNotContainsString('NestedClosureInvokeLlvm', $llvm);
+        $this->assertStringNotContainsString('JitVmHelperLink', $llvm);
     }
 
     public function testArrayUserSetOpsJitHelperDelegatesToVmClosureCall(): void
     {
+        // Host/VM SSOT retained; thin AOT uses ArrayUserSetOpsValueLlvm (#27533).
         $jitHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayUserSetOpsJitHelper.php');
         $this->assertStringContainsString('VmClosureCall::invokeTwoForUserCompare', $jitHelper);
         $this->assertStringContainsString('Superglobals::getActiveContext', $jitHelper);
