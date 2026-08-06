@@ -39,5 +39,7 @@ final class StringGetrusageRuntimeStandaloneTest extends TestCase
 
         $helperSource = (string) \file_get_contents(__DIR__.'/../../../ext/standard/GetrusageJitHelper.php');
         $this->assertStringContainsString('VmProcess::getrusage', $helperSource);
+        $this->assertStringContainsString('VmGetrusageNative::getrusage', $helperSource);
+        $this->assertStringContainsString('resolveOk', $helperSource);
     }
 }

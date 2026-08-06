@@ -23,6 +23,91 @@ final class VmGetrusagePure
     }
 
     /**
+     * NestedJIT-safe scalar field (no associative / packed array) for AOT bridges (#27551).
+     *
+     * Index order matches {@see GetrusageJitHelper::KEYS}.
+     */
+    public static function scalarAt(int $who, int $index): int
+    {
+        if (self::RUSAGE_CHILDREN === $who) {
+            return 0;
+        }
+        if ($index < 0 || $index > 16) {
+            return 0;
+        }
+        // Constant zeros for unused rusage fields on the /proc path.
+        if (0 === $index || 1 === $index || 2 === $index || 3 === $index
+            || 5 === $index || 6 === $index || 9 === $index || 10 === $index
+            || 11 === $index || 12 === $index) {
+            return 0;
+        }
+
+        $stat = self::readProcSelfStat();
+        if (null === $stat) {
+            return 0;
+        }
+
+        if (4 === $index) {
+            $rssPages = self::intField($stat, 20);
+            $pageSize = self::pageSizeBytes();
+
+            return (int) max(0, (int) (($rssPages * $pageSize) / 1024));
+        }
+        if (7 === $index) {
+            return self::intField($stat, 6);
+        }
+        if (8 === $index) {
+            return self::intField($stat, 8);
+        }
+        if (13 === $index || 14 === $index) {
+            $ticks = self::intField($stat, 10);
+            if (14 === $index) {
+                return self::ticksToSec($ticks);
+            }
+
+            return self::ticksToUsec($ticks);
+        }
+        if (15 === $index || 16 === $index) {
+            $ticks = self::intField($stat, 11);
+            if (16 === $index) {
+                return self::ticksToSec($ticks);
+            }
+
+            return self::ticksToUsec($ticks);
+        }
+
+        return 0;
+    }
+
+    private static function ticksToSec(int $ticks): int
+    {
+        if ($ticks <= 0) {
+            return 0;
+        }
+        $hz = VmProcClockTicksPure::clockTicksPerSecond();
+        if ($hz <= 0) {
+            $hz = 100;
+        }
+
+        return intdiv($ticks, $hz);
+    }
+
+    private static function ticksToUsec(int $ticks): int
+    {
+        if ($ticks <= 0) {
+            return 0;
+        }
+        $hz = VmProcClockTicksPure::clockTicksPerSecond();
+        if ($hz <= 0) {
+            $hz = 100;
+        }
+        $sec = intdiv($ticks, $hz);
+        $rem = $ticks - ($sec * $hz);
+
+        return (int) max(0, (int) (($rem * 1000000) / $hz));
+    }
+
+    /**
      * @return array<string, int>|false
      */
     public static function getrusage(int $who = 0): array|false
