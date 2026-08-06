@@ -75,6 +75,10 @@ final class VmNetInterfacesRuntimeShrinkTest extends TestCase
 
             $ht = VmNetInterfaces::get();
             $this->assertNotFalse($ht);
+            // php-src getifaddrs-ish: lo before other ifaces (#28140)
+            $rawOrdered = VmNetInterfacesPure::collect();
+            $this->assertIsArray($rawOrdered);
+            $this->assertSame('lo', array_key_first($rawOrdered));
         } finally {
             if (false === $prev || null === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
