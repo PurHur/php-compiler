@@ -21,9 +21,9 @@ final class VmBrotliNative
 
     public const MODE_FONT = 2;
 
-    private const MIN_QUALITY = 0;
+    public const MIN_QUALITY = 0;
 
-    private const MAX_QUALITY = 11;
+    public const MAX_QUALITY = 11;
 
     private const MIN_LGWIN = 10;
 
