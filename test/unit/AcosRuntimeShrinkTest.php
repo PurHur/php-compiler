@@ -55,7 +55,7 @@ final class AcosRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringContainsString('phpc_acos_kernel', $source);
-        $this->assertStringContainsString('phpc_cos_kernel', $source);
+        $this->assertStringContainsString('phpc_tan_kernel', $source);
     }
 
     public function testSpineBundleIncludesAcosJitHelper(): void
