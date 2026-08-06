@@ -27,8 +27,20 @@ final class VmNetInterfacesRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringNetInterfacesJit.php');
         $this->assertStringContainsString('NetInterfacesJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringContainsString('resolveOk', $source);
+        $this->assertStringContainsString('__hashtable__alloc', $source);
+        $this->assertDoesNotMatchRegularExpression('/NetInterfacesJitHelper::resolve[^O]/', $source);
         $this->assertStringNotContainsString('ifa_next', $source);
         $this->assertStringNotContainsString('IFA_NAME', $source);
+    }
+
+    public function testNetInterfacesJitHelperExposesScalarAccessorsForThinAot(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/NetInterfacesJitHelper.php');
+        $this->assertStringContainsString('NestedJIT must not return', $source);
+        $this->assertStringContainsString('function resolveOk', $source);
+        $this->assertStringContainsString('function ifaceNameAt', $source);
+        $this->assertStringContainsString('#26942', $source);
     }
 
     public function testNetGetInterfacesWorksWithFfiDisabledOnLinux(): void
