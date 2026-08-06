@@ -1239,7 +1239,7 @@ final class VmMbstring
      */
     public static function strrchr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
     {
-        self::assertSearchEncoding($encoding);
+        $encoding = self::assertSearchEncoding($encoding, 'mb_strrchr');
         $pos = self::utf8Strrpos($haystack, $needle, 0, false, $encoding, 'mb_strrchr');
         if (false === $pos) {
             return false;
@@ -1274,7 +1274,7 @@ final class VmMbstring
         bool $caseInsensitive,
         string $function
     ) {
-        self::assertSearchEncoding($encoding);
+        $encoding = self::assertSearchEncoding($encoding, $function);
         $pos = self::utf8Strpos($haystack, $needle, 0, $caseInsensitive, $encoding, $function);
         if (false === $pos) {
             return false;
@@ -1295,7 +1295,7 @@ final class VmMbstring
         bool $warnOnClip = false,
         ?\PHPCompiler\Frame $frame = null,
     ): string {
-        self::assertSubstrCountEncoding($encoding, 'mb_substr');
+        $encoding = self::assertSubstrCountEncoding($encoding, 'mb_substr', 3);
         $charLen = VmString::utf8CharLength($string);
         if ($start < 0) {
             $start += $charLen;
@@ -1338,7 +1338,7 @@ final class VmMbstring
      */
     public static function strwidth(string $string, string $encoding = 'UTF-8'): int
     {
-        self::assertSubstrCountEncoding($encoding, 'mb_strwidth');
+        $encoding = self::assertSubstrCountEncoding($encoding, 'mb_strwidth', 1);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return VmString::byteLength($string);
         }
@@ -1364,7 +1364,7 @@ final class VmMbstring
         string $trimmarker = '',
         string $encoding = 'UTF-8'
     ): string {
-        self::assertSubstrCountEncoding($encoding, 'mb_strimwidth');
+        $encoding = self::assertSubstrCountEncoding($encoding, 'mb_strimwidth', 4);
         if (0 !== $from) {
             $charLen = 'UTF-8' === $encoding
                 ? VmString::utf8CharLength($string)
@@ -1412,7 +1412,7 @@ final class VmMbstring
         int $padType = 1,
         string $encoding = 'UTF-8'
     ): string {
-        self::assertSubstrCountEncoding($encoding, 'mb_str_pad');
+        $encoding = self::assertSubstrCountEncoding($encoding, 'mb_str_pad', 4);
         $inputLength = 'UTF-8' === $encoding
             ? VmString::utf8CharLength($input)
             : VmString::byteLength($input);
@@ -1498,7 +1498,7 @@ final class VmMbstring
         ?int $length = null,
         string $encoding = 'UTF-8'
     ): string {
-        self::assertSubstrCountEncoding($encoding, 'mb_strcut');
+        $encoding = self::assertSubstrCountEncoding($encoding, 'mb_strcut', 3);
         $byteLen = VmString::byteLength($string);
         if (null === $length) {
             $length = $byteLen;
@@ -1683,7 +1683,7 @@ final class VmMbstring
      */
     public static function strrichr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
     {
-        self::assertSearchEncoding($encoding);
+        $encoding = self::assertSearchEncoding($encoding, 'mb_strrichr');
         $lowerHay = self::convertCase($haystack, MbstringConstants::MB_CASE_LOWER, $encoding);
         $lowerNeedle = self::convertCase($needle, MbstringConstants::MB_CASE_LOWER, $encoding);
         $pos = self::utf8Strrpos($lowerHay, $lowerNeedle, 0, false, $encoding, 'mb_strrichr');
@@ -1712,7 +1712,7 @@ final class VmMbstring
         string $encoding,
         string $function
     ) {
-        self::assertSearchEncoding($encoding);
+        $encoding = self::assertSearchEncoding($encoding, $function);
         if ($caseInsensitive) {
             $haystack = self::convertCase($haystack, MbstringConstants::MB_CASE_LOWER, $encoding);
             $needle = self::convertCase($needle, MbstringConstants::MB_CASE_LOWER, $encoding);
@@ -1743,7 +1743,7 @@ final class VmMbstring
         string $encoding,
         string $function
     ) {
-        self::assertSearchEncoding($encoding);
+        $encoding = self::assertSearchEncoding($encoding, $function);
         if ($caseInsensitive) {
             $haystack = self::convertCase($haystack, MbstringConstants::MB_CASE_LOWER, $encoding);
             $needle = self::convertCase($needle, MbstringConstants::MB_CASE_LOWER, $encoding);
@@ -1797,18 +1797,28 @@ final class VmMbstring
         return $offset;
     }
 
-    private static function assertSearchEncoding(string $encoding): void
+    /**
+     * php-src php_mb_check_encoding / zend_argument_value_error for unknown names (#27945);
+     * LogicException only for valid encodings this build does not yet implement.
+     */
+    private static function assertSearchEncoding(string $encoding, string $function, int $argIndex = 3): string
     {
-        self::assertSubstrCountEncoding($encoding, 'mbstring search');
+        return self::assertSubstrCountEncoding($encoding, $function, $argIndex);
     }
 
-    public static function assertSubstrCountEncoding(string $encoding, string $context = 'mb_substr_count'): void
-    {
+    public static function assertSubstrCountEncoding(
+        string $encoding,
+        string $function = 'mb_substr_count',
+        int $argIndex = 2
+    ): string {
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, $function, $argIndex);
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
             throw new \LogicException(
-                $context.' requires mbstring for encoding '.$encoding.' in this compiler build'
+                $function.'() requires mbstring for encoding '.$encoding.' in this compiler build'
             );
         }
+
+        return $encoding;
     }
 
     /**
@@ -3171,7 +3181,7 @@ final class VmMbstring
         if ($length <= 0) {
             throw new \ValueError('mb_str_split(): Argument #2 ($length) must be greater than 0');
         }
-        self::assertSubstrCountEncoding($encoding, 'mb_str_split');
+        $encoding = self::assertSubstrCountEncoding($encoding, 'mb_str_split', 2);
         if ('ASCII' === $encoding || '8BIT' === $encoding) {
             return self::strSplitSingleByte($string, $length);
         }
