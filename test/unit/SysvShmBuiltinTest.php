@@ -28,6 +28,9 @@ final class SysvShmBuiltinTest extends BaseTest
         $reflectionPath = __DIR__.'/../compliance/cases/stdlib/shm_reflection_names_24640.phpt';
         yield 'shm_reflection_names_24640.phpt' => self::parsePHPT($reflectionPath, 'shm_reflection_names_24640.phpt');
 
+        $typesPath = __DIR__.'/../compliance/cases/stdlib/shm_attach_reflection_types_27943.phpt';
+        yield 'shm_attach_reflection_types_27943.phpt' => self::parsePHPT($typesPath, 'shm_attach_reflection_types_27943.phpt');
+
         if (!\function_exists('shmop_open')) {
             return;
         }

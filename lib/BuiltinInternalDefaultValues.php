@@ -192,6 +192,12 @@ final class BuiltinInternalDefaultValues
         'curl_init' => [
             0 => ['kind' => 'null'],
         ],
+        // php-src ext/sysvshm/sysvshm.stub.php — ?int $size = null, int $permissions = 0666 (#27943)
+        // InternalArgInfo int OPT infers 0/0; Zend reflects NULL and 438.
+        'shm_attach' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'int', 'value' => 0666],
+        ],
         'explode' => [
             2 => ['kind' => 'int', 'value' => \PHP_INT_MAX],
         ],

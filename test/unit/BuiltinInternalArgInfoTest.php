@@ -365,6 +365,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src ext/sysvshm/sysvshm.stub.php — SysvSharedMemory stubs; InternalArgInfo int/untyped (#27943). */
+    public function testShmAttachReflectionStubTypes(): void
+    {
+        $this->assertSame('SysvSharedMemory|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('shm_attach'));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::returnTypeLabelForFunction('shm_get_var'));
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('shm_attach', 1));
+        $this->assertSame('SysvSharedMemory', BuiltinInternalArgInfo::stubParamTypeOverride('shm_detach', 0));
+        $this->assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverride('shm_put_var', 2));
+        // InternalArgInfo still names memsize; Reflection uses BuiltinParamNames size (#24640).
+        $this->assertSame(['key', 'size=', 'permissions='], BuiltinParamNames::forFunction('shm_attach'));
+        $size = BuiltinInternalArgInfo::paramInfoForFunction('shm_attach', 1);
+        $this->assertNotNull($size);
+        $this->assertSame('?int', $size['type']);
+        $this->assertTrue($size['isOptional']);
+        $shm = BuiltinInternalArgInfo::paramInfoForFunction('shm_detach', 0);
+        $this->assertNotNull($shm);
+        $this->assertSame('SysvSharedMemory', $shm['type']);
+    }
+
     /** php-src ext/curl/curl.stub.php — CurlShareHandle + mixed $value (#27704). */
     public function testCurlShareSetoptReflectionStubTypes(): void
     {
