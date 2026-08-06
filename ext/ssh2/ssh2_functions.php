@@ -887,6 +887,177 @@ final class ssh2_send_signal extends Ssh2Function
 }
 
 /**
+ * ssh2_keepalive_config(resource $session, bool $want_reply, int $interval): void
+ *
+ * Configure session keepalive (PECL ssh2_keepalive_config; #26737).
+ */
+final class ssh2_keepalive_config extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_keepalive_config');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_keepalive_config() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_keepalive_config', 1);
+        $wantReply = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'ssh2_keepalive_config', 2, 'want_reply');
+        $interval = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'ssh2_keepalive_config', 3, 'interval');
+        if ($interval < 0 || $interval > 4294967295) {
+            @\trigger_error(
+                'ssh2_keepalive_config(): Argument #3 ($interval) must be between 0 and 4294967295',
+                \E_USER_WARNING
+            );
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->null();
+            }
+
+            return;
+        }
+        $native = VmSsh2Session::nativeSession($session);
+        if (null !== $native) {
+            VmSsh2Native::sessionKeepaliveConfig($native, $wantReply, $interval);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
+
+/**
+ * ssh2_keepalive_send(resource $session): int|false
+ *
+ * Send keepalive if needed (PECL ssh2_keepalive_send; #26737).
+ */
+final class ssh2_keepalive_send extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_keepalive_send');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_keepalive_send() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_keepalive_send', 1);
+        $native = VmSsh2Session::nativeSession($session);
+        if (null === $native) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $next = VmSsh2Native::sessionKeepaliveSend($native);
+        if (false === $next) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($next);
+    }
+}
+
+/**
+ * ssh2_set_timeout(resource $session, int $seconds[, int $microseconds = 0]): void
+ *
+ * Set session I/O timeout (PECL ssh2_set_timeout; #26737).
+ */
+final class ssh2_set_timeout extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_set_timeout');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_set_timeout() expects between 2 and 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $session = $this->requireSession($frame->calledArgs[0], 'ssh2_set_timeout', 1);
+        $seconds = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ssh2_set_timeout', 2, 'seconds');
+        $microseconds = 0;
+        if ($argc >= 3) {
+            $microseconds = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'ssh2_set_timeout', 3, 'microseconds');
+        }
+        // PECL: seconds * 1000 + (microseconds + 999) / 1000
+        $timeoutMs = $seconds * 1000 + (int) (($microseconds + 1000 - 1) / 1000);
+        $native = VmSsh2Session::nativeSession($session);
+        if (null !== $native) {
+            VmSsh2Native::sessionSetTimeout($native, $timeoutMs);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
+
+/**
+ * ssh2_shell_resize(resource $channel, int $width, int $height[, int $width_px = 0[, int $height_px = 0]]): bool
+ *
+ * Request PTY size change (PECL ssh2_shell_resize; #26737).
+ */
+final class ssh2_shell_resize extends Ssh2Function
+{
+    public function __construct()
+    {
+        parent::__construct('ssh2_shell_resize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'ssh2_shell_resize() expects between 3 and 5 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $channel = $this->requireChannel($frame->calledArgs[0], 'ssh2_shell_resize', 1);
+        $width = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ssh2_shell_resize', 2, 'width');
+        $height = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'ssh2_shell_resize', 3, 'height');
+        $widthPx = 0;
+        $heightPx = 0;
+        if ($argc >= 4) {
+            $widthPx = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'ssh2_shell_resize', 4, 'width_px');
+        }
+        if ($argc >= 5) {
+            $heightPx = VmMath::parseIntBuiltinArgForFrame($frame, 4, 'ssh2_shell_resize', 5, 'height_px');
+        }
+        $native = VmSsh2Stream::nativeChannel($channel);
+        if (null === $native) {
+            @\trigger_error('ssh2_shell_resize(): Provided stream is not of type SSH2 Channel Stream', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(VmSsh2Native::channelRequestPtySize($native, $width, $height, $widthPx, $heightPx));
+    }
+}
+
+/**
  * ssh2_shell(resource $session, string $term_type = "vanilla", ?array $env = null, int $width = 80, int $height = 25, int $width_height_type = SSH2_TERM_UNIT_CHARS): resource|false
  */
 final class ssh2_shell extends Ssh2Function

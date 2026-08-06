@@ -1183,6 +1183,91 @@ final class VmSsh2Native
     }
 
     /**
+     * Configure session keepalive (PECL ssh2_keepalive_config; #26737).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function sessionKeepaliveConfig(\FFI\CData $session, bool $wantReply, int $interval): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            $ffi->libssh2_keepalive_config($session, $wantReply ? 1 : 0, $interval);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Send keepalive if needed (PECL ssh2_keepalive_send; #26737).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     *
+     * @return int|false seconds until next keepalive needed, or false on error
+     */
+    public static function sessionKeepaliveSend(\FFI\CData $session)
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $secondsToNext = \FFI::new('int');
+            $rc = (int) $ffi->libssh2_keepalive_send($session, \FFI::addr($secondsToNext));
+            if (0 !== $rc) {
+                return false;
+            }
+
+            return (int) $secondsToNext->cdata;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Set session I/O timeout in milliseconds (PECL ssh2_set_timeout; #26737).
+     *
+     * @param \FFI\CData $session LIBSSH2_SESSION*
+     */
+    public static function sessionSetTimeout(\FFI\CData $session, int $timeoutMs): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            $ffi->libssh2_session_set_timeout($session, $timeoutMs);
+        } catch (\Throwable) {
+        }
+    }
+
+    /**
+     * Request PTY size change on a channel (PECL ssh2_shell_resize; #26737).
+     *
+     * @param \FFI\CData $channel LIBSSH2_CHANNEL*
+     */
+    public static function channelRequestPtySize(
+        \FFI\CData $channel,
+        int $width,
+        int $height,
+        int $widthPx,
+        int $heightPx
+    ): bool {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            $ffi->libssh2_channel_request_pty_size_ex($channel, $width, $height, $widthPx, $heightPx);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Open direct-tcpip tunnel channel (PECL ssh2_tunnel; #26677).
      *
      * @param \FFI\CData $session LIBSSH2_SESSION*
@@ -1549,6 +1634,7 @@ ssize_t libssh2_channel_read_ex(LIBSSH2_CHANNEL *channel, int stream_id, char *b
 int libssh2_channel_eof(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_send_eof(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_signal_ex(LIBSSH2_CHANNEL *channel, const char *signame, size_t signame_len);
+int libssh2_channel_request_pty_size_ex(LIBSSH2_CHANNEL *channel, int width, int height, int width_px, int height_px);
 int libssh2_channel_close(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_wait_closed(LIBSSH2_CHANNEL *channel);
 int libssh2_channel_free(LIBSSH2_CHANNEL *channel);
@@ -1557,6 +1643,9 @@ int libssh2_userauth_hostbased_fromfile_ex(LIBSSH2_SESSION *session, const char 
 LIBSSH2_LISTENER *libssh2_channel_forward_listen_ex(LIBSSH2_SESSION *session, const char *host, int port, int *bound_port, int queue_maxsize);
 int libssh2_channel_forward_cancel(LIBSSH2_LISTENER *listener);
 LIBSSH2_CHANNEL *libssh2_channel_forward_accept(LIBSSH2_LISTENER *listener);
+void libssh2_keepalive_config(LIBSSH2_SESSION *session, int want_reply, unsigned int interval);
+int libssh2_keepalive_send(LIBSSH2_SESSION *session, int *seconds_to_next);
+void libssh2_session_set_timeout(LIBSSH2_SESSION *session, long timeout);
 LIBSSH2_AGENT *libssh2_agent_init(LIBSSH2_SESSION *session);
 int libssh2_agent_connect(LIBSSH2_AGENT *agent);
 int libssh2_agent_list_identities(LIBSSH2_AGENT *agent);
