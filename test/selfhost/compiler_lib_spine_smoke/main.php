@@ -2719,6 +2719,8 @@ require_once __DIR__.'/../../../ext/standard/JitOutputRewriteVars.php';
 require_once __DIR__.'/../../../ext/standard/JitPack.php';
 require_once __DIR__.'/../../../ext/standard/JitPackNumericGuard.php';
 require_once __DIR__.'/../../../ext/standard/JitParseIniMaterializer.php';
+require_once __DIR__.'/../../../ext/standard/JitParseIni.php';
+require_once __DIR__.'/../../../ext/standard/ParseIniNativeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitParseStr.php';
 require_once __DIR__.'/../../../ext/standard/JitParseStrMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitParseStrUserScriptCstrKernel.php';
