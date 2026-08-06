@@ -676,6 +676,23 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('error_clear_last'));
     }
 
+    /** php-src ext/standard/basic_functions.stub.php — void + filename="" (#27998). */
+    public function testClearstatcacheReflectionStubTypes(): void
+    {
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('clearstatcache'));
+        $filename = BuiltinInternalArgInfo::paramInfoForFunction('clearstatcache', 1);
+        $this->assertNotNull($filename);
+        $this->assertSame('filename', $filename['name']);
+        $this->assertTrue($filename['isOptional']);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable('clearstatcache', 1, $filename, false));
+        $clearRealpath = BuiltinInternalArgInfo::paramInfoForFunction('clearstatcache', 0);
+        $this->assertNotNull($clearRealpath);
+        $this->assertTrue(BuiltinInternalDefaultValues::isAvailable('clearstatcache', 0, $clearRealpath, false));
+        $dest = new \PHPCompiler\VM\Variable();
+        $this->assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'clearstatcache', 1, $filename));
+        $this->assertSame('', $dest->toString());
+    }
+
     /** php-src ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324). */
     public function testPregGrepPregMatchAllReflectionReturnUnions(): void
     {

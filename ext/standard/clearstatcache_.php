@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,16 +25,26 @@ final class clearstatcache_ extends Internal
         if ($argc > 2) {
             throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
         }
-        if (0 === $argc) {
+        $hasClearRealpath = isset($frame->calledArgs[0]);
+        $hasFilename = isset($frame->calledArgs[1]);
+        if (!$hasClearRealpath && !$hasFilename) {
             VmStatCache::clear();
-        } elseif (1 === $argc) {
-            $clearRealpath = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0],
+        } elseif ($hasFilename) {
+            $clearRealpath = $hasClearRealpath
+                ? VmMath::parseBoolBuiltinArg(
+                    $frame->calledArgs[0],
+                    'clearstatcache',
+                    0,
+                    'clear_realpath_cache'
+                )
+                : false;
+            $filename = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
                 'clearstatcache',
-                0,
-                'clear_realpath_cache'
+                1,
+                'filename'
             );
-            VmStatCache::clear($clearRealpath);
+            VmStatCache::clear($clearRealpath, '' !== $filename ? $filename : null);
         } else {
             $clearRealpath = VmMath::parseBoolBuiltinArg(
                 $frame->calledArgs[0],
@@ -41,8 +52,7 @@ final class clearstatcache_ extends Internal
                 0,
                 'clear_realpath_cache'
             );
-            $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'clearstatcache', 1, 'filename');
-            VmStatCache::clear($clearRealpath, $filename);
+            VmStatCache::clear($clearRealpath);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
@@ -56,6 +66,20 @@ final class clearstatcache_ extends Internal
             throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
         }
 
-        return JitClearstatcache::invoke($context, $argc, ...$args);
+        return JitClearstatcache::invoke($context, self::effectiveArgCount($args), ...$args);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function effectiveArgCount(array $args): int
+    {
+        $hasFilename = isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
+        if ($hasFilename) {
+            return 2;
+        }
+        $hasClearRealpath = isset($args[0]) && !NamedOptionalCallArgs::isOmittedOptional($args[0]);
+
+        return $hasClearRealpath ? 1 : 0;
     }
 }
