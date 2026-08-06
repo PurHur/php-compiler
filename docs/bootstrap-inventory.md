@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7165 |
-| Phase A inventory files (M2 ratio SSOT) | 7165 |
+| PHP files on vm.php path | 7172 |
+| Phase A inventory files (M2 ratio SSOT) | 7172 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23014 |
+| Source constructs flagged (warnings) | 23026 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1996,14 +1996,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/BuiltinClasses.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAddChild.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAsXml.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlAttributes.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlChildren.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlCount.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlGet.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlGetName.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlLoadString.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlOffsetGet.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlRegisterXPathNamespace.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlToString.php` | 0 | 1 |
-| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 6 |
+| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 7 |
 | `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
 | `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 2 |
@@ -6092,9 +6095,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/RuntimeVariableFunction.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAddChild.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAsXml.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementAttributes.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementChildren.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementCount.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementGet.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementGetName.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementOffsetGet.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementRegisterXPathNamespace.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementToString.php` | 0 | 1 |
@@ -6306,7 +6312,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SensitiveParamHelper.php` | 0 | 1 |
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 10 |
+| `lib/JIT/SimpleXmlForeachSnapshot.php` | 0 | 2 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 13 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
@@ -23361,6 +23368,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/simplexml/JitSimpleXmlAttributes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlChildren.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/simplexml/JitSimpleXmlConstruct.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23373,6 +23390,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/simplexml/JitSimpleXmlGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/simplexml/JitSimpleXmlGetName.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -23402,11 +23424,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 119)
-- new JITVariable (line 266)
-- new JITVariable (line 532)
-- new JITVariable (line 601)
-- 22 class method(s)
+- new SimpleXMLElement (line 132)
+- new JITVariable (line 297)
+- new JITVariable (line 313)
+- new JITVariable (line 680)
+- new JITVariable (line 749)
+- 35 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -45714,89 +45737,89 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeVariableFunction (line 11310)
 - new Variable (line 11534)
 - new Variable (line 11548)
-- new VM\Variable (line 11839)
-- new VM (line 11845)
-- new VM\Variable (line 11858)
-- new Variable (line 12097)
-- new Type (line 12104)
-- new Variable (line 12128)
-- new Type (line 12136)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 12141)
-- new Variable (line 12176)
-- new Type (line 12187)
-- new Variable (line 12441)
-- new Variable (line 12462)
-- new Operand\Literal (line 12554)
-- new Variable (line 13953)
-- new Variable (line 13974)
-- new Variable (line 14000)
-- new Variable (line 14025)
-- new Variable (line 14057)
-- new Variable (line 14078)
-- new CompileError (line 14902)
-- new CompileError (line 15031)
-- new Variable (line 15088)
-- new Variable (line 15122)
-- new Variable (line 15584)
-- new Variable (line 15604)
-- new Variable (line 15625)
-- new Variable (line 15745)
-- new Variable (line 15786)
-- new Variable (line 15896)
-- new Variable (line 15920)
-- new Variable (line 15930)
-- new Variable (line 16115)
-- new Variable (line 16133)
-- new Variable (line 16191)
-- new Variable (line 16218)
-- new Variable (line 16244)
-- new Variable (line 16583)
-- new Variable (line 16957)
-- new Variable (line 16987)
-- new Variable (line 17006)
-- new Variable (line 17036)
-- new Variable (line 17073)
-- new Variable (line 17121)
-- new Variable (line 17164)
-- new VM\Variable (line 17657)
-- new Variable (line 17691)
-- new Variable (line 17743)
-- new Variable (line 17761)
-- new Variable (line 17780)
-- new Variable (line 17787)
-- new OpCode (line 17809)
-- new Variable (line 17810)
-- new Variable (line 18070)
-- new Variable (line 18126)
-- new Variable (line 18164)
-- new OpCode (line 18178)
-- new Variable (line 18179)
-- new Variable (line 18238)
-- new OpCode (line 18259)
-- new Variable (line 18260)
-- new Variable (line 18359)
-- new Variable (line 18381)
-- new Variable (line 18449)
-- new Operand\Literal (line 18458)
-- new Variable (line 18473)
-- new Variable (line 18788)
-- new VM\PropertyIsInitializedHandler (line 18885)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18943)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19408)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19627)
-- new JIT\Call\VmCoerceVariableToString (line 19754)
-- new JIT\Call\NoOpConstruct (line 19929)
-- new JIT\Call\IncludePathResolverResolve (line 20099)
-- new Operand\Literal (line 20186)
-- new Operand\Literal (line 20189)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 20232)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20385)
-- new VM (line 21554)
-- new VM\Variable (line 21563)
-- new Variable (line 21584)
-- new Variable (line 21630)
-- new Variable (line 22352)
-- 426 class method(s)
+- new VM\Variable (line 11843)
+- new VM (line 11849)
+- new VM\Variable (line 11862)
+- new Variable (line 12101)
+- new Type (line 12108)
+- new Variable (line 12132)
+- new Type (line 12140)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 12145)
+- new Variable (line 12180)
+- new Type (line 12191)
+- new Variable (line 12445)
+- new Variable (line 12466)
+- new Operand\Literal (line 12558)
+- new Variable (line 13982)
+- new Variable (line 14003)
+- new Variable (line 14029)
+- new Variable (line 14054)
+- new Variable (line 14086)
+- new Variable (line 14107)
+- new CompileError (line 14931)
+- new CompileError (line 15060)
+- new Variable (line 15117)
+- new Variable (line 15151)
+- new Variable (line 15613)
+- new Variable (line 15633)
+- new Variable (line 15654)
+- new Variable (line 15774)
+- new Variable (line 15815)
+- new Variable (line 15925)
+- new Variable (line 15949)
+- new Variable (line 15959)
+- new Variable (line 16144)
+- new Variable (line 16162)
+- new Variable (line 16220)
+- new Variable (line 16247)
+- new Variable (line 16273)
+- new Variable (line 16612)
+- new Variable (line 16986)
+- new Variable (line 17016)
+- new Variable (line 17035)
+- new Variable (line 17065)
+- new Variable (line 17102)
+- new Variable (line 17150)
+- new Variable (line 17193)
+- new VM\Variable (line 17686)
+- new Variable (line 17720)
+- new Variable (line 17772)
+- new Variable (line 17790)
+- new Variable (line 17809)
+- new Variable (line 17816)
+- new OpCode (line 17838)
+- new Variable (line 17839)
+- new Variable (line 18099)
+- new Variable (line 18155)
+- new Variable (line 18193)
+- new OpCode (line 18207)
+- new Variable (line 18208)
+- new Variable (line 18267)
+- new OpCode (line 18288)
+- new Variable (line 18289)
+- new Variable (line 18388)
+- new Variable (line 18410)
+- new Variable (line 18478)
+- new Operand\Literal (line 18487)
+- new Variable (line 18502)
+- new Variable (line 18817)
+- new VM\PropertyIsInitializedHandler (line 18914)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 18972)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19437)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19656)
+- new JIT\Call\VmCoerceVariableToString (line 19783)
+- new JIT\Call\NoOpConstruct (line 19958)
+- new JIT\Call\IncludePathResolverResolve (line 20128)
+- new Operand\Literal (line 20215)
+- new Operand\Literal (line 20218)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 20261)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20414)
+- new VM (line 21583)
+- new VM\Variable (line 21592)
+- new Variable (line 21613)
+- new Variable (line 21659)
+- new Variable (line 22381)
+- 427 class method(s)
 - 20 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -50798,6 +50821,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementAttributes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/SimpleXMLElementChildren.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SimpleXMLElementConstruct.php`
 
 **Warnings** (review for bootstrap subset):
@@ -50809,6 +50842,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/SimpleXMLElementGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/SimpleXMLElementGetName.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -52394,18 +52432,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/SimpleXmlForeachSnapshot.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 39)
+- 2 class method(s)
+
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 44)
-- new Call\SimpleXMLElementAddChild (line 49)
-- new Call\SimpleXMLElementAsXml (line 55)
-- new Call\SimpleXMLElementXpath (line 60)
-- new Call\SimpleXMLElementRegisterXPathNamespace (line 65)
-- new Call\SimpleXMLElementGet (line 70)
-- new Call\SimpleXMLElementOffsetGet (line 75)
-- new Call\SimpleXMLElementCount (line 80)
-- new Call\SimpleXMLElementToString (line 85)
+- new Call\SimpleXMLElementConstruct (line 47)
+- new Call\SimpleXMLElementAddChild (line 52)
+- new Call\SimpleXMLElementAsXml (line 58)
+- new Call\SimpleXMLElementXpath (line 63)
+- new Call\SimpleXMLElementRegisterXPathNamespace (line 68)
+- new Call\SimpleXMLElementGet (line 73)
+- new Call\SimpleXMLElementOffsetGet (line 78)
+- new Call\SimpleXMLElementCount (line 83)
+- new Call\SimpleXMLElementToString (line 88)
+- new Call\SimpleXMLElementChildren (line 93)
+- new Call\SimpleXMLElementAttributes (line 98)
+- new Call\SimpleXMLElementGetName (line 103)
 - 2 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`
@@ -57932,22 +57979,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmIteratorForeach.php`
 
 **Warnings** (review for bootstrap subset):
-- new JitVariable (line 134)
-- new JitVariable (line 159)
-- new JitVariable (line 176)
-- new JitVariable (line 210)
-- new JitVariable (line 235)
-- new JitVariable (line 559)
-- new JitVariable (line 581)
-- new JitVariable (line 602)
-- new JitVariable (line 639)
-- new JitVariable (line 663)
-- new JitVariable (line 726)
-- new JitVariable (line 770)
-- new JitVariable (line 787)
-- new JitVariable (line 796)
-- new JitVariable (line 830)
-- new JitVariable (line 871)
+- new JitVariable (line 135)
+- new JitVariable (line 160)
+- new JitVariable (line 177)
+- new JitVariable (line 211)
+- new JitVariable (line 236)
+- new JitVariable (line 566)
+- new JitVariable (line 588)
+- new JitVariable (line 609)
+- new JitVariable (line 646)
+- new JitVariable (line 670)
+- new JitVariable (line 733)
+- new JitVariable (line 777)
+- new JitVariable (line 794)
+- new JitVariable (line 803)
+- new JitVariable (line 837)
+- new JitVariable (line 878)
 - 34 class method(s)
 
 ### `lib/VM/VmIteratorProtocol.php`
