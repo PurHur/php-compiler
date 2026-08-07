@@ -57,9 +57,12 @@ final class sem_get extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'sem_get() is not supported for JIT/AOT in this compiler build (issue #3704)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 4) {
+            return JitSemGet::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSemGet::invoke($context, $args);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

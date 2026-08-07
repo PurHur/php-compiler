@@ -45,9 +45,12 @@ final class sem_acquire extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'sem_acquire() is not supported for JIT/AOT in this compiler build (issue #3704)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            return JitSemAcquire::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSemAcquire::invoke($context, $args);
     }
 
     private function triggerWarning(Frame $frame, string $message): void
