@@ -329,8 +329,11 @@ PHP;
 class Svc {
     public int $v = 0;
 }
-$proxy = createLazyProxy(Svc::class, function (Svc $o): void {
+$rc = new ReflectionClass(Svc::class);
+$proxy = $rc->newLazyProxy(function (): Svc {
+    $o = new Svc();
     $o->v = 99;
+    return $o;
 });
 echo $proxy->v, "\n";
 echo "ok\n";
@@ -349,7 +352,8 @@ PHP;
 class Svc {
     public int $v = 0;
 }
-$ghost = createLazyGhost(Svc::class, function (Svc $o) {
+$rc = new ReflectionClass(Svc::class);
+$ghost = $rc->newLazyGhost(function (Svc $o) {
     $o->v = 42;
     return $o;
 });

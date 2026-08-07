@@ -11,11 +11,11 @@ class C implements I {
     }
 }
 
-$o = createLazyProxy(I::class, static fn (I $proxy): C => new C());
+$o = (new ReflectionClass(I::class))->newLazyProxy(static fn (): C => new C());
 echo $o->f(), "\n";
 
 try {
-    createLazyGhost(I::class, static function (): void {});
+    (new ReflectionClass(I::class))->newLazyGhost(static function (): void {});
     echo "ghost-uncaught\n";
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";

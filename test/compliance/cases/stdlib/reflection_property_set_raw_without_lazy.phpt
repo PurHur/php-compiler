@@ -9,10 +9,12 @@ class Entity7095 {
 }
 
 $initializerRan = false;
-$o = createLazyGhost(Entity7095::class, static function (Entity7095 $e) use (&$initializerRan): void {
-    $initializerRan = true;
-    $e->label = 'initialized';
-});
+$o = (new ReflectionClass(Entity7095::class))->newLazyGhost(
+    static function (Entity7095 $e) use (&$initializerRan): void {
+        $initializerRan = true;
+        $e->label = 'initialized';
+    }
+);
 
 $rp = new ReflectionProperty(Entity7095::class, 'label');
 var_export(method_exists($rp, 'setRawValueWithoutLazyInitialization'));

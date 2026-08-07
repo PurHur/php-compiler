@@ -2246,13 +2246,26 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ createLazyGhost()/createLazyProxy() and ReflectionClass lazy factories (#6708, #12375, #16812).
+     * PHP 8.4+ ReflectionClass lazy factories (newLazyGhost/newLazyProxy + reset/initialize helpers)
+     * (#6708, #12375, #16812, #28414).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Free-function createLazyGhost()/createLazyProxy() are never advertised — see {@see supportsLazyObjectFreeFunctions()}.
      */
     public static function supportsLazyObjectFactories(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * Free-function createLazyGhost()/createLazyProxy() — phantom vs php-src (#28414, re-#6708/#12375).
+     *
+     * php-src exposes lazy factories only as ReflectionClass instance methods (newLazyGhost /
+     * newLazyProxy). Historical procedural registration must stay off on every profile.
+     */
+    public static function supportsLazyObjectFreeFunctions(): bool
+    {
+        return false;
     }
 
     /**

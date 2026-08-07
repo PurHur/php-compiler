@@ -755,9 +755,12 @@ class Module extends ModuleAbstract
             // get_debug_backtrace() — phantom vs php-src (#24133); Zend has debug_backtrace() only.
             new class_exists_(),
             new class_alias(),
-            ...(CompilerVersion::supportsLazyObjectFactories() ? [
+            // Free-function createLazy* — never advertise (#28414); php-src has ReflectionClass::newLazy* only.
+            ...(CompilerVersion::supportsLazyObjectFreeFunctions() ? [
                 new create_lazy_ghost(),
                 new create_lazy_proxy(),
+            ] : []),
+            ...(CompilerVersion::supportsLazyObjectFactories() ? [
                 new class_has_lazy_object_initializer(),
                 new class_has_lazy_object_uninitializer(),
             ] : []),

@@ -46,6 +46,20 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsLazyObjectFactories());
+            $this->assertFalse(CompilerVersion::supportsLazyObjectFreeFunctions());
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertFalse(isset($ctx->functions['createlazyghost']));
+            $this->assertFalse(isset($ctx->functions['createlazyproxy']));
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'createLazyGhost')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'createLazyProxy')
+            );
+            $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['newlazyghost']));
+            $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['newlazyproxy']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

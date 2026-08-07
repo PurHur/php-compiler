@@ -9,10 +9,12 @@ class Box7094 {
 }
 
 $initializerRan = false;
-$o = createLazyGhost(Box7094::class, static function (Box7094 $instance) use (&$initializerRan): void {
-    $initializerRan = true;
-    $instance->name = 'ghost';
-});
+$o = (new ReflectionClass(Box7094::class))->newLazyGhost(
+    static function (Box7094 $instance) use (&$initializerRan): void {
+        $initializerRan = true;
+        $instance->name = 'ghost';
+    }
+);
 
 $r = new ReflectionProperty(Box7094::class, 'name');
 var_export(method_exists($r, 'skipLazyInitialization'));

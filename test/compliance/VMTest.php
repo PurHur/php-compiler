@@ -1029,6 +1029,7 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'lazy_property_init_once'))) {
                 continue;
             }
+            // lazy_object_factories_phantom always runs — free createLazy* never advertised (#28414).
             if (!CompilerVersion::supportsLazyObjectFactories()
                 && (str_contains($name, 'create_lazy_ghost')
                     || str_contains($name, 'create_lazy_proxy')
@@ -1041,10 +1042,6 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'reflection_property_set_raw_without_lazy')
                     || str_contains($name, 'reflection_property_skip_lazy'))
                 && !str_contains($name, 'lazy_object_factories_phantom')) {
-                continue;
-            }
-            if (CompilerVersion::supportsLazyObjectFactories()
-                && str_contains($name, 'lazy_object_factories_phantom')) {
                 continue;
             }
             // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).

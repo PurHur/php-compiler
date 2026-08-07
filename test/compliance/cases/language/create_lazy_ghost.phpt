@@ -1,18 +1,30 @@
 --TEST--
-Language: createLazyGhost() procedural factory (#6708)
+Language: ReflectionClass::newLazyGhost / newLazyProxy factories (#6708, #28414)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80400) {
-    die('skip createLazyGhost requires PHP 8.4+');
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsLazyObjectFactories()) {
+    die('skip ReflectionClass lazy factories require PHP 8.4 forward profile');
 }
 ?>
 --FILE--
 <?php
+// Free functions stay off (php-src has ReflectionClass::newLazy* only).
+var_export(function_exists('createLazyGhost'));
+echo "\n";
+var_export(function_exists('createLazyProxy'));
+echo "\n";
+
 class C {
     private function __construct() {}
     public string $name = 'unset';
 }
-$ghost = createLazyGhost(C::class, function (C $c): void {
+$rc = new ReflectionClass(C::class);
+$ghost = $rc->newLazyGhost(function (C $c): void {
     $c->name = 'lazy';
 });
 echo $ghost->name, "\n";
@@ -24,30 +36,20 @@ class Svc {
         $this->id = $id;
     }
 }
-$proxy = createLazyProxy(Svc::class, static fn (Svc $o): Svc => new Svc('proxy'));
+$rcSvc = new ReflectionClass(Svc::class);
+$proxy = $rcSvc->newLazyProxy(static fn (): Svc => new Svc('proxy'));
 echo $proxy->id, "\n";
 
-try {
-    createLazyGhost('NoSuchClass', function (): void {});
-    echo "no error\n";
-} catch (ValueError $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
-
-var_export(method_exists(ReflectionClass::class, 'createLazyGhost'));
+var_export(method_exists(ReflectionClass::class, 'newLazyGhost'));
 echo "\n";
-var_export(method_exists(ReflectionClass::class, 'createLazyProxy'));
+var_export(method_exists(ReflectionClass::class, 'newLazyProxy'));
 echo "\n";
-$rcGhost = ReflectionClass::createLazyGhost(C::class, function (C $c): void {
-    $c->name = 'rc-lazy';
-});
-echo $rcGhost->name, "\n";
 ?>
 --EXPECT--
+false
+false
 lazy
 lazy
 proxy
-ValueError: createLazyGhost(): Argument #1 ($class) must be a valid class name, 'NoSuchClass' given
 true
 true
-rc-lazy
