@@ -662,6 +662,46 @@ PHP;
     }
 
     /**
+     * @covers issue #28523 — issue-body: isFinal=1 + WRITE_OK (Zend inheritance-only)
+     * and sibling-class override CompileFatal under PROFILE=8.4 / 8.5.
+     * Re-#28437 / re-#28393; write cell in the issue table was wrong vs php:8.4-cli.
+     */
+    public function testIssue28523IssueBodyIsFinalWriteAndSiblingOverride(): void
+    {
+        $isfinal = dirname(__DIR__) . '/repro/issue_28523_final_plain_isfinal_write.php';
+        $override = dirname(__DIR__) . '/repro/issue_28523_final_plain_property_84.php';
+        self::assertFileExists($isfinal);
+        self::assertFileExists($override);
+        $isfinalCode = file_get_contents($isfinal);
+        $overrideCode = file_get_contents($override);
+        self::assertNotFalse($isfinalCode);
+        self::assertNotFalse($overrideCode);
+
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $_ENV['PHP_COMPILER_PROFILE'] = $profile;
+            self::assertTrue(
+                \PHPCompiler\CompilerVersion::supportsFinalProperties(),
+                'PROFILE='.$profile.' must support final properties'
+            );
+
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($isfinalCode, 'issue_28523_isfinal_'.$profile.'.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("isFinal=1\nWRITE_OK\n", ob_get_clean(), 'PROFILE='.$profile);
+
+            try {
+                $runtime->parseAndCompile($overrideCode, 'issue_28523_override_'.$profile.'.php');
+                $this->fail('Expected CompileFatal on sibling override (#28523) PROFILE='.$profile);
+            } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+                self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+                self::assertStringStartsWith('PHP Fatal error:', $e->zendStderrLine());
+            }
+        }
+    }
+
+    /**
      * @covers issue #28437 — AOT TYPE_EVAL must Fatal on outer-unit final property
      * override (not emitFalse → redef_ok). VM/JIT already inheritFromParent (#22988).
      */
