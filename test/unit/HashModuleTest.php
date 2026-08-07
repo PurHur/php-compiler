@@ -134,6 +134,20 @@ PHP;
         );
     }
 
+    public function test_hash_context_is_final(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+hash_init('sha256');
+echo (new ReflectionClass(HashContext::class))->isFinal() ? '1' : '0';
+PHP;
+        $block = $runtime->parseAndCompile($code, 'hash_context_is_final.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('1', ob_get_clean());
+    }
+
     public function test_hash_context_debug_info_withheld_on_reference_profile(): void
     {
         $runtime = new Runtime();

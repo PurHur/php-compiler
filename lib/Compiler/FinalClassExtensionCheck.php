@@ -39,6 +39,8 @@ final class FinalClassExtensionCheck
         'fiber' => 'Fiber',
         'fibererror' => 'FiberError',
         'generator' => 'Generator',
+        // php-src ext/hash/hash.stub.php — final class HashContext (#28384).
+        'hashcontext' => 'HashContext',
         'inflatecontext' => 'InflateContext',
         // php-src ext/random/random.stub.php — final Randomizer + Engine\* (#28387).
         'random\\engine\\mt19937' => 'Random\\Engine\\Mt19937',
