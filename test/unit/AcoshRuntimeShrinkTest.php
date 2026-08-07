@@ -86,7 +86,7 @@ final class AcoshRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_acosh_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringNotContainsString('phpc_asinh_kernel', $source);
-        $this->assertStringContainsString('phpc_atanh_kernel', $source);
+        $this->assertStringNotContainsString('phpc_atanh_kernel', $source);
         $this->assertStringContainsString('phpc_atan_kernel', $source);
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
         $this->assertStringContainsString('phpc_expm1_kernel', $source);

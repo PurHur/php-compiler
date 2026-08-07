@@ -11,7 +11,7 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * atanh() still uses libc NestedJIT kernel; asinh()/acosh() are NestedJIT-safe PHP (#28355 / #28331).
+ * asinh()/acosh()/atanh() NestedJIT via NestedJIT-safe PHP helpers (#28377 / #28355 / #28331).
  */
 final class InverseHyperbolicRuntimeShrinkTest extends TestCase
 {
@@ -39,38 +39,37 @@ final class InverseHyperbolicRuntimeShrinkTest extends TestCase
         $this->assertEqualsWithDelta(VmMath::acosh(2.0), AcoshJitHelper::acoshArgv(2.0), 1e-15);
     }
 
-    public function testAtanhUsesJitHelperNotLibcLookup(): void
+    public function testAtanhUsesEnsureBridgeWithoutKernel(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/atanh.php');
         $this->assertStringContainsString('MathAtanh::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('atanh')", $builtin);
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathAtanh.php');
-        $this->assertStringContainsString('JitAtanhKernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitAtanhKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertEqualsWithDelta(VmMath::atanh(0.5), AtanhJitHelper::atanhArgv(0.5), 1e-15);
     }
 
-    public function testRemainingJitHelpersDelegateToKernel(): void
+    public function testInverseHyperbolicJitHelpersAreNestedJitSafePhp(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/AtanhJitHelper.php');
-        $this->assertStringContainsString('phpc_atanh_kernel', $source);
-        $asinh = (string) file_get_contents(__DIR__.'/../../ext/standard/AsinhJitHelper.php');
-        $this->assertStringNotContainsString('phpc_asinh_kernel', $asinh);
-        $acosh = (string) file_get_contents(__DIR__.'/../../ext/standard/AcoshJitHelper.php');
-        $this->assertStringNotContainsString('phpc_acosh_kernel', $acosh);
-        if (!\function_exists('phpc_atanh_kernel')) {
-            $this->markTestSkipped('phpc_*_kernel requires compiler runtime');
+        foreach ([
+            'AsinhJitHelper.php' => 'phpc_asinh_kernel',
+            'AcoshJitHelper.php' => 'phpc_acosh_kernel',
+            'AtanhJitHelper.php' => 'phpc_atanh_kernel',
+        ] as $file => $kernel) {
+            $source = (string) file_get_contents(__DIR__.'/../../ext/standard/'.$file);
+            $this->assertStringNotContainsString($kernel, $source);
+            $this->assertStringContainsString('logPositive', $source);
         }
-        $this->assertSame(VmMath::atanh(0.5), AtanhJitHelper::atanhArgv(0.5));
     }
 
-    public function testSpineBundleIncludesInverseHyperbolicJitHelpers(): void
+    public function testSpineBundleIncludesInverseHyperbolicJitHelpersWithoutKernels(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         foreach ([
             'AsinhJitHelper.php', 'AcoshJitHelper.php', 'AtanhJitHelper.php',
             'MathAsinh.php', 'MathAcosh.php', 'MathAtanh.php',
-            'JitAtanhKernel.php',
-            'phpc_atanh_kernel.php',
         ] as $f) {
             $this->assertStringContainsString($f, $spine);
         }
@@ -78,5 +77,7 @@ final class InverseHyperbolicRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_asinh_kernel.php', $spine);
         $this->assertStringNotContainsString('JitAcoshKernel.php', $spine);
         $this->assertStringNotContainsString('phpc_acosh_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitAtanhKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_atanh_kernel.php', $spine);
     }
 }

@@ -2692,7 +2692,6 @@
         "ext/standard/JitAssertOptions.php",
         "ext/standard/JitAtan2Kernel.php",
         "ext/standard/JitAtanKernel.php",
-        "ext/standard/JitAtanhKernel.php",
         "ext/standard/JitAttributeExists.php",
         "ext/standard/JitBuiltinWarning.php",
         "ext/standard/JitCallUserFunc.php",
@@ -4308,7 +4307,6 @@
         "ext/standard/phpc_argon2_verify.php",
         "ext/standard/phpc_atan2_kernel.php",
         "ext/standard/phpc_atan_kernel.php",
-        "ext/standard/phpc_atanh_kernel.php",
         "ext/standard/phpc_chdir_kernel.php",
         "ext/standard/phpc_clone_with_begin.php",
         "ext/standard/phpc_clone_with_end.php",
@@ -7410,9 +7408,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7176,
+        "inventory_files": 7174,
         "excluded": 0,
-        "eligible": 7176,
+        "eligible": 7174,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
