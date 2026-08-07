@@ -1375,13 +1375,18 @@ class Context {
         $this->functionProxies['throwable::__tostring'] = $exceptionToString;
         $this->functionProxies['throwable::gettrace'] = $exceptionGetTrace;
         $this->functionProxies['throwable::gettraceasstring'] = $exceptionGetTraceAsString;
-        $exceptionCtor = new Call\ExceptionConstruct();
+        // Per-class ctor so TypeError wire text + $previous arg index match Zend (#28798).
         foreach (\PHPCompiler\ext\standard\ThrowableManifest::registrationOrder() as $throwableName) {
             if (!\PHPCompiler\ext\standard\ThrowableManifest::isAdvertised($throwableName)) {
                 continue;
             }
             $lc = \PHPCompiler\ext\standard\ThrowableManifest::lcKey($throwableName);
-            $this->functionProxies[$lc.'::__construct'] = $exceptionCtor;
+            // ErrorException::__construct(..., $previous) is Argument #6; others #3.
+            $prevArg = 'errorexception' === $lc ? 6 : 3;
+            $this->functionProxies[$lc.'::__construct'] = new Call\ExceptionConstruct(
+                $throwableName,
+                $prevArg
+            );
             // Throwable::__toString / getTrace / getTraceAsString — user-script AOT (#26796, #27333).
             $this->functionProxies[$lc.'::__tostring'] = $exceptionToString;
             $this->functionProxies[$lc.'::gettrace'] = $exceptionGetTrace;
