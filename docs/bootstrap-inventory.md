@@ -27437,24 +27437,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 64)
 - new ClassEntry (line 107)
 - new ClassEntry (line 127)
-- new ClassEntry (line 149)
-- new ClassEntry (line 175)
-- new ClassEntry (line 201)
-- new ClassEntry (line 228)
-- new ClassEntry (line 255)
-- new ClassEntry (line 281)
-- new ClassEntry (line 308)
-- new ClassEntry (line 335)
-- new ClassEntry (line 361)
-- new ClassEntry (line 386)
-- new ClassEntry (line 411)
-- new ClassEntry (line 447)
-- new ClassEntry (line 479)
-- new ClassEntry (line 506)
-- new ClassEntry (line 538)
-- new Variable (line 556)
-- new Variable (line 570)
-- new Variable (line 584)
+- new ClassEntry (line 150)
+- new ClassEntry (line 176)
+- new ClassEntry (line 202)
+- new ClassEntry (line 229)
+- new ClassEntry (line 256)
+- new ClassEntry (line 282)
+- new ClassEntry (line 309)
+- new ClassEntry (line 336)
+- new ClassEntry (line 362)
+- new ClassEntry (line 387)
+- new ClassEntry (line 412)
+- new ClassEntry (line 448)
+- new ClassEntry (line 480)
+- new ClassEntry (line 507)
+- new ClassEntry (line 539)
+- new Variable (line 557)
+- new Variable (line 571)
+- new Variable (line 585)
 - 22 class method(s)
 
 ### `ext/standard/BuiltinIntrospectionPolicy.php`
@@ -45621,7 +45621,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 312 class method(s)
+- 313 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

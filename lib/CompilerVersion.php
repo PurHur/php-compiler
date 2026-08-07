@@ -2225,6 +2225,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ sockets SHUT_RD / SHUT_WR / SHUT_RDWR (ext/sockets/sockets.stub.php; #26760).
+     *
+     * Absent from Zend 8.2–8.4 sockets category; registered under `#ifdef SHUT_RDWR` from 8.5.
+     * Withheld on ≤8.4 (reference + PROFILE≤8.4). Enable via stable 8.5.0+ or
+     * `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsSocketShutConstants(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * Formerly gated a mistaken ValueError for json_encode(unit enum) on forward profiles (#5683).
      *
      * php-src (8.2–8.4) always returns false + JSON_ERROR_NON_BACKED_ENUM; never ValueError

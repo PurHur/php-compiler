@@ -1092,6 +1092,37 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsSocketShutConstantsFalseOnDefaultAnd84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsSocketShutConstants());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsSocketShutConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsSocketShutConstantsTrueOn85Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSocketShutConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testJsonEncodeUnitEnumValueErrorAlwaysFalse(): void
     {
         // Zend never ValueError for unit enums (#22681/#22688) — gate retired to always-false.
