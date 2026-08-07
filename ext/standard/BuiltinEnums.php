@@ -373,9 +373,10 @@ final class BuiltinEnums
     }
 
     /**
-     * PHP 8.4 RoundingMode: int-backed enum for round() mode (#5934, #16875).
+     * PHP 8.4 RoundingMode: unit enum for round() mode (#5934, #28535).
      *
-     * php-src: ext/standard/basic_functions.stub.php — enum RoundingMode: int
+     * php-src: ext/standard/basic_functions.stub.php — enum RoundingMode (not int-backed).
+     * Case → int mapping for round() stays in {@see VmRoundMode::roundModeIntFromCaseName()}.
      */
     private static function registerRoundingMode(Context $ctx): void
     {
@@ -385,7 +386,6 @@ final class BuiltinEnums
 
         $entry = new ClassEntry('RoundingMode');
         $entry->isEnum = true;
-        $entry->backedType = 'int';
 
         foreach ([
             'HalfAwayFromZero',
@@ -397,7 +397,7 @@ final class BuiltinEnums
             'NegativeInfinity',
             'PositiveInfinity',
         ] as $caseName) {
-            self::registerBackedEnumCase($entry, $caseName, VmRoundMode::roundModeIntFromCaseName($caseName));
+            self::registerPureEnumCase($entry, $caseName);
         }
 
         EnumSupport::ensureBuiltinCasesMethod($entry);

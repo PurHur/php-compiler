@@ -4373,10 +4373,10 @@ class Object_ extends Type {
             }
         }
         if ('roundingmode' === $lcname) {
+            // php-src basic_functions.stub.php — unit enum (not int-backed) (#28535).
             $this->enums[$lcname] = true;
             $this->setClassNoDynamicProperties($id, true);
             $this->setClassAllowsDynamicProperties($id, false);
-            $this->setEnumBackedType($id, 'int');
             foreach ([
                 'HalfAwayFromZero',
                 'HalfTowardsZero',
@@ -4388,7 +4388,7 @@ class Object_ extends Type {
                 'PositiveInfinity',
             ] as $caseName) {
                 $backing = new VMVariable();
-                $backing->int(\PHPCompiler\ext\standard\VmRoundMode::roundModeIntFromCaseName($caseName));
+                $backing->null();
                 $this->defineEnumCaseConst($id, $caseName, $backing);
             }
         }

@@ -489,6 +489,10 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
+            // ext/standard/basic_functions.stub.php — RoundingMode|int $mode = RoundingMode::HalfAwayFromZero (#28535)
+            'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
+                ? 'RoundingMode|int'
+                : null,
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)
             'idate' => 1 === $index ? '?int' : null,
             'getdate' => 0 === $index ? '?int' : null,
