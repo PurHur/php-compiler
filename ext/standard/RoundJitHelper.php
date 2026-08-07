@@ -153,19 +153,16 @@ final class RoundJitHelper
 
     /**
      * places==0 NestedJIT fast path — avoid exponent scale (returns 0 under NestedJIT).
+     *
+     * Integral part matches php-src _php_math_round: floor for positives, ceil for
+     * negatives (toward-zero truncation) — #28534.
      */
     private static function roundPlacesZero(float $num, int $mode): float
     {
         $valueAbs = $num < 0.0 ? -$num : $num;
+        // PHP (int) cast truncates toward zero ≡ floor(x≥0) / ceil(x<0).
         $asInt = (int) $num;
-        $asFloat = (float) $asInt;
-        if ($num >= 0.0) {
-            $integral = $asFloat;
-        } elseif ($asFloat === $num) {
-            $integral = $asFloat;
-        } else {
-            $integral = (float) ($asInt - 1);
-        }
+        $integral = (float) $asInt;
         $step = $num >= 0.0 ? 1.0 : -1.0;
         $half = $num >= 0.0 ? 0.5 : -0.5;
         $edge = $integral + $half;
