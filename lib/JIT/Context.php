@@ -2776,6 +2776,20 @@ class Context {
         if (null === $slot) {
             return false;
         }
+        // Prefer any Variable already bound for this slot in scope — ARG_SEND / json_encode
+        // often use a distinct Temporary from ARRAY_SPREAD's dest (#28673). Searching only
+        // scopedOperands() missed the spread rebind and allocated a fresh null value box.
+        foreach ($this->scope->variables as $scopeOp) {
+            if (!$scopeOp instanceof Operand) {
+                continue;
+            }
+            if ($block->slotForOperand($scopeOp) !== $slot) {
+                continue;
+            }
+            $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+            return true;
+        }
         foreach ($block->scopedOperands() as $scopeOp) {
             if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
                 continue;

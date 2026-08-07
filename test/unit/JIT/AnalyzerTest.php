@@ -28,6 +28,18 @@ class AnalyzerTest extends TestCase
         $this->assertEquals(3, $analyzer->computeStaticArraySize($this->makeOperand([null, null, null])));
     }
 
+    public function testComputeStaticArraySizeUnpackSpreadReturnsNull(): void
+    {
+        // `[...$a]` — NullOperand key with unpack=true must not look like size-1 native (#28673).
+        $analyzer = new Analyzer();
+        $keys = [new Operand\NullOperand()];
+        $values = [new Operand\Temporary()];
+        $result = new Operand\Temporary();
+        $result->addWriteOp(new Array_($keys, $values, [], [true]));
+
+        $this->assertNull($analyzer->computeStaticArraySize($result));
+    }
+
     public function testComputeStaticArraySizeNonNullKeys(): void
     {
         $analyzer = new Analyzer();
