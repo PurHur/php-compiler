@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * gettext JIT lowering routes through GettextJitHelper PHP; NestedJIT via JitVmHelperLink (#9859, #26226).
+ * gettext JIT lowering routes through GettextJitHelper PHP; NestedJIT via JitVmHelperLink (#9859, #26226, #27391).
  */
 final class StringGettextRuntimeShrinkTest extends TestCase
 {
@@ -20,9 +20,12 @@ final class StringGettextRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettextRuntime.php');
         $this->assertStringContainsString('GettextJitHelper', $runtime);
         $this->assertStringContainsString('VmGettextNative', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('HELPER_BUNDLE', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
         $this->assertStringContainsString('/ext/gettext/GettextJitHelper.php', $runtime);
+        $this->assertStringContainsString('/ext/gettext/VmGettextNative.php', $runtime);
+        $this->assertStringNotContainsString('/ext/gettext/VmGettextPure.php', $runtime);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringNotContainsString('parseAndCompile', $runtime);
         $this->assertStringNotContainsString('new JIT(', $runtime);

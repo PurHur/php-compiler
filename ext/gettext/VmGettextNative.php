@@ -34,12 +34,20 @@ final class VmGettextNative
 
     public static function gettext(string $msgid): string
     {
+        // Unbound catalog: return msgid without NestedJIT'ing VmGettextPure (#27391).
+        if ('' === (self::$domainPaths[self::$currentDomain] ?? '')) {
+            return $msgid;
+        }
+
         return VmGettextPure::translate(self::$currentDomain, $msgid, self::LC_MESSAGES);
     }
 
     public static function dgettext(string $domain, string $msgid): string
     {
         self::rejectEmptyDomain($domain, 'dgettext');
+        if ('' === (self::$domainPaths[$domain] ?? '')) {
+            return $msgid;
+        }
 
         return VmGettextPure::translate($domain, $msgid, self::LC_MESSAGES);
     }
@@ -47,6 +55,9 @@ final class VmGettextNative
     public static function dcgettext(string $domain, string $msgid, int $category): string
     {
         self::rejectEmptyDomain($domain, 'dcgettext');
+        if ('' === (self::$domainPaths[$domain] ?? '')) {
+            return $msgid;
+        }
 
         return VmGettextPure::translate($domain, $msgid, $category);
     }
@@ -59,6 +70,9 @@ final class VmGettextNative
     public static function dngettext(string $domain, string $msgid1, string $msgid2, int $n): string
     {
         self::rejectEmptyDomain($domain, 'dngettext');
+        if ('' === (self::$domainPaths[$domain] ?? '')) {
+            return 1 === $n ? $msgid1 : $msgid2;
+        }
 
         return VmGettextPure::translatePlural($domain, $msgid1, $msgid2, $n, self::LC_MESSAGES);
     }
@@ -71,6 +85,9 @@ final class VmGettextNative
         int $category
     ): string {
         self::rejectEmptyDomain($domain, 'dcngettext');
+        if ('' === (self::$domainPaths[$domain] ?? '')) {
+            return 1 === $n ? $msgid1 : $msgid2;
+        }
 
         return VmGettextPure::translatePlural($domain, $msgid1, $msgid2, $n, $category);
     }
@@ -123,10 +140,10 @@ final class VmGettextNative
     private static function rejectEmptyDomain(string $domain, string $function): void
     {
         if ('' === $domain) {
-            throw new \ValueError(sprintf(
-                '%s(): Argument #1 ($domain) must not be empty',
-                $function
-            ));
+            // String concat — NestedJIT must not depend on __compiler_sprintf (#27391).
+            throw new \ValueError(
+                $function.'(): Argument #1 ($domain) must not be empty'
+            );
         }
     }
 
