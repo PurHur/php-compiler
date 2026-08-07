@@ -21,10 +21,9 @@ final class error_reporting extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28690).
+        $this->requireAtMostArgCount($frame, 'error_reporting', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('error_reporting() accepts at most one argument');
-        }
         if (null === $frame->vmContext || null === $frame->returnVar) {
             return;
         }
@@ -46,10 +45,11 @@ final class error_reporting extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 1) {
-            throw new \LogicException('error_reporting() accepts at most one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28690.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'error_reporting', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
 
         return JitErrorReporting::invoke($context, $argc >= 1 ? $args[0] : null);
     }
