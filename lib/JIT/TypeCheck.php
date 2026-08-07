@@ -30,6 +30,13 @@ final class TypeCheck
         if ($var->type === $expected) {
             return;
         }
+        // Zend: int→float widening under strict_types (compileArg siToFp) — #28615.
+        if (
+            Variable::TYPE_NATIVE_DOUBLE === $expected
+            && Variable::TYPE_NATIVE_LONG === $var->type
+        ) {
+            return;
+        }
         if (
             Variable::TYPE_HASHTABLE === $expected
             && 0 !== ($var->type & Variable::IS_NATIVE_ARRAY)
@@ -145,14 +152,27 @@ final class TypeCheck
         $i8 = $context->getTypeFromString('int8');
         $okBlock = BasicBlockHelper::append($context, 'strict_type_ok');
         $failBlock = BasicBlockHelper::append($context, 'strict_type_fail');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt($expected, false)),
-            $okBlock,
-            $failBlock
+        // __value__ type tags use JIT Variable constants (see __value__writeLong/Double).
+        $matchExact = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt($expected, false)
         );
+        // Zend int→float under strict_types — #28615.
+        if (Variable::TYPE_NATIVE_DOUBLE === $expected) {
+            $matchInt = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+            );
+            $matchExact = $context->builder->or($matchExact, $matchInt);
+        }
+        $context->builder->branchIf($matchExact, $okBlock, $failBlock);
         $context->builder->positionAtEnd($failBlock);
         $context->builder->call($context->lookupFunction('abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
         $context->builder->positionAtEnd($okBlock);
+        // Int-tagged boxes are widened by compileArg (siToFp / emitFloatCast), not here —
+        // in-place writeDouble IR failed module verify on AOT (#28615).
     }
 }
