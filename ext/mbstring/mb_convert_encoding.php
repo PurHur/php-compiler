@@ -10,6 +10,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -103,30 +104,55 @@ final class mb_convert_encoding extends Internal
             $fromList = preg_split('/\s*,\s*/', $fromLit) ?: [];
             $fromList = array_values(array_filter($fromList, static fn (string $p): bool => '' !== $p));
             if ([] === $fromList) {
-                return $context->getTypeFromString('bool')->constInt(0, false);
+                return self::foldFalse($context);
             }
             foreach ($fromList as $from) {
                 if (
                     !VmMbstring::isHtmlEntitiesEncoding($from)
                     && null === CharsetEngine::parseEncodingSpec($from)
                 ) {
-                    return $context->getTypeFromString('bool')->constInt(0, false);
+                    return self::foldFalse($context);
                 }
             }
             if (
                 !VmMbstring::isHtmlEntitiesEncoding($toLit)
                 && null === CharsetEngine::parseEncodingSpec($toLit)
             ) {
-                return $context->getTypeFromString('bool')->constInt(0, false);
+                return self::foldFalse($context);
             }
             $converted = VmMbstring::convertEncodingWithFromList($sourceLit, $toLit, $fromList);
             if (false === $converted) {
-                return $context->getTypeFromString('bool')->constInt(0, false);
+                return self::foldFalse($context);
             }
 
-            return $context->constantFromString($converted);
+            // constantFromString() is a C-string global — box as __string__/__value__ so AOT can
+            // infer the array|string|false return (same shape as iconv fold; #28525).
+            return self::foldString($context, $converted);
         }
 
         throw new \LogicException('mb_convert_encoding() is not lowered for JIT/AOT in this compiler build');
+    }
+
+    private static function foldFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
+    private static function foldString(Context $context, string $converted): Value
+    {
+        $strPtr = $context->builder->load($context->constantStringFromString($converted));
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $strPtr
+        );
+
+        return $ptr;
     }
 }
