@@ -7128,6 +7128,7 @@
         "lib/VM/SplFixedArrayJitHelper.php",
         "lib/VM/SplHeapJitHelper.php",
         "lib/VM/SplHtPosIteratorJitHelper.php",
+        "lib/VM/SplObjectStorageJitHelper.php",
         "lib/VM/SplOuterIteratorHt.php",
         "lib/VM/SplPriorityQueueJitHelper.php",
         "lib/VM/StringOffsetJitHelper.php",
@@ -7447,9 +7448,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7213,
+        "inventory_files": 7214,
         "excluded": 0,
-        "eligible": 7213,
+        "eligible": 7214,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

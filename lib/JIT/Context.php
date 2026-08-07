@@ -1250,9 +1250,12 @@ class Context {
                 $this->functionProxies[$heapLc.'::'.$heapMethod] = new Call\SplHeapMethod($heapMethod, $heapKind);
             }
         }
-        // SplPriorityQueue — parallel data/priority HTs + extract (#27277).
+        // SplPriorityQueue — parallel data/priority HTs + Iterator foreach (#27277, #28708).
         $this->type->object->lookup('SplPriorityQueue');
-        foreach (['__construct', 'insert', 'extract', 'top', 'count'] as $pqMethod) {
+        foreach ([
+            '__construct', 'insert', 'extract', 'top', 'count',
+            'rewind', 'valid', 'current', 'key', 'next',
+        ] as $pqMethod) {
             $this->functionProxies['splpriorityqueue::'.$pqMethod] = new Call\SplPriorityQueueMethod($pqMethod);
         }
         // SplDoublyLinkedList / SplQueue / SplStack — `__spl_ht` deque (#26790, #27311, #28704).

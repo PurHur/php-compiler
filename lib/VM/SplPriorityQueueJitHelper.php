@@ -15,10 +15,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Thin-AOT SplPriorityQueue — parallel `__spl_data` / `__spl_prio` + extract (#27277).
+ * Thin-AOT SplPriorityQueue — parallel `__spl_data` / `__spl_prio` + Iterator (#27277, #28708).
  *
- * php-src: ext/spl/spl_heap.c — SplPriorityQueue insert/extract (default EXTR_DATA).
- * Priorities stay sorted descending via {@see MultisortRuntime::multisortPacked}.
+ * php-src: ext/spl/spl_heap.c — SplPriorityQueue insert/extract + destructive foreach
+ * (default EXTR_DATA). Priorities stay sorted descending via {@see MultisortRuntime::multisortPacked}.
  */
 final class SplPriorityQueueJitHelper
 {
@@ -100,6 +100,125 @@ final class SplPriorityQueueJitHelper
         );
 
         return $slot;
+    }
+
+    /** php-src: key = remaining count − 1 (#22290, #28708). */
+    public static function compileRewind(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::dataPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        $pos = $context->builder->sub($n64, $i64->constInt(1, false));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $pos = $context->builder->select($empty, $i64->constInt(-1, true), $pos);
+        self::storeLongPropertyValue($context, $obj, self::PROP_ITER_POS, $pos);
+
+        return self::voidResult($context);
+    }
+
+    public static function compileValid(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pos = self::loadLongProperty($context, $obj, self::PROP_ITER_POS);
+        $ht = self::dataPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $posOk = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
+        $nonEmpty = $context->builder->icmp(Builder::INT_UGT, $n, $sizeT->constInt(0, false));
+        $valid = $context->builder->and($posOk, $nonEmpty);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $valid);
+
+        return $slot;
+    }
+
+    /** Default EXTR_DATA — yield data[0] (flags other than EXTR_DATA stay VM-covered). */
+    public static function compileCurrent(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::dataPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $out = JitValueBox::alloc($context);
+        $emptyBb = BasicBlockHelper::append($context, 'splpq_current_empty');
+        $readBb = BasicBlockHelper::append($context, 'splpq_current_read');
+        $merge = BasicBlockHelper::append($context, 'splpq_current_merge');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyBb, $readBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($readBb);
+        $fetched = HashTableHelper::readIndexedToValueBox(
+            $context,
+            $ht,
+            $sizeT->constInt(0, false)
+        );
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $fetched)
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+
+        return $out;
+    }
+
+    public static function compileKey(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pos = self::loadLongProperty($context, $obj, self::PROP_ITER_POS);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $pos);
+
+        return $slot;
+    }
+
+    /** Destructive foreach — extract top then refresh key = remaining − 1 (#28708). */
+    public static function compileNext(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $pos = self::loadLongProperty($context, $obj, self::PROP_ITER_POS);
+        $i64 = $context->getTypeFromString('int64');
+        $skip = BasicBlockHelper::append($context, 'splpq_next_skip');
+        $doExtract = BasicBlockHelper::append($context, 'splpq_next_extract');
+        $done = BasicBlockHelper::append($context, 'splpq_next_done');
+        $posOk = $context->builder->icmp(Builder::INT_SGE, $pos, $i64->constInt(0, false));
+        $context->builder->branchIf($posOk, $doExtract, $skip);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($doExtract);
+        self::extractTop($context, $obj);
+        $ht = self::dataPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $n64 = $context->builder->truncOrBitCast($n, $i64);
+        $newPos = $context->builder->sub($n64, $i64->constInt(1, false));
+        $empty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $newPos = $context->builder->select($empty, $i64->constInt(-1, true), $newPos);
+        self::storeLongPropertyValue($context, $obj, self::PROP_ITER_POS, $newPos);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return self::voidResult($context);
     }
 
     /**
@@ -251,14 +370,30 @@ final class SplPriorityQueueJitHelper
     private static function storeLongProperty(Context $context, Value $obj, string $prop, int $value): void
     {
         $i64 = $context->getTypeFromString('int64');
+        self::storeLongPropertyValue($context, $obj, $prop, $i64->constInt($value, true));
+    }
+
+    private static function storeLongPropertyValue(
+        Context $context,
+        Value $obj,
+        string $prop,
+        Value $value
+    ): void {
         $slot = $context->type->object->propertySlotFor($obj, self::CLASS_NAME, $prop);
         $var = new JITVariable(
             $context,
             JITVariable::TYPE_NATIVE_LONG,
             JITVariable::KIND_VALUE,
-            $i64->constInt($value, true)
+            $value
         );
         $context->type->object->propertyStore($slot, $var, JITVariable::TYPE_NATIVE_LONG);
+    }
+
+    private static function loadLongProperty(Context $context, Value $obj, string $prop): Value
+    {
+        $slot = $context->type->object->propertyFetch($obj, self::CLASS_NAME, $prop);
+
+        return $context->helper->loadValue($slot);
     }
 
     private static function voidResult(Context $context): Value
