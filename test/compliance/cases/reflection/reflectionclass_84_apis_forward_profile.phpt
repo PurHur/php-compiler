@@ -1,5 +1,5 @@
 --TEST--
-ReflectionClass 8.4 APIs present on PROFILE=8.4 (#22599, ext/reflection/php_reflection.stub.php)
+ReflectionClass 8.4 APIs present on PROFILE=8.4 (#22599, #28518, ext/reflection/php_reflection.stub.php)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -13,9 +13,12 @@ foreach ([
 ] as $method) {
     echo $method, '=', method_exists(ReflectionClass::class, $method) ? '1' : '0', "\n";
 }
+// php-src: isStatic is on ReflectionProperty / ReflectionFunctionAbstract only (#28518).
+echo 'prop_isStatic=', method_exists(ReflectionProperty::class, 'isStatic') ? '1' : '0', "\n";
 --EXPECT--
 getDeprecatedMessage=1
 getDeprecatedVersion=1
 getLazyPropertyNames=1
 getReadOnlyProperties=1
-isStatic=1
+isStatic=0
+prop_isStatic=1

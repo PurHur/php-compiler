@@ -1,5 +1,5 @@
 --TEST--
-Language: static class (PHP 8.4) parses, reflects, rejects instantiation (#6929, #24894)
+Language: static class (forward profile) parses and rejects instantiation (#6929, #24894, #28518)
 --SKIPIF--
 <?php
 // Key off PROFILE env — not supportsStaticClass(). If the gate wrongly
@@ -26,7 +26,8 @@ static class S {
 }
 echo S::m(), "\n";
 $rc = new ReflectionClass(S::class);
-echo $rc->isStatic() ? "static\n" : "not-static\n";
+// ReflectionClass::isStatic is absent from php-src (static-class RFC unmerged) (#28518).
+echo method_exists($rc, 'isStatic') ? "has-isStatic\n" : "no-isStatic\n";
 try {
     new S();
     echo "instantiated\n";
@@ -35,5 +36,5 @@ try {
 }
 --EXPECT--
 42
-static
+no-isStatic
 Cannot instantiate static class S

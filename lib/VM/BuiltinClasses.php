@@ -163,7 +163,6 @@ use PHPCompiler\VM\Builtin\ReflectionClassIsIterable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionClassIsSubclassOf;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
-use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
@@ -1110,8 +1109,8 @@ final class BuiltinClasses
         $rc->methods['isanonymous'] = new ReflectionClassIsAnonymous();
         $rc->methodVisibility['isanonymous'] = $pub;
         if (CompilerVersion::supportsReflectionClassPhp84Apis()) {
-            $rc->methods['isstatic'] = new ReflectionClassIsStatic();
-            $rc->methodVisibility['isstatic'] = $pub;
+            // ReflectionClass::isStatic() is NOT in php-src — static-class RFC unmerged (#28518).
+            // Leave ReflectionProperty/Method/Function::isStatic alone. Builtin class file kept for spine.
             $rc->methods['getdeprecatedmessage'] = new ReflectionClassGetDeprecatedMessage();
             $rc->methodVisibility['getdeprecatedmessage'] = $pub;
             $rc->methods['getdeprecatedversion'] = new ReflectionClassGetDeprecatedVersion();
