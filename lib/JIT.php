@@ -9167,6 +9167,7 @@ class JIT {
                     $array = $this->context->getVariableFromOp($arrayOp);
                     // Zend FE_RESET / CV fetch: Undefined variable E_WARNING before type check (#26148).
                     JIT\UndefinedVariableHelper::guardBeforeRuntimeRead($this->context, $arrayOp, $array);
+                    JIT\GeneratorHelper::hydrateGeneratorMetadata($this->context, $array);
                     if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
                         JIT\GeneratorHelper::compileIterReset($this->context, $array);
                         break;
@@ -9180,6 +9181,7 @@ class JIT {
                 case OpCode::TYPE_ITER_VALID:
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    JIT\GeneratorHelper::hydrateGeneratorMetadata($this->context, $array);
                     if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
                         $valid = JIT\GeneratorHelper::compileIterValid($this->context, $array);
                         $this->assignOperandValue($block->getOperand($op->arg1), $valid);
@@ -9195,6 +9197,7 @@ class JIT {
                 case OpCode::TYPE_ITER_KEY:
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    JIT\GeneratorHelper::hydrateGeneratorMetadata($this->context, $array);
                     if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
                         $key = JIT\GeneratorHelper::compileIterKey($this->context, $array);
                         $this->assignOperand($block->getOperand($op->arg1), $key);
@@ -9210,6 +9213,7 @@ class JIT {
                 case OpCode::TYPE_ITER_VALUE:
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    JIT\GeneratorHelper::hydrateGeneratorMetadata($this->context, $array);
                     if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
                         if ($op->arg3) {
                             $value = JIT\GeneratorHelper::compileIterValueByRef($this->context, $array, $this);
@@ -15779,6 +15783,17 @@ class JIT {
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
+        // Generator create results carry resume/state tags — first-bind must not strip them via
+        // makeVariableFromValueOp, or foreach ($g as …) misses the Generator ITER path (#28624).
+        if ($value->isJitGenerator) {
+            $this->context->setVariableOp($resultOp, $value);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $value);
+            }
+
+            return;
+        }
         if (!$this->context->hasVariableOp($resultOp)) {
             if (
                 null !== $this->context->jitCurrentBlock
@@ -15915,15 +15930,6 @@ class JIT {
             );
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->recordListUnpackAssignSlot($resultOp, $result);
-
-            return;
-        }
-        if ($value->isJitGenerator) {
-            $this->context->setVariableOp($resultOp, $value);
-            $resolved = JIT\OperandName::resolve($resultOp);
-            if (null !== $resolved && '' !== $resolved) {
-                $this->context->bindVariableByName($resolved, $value);
-            }
 
             return;
         }

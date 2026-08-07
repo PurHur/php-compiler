@@ -304,7 +304,28 @@ final class GeneratorHelper
             }
         }
 
+        // Resume past the last yield (resume_ip == n): run the post-yield tail, capture
+        // Generator::getReturn(), and set has_returned — mirrors FiberHelperLlvm (#28624).
         $context->builder->positionAtEnd($doneBb);
+        $doneEntry = GeneratorIteratorJitHelper::emitInjectPendingThrow(
+            $jit,
+            $func,
+            $stateParam,
+            $doneBb
+        );
+        if ($n > 0 && 'yield' === $points[$n - 1]['kind']) {
+            $doneEntry = GeneratorIteratorJitHelper::emitInjectPendingSend(
+                $jit,
+                $func,
+                $points[$n - 1]['block'],
+                $points[$n - 1]['op'],
+                $stateParam,
+                $doneEntry
+            );
+        }
+        $context->builder->positionAtEnd($doneEntry);
+        self::compilePostYieldReturnTail($jit, $func, $points, $stateParam, $doneEntry, $map);
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['has_returned']));
         $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
         $context->builder->returnValue($i64->constInt(0, false));
@@ -324,6 +345,105 @@ final class GeneratorHelper
         $context->functionProxies[$lc] = new Native($func, $resumeName, [$statePtrTy], []);
 
         return $func;
+    }
+
+    /**
+     * Lower opcodes after the last yield up to RETURN into gen_done, then store return_value.
+     *
+     * @param list<array{kind: string, op: OpCode, block: Block}> $points
+     * @param array<string, int>                                  $map
+     */
+    private static function compilePostYieldReturnTail(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        array $points,
+        Value $stateParam,
+        \PHPLLVM\BasicBlock $doneEntry,
+        array $map
+    ): void {
+        $context = $jit->context;
+        $n = \count($points);
+        if (0 === $n) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['return_value']))
+            );
+
+            return;
+        }
+
+        $last = $points[$n - 1];
+        $tailBlock = $last['block'];
+        $tailStart = GeneratorJitHelper::opcodeIndex($tailBlock, $last['op']) + 1;
+        $returnIdx = null;
+        $retOp = null;
+        for ($i = $tailStart, $end = $tailBlock->nOpCodes; $i < $end; ++$i) {
+            $op = $tailBlock->opCodes[$i];
+            if (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
+                $returnIdx = $i;
+                $retOp = $op;
+                break;
+            }
+            if (OpCode::TYPE_YIELD === $op->type || OpCode::TYPE_YIELD_FROM === $op->type) {
+                break;
+            }
+            // Common CFG: last yield then JUMP into a return block (no further yields).
+            if (OpCode::TYPE_JUMP === $op->type && null !== $op->block2 && $i + 1 === $end) {
+                if ($tailStart < $i) {
+                    $savedStorage = $context->scope->blockStorage;
+                    $context->scope->blockStorage = new \SplObjectStorage();
+                    $exit = $jit->compileGeneratorResumePrefix($func, $tailBlock, $tailStart, $i, $doneEntry);
+                    $context->builder->positionAtEnd($exit);
+                    $context->scope->blockStorage = $savedStorage;
+                    $doneEntry = $exit;
+                }
+                $tailBlock = $op->block2;
+                $tailStart = 0;
+                $returnIdx = null;
+                $retOp = null;
+                for ($j = 0, $jEnd = $tailBlock->nOpCodes; $j < $jEnd; ++$j) {
+                    $rop = $tailBlock->opCodes[$j];
+                    if (OpCode::TYPE_RETURN === $rop->type || OpCode::TYPE_RETURN_VOID === $rop->type) {
+                        $returnIdx = $j;
+                        $retOp = $rop;
+                        break;
+                    }
+                    if (OpCode::TYPE_YIELD === $rop->type || OpCode::TYPE_YIELD_FROM === $rop->type) {
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (null !== $returnIdx && $tailStart < $returnIdx) {
+            $savedStorage = $context->scope->blockStorage;
+            $context->scope->blockStorage = new \SplObjectStorage();
+            $exit = $jit->compileGeneratorResumePrefix(
+                $func,
+                $tailBlock,
+                $tailStart,
+                $returnIdx,
+                $doneEntry
+            );
+            $context->builder->positionAtEnd($exit);
+            $context->scope->blockStorage = $savedStorage;
+        }
+
+        if (null !== $retOp && OpCode::TYPE_RETURN === $retOp->type && null !== $retOp->arg1) {
+            $retVar = $context->getVariableFromOp($tailBlock->getOperand($retOp->arg1));
+            self::assignValueField(
+                $context,
+                $context->builder->structGep($stateParam, $map['return_value']),
+                $retVar,
+                $tailBlock->getOperand($retOp->arg1)
+            );
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $context->builder->structGep($stateParam, $map['return_value']))
+            );
+        }
     }
 
     public static function prefixOpcodesSafeForYieldFromInit(Block $block, int $yieldFromIndex): bool
