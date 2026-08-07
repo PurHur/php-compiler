@@ -74,6 +74,13 @@ final class BuiltinInternalArgInfo
             }
         }
 
+        // ext/standard/streamsfuncs.stub.php — true return on PROFILE≥8.4; ≤8.3 keeps bool (#28344)
+        if ('stream_context_set_option' === $callableLc
+            && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')
+        ) {
+            return 'true';
+        }
+
         return match ($callableLc) {
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',

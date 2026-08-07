@@ -4924,7 +4924,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #25453 / #28239 */
+    /** @covers issue #25453 / #28239 / #28344 */
     public function testStreamContextSetOptionsStubReturnAndOptionsType(): void
     {
         self::assertSame(
@@ -4941,6 +4941,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
         self::assertNull(
             BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_set_options', 0)
+        );
+    }
+
+    /**
+     * streamsfuncs.stub.php — stream_context_set_option return true under PROFILE≥8.4 (#28344).
+     *
+     * @runInSeparateProcess
+     */
+    public function testStreamContextSetOptionReturnTrueUnderProfile84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertSame(
+            'true',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_context_set_option')
         );
     }
 
