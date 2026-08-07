@@ -213,6 +213,50 @@ PHP;
         $this->assertSame("true\ntrue\n", ob_get_clean());
     }
 
+    /** @covers issue #28390 — php-src Zend/zend_weakrefs.stub.php final class WeakReference */
+    public function testExtendWeakReferenceFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadWeakReference extends WeakReference {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadWeakReference cannot extend final class WeakReference');
+        $runtime->parseAndCompile($code, 'extend_weakreference.php');
+    }
+
+    /** @covers issue #28390 — php-src Zend/zend_weakrefs.stub.php final class WeakMap */
+    public function testExtendWeakMapFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadWeakMap extends WeakMap {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadWeakMap cannot extend final class WeakMap');
+        $runtime->parseAndCompile($code, 'extend_weakmap.php');
+    }
+
+    /** @covers issue #28390 */
+    public function testWeakReferenceAndWeakMapReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export((new ReflectionClass(WeakReference::class))->isFinal());
+echo "\n";
+var_export((new ReflectionClass(WeakMap::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'weakref_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\ntrue\n", ob_get_clean());
+    }
+
     /** @covers issue #26531 */
     public function testExtendUnitEnumFailsAtCompileTime(): void
     {

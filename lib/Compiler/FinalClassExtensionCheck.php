@@ -33,6 +33,9 @@ final class FinalClassExtensionCheck
         'fiber' => 'Fiber',
         'fibererror' => 'FiberError',
         'generator' => 'Generator',
+        // php-src Zend/zend_weakrefs.stub.php — final class WeakReference / WeakMap (#28390).
+        'weakmap' => 'WeakMap',
+        'weakreference' => 'WeakReference',
     ];
 
     /** @var array<string, array{display: string, final: bool, extends: ?string}> */

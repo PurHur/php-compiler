@@ -591,6 +591,8 @@ final class BuiltinClasses
     private static function registerWeakReference(Context $ctx): void
     {
         $entry = new ClassEntry('WeakReference');
+        // php-src Zend/zend_weakrefs.stub.php — final class WeakReference (#28390).
+        $entry->isFinal = true;
         // zend_weakrefs.c — clone_obj unset; WeakReference is uncloneable (#25962).
         $entry->denyClone = true;
         $nullProto = new Variable(Variable::TYPE_NULL);
@@ -614,6 +616,8 @@ final class BuiltinClasses
     private static function registerWeakMap(Context $ctx): void
     {
         $entry = new ClassEntry('WeakMap');
+        // php-src Zend/zend_weakrefs.stub.php — final class WeakMap (#28390).
+        $entry->isFinal = true;
         // ZEND_ACC_NO_DYNAMIC_PROPERTIES (zend_weakrefs.c; #26371).
         $entry->noDynamicProperties = true;
         // Zend/zend_weakrefs.c — ArrayAccess + Countable + IteratorAggregate (#22267).
