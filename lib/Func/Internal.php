@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Func;
 
+use PHPCompiler\Compiler\AttributeEntry;
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Handler;
@@ -21,6 +23,16 @@ use PHPLLVM\Value;
 
 abstract class Internal extends Func implements Handler, Call
 {
+    /**
+     * Stub #[\Deprecated] / other Reflection attributes for internal builtins (#28172).
+     *
+     * @var list<AttributeEntry>
+     */
+    public array $attributeEntries = [];
+
+    /** Stub #[\Deprecated] metadata for ReflectionFunction::isDeprecated() (#28172). */
+    public ?DeprecatedMetadata $deprecated = null;
+
     public function __construct(?string $name = null)
     {
         if (null === $name) {

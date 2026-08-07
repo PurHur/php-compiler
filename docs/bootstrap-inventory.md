@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7176 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23081 |
+| Source constructs flagged (warnings) | 23084 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4729,7 +4729,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
 | `ext/xml/XmlConstants.php` | 0 | 1 |
 | `ext/xml/XmlFunction.php` | 0 | 1 |
-| `ext/xml/XmlHandlerDeprecation.php` | 0 | 3 |
+| `ext/xml/XmlHandlerDeprecation.php` | 0 | 5 |
 | `ext/xml/XmlParserHandlers.php` | 0 | 8 |
 | `ext/xml/XmlParserSerializeDeny.php` | 0 | 3 |
 | `ext/xml/XmlParserSupport.php` | 0 | 4 |
@@ -4908,7 +4908,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/xmlwriter_write_raw.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
 | `ext/xsl/JitXsltMethod.php` | 0 | 1 |
-| `ext/xsl/JitXsltUserScript.php` | 0 | 2 |
+| `ext/xsl/JitXsltUserScript.php` | 0 | 3 |
 | `ext/xsl/Module.php` | 0 | 2 |
 | `ext/xsl/VmXsl.php` | 0 | 16 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
@@ -9997,11 +9997,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadXMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 169)
-- new JITVariable (line 196)
-- new JITVariable (line 259)
-- new JITVariable (line 276)
-- 16 class method(s)
+- new JITVariable (line 246)
+- new JITVariable (line 273)
+- new JITVariable (line 336)
+- new JITVariable (line 353)
+- 19 class method(s)
 
 ### `ext/dom/JitDomNodeChildProperty.php`
 
@@ -27413,25 +27413,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 108)
 - new ClassEntry (line 111)
-- new ClassProperty (line 113)
-- new ClassProperty (line 114)
-- new DeprecatedConstruct (line 115)
-- new AttributeEntry (line 132)
-- new Variable (line 140)
-- new ClassEntry (line 143)
-- new ClassProperty (line 145)
-- new NoDiscardConstruct (line 146)
-- new AttributeEntry (line 153)
-- new Variable (line 161)
-- new ClassEntry (line 164)
-- new ClassProperty (line 166)
-- new EnumCasesConstruct (line 167)
-- new AttributeEntry (line 174)
-- new ClassEntry (line 211)
-- new AttributeEntry (line 215)
-- new ClassEntry (line 229)
-- new OverrideConstruct (line 231)
-- new AttributeEntry (line 237)
+- new ClassProperty (line 115)
+- new ClassProperty (line 116)
+- new DeprecatedConstruct (line 117)
+- new AttributeEntry (line 134)
+- new Variable (line 142)
+- new ClassEntry (line 145)
+- new ClassProperty (line 149)
+- new NoDiscardConstruct (line 150)
+- new AttributeEntry (line 157)
+- new Variable (line 165)
+- new ClassEntry (line 168)
+- new ClassProperty (line 172)
+- new EnumCasesConstruct (line 173)
+- new AttributeEntry (line 180)
+- new ClassEntry (line 217)
+- new AttributeEntry (line 223)
+- new ClassEntry (line 237)
+- new OverrideConstruct (line 241)
+- new AttributeEntry (line 247)
 - 12 class method(s)
 
 ### `ext/standard/BuiltinClasses.php`
@@ -42119,9 +42119,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlHandlerDeprecation.php`
 
 **Warnings** (review for bootstrap subset):
-- new DeprecatedMetadata (line 28)
-- new Variable (line 54)
-- 4 class method(s)
+- new AttributeEntry (line 38)
+- new DeprecatedMetadata (line 52)
+- new DeprecatedMetadata (line 60)
+- new Variable (line 86)
+- 6 class method(s)
 
 ### `ext/xml/XmlParserHandlers.php`
 
@@ -42270,7 +42272,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/xml_set_object.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 31)
 - 1 class method(s)
 
 ### `ext/xml/xml_set_processing_instruction_handler.php`
@@ -43399,8 +43401,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/JitXsltUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new DOMDocument (line 103)
-- 15 class method(s)
+- new DOMDocument (line 107)
+- new DOMDocument (line 143)
+- 18 class method(s)
 
 ### `ext/xsl/Module.php`
 
@@ -45274,11 +45277,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/FinalClassExtensionCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 63)
-- new DeclarationFinder (line 71)
-- new Traverser (line 72)
-- new Traverser (line 90)
-- new CompileError (line 135)
+- new self (line 67)
+- new DeclarationFinder (line 75)
+- new Traverser (line 76)
+- new Traverser (line 94)
+- new CompileError (line 139)
 - 10 class method(s)
 
 ### `lib/Compiler/FinalMethodOverrideCheck.php`
@@ -45679,12 +45682,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Func/Internal.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 35)
-- new ArgumentCountError (line 112)
-- new ArgumentCountError (line 120)
-- new ArgumentCountError (line 128)
-- new ArgumentCountError (line 136)
-- new ArgumentCountError (line 139)
+- new Frame (line 47)
+- new ArgumentCountError (line 124)
+- new ArgumentCountError (line 132)
+- new ArgumentCountError (line 140)
+- new ArgumentCountError (line 148)
+- new ArgumentCountError (line 151)
 - 18 class method(s)
 
 ### `lib/Func/JIT.php`
@@ -52746,7 +52749,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/XsltInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\XsltMethod (line 45)
+- new Call\XsltMethod (line 46)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`

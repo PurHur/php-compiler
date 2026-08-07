@@ -170,6 +170,22 @@ final class AttributeRegistry
         }
         $target = AttributeSupport::TARGET_FUNCTION;
         if ($reflection->reflectionIsInternalFunction ?? false) {
+            // php-src stub attributes on internals (e.g. xml_set_object #[\Deprecated]; #28172).
+            $internal = ReflectionSupport::resolveFunctionForReflection(
+                $ctx,
+                ReflectionSupport::functionNameFromReflection($reflection)
+            );
+            if ($internal instanceof \PHPCompiler\Func\Internal && [] !== $internal->attributeEntries) {
+                $entries = ReflectionSupport::filterEntriesByName(
+                    $ctx,
+                    $internal->attributeEntries,
+                    $filter,
+                    $flags
+                );
+
+                return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
+            }
+
             return ReflectionSupport::attributesArray($frame, [], $target);
         }
         $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $reflection);
