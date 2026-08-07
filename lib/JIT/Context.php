@@ -887,7 +887,6 @@ class Context {
             // Float math always-helper NestedJIT leaves (#20664) — peer rename/fpc (#20290).
             'phpc_fpow_kernel',
             'phpc_nextafter_kernel',
-            'phpc_tanh_kernel',
             'phpc_atan_kernel',
             'phpc_atan2_kernel',
             'phpc_expm1_kernel',
