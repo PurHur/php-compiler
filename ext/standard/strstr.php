@@ -17,10 +17,9 @@ final class strstr extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28228).
+        $this->requireArgCountRange($frame, 'strstr', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('strstr() requires two or three arguments in this compiler build');
-        }
         $haystackStr = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'strstr', 0, 'haystack');
         $needleStr = VmString::coerceTrimFamilyStringArg($frame->calledArgs[1], 'strstr', 1, 'needle');
         $beforeNeedle = false;
@@ -41,10 +40,11 @@ final class strstr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('strstr() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer #28311 / #21964.
+        if (!$this->requireArgCountRangeJit($context, $args, 'strstr', 2, 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $before = null;
         if (3 === $argc) {
             $i8 = $context->getTypeFromString('int8');
