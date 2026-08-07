@@ -152,6 +152,11 @@ final class FinfoBufferMethod extends VmClassMethod
         $result = VmFinfo::buffer($object, $string, $flags, 'finfo::buffer');
         $frame->returnVar->string($result);
     }
+
+    public function call(JitContext $context, JITVariable ...$args): Value
+    {
+        return JitFinfoBuffer::invokeMethod($context, ...$args);
+    }
 }
 
 final class FinfoSetFlagsMethod extends VmClassMethod

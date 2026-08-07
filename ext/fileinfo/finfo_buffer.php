@@ -50,6 +50,6 @@ final class finfo_buffer extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('finfo_buffer() is not implemented for JIT in this compiler build (issue #3366)');
+        return JitFinfoBuffer::invokeProcedural($context, ...$args);
     }
 }
