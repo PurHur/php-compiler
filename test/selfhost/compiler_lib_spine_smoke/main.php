@@ -93,6 +93,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -1323,9 +1324,14 @@ require_once __DIR__.'/../../../ext/mbstring/mb_ucfirst.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_ucwords.php';
 require_once __DIR__.'/../../../ext/msgpack/Module.php';
 require_once __DIR__.'/../../../ext/msgpack/MsgpackExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/msgpack/MsgpackConstants.php';
+require_once __DIR__.'/../../../ext/msgpack/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/msgpack/VmMsgpack.php';
+require_once __DIR__.'/../../../ext/msgpack/VmMessagePack.php';
 require_once __DIR__.'/../../../ext/msgpack/msgpack_pack.php';
 require_once __DIR__.'/../../../ext/msgpack/msgpack_unpack.php';
+require_once __DIR__.'/../../../ext/msgpack/msgpack_serialize.php';
+require_once __DIR__.'/../../../ext/msgpack/msgpack_unserialize.php';
 require_once __DIR__.'/../../../ext/opcache/Module.php';
 require_once __DIR__.'/../../../ext/opcache/OpcacheFunction.php';
 require_once __DIR__.'/../../../ext/opcache/VmOpcache.php';
@@ -7264,6 +7270,7 @@ require_once __DIR__.'/../../../ext/soap/JitUseSoapErrorHandler.php';
 require_once __DIR__.'/../../../ext/soap/UseSoapErrorHandlerJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NoOpConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/MultipleIteratorZipLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfStrtolApply.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -7294,5 +7301,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfStrtolApply.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

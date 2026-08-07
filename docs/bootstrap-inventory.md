@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7173 |
-| Phase A inventory files (M2 ratio SSOT) | 7173 |
+| PHP files on vm.php path | 7178 |
+| Phase A inventory files (M2 ratio SSOT) | 7178 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23055 |
+| Source constructs flagged (warnings) | 23077 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1547,11 +1547,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mongodb/MongodbExtensionPolicy.php` | 0 | 1 |
 | `ext/mongodb/QueryConstruct.php` | 0 | 2 |
 | `ext/mongodb/VmMongodb.php` | 0 | 12 |
-| `ext/msgpack/Module.php` | 0 | 3 |
+| `ext/msgpack/BuiltinClasses.php` | 0 | 1 |
+| `ext/msgpack/Module.php` | 0 | 6 |
+| `ext/msgpack/MsgpackConstants.php` | 0 | 1 |
 | `ext/msgpack/MsgpackExtensionPolicy.php` | 0 | 1 |
+| `ext/msgpack/VmMessagePack.php` | 0 | 12 |
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
+| `ext/msgpack/msgpack_serialize.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
+| `ext/msgpack/msgpack_unserialize.php` | 0 | 2 |
 | `ext/mysqli/BuiltinClasses.php` | 0 | 7 |
 | `ext/mysqli/Module.php` | 0 | 106 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
@@ -19061,17 +19066,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ManagerState (line 124)
 - 11 class method(s)
 
+### `ext/msgpack/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/msgpack/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new msgpack_pack (line 42)
-- new msgpack_unpack (line 43)
-- 3 class method(s)
+- new VM\Variable (line 28)
+- new msgpack_pack (line 59)
+- new msgpack_unpack (line 60)
+- new msgpack_serialize (line 61)
+- new msgpack_unserialize (line 62)
+- 4 class method(s)
+
+### `ext/msgpack/MsgpackConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/msgpack/MsgpackExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/msgpack/VmMessagePack.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 42)
+- new Variable (line 53)
+- new MessagePackPack (line 61)
+- new MessagePackUnpack (line 62)
+- new MessagePackSetOption (line 63)
+- new ClassEntry (line 79)
+- new ArgumentCountError (line 116)
+- new Exception (line 126)
+- new ArgumentCountError (line 145)
+- new ArgumentCountError (line 150)
+- new ArgumentCountError (line 190)
+- 7 class method(s)
 
 ### `ext/msgpack/VmMsgpack.php`
 
@@ -19095,10 +19129,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 37)
 - 2 class method(s)
 
+### `ext/msgpack/msgpack_serialize.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 34)
+- new Error (line 41)
+- 2 class method(s)
+
 ### `ext/msgpack/msgpack_unpack.php`
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 58)
+- 2 class method(s)
+
+### `ext/msgpack/msgpack_unserialize.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 62)
 - 2 class method(s)
 
 ### `ext/mysqli/BuiltinClasses.php`
@@ -44481,7 +44528,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1232)
+- new InternalArgInfo (line 1234)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
