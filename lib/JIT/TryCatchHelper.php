@@ -1269,10 +1269,18 @@ final class TryCatchHelper
             $builder->branch($uncaught);
         }
         $builder->positionAtEnd($uncaught);
+        // Pending throw survived finally with no same-function catch. Non-main callees
+        // must return with throw-pending set so the caller's emitCheckPendingThrowAfterCall
+        // can land in an outer catch — raw abort() skipped that path (#28623 / re-#24105).
+        // Main / uncaught: Zend-shaped fatal via emitUncaughtUserHandlerOrAbort (#24680).
         $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
-        $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
-        $builder->call($context->lookupFunction('abort'));
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        $cfgBlock = $handler->finallyOp->block1 ?? $handler->mergeBlock;
+        if (self::isNonMainUserFunction($cfgBlock)) {
+            $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
+            self::emitPropagateReturn($context, $func);
+        } else {
+            self::emitUncaughtUserHandlerOrAbort($context, $pendingObj);
+        }
         if (null !== $saved) {
             BasicBlockHelper::restoreInsertBlock($context, $saved);
         }
