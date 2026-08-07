@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\VmJson;
 use PHPLLVM\Value;
 
 final class pcntl_waitpid extends Internal
@@ -20,9 +21,10 @@ final class pcntl_waitpid extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
+        // php-src ext/pcntl/pcntl.stub.php — process_id, &status, flags=0, &resource_usage=[] (#27849)
+        if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'pcntl_waitpid() expects at least 2 arguments and at most 3, '.$argc.' given'
+                'pcntl_waitpid() expects at least 2 arguments and at most 4, '.$argc.' given'
             );
         }
         if (null === $frame->returnVar) {
@@ -32,14 +34,22 @@ final class pcntl_waitpid extends Internal
             throw new \Error('pcntl_waitpid() is not available in this compiler build');
         }
         $pid = VmPcntlArg::coerceIntArg($frame->calledArgs[0], 'pcntl_waitpid', 0, 'process_id');
-        $options = 0;
+        $flags = 0;
         if ($argc >= 3) {
-            $options = VmPcntlArg::coerceIntArg($frame->calledArgs[2], 'pcntl_waitpid', 2, 'options');
+            $flags = VmPcntlArg::coerceIntArg($frame->calledArgs[2], 'pcntl_waitpid', 2, 'flags');
         }
         $status = 0;
-        $waitRc = VmPcntl::waitpid($pid, $status, $options);
+        $resourceUsage = null;
+        $captureRusage = $argc >= 4;
+        if ($captureRusage) {
+            $resourceUsage = [];
+        }
+        $waitRc = VmPcntl::waitpid($pid, $status, $flags, $captureRusage, $resourceUsage);
         // ZEND_SEND_REF — write through byRefTarget so caller $status updates (#19564)
         $frame->calledArgs[1]->byRefTarget()->int($status);
+        if ($captureRusage) {
+            $frame->calledArgs[3]->byRefTarget()->copyFrom(VmJson::import($resourceUsage ?? []));
+        }
         $frame->returnVar->int($waitRc);
     }
 

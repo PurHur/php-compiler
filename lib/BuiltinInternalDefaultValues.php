@@ -270,6 +270,11 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],
         ],
+        // php-src ext/pcntl/pcntl.stub.php — int $flags = 0; &$resource_usage = [] (#27849)
+        'pcntl_waitpid' => [
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'array'],
+        ],
         'preg_filter' => [
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],
