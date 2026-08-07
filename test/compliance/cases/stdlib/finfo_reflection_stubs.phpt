@@ -1,10 +1,10 @@
 --TEST--
-stdlib finfo_open/file/buffer Reflection stubs match php-src (#25471)
+stdlib finfo_open/file/buffer/close Reflection stubs match php-src (#25471, #28569)
 --FILE--
 <?php
 declare(strict_types=1);
 
-foreach (['finfo_open', 'finfo_file', 'finfo_buffer'] as $fn) {
+foreach (['finfo_open', 'finfo_file', 'finfo_buffer', 'finfo_close'] as $fn) {
     $r = new ReflectionFunction($fn);
     echo $fn, ' ret=', (string) $r->getReturnType(), "\n";
     foreach ($r->getParameters() as $p) {
@@ -29,3 +29,5 @@ finfo_buffer ret=string|false
   string type=string opt=N
   flags type=int opt=Y def=0
   context type=? opt=Y def=NULL
+finfo_close ret=bool
+  finfo type=finfo opt=N

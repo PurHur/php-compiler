@@ -340,7 +340,9 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('finfo|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('finfo_open'));
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('finfo_file'));
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('finfo_buffer'));
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('finfo_close'));
         $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('finfo_open', 1));
+        $this->assertSame('finfo', BuiltinInternalArgInfo::stubParamTypeOverride('finfo_close', 0));
         $this->assertSame('finfo', BuiltinInternalArgInfo::stubParamTypeOverride('finfo_file', 0));
         $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('finfo_file', 1));
         $this->assertSame('finfo', BuiltinInternalArgInfo::stubParamTypeOverride('finfo_buffer', 0));
