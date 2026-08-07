@@ -980,7 +980,11 @@ final class JitSimpleXmlUserScript
         return self::lookupExact($receiver) ?? self::$lastTree;
     }
 
-    /** Array / value-box operands are never host SXE trees for count() folds (#27413). */
+    /**
+     * Array-shaped operands must not fall back to lastTree for count() (#27413).
+     * Value-boxed SXE from load/property still count via an exact host-tree token
+     * once applyPendingElementAssign has bound it (#26863 / #28639).
+     */
     private static function isArrayShapedCountOperand(JITVariable $var): bool
     {
         if (JITVariable::TYPE_HASHTABLE === $var->type) {
@@ -990,7 +994,8 @@ final class JitSimpleXmlUserScript
             return true;
         }
         if (JITVariable::TYPE_VALUE === $var->type) {
-            return true;
+            // Opaque value boxes (e.g. xpath lists without SXE token) stay array-shaped.
+            return null === self::lookupExact($var);
         }
 
         return JitValueBox::isValueOperand($var);
