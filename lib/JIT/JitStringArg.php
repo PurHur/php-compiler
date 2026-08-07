@@ -40,8 +40,12 @@ final class JitStringArg
             }
             // Slot-backed concat temps carry compileTimeString for other folds but must
             // read the runtime __string__* written by JitStringConcat (AOT tier-2, #15642).
+            // Use stringPtrFromVariable — NOT materializeStringSlot/__string__separate:
+            // separate on a freshly loaded slot pointer corrupts AOT heaps and later
+            // segfaults in __value__readObject (sodium AEAD #27318, gzcompress/bin2hex
+            // variable args, secretbox keys).
             if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
-                return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+                return self::stringPtrFromVariable($context, $arg);
             }
 
             return $context->builder->load($context->constantStringFromString($literal));
@@ -121,15 +125,16 @@ final class JitStringArg
     {
         // Slot-backed locals may receive different ?: arm values; compileTimeString from the
         // first arm must not fold into a shared merge echo (standalone AOT — #15704).
+        // Load the slot directly — __string__separate materialize segfaults under thin AOT (#27318).
         if (Variable::KIND_VARIABLE === $arg->kind && Variable::TYPE_STRING === $arg->type) {
-            return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+            return self::stringPtrFromVariable($context, $arg);
         }
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
             return $context->builder->load($context->constantStringFromString($literal));
         }
         if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
-            return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+            return self::stringPtrFromVariable($context, $arg);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
             $str = $context->builder->call(

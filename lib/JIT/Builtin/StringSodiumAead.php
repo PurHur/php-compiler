@@ -54,6 +54,7 @@ final class StringSodiumAead
         self::restoreInsertBlock($context, $restore);
     }
 
+    /** Returns __value__* — string on success (null ABI → false; peer JitZlib #26864). */
     public static function invokeEncrypt(
         Context $context,
         Value $message,
@@ -62,14 +63,15 @@ final class StringSodiumAead
         Value $key
     ): Value {
         self::ensureLinked($context);
-
-        return $context->builder->call(
+        $raw = $context->builder->call(
             $context->lookupFunction('__compiler_sodium_aead_xchacha_ietf_encrypt'),
             $message,
             $additionalData,
             $nonce,
             $key
         );
+
+        return self::stringOrFalse($context, $raw);
     }
 
     /** Returns __value__* — string on success, bool false on auth failure. */
@@ -344,12 +346,18 @@ final class StringSodiumAead
     private static function ensureStringAlloc(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');
-        $sizeT = $context->getTypeFromString('size_t');
-        self::ensureExternal(
-            $context,
-            '__string__alloc',
-            $context->context->functionType($strPtr, false, $sizeT)
-        );
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        // Prefer existing __string__init from Type\String_; declare only if missing.
+        try {
+            $context->lookupFunction('__string__init');
+        } catch (\Throwable) {
+            self::ensureExternal(
+                $context,
+                '__string__init',
+                $context->context->functionType($strPtr, false, $i64, $i8p)
+            );
+        }
     }
 
     private static function ensureExternal(Context $context, string $name, $ft): void
@@ -372,31 +380,15 @@ final class StringSodiumAead
     private static function stringData(Context $context, Value $strObj): Value
     {
         $map = $context->structFieldMap['__string__'];
-        $i8p = $context->getTypeFromString('int8*');
 
-        return $context->builder->pointerCast(
-            $context->builder->structGep($strObj, $map['value']),
-            $i8p
-        );
+        // Peer StringZlibJit — structGep of int8 value field is already i8*.
+        return $context->builder->structGep($strObj, $map['value']);
     }
 
     private static function stringFromBytes(Context $context, Value $data, Value $len): Value
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $nSize = $context->builder->truncOrBitCast($len, $sizeT);
-        $str = $context->builder->call($context->lookupFunction('__string__alloc'), $nSize);
-        $map = $context->structFieldMap['__string__'];
-        $dst = $context->builder->structGep($str, $map['value']);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->builder->pointerCast($dst, $i8p),
-            $data,
-            $nSize
-        );
-        $context->builder->call($context->lookupFunction('free'), $data);
-
-        return $str;
+        // Peer StringZlibJit — __string__init owns the buffer (frees $data).
+        return $context->builder->call($context->lookupFunction('__string__init'), $len, $data);
     }
 
     private static function stringOrFalse(Context $context, Value $result): Value

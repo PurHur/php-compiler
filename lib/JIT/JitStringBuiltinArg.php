@@ -249,9 +249,10 @@ final class JitStringBuiltinArg
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
                 $context->builder->positionAtEnd($okBlock);
             }
-            $native = JitNativeString::coerce($context, $arg);
-
-            return $context->helper->loadValue($native);
+            // Boxed strings: readString from the value box. Do NOT run
+            // JitNativeString::coerce + loadValue — that path miscompiles under
+            // thin AOT for KIND_VALUE boxes (sodium AEAD #27318, gzcompress/bin2hex).
+            return JitStringArg::stringPtrFromVariable($context, $arg);
         }
 
         return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));

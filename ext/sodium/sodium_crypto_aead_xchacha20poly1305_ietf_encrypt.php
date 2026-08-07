@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\sodium;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -25,7 +26,11 @@ final class sodium_crypto_aead_xchacha20poly1305_ietf_encrypt extends SodiumAead
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (!$this->requireExactJitArgCount($context, $args, $this->getName(), 4)) {
-            return $context->getTypeFromString('__string__*')->constNull();
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
         }
         $message = JitStringBuiltinArg::lower($context, $args[0], $this->getName(), 0, 'message');
         $additionalData = JitStringBuiltinArg::lower($context, $args[1], $this->getName(), 1, 'additional_data');
