@@ -109,6 +109,8 @@ final class BuiltinAttributes
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $entry = new ClassEntry('Deprecated');
+        // php-src Zend/zend_attributes.stub.php — final class Deprecated (#28402).
+        $entry->isFinal = true;
         $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
         $entry->properties[] = new ClassProperty('message', null, $strProto, true);
         $entry->properties[] = new ClassProperty('since', null, $strProto, true);
@@ -141,6 +143,8 @@ final class BuiltinAttributes
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $entry = new ClassEntry('NoDiscard');
+        // php-src Zend/zend_attributes.stub.php — final class NoDiscard (#28402).
+        $entry->isFinal = true;
         $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
         $entry->properties[] = new ClassProperty('message', null, $strProto, true);
         $entry->constructor = new NoDiscardConstruct();
@@ -162,6 +166,8 @@ final class BuiltinAttributes
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $entry = new ClassEntry('EnumCases');
+        // php-src Zend/zend_attributes.stub.php — final class EnumCases (#28402).
+        $entry->isFinal = true;
         $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
         $entry->properties[] = new ClassProperty('name', null, $strProto, true);
         $entry->constructor = new EnumCasesConstruct();
@@ -209,6 +215,8 @@ final class BuiltinAttributes
         int $targets
     ): void {
         $entry = new ClassEntry($name);
+        // php-src Zend/zend_attributes.stub.php — final class (#28402).
+        $entry->isFinal = true;
         $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
         $entry->attributeNames = ['Attribute'];
         $entry->attributeEntries = [
@@ -227,6 +235,8 @@ final class BuiltinAttributes
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $entry = new ClassEntry($name);
+        // php-src Zend/zend_attributes.stub.php — final class (#28402).
+        $entry->isFinal = true;
         $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
         $entry->constructor = new OverrideConstruct();
         $entry->methods['__construct'] = $entry->constructor;

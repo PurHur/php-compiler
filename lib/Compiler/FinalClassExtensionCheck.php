@@ -31,6 +31,8 @@ final class FinalClassExtensionCheck
         // php-src ext/sockets/sockets.stub.php — final class Socket / AddressInfo (#28391).
         'addressinfo' => 'AddressInfo',
         'attribute' => 'Attribute',
+        // php-src Zend/zend_attributes.stub.php — final builtin attribute classes (#28402).
+        'allowdynamicproperties' => 'AllowDynamicProperties',
         'closure' => 'Closure',
         // php-src ext/zlib/zlib.stub.php — final class DeflateContext / InflateContext (#28385).
         'deflatecontext' => 'DeflateContext',
@@ -44,6 +46,8 @@ final class FinalClassExtensionCheck
         'random\\engine\\secure' => 'Random\\Engine\\Secure',
         'random\\engine\\xoshiro256starstar' => 'Random\\Engine\\Xoshiro256StarStar',
         'random\\randomizer' => 'Random\\Randomizer',
+        'returntypewillchange' => 'ReturnTypeWillChange',
+        'sensitiveparameter' => 'SensitiveParameter',
         'socket' => 'Socket',
         // php-src Zend/zend_weakrefs.stub.php — final class WeakReference / WeakMap (#28390).
         'weakmap' => 'WeakMap',
@@ -154,6 +158,16 @@ final class FinalClassExtensionCheck
         // php-src 8.4+ `final class GMP` (ext/gmp/gmp.stub.php; #28135) — not in script AST.
         if ('gmp' === $parentLc && \PHPCompiler\CompilerVersion::supportsGmp()) {
             return 'GMP';
+        }
+        // php-src Zend/zend_attributes.stub.php — profile-gated final attribute classes (#28402).
+        if ('override' === $parentLc && \PHPCompiler\CompilerVersion::advertisesOverrideAttributeClass()) {
+            return 'Override';
+        }
+        if ('deprecated' === $parentLc && \PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
+            return 'Deprecated';
+        }
+        if ('nodiscard' === $parentLc && \PHPCompiler\CompilerVersion::advertisesNoDiscardAttributeClass()) {
+            return 'NoDiscard';
         }
 
         return null;

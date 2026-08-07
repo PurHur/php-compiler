@@ -120,6 +120,73 @@ PHP;
         $this->assertSame("true\nok\n", ob_get_clean());
     }
 
+    /**
+     * @covers issue #28402
+     * php-src Zend/zend_attributes.stub.php — final class AllowDynamicProperties /
+     * ReturnTypeWillChange / SensitiveParameter / Override / Deprecated.
+     */
+    public function testBuiltinAttributeClassesReflectionIsFinalUnderForward84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+foreach ([
+    AllowDynamicProperties::class,
+    ReturnTypeWillChange::class,
+    SensitiveParameter::class,
+    Override::class,
+    Deprecated::class,
+] as $c) {
+    var_export((new ReflectionClass($c))->isFinal());
+    echo " $c\n";
+}
+PHP;
+            $block = $runtime->parseAndCompile($code, 'builtin_attr_isfinal.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $out = (string) ob_get_clean();
+            self::assertStringContainsString('true AllowDynamicProperties', $out);
+            self::assertStringContainsString('true ReturnTypeWillChange', $out);
+            self::assertStringContainsString('true SensitiveParameter', $out);
+            self::assertStringContainsString('true Override', $out);
+            self::assertStringContainsString('true Deprecated', $out);
+            self::assertStringNotContainsString('false ', $out);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #28402 */
+    public function testExtendAllowDynamicPropertiesFailsAtCompileTime(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class BadAttr extends AllowDynamicProperties {}
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Class BadAttr cannot extend final class AllowDynamicProperties');
+            $runtime->parseAndCompile($code, 'extend_allow_dynamic_properties.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #28135 — php-src 8.4+ final class GMP */
     public function testExtendGmpFailsUnderForward84Profile(): void
     {
