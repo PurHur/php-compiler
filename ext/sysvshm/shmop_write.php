@@ -32,11 +32,10 @@ final class shmop_write extends Internal
 
         ShmopArgs::requireAvailable('shmop_write');
         $object = ShmopArgs::parseShmop($frame, 'shmop_write');
-        $host = ShmopArgs::requireHost($object, 'shmop_write');
         $data = ShmopArgs::parseData($frame, 'shmop_write', 1);
         $offset = ShmopArgs::parseOffset($frame, 'shmop_write', 2);
 
-        $result = VmShmop::write($host, $data, $offset);
+        $result = VmShmop::writeForObject($object, $data, $offset);
         if (false === $result) {
             $this->triggerWarning($frame, 'shmop_write() failed');
             $frame->returnVar->bool(false);
@@ -49,9 +48,12 @@ final class shmop_write extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'shmop_write() is not supported for JIT/AOT in this compiler build (issue #3344)'
-        );
+        $argc = \count($args);
+        if (3 !== $argc) {
+            return JitShmopWrite::emitArgumentCountError($context, $argc);
+        }
+
+        return JitShmopWrite::invoke($context, $args[0], $args[1], $args[2]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void
