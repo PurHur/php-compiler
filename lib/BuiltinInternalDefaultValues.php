@@ -68,6 +68,15 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'null'],
             3 => ['kind' => 'bool', 'value' => true],
         ],
+        // php-src ext/standard/basic_functions.stub.php — flags=ENT_QUOTES|ENT_SUBSTITUTE (#23265)
+        'htmlspecialchars_decode' => [
+            1 => ['kind' => 'int', 'value' => 11],
+        ],
+        // php-src ext/standard/basic_functions.stub.php — flags=11, encoding=null (#23265)
+        'html_entity_decode' => [
+            1 => ['kind' => 'int', 'value' => 11],
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/intl/spoofchecker/spoofchecker.stub.php — &$errorCode = null (#25055)
         'spoofchecker::issuspicious' => [
             1 => ['kind' => 'null'],

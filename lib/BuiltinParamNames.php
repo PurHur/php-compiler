@@ -1643,6 +1643,11 @@ final class BuiltinParamNames
             case 'htmlspecialchars':
             case 'htmlentities':
                 return ['string', 'flags=', 'encoding=', 'double_encode='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still quote_style (#23265)
+            case 'htmlspecialchars_decode':
+                return ['string', 'flags='];
+            case 'html_entity_decode':
+                return ['string', 'flags=', 'encoding='];
             // php-src ext/standard/basic_functions.stub.php — ?string $operator = null (#24971)
             case 'version_compare':
                 return ['version1', 'version2', 'operator='];
