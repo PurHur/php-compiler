@@ -4103,8 +4103,8 @@ class Object_ extends Type {
             || 'splqueue' === $lcname
             || 'splstack' === $lcname
         ) {
-            // Thin AOT: `__spl_ht` packed deque + FIFO foreach (#26790, #27311).
-            // unshift rotates packed slots; SplStack LIFO foreach is not HT-backed yet.
+            // Thin AOT: `__spl_ht` packed deque + FIFO/LIFO foreach (#26790, #27311, #28705).
+            // SplQueue/DDL: forward nextFree walk; SplStack: descending (#28705).
             // Zend rematerializes Serializable-first subclass interfaces (#25797).
             $this->ensureTraversableBuiltinInterfaces();
             $this->setClassInterfaces($displayName, [

@@ -37,12 +37,27 @@ final class SplOuterIteratorHt
         ];
     }
 
-    public static function isHtBacked(?string $containerUserType): bool
+    /**
+     * SplStack stores push order in `__spl_ht` but iterates LIFO (#28705 / #27311).
+     *
+     * Still uses {@see splBackingHashtable}; foreach walks nextFreeElement descending.
+     */
+    public static function isReverseHtWalk(?string $containerUserType): bool
     {
         if (null === $containerUserType || '' === $containerUserType) {
             return false;
         }
 
-        return \in_array(strtolower(ltrim($containerUserType, '\\')), self::classNamesLc(), true);
+        return 'splstack' === strtolower(ltrim($containerUserType, '\\'));
+    }
+
+    public static function isHtBacked(?string $containerUserType): bool
+    {
+        if (null === $containerUserType || '' === $containerUserType) {
+            return false;
+        }
+        $lc = strtolower(ltrim($containerUserType, '\\'));
+
+        return \in_array($lc, self::classNamesLc(), true) || self::isReverseHtWalk($containerUserType);
     }
 }

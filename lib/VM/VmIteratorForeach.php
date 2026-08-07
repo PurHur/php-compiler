@@ -111,6 +111,18 @@ final class VmIteratorForeach
         $context->builder->store($invalid, self::indexSlot($context, $slotKey));
     }
 
+    /** SplStack LIFO — start one past the last packed slot (#28705). */
+    private static function initHashtableIndexReverse(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey
+    ): void {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $context->builder->store($nextFree, self::indexSlot($context, $slotKey));
+    }
+
     private static function usesWeakMapHashtable(?string $containerUserType): bool
     {
         return null !== $containerUserType
@@ -320,6 +332,12 @@ final class VmIteratorForeach
 
             return;
         }
+        if (SplOuterIteratorHt::isReverseHtWalk($containerUserType)) {
+            $context->foreachReverseHtSlots[$context->foreachSlotMapKey($slotKey)] = true;
+            self::initHashtableIndexReverse($context, $array, $slotKey);
+
+            return;
+        }
         self::initHashtableIndex($context, $slotKey);
     }
 
@@ -414,6 +432,9 @@ final class VmIteratorForeach
 
     private static function compileValidHashtable(Context $context, JitVariable $array, JitVariable $slotKey): \PHPLLVM\Value
     {
+        if (isset($context->foreachReverseHtSlots[$context->foreachSlotMapKey($slotKey)])) {
+            return self::compileValidHashtableReverse($context, $array, $slotKey);
+        }
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -483,6 +504,62 @@ final class VmIteratorForeach
         $node->addIncoming($nextNode, $strAdvance);
         $remaining->addIncoming($context->builder->sub($remaining, $one), $strAdvance);
         $context->builder->branch($strWalk);
+
+        $context->builder->positionAtEnd($found);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $result = $context->builder->phi($i1);
+        $result->addIncoming($i1->constInt(1, false), $found);
+        $result->addIncoming($i1->constInt(0, false), $empty);
+
+        return $result;
+    }
+
+    /**
+     * SplStack LIFO packed walk — decrement from nextFree toward 0 (#28705).
+     *
+     * Keys are storage indices (Zend: push 10/20/30 → k=2,1,0).
+     */
+    private static function compileValidHashtableReverse(
+        Context $context,
+        JitVariable $array,
+        JitVariable $slotKey
+    ): \PHPLLVM\Value {
+        $ht = $context->helper->loadValue($array);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $slot = self::indexSlot($context, $slotKey);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $head = $fn->appendBasicBlock('foreach_rev_head');
+        $body = $fn->appendBasicBlock('foreach_rev_body');
+        $found = $fn->appendBasicBlock('foreach_rev_found');
+        $empty = $fn->appendBasicBlock('foreach_rev_empty');
+        $merge = $fn->appendBasicBlock('foreach_rev_merge');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($slot);
+        $hasMore = $context->builder->icmp(Builder::INT_UGT, $idx, $zero);
+        $context->builder->branchIf($hasMore, $body, $empty);
+
+        $context->builder->positionAtEnd($body);
+        $nextIdx = $context->builder->sub($idx, $one);
+        $context->builder->store($nextIdx, $slot);
+        $entry = HashTableHelper::listEntryPointer($context, $ht, $nextIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isDefined = $context->builder->icmp(
+            Builder::INT_NE,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_UNDEFINED & 0xff, false)
+        );
+        $context->builder->branchIf($isDefined, $found, $head);
 
         $context->builder->positionAtEnd($found);
         $context->builder->branch($merge);
