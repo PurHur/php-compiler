@@ -1024,7 +1024,7 @@ final class CollatorCreate extends VmClassMethod
     }
 }
 
-/** Collator::compare() — php-src collator_compare (#5747). Z_PARAM_STR null TypeError on 8.4 (#21077). */
+/** Collator::compare() — php-src collator_compare (#5747, AOT #28649). Z_PARAM_STR null TypeError on 8.4 (#21077). */
 final class CollatorCompare extends VmClassMethod
 {
     public function __construct()
@@ -1059,6 +1059,11 @@ final class CollatorCompare extends VmClassMethod
             return;
         }
         $frame->returnVar->int($result);
+    }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        return JitCollatorCompare::invokeMethod($context, ...$args);
     }
 }
 

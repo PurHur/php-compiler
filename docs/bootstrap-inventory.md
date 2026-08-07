@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7219 |
-| Phase A inventory files (M2 ratio SSOT) | 7219 |
+| PHP files on vm.php path | 7222 |
+| Phase A inventory files (M2 ratio SSOT) | 7222 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23317 |
+| Source constructs flagged (warnings) | 23322 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1088,6 +1088,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
 | `ext/intl/BuiltinClasses.php` | 0 | 53 |
+| `ext/intl/CollatorCompareJitHelper.php` | 0 | 1 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IcuDateFormat.php` | 0 | 1 |
 | `ext/intl/IcuErrorConstants.php` | 0 | 1 |
@@ -1109,6 +1110,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/IntlError.php` | 0 | 1 |
 | `ext/intl/IntlExtensionPolicy.php` | 0 | 4 |
 | `ext/intl/IntlSerializeDeny.php` | 0 | 3 |
+| `ext/intl/JitCollatorCompare.php` | 0 | 3 |
 | `ext/intl/JitGrapheme.php` | 0 | 4 |
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
@@ -1164,7 +1166,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmTransliterator.php` | 0 | 29 |
 | `ext/intl/VmUConverter.php` | 0 | 60 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
-| `ext/intl/collator_compare.php` | 0 | 3 |
+| `ext/intl/collator_compare.php` | 0 | 2 |
 | `ext/intl/collator_create.php` | 0 | 3 |
 | `ext/intl/collator_get_attribute.php` | 0 | 3 |
 | `ext/intl/collator_get_error_code.php` | 0 | 3 |
@@ -5920,6 +5922,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ClosureFromCallable.php` | 0 | 3 |
 | `lib/JIT/Call/ClosureWithBinding.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureWithCaptures.php` | 0 | 1 |
+| `lib/JIT/Call/CollatorCompare.php` | 0 | 1 |
 | `lib/JIT/Call/ContextRunStackFramesNested.php` | 0 | 1 |
 | `lib/JIT/Call/DateIntervalConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/DateIntervalCreateFromDateString.php` | 0 | 1 |
@@ -6189,7 +6192,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 171 |
+| `lib/JIT/Context.php` | 0 | 172 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -15042,6 +15045,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 344)
 - 18 class method(s)
 
+### `ext/intl/CollatorCompareJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15176,6 +15184,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 49)
 - new Exception (line 56)
 - 5 class method(s)
+
+### `ext/intl/JitCollatorCompare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 55)
+- 3 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -15693,29 +15708,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1014)
 - new ArgumentCountError (line 1039)
 - new Error (line 1047)
-- new ArgumentCountError (line 1077)
-- new Error (line 1085)
-- new ArgumentCountError (line 1111)
-- new Error (line 1119)
-- new ArgumentCountError (line 1145)
-- new Error (line 1153)
-- new ArgumentCountError (line 1175)
-- new Error (line 1183)
-- new ArgumentCountError (line 1212)
-- new Error (line 1220)
-- new ArgumentCountError (line 1241)
-- new Error (line 1249)
-- new ArgumentCountError (line 1272)
-- new Error (line 1280)
-- new ArgumentCountError (line 1308)
-- new Error (line 1316)
-- new ArgumentCountError (line 1340)
-- new Error (line 1348)
-- new ArgumentCountError (line 1376)
-- new Error (line 1384)
-- new ArgumentCountError (line 1405)
-- new Error (line 1413)
-- 47 class method(s)
+- new ArgumentCountError (line 1082)
+- new Error (line 1090)
+- new ArgumentCountError (line 1116)
+- new Error (line 1124)
+- new ArgumentCountError (line 1150)
+- new Error (line 1158)
+- new ArgumentCountError (line 1180)
+- new Error (line 1188)
+- new ArgumentCountError (line 1217)
+- new Error (line 1225)
+- new ArgumentCountError (line 1246)
+- new Error (line 1254)
+- new ArgumentCountError (line 1277)
+- new Error (line 1285)
+- new ArgumentCountError (line 1313)
+- new Error (line 1321)
+- new ArgumentCountError (line 1345)
+- new Error (line 1353)
+- new ArgumentCountError (line 1381)
+- new Error (line 1389)
+- new ArgumentCountError (line 1410)
+- new Error (line 1418)
+- 48 class method(s)
 - 2 closure(s)
 
 ### `ext/intl/VmGrapheme.php`
@@ -16478,7 +16493,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new Error (line 61)
 - 2 class method(s)
 
 ### `ext/intl/collator_create.php`
@@ -50136,6 +50150,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Call/CollatorCompare.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/ContextRunStackFramesNested.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51767,27 +51786,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetName (line 1454)
 - new Call\DateTimeZoneGetOffset (line 1456)
 - new Call\NumberFormatterFormat (line 1460)
-- new Call\FinfoConstruct (line 1462)
-- new Call\FinfoFile (line 1463)
-- new Call\FinfoBuffer (line 1464)
-- new Call\PdoConstruct (line 1466)
-- new Call\PdoGetAvailableDrivers (line 1467)
-- new Call\PdoQuote (line 1468)
-- new Call\DomXmlDocumentCreateFromString (line 1471)
-- new Call\DomHtmlDocumentCreateFromString (line 1472)
-- new Result (line 1849)
-- new Result (line 1871)
-- new Variable (line 2549)
-- new Variable (line 2721)
-- new Variable (line 2989)
-- new Variable (line 3047)
-- new VMVariable (line 3209)
-- new VMVariable (line 3225)
-- new VMVariable (line 3231)
-- new VMVariable (line 3237)
-- new VMVariable (line 3248)
-- new Variable (line 3278)
-- new Variable (line 3323)
+- new Call\CollatorCompare (line 1462)
+- new Call\FinfoConstruct (line 1464)
+- new Call\FinfoFile (line 1465)
+- new Call\FinfoBuffer (line 1466)
+- new Call\PdoConstruct (line 1468)
+- new Call\PdoGetAvailableDrivers (line 1469)
+- new Call\PdoQuote (line 1470)
+- new Call\DomXmlDocumentCreateFromString (line 1473)
+- new Call\DomHtmlDocumentCreateFromString (line 1474)
+- new Result (line 1851)
+- new Result (line 1873)
+- new Variable (line 2551)
+- new Variable (line 2723)
+- new Variable (line 2991)
+- new Variable (line 3049)
+- new VMVariable (line 3211)
+- new VMVariable (line 3227)
+- new VMVariable (line 3233)
+- new VMVariable (line 3239)
+- new VMVariable (line 3250)
+- new Variable (line 3280)
+- new Variable (line 3325)
 - 111 class method(s)
 - 32 closure(s)
 
