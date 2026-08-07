@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\BuiltinByRefParams;
+use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
+use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\NamedArgs;
@@ -63,7 +66,10 @@ final class VmCallable
     ): Variable {
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
-            return VmClosureCall::invoke($ctx, VmClosureCall::resolve($callback), ...$args);
+            $state = VmClosureCall::resolve($callback);
+            self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $state->func, $args);
+
+            return VmClosureCall::invoke($ctx, $state, ...$args);
         }
         if (Variable::TYPE_STRING === $callback->type) {
             return self::invokeStringCallable($ctx, $callback->toString(), $function, $scopeFrame, ...$args);
@@ -76,6 +82,7 @@ final class VmCallable
             if (null !== $object->closureState) {
                 throw new \TypeError(self::invalidCallbackTypeError($function));
             }
+            self::warnObjectInvokeByRefValueArgs($ctx, $scopeFrame, $object->class, $args);
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, '__invoke', ...$args);
         }
@@ -102,6 +109,7 @@ final class VmCallable
                 null,
                 $entries
             );
+            self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $state->func, $resolved);
 
             return VmClosureCall::invoke($ctx, $state, ...$resolved);
         }
@@ -125,6 +133,7 @@ final class VmCallable
                 throw new \TypeError(self::invalidCallbackTypeError($function));
             }
             $resolved = self::resolveEntriesToPositional($entries);
+            self::warnObjectInvokeByRefValueArgs($ctx, $scopeFrame, $object->class, $resolved);
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, '__invoke', ...$resolved);
         }
@@ -608,9 +617,11 @@ final class VmCallable
             } catch (\LogicException) {
                 throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
             }
+            self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $fn, $args);
 
             return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
         }
+        self::warnInternalByRefValueArgs($ctx, $scopeFrame, $internal->getName(), $args);
 
         return VmInternalCall::invokeInContext($ctx, $internal, ...$args);
     }
@@ -643,12 +654,22 @@ final class VmCallable
                 throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
             }
 
+            $resolved = NamedArgs::resolve(
+                $entries,
+                $fn->block->paramNames,
+                $fn->block->variadicParamIndex,
+                $fn->block->func?->name ?? null
+            );
+            ksort($resolved);
+            self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $fn, $resolved);
+
             return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
         }
-        $paramNames = \PHPCompiler\BuiltinParamNames::forFunction($name) ?? [];
-        $variadicIndex = \PHPCompiler\BuiltinParamNames::variadicParamIndexForFunction($name);
+        $paramNames = BuiltinParamNames::forFunction($name) ?? [];
+        $variadicIndex = BuiltinParamNames::variadicParamIndexForFunction($name);
         $resolved = NamedArgs::resolve($entries, $paramNames, $variadicIndex, $name);
         ksort($resolved);
+        self::warnInternalByRefValueArgs($ctx, $scopeFrame, $name, $resolved);
 
         return VmInternalCall::invokeInContext($ctx, $internal, ...array_values($resolved));
     }
@@ -681,15 +702,12 @@ final class VmCallable
         $out = [];
         foreach ($entries as $entry) {
             if ('p' === $entry[0]) {
-                $copy = new Variable();
-                $copy->copyFrom($entry[1]);
-                $out[] = $copy;
+                // Preserve TYPE_INDIRECT so call_user_func_array([&$x]) writeback works (#28793).
+                $out[] = $entry[1];
                 continue;
             }
             if ('n' === $entry[0]) {
-                $copy = new Variable();
-                $copy->copyFrom($entry[2]);
-                $out[] = $copy;
+                $out[] = $entry[2];
             }
         }
 
@@ -716,7 +734,7 @@ final class VmCallable
         if ('' === $methodName) {
             throw new \TypeError(self::invalidCallbackTypeError($function));
         }
-        if (Variable::TYPE_OBJECT === $target->type) {
+            if (Variable::TYPE_OBJECT === $target->type) {
             $object = $target->toObject();
             // Missing method + __call: invokeInstanceMethod does not magic-dispatch (#25747).
             if (
@@ -736,6 +754,7 @@ final class VmCallable
             )) {
                 return self::invokeMagicInstanceCall($ctx, $object, $methodName, ...$args);
             }
+            self::warnInstanceMethodByRefValueArgs($ctx, $scopeFrame, $object->class, $methodName, $args);
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, $methodName, ...$args);
         }
@@ -999,11 +1018,14 @@ final class VmCallable
                 return self::invokeMagicInstanceCall($ctx, $object, $methodName, ...$args);
             }
             $func = $declaring->methods[$methodLc];
-            if (!$func instanceof \PHPCompiler\Func\PHP) {
+            if (!$func instanceof PhpFunc) {
+                self::warnInstanceMethodByRefValueArgs($ctx, $scopeFrame, $object->class, $methodName, $args);
+
                 return $vm->invokeInstanceMethod($object, $methodName, ...$args);
             }
             $boundThis = new Variable();
             $boundThis->object($object);
+            self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $func, $args);
 
             return $vm->invokePhpFunctionIsolated($func, $boundThis, ...$args);
         }
@@ -1029,6 +1051,10 @@ final class VmCallable
 
         if ($needsMagic) {
             return self::invokeMagicStaticCall($ctx, $resolved, $methodName, ...$args);
+        }
+        $staticFunc = $declaring->methods[$methodLc] ?? null;
+        if ($staticFunc instanceof PhpFunc) {
+            self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $staticFunc, $args);
         }
 
         return $vm->invokeDeclaredStaticWithCalledScope(
@@ -1140,6 +1166,232 @@ final class VmCallable
         self::maybeDeprecateScopeKeywordCallable($ctx, $scopeFrame, $lc, $emitDeprecation);
 
         return $resolved;
+    }
+
+    /**
+     * Zend zend_call_function — E_WARNING when a by-ref parameter receives a non-reference (#28793).
+     *
+     * call_user_func* / forward_static_call* / FCC paths pass by-value copies; php-src still
+     * invokes the callee but warns and does not write back. Real references (TYPE_INDIRECT from
+     * `[&$x]`) bind silently.
+     *
+     * @param array<int, Variable> $args parameter arguments (no $this)
+     */
+    public static function warnPhpFuncByRefValueArgs(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        PhpFunc $func,
+        array $args
+    ): void {
+        $block = $func->block;
+        if ([] === $block->paramByRef) {
+            return;
+        }
+        self::warnByRefParamsGivenByValue(
+            $ctx,
+            $scopeFrame,
+            self::phpCalleeDisplayName($func),
+            $block->paramByRef,
+            $block->paramNames,
+            $args,
+            $block->variadicParamIndex
+        );
+    }
+
+    /**
+     * @param array<int, Variable> $args
+     */
+    public static function warnInternalByRefValueArgs(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        string $functionName,
+        array $args
+    ): void {
+        $indices = BuiltinByRefParams::forFunction($functionName);
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($functionName);
+        if ([] === $indices && null === $variadicFrom) {
+            return;
+        }
+        $paramNames = BuiltinParamNames::forFunction($functionName) ?? [];
+        $paramByRef = [];
+        foreach ($indices as $idx) {
+            $paramByRef[(int) $idx] = true;
+        }
+        self::warnByRefParamsGivenByValue(
+            $ctx,
+            $scopeFrame,
+            $functionName,
+            $paramByRef,
+            $paramNames,
+            $args,
+            $variadicFrom
+        );
+    }
+
+    /**
+     * @param array<int, Variable> $args
+     */
+    private static function warnInstanceMethodByRefValueArgs(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        ClassEntry $class,
+        string $methodName,
+        array $args
+    ): void {
+        $methodLc = strtolower($methodName);
+        $current = $class;
+        $visited = [];
+        while (true) {
+            $lc = strtolower($current->name);
+            if (isset($visited[$lc])) {
+                return;
+            }
+            $visited[$lc] = true;
+            if (isset($current->methods[$methodLc])) {
+                $func = $current->methods[$methodLc];
+                if ($func instanceof PhpFunc) {
+                    self::warnPhpFuncByRefValueArgs($ctx, $scopeFrame, $func, $args);
+                }
+
+                return;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    /**
+     * @param array<int, Variable> $args
+     */
+    private static function warnObjectInvokeByRefValueArgs(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        ClassEntry $class,
+        array $args
+    ): void {
+        self::warnInstanceMethodByRefValueArgs($ctx, $scopeFrame, $class, '__invoke', $args);
+    }
+
+    /**
+     * @param array<int, true>     $paramByRef
+     * @param list<string>         $paramNames
+     * @param array<int, Variable> $args
+     */
+    private static function warnByRefParamsGivenByValue(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        string $calleeDisplayName,
+        array $paramByRef,
+        array $paramNames,
+        array $args,
+        ?int $variadicByRefIdx
+    ): void {
+        if ([] === $paramByRef && null === $variadicByRefIdx) {
+            return;
+        }
+        $maxArg = -1;
+        foreach (array_keys($args) as $key) {
+            if ((int) $key > $maxArg) {
+                $maxArg = (int) $key;
+            }
+        }
+        foreach ($paramByRef as $paramIdx => $_) {
+            $idx = (int) $paramIdx;
+            if (null !== $variadicByRefIdx && $idx === $variadicByRefIdx) {
+                continue;
+            }
+            if (!array_key_exists($idx, $args)) {
+                continue;
+            }
+            if (self::argIsCallUserFuncReference($args[$idx])) {
+                continue;
+            }
+            $paramName = $paramNames[$idx] ?? 'param'.$idx;
+            self::emitMustBePassedByReferenceWarning(
+                $ctx,
+                $scopeFrame,
+                $calleeDisplayName,
+                $idx + 1,
+                $paramName
+            );
+        }
+        if (null === $variadicByRefIdx) {
+            return;
+        }
+        $paramName = $paramNames[$variadicByRefIdx] ?? 'param'.$variadicByRefIdx;
+        for ($argIndex = $variadicByRefIdx; $argIndex <= $maxArg; ++$argIndex) {
+            if (!array_key_exists($argIndex, $args)) {
+                continue;
+            }
+            if (self::argIsCallUserFuncReference($args[$argIndex])) {
+                continue;
+            }
+            self::emitMustBePassedByReferenceWarning(
+                $ctx,
+                $scopeFrame,
+                $calleeDisplayName,
+                $argIndex + 1,
+                $paramName
+            );
+        }
+    }
+
+    /**
+     * call_user_func_array([&$x]) / HT reference elements are TYPE_INDIRECT (#28793).
+     */
+    private static function argIsCallUserFuncReference(Variable $arg): bool
+    {
+        return Variable::TYPE_INDIRECT === $arg->type;
+    }
+
+    private static function emitMustBePassedByReferenceWarning(
+        Context $ctx,
+        ?Frame $scopeFrame,
+        string $calleeDisplayName,
+        int $argNum,
+        string $paramName
+    ): void {
+        $ctx->errors->languageWarning(
+            \sprintf(
+                '%s(): Argument #%d ($%s) must be passed by reference, value given',
+                $calleeDisplayName,
+                $argNum,
+                $paramName
+            ),
+            null,
+            0,
+            $ctx,
+            $scopeFrame
+        );
+    }
+
+    private static function phpCalleeDisplayName(PhpFunc $func): string
+    {
+        $decl = $func->block->func;
+        if (null !== $decl) {
+            $name = $decl->name;
+            if (is_string($name) && preg_match('/^\{anonymous\}#\d+$/', $name)) {
+                return '{closure}';
+            }
+            if (null !== $decl->class) {
+                $className = $decl->class instanceof \PHPCfg\Operand\Literal
+                    ? (string) $decl->class->value
+                    : (string) $decl->class;
+
+                return $className.'::'.$name;
+            }
+            if (is_string($name) && '' !== $name) {
+                return $name;
+            }
+        }
+        $fallback = $func->getName();
+        if (preg_match('/^\{anonymous\}#\d+$/', $fallback) || '{closure}' === $fallback) {
+            return '{closure}';
+        }
+
+        return $fallback;
     }
 
     /**
