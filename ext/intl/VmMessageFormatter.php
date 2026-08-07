@@ -1054,6 +1054,11 @@ final class MessageFormatterConstruct extends VmClassMethod
             throw new \IntlException(IntlError::getMessage());
         }
     }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        return JitMessageFormatterConstruct::invoke($context, ...$args);
+    }
 }
 
 /** MessageFormatter::create() — php-src msgfmt_create (#6366). */
@@ -1089,7 +1094,7 @@ final class MessageFormatterCreate extends VmClassMethod
     }
 }
 
-/** MessageFormatter::format() — php-src msgfmt_format (#6366). */
+/** MessageFormatter::format() — php-src msgfmt_format (#6366). AOT: #28655. */
 final class MessageFormatterFormat extends VmClassMethod
 {
     public function __construct()
@@ -1122,6 +1127,11 @@ final class MessageFormatterFormat extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        return JitMessageFormatterFormat::invokeMethod($context, ...$args);
     }
 }
 
