@@ -30,6 +30,16 @@ final class RandomU64
         return self::fromHex64($hi, $lo);
     }
 
+    /** Split a non-negative PHP int into unsigned 32-bit limbs (values up to 2^63-1). */
+    public static function fromUint64(int $value): self
+    {
+        if ($value < 0) {
+            throw new \LogicException('fromUint64 requires a non-negative value');
+        }
+
+        return new self(($value >> 32) & 0xFFFFFFFF, $value & 0xFFFFFFFF);
+    }
+
     public function toInt(): int
     {
         return 0 === $this->hi ? $this->lo : ($this->lo | ($this->hi << 32));
@@ -86,9 +96,47 @@ final class RandomU64
         if (0 === $value->hi) {
             return $value->lo % $modulus;
         }
-        $two32mod = (int) (4294967296 % $modulus);
+        // ((hi % m) * (2^32 % m) + (lo % m)) % m — mul without overflowing PHP int (#28526).
+        $hiMod = $value->hi % $modulus;
+        $loMod = $value->lo % $modulus;
+        $two32mod = 4294967296 % $modulus;
 
-        return (($value->hi % $modulus) * $two32mod + ($value->lo % $modulus)) % $modulus;
+        return self::addMod(self::mulMod($hiMod, $two32mod, $modulus), $loMod, $modulus);
+    }
+
+    /** ($a * $b) % $m for non-negative operands (avoids float promotion on large products). */
+    private static function mulMod(int $a, int $b, int $m): int
+    {
+        $a %= $m;
+        $b %= $m;
+        if (0 === $a || 0 === $b) {
+            return 0;
+        }
+        if ($b <= intdiv(\PHP_INT_MAX, $a)) {
+            return ($a * $b) % $m;
+        }
+        $result = 0;
+        while ($b > 0) {
+            if (0 !== ($b & 1)) {
+                $result = self::addMod($result, $a, $m);
+            }
+            $a = self::addMod($a, $a, $m);
+            $b >>= 1;
+        }
+
+        return $result;
+    }
+
+    private static function addMod(int $a, int $b, int $m): int
+    {
+        $a %= $m;
+        $b %= $m;
+        // Both in [0, m); avoid a+b promoting to float when 2m > PHP_INT_MAX.
+        if ($a >= $m - $b) {
+            return $a - ($m - $b);
+        }
+
+        return $a + $b;
     }
 
     public function upper53UnitFloat(): float

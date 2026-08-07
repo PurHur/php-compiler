@@ -155,21 +155,20 @@ final class RandomEngineStorage
         }
 
         $result = self::generateRandomU64($engineObject);
-        if (0xFFFFFFFF === $umax) {
-            return $result->toInt();
-        }
+        // php-src: umax == UINT64_MAX → return raw. Not representable as signed PHP int.
 
         $umaxPlusOne = $umax + 1;
+        // Powers of two are unbiased: return result & umax (php-src after umax++).
+        // umax may exceed 32 bits (e.g. 2^52-1 for getFloat [0,1) γ-section) — #28526.
         if (($umaxPlusOne & $umax) === 0) {
-            $masked = RandomU64::and($result, RandomU64::fromParts(0, $umax));
-
-            return 0 === $masked->hi ? $masked->lo : RandomU64::modSmall($masked, $umaxPlusOne);
+            return RandomU64::and($result, RandomU64::fromUint64($umax))->toInt();
         }
 
-        $limit = RandomU64::fromParts(
-            0xFFFFFFFF,
-            (0xFFFFFFFF - $umaxPlusOne) & 0xFFFFFFFF
-        );
+        // limit = UINT64_MAX - (UINT64_MAX % umaxPlusOne) - 1
+        $u64max = RandomU64::fromParts(0xFFFFFFFF, 0xFFFFFFFF);
+        $remainder = RandomU64::modSmall($u64max, $umaxPlusOne);
+        $limitNot = ~($remainder + 1);
+        $limit = RandomU64::fromParts(($limitNot >> 32) & 0xFFFFFFFF, $limitNot & 0xFFFFFFFF);
         $attempts = 0;
         while (RandomU64::compare($result, $limit) > 0) {
             if (++$attempts > 50) {
