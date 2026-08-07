@@ -837,7 +837,8 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsMemcached()
                 && str_contains($name, 'memcached')
-                && !str_contains($name, 'memcached_phantom')) {
+                && !str_contains($name, 'memcached_phantom')
+                && !str_contains($name, 'forward84')) {
                 continue;
             }
             if (CompilerVersion::supportsMemcached()

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7206 |
-| Phase A inventory files (M2 ratio SSOT) | 7206 |
+| PHP files on vm.php path | 7207 |
+| Phase A inventory files (M2 ratio SSOT) | 7207 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23227 |
+| Source constructs flagged (warnings) | 23255 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1535,12 +1535,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/memcached/MemcachedClassMethod.php` | 0 | 1 |
 | `ext/memcached/MemcachedConstruct.php` | 0 | 1 |
 | `ext/memcached/MemcachedDelete.php` | 0 | 2 |
+| `ext/memcached/MemcachedDepthMethods.php` | 0 | 16 |
 | `ext/memcached/MemcachedExtensionPolicy.php` | 0 | 1 |
 | `ext/memcached/MemcachedGet.php` | 0 | 2 |
 | `ext/memcached/MemcachedGetResultCode.php` | 0 | 1 |
 | `ext/memcached/MemcachedSet.php` | 0 | 2 |
 | `ext/memcached/Module.php` | 0 | 1 |
-| `ext/memcached/VmMemcached.php` | 0 | 10 |
+| `ext/memcached/VmMemcached.php` | 0 | 22 |
 | `ext/memcached/VmMemcachedNative.php` | 0 | 1 |
 | `ext/mongodb/BuiltinClasses.php` | 0 | 1 |
 | `ext/mongodb/BulkWriteConstruct.php` | 0 | 1 |
@@ -19090,6 +19091,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/memcached/MemcachedDepthMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 63)
+- new ArgumentCountError (line 100)
+- new ArgumentCountError (line 134)
+- new ArgumentCountError (line 168)
+- new ArgumentCountError (line 208)
+- new ArgumentCountError (line 278)
+- new HashTable (line 305)
+- new Variable (line 311)
+- new ArgumentCountError (line 330)
+- new ArgumentCountError (line 372)
+- new HashTable (line 384)
+- new Variable (line 387)
+- new ArgumentCountError (line 409)
+- new ArgumentCountError (line 454)
+- 12 class method(s)
+
 ### `ext/memcached/MemcachedExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19123,18 +19144,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 32)
 - new Variable (line 35)
 - new MemcachedConstruct (line 42)
-- new MemcachedAddServer (line 47)
-- new MemcachedSet (line 48)
-- new MemcachedGet (line 49)
-- new MemcachedDelete (line 50)
-- new MemcachedGetResultCode (line 51)
-- new MemcachedState (line 68)
-- 9 class method(s)
+- new MemcachedAddServer (line 48)
+- new MemcachedSet (line 49)
+- new MemcachedGet (line 50)
+- new MemcachedDelete (line 51)
+- new MemcachedGetResultCode (line 52)
+- new MemcachedAdd (line 54)
+- new MemcachedReplace (line 55)
+- new MemcachedAppend (line 56)
+- new MemcachedPrepend (line 57)
+- new MemcachedIncrement (line 58)
+- new MemcachedDecrement (line 59)
+- new MemcachedFlush (line 60)
+- new MemcachedGetMulti (line 61)
+- new MemcachedSetMulti (line 62)
+- new MemcachedDeleteMulti (line 63)
+- new MemcachedTouch (line 64)
+- new MemcachedCas (line 65)
+- new MemcachedState (line 85)
+- 11 class method(s)
 
 ### `ext/memcached/VmMemcachedNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 18 class method(s)
 
 ### `ext/mongodb/BuiltinClasses.php`
 
