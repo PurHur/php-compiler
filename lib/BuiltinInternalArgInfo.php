@@ -159,8 +159,9 @@ final class BuiltinInternalArgInfo
             'realpath' => 'string|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits |false (#26317)
             'getmyuid', 'getmygid', 'getmypid', 'getlastmod' => 'int|false',
-            // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511, #26342)
-            'gzencode', 'gzdecode', 'gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate' => 'string|false',
+            // ext/zlib/zlib.stub.php — InternalArgInfo omits |false (#25511, #26342, #28349)
+            'gzencode', 'gzdecode', 'gzcompress', 'gzuncompress', 'gzdeflate', 'gzinflate',
+            'zlib_encode', 'zlib_decode' => 'string|false',
             // pecl-file_formats-lzf lzf.stub.php — InternalArgInfo return int (missing |false) (#28063)
             'lzf_optimized_for' => 'int|false',
             // ext/zlib/zlib.stub.php — InternalArgInfo return resource; Zend DeflateContext|false / InflateContext|false (#27627)
