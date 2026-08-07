@@ -1,5 +1,5 @@
 --TEST--
-stdlib forward profile — IEEE math advertised, bcmath withheld (#16677, #16086)
+stdlib forward profile — fpow/bcround advertised; IEEE phantoms withheld (#28565, #16677, #16086)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -7,8 +7,13 @@ PHP_COMPILER_PROFILE=8.4
 declare(strict_types=1);
 
 $fail = [];
-foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'nextafter', 'bcround'] as $fn) {
+foreach (['fpow', 'bcround'] as $fn) {
     if (!function_exists($fn)) {
+        $fail[] = $fn;
+    }
+}
+foreach (['fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'nextafter'] as $fn) {
+    if (function_exists($fn)) {
         $fail[] = $fn;
     }
 }

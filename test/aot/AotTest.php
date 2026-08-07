@@ -157,12 +157,18 @@ class AotTest extends BaseTest
                 continue;
             }
             if (!CompilerVersion::supportsFpow()
-                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax')
-                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))) {
+                && str_contains($name, 'fpow')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsIeeeFloatOpPhantoms()
+                && (str_contains($name, 'fmin') || str_contains($name, 'fmax')
+                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))
+                && !str_contains($name, 'phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsNextafter()
-                && str_contains($name, 'nextafter')) {
+                && str_contains($name, 'nextafter')
+                && !str_contains($name, 'phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsRoundingModeEnum()

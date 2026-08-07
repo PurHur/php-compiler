@@ -20,8 +20,12 @@ final class BuiltinIntrospectionPolicy
     public static function functionIsAdvertised(string $functionName): bool
     {
         $lc = strtolower($functionName);
-        if (\in_array($lc, ['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'], true)) {
+        if ('fpow' === $lc) {
             return CompilerVersion::advertisesFpow();
+        }
+        // fadd/fsub/fmul/fmax/fmin — absent from php-src (#28565).
+        if (\in_array($lc, ['fmin', 'fmax', 'fadd', 'fsub', 'fmul'], true)) {
+            return CompilerVersion::advertisesIeeeFloatOpPhantoms();
         }
         if ('json_validate' === $lc) {
             return CompilerVersion::advertisesJsonValidate();

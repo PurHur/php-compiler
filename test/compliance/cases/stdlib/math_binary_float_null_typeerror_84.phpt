@@ -1,10 +1,10 @@
 --TEST--
-stdlib fadd/fsub/fmul/fdiv/fmod/hypot/atan2(null) TypeError on 8.4 forward profile (#19182, #20432, #24198; fpow → #24177)
+stdlib fdiv/fmod/hypot/atan2(null) TypeError on 8.4 forward profile (#19182, #20432, #24198)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-foreach (['fadd', 'fsub', 'fmul', 'fdiv', 'fmod', 'hypot', 'atan2'] as $fn) {
+foreach (['fdiv', 'fmod', 'hypot', 'atan2'] as $fn) {
     try {
         $fn(null, 1.0);
         echo "fail {$fn}\n";
@@ -13,9 +13,6 @@ foreach (['fadd', 'fsub', 'fmul', 'fdiv', 'fmod', 'hypot', 'atan2'] as $fn) {
     }
 }
 --EXPECT--
-ok fadd
-ok fsub
-ok fmul
 ok fdiv
 ok fmod
 ok hypot

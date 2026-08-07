@@ -1082,23 +1082,21 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsNextafterFalseOnReferenceProfile(): void
+    public function testSupportsNextafterAlwaysFalse(): void
     {
+        // php-src has no nextafter() userland builtin (#28565).
         $this->assertFalse(CompilerVersion::supportsNextafter());
-    }
-
-    public function testSupportsNextafterTrueOnForwardProfile(): void
-    {
+        $this->assertFalse(CompilerVersion::advertisesNextafter());
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsNextafter());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsNextafter(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesNextafter(), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
@@ -3112,13 +3110,13 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
     }
 
-    public function testVmRegistersNextafterOnForwardProfile(): void
+    public function testVmDoesNotRegisterNextafterOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+            $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

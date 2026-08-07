@@ -18,9 +18,15 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsFpow());
             $this->assertTrue(CompilerVersion::advertisesFpow());
-            $this->assertTrue(CompilerVersion::advertisesNextafter());
+            $this->assertFalse(CompilerVersion::supportsIeeeFloatOpPhantoms());
+            $this->assertFalse(CompilerVersion::advertisesIeeeFloatOpPhantoms());
+            $this->assertFalse(CompilerVersion::supportsNextafter());
+            $this->assertFalse(CompilerVersion::advertisesNextafter());
             $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('fpow'));
-            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('nextafter'));
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('nextafter'));
+            foreach (['fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
+                $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised($fn), $fn);
+            }
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -28,7 +34,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'fpow')
             );
-            $this->assertTrue(
+            $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'nextafter')
             );
         } finally {
@@ -351,7 +357,10 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertContains('str_increment', $internal);
             $this->assertContains('str_decrement', $internal);
             $this->assertContains('fpow', $internal);
-            $this->assertContains('nextafter', $internal);
+            $this->assertNotContains('nextafter', $internal);
+            foreach (['fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
+                $this->assertNotContains($fn, $internal, $fn);
+            }
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
