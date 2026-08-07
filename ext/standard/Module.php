@@ -134,7 +134,9 @@ class Module extends ModuleAbstract
             // ldexp() — phantom vs php-src math.stub.php (#24607); keep VmMath::ldexp / MathLdexp internal.
             // frexp() — phantom vs php-src math.stub.php (#24133); keep VmMath::frexp / MathFrexp internal.
             new fdiv(),
-            ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax(), new fadd(), new fsub(), new fmul()] : []),
+            // fpow only — fadd/fsub/fmul/fmax/fmin/nextafter are php-src phantoms (#28565).
+            ...(CompilerVersion::supportsFpow() ? [new fpow()] : []),
+            ...(CompilerVersion::supportsIeeeFloatOpPhantoms() ? [new fmin(), new fmax(), new fadd(), new fsub(), new fmul()] : []),
             ...(CompilerVersion::supportsClamp() ? [new clamp()] : []),
             ...(CompilerVersion::supportsNextafter() ? [new nextafter()] : []),
             new intval(),

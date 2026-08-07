@@ -1259,13 +1259,22 @@ function withheldBuiltinGateDefinitions(): array
 {
     return [
         [
-            'names' => ['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'],
+            'names' => ['fpow'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsFpow'],
             'since' => '8.4.0',
             'module' => 'standard',
             'relPath' => 'ext/standard/fpow.php',
         ],
         [
+            // Absent from php-src math.stub.php — withhold forever (#28565).
+            'names' => ['fmin', 'fmax', 'fadd', 'fsub', 'fmul'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsIeeeFloatOpPhantoms'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/fadd.php',
+        ],
+        [
+            // Absent from php-src — withhold forever (#28565); phpc_nextafter_kernel stays internal.
             'names' => ['nextafter'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsNextafter'],
             'since' => '8.4.0',

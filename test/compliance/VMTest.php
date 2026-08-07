@@ -86,27 +86,36 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsFpow()
-                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax')
-                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))
+                && str_contains($name, 'fpow')
                 && !str_contains($name, 'php84_math_string_builtins_phantom')
                 && !str_contains($name, 'fpow_function_exists_forward_profile')
                 && !str_contains($name, 'fpow_roundingmode_argcount')) {
                 continue;
             }
+            if (!CompilerVersion::supportsIeeeFloatOpPhantoms()
+                && (str_contains($name, 'fmin') || str_contains($name, 'fmax')
+                    || str_contains($name, 'fadd') || str_contains($name, 'fsub') || str_contains($name, 'fmul'))
+                && !str_contains($name, 'fadd_fsub_fmul_phantom')
+                && !str_contains($name, 'fmin_fmax_phantom')
+                && !str_contains($name, 'ieee_float_op_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsNextafter()
                 && str_contains($name, 'nextafter')
                 && !str_contains($name, 'php84_math_string_builtins_phantom')
-                && !str_contains($name, 'nextafter_profile')) {
+                && !str_contains($name, 'nextafter_profile')
+                && !str_contains($name, 'nextafter_phantom')) {
                 continue;
             }
             if (CompilerVersion::supportsNextafter()
-                && str_contains($name, 'nextafter_profile')) {
+                && (str_contains($name, 'nextafter_profile') || str_contains($name, 'nextafter_phantom'))) {
                 continue;
             }
             if (CompilerVersion::supportsNextafter()
                 && !CompilerVersion::advertisesNextafter()
                 && str_contains($name, 'nextafter')
                 && !str_contains($name, 'nextafter_profile')
+                && !str_contains($name, 'nextafter_phantom')
                 && !str_contains($name, 'php84_math_string_builtins_phantom')
                 && !str_contains($name, 'forward_profile_phantom_introspection')) {
                 continue;

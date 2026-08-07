@@ -973,10 +973,22 @@ final class CompilerVersion
      * PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045, #12412, #15028, #15692).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Sibling phantoms fadd/fsub/fmul/fmax/fmin are never registered — see {@see supportsIeeeFloatOpPhantoms()}.
      */
     public static function supportsFpow(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * fadd()/fsub()/fmul()/fmax()/fmin() — absent from php-src (ext/standard/math.c / math.stub.php).
+     *
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.4/8.5).
+     * Prior forward-profile enable (#16677/#17290/#27617) retired by #28565 — Zend ships fpow/fdiv/fmod only.
+     */
+    public static function supportsIeeeFloatOpPhantoms(): bool
+    {
+        return false;
     }
 
     /**
@@ -1014,10 +1026,10 @@ final class CompilerVersion
     }
 
     /**
-     * fpow()/fmin()/fmax()/fadd()/fsub()/fmul() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
+     * fpow() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
      *
      * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev
-     * reference harness like Zend 8.2.
+     * reference harness like Zend 8.2. Phantom siblings use {@see supportsIeeeFloatOpPhantoms()} (#28565).
      */
     public static function advertisesFpow(): bool
     {
@@ -1028,24 +1040,28 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
+    /** fadd/fsub/fmul/fmax/fmin visible to function_exists() — never (php-src absent, #28565). */
+    public static function advertisesIeeeFloatOpPhantoms(): bool
+    {
+        return false;
+    }
+
     /**
-     * PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241, #15584, #15677).
+     * nextafter() — absent from php-src as a userland builtin (libc nextafter(3) only;
+     * ext/standard/math.c has fpow/fdiv/fmod, not nextafter).
      *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Never register or advertise on php-src-strict profiles. Keep {@see phpc_nextafter_kernel}
+     * as an internal IEEE helper for sin/cos/etc. (#28565; re-#9241/#15584/#15677).
      */
     public static function supportsNextafter(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
-    /** nextafter() visible to function_exists() — stable runtime or forward 8.4+ (#16677). */
+    /** nextafter() visible to function_exists() — never (php-src absent, #28565). */
     public static function advertisesNextafter(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
@@ -3855,7 +3871,7 @@ final class CompilerVersion
      * PHP 8.4+ bcround() (ext/bcmath/bcmath.c; #5935, #16709).
      *
      * Callable under forward profile via {@see supportsBcmath()}; advertised on stable 8.4+ or
-     * {@code PHP_COMPILER_PROFILE=8.4} like fpow/nextafter (#16677).
+     * {@code PHP_COMPILER_PROFILE=8.4} like fpow (#16677).
      */
     public static function advertisesBcround(): bool
     {

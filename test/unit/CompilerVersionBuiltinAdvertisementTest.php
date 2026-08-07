@@ -450,24 +450,21 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testNextafterWithheldOnReferenceProfile(): void
+    public function testNextafterWithheldAlways(): void
     {
+        // php-src has no nextafter() userland builtin (#28565).
         $this->assertFalse(CompilerVersion::supportsNextafter());
-    }
-
-    public function testNextafterAdvertisedOnForwardProfile(): void
-    {
+        $this->assertFalse(CompilerVersion::advertisesNextafter());
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsNextafter());
-            $this->assertTrue(CompilerVersion::advertisesNextafter());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsNextafter(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesNextafter(), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
@@ -478,7 +475,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsFpow());
             $this->assertTrue(CompilerVersion::advertisesFpow());
-            $this->assertTrue(CompilerVersion::advertisesNextafter());
+            $this->assertFalse(CompilerVersion::supportsIeeeFloatOpPhantoms());
+            $this->assertFalse(CompilerVersion::advertisesIeeeFloatOpPhantoms());
+            $this->assertFalse(CompilerVersion::advertisesNextafter());
             $this->assertTrue(CompilerVersion::supportsBcmath());
             $this->assertTrue(CompilerVersion::advertisesBcround());
         } finally {
@@ -629,15 +628,16 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersFpowFamilyOnForwardProfile(): void
+    public function testVmRegistersFpowOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            $this->assertTrue(isset($ctx->functions['fpow']));
+            foreach (['fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'nextafter'] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
             $this->assertFalse(isset($ctx->functions['stream_supports']));
             $this->assertTrue(isset($ctx->functions['stream_supports_lock']));
@@ -658,13 +658,14 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
     }
 
-    public function testVmRegistersNextafterOnForwardProfile(): void
+    public function testVmDoesNotRegisterNextafterOnForwardProfile(): void
     {
+        // php-src has no nextafter() (#28565).
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+            $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

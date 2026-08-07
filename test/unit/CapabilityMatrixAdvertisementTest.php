@@ -34,7 +34,7 @@ final class CapabilityMatrixAdvertisementTest extends TestCase
     public function testWithheldFpowFamilyDocumentedWhenGateOff(): void
     {
         if (CompilerVersion::supportsFpow()) {
-            $this->markTestSkipped('fpow family registered on this profile');
+            $this->markTestSkipped('fpow registered on this profile');
         }
 
         $root = dirname(__DIR__, 2);
@@ -44,7 +44,11 @@ final class CapabilityMatrixAdvertisementTest extends TestCase
             applyBuiltinAdvertisementParity(collectCapabilities($root), $root)
         );
 
-        foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
+        $this->assertArrayHasKey('fpow', $capabilities);
+        $this->assertFalse($capabilities['fpow']['vm'], 'fpow');
+        $this->assertNotEmpty($capabilities['fpow']['notes']);
+
+        foreach (['fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'nextafter'] as $fn) {
             $this->assertArrayHasKey($fn, $capabilities);
             $this->assertFalse($capabilities[$fn]['vm'], $fn);
             $this->assertNotEmpty($capabilities[$fn]['notes']);
