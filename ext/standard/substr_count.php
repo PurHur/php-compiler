@@ -25,10 +25,9 @@ final class substr_count extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28311).
+        $this->requireArgCountRange($frame, 'substr_count', 2, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -53,10 +52,11 @@ final class substr_count extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer strpos #21964 / #28311.
+        if (!$this->requireArgCountRangeJit($context, $args, 'substr_count', 2, 4)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        $argc = \count($args);
 
         // Compile-time fold (#21657) — host-evaluate when operands are literals (AOT verify).
         $folded = self::tryFoldCompileTime($context, $args);

@@ -19,10 +19,9 @@ final class strspn extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28311).
+        $this->requireArgCountRange($frame, 'strspn', 2, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('strspn() requires two to four arguments in this compiler build');
-        }
         $str = VmString::trimFamilyStringArgForFrame($frame, 0, 'strspn', 0, 'string');
         $mask = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'strspn', 1, 'characters');
         $offset = 0;
@@ -43,10 +42,11 @@ final class strspn extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('strspn() requires two to four arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer strpos #21964 / #28311.
+        if (!$this->requireArgCountRangeJit($context, $args, 'strspn', 2, 4)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
+
         return SpnJitLowering::extended($context, $args, true, 'strspn');
     }
 }
