@@ -29,10 +29,8 @@ final class getenv_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc > 2) {
-            throw new \LogicException('getenv() accepts at most two arguments');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28690).
+        $this->requireAtMostArgCount($frame, 'getenv', 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -70,10 +68,11 @@ final class getenv_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 2) {
-            throw new \LogicException('getenv() accepts at most two arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #28690.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'getenv', 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
         // Densify pads omitted name with null constant before spread (#24855 / #9525).
         if (
             0 === $argc

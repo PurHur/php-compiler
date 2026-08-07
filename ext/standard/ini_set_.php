@@ -23,9 +23,8 @@ final class ini_set_ extends Internal
     public function execute(Frame $frame): void
     {
         $fn = $this->getName();
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException($fn.'() requires exactly two arguments');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28690).
+        $this->requireExactArgCount($frame, $fn, 2);
         if (null === $frame->vmContext) {
             return;
         }
@@ -82,8 +81,9 @@ final class ini_set_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $fn = $this->getName();
-        if (2 !== \count($args)) {
-            throw new \LogicException($fn.'() requires exactly two arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #28690.
+        if (!$this->requireExactJitArgCount($context, $args, $fn, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         // Compile-time non-string TypeError (int/… on 8.4; null soft-coerces #21312; #20361).
         if (IniOptionArg::jitOptionRejectsWithoutIniCall($context, $args[0])) {
