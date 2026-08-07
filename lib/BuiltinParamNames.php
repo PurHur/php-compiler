@@ -899,6 +899,9 @@ final class BuiltinParamNames
                 return ['stream', 'format', 'values'];
             case 'pack':
                 return ['format', 'values'];
+            // php-src ext/pgsql/pgsql.stub.php — InternalArgInfo still field_number (#27703)
+            case 'pg_field_table':
+                return ['result', 'field', 'oid_only='];
             // php-src ext/standard/array.stub.php — array ...$arrays (0 required); InternalArgInfo still arr1+... (#25382)
             case 'array_merge':
             case 'array_merge_recursive':
