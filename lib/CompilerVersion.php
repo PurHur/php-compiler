@@ -1885,14 +1885,17 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionProperty/ReflectionParameter::isDeprecated() (ext/reflection/php_reflection.c, #9768).
+     * ReflectionProperty/ReflectionParameter::isDeprecated() — phantom vs php-src (#28529, re-#9768).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * php-src only ships isDeprecated() on ReflectionFunctionAbstract (+ Method) and
+     * ReflectionClassConstant / ReflectionConstant (ext/reflection/php_reflection.stub.php on 8.2–8.5).
+     * Never advertise Parameter/Property isDeprecated on any php-src-strict profile.
+     * Function/ClassConstant gates stay separate ({@see supportsReflectionFunctionIsDeprecated},
+     * {@see supportsReflectionClassConstantIsDeprecated}).
      */
     public static function supportsReflectionPropertyParameterIsDeprecated(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

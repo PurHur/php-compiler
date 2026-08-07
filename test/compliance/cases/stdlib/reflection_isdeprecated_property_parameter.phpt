@@ -1,8 +1,8 @@
 --TEST--
-ReflectionProperty/ReflectionParameter::isDeprecated() — skipped: Zend rejects #[\Deprecated] on property/parameter (#9768 / #23701)
+ReflectionProperty/ReflectionParameter::isDeprecated() — skipped: phantoms vs php-src (#28529 / #23701)
 --SKIPIF--
 <?php
-die('skip #[\Deprecated] cannot target property/parameter (Zend 8.4/8.5, #23701); ReflectionProperty::isDeprecated absent on php-src 8.4');
+die('skip ReflectionProperty/Parameter::isDeprecated absent from php-src (#28529); #[\Deprecated] cannot target property/parameter');
 ?>
 --FILE--
 <?php

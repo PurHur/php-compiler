@@ -75,6 +75,12 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(CompilerVersion::supportsReflectionParameterIsSensitiveParameter());
             $this->assertFalse(isset($ctx->classes['reflectionparameter']->methods['issensitive']));
             $this->assertFalse(isset($ctx->classes['reflectionparameter']->methods['issensitiveparameter']));
+            // ReflectionParameter/Property::isDeprecated are phantoms vs php-src (#28529).
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyParameterIsDeprecated());
+            $this->assertFalse(isset($ctx->classes['reflectionparameter']->methods['isdeprecated']));
+            $this->assertFalse(isset($ctx->classes['reflectionproperty']->methods['isdeprecated']));
+            $this->assertTrue(isset($ctx->classes['reflectionfunction']->methods['isdeprecated']));
+            $this->assertTrue(isset($ctx->classes['reflectionclassconstant']->methods['isdeprecated']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
