@@ -262,7 +262,7 @@ final class Linker
         return false;
     }
 
-    /** libsodium.so.23 for AOT sodium AEAD thin LLVM (#27318). */
+    /** libsodium.so.23 for AOT sodium AEAD/generichash thin LLVM (#27318, #27292). */
     private static function sodiumRuntimeAvailable(): bool
     {
         foreach ([

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\sodium;
 
 use PHPCompiler\JIT\Builtin\StringSodium;
 use PHPCompiler\JIT\Builtin\StringSodiumAead;
+use PHPCompiler\JIT\Builtin\StringSodiumGenerichash;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -13,6 +14,16 @@ use PHPLLVM\Value;
 /** LLVM lowering for sodium builtins via __compiler_sodium_* runtime (#13078). */
 final class JitSodium
 {
+    /** #27292 — thin libsodium crypto_generichash (peer AEAD #27318). */
+    public static function invokeGenerichash(
+        Context $context,
+        Value $message,
+        Value $key,
+        Value $length
+    ): Value {
+        return StringSodiumGenerichash::invoke($context, $message, $key, $length);
+    }
+
     public static function invokeAeadXchachaIetfEncrypt(
         Context $context,
         Value $message,
