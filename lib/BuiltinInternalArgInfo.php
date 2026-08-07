@@ -81,6 +81,13 @@ final class BuiltinInternalArgInfo
             return 'true';
         }
 
+        // ext/hash/hash.stub.php — true return on PROFILE≥8.4; ≤8.3 keeps InternalArgInfo bool (#28742)
+        if ('hash_update' === $callableLc
+            && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')
+        ) {
+            return 'true';
+        }
+
         return match ($callableLc) {
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',
