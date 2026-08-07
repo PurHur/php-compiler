@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM;
+use PHPCompiler\VM\CallableCheck;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -273,8 +276,26 @@ final class XmlParserHandlers
         return self::stringHandlerCallback($parser, $handler);
     }
 
+    /**
+     * Resolve a string SAX handler name (php-src ext/xml/xml.c xml_set_*_handler).
+     *
+     * PHP 8.4+ uses zend_parse {@code F!} before the legacy method-name {@code S} path, so a
+     * global/builtin callable (e.g. {@code end}) wins over {@see xml_set_object()} method lookup
+     * (#28502). Pre-8.4 keeps the historical object-method preference when an object is set.
+     */
     private static function stringHandlerCallback(ObjectEntry $parser, string $handlerName): Variable
     {
+        $fn = new Variable();
+        $fn->string($handlerName);
+
+        // PROFILE≥8.4: prefer global/callable string (OF!F! / OSF! / OF!S) over method names.
+        if (CompilerVersion::supportsDeprecatedAttributeRuntimeNotices()) {
+            $vm = VM::running();
+            if (null !== $vm && CallableCheck::isCallable($fn, $vm->context, null)) {
+                return $fn;
+            }
+        }
+
         $state = VmXml::parserState($parser->id);
         $object = null !== $state ? ($state['handlerObject'] ?? null) : null;
         if ($object instanceof ObjectEntry) {
@@ -288,8 +309,6 @@ final class XmlParserHandlers
 
             return $cb;
         }
-        $fn = new Variable();
-        $fn->string($handlerName);
 
         return $fn;
     }
