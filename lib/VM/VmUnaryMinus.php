@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
+use PHPLLVM\Builder;
 use PHPLLVM\Value as LlvmValue;
 
 /**
- * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976).
+ * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976, #28761).
  *
  * JIT trampoline: {@see \PHPCompiler\JIT\JitUnaryMinus}
  */
@@ -58,8 +60,79 @@ final class VmUnaryMinus
             return new Variable($context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $negated);
         }
 
-        $negated = $context->builder->negate($value);
+        // Native long: PHP_INT_MIN overflows to double (zendi_negate_function, #28761).
+        if (Variable::KIND_VALUE === $coerced->kind
+            && null !== $coerced->value
+            && LlvmValue::KIND_CONSTANT_INT === $coerced->value->getKind()
+        ) {
+            $const = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($coerced->value->value);
+            if (\PHP_INT_MIN === $const) {
+                $neg = -(float) $const;
+                $out = new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_DOUBLE,
+                    Variable::KIND_VALUE,
+                    $context->constantFromFloat($neg, 'double')
+                );
+                $out->compileTimeFloat = $neg;
 
-        return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $negated);
+                return $out;
+            }
+            $neg = -$const;
+
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger($neg, 'long')
+            );
+        }
+
+        return self::negateLongWithIntMinPromote($context, $value);
+    }
+
+    /**
+     * Runtime long negate with PHP_INT_MIN → double promotion into a value box (#28761).
+     */
+    private static function negateLongWithIntMinPromote(Context $context, LlvmValue $value): Variable
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'unary_minus_int_min_cont');
+        $i64 = $context->getTypeFromString('int64');
+        $f64 = $context->getTypeFromString('double');
+        $long = $context->builder->intCast($value, $i64);
+        $valuePtr = $context->builder->alloca($context->getTypeFromString('__value__'));
+
+        $isMin = $context->builder->icmp(
+            Builder::INT_EQ,
+            $long,
+            $i64->constInt(\PHP_INT_MIN, true)
+        );
+        $minBlock = BasicBlockHelper::append($context, 'unary_minus_int_min');
+        $longBlock = BasicBlockHelper::append($context, 'unary_minus_long');
+        $doneBlock = BasicBlockHelper::append($context, 'unary_minus_done');
+        $context->builder->branchIf($isMin, $minBlock, $longBlock);
+
+        $context->builder->positionAtEnd($minBlock);
+        // fneg(sitofp(INT_MIN)): LLVM integer negate wraps INT_MIN to itself.
+        $minNeg = $context->builder->fNegate($context->builder->sitofp($long, $f64));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $valuePtr,
+            $minNeg
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $negLong = $context->builder->negate($long);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $valuePtr,
+            $negLong
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $valuePtr);
     }
 }
