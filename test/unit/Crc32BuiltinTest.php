@@ -17,10 +17,10 @@ echo crc32(''), "\n";
 echo crc32('abc'), "\n";
 echo crc32('foo'), "\n";
 echo crc32("The quick brown fox jumped over the lazy dog."), "\n";
-echo crc32('oo', crc32('f')), "\n";
 PHP;
 
-    private const EXPECT = "3632233996\n0\n891568578\n2356372769\n2191738434\n2356372769\n";
+    // php-src crc32.c is arity 1 only — phantom seed removed (#28313).
+    private const EXPECT = "3632233996\n0\n891568578\n2356372769\n2191738434\n";
 
     public function testVmMatchesPhpSubset(): void
     {
@@ -48,6 +48,8 @@ PHP;
         file_put_contents($tmp, "<?php\n" . self::CODE);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
+        // Avoid fingerprint-stale helper-runtime cache (wrong crc32 digests on master too).
+        $env['PHP_COMPILER_HELPER_RUNTIME_O'] = '0';
         $compile = proc_open(
             ['php', $repo . '/bin/compile.php', '-o', $out, $tmp],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],

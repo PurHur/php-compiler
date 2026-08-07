@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\Hebrev;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStrictIntArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -18,8 +19,17 @@ final class JitHebrev
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28313).
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hebrev() accepts one or two arguments in this compiler build');
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('hebrev() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('hebrev() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
 
         $strLit = $args[0]->compileTimeString ?? null;

@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -27,10 +26,9 @@ final class hebrev extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28313).
+        $this->requireArgCountRange($frame, 'hebrev', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hebrev() accepts one or two arguments in this compiler build');
-        }
         $string = self::vmStringArg($frame, 0, 'string');
         $maxCharsPerLine = 0;
         if ($argc >= 2) {

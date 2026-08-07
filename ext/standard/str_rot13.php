@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrRot13;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -31,9 +32,8 @@ final class str_rot13 extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('str_rot13() requires exactly one argument');
-        }
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28313).
+        $this->requireExactArgCount($frame, 'str_rot13', 1);
         $subject = self::vmStringArg($frame, 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
@@ -46,8 +46,15 @@ final class str_rot13 extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('str_rot13() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT try/catch) — peer basename #28286 / #28313.
+        if (1 !== \count($args)) {
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('str_rot13() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
 
         $str = self::jitStringArg($context, $args[0], 0, 'string');

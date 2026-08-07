@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
@@ -25,10 +27,9 @@ final class md5 extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28313).
+        $this->requireArgCountRange($frame, 'md5', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('md5() requires one or two arguments in this compiler build');
-        }
         $data = self::vmStringArg($frame);
         $raw = false;
         if (2 === $argc) {
@@ -51,8 +52,18 @@ final class md5 extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('md5() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT try/catch) — peer basename #28286 / #28313.
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('md5() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('md5() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[1])) {

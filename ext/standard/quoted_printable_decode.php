@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -21,9 +22,8 @@ final class quoted_printable_decode extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28313).
+        $this->requireExactArgCount($frame, 'quoted_printable_decode', 1);
         $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'quoted_printable_decode', 0, 'string');
         if (null === $frame->returnVar) {
             return;
@@ -33,8 +33,15 @@ final class quoted_printable_decode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer basename #28286 / #28313.
         if (1 !== \count($args)) {
-            throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('quoted_printable_decode() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
 
         return JitQuotedPrintableDecode::decode(
