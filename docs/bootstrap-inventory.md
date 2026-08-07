@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7192 |
-| Phase A inventory files (M2 ratio SSOT) | 7192 |
+| PHP files on vm.php path | 7201 |
+| Phase A inventory files (M2 ratio SSOT) | 7201 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23100 |
+| Source constructs flagged (warnings) | 23108 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4596,8 +4596,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_covariance.php` | 0 | 2 |
 | `ext/stats/stats_standard_deviation.php` | 0 | 2 |
 | `ext/stats/stats_variance.php` | 0 | 2 |
+| `ext/sysvmsg/JitMsgGet.php` | 0 | 1 |
+| `ext/sysvmsg/JitMsgHandle.php` | 0 | 1 |
+| `ext/sysvmsg/JitMsgReceive.php` | 0 | 1 |
+| `ext/sysvmsg/JitMsgRemove.php` | 0 | 1 |
+| `ext/sysvmsg/JitMsgSend.php` | 0 | 1 |
 | `ext/sysvmsg/Module.php` | 0 | 9 |
 | `ext/sysvmsg/MsgArgs.php` | 0 | 2 |
+| `ext/sysvmsg/MsgLibcThinAbi.php` | 0 | 1 |
 | `ext/sysvmsg/SysvmsgConstants.php` | 0 | 1 |
 | `ext/sysvmsg/VmMsg.php` | 0 | 6 |
 | `ext/sysvmsg/msg_get_queue.php` | 0 | 2 |
@@ -5469,6 +5475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MemoryUsageJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MsgRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
@@ -5732,6 +5739,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMkdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringMsg.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNCompare.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNaturalCompare.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNaturalCompareJit.php` | 0 | 1 |
@@ -40911,6 +40919,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/sysvmsg/JitMsgGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/sysvmsg/JitMsgHandle.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `ext/sysvmsg/JitMsgReceive.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvmsg/JitMsgRemove.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvmsg/JitMsgSend.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/sysvmsg/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -40929,6 +40962,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 19)
 - 7 class method(s)
+
+### `ext/sysvmsg/MsgLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/sysvmsg/SysvmsgConstants.php`
 
@@ -47542,6 +47580,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/MsgRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
+
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48911,6 +48954,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/Builtin/StringMsg.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringNCompare.php`
 

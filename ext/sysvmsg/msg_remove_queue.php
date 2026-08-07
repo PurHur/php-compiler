@@ -45,9 +45,12 @@ final class msg_remove_queue extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'msg_remove_queue() is not supported for JIT/AOT in this compiler build (issue #3666)'
-        );
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitMsgRemove::emitArgumentCountError($context, $argc);
+        }
+
+        return JitMsgRemove::invoke($context, $args[0]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

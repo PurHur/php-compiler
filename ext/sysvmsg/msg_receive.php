@@ -70,9 +70,12 @@ final class msg_receive extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'msg_receive() is not supported for JIT/AOT in this compiler build (issue #3666)'
-        );
+        $argc = \count($args);
+        if ($argc < 5 || $argc > 8) {
+            return JitMsgReceive::emitArgumentCountError($context, $argc);
+        }
+
+        return JitMsgReceive::invoke($context, $args);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

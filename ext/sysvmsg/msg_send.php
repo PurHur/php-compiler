@@ -59,9 +59,12 @@ final class msg_send extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'msg_send() is not supported for JIT/AOT in this compiler build (issue #3666)'
-        );
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 6) {
+            return JitMsgSend::emitArgumentCountError($context, $argc);
+        }
+
+        return JitMsgSend::invoke($context, $args);
     }
 
     private function triggerWarning(Frame $frame, string $message): void
