@@ -75,7 +75,7 @@ final class TanRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_tan_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringContainsString('phpc_expm1_kernel', $source);
+        $this->assertStringContainsString('phpc_log1p_kernel', $source);
         $this->assertStringContainsString('phpc_nextafter_kernel', $source);
     }
 
