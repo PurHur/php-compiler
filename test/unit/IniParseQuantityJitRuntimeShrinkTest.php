@@ -49,5 +49,11 @@ final class IniParseQuantityJitRuntimeShrinkTest extends TestCase
         $this->assertSame(512, $helper::parseQuantity('512'));
         $this->assertSame(-(1 << 20), $helper::parseQuantity('-1M'));
         $this->assertSame(0, $helper::parseQuantity(''));
+        // Legacy leading-zero octal (#28763 / zend_ini_parse_quantity)
+        $this->assertSame(8, $helper::parseQuantity('010'));
+        $this->assertSame(-8, $helper::parseQuantity('-010'));
+        $this->assertSame(0, $helper::parseQuantity('08'));
+        $this->assertSame(8, $helper::parseQuantity('0o10'));
+        $this->assertSame(16, $helper::parseQuantity('0x10'));
     }
 }
