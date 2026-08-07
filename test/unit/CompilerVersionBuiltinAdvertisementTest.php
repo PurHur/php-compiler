@@ -858,9 +858,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrxfrm());
     }
 
-    public function testGetmygrgidNotAdvertisedOnReferenceProfile(): void
+    public function testGetmygrgidNeverAdvertised(): void
     {
+        // php-src: getmygid / getmyuid / getmypid / getmyinode only (#28366).
         $this->assertFalse(CompilerVersion::supportsGetmygrgid());
+        $this->assertFalse(CompilerVersion::advertisesGetmygrgid());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsGetmygrgid(), $profile);
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['getmygrgid']), $profile);
+            $this->assertTrue(isset($runtime->vmContext->functions['getmygid']), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
     }
 
     public function testDisktotalspaceNotAdvertisedOnReferenceProfile(): void
@@ -879,11 +894,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             $this->assertTrue(CompilerVersion::supportsStrxfrm());
             $this->assertFalse(CompilerVersion::supportsConvertCyrString());
             $this->assertFalse(CompilerVersion::supportsMoneyFormat());
-            $this->assertTrue(CompilerVersion::supportsGetmygrgid());
+            $this->assertFalse(CompilerVersion::supportsGetmygrgid());
             $runtime = new Runtime();
-            foreach (['strxfrm', 'getmygrgid'] as $fn) {
-                $this->assertTrue(isset($runtime->vmContext->functions[$fn]), $fn);
-            }
+            $this->assertTrue(isset($runtime->vmContext->functions['strxfrm']));
+            $this->assertFalse(isset($runtime->vmContext->functions['getmygrgid']));
             $this->assertFalse(isset($runtime->vmContext->functions['convert_cyr_string']));
             $this->assertFalse(isset($runtime->vmContext->functions['money_format']));
         } finally {
