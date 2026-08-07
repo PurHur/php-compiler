@@ -126,9 +126,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
     }
-    if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime|JitFinfoFile|FinfoFileRuntime/i', $source)) {
-        if (preg_match('/JitFinfoFile|FinfoFileRuntime/i', $source)) {
-            $notes[] = 'ext/fileinfo MIME sniff via VmMime + FinfoFileRuntime AOT (#3366,#27196; FILEINFO_NONE/RAW still VM-rich)';
+    if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime|JitFinfoFile|JitFinfoBuffer|FinfoFileRuntime|FinfoBufferRuntime/i', $source)) {
+        if (preg_match('/JitFinfoFile|JitFinfoBuffer|FinfoFileRuntime|FinfoBufferRuntime/i', $source)) {
+            $notes[] = 'ext/fileinfo MIME sniff via VmMime + FinfoFileRuntime/FinfoBufferRuntime AOT (#3366,#27196,#28660; FILEINFO_NONE/RAW still VM-rich)';
         } else {
             $notes[] = 'ext/fileinfo VM sniff via VmMime + FILEINFO_NONE/RAW human desc (#3366,#19247; JIT deferred)';
         }

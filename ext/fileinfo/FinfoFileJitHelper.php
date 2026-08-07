@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\fileinfo;
 
 /**
- * finfo_file() / finfo::file() MIME sniff for compiled JIT/AOT modules (#27196, php-in-PHP).
+ * finfo_file() / finfo_buffer() MIME sniff for compiled JIT/AOT modules (#27196, #28660, php-in-PHP).
  *
  * NestedJIT-self-contained. Sniff mirrors {@see \PHPCompiler\ext\standard\VmMime::detectFromBytes}
- * for magics needed by the #27196 Done-when (`text/plain` for `"hello"`).
+ * for magics needed by the Done-when (`text/plain` for `"hello"`).
  *
  * NestedJIT hazards avoided (#27196):
  * - `\strncmp` / `\strcasecmp` with needles (false match)
  * - UTF-8 BOM / PNG binary string compares (segfault)
  *
- * php-src: ext/fileinfo/fileinfo.c — PHP_FUNCTION(finfo_file)
+ * php-src: ext/fileinfo/fileinfo.c — PHP_FUNCTION(finfo_file) / PHP_FUNCTION(finfo_buffer)
  */
 final class FinfoFileJitHelper
 {
@@ -31,6 +31,16 @@ final class FinfoFileJitHelper
             return null;
         }
 
+        return self::detectFromBytes($data);
+    }
+
+    /**
+     * finfo_buffer() / finfo::buffer() — sniff in-memory bytes (#28660).
+     *
+     * Always returns a MIME string (peer {@see \PHPCompiler\ext\fileinfo\VmFinfo::buffer}).
+     */
+    public static function mimeFromBuffer(string $data): string
+    {
         return self::detectFromBytes($data);
     }
 
