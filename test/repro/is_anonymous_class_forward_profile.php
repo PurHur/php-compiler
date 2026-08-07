@@ -1,12 +1,11 @@
 <?php
 declare(strict_types=1);
 
+// Historical forward-profile probe (#19969) — free function retired as phantom (#28616).
 var_export(function_exists('isAnonymousClass'));
 echo "\n";
-var_export(isAnonymousClass(new class {}));
+$anon = new class {};
+var_export((new ReflectionClass($anon))->isAnonymous());
 echo "\n";
-var_export(isAnonymousClass(new stdClass()));
-echo "\n";
-$anon = new class extends stdClass {};
-var_export(isAnonymousClass($anon));
+var_export((new ReflectionClass(stdClass::class))->isAnonymous());
 echo "\n";

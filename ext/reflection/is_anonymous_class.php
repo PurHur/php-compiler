@@ -12,7 +12,8 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Value;
 
 /**
- * isAnonymousClass() — PHP 8.4 global wrapper around ReflectionClass::isAnonymous() (#19969).
+ * isAnonymousClass() — phantom vs php-src (#28616, re-#19969); Module withholds registration.
+ * Kept for NestedJIT/helper wiring only — Zend ships ReflectionClass::isAnonymous() alone.
  *
  * php-src: ext/reflection/php_reflection.c — PHP_FUNCTION(is_anonymous_class)
  */

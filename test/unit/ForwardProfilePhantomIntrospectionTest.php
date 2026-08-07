@@ -92,6 +92,11 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(isset($ctx->classes['reflectionproperty']->methods['getreadabletype']));
             $this->assertTrue(CompilerVersion::supportsReflectionPropertyReadableSettableType());
             $this->assertTrue(isset($ctx->classes['reflectionproperty']->methods['getsettabletype']));
+            // Free-function isAnonymousClass() is a phantom; ReflectionClass::isAnonymous remains (#28616).
+            $this->assertFalse(CompilerVersion::supportsIsAnonymousClass());
+            $this->assertFalse(CompilerVersion::advertisesIsAnonymousClass());
+            $this->assertFalse(isset($ctx->functions['isanonymousclass']));
+            $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['isanonymous']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
