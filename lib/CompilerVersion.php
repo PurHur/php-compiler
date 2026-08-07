@@ -1916,14 +1916,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989, #14722, #15025, #16664).
+     * Free-function class_has_method()/class_has_property()/class_has_constant() — phantom vs php-src (#28413, re-#9989).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (functions absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * php-src never registered these; introspection is ReflectionClass::hasMethod/hasProperty/hasConstant
+     * (ext/reflection/php_reflection.stub.php). Prior forward-profile enable (#14722/#15025/#16664) was incorrect.
+     * Never register or advertise on any php-src-strict profile (including PROFILE=8.4/8.5).
      */
     public static function supportsClassHasFunctions(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
