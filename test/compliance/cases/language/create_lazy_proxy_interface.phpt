@@ -1,9 +1,14 @@
 --TEST--
-Language: createLazyProxy() on interfaces delegates to factory instance (#9999)
+Language: newLazyProxy() on interfaces delegates to factory instance (#9999, #28414)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80400) {
-    die('skip createLazyProxy requires PHP 8.4+');
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsLazyObjectFactories()) {
+    die('skip ReflectionClass lazy factories require PHP 8.4 forward profile');
 }
 ?>
 --FILE--
@@ -21,7 +26,8 @@ class C implements I {
 }
 
 $calls = 0;
-$o = createLazyProxy(I::class, static function (I $proxy) use (&$calls): C {
+$rc = new ReflectionClass(I::class);
+$o = $rc->newLazyProxy(static function () use (&$calls): C {
     ++$calls;
     return new C();
 });
@@ -31,7 +37,7 @@ echo $o->f(), "\n";
 echo $calls, "\n";
 
 try {
-    createLazyGhost(I::class, static function (): void {});
+    (new ReflectionClass(I::class))->newLazyGhost(static function (): void {});
     echo "ghost-uncaught\n";
 } catch (Throwable $e) {
     echo get_class($e), "\n";

@@ -14,9 +14,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * createLazyProxy() — PHP 8.4 procedural lazy proxy factory (#6708).
+ * createLazyProxy() — historical procedural lazy proxy factory (#6708).
  *
- * @see Zend/zend_lazy_objects.c — create_lazy_proxy
+ * Never registered: php-src exposes ReflectionClass::newLazyProxy only (#28414).
+ * File kept so ReflectionClass / JIT helpers can reuse {@see JitCreateLazyProxy}.
+ *
+ * @see Zend/zend_lazy_objects.c
  * @see Zend/zend_builtin_functions.c
  */
 final class create_lazy_proxy extends Internal

@@ -14,9 +14,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * createLazyGhost() — PHP 8.4 procedural lazy ghost factory (#6708).
+ * createLazyGhost() — historical procedural lazy ghost factory (#6708).
  *
- * @see Zend/zend_lazy_objects.c — create_lazy_ghost
+ * Never registered: php-src exposes ReflectionClass::newLazyGhost only (#28414).
+ * File kept so ReflectionClass / JIT helpers can reuse {@see JitCreateLazyGhost}.
+ *
+ * @see Zend/zend_lazy_objects.c
  * @see Zend/zend_builtin_functions.c
  */
 final class create_lazy_ghost extends Internal

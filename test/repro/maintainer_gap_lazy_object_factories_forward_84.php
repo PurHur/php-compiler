@@ -2,13 +2,24 @@
 
 declare(strict_types=1);
 
-$required = [
+/**
+ * #28414 / #16812 — PROFILE=8.4 keeps ReflectionClass::newLazy*; free createLazy* stay off.
+ */
+$forbidden = [
     'createLazyGhost',
     'createLazyProxy',
-    'class_has_lazy_object_initializer',
-    'class_has_lazy_object_uninitializer',
+    'createlazyghost',
+    'createlazyproxy',
 ];
-foreach ($required as $fn) {
+foreach ($forbidden as $fn) {
+    if (function_exists($fn)) {
+        echo "fail: function_exists({$fn}) true under PHP_COMPILER_PROFILE=8.4 (phantom)\n";
+        exit(1);
+    }
+}
+
+// Probes that are still advertised with the ReflectionClass gate (not free createLazy*).
+foreach (['class_has_lazy_object_initializer', 'class_has_lazy_object_uninitializer'] as $fn) {
     if (!function_exists($fn)) {
         echo "fail: function_exists({$fn}) false under PHP_COMPILER_PROFILE=8.4\n";
         exit(1);

@@ -120,7 +120,9 @@ final class LazyObjectSupport
 
     public static function createProxy(ClassEntry $class, ClosureState $initializer, int $options = 0): ObjectEntry
     {
-        if (!self::classCanBeLazy($class)) {
+        // Interfaces have no instance properties but still need a pending proxy placeholder
+        // so the factory runs on first use (Zend/zend_lazy_objects.c; #9999 / #28414).
+        if (!$class->isInterface && !self::classCanBeLazy($class)) {
             // zend_object_make_lazy early-return: ordinary object, initializer discarded (#21570).
             $object = new ObjectEntry($class);
             $object->constructed = true;
