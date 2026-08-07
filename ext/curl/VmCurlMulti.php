@@ -36,6 +36,8 @@ final class VmCurlMulti
 
         $entry = new ClassEntry('CurlMultiHandle');
         $entry->isInternal = true;
+        // php-src `final class CurlMultiHandle` (ext/curl/curl.stub.php; #28371).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
