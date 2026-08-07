@@ -370,6 +370,29 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_memzero'));
     }
 
+    /** php-src ext/pgsql/pgsql.stub.php — result/field/oid_only → string|int|false (#27703). */
+    public function testPgFieldTableReflectionStubTypes(): void
+    {
+        $this->assertSame(
+            ['result', 'field', 'oid_only='],
+            BuiltinParamNames::forFunction('pg_field_table')
+        );
+        $this->assertSame('string|int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('pg_field_table'));
+        $this->assertSame('?PgSql\\Result', BuiltinInternalArgInfo::stubParamTypeOverride('pg_field_table', 0));
+        $result = BuiltinInternalArgInfo::paramInfoForFunction('pg_field_table', 0);
+        $this->assertNotNull($result);
+        $this->assertSame('?PgSql\\Result', $result['type']);
+        $this->assertFalse($result['isOptional']);
+        $field = BuiltinInternalArgInfo::paramInfoForFunction('pg_field_table', 1);
+        $this->assertNotNull($field);
+        $this->assertSame('int', $field['type']);
+        $this->assertFalse($field['isOptional']);
+        $oidOnly = BuiltinInternalArgInfo::paramInfoForFunction('pg_field_table', 2);
+        $this->assertNotNull($oidOnly);
+        $this->assertSame('bool', $oidOnly['type']);
+        $this->assertTrue($oidOnly['isOptional']);
+    }
+
     /** php-src ext/hash/hash.stub.php — InternalArgInfo return string (missing |false) (#28318). */
     public function testHashFileReflectionReturnUnion(): void
     {
