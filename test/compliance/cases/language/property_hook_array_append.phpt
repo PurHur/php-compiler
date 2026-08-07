@@ -1,5 +1,5 @@
 --TEST--
-Hooked property array append read-modify-write via get/set hooks (#19171, zend_property_hooks.c)
+Hooked property array append/dim without &get → Indirect modification Error (#28590, zend_property_hooks.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -25,9 +25,12 @@ class C {
     }
 }
 $c = new C();
-$c->items[] = 'a';
-echo count($c->items), "\n";
-echo $c->items[0], "\n";
+try {
+    $c->items[] = 'a';
+    echo "WROTE\n";
+} catch (Throwable $e) {
+    echo get_class($e), ": ", $e->getMessage(), "\n";
+}
 
 class D {
     public array $items {
@@ -36,11 +39,23 @@ class D {
     }
 }
 $d = new D();
-$d->items[] = 'b';
-echo count($d->items), "\n";
-echo $d->items[0], "\n";
+try {
+    $d->items[] = 'b';
+    echo "WROTE\n";
+} catch (Throwable $e) {
+    echo get_class($e), ": ", $e->getMessage(), "\n";
+}
+
+class E {
+    private array $a = [1];
+    public array $x {
+        &get => $this->a;
+    }
+}
+$e = new E;
+$e->x[] = 2;
+echo implode(',', $e->x), "\n";
 --EXPECT--
-1
-a
-1
-b
+Error: Indirect modification of C::$items is not allowed
+Error: Indirect modification of D::$items is not allowed
+1,2

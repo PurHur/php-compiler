@@ -1,4 +1,5 @@
 <?php
+// Updated for #28590 — without &get, append must Error (was RMW success under #19171).
 class C {
     public array $items {
         get {
@@ -10,6 +11,9 @@ class C {
     }
 }
 $c = new C();
-$c->items[] = 'a';
-echo count($c->items), "\n";
-echo $c->items[0], "\n";
+try {
+    $c->items[] = 'a';
+    echo "WROTE\n";
+} catch (Throwable $e) {
+    echo get_class($e), ": ", $e->getMessage(), "\n";
+}

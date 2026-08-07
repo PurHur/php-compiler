@@ -8447,7 +8447,17 @@ restart:
                                 )) {
                                     break;
                                 }
-                                // PROPERTY_FETCH_WRITE + []= must read-modify-write via hooks (#19171).
+                                // Without `&get`, refuse before RMW / backing write (#28590, php-src 8.4.24+).
+                                $catchFrame = $this->enforceHookedPropertyDimWriteRequiresByRefGet(
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                // Virtual `&get`+`set`: RMW via get then set write-back (#21098).
                                 $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                                 if (null !== $hookValue) {
                                     $catchFrame = $this->deliverHookedPropertyDimWriteContainer(
@@ -8495,6 +8505,15 @@ restart:
                                     $frame
                                 )) {
                                     break;
+                                }
+                                $catchFrame = $this->enforceHookedPropertyDimWriteRequiresByRefGet(
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
                                 }
                                 $catchFrame = $this->deliverHookedPropertyDimWriteContainer(
                                     $result,
@@ -11038,6 +11057,11 @@ restart:
         return null;
     }
 
+    /**
+     * Dim/append/unset-dim on a hooked property without `&get` is Error in php-src 8.4.24+
+     * (zend_object_handlers get_property_ptr_ptr / #28590). Older get→set RMW (#6775/#19171)
+     * no longer matches Zend; keep RMW only for virtual `&get`+`set`.
+     */
     private function deliverHookedPropertyDimWriteContainer(
         Variable $dest,
         Variable $hookValue,
@@ -11048,6 +11072,14 @@ restart:
         $proxy = new Variable();
         $proxy->objectPropertyOwner = $owner;
         $proxy->objectPropertyName = $propName;
+        // Caller already enforced `&get` via enforceHookedPropertyDimWriteRequiresByRefGet;
+        // keep the check here for static/shared call sites.
+        if (!$this->propertyHookGetIsByRef($proxy)) {
+            return $this->dispatchVmError(
+                $this->indirectModificationOfHookedPropertyMessage($proxy),
+                $frame
+            );
+        }
         $catchFrame = $this->enforceVirtualPropertyHookWrite($proxy, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -11060,6 +11092,34 @@ restart:
         $dest->propertyHookDimWriteBackPending = true;
 
         return null;
+    }
+
+    /**
+     * Refuse `$o->hooked[]=` / `$o->hooked[$k]=` / `unset($o->hooked[$k])` unless `&get` (#28590).
+     */
+    private function enforceHookedPropertyDimWriteRequiresByRefGet(
+        ObjectEntry $owner,
+        string $propName,
+        Frame $frame,
+    ): ?Frame {
+        $meta = $this->classPropertyMeta($owner, $propName);
+        if (null === $meta) {
+            return null;
+        }
+        if (null === $meta->getHookMethodLc && null === $meta->setHookMethodLc) {
+            return null;
+        }
+        if ($meta->getHookByRef) {
+            return null;
+        }
+        $proxy = new Variable();
+        $proxy->objectPropertyOwner = $owner;
+        $proxy->objectPropertyName = $propName;
+
+        return $this->dispatchVmError(
+            $this->indirectModificationOfHookedPropertyMessage($proxy),
+            $frame
+        );
     }
 
     /**
@@ -11188,6 +11248,13 @@ restart:
         $proxy = new Variable();
         $proxy->staticPropertyClassLc = $classLc;
         $proxy->objectPropertyName = $propNameRaw;
+        // Same `&get` requirement as instance dim writes (#28590).
+        if (!$this->propertyHookGetIsByRef($proxy)) {
+            return $this->dispatchVmError(
+                $this->indirectModificationOfHookedPropertyMessage($proxy),
+                $frame
+            );
+        }
         $catchFrame = $this->enforceVirtualPropertyHookWrite($proxy, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
