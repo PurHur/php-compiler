@@ -57,6 +57,8 @@ final class VmCurlEasy
 
         $entry = new ClassEntry('CurlHandle');
         $entry->isInternal = true;
+        // php-src `final class CurlHandle` (ext/curl/curl.stub.php; #28371).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

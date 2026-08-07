@@ -47,6 +47,8 @@ final class VmCurlShare
 
         $entry = new ClassEntry('CurlShareHandle');
         $entry->isInternal = true;
+        // php-src `final class CurlShareHandle` (ext/curl/curl.stub.php; #28371).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -58,6 +60,8 @@ final class VmCurlShare
 
         $entry = new ClassEntry('CurlSharePersistentHandle');
         $entry->isInternal = true;
+        // php-src `final class CurlSharePersistentHandle` (ext/curl/curl.stub.php; #28371).
+        $entry->isFinal = true;
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $arrayProto->array(new HashTable());
         $entry->properties[] = new ClassProperty(
