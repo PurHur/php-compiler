@@ -13,15 +13,15 @@ use PHPCompiler\VM\Variable;
  *
  * Stub second param is `$binary` (php-src hash.stub.php); legacy InternalArgInfo
  * `raw_output` is overridden via BuiltinParamNames (#23586).
+ * Excess argc → ArgumentCountError (#28315).
  */
 final class hash_final extends HashFunction
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/hash/hash.stub.php — ArgumentCountError (#28315).
+        $this->requireArgCountRange($frame, 'hash_final', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hash_final() requires one or two arguments in this compiler build');
-        }
         $ctx = VmHashContext::requireHashContext($frame->calledArgs[0], 'hash_final', 1);
         $raw = false;
         if (2 === $argc) {

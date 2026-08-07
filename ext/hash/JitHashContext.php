@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\HashContextRuntime;
 use PHPCompiler\JIT\Builtin\StringBin2hex;
 use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -101,8 +102,16 @@ final class JitHashContext
 
     public static function update(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('hash_update() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        // php-src ext/hash/hash.stub.php — ArgumentCountError (#28315).
+        if (2 !== $argc) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('hash_update() expects exactly 2 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
         HashContextEmbedBridge::ensureLinked($context);
         $obj = self::readContextObject($context, $args[0]);
@@ -147,8 +156,17 @@ final class JitHashContext
     public static function final(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // php-src ext/hash/hash.stub.php — ArgumentCountError (#28315).
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hash_final() requires one or two arguments in this compiler build');
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('hash_final() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('hash_final() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
         HashContextEmbedBridge::ensureLinked($context);
 
@@ -283,8 +301,16 @@ final class JitHashContext
 
     public static function copy(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('hash_copy() requires exactly one argument in this compiler build');
+        $argc = \count($args);
+        // php-src ext/hash/hash.stub.php — ArgumentCountError (#28315).
+        if (1 !== $argc) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('hash_copy() expects exactly 1 argument, %d given', $argc)
+            );
+
+            return $slot;
         }
         HashContextEmbedBridge::ensureLinked($context);
 
