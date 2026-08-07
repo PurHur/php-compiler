@@ -476,18 +476,29 @@ final class CloneWithDesugar
             if (\is_string($token)) {
                 if ('(' === $token) {
                     ++$depthParen;
-                } elseif (')' === $token && 0 === $depthParen && 0 === $depthBracket && 0 === $depthBrace) {
-                    return null === $endIdx ? null : $endIdx;
+                } elseif (')' === $token) {
+                    // Nested ctor/call parens in the first arg (e.g. clone(new C(1, "a"), [...]))
+                    // must decrement — previously depth stuck ≥1 and the comma was never seen (#28564).
+                    if (0 === $depthParen && 0 === $depthBracket && 0 === $depthBrace) {
+                        return null === $endIdx ? null : $endIdx;
+                    }
+                    if ($depthParen > 0) {
+                        --$depthParen;
+                    }
                 } elseif (',' === $token && 0 === $depthParen && 0 === $depthBracket && 0 === $depthBrace) {
                     return null === $endIdx ? null : $endIdx;
                 } elseif ('[' === $token) {
                     ++$depthBracket;
                 } elseif (']' === $token) {
-                    --$depthBracket;
+                    if ($depthBracket > 0) {
+                        --$depthBracket;
+                    }
                 } elseif ('{' === $token) {
                     ++$depthBrace;
                 } elseif ('}' === $token) {
-                    --$depthBrace;
+                    if ($depthBrace > 0) {
+                        --$depthBrace;
+                    }
                 }
             }
 

@@ -44,6 +44,37 @@ final class CloneWithTest extends TestCase
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
+    /** Issue #28564 — nested ctor commas in clone(new C(...), [...]) must desugar. */
+    public function testDesugarRewritesCloneCallWithNewExprFirstArg(): void
+    {
+        $this->skipUnlessCloneWithEnabled();
+        $input = '<?php $d = clone(new C(1, "a"), [\'x\' => 2]);';
+        $out = CloneWithDesugar::desugar($input);
+        $this->assertNotSame($input, $out, 'clone(new C(...), [...]) must desugar (#28564)');
+        $this->assertStringContainsString('phpc_clone_with_begin($__phpc_r, \'x\')', $out);
+        $this->assertStringContainsString('clone $__phpc_o', $out);
+        $this->assertStringContainsString('new C(1, "a")', $out);
+    }
+
+    /** Issue #28564 — VM PROFILE=8.5 clone(new C(...), [...]) matches Zend. */
+    public function testVmCloneCallWithNewExprFirstArg(): void
+    {
+        $this->skipUnlessCloneWithEnabled();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public int $x = 1, public string $y = 'a') {}
+}
+$c = clone(new C(1, 'a'), ['x' => 2]);
+echo $c->x, ',', $c->y, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'issue_28564.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("2,a\n", ob_get_clean());
+    }
+
     /** Issue #28182 — Zend 8.5.8 rejects named `with:` on clone() (reverts #12939 over-accept). */
     public function testDesugarRewritesNamedWithArgToUnknownNamedParameterError(): void
     {
