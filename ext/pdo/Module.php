@@ -12,9 +12,11 @@ use PHPCompiler\Runtime;
  *
  * Also advertises logical {@code pdo_sqlite} when
  * {@see PdoExtensionPolicy::advertisesSqliteDriver()} (host pdo_sqlite or
- * PHP_COMPILER_ENABLE_PDO_SQLITE + libsqlite3; #24523), and {@code pdo_pgsql}
+ * PHP_COMPILER_ENABLE_PDO_SQLITE + libsqlite3; #24523), {@code pdo_pgsql}
  * when {@see PdoExtensionPolicy::advertisesPgsqlDriver()} (host pdo_pgsql or
- * PHP_COMPILER_ENABLE_PDO_PGSQL + libpq; #26140).
+ * PHP_COMPILER_ENABLE_PDO_PGSQL + libpq; #26140), and {@code pdo_mysql}
+ * when {@see PdoExtensionPolicy::advertisesMysqlDriver()} (host pdo_mysql or
+ * PHP_COMPILER_ENABLE_PDO_MYSQL; #27332).
  */
 class Module extends ModuleAbstract
 {
@@ -45,6 +47,9 @@ class Module extends ModuleAbstract
         if (PdoExtensionPolicy::advertisesPgsqlDriver()) {
             $names[] = 'pdo_pgsql';
         }
+        if (PdoExtensionPolicy::advertisesMysqlDriver()) {
+            $names[] = 'pdo_mysql';
+        }
 
         return $names;
     }
@@ -57,6 +62,9 @@ class Module extends ModuleAbstract
         }
         if (PdoExtensionPolicy::advertisesPgsqlDriver()) {
             $versions['pdo_pgsql'] = '1.0.2';
+        }
+        if (PdoExtensionPolicy::advertisesMysqlDriver()) {
+            $versions['pdo_mysql'] = '1.0.2';
         }
 
         return $versions;
