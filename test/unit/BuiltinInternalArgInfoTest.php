@@ -770,6 +770,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_encode'));
     }
 
+    /** php-src session.stub.php — absent InternalArgInfo → int|false (#27855). */
+    public function testSessionGcReflectionReturn(): void
+    {
+        $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_gc'));
+    }
+
     /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
     public function testIconvStrlenReflectionStubTypes(): void
     {
