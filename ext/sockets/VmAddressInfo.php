@@ -35,6 +35,8 @@ final class VmAddressInfo
 
         $entry = new ClassEntry('AddressInfo');
         $entry->isInternal = true;
+        // php-src `final class AddressInfo` (ext/sockets/sockets.stub.php; #28391).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

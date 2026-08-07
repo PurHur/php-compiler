@@ -28,11 +28,14 @@ final class FinalClassExtensionCheck
      * @var array<string, string> lowercase name => display name
      */
     private const INTERNAL_FINAL = [
+        // php-src ext/sockets/sockets.stub.php — final class Socket / AddressInfo (#28391).
+        'addressinfo' => 'AddressInfo',
         'attribute' => 'Attribute',
         'closure' => 'Closure',
         'fiber' => 'Fiber',
         'fibererror' => 'FiberError',
         'generator' => 'Generator',
+        'socket' => 'Socket',
         // php-src Zend/zend_weakrefs.stub.php — final class WeakReference / WeakMap (#28390).
         'weakmap' => 'WeakMap',
         'weakreference' => 'WeakReference',

@@ -213,6 +213,50 @@ PHP;
         $this->assertSame("true\ntrue\n", ob_get_clean());
     }
 
+    /** @covers issue #28391 — php-src ext/sockets/sockets.stub.php final class Socket */
+    public function testExtendSocketFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadSocket extends Socket {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadSocket cannot extend final class Socket');
+        $runtime->parseAndCompile($code, 'extend_socket.php');
+    }
+
+    /** @covers issue #28391 — php-src ext/sockets/sockets.stub.php final class AddressInfo */
+    public function testExtendAddressInfoFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadAddressInfo extends AddressInfo {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadAddressInfo cannot extend final class AddressInfo');
+        $runtime->parseAndCompile($code, 'extend_addressinfo.php');
+    }
+
+    /** @covers issue #28391 */
+    public function testSocketAndAddressInfoReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export((new ReflectionClass(Socket::class))->isFinal());
+echo "\n";
+var_export((new ReflectionClass(AddressInfo::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'socket_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\ntrue\n", ob_get_clean());
+    }
+
     /** @covers issue #28390 — php-src Zend/zend_weakrefs.stub.php final class WeakReference */
     public function testExtendWeakReferenceFailsAtCompileTime(): void
     {
