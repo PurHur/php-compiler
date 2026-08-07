@@ -2959,7 +2959,6 @@
         "ext/standard/JitMultipartKernel.php",
         "ext/standard/JitNetGetInterfaces.php",
         "ext/standard/JitNetworkServices.php",
-        "ext/standard/JitNextafterKernel.php",
         "ext/standard/JitNlLanginfo.php",
         "ext/standard/JitNumberFormat.php",
         "ext/standard/JitObClean.php",
@@ -4341,7 +4340,6 @@
         "ext/standard/phpc_native_ht_set_string_key.php",
         "ext/standard/phpc_native_ht_set_string_key_ht.php",
         "ext/standard/phpc_native_ht_set_string_key_long.php",
-        "ext/standard/phpc_nextafter_kernel.php",
         "ext/standard/phpc_ob_write_stdout_kernel.php",
         "ext/standard/phpc_object_invoke_destructor_native.php",
         "ext/standard/phpc_object_is_constructed_native.php",
@@ -7448,9 +7446,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7214,
+        "inventory_files": 7212,
         "excluded": 0,
-        "eligible": 7214,
+        "eligible": 7212,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

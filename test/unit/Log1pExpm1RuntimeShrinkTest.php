@@ -147,11 +147,10 @@ final class Log1pExpm1RuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringNotContainsString('phpc_log1p_kernel', $source);
         $this->assertStringNotContainsString('phpc_expm1_kernel', $source);
-        // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringNotContainsString('phpc_log10_kernel', $source);
         $this->assertStringNotContainsString('phpc_atan2_kernel', $source);
         $this->assertStringNotContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringContainsString('phpc_nextafter_kernel', $source);
+        $this->assertStringNotContainsString('phpc_nextafter_kernel', $source);
     }
 
     public function testSpineBundleIncludesHelpersWithoutKernels(): void

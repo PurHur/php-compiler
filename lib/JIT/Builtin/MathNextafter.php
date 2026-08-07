@@ -6,17 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitNextafterKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259, #20034, #20664).
+ * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259, #20034, #20664, #28716).
  *
- * Embed + thin standalone AOT: {@see NextafterJitHelper} via {@see JitVmHelperLink}
- * (Rename #20603 shape — no thin libc ABI fork; double results via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
- * Nested helper compile: IEEE bitcast leaf without re-entering NextafterJitHelper (#27496).
- * php-src: ext/standard/math.c — PHP_FUNCTION(nextafter)
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathFpow #28674 / MathLog10 #28642 shape).
+ * NestedJIT no longer needs an LLVM bitcast kernel — helper uses NestedJIT-safe ULP peel.
+ * php-src: libc nextafter(3) semantics (userland nextafter is a php-src phantom — #28565).
  */
 final class MathNextafter
 {
@@ -45,10 +42,6 @@ final class MathNextafter
 
     public static function invoke(Context $context, Value $num, Value $next): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitNextafterKernel::invoke($context, $num, $next);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -60,10 +53,6 @@ final class MathNextafter
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_NEXTAFTER);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_NEXTAFTER, $probe);
@@ -81,7 +70,7 @@ final class MathNextafter
             self::NEXTAFTER_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20664'
+            '#28716'
         );
     }
 }

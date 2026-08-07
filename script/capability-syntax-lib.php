@@ -1274,7 +1274,7 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/fadd.php',
         ],
         [
-            // Absent from php-src — withhold forever (#28565); phpc_nextafter_kernel stays internal.
+            // Absent from php-src — withhold forever (#28565); NestedJIT ULP in NextafterJitHelper (#28716).
             'names' => ['nextafter'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsNextafter'],
             'since' => '8.4.0',
