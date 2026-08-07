@@ -12634,6 +12634,12 @@ class JIT {
                                         $magicVar = $this->context->getVariableFromOp($result);
                                         $magicVar->magicGetOverloadedClass = 'SimpleXMLElement';
                                         $magicVar->magicGetOverloadedName = $name->value;
+                                        // Bind host tree + baked name/text onto the property
+                                        // result — same as dim (#27438) — so (string)$sxe->child
+                                        // folds without NestedJIT / OOB cast (#28639).
+                                        \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign(
+                                            $magicVar
+                                        );
                                         break;
                                     }
                                 }
