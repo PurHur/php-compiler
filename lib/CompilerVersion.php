@@ -3228,10 +3228,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ substr() optional $truncate silences Z_STR_TRUNCATED warnings (#17239).
-     * mb_substr has no $truncate in php-src — use this only for byte substr() clip warnings (#23603).
+     * Forward-profile phantom substr() `$truncate` arity gate (#17239 / #27749).
      *
-     * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile (#17252).
+     * php-src `string.stub.php` keeps arity 3 through 8.4+ — there is no `$truncate` and no
+     * Z_STR_TRUNCATED warning on oversize length (#28556). This flag still widens Reflection
+     * arity under PROFILE≥8.4 until #27749 retires the phantom; clip warnings must stay off.
+     *
+     * mb_substr has no `$truncate` in php-src either (#23603).
      */
     public static function supportsSubstrTruncate(): bool
     {
