@@ -34,7 +34,6 @@ final class RecursiveCallbackFilterIteratorBuiltin
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        $prot = CfgFunc::FLAG_PROTECTED;
         $entry = new ClassEntry('RecursiveCallbackFilterIterator');
         // Zend rematerialized flattened ce->interfaces (#25823).
         $entry->interfaces = [];
@@ -47,8 +46,9 @@ final class RecursiveCallbackFilterIteratorBuiltin
         $entry->constructor = new RecursiveCallbackFilterIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        // php-src — public accept() (inherited CallbackFilterIterator in Zend; local method here) (#28560).
         $entry->methods['accept'] = new RecursiveCallbackFilterIteratorAccept();
-        $entry->methodVisibility['accept'] = $prot;
+        $entry->methodVisibility['accept'] = $pub;
         $entry->methods['rewind'] = new RecursiveCallbackFilterIteratorRewind();
         $entry->methodVisibility['rewind'] = $pub;
         $entry->methods['next'] = new RecursiveCallbackFilterIteratorNext();

@@ -50,7 +50,6 @@ final class RegexIteratorBuiltin
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        $prot = CfgFunc::FLAG_PROTECTED;
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('RegexIterator');
@@ -90,7 +89,8 @@ final class RegexIteratorBuiltin
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['accept'] = new RegexIteratorAccept();
-        $entry->methodVisibility['accept'] = $prot;
+        // php-src — public function accept(): bool (#28560).
+        $entry->methodVisibility['accept'] = $pub;
         foreach ([
             'rewind' => RegexIteratorRewind::class,
             'valid' => RegexIteratorValid::class,

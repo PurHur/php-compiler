@@ -28,7 +28,6 @@ final class FilterIteratorBuiltin
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        $prot = CfgFunc::FLAG_PROTECTED;
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('FilterIterator');
@@ -44,8 +43,9 @@ final class FilterIteratorBuiltin
         $entry->constructor = new FilterIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        // php-src spl_iterators.stub.php — abstract public function accept(): bool (#28560).
         $entry->methods['accept'] = new FilterIteratorAccept();
-        $entry->methodVisibility['accept'] = $prot;
+        $entry->methodVisibility['accept'] = $pub;
         $entry->abstractMethods['accept'] = true;
         $entry->isAbstract = true;
         foreach ([
