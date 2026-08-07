@@ -10977,6 +10977,12 @@ class Compiler {
         if (!class_exists($className, $autoload)) {
             return null;
         }
+        // Host PHP may still expose the constant while our PROFILE marks it #[\Deprecated]
+        // (e.g. DATE path DateTime::RFC7231 under PROFILE=8.5 on a Zend 8.2 host). Refuse
+        // fold so VM/JIT emit E_USER_DEPRECATED at fetch (#28134).
+        if ($this->vmClassConstFetchIsDeprecated($className, $constName)) {
+            return null;
+        }
         try {
             $ref = new \ReflectionClassConstant($className, $constName);
         } catch (\ReflectionException) {
@@ -11009,6 +11015,26 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /** True when VM ClassEntry marks the constant #[\Deprecated] for the active profile. */
+    private function vmClassConstFetchIsDeprecated(string $className, string $constName): bool
+    {
+        if (null === $this->vmContext) {
+            return false;
+        }
+        $lc = strtolower(ltrim($className, '\\'));
+        $entry = $this->vmContext->classes[$lc] ?? null;
+        if (null === $entry) {
+            return false;
+        }
+        $key = ClassConstName::key($constName);
+        $meta = $entry->constDeprecated[$key] ?? null;
+        if (null === $meta) {
+            return false;
+        }
+
+        return $meta->emitsRuntimeNotice();
     }
 
     protected function pseudoClassInCompileScope(string $className, Block $block): bool

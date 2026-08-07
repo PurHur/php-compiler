@@ -76,7 +76,30 @@ final class DateConstants
     }
 
     /**
-     * @return array<string, int>
+     * php-src ext/date/php_date.stub.php — #[\Deprecated(since: '8.5', message: …)] on DATE_RFC7231 / RFC7231 (#28134).
+     */
+    public const RFC7231_DEPRECATED_MESSAGE = 'as this format ignores the associated timezone and always uses GMT';
+
+    public const RFC7231_DEPRECATED_SINCE = '8.5';
+
+    /**
+     * @return \PHPCompiler\Compiler\DeprecatedMetadata|null null when PROFILE &lt; 8.5
+     */
+    public static function rfc7231DeprecatedMetadata(): ?\PHPCompiler\Compiler\DeprecatedMetadata
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsDeprecatedTraitAttribute()) {
+            // same ≥8.5.0 gate as other 8.5 #[\Deprecated] surfaces
+            return null;
+        }
+
+        return new \PHPCompiler\Compiler\DeprecatedMetadata(
+            self::RFC7231_DEPRECATED_MESSAGE,
+            self::RFC7231_DEPRECATED_SINCE
+        );
+    }
+
+    /**
+     * @return array<string, string>
      */
     public static function sunfuncsConstants(): array
     {

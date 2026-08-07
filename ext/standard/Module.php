@@ -75,6 +75,10 @@ class Module extends ModuleAbstract
         foreach (ReadlineConstants::registeredConstants() as $name => $value) {
             self::defineModuleConstant($runtime, $name, $value);
         }
+        $rfc7231Dep = DateConstants::rfc7231DeprecatedMetadata();
+        if (null !== $rfc7231Dep) {
+            $runtime->vmContext->globalConstDeprecated['date_rfc7231'] = $rfc7231Dep;
+        }
     }
 
     /**

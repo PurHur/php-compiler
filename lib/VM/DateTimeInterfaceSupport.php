@@ -70,6 +70,17 @@ final class DateTimeInterfaceSupport
             $entry->constants[$canonical] = $const;
             $entry->constNames[$canonical] = $canonical;
         }
+        self::registerRfc7231Deprecation($entry);
+    }
+
+    /** php-src stub #[\Deprecated] on RFC7231 under PROFILE≥8.5 (#28134). */
+    private static function registerRfc7231Deprecation(ClassEntry $entry): void
+    {
+        $meta = \PHPCompiler\ext\standard\DateConstants::rfc7231DeprecatedMetadata();
+        if (null === $meta) {
+            return;
+        }
+        $entry->constDeprecated[\PHPCompiler\ClassConstName::key('RFC7231')] = $meta;
     }
 
     public static function isDateTimeInterfaceLc(string $ifaceLc): bool
