@@ -4133,7 +4133,7 @@ class Object_ extends Type {
             }
         }
         if ('splfixedarray' === $lcname) {
-            // Thin AOT: `__spl_ht` packed storage for fromArray/count/ArrayAccess (#26793).
+            // Thin AOT: `__spl_ht` packed storage + foreach via nextFreeElement (#26793, #28640).
             // php-src ext/spl/spl_fixedarray.stub.php — IteratorAggregate + ArrayAccess + Countable + JsonSerializable.
             $this->ensureZendBuiltinInterfaces();
             $this->markInterfaceClass('JsonSerializable');
