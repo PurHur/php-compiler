@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7228 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23339 |
+| Source constructs flagged (warnings) | 23341 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -7086,7 +7086,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmResourceIdString.php` | 0 | 1 |
 | `lib/VM/VmStringCompare.php` | 0 | 1 |
 | `lib/VM/VmTryCatch.php` | 0 | 1 |
-| `lib/VM/VmUnaryMinus.php` | 0 | 5 |
+| `lib/VM/VmUnaryMinus.php` | 0 | 7 |
 | `lib/VM/VmUnaryPlus.php` | 0 | 5 |
 | `lib/VM/VmUnset.php` | 0 | 1 |
 | `lib/VM/VmValueBoxWriteBool.php` | 0 | 1 |
@@ -7342,11 +7342,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/JitBcmath.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new HashTable (line 104)
-- new VmVariable (line 105)
-- new VmVariable (line 107)
-- 23 class method(s)
+- new ArgumentCountError (line 34)
+- new HashTable (line 108)
+- new VmVariable (line 109)
+- new VmVariable (line 111)
+- 25 class method(s)
 
 ### `ext/bcmath/Module.php`
 
@@ -20841,7 +20841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_open.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pbkdf2.php`
@@ -20981,9 +20981,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_seal.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new HashTable (line 60)
-- new Variable (line 62)
+- new ArgumentCountError (line 34)
+- new HashTable (line 64)
+- new Variable (line 66)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_sign.php`
@@ -21157,30 +21157,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 104)
 - new Error (line 173)
 - new Error (line 265)
-- new Error (line 277)
-- new Error (line 295)
-- new Error (line 311)
-- new Error (line 323)
-- new Error (line 335)
-- new Error (line 347)
-- new Error (line 359)
-- new Error (line 371)
-- new Error (line 383)
-- new Error (line 395)
-- new Error (line 433)
-- new Error (line 464)
-- new Error (line 475)
-- new Error (line 512)
-- new Error (line 563)
-- new Variable (line 609)
-- new Variable (line 617)
-- new Variable (line 631)
-- new Error (line 712)
-- new Error (line 733)
+- new Error (line 292)
+- new Error (line 310)
+- new Error (line 326)
+- new Error (line 338)
+- new Error (line 350)
+- new Error (line 362)
+- new Error (line 374)
+- new Error (line 386)
+- new Error (line 398)
+- new Error (line 410)
+- new Error (line 448)
+- new Error (line 479)
+- new Error (line 490)
+- new Error (line 527)
+- new Error (line 578)
+- new Variable (line 624)
+- new Variable (line 632)
+- new Variable (line 646)
+- new Error (line 727)
 - new Error (line 748)
-- new Variable (line 776)
-- new HashTable (line 858)
-- new Variable (line 860)
+- new Error (line 763)
+- new Variable (line 791)
+- new HashTable (line 873)
+- new Variable (line 875)
 - 46 class method(s)
 
 ### `ext/pcntl/VmPcntlArg.php`
@@ -21358,9 +21358,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pcntl/pcntl_waitpid.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new Error (line 32)
-- new Error (line 48)
+- new ArgumentCountError (line 26)
+- new Error (line 34)
+- new Error (line 58)
 - 2 class method(s)
 
 ### `ext/pcntl/pcntl_wexitstatus.php`
@@ -34588,7 +34588,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIniQuantity.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmIniValue.php`
 
@@ -35351,7 +35351,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmRoundMode.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/VmSapiHeaderGuard.php`
 
@@ -44835,7 +44835,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1360)
+- new InternalArgInfo (line 1386)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44851,8 +44851,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2320)
-- new ArgumentCountError (line 2331)
+- new ArgumentCountError (line 2329)
+- new ArgumentCountError (line 2340)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -52293,12 +52293,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Helper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 188)
-- new Variable (line 192)
-- new Variable (line 194)
-- new Variable (line 1936)
-- new Variable (line 1940)
-- new Variable (line 2215)
+- new Variable (line 201)
+- new Variable (line 205)
+- new Variable (line 207)
+- new Variable (line 1949)
+- new Variable (line 1953)
+- new Variable (line 2228)
 - 11 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
@@ -58415,10 +58415,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 3049)
 - new self (line 3070)
 - new self (line 3078)
-- new Error (line 3268)
-- new Error (line 3274)
-- new Error (line 3299)
+- new Error (line 3276)
+- new Error (line 3282)
 - new Error (line 3307)
+- new Error (line 3315)
 - 132 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
@@ -58620,11 +58620,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmUnaryMinus.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 26)
-- new Variable (line 46)
-- new Variable (line 58)
-- new Variable (line 63)
-- 1 class method(s)
+- new OpCode (line 28)
+- new Variable (line 48)
+- new Variable (line 60)
+- new Variable (line 71)
+- new Variable (line 83)
+- new Variable (line 136)
+- 2 class method(s)
 
 ### `lib/VM/VmUnaryPlus.php`
 
