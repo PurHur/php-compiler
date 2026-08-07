@@ -694,6 +694,12 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($info['isOptional']);
     }
 
+    /** php-src openssl.stub.php — InternalArgInfo omits return (#28368). */
+    public function testOpensslErrorStringReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_error_string'));
+    }
+
     /** php-src link.stub.php — InternalArgInfo return int; Zend bool (#26323). */
     public function testSymlinkReflectionReturnBool(): void
     {
