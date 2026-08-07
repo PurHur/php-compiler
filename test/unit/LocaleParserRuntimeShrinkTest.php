@@ -29,6 +29,8 @@ final class LocaleParserRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmLocale::getScript', $source);
         $this->assertStringContainsString('VmLocale::canonicalize', $source);
         $this->assertStringContainsString('canonicalizeArgv', $source);
+        $this->assertStringContainsString('VmLocale::acceptFromHttp', $source);
+        $this->assertStringContainsString('acceptFromHttpArgv', $source);
     }
 
     public function testLocaleDefaultJitHelperDelegatesSemantics(): void
