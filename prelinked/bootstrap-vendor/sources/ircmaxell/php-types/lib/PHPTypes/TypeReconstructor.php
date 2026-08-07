@@ -325,11 +325,30 @@ class TypeReconstructor
     protected function resolveOp_Expr_Array(Operand $var, Op\Expr\Array_ $op, SplObjectStorage $resolved)
     {
         $types = [];
-        foreach ($op->values as $value) {
+        $unpackFlags = property_exists($op, 'unpack') && \is_array($op->unpack)
+            ? $op->unpack
+            : [];
+        foreach ($op->values as $i => $value) {
             if (! isset($resolved[$value])) {
                 return false;
             }
-            $types[] = $resolved[$value];
+            $valueType = $resolved[$value];
+            // `[...$a]` contributes $a's element types, not array-as-element (#28673).
+            if (!empty($unpackFlags[$i])) {
+                if ($valueType instanceof Type && Type::TYPE_ARRAY === $valueType->type) {
+                    if (!empty($valueType->subTypes)) {
+                        foreach ($valueType->subTypes as $sub) {
+                            $types[] = $sub;
+                        }
+                        continue;
+                    }
+
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [new Type(Type::TYPE_ARRAY)];
+            }
+            $types[] = $valueType;
         }
         if (empty($types)) {
             return [new Type(Type::TYPE_ARRAY)];

@@ -212,14 +212,50 @@ final class CallUnpackCompileTime
 
         $foundInit = false;
         $elements = [];
+        /** @var \PHPCompiler\VM\HashTable|null $spreadHt */
+        $spreadHt = null;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ARRAY_SPREAD === $op->type && $op->arg1 === $slot) {
-                return null;
+                // Materialize prior literal elements, then apply unpack (array_merge semantics).
+                // NestedJIT cannot export runtime string-key HTs — json_encode folds here (#28673 /
+                // peer #27546 array_merge).
+                if (null === $spreadHt) {
+                    if ($foundInit) {
+                        $spreadHt = CallUnpackJitHelper::vmArrayFromElements($elements)->toArray();
+                        $elements = [];
+                    } else {
+                        $spreadHt = new \PHPCompiler\VM\HashTable();
+                        $foundInit = true;
+                    }
+                } elseif ([] !== $elements) {
+                    foreach ($elements as [$key, $value]) {
+                        if (null === $key) {
+                            $spreadHt->append($value);
+                        } elseif (VmVariable::TYPE_INTEGER === $key->type) {
+                            $spreadHt->addIndex($key->toInt(), $value);
+                        } elseif (VmVariable::TYPE_STRING === $key->type) {
+                            $spreadHt->add($key->toString(), $value);
+                        } else {
+                            return null;
+                        }
+                    }
+                    $elements = [];
+                }
+                if (null === $op->arg2) {
+                    return null;
+                }
+                $src = self::tryCompileTimeArrayFromSlot($block, (int) $op->arg2, $visited);
+                if (null === $src || VmVariable::TYPE_ARRAY !== $src->type) {
+                    return null;
+                }
+                $spreadHt->spreadFrom($src->toArray());
+                continue;
             }
             if (OpCode::TYPE_INIT_ARRAY === $op->type && $op->arg1 === $slot) {
                 // Slot reuse: a later INIT_ARRAY replaces the prior list (fold saw [1,2,3]×2 → #26977).
                 $foundInit = true;
                 $elements = [];
+                $spreadHt = null;
                 if (null !== $op->arg2) {
                     // null arg3 = list append (nextFreeElement); do not treat as missing key (#24144).
                     $key = null === $op->arg3 ? null : self::compileTimeKey($block, $op->arg3);
@@ -243,8 +279,40 @@ final class CallUnpackCompileTime
                 if (null === $value) {
                     return null;
                 }
-                $elements[] = [$key, $value];
+                if (null !== $spreadHt) {
+                    if (null === $key) {
+                        $spreadHt->append($value);
+                    } elseif (VmVariable::TYPE_INTEGER === $key->type) {
+                        $spreadHt->addIndex($key->toInt(), $value);
+                    } elseif (VmVariable::TYPE_STRING === $key->type) {
+                        $spreadHt->add($key->toString(), $value);
+                    } else {
+                        return null;
+                    }
+                } else {
+                    $elements[] = [$key, $value];
+                }
             }
+        }
+
+        if (null !== $spreadHt) {
+            if ([] !== $elements) {
+                foreach ($elements as [$key, $value]) {
+                    if (null === $key) {
+                        $spreadHt->append($value);
+                    } elseif (VmVariable::TYPE_INTEGER === $key->type) {
+                        $spreadHt->addIndex($key->toInt(), $value);
+                    } elseif (VmVariable::TYPE_STRING === $key->type) {
+                        $spreadHt->add($key->toString(), $value);
+                    } else {
+                        return null;
+                    }
+                }
+            }
+            $var = new VmVariable();
+            $var->array($spreadHt);
+
+            return $var;
         }
 
         if ($foundInit) {

@@ -26,6 +26,7 @@ use PHPLLVM\Value;
  * `json_encode(array_flip(lit…))` (#27072),
  * `json_encode(array_combine(lit, lit))` (#27132),
  * `json_encode(array_merge(lit…))` (#27546),
+ * `json_encode([...$lit, ...])` array unpack via CallUnpackCompileTime (#28673),
  * `json_encode(array_reverse(lit…))` (#27130),
  * `json_encode(array_column(lit…))` (#27131),
  * `json_encode(array_fill(lit, lit, lit))` (#27073),

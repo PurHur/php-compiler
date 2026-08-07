@@ -183,7 +183,15 @@ class Analyzer
             if ($op instanceof Op\Expr\Array_) {
                 $newSize = 0;
                 $nextListIndex = 0;
-                foreach ($op->keys as $key) {
+                $unpackFlags = property_exists($op, 'unpack') && \is_array($op->unpack)
+                    ? $op->unpack
+                    : [];
+                foreach ($op->keys as $i => $key) {
+                    // `[...$a]` uses NullOperand keys with unpack=true — runtime length / string
+                    // keys; never a fixed native packed list (#28673).
+                    if (!empty($unpackFlags[$i])) {
+                        return null;
+                    }
                     if ($key instanceof Operand\NullOperand) {
                         ++$newSize;
                         ++$nextListIndex;
