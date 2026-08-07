@@ -1,5 +1,5 @@
 --TEST--
-ReflectionClass::getLazyPropertyNames() — PHP 8.4 lazy modifier (#16954, ext/reflection/php_reflection.c)
+ReflectionProperty::isLazy for lazy modifier — getLazyPropertyNames phantom (#16954, #28516)
 --SKIPIF--
 <?php
 if (getenv('PHP_COMPILER_PROFILE') !== '8.4' && getenv('PHP_COMPILER_PROFILE') !== '8.5') {
@@ -14,8 +14,10 @@ class LazyDecl {
     public lazy string $a = '1';
     public string $b = '2';
 }
-$names = (new ReflectionClass(LazyDecl::class))->getLazyPropertyNames();
-sort($names);
-echo implode(',', $names), "\n";
+echo 'getLazyPropertyNames=', method_exists(ReflectionClass::class, 'getLazyPropertyNames') ? '1' : '0', "\n";
+$c = new LazyDecl();
+$rp = new ReflectionProperty(LazyDecl::class, 'a');
+echo $rp->isLazy($c) ? "lazy\n" : "not-lazy\n";
 --EXPECT--
-a
+getLazyPropertyNames=0
+lazy

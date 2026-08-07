@@ -1896,15 +1896,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionParameter::isSensitive() / isSensitiveParameter()
-     * (ext/reflection/php_reflection.c, #7072, #16130, #22899).
+     * ReflectionParameter::isSensitive() / isSensitiveParameter() — phantom vs php-src (#28528, re-#7072/#16130/#22899).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * php-src never ships these methods (ext/reflection/php_reflection.stub.php on 8.2–8.5).
+     * #[\SensitiveParameter] exception-trace redaction is separate ({@see \PHPCompiler\VM\SensitiveParamSupport})
+     * and stays enabled. Never advertise on any php-src-strict profile.
      */
     public static function supportsReflectionParameterIsSensitiveParameter(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
@@ -2248,11 +2248,13 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ ReflectionClass lazy factories (newLazyGhost/newLazyProxy + reset/initialize helpers)
-     * (#6708, #12375, #16812, #28414).
+     * (#6708, #12375, #16812, #28414, #28516).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      * Free-function createLazyGhost()/createLazyProxy() are never advertised — see {@see supportsLazyObjectFreeFunctions()}.
      * Free-function class_has_lazy_object_* are never advertised — see {@see supportsClassHasLazyObjectFreeFunctions()}.
+     * ReflectionClass::{createLazyGhost,createLazyProxy,resetAsLazyObject,getLazyInitializationException,
+     * getLazyProxyFactory} are also phantoms vs php-src stub — never register them (#28516).
      */
     public static function supportsLazyObjectFactories(): bool
     {
@@ -2283,9 +2285,9 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionClass::{getDeprecatedMessage,getDeprecatedVersion,getLazyPropertyNames,
-     * getReadOnlyProperties} and ReflectionMethod::{getDeprecatedMessage,getDeprecatedVersion}
-     * (ext/reflection/php_reflection.stub.php, #22599, #25058; re-#6917/#6606).
+     * PHP 8.4+ ReflectionClass::{getDeprecatedMessage,getDeprecatedVersion} and
+     * ReflectionMethod::{getDeprecatedMessage,getDeprecatedVersion}
+     * (#22599, #25058; re-#6917).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev / PROFILE=8.2 matches Zend 8.2
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
@@ -2293,6 +2295,9 @@ final class CompilerVersion
      * Note: ReflectionClass::isStatic() is withheld on every profile — the static-class RFC never
      * landed in php-src; isStatic exists only on ReflectionFunctionAbstract / ReflectionProperty
      * (#28518). Do not re-advertise it under this gate.
+     *
+     * Note: getLazyPropertyNames / getReadOnlyProperties are not in php-src stubs — withheld on
+     * every profile (#28516). Use getProperties() + ReflectionProperty::isReadOnly() instead.
      */
     public static function supportsReflectionClassPhp84Apis(): bool
     {

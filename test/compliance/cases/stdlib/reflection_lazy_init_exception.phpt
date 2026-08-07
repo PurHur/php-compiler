@@ -1,33 +1,11 @@
 --TEST--
-Stdlib: ReflectionClass::getLazyInitializationException() stores lazy init failure (#6514)
+Stdlib: ReflectionClass::getLazyInitializationException() phantom vs php-src (#28516, re-#6514)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-class Svc {
-    public function __construct(public string $id) {
-        if ($id === 'fail') {
-            throw new RuntimeException('init boom');
-        }
-    }
-}
-$ref = new ReflectionClass(Svc::class);
-$lazy = $ref->newLazyGhost(function (Svc $o) {
-    new Svc('fail');
-});
-try {
-    $lazy->id;
-} catch (Throwable $e) {
-    echo 'caught', "\n";
-}
-$stored = $ref->getLazyInitializationException($lazy);
-echo $stored?->getMessage(), "\n";
-try {
-    $ref->getLazyInitializationException(new Svc('ok'));
-} catch (TypeError $e) {
-    echo 'te_non_lazy', "\n";
-}
+echo 'getLazyInitializationException=', method_exists(ReflectionClass::class, 'getLazyInitializationException') ? '1' : '0', "\n";
+echo 'getLazyInitializer=', method_exists(ReflectionClass::class, 'getLazyInitializer') ? '1' : '0', "\n";
 --EXPECT--
-caught
-init boom
-te_non_lazy
-
-te_non_lazy
+getLazyInitializationException=0
+getLazyInitializer=1

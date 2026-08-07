@@ -44,8 +44,9 @@ final class ReflectionClassIsStaticPhantomGateTest extends TestCase
             $this->assertArrayNotHasKey('isstatic', $rc, 'ReflectionClass::isStatic must not register (#28518)');
             $this->assertArrayHasKey('getdeprecatedmessage', $rc);
             $this->assertArrayHasKey('getdeprecatedversion', $rc);
-            $this->assertArrayHasKey('getreadonlyproperties', $rc);
-            $this->assertArrayHasKey('getlazypropertynames', $rc);
+            // getReadOnlyProperties / getLazyPropertyNames are phantoms vs php-src (#28516).
+            $this->assertArrayNotHasKey('getreadonlyproperties', $rc);
+            $this->assertArrayNotHasKey('getlazypropertynames', $rc);
 
             $this->assertArrayHasKey('isstatic', $ctx->classes['reflectionproperty']->methods);
             $this->assertArrayHasKey('isstatic', $ctx->classes['reflectionmethod']->methods);

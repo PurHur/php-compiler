@@ -8,7 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** ReflectionClass::getLazyPropertyNames() — #6606, #16954. */
+/** ReflectionClass::getLazyPropertyNames() is a phantom vs php-src (#28516, re-#6606). */
 final class ReflectionLazyPropertyNamesTest extends TestCase
 {
     protected function setUp(): void
@@ -18,43 +18,18 @@ final class ReflectionLazyPropertyNamesTest extends TestCase
         }
     }
 
-    public function testMethodExistsAndLazyGhostTraitListsInstanceProperties(): void
+    public function testGetLazyPropertyNamesAbsentOnForwardProfile(): void
     {
         $code = <<<'PHP'
 <?php
 var_export(method_exists(ReflectionClass::class, 'getLazyPropertyNames'));
 echo "\n";
-class Svc {
-    use LazyGhostTrait;
-    public string $id;
-}
-$names = (new ReflectionClass(Svc::class))->getLazyPropertyNames();
-echo count($names), "\n";
-echo $names[0], "\n";
+echo method_exists(ReflectionClass::class, 'newLazyGhost') ? "newLazyGhost\n" : "missing\n";
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("true\n1\nid\n", ob_get_clean());
-    }
-
-    public function testLazyModifierPropertyNames(): void
-    {
-        $code = <<<'PHP'
-<?php
-class LazyDecl {
-    public lazy string $a = '1';
-    public string $b = '2';
-}
-$names = (new ReflectionClass(LazyDecl::class))->getLazyPropertyNames();
-sort($names);
-echo implode(',', $names), "\n";
-PHP;
-        $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'test.php');
-        ob_start();
-        $rt->run($block);
-        self::assertSame("a\n", ob_get_clean());
+        self::assertSame("false\nnewLazyGhost\n", ob_get_clean());
     }
 }

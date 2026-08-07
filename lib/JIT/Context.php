@@ -1284,8 +1284,7 @@ class Context {
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
-            $this->functionProxies['reflectionclass::createlazyghost'] = new Call\ReflectionClassCreateLazyGhost();
-            $this->functionProxies['reflectionclass::createlazyproxy'] = new Call\ReflectionClassCreateLazyProxy();
+            // ReflectionClass::createLazyGhost/Proxy are phantoms vs php-src (#28516).
         }
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();

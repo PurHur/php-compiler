@@ -239,7 +239,7 @@ PHP;
         $this->assertSame("lazy\ninit\n", ob_get_clean());
     }
 
-    /** @covers issue #6125 */
+    /** @covers issue #6125 / #28516 — reset via resetAsLazyGhost (php-src); resetAsLazyObject is phantom */
     public function testResetAsLazyObject(): void
     {
         $runtime = new Runtime();
@@ -256,7 +256,9 @@ $lazy = $ref->newLazyGhost(function (Svc $o) {
     $o->__construct('init');
 });
 $ref->markLazyObjectAsInitialized($lazy);
-$ref->resetAsLazyObject($lazy);
+$ref->resetAsLazyGhost($lazy, function (Svc $o) {
+    $o->__construct('init');
+});
 echo $ref->isUninitializedLazyObject($lazy) ? 'uninit' : 'init', "\n";
 echo $lazy->id, "\n";
 PHP;
@@ -302,7 +304,7 @@ PHP;
         );
     }
 
-    /** @covers issue #6776 */
+    /** @covers issue #6776 / #28516 — getLazyProxyFactory is phantom; use getLazyInitializer */
     public function testLazyProxyReflectionMethods(): void
     {
         $runtime = new Runtime();
@@ -317,19 +319,19 @@ echo 'methods=';
 echo (int) method_exists($ref, 'getLazyProxyFactory');
 echo (int) method_exists($ref, 'resetAsLazyProxy');
 echo "\n";
-$factory = $ref->getLazyProxyFactory($lazy);
+$factory = $ref->getLazyInitializer($lazy);
 echo 'pending_factory=', (null === $factory ? 'null' : 'callable'), "\n";
 echo 'before=', $lazy->id, "\n";
 $ref->resetAsLazyProxy($lazy, static fn () => new Svc('rebound'));
 echo 'rebound_before=', $lazy->id, "\n";
 echo 'after_rebound=', $lazy->id, "\n";
 $ref->markLazyObjectAsInitialized($lazy);
-echo 'after_mark_factory=', (null === $ref->getLazyProxyFactory($lazy) ? 'null' : 'callable'), "\n";
+echo 'after_mark_factory=', (null === $ref->getLazyInitializer($lazy) ? 'null' : 'callable'), "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'lazy_proxy_reflection.php'));
         $this->assertSame(
-            "methods=11\npending_factory=callable\nbefore=proxy\nrebound_before=rebound\nafter_rebound=rebound\nafter_mark_factory=null\n",
+            "methods=01\npending_factory=callable\nbefore=proxy\nrebound_before=rebound\nafter_rebound=rebound\nafter_mark_factory=null\n",
             ob_get_clean()
         );
     }

@@ -1,5 +1,7 @@
 --TEST--
-Language: ReflectionClass::resetAsLazyObject restores uninitialized lazy state (#6125)
+Language: ReflectionClass::resetAsLazyGhost restores uninitialized lazy state (#6125, #28516)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Svc {
@@ -14,17 +16,14 @@ $lazy = $ref->newLazyGhost(function (Svc $o) {
 });
 $ref->markLazyObjectAsInitialized($lazy);
 echo 'marked=', $lazy->id, "\n";
-$ref->resetAsLazyObject($lazy);
+$ref->resetAsLazyGhost($lazy, function (Svc $o) {
+    $o->__construct('init');
+});
 echo 'reset_uninit=', $ref->isUninitializedLazyObject($lazy) ? 'yes' : 'no', "\n";
 echo 'reinit=', $lazy->id, "\n";
-try {
-    $ref->resetAsLazyObject(new Svc('plain'));
-    echo "plain_ok\n";
-} catch (TypeError $e) {
-    echo "plain_type_error\n";
-}
+echo 'phantom_resetAsLazyObject=', method_exists($ref, 'resetAsLazyObject') ? '1' : '0', "\n";
 --EXPECT--
 marked=
 reset_uninit=yes
 reinit=init
-plain_type_error
+phantom_resetAsLazyObject=0

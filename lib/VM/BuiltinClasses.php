@@ -116,9 +116,6 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetInterfaces;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraits;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
-use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializationException;
-use PHPCompiler\VM\Builtin\ReflectionClassGetLazyPropertyNames;
-use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
 use PHPCompiler\VM\Builtin\ReflectionClassGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetNamespaceName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetShortName;
@@ -132,7 +129,6 @@ use PHPCompiler\VM\Builtin\ReflectionClassHasProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetParentClass;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
-use PHPCompiler\VM\Builtin\ReflectionClassGetReadOnlyProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStaticProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStaticPropertyValue;
 use PHPCompiler\VM\Builtin\ReflectionClassSetStaticPropertyValue;
@@ -166,14 +162,11 @@ use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
-use PHPCompiler\VM\Builtin\ReflectionClassCreateLazyGhost;
-use PHPCompiler\VM\Builtin\ReflectionClassCreateLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionClassNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassNewInstanceArgs;
 use PHPCompiler\VM\Builtin\ReflectionClassNewInstanceWithoutConstructor;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyGhost;
-use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassResetAsLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
@@ -814,7 +807,8 @@ final class BuiltinClasses
         $rparam->methodVisibility['ispassedbyreference'] = $pub;
         $rparam->methods['isvariadic'] = new ReflectionParameterIsVariadic();
         $rparam->methodVisibility['isvariadic'] = $pub;
-        // isSensitive / isSensitiveParameter: PHP 8.4+ only (Zend 8.2 absent) — #22899, #16130, #7072
+        // isSensitive / isSensitiveParameter: phantom vs php-src (#28528) — never register.
+        // Builtin classes kept for spine; #[\SensitiveParameter] redaction is SensitiveParamSupport.
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $rparam->methods['issensitive'] = new ReflectionParameterIsSensitive();
             $rparam->methodVisibility['issensitive'] = $pub;
@@ -995,12 +989,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getstaticpropertyvalue'] = $pub;
         $rc->methods['setstaticpropertyvalue'] = new ReflectionClassSetStaticPropertyValue();
         $rc->methodVisibility['setstaticpropertyvalue'] = $pub;
-        if (CompilerVersion::supportsReflectionClassPhp84Apis()) {
-            $rc->methods['getreadonlyproperties'] = new ReflectionClassGetReadOnlyProperties();
-            $rc->methodVisibility['getreadonlyproperties'] = $pub;
-            $rc->methods['getlazypropertynames'] = new ReflectionClassGetLazyPropertyNames();
-            $rc->methodVisibility['getlazypropertynames'] = $pub;
-        }
+        // getReadOnlyProperties / getLazyPropertyNames are phantoms vs php-src (#28516).
+        // Readonly: getProperties() + ReflectionProperty::isReadOnly(); lazy names: not in stub.
         $rc->methods['getmethods'] = new ReflectionClassGetMethods();
         $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();
@@ -1061,21 +1051,16 @@ final class BuiltinClasses
         $rc->methodVisibility['hasconstant'] = $pub;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         if (CompilerVersion::supportsLazyObjectFactories()) {
-            // Zend instance methods — not FLAG_STATIC (#22527; static dropped $this, #22288).
+            // php-src ReflectionClass lazy surface only (ext/reflection/php_reflection.stub.php) —
+            // newLazyGhost/newLazyProxy + reset/initialize/mark/isUninitialized/getLazyInitializer.
+            // Phantoms withheld (#28516): createLazyGhost/Proxy, resetAsLazyObject,
+            // getLazyInitializationException, getLazyProxyFactory.
             $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
             $rc->methodVisibility['newlazyproxy'] = $pub;
             $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
             $rc->methodVisibility['newlazyghost'] = $pub;
-            $rc->methods['createlazyghost'] = new ReflectionClassCreateLazyGhost();
-            $rc->methodVisibility['createlazyghost'] = $pubStatic;
-            $rc->methods['createlazyproxy'] = new ReflectionClassCreateLazyProxy();
-            $rc->methodVisibility['createlazyproxy'] = $pubStatic;
             $rc->methods['getlazyinitializer'] = new ReflectionClassGetLazyInitializer();
             $rc->methodVisibility['getlazyinitializer'] = $pub;
-            $rc->methods['getlazyinitializationexception'] = new ReflectionClassGetLazyInitializationException();
-            $rc->methodVisibility['getlazyinitializationexception'] = $pub;
-            $rc->methods['getlazyproxyfactory'] = new ReflectionClassGetLazyProxyFactory();
-            $rc->methodVisibility['getlazyproxyfactory'] = $pub;
             $rc->methods['isuninitializedlazyobject'] = new ReflectionClassIsUninitializedLazyObject();
             $rc->methodVisibility['isuninitializedlazyobject'] = $pub;
             $rc->methods['initializelazyobject'] = new ReflectionClassInitializeLazyObject();
@@ -1086,8 +1071,6 @@ final class BuiltinClasses
             $rc->methodVisibility['resetaslazyghost'] = $pubStatic;
             $rc->methods['resetaslazyproxy'] = new ReflectionClassResetAsLazyProxy();
             $rc->methodVisibility['resetaslazyproxy'] = $pubStatic;
-            $rc->methods['resetaslazyobject'] = new ReflectionClassResetAsLazyObject();
-            $rc->methodVisibility['resetaslazyobject'] = $pub;
             // php-src stub return types — absent from php-types InternalArgInfo (#27741).
             $objectRet = ReflectionTypeSupport::cfgTypeFromLabel('object');
             $voidRet = ReflectionTypeSupport::cfgTypeFromLabel('void');
