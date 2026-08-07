@@ -44,6 +44,8 @@ final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmStreamSocketNative::client', $source);
         $this->assertStringContainsString('VmFs::fwrite', $source);
         $this->assertStringContainsString('VmFs::streamGetContents', $source);
+        $this->assertStringContainsString('HTTP/1.1', $source);
+        $this->assertStringNotContainsString('HTTP/1.0', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString('ssize_t send(int sockfd', $source);
         $this->assertStringNotContainsString('without host PHP', $source);
