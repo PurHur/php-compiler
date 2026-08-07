@@ -61,15 +61,10 @@ final class VmIniQuantity
             return 0;
         }
 
-        $base = 10;
-        $digitsStart = $pos;
+        // base 0 = C strtoul auto (leading 0 → octal); explicit 0x/0o/0b set below.
+        // php-src: Zend/zend_ini.c zend_ini_parse_quantity_internal (#28763).
+        $base = 0;
         if ('0' === $slice[$pos] && ($pos + 1) < $sliceLen && !ctype_digit($slice[$pos + 1])) {
-            if (($pos + 1) === $sliceLen - 0 && $sliceLen === $pos + 1) {
-                return 0;
-            }
-            if ($sliceLen === $pos + 1) {
-                return 0;
-            }
             $prefix = $slice[$pos + 1];
             if (\in_array($prefix, ['g', 'G', 'm', 'M', 'k', 'K'], true)) {
                 goto evaluation;
@@ -115,8 +110,21 @@ final class VmIniQuantity
         }
 
         evaluation:
+        // Resolve strtoul(base=0): leading 0 + digit → octal (legacy); else decimal.
+        if (0 === $base) {
+            if (
+                '0' === $slice[$pos]
+                && ($pos + 1) < $sliceLen
+                && ctype_digit($slice[$pos + 1])
+            ) {
+                $base = 8;
+            } else {
+                $base = 10;
+            }
+        }
+
         $digitsEnd = $pos;
-        while ($digitsEnd < $sliceLen && ctype_digit($slice[$digitsEnd])) {
+        while ($digitsEnd < $sliceLen && self::isDigitInBase($slice[$digitsEnd], $base)) {
             ++$digitsEnd;
         }
 
@@ -196,6 +204,17 @@ final class VmIniQuantity
         }
 
         return (int) $multiplied;
+    }
+
+    /** Digit predicate matching C strtoul for the active base (zend_ini_parse_quantity). */
+    private static function isDigitInBase(string $c, int $base): bool
+    {
+        return match ($base) {
+            2 => '0' === $c || '1' === $c,
+            8 => $c >= '0' && $c <= '7',
+            16 => (bool) ctype_xdigit($c),
+            default => (bool) ctype_digit($c),
+        };
     }
 
     private static function parseUnsignedDigits(string $digits, int $base): int|float
