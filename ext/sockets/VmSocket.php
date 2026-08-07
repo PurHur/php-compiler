@@ -57,6 +57,8 @@ final class VmSocket
 
         $entry = new ClassEntry('Socket');
         $entry->isInternal = true;
+        // php-src `final class Socket` (ext/sockets/sockets.stub.php; #28391).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

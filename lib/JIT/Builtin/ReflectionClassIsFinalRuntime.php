@@ -15,7 +15,8 @@ use PHPLLVM\Value;
  * Native strcmp table — NestedJIT bool/int helpers for this probe fail module verify
  * under thin AOT (ret i64 vs i1 / terminator-in-block). Builtin finals are known at
  * link time; matches FinalClassExtensionCheck::INTERNAL_FINAL + profile-gated GMP
- * (+ Fiber/FiberError from zend_fibers.stub.php; #28389).
+ * (+ Fiber/FiberError from zend_fibers.stub.php; #28389;
+ * Socket/AddressInfo from sockets.stub.php; #28391).
  */
 final class ReflectionClassIsFinalRuntime
 {
@@ -118,7 +119,15 @@ final class ReflectionClassIsFinalRuntime
      */
     private static function knownFinalClassNames(): array
     {
-        $names = ['Attribute', 'Closure', 'Fiber', 'FiberError', 'Generator'];
+        $names = [
+            'AddressInfo',
+            'Attribute',
+            'Closure',
+            'Fiber',
+            'FiberError',
+            'Generator',
+            'Socket',
+        ];
         // php-src 8.4+ final class GMP (ext/gmp/gmp.stub.php; #28135)
         if (CompilerVersion::supportsGmp()) {
             $names[] = 'GMP';
