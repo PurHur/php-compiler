@@ -1049,6 +1049,27 @@ final class BuiltinInternalArgInfoTest extends TestCase
         );
     }
 
+    /** php-src ext/dom/php_dom.stub.php — loadHTML/loadHTMLFile int $options = 0 (#28713). */
+    public function testDomDocumentLoadHtmlOptionsStubParamType(): void
+    {
+        $this->assertSame(
+            'int',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('domdocument', 'loadhtml', 1)
+        );
+        $this->assertSame(
+            'int',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('domdocument', 'loadhtmlfile', 1)
+        );
+        $this->assertSame(
+            'int',
+            BuiltinInternalArgInfo::paramInfoForClassMethod('DOMDocument', 'loadHTML', 1)['type'] ?? null
+        );
+        $this->assertSame(
+            'int',
+            BuiltinInternalArgInfo::paramInfoForClassMethod('DOMDocument', 'loadHTMLFile', 1)['type'] ?? null
+        );
+    }
+
     /** php-src ext/zlib/zlib.stub.php — DeflateContext|false / InflateContext|false (#27627); options object|array (#28592). */
     public function testDeflateInflateInitReflectionStubTypes(): void
     {

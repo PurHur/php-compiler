@@ -1035,6 +1035,10 @@ final class BuiltinInternalArgInfo
             'domdocument::createelementns' => 0 === $index ? '?string' : null,
             // ext/dom/php_dom.stub.php — createAttributeNS(?string $namespace, …)
             'domdocument::createattributens' => 0 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — loadHTML(string $source, int $options = 0): bool (#28713)
+            // InternalArgInfo omits the optional $options param (load/loadXML already have int).
+            'domdocument::loadhtml',
+            'domdocument::loadhtmlfile' => 1 === $index ? 'int' : null,
             // ext/intl/spoofchecker/spoofchecker.stub.php — string $string / $string1/$string2 (#25055)
             'spoofchecker::issuspicious' => 0 === $index ? 'string' : null,
             'spoofchecker::areconfusable' => ($index === 0 || $index === 1) ? 'string' : null,
