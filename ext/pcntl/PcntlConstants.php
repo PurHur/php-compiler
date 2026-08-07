@@ -39,9 +39,11 @@ final class PcntlConstants
     public const SIGPWR = 30;
     public const SIGSYS = 31;
 
-    /** Signal aliases (php-src ext/pcntl/pcntl.stub.php; #24111). */
+    /** Signal aliases (php-src ext/pcntl/pcntl.stub.php; #24111 / #26759). */
     public const SIGCLD = 17; // alias of SIGCHLD
     public const SIGIOT = 6;  // alias of SIGABRT
+    public const SIGPOLL = 29; // alias of SIGIO (ifdef SIGPOLL)
+    public const SIGBABY = 31; // alias of SIGSYS (ifdef SIGSYS)
 
     /** Real-time signal range (Linux x86_64; php-src SIGRTMIN/SIGRTMAX). */
     public const SIGRTMIN = 34;
@@ -92,6 +94,19 @@ final class PcntlConstants
 
     public const TRAP_BRKPT = 1;
     public const TRAP_TRACE = 2;
+
+    /**
+     * siginfo_t.si_code selectors for SIGILL (Linux signal.h; php-src ILL_*; #26759).
+     * Values match Zend 8.2 on glibc/Linux.
+     */
+    public const ILL_ILLOPC = 1;
+    public const ILL_ILLOPN = 2;
+    public const ILL_ILLADR = 3;
+    public const ILL_ILLTRP = 4;
+    public const ILL_PRVOPC = 5;
+    public const ILL_PRVREG = 6;
+    public const ILL_COPROC = 7;
+    public const ILL_BADSTK = 8;
 
     /** waitpid(2) WNOHANG — return immediately if no child has exited (issue #3327). */
     public const WNOHANG = 1;
@@ -243,6 +258,8 @@ final class PcntlConstants
             'SIGSYS' => self::SIGSYS,
             'SIGCLD' => self::SIGCLD,
             'SIGIOT' => self::SIGIOT,
+            'SIGPOLL' => self::SIGPOLL,
+            'SIGBABY' => self::SIGBABY,
             'SIGRTMIN' => self::SIGRTMIN,
             'SIGRTMAX' => self::SIGRTMAX,
             'SI_USER' => self::SI_USER,
@@ -280,6 +297,14 @@ final class PcntlConstants
             'POLL_HUP' => self::POLL_HUP,
             'TRAP_BRKPT' => self::TRAP_BRKPT,
             'TRAP_TRACE' => self::TRAP_TRACE,
+            'ILL_ILLOPC' => self::ILL_ILLOPC,
+            'ILL_ILLOPN' => self::ILL_ILLOPN,
+            'ILL_ILLADR' => self::ILL_ILLADR,
+            'ILL_ILLTRP' => self::ILL_ILLTRP,
+            'ILL_PRVOPC' => self::ILL_PRVOPC,
+            'ILL_PRVREG' => self::ILL_PRVREG,
+            'ILL_COPROC' => self::ILL_COPROC,
+            'ILL_BADSTK' => self::ILL_BADSTK,
         ];
     }
 
