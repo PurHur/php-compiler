@@ -1049,20 +1049,21 @@ final class BuiltinInternalArgInfoTest extends TestCase
         );
     }
 
-    /** php-src ext/zlib/zlib.stub.php — DeflateContext|false / InflateContext|false (#27627). */
+    /** php-src ext/zlib/zlib.stub.php — DeflateContext|false / InflateContext|false (#27627); options object|array (#28592). */
     public function testDeflateInflateInitReflectionStubTypes(): void
     {
         $this->assertSame('DeflateContext|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('deflate_init'));
         $this->assertSame('InflateContext|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('inflate_init'));
-        $this->assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('inflate_init', 1));
+        $this->assertSame('object|array', BuiltinInternalArgInfo::stubParamTypeOverride('deflate_init', 1));
+        $this->assertSame('object|array', BuiltinInternalArgInfo::stubParamTypeOverride('inflate_init', 1));
         $opts = BuiltinInternalArgInfo::paramInfoForFunction('inflate_init', 1);
         $this->assertNotNull($opts);
         $this->assertSame('options', $opts['name']);
-        $this->assertSame('array', $opts['type']);
+        $this->assertSame('object|array', $opts['type']);
         $this->assertTrue($opts['isOptional']);
         $deflateOpts = BuiltinInternalArgInfo::paramInfoForFunction('deflate_init', 1);
         $this->assertNotNull($deflateOpts);
-        $this->assertSame('array', $deflateOpts['type']);
+        $this->assertSame('object|array', $deflateOpts['type']);
         // Optionality for deflate_init $options is from BuiltinParamNames `options=` (#24568), not InternalArgInfo.
     }
 
