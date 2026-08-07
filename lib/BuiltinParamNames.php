@@ -35,6 +35,10 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — PHP 8.4+ createFromTimestamp(int|float $timestamp): static (#26097)
             'datetime::createfromtimestamp',
             'datetimeimmutable::createfromtimestamp' => ['timestamp'],
+            // php-src ext/pdo/pdo_dbh.stub.php — InternalArgInfo still passwd/statement/sql + required (#24590)
+            'pdo::__construct' => ['dsn', 'username=', 'password=', 'options='],
+            'pdo::prepare' => ['query', 'options='],
+            'pdo::query' => ['query', 'fetchMode=', '...fetchModeArgs'],
             // php-src ext/pdo/pdo_dbh.stub.php — PHP 8.4+; missing from InternalArgInfo (#26223)
             'pdo::connect' => ['dsn', 'username=', 'password=', 'options='],
             'datetimezone::__construct' => ['timezone'],

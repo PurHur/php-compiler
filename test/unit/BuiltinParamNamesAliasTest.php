@@ -1441,6 +1441,77 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'connect', 3));
     }
 
+    /** @covers issue #24590 */
+    public function testPdoConstructPrepareQueryNamedParameters(): void
+    {
+        $ctor = 'PDO::__construct';
+        self::assertSame(
+            ['dsn', 'username=', 'password=', 'options='],
+            BuiltinParamNames::forClassMethod($ctor)
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($ctor),
+            'dsn',
+            $ctor
+        ));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($ctor),
+            'password',
+            $ctor
+        ));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($ctor),
+            'passwd',
+            $ctor
+        ));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('PDO', '__construct'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalMethod('PDO', '__construct'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', '__construct', 1));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', '__construct', 2));
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', '__construct', 3));
+
+        $prepare = 'PDO::prepare';
+        self::assertSame(['query', 'options='], BuiltinParamNames::forClassMethod($prepare));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($prepare),
+            'query',
+            $prepare
+        ));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($prepare),
+            'statement',
+            $prepare
+        ));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('PDO', 'prepare'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('PDO', 'prepare'));
+
+        $query = 'PDO::query';
+        self::assertSame(
+            ['query', 'fetchMode=', '...fetchModeArgs'],
+            BuiltinParamNames::forClassMethod($query)
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($query),
+            'query',
+            $query
+        ));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($query),
+            'fetchMode',
+            $query
+        ));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forClassMethod($query),
+            'sql',
+            $query
+        ));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('PDO', 'query'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod('PDO', 'query'));
+        self::assertSame(2, BuiltinParamNames::variadicParamIndexForFunction($query));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'query', 1));
+        self::assertSame('mixed', BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('pdo', 'query', 2));
+    }
+
     /** @covers issue #27599 */
     public function testReflectionPropertyRawValueNamedParameters(): void
     {
