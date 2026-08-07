@@ -74,7 +74,7 @@ final class ExpRuntimeShrinkTest extends TestCase
         // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
         $this->assertStringContainsString('phpc_nextafter_kernel', $source);
-        $this->assertStringContainsString('phpc_log_kernel', $source);
+        $this->assertStringContainsString('phpc_log10_kernel', $source);
     }
 
     public function testSpineBundleIncludesExpHelperWithoutKernel(): void

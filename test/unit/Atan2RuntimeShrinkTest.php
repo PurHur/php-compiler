@@ -84,7 +84,7 @@ final class Atan2RuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_atan2_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringContainsString('phpc_log_kernel', $source);
+        $this->assertStringContainsString('phpc_log10_kernel', $source);
     }
 
     public function testSpineBundleIncludesAtan2HelperWithoutKernel(): void

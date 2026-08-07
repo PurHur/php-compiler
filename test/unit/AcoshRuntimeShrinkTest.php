@@ -89,7 +89,7 @@ final class AcoshRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_atanh_kernel', $source);
         $this->assertStringNotContainsString('phpc_atan2_kernel', $source);
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringContainsString('phpc_log_kernel', $source);
+        $this->assertStringContainsString('phpc_log10_kernel', $source);
     }
 
     public function testSpineBundleIncludesAcoshHelperWithoutKernel(): void
