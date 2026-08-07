@@ -60,10 +60,12 @@ final class JitGetObjectId
             $context->builder->structGep($loaded, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED — writers store JIT TYPE_OBJECT (5|0x80) or VM kind 5 (#28661 / #21921).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'get_object_id_ok');
         $errBlock = BasicBlockHelper::append($context, 'get_object_id_err');
