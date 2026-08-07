@@ -776,6 +776,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_gc'));
     }
 
+    /** php-src session.stub.php — string|false + prefix="" (#27725). */
+    public function testSessionCreateIdReflectionStub(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('session_create_id'));
+        $this->assertSame(['prefix='], BuiltinParamNames::forFunction('session_create_id'));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('session_create_id', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('prefix', $info['name']);
+        $this->assertSame('string', $info['type']);
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('session_create_id', 0, [
+                'name' => 'prefix',
+                'type' => 'string',
+                'isOptional' => true,
+            ], false)
+        );
+    }
+
     /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
     public function testIconvStrlenReflectionStubTypes(): void
     {
