@@ -8104,6 +8104,26 @@ class JIT {
                     }
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
+                    // XMLReader::XML() ASSIGN into CFG-bool `$reader` — promote slots to VALUE
+                    // so property fetches keep classUserType (#28670).
+                    if ('XMLReader' === ($value->classUserType ?? '')) {
+                        foreach ([$destOp, $aliasOp] as $tagOp) {
+                            if (!$tagOp instanceof Operand) {
+                                continue;
+                            }
+                            $tagOp->type = new Type(Type::TYPE_OBJECT, [], 'XMLReader');
+                            if ($this->context->hasVariableOp($tagOp)) {
+                                $ex = $this->context->getVariableFromOp($tagOp);
+                                if (
+                                    Variable::TYPE_VALUE !== $ex->type
+                                    && Variable::TYPE_OBJECT !== $ex->type
+                                ) {
+                                    $ex->free();
+                                    unset($this->context->scope->variables[$tagOp]);
+                                }
+                            }
+                        }
+                    }
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
                         $this->emitJitReturnFromValue($func, $block, $value);
                         break;
@@ -11843,6 +11863,10 @@ class JIT {
                         $result,
                         $this->calleeReturnsByRef($this->context->scope->toCall)
                     );
+                    $this->propagateXmlReaderFactoryResultType(
+                        $block->getOperand($op->arg1),
+                        $this->context->scope->toCall
+                    );
                     $this->attachBoundClosureInvokeMetadata($block, $op);
                     $this->propagateDomCreateElementCompileTimeTag(
                         $block->getOperand($op->arg1),
@@ -12355,6 +12379,15 @@ class JIT {
                     $nonObjectLabel = Variable::propertyFetchNonObjectTypeLabel(
                         Variable::getTypeFromType($obj->type)
                     );
+                    // XMLReader::XML() result is CFG-typed bool (InternalArgInfo) but the JIT
+                    // variable is a live VALUE box tagged classUserType=XMLReader (#28670).
+                    if (
+                        null !== $nonObjectLabel
+                        && $this->context->hasVariableOp($obj)
+                        && 'XMLReader' === ($this->context->getVariableFromOp($obj)->classUserType ?? '')
+                    ) {
+                        $nonObjectLabel = null;
+                    }
                     // Nested ?->: prior nullsafe result Temporaries are often typed TYPE_NULL even
                     // though the fetch arm runs only after a runtime non-null check and the JIT
                     // receiver is a VALUE/OBJECT box (#26818).
@@ -13879,8 +13912,41 @@ class JIT {
     }
 
     /**
-     * Attach host SXE token after children/attributes/load/__get/offsetGet (#27535).
+     * XMLReader::XML()/fromString() — InternalArgInfo types XML()/open() as boolean (instance
+     * form). Static factory results are objects; retag the CFG operand so `$r->nodeType`
+     * does not take the non-object property path (#28670, re-#27299).
      */
+    private function propagateXmlReaderFactoryResultType(Operand $result, mixed $toCall): void
+    {
+        if (
+            !($toCall instanceof JIT\Call\XmlReaderXML)
+            && !($toCall instanceof JIT\Call\XmlReaderFromString)
+        ) {
+            return;
+        }
+        $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLReader');
+        if ($this->context->hasVariableOp($result)) {
+            $var = $this->context->getVariableFromOp($result);
+            $var->classUserType = 'XMLReader';
+            // CFG may have allocated a NATIVE_BOOL slot from InternalArgInfo; keep VALUE.
+            if (
+                Variable::TYPE_VALUE !== $var->type
+                && Variable::TYPE_OBJECT !== $var->type
+            ) {
+                // Storage already forced in assignCallResultOperand for these callees.
+                $var->classUserType = 'XMLReader';
+            }
+            $name = JIT\OperandName::resolve($result);
+            if (null !== $name && '' !== $name) {
+                $resolved = $this->context->resolveRefAliasName($name);
+                if (isset($this->context->namedVariableBindings[$resolved])) {
+                    $this->context->namedVariableBindings[$resolved]->classUserType = 'XMLReader';
+                }
+                $this->context->bindVariableByName($resolved, $var);
+            }
+        }
+    }
+
     private function propagateSimpleXmlElementCompileTime(Operand $result, mixed $toCall): void
     {
         if (!$this->context->hasVariableOp($result)) {
@@ -14100,6 +14166,36 @@ class JIT {
                 $this->assignOperandValue($result, $llvmResult, true);
                 if ($this->context->hasVariableOp($result)) {
                     $this->context->getVariableFromOp($result)->classUserType = 'WeakReference';
+                }
+
+                return;
+            }
+            // XMLReader::XML()/fromString() — CFG types XML() as bool (InternalArgInfo) but the
+            // factory returns a __value__ object box. Force VALUE storage + classUserType so
+            // ASSIGN/$reader->nodeType do not take the non-object property path (#28670).
+            if (
+                $this->context->scope->toCall instanceof JIT\Call\XmlReaderXML
+                || $this->context->scope->toCall instanceof JIT\Call\XmlReaderFromString
+            ) {
+                $ptr = JIT\JitValueBox::coerceToValuePtrForStore($this->context, $llvmResult);
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                $resultVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $resultVar->classUserType = 'XMLReader';
+                $this->context->setVariableOp($result, $resultVar);
+                $result->type = new Type(Type::TYPE_OBJECT, [], 'XMLReader');
+                $name = JIT\OperandName::resolve($result);
+                if (null !== $name && '' !== $name) {
+                    $resolved = $this->context->resolveRefAliasName($name);
+                    $this->context->bindVariableByName($resolved, $resultVar);
                 }
 
                 return;

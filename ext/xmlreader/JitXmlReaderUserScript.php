@@ -14,14 +14,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: XMLReader::fromString + read() + nodeType/name/value (#27299).
+ * User-script AOT: XMLReader::XML / fromString + read() + nodeType/name/value (#27299, #28670).
  *
  * Thin standalone previously lowered factories to ExternalMethod NULL and then failed
  * `while ($r->read())` with `object::read()` once PHPCfg widened the receiver. Compile-time
  * tokenize via {@see VmXmlReader::tokenize} and emit a position switch that updates real
  * object slots so property fetches match Zend without NestedJIT of the full pull parser.
  *
- * php-src: ext/xmlreader/php_xmlreader.c — fromString / read / xmlreader props
+ * php-src: ext/xmlreader/php_xmlreader.c — XML / fromString / read / xmlreader props
  */
 final class JitXmlReaderUserScript
 {
@@ -50,7 +50,12 @@ final class JitXmlReaderUserScript
         if (!self::isUserScriptAot() || \count($args) < 1) {
             return null;
         }
+        // Static factory: source is $args[0]. Instance XML()/open() may keep EX(This) as
+        // $args[0] with source in $args[1] (#22630 / #28670).
         $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if ((null === $lit || '' === $lit) && isset($args[1])) {
+            $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        }
         if (null === $lit || '' === $lit) {
             return null;
         }

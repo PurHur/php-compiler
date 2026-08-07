@@ -12,6 +12,7 @@ final class XmlReaderInstanceMethodJit
     /** @var array<string, true> */
     private const METHODS = [
         'xmlreader::fromstring' => true,
+        'xmlreader::xml' => true,
         'xmlreader::read' => true,
     ];
 
@@ -39,6 +40,11 @@ final class XmlReaderInstanceMethodJit
         }
         if ('xmlreader::fromstring' === $lc) {
             $context->functionProxies[$lc] = new Call\XmlReaderFromString();
+
+            return;
+        }
+        if ('xmlreader::xml' === $lc) {
+            $context->functionProxies[$lc] = new Call\XmlReaderXML();
 
             return;
         }
