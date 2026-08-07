@@ -2252,6 +2252,7 @@ final class CompilerVersion
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      * Free-function createLazyGhost()/createLazyProxy() are never advertised — see {@see supportsLazyObjectFreeFunctions()}.
+     * Free-function class_has_lazy_object_* are never advertised — see {@see supportsClassHasLazyObjectFreeFunctions()}.
      */
     public static function supportsLazyObjectFactories(): bool
     {
@@ -2265,6 +2266,18 @@ final class CompilerVersion
      * newLazyProxy). Historical procedural registration must stay off on every profile.
      */
     public static function supportsLazyObjectFreeFunctions(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Free-function class_has_lazy_object_initializer()/class_has_lazy_object_uninitializer() —
+     * phantom vs php-src (#28517, re-#6052/#6097).
+     *
+     * php-src introspects lazy state only via ReflectionClass::isUninitializedLazyObject() /
+     * getLazyInitializer() (Zend/zend_lazy_objects.c). Never advertise on any profile.
+     */
+    public static function supportsClassHasLazyObjectFreeFunctions(): bool
     {
         return false;
     }

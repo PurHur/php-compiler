@@ -351,7 +351,10 @@ final class LazyObjectSupport
         return $object->lazyPending;
     }
 
-    /** class_has_lazy_object_initializer() — ghost with pending initializer (#6052). */
+    /**
+     * Ghost with pending initializer — internal probe formerly exposed as
+     * class_has_lazy_object_initializer() (#6052; free function retired #28517).
+     */
     public static function hasLazyObjectInitializer(ObjectEntry $object): bool
     {
         return $object->lazyGhost
@@ -359,7 +362,10 @@ final class LazyObjectSupport
             && null !== $object->lazyInitializer;
     }
 
-    /** class_has_lazy_object_uninitializer() — proxy with pending factory (#6097). */
+    /**
+     * Proxy with pending factory — internal probe formerly exposed as
+     * class_has_lazy_object_uninitializer() (#6097; free function retired #28517).
+     */
     public static function hasLazyObjectUninitializer(ObjectEntry $object): bool
     {
         return !$object->lazyGhost

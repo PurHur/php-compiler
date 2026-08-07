@@ -14,10 +14,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * class_has_lazy_object_uninitializer() — PHP 8.4 lazy proxy probe (#6097).
+ * class_has_lazy_object_uninitializer() — historical free-function lazy proxy probe (#6097).
  *
- * @see Zend/zend_lazy_objects.c — proxy pending factory flag
- * @see ext/standard/basic_functions.c — PHP_FUNCTION(class_has_lazy_object_uninitializer)
+ * Never registered: php-src introspects via ReflectionClass::isUninitializedLazyObject /
+ * getLazyInitializer only (#28517). File kept for inventory/spine + internal LazyObjectSupport.
+ *
+ * @see Zend/zend_lazy_objects.c
  */
 final class class_has_lazy_object_uninitializer extends Internal
 {
