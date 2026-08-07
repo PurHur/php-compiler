@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\VM\ArraySpread;
+use PHPCompiler\VM\HashTable as VmHashTable;
 use PHPCompiler\VM\HashTableJitHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
@@ -843,6 +844,7 @@ final class HashTableWriteLlvm
             $index = $context->builder->load(
                 $context->builder->structGep($ht, $map['nextFreeElement'])
             );
+            self::emitAppendOccupiedIfNextFreeOverflowed($context, $index);
             self::setAtIndex($context, $ht, $index, $element);
             $array->nextFreeElementFromRuntime = true;
             // Track string literals for compile-time folds (preg_filter #27181 / str_replace peers).
@@ -1432,11 +1434,16 @@ final class HashTableWriteLlvm
         $index = $context->builder->load(
             $context->builder->structGep($ht, $map['nextFreeElement'])
         );
+        self::emitAppendOccupiedIfNextFreeOverflowed($context, $index);
         $array->nextFreeElementFromRuntime = true;
         ++$array->nextFreeElement;
         $one = $sizeT->constInt(1, false);
+        $maxIdx = $sizeT->constInt(\PHP_INT_MAX, false);
+        $overflowSentinel = $sizeT->constInt(\PHP_INT_MIN, true);
+        $isMax = $context->builder->icmp(Builder::INT_EQ, $index, $maxIdx);
         $need = $context->builder->addNoSignedWrap($index, $one);
-        $context->builder->call($context->lookupFunction('__hashtable__grow'), $ht, $need);
+        $advanced = $context->builder->select($isMax, $overflowSentinel, $need);
+        $context->builder->call($context->lookupFunction('__hashtable__grow'), $ht, $advanced);
         $entry = HashTableReadLlvm::listEntryPointer($context, $ht, $index);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $entry);
 
@@ -1447,19 +1454,59 @@ final class HashTableWriteLlvm
             $context->builder->structGep($ht, $map['numElements'])
         );
         $updateNext = $context->builder->icmp(Builder::INT_UGE, $index, $nextFree);
-        $newNext = $context->builder->select($updateNext, $need, $nextFree);
+        $newNext = $context->builder->select($updateNext, $advanced, $nextFree);
         $context->builder->store(
             $newNext,
             $context->builder->structGep($ht, $map['nextFreeElement'])
         );
         $updateNum = $context->builder->icmp(Builder::INT_UGE, $index, $numElements);
-        $newNum = $context->builder->select($updateNum, $need, $numElements);
+        $newNum = $context->builder->select($updateNum, $advanced, $numElements);
         $context->builder->store(
             $newNum,
             $context->builder->structGep($ht, $map['numElements'])
         );
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+    }
+
+    /**
+     * zend_hash_next_index_insert: nNextFreeElement < 0 → Error (#28762).
+     * Continues on the ok block when nextFree is still valid.
+     */
+    private static function emitAppendOccupiedIfNextFreeOverflowed(Context $context, Value $nextFree): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $asSigned = $nextFree->typeOf() === $i64
+            ? $nextFree
+            : $context->builder->truncOrBitCast($nextFree, $i64);
+        $overflowed = $context->builder->icmp(
+            Builder::INT_SLT,
+            $asSigned,
+            $i64->constInt(0, true)
+        );
+        $tag = (string) self::nextSeq();
+        $errBb = BasicBlockHelper::append($context, 'ht_append_occupied_'.$tag);
+        $okBb = BasicBlockHelper::append($context, 'ht_append_ok_'.$tag);
+        $context->builder->branchIf($overflowed, $errBb, $okBb);
+        $context->builder->positionAtEnd($errBb);
+        self::emitNextElementOccupiedError($context);
+        $context->builder->positionAtEnd($okBb);
+    }
+
+    private static function emitNextElementOccupiedError(Context $context): void
+    {
+        $message = VmHashTable::NEXT_ELEMENT_OCCUPIED_MESSAGE;
+        if ([] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError($context, 'Error', $message, null);
+
+            return;
+        }
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::ensureStandaloneBodies($context);
+        ErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 
     /**

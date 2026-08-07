@@ -294,8 +294,11 @@ class HashTableTest extends TestCase
         $this->assertSame('x', $key->toString());
     }
 
-    /** Issue #9534 — PHP_INT_MAX index must not overflow nextFreeElement (php-src zend_ulong). */
-    public function testAddIndexAtPhpIntMaxDoesNotOverflowNextFreeElement(): void
+    /**
+     * Issue #9534 / #28762 — PHP_INT_MAX index wraps nNextFreeElement (zend_long);
+     * `$a[]` then throws Zend's "next element is already occupied" Error.
+     */
+    public function testAddIndexAtPhpIntMaxMakesAppendThrowOccupied(): void
     {
         $ht = new HashTable();
         $value = $this->int(1);
@@ -307,10 +310,22 @@ class HashTableTest extends TestCase
 
         $appended = new Variable();
         $appended->string('tail');
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage(HashTable::NEXT_ELEMENT_OCCUPIED_MESSAGE);
         $ht->append($appended);
-        $atZero = $ht->findIndex(0);
-        $this->assertNotNull($atZero);
-        $this->assertSame('tail', $atZero->toString());
+    }
+
+    /** Control: append after PHP_INT_MAX-1 still claims PHP_INT_MAX (#28762). */
+    public function testAppendAfterPhpIntMaxMinusOneUsesPhpIntMax(): void
+    {
+        $ht = new HashTable();
+        $ht->addIndex(\PHP_INT_MAX - 1, $this->int(1));
+        $tail = new Variable();
+        $tail->string('tail');
+        $ht->append($tail);
+        $atMax = $ht->findIndex(\PHP_INT_MAX);
+        $this->assertNotNull($atMax);
+        $this->assertSame('tail', $atMax->toString());
     }
 
     /** Issue #23485 — array === requires identical element types (no == juggling). */

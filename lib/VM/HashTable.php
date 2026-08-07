@@ -45,6 +45,10 @@ final class HashTable {
     const ADD_NEW         = 0b001000;
     const ADD_NEXT        = 0b010000;
 
+    /** Zend zend_hash_next_index_insert — nNextFreeElement overflow (#28762). */
+    public const NEXT_ELEMENT_OCCUPIED_MESSAGE =
+        'Cannot add element to the array as the next element is already occupied';
+
     private Refcount $refcount;
     private int $flags = 0;
     private MaskedArray $indexes;
@@ -2269,6 +2273,11 @@ final class HashTable {
     }
 
     public function append(Variable $data): ?Variable {
+        // After an int key of PHP_INT_MAX, nNextFreeElement is negative (zend_long wrap).
+        if ($this->nextFreeElement < 0) {
+            throw new \Error(self::NEXT_ELEMENT_OCCUPIED_MESSAGE);
+        }
+
         return $this->addOrUpdate($this->nextFreeElement, null, $data, self::ADD | self::ADD_NEXT);
     }
 
@@ -2453,11 +2462,16 @@ final class HashTable {
 
     /**
      * Advance nextFreeElement after storing integer key $index (php-src nNextFreeElement; #9534).
-     * PHP int cannot represent PHP_INT_MAX + 1 — skip bump so append finds the first free slot.
+     * PHP_INT_MAX + 1 is not representable as zend_long — wrap to PHP_INT_MIN so append errors (#28762).
      */
     private function bumpNextFreeElementForIndex(int $index): void
     {
-        if ($index < $this->nextFreeElement || $index >= \PHP_INT_MAX) {
+        if ($index < $this->nextFreeElement) {
+            return;
+        }
+        if ($index >= \PHP_INT_MAX) {
+            $this->nextFreeElement = \PHP_INT_MIN;
+
             return;
         }
         $this->nextFreeElement = $index + 1;
@@ -2594,16 +2608,25 @@ final class HashTable {
     private function recalcNextFreeElementFromBuckets(): void
     {
         $next = 0;
+        $overflow = false;
         for ($i = 0; $i < $this->numUsed; ++$i) {
             $bucket = $this->buckets->read($i);
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            if (null === $bucket->key && $bucket->hash >= $next && $bucket->hash < \PHP_INT_MAX) {
+            if (null !== $bucket->key) {
+                continue;
+            }
+            if ($bucket->hash >= \PHP_INT_MAX) {
+                $overflow = true;
+                continue;
+            }
+            if ($bucket->hash >= $next) {
                 $next = $bucket->hash + 1;
             }
         }
-        $this->nextFreeElement = $next;
+        // Match zend_hash: presence of PHP_INT_MAX leaves nNextFreeElement negative (#28762).
+        $this->nextFreeElement = $overflow ? \PHP_INT_MIN : $next;
     }
 
     private function reset() {
