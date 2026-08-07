@@ -19,6 +19,7 @@ final class MemcachedConstants
     public const RES_CONNECTION_FAILURE = 3;
     public const RES_WRITE_FAILURE = 5;
     public const RES_READ_FAILURE = 6;
+    public const RES_DATA_EXISTS = 12;
     public const RES_NOTSTORED = 14;
     public const RES_NOTFOUND = 16;
     public const RES_NO_SERVERS = 20;
@@ -59,6 +60,7 @@ final class MemcachedConstants
         'res_connection_failure' => self::RES_CONNECTION_FAILURE,
         'res_write_failure' => self::RES_WRITE_FAILURE,
         'res_read_failure' => self::RES_READ_FAILURE,
+        'res_data_exists' => self::RES_DATA_EXISTS,
         'res_notstored' => self::RES_NOTSTORED,
         'res_notfound' => self::RES_NOTFOUND,
         'res_no_servers' => self::RES_NO_SERVERS,
@@ -95,6 +97,7 @@ final class MemcachedConstants
         'res_connection_failure' => 'RES_CONNECTION_FAILURE',
         'res_write_failure' => 'RES_WRITE_FAILURE',
         'res_read_failure' => 'RES_READ_FAILURE',
+        'res_data_exists' => 'RES_DATA_EXISTS',
         'res_notstored' => 'RES_NOTSTORED',
         'res_notfound' => 'RES_NOTFOUND',
         'res_no_servers' => 'RES_NO_SERVERS',

@@ -43,12 +43,26 @@ final class VmMemcached
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
 
+        require_once __DIR__.'/MemcachedDepthMethods.php';
         $methods = [
             'addserver' => new MemcachedAddServer(),
             'set' => new MemcachedSet(),
             'get' => new MemcachedGet(),
             'delete' => new MemcachedDelete(),
             'getresultcode' => new MemcachedGetResultCode(),
+            // #27874 depth surface
+            'add' => new MemcachedAdd(),
+            'replace' => new MemcachedReplace(),
+            'append' => new MemcachedAppend(),
+            'prepend' => new MemcachedPrepend(),
+            'increment' => new MemcachedIncrement(),
+            'decrement' => new MemcachedDecrement(),
+            'flush' => new MemcachedFlush(),
+            'getmulti' => new MemcachedGetMulti(),
+            'setmulti' => new MemcachedSetMulti(),
+            'deletemulti' => new MemcachedDeleteMulti(),
+            'touch' => new MemcachedTouch(),
+            'cas' => new MemcachedCas(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -56,6 +70,9 @@ final class VmMemcached
             $entry->methodNames[$name] = match ($name) {
                 'addserver' => 'addServer',
                 'getresultcode' => 'getResultCode',
+                'getmulti' => 'getMulti',
+                'setmulti' => 'setMulti',
+                'deletemulti' => 'deleteMulti',
                 default => $name,
             };
         }
@@ -182,6 +199,58 @@ final class VmMemcached
                 self::typeLabel($var)
             )),
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function coerceStringListArg(Variable $var, string $label, int $index, string $paramName): array
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                self::typeLabel($var)
+            ));
+        }
+        $out = [];
+        foreach ($resolved->toArray()->iterateKeyed(true) as [, $valueVar]) {
+            $out[] = self::coerceValueToString($valueVar, $label, $index, $paramName);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function coerceStringMapArg(Variable $var, string $label, int $index, string $paramName): array
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                self::typeLabel($var)
+            ));
+        }
+        $out = [];
+        foreach ($resolved->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $keyResolved = $keyVar->resolveIndirect();
+            $key = match ($keyResolved->type) {
+                Variable::TYPE_STRING => $keyResolved->toString(),
+                Variable::TYPE_INTEGER => (string) $keyResolved->toInt(),
+                default => self::coerceValueToString($keyVar, $label, $index, $paramName),
+            };
+            $out[$key] = self::coerceValueToString($valueVar, $label, $index, $paramName);
+        }
+
+        return $out;
     }
 
     private static function typeLabel(Variable $var): string
