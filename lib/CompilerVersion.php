@@ -3451,14 +3451,21 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ getmygrgid() (ext/standard/basic_functions.c, #11923, #17319).
+     * getmygrgid() — absent from php-src (getmyuid/getmygid/getmypid/getmyinode only;
+     * ext/standard/basic_functions.stub.php).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.4/8.5).
+     * Forward-profile enable (#17319) retired by #28366 (re-#11923).
      */
     public static function supportsGetmygrgid(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
+    }
+
+    /** getmygrgid() visible to function_exists() — never (php-src absent, #28366). */
+    public static function advertisesGetmygrgid(): bool
+    {
+        return false;
     }
 
     /**
