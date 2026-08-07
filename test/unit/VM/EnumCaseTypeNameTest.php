@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit\VM;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\ClassEntry;
@@ -55,5 +56,53 @@ final class EnumCaseTypeNameTest extends TestCase
         $this->expectExceptionMessage('Traversable|array');
         $this->expectExceptionMessage('E given');
         IterableCheck::assertParameter($case, $ctx);
+    }
+
+    /** @covers \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage */
+    public function testFormatIllegalContainerOffsetMessageProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsTypedIllegalContainerOffset());
+            $this->assertSame(
+                'Cannot access offset of type E on array',
+                EnumCaseSupport::formatIllegalContainerOffsetMessage('E')
+            );
+            $this->assertSame(
+                'Cannot access offset of type S on array',
+                EnumCaseSupport::formatIllegalContainerOffsetMessage('S', 'Illegal offset type')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers \PHPCompiler\VM\EnumCaseSupport::illegalArrayOffsetMessage */
+    public function testIllegalArrayOffsetMessageForEnumCaseObjectProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $enum = new ClassEntry('E');
+            $enum->isEnum = true;
+            $backing = new Variable();
+            $backing->null();
+            $case = EnumCaseSupport::createCase($enum, 'A', $backing);
+            $this->assertSame(
+                'Cannot access offset of type E on array',
+                EnumCaseSupport::illegalArrayOffsetMessage($case)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

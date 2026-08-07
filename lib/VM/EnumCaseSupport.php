@@ -479,11 +479,24 @@ final class EnumCaseSupport
         Variable $index,
         string $legacyMessage = 'Illegal offset type'
     ): string {
+        return self::formatIllegalContainerOffsetMessage(
+            self::typeNameForVariable($index),
+            $legacyMessage
+        );
+    }
+
+    /**
+     * Zend zend_illegal_container_offset() text from a zend_zval_type_name() label (#28628).
+     *
+     * Shared by VM {@see illegalArrayOffsetMessage()} and JIT compile-time key guards.
+     */
+    public static function formatIllegalContainerOffsetMessage(
+        string $typeName,
+        string $legacyMessage = 'Illegal offset type'
+    ): string {
         if (!CompilerVersion::supportsTypedIllegalContainerOffset()) {
             return $legacyMessage;
         }
-
-        $typeName = self::typeNameForVariable($index);
 
         return match ($legacyMessage) {
             'Illegal offset type in isset or empty' => 'Cannot access offset of type '.$typeName.' in isset or empty',

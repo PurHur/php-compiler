@@ -1066,7 +1066,7 @@ final class Variable {
                 }
                 if (self::TYPE_OBJECT === $dim->type) {
                     if ($forWrite) {
-                        HashTableHelper::emitIllegalOffsetType($this->context);
+                        HashTableHelper::emitIllegalOffsetTypeForKey($this->context, $dim);
                         $this->context->builder->call($this->context->lookupFunction('abort'));
                         $this->context->builder->clearInsertionPosition();
 

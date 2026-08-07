@@ -502,4 +502,51 @@ final class HashTableHelper
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
     }
+
+    /**
+     * Array-literal / dim-write illegal key — PROFILE≥8.3 typed TypeError (#28628, zend_illegal_container_offset).
+     */
+    public static function emitIllegalOffsetTypeForKey(
+        Context $context,
+        Variable $key,
+        string $legacyMessage = 'Illegal offset type'
+    ): void {
+        self::emitIllegalOffsetType(
+            $context,
+            self::illegalOffsetMessageForJitKey($context, $key, $legacyMessage)
+        );
+    }
+
+    /**
+     * Resolve zend_zval_type_name()-shaped label for a compile-time JIT array key (#28628).
+     */
+    public static function illegalOffsetMessageForJitKey(
+        Context $context,
+        Variable $key,
+        string $legacyMessage = 'Illegal offset type'
+    ): string {
+        if (Variable::TYPE_HASHTABLE === $key->type) {
+            return \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage(
+                'array',
+                $legacyMessage
+            );
+        }
+
+        $typeName = 'object';
+        if (null !== $key->compileTimeEnumCase && isset($key->compileTimeEnumCase['classId'])) {
+            $name = $context->type->object->classNameForId((int) $key->compileTimeEnumCase['classId']);
+            if (\is_string($name) && '' !== $name) {
+                $typeName = $name;
+            }
+        } elseif (null !== $key->objectPropertyClassName && '' !== $key->objectPropertyClassName) {
+            $typeName = $key->objectPropertyClassName;
+        } elseif (null !== $key->magicGetOverloadedClass && '' !== $key->magicGetOverloadedClass) {
+            $typeName = $key->magicGetOverloadedClass;
+        }
+
+        return \PHPCompiler\VM\EnumCaseSupport::formatIllegalContainerOffsetMessage(
+            $typeName,
+            $legacyMessage
+        );
+    }
 }

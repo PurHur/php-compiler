@@ -863,7 +863,8 @@ final class HashTableWriteLlvm
         $array->compileTimeArray = null;
         if (Variable::TYPE_OBJECT === $key->type
             || Variable::TYPE_HASHTABLE === $key->type) {
-            HashTableHelper::emitIllegalOffsetType($context);
+            // Array-literal enum/object keys: typed TypeError under PROFILE≥8.3 (#28628).
+            HashTableHelper::emitIllegalOffsetTypeForKey($context, $key);
 
             return;
         }
@@ -1331,7 +1332,7 @@ final class HashTableWriteLlvm
         $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
         if (Variable::TYPE_STRING !== $key->type) {
             if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
-                HashTableHelper::emitIllegalOffsetType($context);
+                HashTableHelper::emitIllegalOffsetTypeForKey($context, $key);
 
                 return;
             }
