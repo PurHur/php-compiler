@@ -1670,6 +1670,53 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #28741 */
+    public function testDomHtmlElementSelectorNamedParameters(): void
+    {
+        $selectors = ['selectors'];
+        foreach ([
+            'Dom\\Element::querySelector',
+            'Dom\\HTMLElement::querySelector',
+            'Dom\\HTMLDocument::querySelector',
+            'Dom\\Element::querySelectorAll',
+            'Dom\\HTMLElement::querySelectorAll',
+            'Dom\\Element::closest',
+            'Dom\\HTMLElement::closest',
+            'Dom\\Element::matches',
+            'Dom\\HTMLElement::matches',
+        ] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame($selectors, $names, $qual);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'selectors', $qual), $qual);
+        }
+        $qualifiedName = ['qualifiedName'];
+        foreach ([
+            'Dom\\Element::getElementsByTagName',
+            'Dom\\HTMLElement::getElementsByTagName',
+            'Dom\\HTMLDocument::getElementsByTagName',
+        ] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame($qualifiedName, $names, $qual);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'qualifiedName', $qual), $qual);
+        }
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Dom\\HTMLElement', 'querySelector'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('Dom\\HTMLElement', 'querySelector'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Dom\\Element', 'closest'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Dom\\HTMLElement', 'getElementsByTagName'));
+        self::assertSame(
+            'string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\htmlelement', 'queryselector', 0)
+        );
+        self::assertSame(
+            'string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\element', 'matches', 0)
+        );
+        self::assertSame(
+            'string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\htmlelement', 'getelementsbytagname', 0)
+        );
+    }
+
     /** @covers issue #27713 */
     public function testXmlReaderFactoryNamedParameters(): void
     {

@@ -352,6 +352,8 @@ final class DomLivingBuiltinClasses
         $element->methodNames['rename'] = 'rename';
         // php-src php_dom.stub.php — Dom\Element attribute getters are nullable (#26065).
         self::applyElementAttributeGetterReturnTypes($element);
+        // php-src php_dom.stub.php — Element selector / getElementsByTagName returns (#28741).
+        self::applyElementSelectorReturnTypes($element);
         $ctx->classes[VmDomLiving::CLASS_ELEMENT] = $element;
 
         $htmlElement = new ClassEntry('Dom\\HTMLElement');
@@ -509,6 +511,14 @@ final class DomLivingBuiltinClasses
         $htmlDocument->methods['queryselectorall'] = new HtmlDocumentQuerySelectorAll();
         $htmlDocument->methodVisibility['queryselectorall'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['queryselectorall'] = 'querySelectorAll';
+        // ParentNode selector returns (php-src php_dom.stub.php; #28741).
+        if (null !== $elementRet) {
+            $htmlDocument->methodReturnDeclaredTypes['queryselector'] = $elementRet;
+        }
+        $nodeListRet = ReflectionTypeSupport::cfgTypeFromLabel('Dom\\NodeList');
+        if (null !== $nodeListRet) {
+            $htmlDocument->methodReturnDeclaredTypes['queryselectorall'] = $nodeListRet;
+        }
         $htmlDocument->methods['savehtml'] = new HtmlDocumentSaveHtml();
         $htmlDocument->methodVisibility['savehtml'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['savehtml'] = 'saveHtml';
@@ -655,6 +665,26 @@ final class DomLivingBuiltinClasses
             // Stub `?Attr` resolves to Dom\Attr (ReflectionNamedType FQCN).
             'getattributenode' => '?Dom\\Attr',
             'getattributenodens' => '?Dom\\Attr',
+        ];
+        foreach ($returns as $methodLc => $label) {
+            $type = ReflectionTypeSupport::cfgTypeFromLabel($label);
+            if (null !== $type) {
+                $element->methodReturnDeclaredTypes[$methodLc] = $type;
+            }
+        }
+    }
+
+    /**
+     * php-src ext/dom/php_dom.stub.php — Dom\Element CSS / tag-name query returns (#28741).
+     */
+    private static function applyElementSelectorReturnTypes(ClassEntry $element): void
+    {
+        $returns = [
+            'queryselector' => '?Dom\\Element',
+            'queryselectorall' => 'Dom\\NodeList',
+            'closest' => '?Dom\\Element',
+            'matches' => 'bool',
+            'getelementsbytagname' => 'Dom\\HTMLCollection',
         ];
         foreach ($returns as $methodLc => $label) {
             $type = ReflectionTypeSupport::cfgTypeFromLabel($label);
