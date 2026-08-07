@@ -14624,7 +14624,13 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $constNameLc = strtolower($name->value);
-                    $constValue = $this->jitClassConstDefineValue($block, $op, $constNameLc, $classId);
+                    $constValue = $this->jitClassConstDefineValue(
+                        $block,
+                        $op,
+                        $constNameLc,
+                        $classId,
+                        (string) $name->value
+                    );
                     if (!isset($block->constants[$op->arg2])) {
                         if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
@@ -21595,7 +21601,8 @@ class JIT {
         Block $block,
         OpCode $op,
         string $constNameLc,
-        int $classId
+        int $classId,
+        ?string $constDisplayName = null
     ): VM\Variable {
         if (
             !isset($block->constants[$op->arg2])
@@ -21612,7 +21619,13 @@ class JIT {
         if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
             $check = new VM\Variable();
             $check->copyFrom($value);
-            VM\TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $constNameLc);
+            $className = $this->context->type->object->classNameForId($classId);
+            VM\TypeCheck::assertClassConstantTypedValue(
+                $check,
+                $block->constants[$op->arg3],
+                $constDisplayName ?? $constNameLc,
+                '' !== $className ? $className : null
+            );
             $value = $check;
         }
 

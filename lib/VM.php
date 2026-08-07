@@ -19937,7 +19937,12 @@ restart:
         if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
             $check = new Variable();
             $check->copyFrom($value);
-            TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $name);
+            TypeCheck::assertClassConstantTypedValue(
+                $check,
+                $block->constants[$op->arg3],
+                $canonical,
+                $entry->name
+            );
             $value->copyFrom($check);
         }
         $this->rejectIncompatibleTraitClassConstOverride($entry, $name, $canonical, $value);

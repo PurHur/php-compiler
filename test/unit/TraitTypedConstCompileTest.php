@@ -69,7 +69,9 @@ final class C {
 PHP;
         $runtime = new Runtime();
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Cannot assign string to class constant X of type int');
+        $this->expectExceptionMessage(
+            'Cannot use string as value for class constant TBad::X of type int'
+        );
         $runtime->parseAndCompile($code, 'trait_typed_const_mismatch.php');
     }
 
