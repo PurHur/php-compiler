@@ -71,6 +71,10 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['newlazyproxy']));
             $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['isuninitializedlazyobject']));
             $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['getlazyinitializer']));
+            // ReflectionParameter::isSensitive* are phantoms vs php-src (#28528).
+            $this->assertFalse(CompilerVersion::supportsReflectionParameterIsSensitiveParameter());
+            $this->assertFalse(isset($ctx->classes['reflectionparameter']->methods['issensitive']));
+            $this->assertFalse(isset($ctx->classes['reflectionparameter']->methods['issensitiveparameter']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

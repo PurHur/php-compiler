@@ -1,11 +1,7 @@
 <?php
-// Requires PHP_COMPILER_PROFILE=8.4 (default 8.2 profile withholds isSensitive — #22899).
-// See also test/repro/reflection_parameter_is_sensitive_profile.php
-function f(#[\SensitiveParameter] string $p) {}
-function g(string $p) {}
-$rf = new ReflectionParameter('f', 0);
-$rg = new ReflectionParameter('g', 0);
-var_export(method_exists($rf, 'isSensitive'));
+// #28528 — isSensitive absent on every profile (including 8.4).
+// See also test/repro/issue_28528_reflectionparameter_issensitive_phantoms_84.php
+var_export(method_exists(ReflectionParameter::class, 'isSensitive'));
 echo "\n";
-echo $rf->isSensitive() ? "yes\n" : "no\n";
-echo $rg->isSensitive() ? "yes\n" : "no\n";
+var_export(method_exists(ReflectionParameter::class, 'isSensitiveParameter'));
+echo "\n";
