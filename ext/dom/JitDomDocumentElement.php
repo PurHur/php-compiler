@@ -69,6 +69,10 @@ final class JitDomDocumentElement
      * Seed firstChild/lastChild/parentNode/sibling slots from compile-time XML (#19455, #23251).
      *
      * Element children are required so held references survive textContent writes (detach).
+     * Sibling links must use {@see CLASS_ELEMENT} slots — same as
+     * {@see JitDomAppendChildLiveSlots} (#27476 / #28672). Writing DOMNode
+     * next/previous into a DOMElement allocation corrupts layout; LiveSlots then
+     * sees null next on same-parent move and clears firstChild → AOT segfault.
      */
     public static function syncChildrenFromXmlPublic(
         \PHPCompiler\JIT\Context $context,
@@ -124,13 +128,14 @@ final class JitDomDocumentElement
                     JITVariable::KIND_VALUE,
                     $prev
                 );
+                // DOMElement — peer JitDomAppendChildLiveSlots / createElement layout (#28672).
                 $objectType->propertyStore(
-                    $objectType->propertySlotFor($prev, 'DOMNode', VmDom::PROP_NEXT_SIBLING),
+                    $objectType->propertySlotFor($prev, self::CLASS_ELEMENT, VmDom::PROP_NEXT_SIBLING),
                     $childJit,
                     JITVariable::TYPE_VALUE
                 );
                 $objectType->propertyStore(
-                    $objectType->propertySlotFor($child, 'DOMNode', VmDom::PROP_PREVIOUS_SIBLING),
+                    $objectType->propertySlotFor($child, self::CLASS_ELEMENT, VmDom::PROP_PREVIOUS_SIBLING),
                     $prevJit,
                     JITVariable::TYPE_VALUE
                 );
@@ -144,23 +149,40 @@ final class JitDomDocumentElement
         if (null !== $first && null !== $last) {
             self::storeFirstLast($context, $element, $first, $last);
         }
-        self::storeChildNodesLength($context, $element, \count($children));
+        self::storeChildNodesLength($context, $element, \count($children), $first, $last);
     }
 
-    /** Attach a DOMNodeList with the given length for user-script childNodes (#23251). */
+    /**
+     * Attach a DOMNodeList with the given length for user-script childNodes (#23251).
+     *
+     * Optional first/last pin {@see VmDom::PROP_CHILD_NODES_OWNER} + __phpcItemN so
+     * item(0)/item(1) work before any LiveSlots rewrite (#28672 / #27410).
+     */
     public static function storeChildNodesLength(
         \PHPCompiler\JIT\Context $context,
         Value $element,
-        int $length
+        int $length,
+        ?Value $item0 = null,
+        ?Value $item1 = null
     ): void {
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
         $listClassId = $objectType->lookup('DOMNodeList');
+        // VALUE — peer LiveSlots / #27216. TYPE_OBJECT leaves NULL-tagged slots as
+        // garbage pointers; after appendChild rewrite, length fetch segfaults (#28672).
         if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
-            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_OBJECT);
+            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_VALUE);
         }
         if (!$objectType->hasProperty($listClassId, 'length')) {
             $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        }
+        if (!$objectType->hasProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER)) {
+            $objectType->defineProperty($listClassId, VmDom::PROP_CHILD_NODES_OWNER, JITVariable::TYPE_VALUE);
+        }
+        foreach (['__phpcItem0', '__phpcItem1'] as $prop) {
+            if (!$objectType->hasProperty($listClassId, $prop)) {
+                $objectType->defineProperty($listClassId, $prop, JITVariable::TYPE_VALUE);
+            }
         }
         $list = $objectType->allocate($listClassId);
         $objectType->markObjectConstructed($list);
@@ -175,6 +197,33 @@ final class JitDomDocumentElement
             $lengthVar,
             JITVariable::TYPE_NATIVE_LONG
         );
+        $ownerJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $element
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, 'DOMNodeList', VmDom::PROP_CHILD_NODES_OWNER),
+            $ownerJit,
+            JITVariable::TYPE_VALUE
+        );
+        if (null !== $item0) {
+            $i0 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item0);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($list, 'DOMNodeList', '__phpcItem0'),
+                $i0,
+                JITVariable::TYPE_VALUE
+            );
+        }
+        if (null !== $item1) {
+            $i1 = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $item1);
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($list, 'DOMNodeList', '__phpcItem1'),
+                $i1,
+                JITVariable::TYPE_VALUE
+            );
+        }
         $listJit = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
@@ -184,7 +233,7 @@ final class JitDomDocumentElement
         $objectType->propertyStore(
             $objectType->propertySlotFor($element, 'DOMNode', VmDom::PROP_CHILD_NODES),
             $listJit,
-            JITVariable::TYPE_OBJECT
+            JITVariable::TYPE_VALUE
         );
     }
 
@@ -193,13 +242,21 @@ final class JitDomDocumentElement
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
         $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING] as $prop) {
+        // Parent edges stay on DOMNode (property fetch / LiveSlots loadChildEdge).
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        // Sibling + parentNode on DOMElement — createElement / LiveSlots layout (#27476, #28672).
+        foreach ([
+            VmDom::PROP_NEXT_SIBLING,
+            VmDom::PROP_PREVIOUS_SIBLING,
+            VmDom::PROP_PARENT_NODE,
+        ] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_VALUE);
+            }
         }
     }
 
