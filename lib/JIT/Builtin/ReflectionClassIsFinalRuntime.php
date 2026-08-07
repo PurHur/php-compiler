@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  * (+ Fiber/FiberError from zend_fibers.stub.php; #28389;
  * Socket/AddressInfo from sockets.stub.php; #28391;
  * InflateContext/DeflateContext from zlib.stub.php; #28385;
+ * Random\\Randomizer + Engine\\* from random.stub.php; #28387;
  * XMLParser from ext/xml/xml.stub.php; #28386).
  */
 final class ReflectionClassIsFinalRuntime
@@ -130,6 +131,11 @@ final class ReflectionClassIsFinalRuntime
             'FiberError',
             'Generator',
             'InflateContext',
+            'Random\\Engine\\Mt19937',
+            'Random\\Engine\\PcgOneseq128XslRr64',
+            'Random\\Engine\\Secure',
+            'Random\\Engine\\Xoshiro256StarStar',
+            'Random\\Randomizer',
             'Socket',
             // php-src ext/xml/xml.stub.php — final class XMLParser (#28386)
             'XMLParser',

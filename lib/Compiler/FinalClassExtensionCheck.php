@@ -38,6 +38,12 @@ final class FinalClassExtensionCheck
         'fibererror' => 'FiberError',
         'generator' => 'Generator',
         'inflatecontext' => 'InflateContext',
+        // php-src ext/random/random.stub.php — final Randomizer + Engine\* (#28387).
+        'random\\engine\\mt19937' => 'Random\\Engine\\Mt19937',
+        'random\\engine\\pcgoneseq128xslrr64' => 'Random\\Engine\\PcgOneseq128XslRr64',
+        'random\\engine\\secure' => 'Random\\Engine\\Secure',
+        'random\\engine\\xoshiro256starstar' => 'Random\\Engine\\Xoshiro256StarStar',
+        'random\\randomizer' => 'Random\\Randomizer',
         'socket' => 'Socket',
         // php-src Zend/zend_weakrefs.stub.php — final class WeakReference / WeakMap (#28390).
         'weakmap' => 'WeakMap',

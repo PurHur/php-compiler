@@ -213,6 +213,57 @@ PHP;
         $this->assertSame("true\ntrue\n", ob_get_clean());
     }
 
+    /** @covers issue #28387 — php-src ext/random/random.stub.php final Randomizer + engines */
+    public function testExtendRandomizerFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadRandomizer extends Random\Randomizer {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadRandomizer cannot extend final class Random\\Randomizer');
+        $runtime->parseAndCompile($code, 'extend_randomizer.php');
+    }
+
+    /** @covers issue #28387 */
+    public function testExtendRandomEngineMt19937FailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadMt extends Random\Engine\Mt19937 {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadMt cannot extend final class Random\\Engine\\Mt19937');
+        $runtime->parseAndCompile($code, 'extend_mt19937.php');
+    }
+
+    /** @covers issue #28387 */
+    public function testRandomClassesReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$classes = [
+    Random\Randomizer::class,
+    Random\Engine\Mt19937::class,
+    Random\Engine\Secure::class,
+    Random\Engine\PcgOneseq128XslRr64::class,
+    Random\Engine\Xoshiro256StarStar::class,
+];
+foreach ($classes as $c) {
+    var_export((new ReflectionClass($c))->isFinal());
+    echo "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'random_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\ntrue\ntrue\ntrue\ntrue\n", ob_get_clean());
+    }
+
     /** @covers issue #28385 — php-src ext/zlib/zlib.stub.php final class InflateContext */
     public function testExtendInflateContextFailsAtCompileTime(): void
     {
