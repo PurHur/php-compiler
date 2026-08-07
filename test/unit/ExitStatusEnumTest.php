@@ -5,41 +5,42 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
-use PHPCompiler\Test\Support\BuiltinStubEnumTestSkip;
 use PHPCompiler\VM\ScriptExit;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #7294 */
+/** ExitStatus phantom retirement — exit()/die() stay string|int (#28500, re-#28200 / #7294). */
 final class ExitStatusEnumTest extends TestCase
 {
-    use BuiltinStubEnumTestSkip;
-
-    public function testExitStatusBuiltinEnumExists(): void
+    protected function tearDown(): void
     {
-        $this->skipUnlessBuiltinStubEnumsEnabled();
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        parent::tearDown();
+    }
+
+    public function testExitStatusPhantomAbsentOnProfile84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 var_export(enum_exists('ExitStatus', false));
 echo "\n";
-var_export(ExitStatus::Success->name);
-echo "\n";
-var_export(ExitStatus::Success->value);
-echo "\n";
-var_export(ExitStatus::Failure->value);
 PHP;
         ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'exit_status_enum.php'));
-        $this->assertSame("true\n'Success'\n0\n1", ob_get_clean());
+        $runtime->run($runtime->parseAndCompile($code, 'exit_status_no_enum.php'));
+        $this->assertSame("false\n", ob_get_clean());
     }
 
-    public function testExitAcceptsExitStatusEnumCase(): void
+    public function testExitIntStatusUnchanged(): void
     {
-        $this->skipUnlessBuiltinStubEnumsEnabled();
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $runtime = new Runtime();
         ob_start();
         try {
-            $runtime->run($runtime->parseAndCompile('<?php exit(ExitStatus::Failure);', 'exit_status.php'));
+            $runtime->run($runtime->parseAndCompile('<?php exit(1);', 'exit_int.php'));
             $this->fail('Expected ScriptExit');
         } catch (ScriptExit $e) {
             $this->assertSame(1, $e->status);
@@ -47,13 +48,14 @@ PHP;
         $this->assertSame('', ob_get_clean());
     }
 
-    public function testDieAcceptsExitStatusEnumCase(): void
+    public function testDieIntStatusUnchanged(): void
     {
-        $this->skipUnlessBuiltinStubEnumsEnabled();
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
         $runtime = new Runtime();
         ob_start();
         try {
-            $runtime->run($runtime->parseAndCompile('<?php die(ExitStatus::Success);', 'die_status.php'));
+            $runtime->run($runtime->parseAndCompile('<?php die(0);', 'die_int.php'));
             $this->fail('Expected ScriptExit');
         } catch (ScriptExit $e) {
             $this->assertSame(0, $e->status);
