@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Thin NestedJIT-safe getprotobyname()/getservbyname() (#27060).
+ * Thin NestedJIT-safe getprotobyname()/getservbyname() (#27060, #27198).
  *
  * Avoids {@see VmNetworkServices} static `?array` caches — NestedJIT cannot boxed-store
- * `__hashtable__*` into static properties. Common IANA names only (tcp/udp/…); full
- * /etc/protocols parsing remains on the VM/MCJIT path via VmNetworkServices.
+ * `__hashtable__*` into static properties.
+ *
+ * getservbyname: thin AOT always returns -1 (false). NestedJIT cannot honor `/etc/services`
+ * without inventing ports (prior IANA table returned 80 with no services DB — #27198) or
+ * without NestedJIT-unsafe file parsing. VM / non-thin
+ * {@see NetworkServicesNameLookupJitHelper} still parses the real services file.
  *
  * php-src: ext/standard/network.c
  */
@@ -45,42 +49,9 @@ final class NetworkServicesNameLookupJitHelper
 
     public static function getservbynameLookup(string $service, string $protocol): int
     {
-        $svc = \strtolower($service);
-        $proto = \strtolower($protocol);
-        if ('tcp' === $proto) {
-            if ('ftp' === $svc) {
-                return 21;
-            }
-            if ('ssh' === $svc) {
-                return 22;
-            }
-            if ('telnet' === $svc) {
-                return 23;
-            }
-            if ('smtp' === $svc) {
-                return 25;
-            }
-            if ('domain' === $svc) {
-                return 53;
-            }
-            if ('http' === $svc) {
-                return 80;
-            }
-            if ('pop3' === $svc) {
-                return 110;
-            }
-            if ('imap' === $svc) {
-                return 143;
-            }
-            if ('https' === $svc) {
-                return 443;
-            }
-        }
-        if ('udp' === $proto) {
-            if ('domain' === $svc) {
-                return 53;
-            }
-        }
+        // Thin AOT: never invent ports when /etc/services is missing (#27198).
+        // Full lookup stays on the VM path (VmNetworkServices).
+        unset($service, $protocol);
 
         return -1;
     }
