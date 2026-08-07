@@ -13,7 +13,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register Ds\Vector / Ds\Map / Ds\Set (#22549, php-ds/ext-ds).
+ * Register Ds\Vector / Ds\Map / Ds\Set (#22549) + depth types (#28062, php-ds/ext-ds).
  */
 final class BuiltinClasses
 {
@@ -23,6 +23,9 @@ final class BuiltinClasses
         self::registerVector($ctx);
         self::registerMap($ctx);
         self::registerSet($ctx);
+        require_once __DIR__.'/VmDsDepth.php';
+        require_once __DIR__.'/DsDepthClasses.php';
+        DsDepthClasses::register($ctx);
         foreach (\array_diff(\array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
