@@ -1519,6 +1519,7 @@ class Type extends Builtin {
         StringDir::ensureLinked($this->context);
         DirectoryIteratorSnapshotRuntime::ensureLinked($this->context);
         GlobIteratorSnapshotRuntime::ensureLinked($this->context);
+        SplFileObjectSnapshotRuntime::ensureLinked($this->context);
         StringFsGlob::ensureLinked($this->context);
         StringFsDir::ensureLinked($this->context);
         StatCache::ensureLinked($this->context);

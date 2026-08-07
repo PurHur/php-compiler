@@ -1225,6 +1225,9 @@ class Context {
             'getFilename',
             'SplFileInfo'
         );
+        // SplFileObject — line snapshot `__spl_ht` for foreach (#28709).
+        $this->type->object->lookup('SplFileObject');
+        $this->functionProxies['splfileobject::__construct'] = new Call\SplFileObjectMethod('__construct');
         // GlobIterator — glob snapshot + Iterator (#27422).
         $this->type->object->lookup('GlobIterator');
         foreach ([
