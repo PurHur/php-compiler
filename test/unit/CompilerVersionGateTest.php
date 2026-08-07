@@ -580,12 +580,13 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsProcGetStatusPendingSignals());
     }
 
-    public function testSupportsProcGetStatusPendingSignalsTrueOnForwardProfile83(): void
+    public function testSupportsProcGetStatusPendingSignalsFalseOnForwardProfile83(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.3');
         try {
-            $this->assertTrue(CompilerVersion::supportsProcGetStatusPendingSignals());
+            // php-src never shipped pending_signals (#28527).
+            $this->assertFalse(CompilerVersion::supportsProcGetStatusPendingSignals());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -595,12 +596,32 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsProcGetStatusPendingSignalsTrueOnForwardProfile84(): void
+    public function testSupportsProcGetStatusPendingSignalsFalseOnForwardProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsProcGetStatusPendingSignals());
+            $this->assertFalse(CompilerVersion::supportsProcGetStatusPendingSignals());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsProcGetStatusCachedFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsProcGetStatusCached());
+    }
+
+    public function testSupportsProcGetStatusCachedTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsProcGetStatusCached());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

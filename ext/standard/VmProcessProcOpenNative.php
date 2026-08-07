@@ -429,6 +429,7 @@ final class VmProcessProcOpenNative
                 0,
                 0,
                 $pendingSignals,
+                true,
             );
         }
 
@@ -467,6 +468,7 @@ final class VmProcessProcOpenNative
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
+            $slot['statusKnown'],
         );
     }
 
@@ -511,13 +513,15 @@ final class VmProcessProcOpenNative
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
+            true,
         );
     }
 
     /**
-     * php-src ext/standard/exec.c — PHP_FUNCTION(proc_get_status) array insertion order (#13210, #16707).
+     * php-src ext/standard/proc_open.c — PHP_FUNCTION(proc_get_status) array insertion order
+     * (#13210, #17362, #28527): command, pid, [cached], running, signaled, stopped, exitcode, termsig, stopsig.
      *
-     * @param list<int> $pendingSignals
+     * @param list<int> $pendingSignals unused — pending_signals never shipped in php-src (#28527)
      *
      * @return array<string, mixed>
      */
@@ -531,17 +535,23 @@ final class VmProcessProcOpenNative
         int $termsig,
         int $stopsig,
         array $pendingSignals = [],
+        bool $cached = false,
     ): array {
         $status = [
             'command' => $command,
             'pid' => $pid,
-            'running' => $running,
-            'signaled' => $signaled,
-            'stopped' => $stopped,
-            'exitcode' => $exitcode,
-            'termsig' => $termsig,
-            'stopsig' => $stopsig,
         ];
+        // php-src inserts cached immediately after pid (GH-10239).
+        if (CompilerVersion::supportsProcGetStatusCached()) {
+            $status['cached'] = $cached;
+        }
+        $status['running'] = $running;
+        $status['signaled'] = $signaled;
+        $status['stopped'] = $stopped;
+        $status['exitcode'] = $exitcode;
+        $status['termsig'] = $termsig;
+        $status['stopsig'] = $stopsig;
+        // pending_signals was a compiler phantom (#16707/#17907); Zend 8.3–8.5 omit it (#28527).
         if (CompilerVersion::supportsProcGetStatusPendingSignals()) {
             $status['pending_signals'] = $pendingSignals;
         }

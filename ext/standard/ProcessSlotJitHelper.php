@@ -119,6 +119,7 @@ final class ProcessSlotJitHelper
                 0,
                 0,
                 $pendingSignals,
+                true,
             );
         }
 
@@ -160,6 +161,7 @@ final class ProcessSlotJitHelper
             $signals['termsig'],
             $signals['stopsig'],
             $pendingSignals,
+            $entry['statusKnown'],
         );
     }
 
