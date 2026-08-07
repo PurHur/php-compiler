@@ -357,6 +357,19 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('hash_equals', 1));
     }
 
+    /** php-src ext/sodium/libsodium.stub.php — string &$string → void (#27630). */
+    public function testSodiumMemzeroReflectionStubTypes(): void
+    {
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('sodium_memzero'));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('sodium_memzero', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('sodium_memzero', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('string', $info['name']);
+        $this->assertSame('string', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_memzero'));
+    }
+
     /** php-src ext/hash/hash.stub.php — InternalArgInfo return string (missing |false) (#28318). */
     public function testHashFileReflectionReturnUnion(): void
     {
