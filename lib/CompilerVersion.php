@@ -3133,9 +3133,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.5+ Closure::getCurrent() (Zend/zend_closures.stub.php, #22583; re-#16989).
+     * PHP 8.5+ Closure::getCurrent() (Zend/zend_closures.stub.php, #22583; re-#16989, #28710).
      *
-     * php-src adds getCurrent() on the PHP-8.5 stub only — not on 8.4. Gated on stable 8.5.0 /
+     * php-src adds getCurrent() on the PHP-8.5 stub only — not on 8.4 (PHP-8.4 branch /
+     * PHP-8.4.15 stubs omit it; commit eb65ec41 landed for 8.5). Gated on stable 8.5.0 /
      * PHP_COMPILER_PROFILE=8.5 so PROFILE=8.4 matches Zend 8.4 (method undefined).
      */
     public static function supportsClosureGetCurrent(): bool

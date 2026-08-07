@@ -432,6 +432,11 @@ final class ClosureState
             $entry->methods['getcurrent'] = new Builtin\ClosureGetCurrent();
             $entry->methodVisibility['getcurrent'] = $pubStatic;
             $entry->methodNames['getcurrent'] = 'getCurrent';
+            // Zend/zend_closures.stub.php — getCurrent(): Closure (#28710, re-#22583).
+            $getCurrentRet = ReflectionTypeSupport::cfgTypeFromLabel('Closure');
+            if (null !== $getCurrentRet) {
+                $entry->methodReturnDeclaredTypes['getcurrent'] = $getCurrentRet;
+            }
         }
         $ctx->classes['closure'] = $entry;
     }

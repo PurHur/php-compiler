@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for Closure::getCurrent() (#13981, #14504, #22583). */
+/** VM compliance for Closure::getCurrent() (#13981, #14504, #22583, #28710). */
 final class ClosureGetCurrentVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -29,6 +29,10 @@ final class ClosureGetCurrentVMTest extends BaseTest
         yield 'closure_get_current_nested_85.phpt' => self::parsePHPT(
             __DIR__.'/cases/language/closure_get_current_nested_85.phpt',
             'closure_get_current_nested_85.phpt'
+        );
+        yield 'closure_get_current_reflection_return_85.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/closure_get_current_reflection_return_85.phpt',
+            'closure_get_current_reflection_return_85.phpt'
         );
 
         if (!CompilerVersion::supportsClosureGetCurrent()) {
