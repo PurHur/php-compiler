@@ -2,6 +2,7 @@
 Pdo\Mysql/Sqlite/Pgsql do not inherit cross-driver PDO_*_Ext methods (#21552)
 --ENV--
 PHP_COMPILER_ENABLE_PDO_SQLITE=1
+PHP_COMPILER_ENABLE_PDO_MYSQL=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php

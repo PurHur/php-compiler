@@ -302,9 +302,11 @@ final class VmPDO
     }
 
     /**
-     * PHP 8.4 Pdo\Mysql (php-src ext/pdo_mysql/pdo_mysql.stub.php; #20548).
+     * PHP 8.4 Pdo\Mysql (php-src ext/pdo_mysql/pdo_mysql.stub.php; #20548 / #27332).
      *
-     * Native mysql connection factory is not wired yet — class/constants/methods only.
+     * Gated on {@see PdoExtensionPolicy::advertisesMysqlSubclass()} (host pdo_mysql or
+     * PHP_COMPILER_ENABLE_PDO_MYSQL + PROFILE≥8.4). Native mysql connection factory is
+     * not wired yet — class/constants/methods only when advertised.
      */
     public static function registerMysqlSubclass(Context $ctx): void
     {

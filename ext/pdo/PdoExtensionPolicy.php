@@ -20,12 +20,18 @@ use PHPCompiler\CompilerVersion;
  * PHP 8.4 {@see PDO::connect()} and driver subclasses ({@see Pdo\Sqlite}, {@see Pdo\Mysql},
  * {@see Pdo\Pgsql}) are advertised on language profile ≥ 8.4 (#20548, #22600, #22790).
  * {@see Pdo\Sqlite} additionally requires the sqlite driver gate ({@see advertisesSqliteSubclass()}).
+ * {@see Pdo\Mysql} requires the mysql driver gate ({@see advertisesMysqlSubclass()}; #27332) —
+ * PROFILE≥8.4 alone must not invent {@code class_exists('Pdo\\Mysql')} when host Zend has no
+ * {@code pdo_mysql}.
  *
  * Logical {@code pdo_pgsql} follows the host {@code extension_loaded('pdo_pgsql')} gate
  * (sqlite-style; #26140) — not the PHP 8.4 {@see Pdo\Pgsql} subclass profile alone —
  * so reference builds match Zend driver advertisement / {@code PDO::getAvailableDrivers()}.
  * Enable via host module or {@code PHP_COMPILER_ENABLE_PDO_PGSQL=1} when libpq FFI is available.
  * Live COPY / LISTEN-NOTIFY / backend PID still need a live libpq handle (#3741).
+ *
+ * Logical {@code pdo_mysql} follows the same host / {@code PHP_COMPILER_ENABLE_PDO_MYSQL=1} gate
+ * (#27332). Native mysqlnd/libmysql connection factory is still a follow-on (#3435).
  */
 final class PdoExtensionPolicy
 {
@@ -82,10 +88,29 @@ final class PdoExtensionPolicy
     }
 
     /**
-     * PHP 8.4+ Pdo\Mysql / Pdo\Pgsql subclass API (pdo_mysql.stub.php / pdo_pgsql.stub.php).
+     * Logical pdo_mysql for extension_loaded() / subclass gate (#27332).
      *
-     * Not gated on native client libs yet — class/constants/methods exist for reflection
-     * and instanceof; live connections remain a follow-on (#3435 / #3741).
+     * Host Zend without pdo_mysql must stay false even on PROFILE≥8.4 (subclass API
+     * must not phantom). Mirror {@see advertisesSqliteDriver()} / {@see advertisesPgsqlDriver()}.
+     * Enable via host module or {@code PHP_COMPILER_ENABLE_PDO_MYSQL=1} for functional PHPT.
+     */
+    public static function advertisesMysqlDriver(): bool
+    {
+        if (!self::advertisesExtension()) {
+            return false;
+        }
+        if (\extension_loaded('pdo_mysql')) {
+            return true;
+        }
+
+        return self::explicitMysqlEnableRequested();
+    }
+
+    /**
+     * PHP 8.4+ driver-specific subclass profile gate (pdo_*.stub.php; #20548).
+     *
+     * Individual subclasses still require their driver gate ({@see advertisesSqliteSubclass()},
+     * {@see advertisesMysqlSubclass()}, {@see advertisesPgsqlSubclass()}).
      */
     public static function advertisesDriverSpecificSubclasses(): bool
     {
@@ -116,9 +141,16 @@ final class PdoExtensionPolicy
             && self::advertisesDriverSpecificSubclasses();
     }
 
+    /**
+     * PHP 8.4+ {@see Pdo\Mysql} subclass (pdo_mysql.stub.php; #20548 / #27332).
+     *
+     * Requires both the mysql driver (host pdo_mysql or ENABLE) and the driver-specific
+     * subclass profile gate. PROFILE≥8.4 alone must match Zend: no phantom class.
+     */
     public static function advertisesMysqlSubclass(): bool
     {
-        return self::advertisesDriverSpecificSubclasses();
+        return self::advertisesMysqlDriver()
+            && self::advertisesDriverSpecificSubclasses();
     }
 
     public static function advertisesPgsqlSubclass(): bool
@@ -176,6 +208,19 @@ final class PdoExtensionPolicy
     private static function explicitPgsqlEnableRequested(): bool
     {
         $raw = getenv('PHP_COMPILER_ENABLE_PDO_PGSQL');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        $v = strtolower(trim($raw));
+
+        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
+    }
+
+    /** Explicit side-load / functional-test opt-in when host Zend lacks pdo_mysql (#27332). */
+    private static function explicitMysqlEnableRequested(): bool
+    {
+        $raw = getenv('PHP_COMPILER_ENABLE_PDO_MYSQL');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
