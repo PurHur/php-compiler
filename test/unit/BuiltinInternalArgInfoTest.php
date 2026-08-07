@@ -531,6 +531,17 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('int', $option['type']);
     }
 
+    /** php-src ext/xml/xml.stub.php — xml_parser_free XMLParser → bool (#27793). */
+    public function testXmlParserFreeReflectionStubTypes(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('xml_parser_free'));
+        $this->assertSame('XMLParser', BuiltinInternalArgInfo::stubParamTypeOverride('xml_parser_free', 0));
+        $parser = BuiltinInternalArgInfo::paramInfoForFunction('xml_parser_free', 0);
+        $this->assertNotNull($parser);
+        $this->assertSame('parser', $parser['name']);
+        $this->assertSame('XMLParser', $parser['type']);
+    }
+
     /** php-src ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687). */
     public function testXmlParserCreateNsAndIntoStructReflectionStubTypes(): void
     {

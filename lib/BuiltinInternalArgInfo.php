@@ -258,6 +258,8 @@ final class BuiltinInternalArgInfo
             'xml_set_object' => 'true',
             // ext/xml/xml.stub.php — InternalArgInfo return int; Zend string|int (#27743)
             'xml_parser_get_option' => 'string|int',
+            // ext/xml/xml.stub.php — InternalArgInfo return int; Zend bool (#27793)
+            'xml_parser_free' => 'bool',
             // ext/xml/xml.stub.php — InternalArgInfo resource / int; Zend XMLParser / int|false (#26687)
             'xml_parser_create_ns' => 'XMLParser',
             'xml_parse_into_struct' => 'int|false',
@@ -878,6 +880,8 @@ final class BuiltinInternalArgInfo
             'xml_get_current_line_number' => 0 === $index ? 'XMLParser' : null,
             // ext/xml/xml.stub.php — XMLParser $parser; InternalArgInfo untyped (#27743)
             'xml_parser_get_option' => 0 === $index ? 'XMLParser' : null,
+            // ext/xml/xml.stub.php — XMLParser $parser; InternalArgInfo untyped (#27793)
+            'xml_parser_free' => 0 === $index ? 'XMLParser' : null,
             // ext/xml/xml.stub.php — create_ns / into_struct; InternalArgInfo resource/sep/array (#26687)
             'xml_parser_create_ns' => 0 === $index ? '?string' : null,
             'xml_parse_into_struct' => match ($index) {
