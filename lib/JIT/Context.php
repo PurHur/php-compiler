@@ -365,6 +365,13 @@ class Context {
     public array $foreachAggregateInnerHtSlots = [];
 
     /**
+     * SplStack (and LIFO dllist) foreach — packed `__spl_ht` walked descending (#28705).
+     *
+     * @var array<string, true>
+     */
+    public array $foreachReverseHtSlots = [];
+
+    /**
      * Map key for foreach alloca tables — include activeFunction so NestedJIT of a
      * multi-method helper cannot reuse a sibling method's entry alloca when
      * spl_object_id values collide after GC (#28053 / #27228).
