@@ -179,7 +179,7 @@ final class VmHttpFetchPure
             $path .= '?'.$parts['query'];
         }
 
-        $request = self::buildRequest($method, $path, $host, $port, $useTls, $parts);
+        $request = self::buildRequest($method, $path, $host, $port, $useTls, $parts, $httpOptions);
 
         $remote = 'tcp://'.$host.':'.$port;
         [$handle, $errno, $errstr, $socketFd] = VmStreamSocketNative::client(
@@ -244,6 +244,7 @@ final class VmHttpFetchPure
 
     /**
      * @param array<string, mixed> $parts
+     * @param array<string, mixed> $httpOptions
      */
     private static function buildRequest(
         string $method,
@@ -251,7 +252,8 @@ final class VmHttpFetchPure
         string $host,
         int $port,
         bool $useTls,
-        array $parts
+        array $parts,
+        array $httpOptions = []
     ): string {
         // php-src http_fopen_wrapper.c: request version is HTTP/1.1 (#28789).
         $request = $method.' '.$path." HTTP/1.1\r\n";
@@ -266,9 +268,26 @@ final class VmHttpFetchPure
             $pass = isset($parts['pass']) ? (string) $parts['pass'] : '';
             $request .= 'Authorization: Basic '.\base64_encode($user.':'.$pass)."\r\n";
         }
+        // php-src: context user_agent, else INI user_agent; omit when empty (#28792).
+        $userAgent = self::httpOptionUserAgent($httpOptions);
+        if ('' !== $userAgent) {
+            $request .= 'User-Agent: '.$userAgent."\r\n";
+        }
         $request .= "\r\n";
 
         return $request;
+    }
+
+    /**
+     * @param array<string, mixed> $httpOptions
+     */
+    private static function httpOptionUserAgent(array $httpOptions): string
+    {
+        if (isset($httpOptions['user_agent']) && \is_scalar($httpOptions['user_agent'])) {
+            return (string) $httpOptions['user_agent'];
+        }
+
+        return VmIni::getUserAgent();
     }
 
     /**
