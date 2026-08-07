@@ -277,13 +277,19 @@ final class JitSimpleXmlUserScript
 
             return self::boxConstantString($context, $text);
         }
+        // Baked __phpc_sxe_text lives on TYPE_OBJECT SXE only. Opaque TYPE_VALUE locals are
+        // often plain strings — emitting readObject there segfaults concat/echo (#28625).
+        if (JITVariable::TYPE_OBJECT !== $args[0]->type) {
+            return null;
+        }
 
         return self::readBakedStringProp($context, $args[0], self::BAKED_TEXT_PROP);
     }
 
     /**
-     * Fold string cast of a value-boxed / object SXE without a class hint (#26863).
-     * Exact match only (#27535).
+     * Fold string cast of a known SXE without a class hint (#26863).
+     * Exact host-tree match, else baked text on a TYPE_OBJECT SXE (#27535).
+     * Must not treat opaque TYPE_VALUE (e.g. `$k = "a"`) as SXE (#28625).
      */
     public static function tryFoldStringCast(Context $context, JITVariable $var): ?JITVariable
     {
@@ -300,6 +306,9 @@ final class JitSimpleXmlUserScript
                 JITVariable::KIND_VALUE,
                 $context->builder->load($context->constantStringFromString($text))
             );
+        }
+        if (JITVariable::TYPE_OBJECT !== $var->type) {
+            return null;
         }
         $boxed = self::readBakedStringProp($context, $var, self::BAKED_TEXT_PROP);
         if (null === $boxed) {
@@ -870,22 +879,15 @@ final class JitSimpleXmlUserScript
 
     private static function readBakedStringProp(Context $context, JITVariable $receiver, string $prop): ?Value
     {
-        if (JITVariable::TYPE_OBJECT !== $receiver->type && JITVariable::TYPE_VALUE !== $receiver->type) {
+        // Only TYPE_OBJECT SXE carries baked slots. TYPE_VALUE must not call readObject —
+        // that path was taken for plain string locals and segfaulted under AOT (#28625).
+        if (JITVariable::TYPE_OBJECT !== $receiver->type) {
             return null;
         }
         try {
-            if (JITVariable::TYPE_OBJECT === $receiver->type && JITVariable::KIND_VALUE === $receiver->kind) {
-                $obj = $receiver->value;
-            } elseif (JITVariable::TYPE_OBJECT === $receiver->type) {
-                $obj = $context->builder->load($receiver->value);
-            } elseif (JITVariable::TYPE_VALUE === $receiver->type) {
-                $obj = $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    JitValueBox::valuePtrFromVariable($context, $receiver)
-                );
-            } else {
-                return null;
-            }
+            $obj = JITVariable::KIND_VALUE === $receiver->kind
+                ? $receiver->value
+                : $context->builder->load($receiver->value);
             $slot = $context->type->object->propertySlotFor($obj, 'SimpleXMLElement', $prop);
             $raw = $context->builder->load($slot);
             $strPtr = $context->builder->pointerCast($raw, $context->getTypeFromString('__string__*'));
