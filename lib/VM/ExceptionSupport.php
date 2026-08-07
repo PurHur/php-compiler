@@ -458,6 +458,7 @@ final class ExceptionSupport
         \Throwable $native,
         ?ObjectEntry $vmEntry = null,
         bool $displayErrors = false,
+        ?Variable $traceOverride = null,
     ): void {
         $class = $native::class;
         $message = $native->getMessage();
@@ -471,7 +472,7 @@ final class ExceptionSupport
                 $body .= ":{$line}";
             }
         }
-        $body .= "\nStack trace:\n".self::formatUncaughtStackTrace($vmEntry);
+        $body .= "\nStack trace:\n".self::formatUncaughtStackTrace($vmEntry, $traceOverride);
         $body .= '  thrown';
         ErrorReporter::writeCliErrorOutput(
             ErrorReporter::E_WARNING,
@@ -554,8 +555,16 @@ final class ExceptionSupport
         }
     }
 
-    private static function formatUncaughtStackTrace(?ObjectEntry $vmEntry): string
-    {
+    private static function formatUncaughtStackTrace(
+        ?ObjectEntry $vmEntry,
+        ?Variable $traceOverride = null,
+    ): string {
+        if (null !== $traceOverride) {
+            $override = $traceOverride->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $override->type && $override->toArray()->getNumElements() > 0) {
+                return ExceptionTraceFormat::asString($override)."\n";
+            }
+        }
         if (null !== $vmEntry) {
             $trace = ExceptionTrace::resolveTraceVariable($vmEntry);
             if (Variable::TYPE_ARRAY === $trace->type && $trace->toArray()->getNumElements() > 0) {

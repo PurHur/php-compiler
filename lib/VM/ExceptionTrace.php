@@ -58,6 +58,103 @@ final class ExceptionTrace
     }
 
     /**
+     * Warning stack for engine-invoked `__debugInfo` throw under var_dump/print_r/debug_zval_dump (#28618).
+     *
+     * php-src: zend_call_method → `[internal function]: Class->__debugInfo()`, then the dump builtin
+     * at the user call site (Zend/zend_object_handlers.c + ext/standard/var.c).
+     */
+    public static function buildDebugInfoEngineInvokeTrace(ObjectEntry $object, ?Frame $dumpFrame): Variable
+    {
+        $trace = new Variable();
+        $trace->newArray();
+        $ht = $trace->toArray();
+
+        $hook = new Variable();
+        $hook->newArray();
+        $hookHt = $hook->toArray();
+        $classVar = new Variable(Variable::TYPE_STRING);
+        $classVar->string($object->class->name);
+        $hookHt->add('class', $classVar);
+        $typeVar = new Variable(Variable::TYPE_STRING);
+        $typeVar->string('->');
+        $hookHt->add('type', $typeVar);
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string('__debugInfo');
+        $hookHt->add('function', $fnVar);
+        $ht->append($hook);
+
+        if (null === $dumpFrame) {
+            return $trace;
+        }
+
+        $builtinName = '';
+        if ($dumpFrame->hasHandler() && $dumpFrame->handler instanceof Internal) {
+            $builtinName = $dumpFrame->handler->getName();
+        }
+        $caller = $dumpFrame->parent;
+        if ('' === $builtinName || null === $caller) {
+            return $trace;
+        }
+
+        // Builtin call site = caller's opline (callSiteLine), not parent-of-caller (#28618 nested).
+        $ht->append(self::debugInfoDumpBuiltinFrameEntry($caller, $builtinName));
+
+        $chain = [];
+        for ($f = $caller; null !== $f; $f = $f->parent) {
+            if ($f->hasHandler()) {
+                continue;
+            }
+            if (null !== $f->block && $f->block->isMainScript()) {
+                break;
+            }
+            $chain[] = $f;
+        }
+        if ([] !== $chain) {
+            $rest = self::sanitizeCapturedTrace(
+                VmDebugBacktrace::buildFromFrames($chain, self::traceCaptureOptions())
+            );
+            foreach ($rest->toArray()->iterate(true) as $frameVar) {
+                $ht->append($frameVar);
+            }
+        }
+
+        return $trace;
+    }
+
+    /**
+     * Frame entry for the dump builtin at the user call site (file/line of the call inside the caller).
+     */
+    private static function debugInfoDumpBuiltinFrameEntry(Frame $caller, string $builtinName): Variable
+    {
+        $entry = new Variable();
+        $entry->newArray();
+        $ht = $entry->toArray();
+
+        [$file, $line] = ExceptionSupport::userFatalSite($caller);
+        if ('' === $file && $caller->callSiteLine > 0) {
+            $line = $caller->callSiteLine;
+        } elseif ($caller->callSiteLine > 0) {
+            // Prefer the active call opcode line over parent-invoke line (#28618).
+            $line = $caller->callSiteLine;
+        }
+        if ('' !== $file) {
+            $fileVar = new Variable(Variable::TYPE_STRING);
+            $fileVar->string($file);
+            $ht->add('file', $fileVar);
+
+            $lineVar = new Variable(Variable::TYPE_INTEGER);
+            $lineVar->int(max(0, $line));
+            $ht->add('line', $lineVar);
+        }
+
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($builtinName);
+        $ht->add('function', $fnVar);
+
+        return $entry;
+    }
+
+    /**
      * Builtin throw trace — Zend includes internal function name at user call site (#11677).
      */
     public static function captureOnBuiltinThrow(

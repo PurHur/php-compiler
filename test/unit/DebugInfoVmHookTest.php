@@ -93,12 +93,9 @@ PHP;
 
         try {
             $vm->getObjectDebugProperties($object);
-            self::fail('Expected TypeError for non-array __debugInfo() return');
-        } catch (\TypeError $e) {
-            self::assertSame(
-                'C::__debugInfo(): Return value must be of type array, string returned',
-                $e->getMessage()
-            );
+            self::fail('Expected ScriptExit for non-array __debugInfo() return (#25748)');
+        } catch (VM\ScriptExit $e) {
+            self::assertSame(255, $e->getCode());
         }
     }
 }
