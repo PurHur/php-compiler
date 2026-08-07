@@ -11,8 +11,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for locale_get_primary_language/region/script + canonicalize + get_default via LocaleParserJitHelper
- * (#17072, #20101, #20760, #27369).
+ * JIT/AOT link for locale_get_primary_language/region/script + canonicalize + accept_from_http + get_default
+ * via LocaleParserJitHelper (#17072, #20101, #20760, #27369, #28656).
  *
  * Always {@see JitVmHelperLink} → {@see \PHPCompiler\ext\intl\LocaleParserJitHelper}
  * (no user-script NestedJIT defer early-return — thin/user-script AOT must still link bridges).
@@ -29,6 +29,8 @@ final class LocaleParser
 
     private const ABI_CANONICALIZE = '__phpc_jit_locale_canonicalize';
 
+    private const ABI_ACCEPT_FROM_HTTP = '__phpc_jit_locale_accept_from_http';
+
     private const ABI_DEFAULT = '__phpc_jit_locale_get_default';
 
     private const HELPER_PATH = '/ext/intl/LocaleParserJitHelper.php';
@@ -41,6 +43,8 @@ final class LocaleParser
 
     private const CANONICALIZE_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::canonicalizeArgv';
 
+    private const ACCEPT_FROM_HTTP_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::acceptFromHttpArgv';
+
     private const DEFAULT_HELPER = 'PHPCompiler\\ext\\intl\\LocaleDefaultJitHelper::getDefaultArgv';
 
     private const HELPER_PATH_DEFAULT = '/ext/intl/LocaleDefaultJitHelper.php';
@@ -51,6 +55,7 @@ final class LocaleParser
         self::REGION_HELPER,
         self::SCRIPT_HELPER,
         self::CANONICALIZE_HELPER,
+        self::ACCEPT_FROM_HTTP_HELPER,
     ];
 
     /** @var list<string> */
@@ -95,6 +100,16 @@ final class LocaleParser
         return $context->builder->call(
             $context->lookupFunction(self::ABI_CANONICALIZE),
             $locale
+        );
+    }
+
+    public static function invokeAcceptFromHttp(Context $context, Value $header): Value
+    {
+        self::ensureAcceptFromHttpLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_ACCEPT_FROM_HTTP),
+            $header
         );
     }
 
@@ -147,6 +162,16 @@ final class LocaleParser
         );
     }
 
+    public static function ensureAcceptFromHttpLinked(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            self::ABI_ACCEPT_FROM_HTTP,
+            'locale_accept_from_http_bridge_entry',
+            self::ACCEPT_FROM_HTTP_HELPER
+        );
+    }
+
     public static function ensureDefaultLinked(Context $context): void
     {
         self::ensureBridge(
@@ -166,6 +191,7 @@ final class LocaleParser
         self::ensureRegionLinked($context);
         self::ensureScriptLinked($context);
         self::ensureCanonicalizeLinked($context);
+        self::ensureAcceptFromHttpLinked($context);
         self::ensureDefaultLinked($context);
     }
 

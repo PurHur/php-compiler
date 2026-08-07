@@ -33,4 +33,16 @@ final class LocaleParserJitHelper
     {
         return VmLocale::canonicalize($locale) ?? '';
     }
+
+    /**
+     * Accept-Language negotiate (#28656); empty string when VmLocale returns false.
+     *
+     * php-src: ext/intl/locale/locale_methods.c — acceptFromHttp
+     */
+    public static function acceptFromHttpArgv(string $header): string
+    {
+        $result = VmLocale::acceptFromHttp($header);
+
+        return false === $result ? '' : $result;
+    }
 }

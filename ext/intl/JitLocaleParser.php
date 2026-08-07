@@ -90,6 +90,35 @@ final class JitLocaleParser
         );
     }
 
+    /**
+     * Locale::acceptFromHttp() / locale_accept_from_http() (#28656 / #20036).
+     *
+     * Compile-time: `__string__*` or `__value__*` false. Runtime: NestedJIT `__string__*`
+     * (empty when negotiation fails — same empty-on-fail shape as canonicalize null).
+     */
+    public static function acceptFromHttp(Context $context, JITVariable $header, string $function = 'locale_accept_from_http'): Value
+    {
+        $literal = $header->compileTimeString ?? JitStringArg::compileTimeLiteral($header);
+        if (null !== $literal) {
+            $result = VmLocale::acceptFromHttp($literal);
+            if (false === $result) {
+                $slot = JitValueBox::alloc($context);
+                JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+                return $slot;
+            }
+
+            return $context->builder->load(
+                $context->constantStringFromString($result)
+            );
+        }
+
+        return LocaleParser::invokeAcceptFromHttp(
+            $context,
+            JitStringBuiltinArg::lowerZparamStr($context, $header, $function, 0, 'header')
+        );
+    }
+
     public static function getDefault(Context $context): Value
     {
         return LocaleParser::invokeDefault($context);

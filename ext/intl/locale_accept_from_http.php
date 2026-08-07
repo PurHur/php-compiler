@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** locale_accept_from_http() — HTTP Accept-Language negotiate (#20036). */
+/** locale_accept_from_http() — HTTP Accept-Language negotiate (#20036, AOT #28656). */
 final class locale_accept_from_http extends Internal
 {
     public function execute(Frame $frame): void
@@ -41,6 +41,13 @@ final class locale_accept_from_http extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \RuntimeException('locale_accept_from_http() JIT lowering not implemented; use VM');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(\sprintf(
+                'locale_accept_from_http() expects exactly 1 argument, %d given',
+                \count($args)
+            ));
+        }
+
+        return JitLocaleParser::acceptFromHttp($context, $args[0], 'locale_accept_from_http');
     }
 }

@@ -1456,6 +1456,8 @@ class Context {
         $this->functionProxies['datetimezone::getoffset'] = new Call\DateTimeZoneGetOffset();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
+        // Locale::acceptFromHttp — avoid ExternalMethod silent NULL on thin AOT (#28656).
+        $this->functionProxies['locale::acceptfromhttp'] = new \PHPCompiler\ext\intl\LocaleAcceptFromHttp();
         // NumberFormatter::format — avoid ExternalMethod silent NULL on thin AOT (#28648).
         $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();
         // Collator::compare — avoid ExternalMethod silent NULL on thin AOT (#28649).
