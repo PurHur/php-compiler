@@ -143,6 +143,17 @@ final class PregJitHelper
         return '';
     }
 
+    /** Thin-AOT named-capture stubs — real impl in PregJitHelperThinAot (#28611). */
+    public static function thinMatchExCapName(int $groupIndex): string
+    {
+        return '';
+    }
+
+    public static function thinMatchExHasCapName(int $groupIndex): int
+    {
+        return 0;
+    }
+
     /** Thin AOT only — full helper never stores split parts here (#27080). */
     public static function thinSplitPartCount(): int
     {

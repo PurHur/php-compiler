@@ -35,6 +35,15 @@ final class PregAotFastPath
 
     private static int $capCount = 0;
 
+    /** Named subpattern for group 1 (php-src $matches order: 0, name, 1) — #28611. */
+    private static string $capName1 = '';
+
+    /**
+     * Name pending from {@see patternKind} for the next successful storeCaps (#28611).
+     * NestedJIT cannot return (kind, name) pairs — stash here instead.
+     */
+    private static string $kindName = '';
+
     /**
      * NestedJIT-local PCRE last-error mirror (AOT TU isolation — peer JsonValidate #26792 / #27561).
      * PregJitHelperThinAot must not keep its own static; helpers do not share PHP statics across TUs.
@@ -67,6 +76,7 @@ final class PregAotFastPath
     public static function matchCount(string $pattern, string $subject, int $offset): int
     {
         self::clearCaps();
+        self::$kindName = '';
         self::$lastError = 0;
         // Unclosed group — Zend PREG_INTERNAL_ERROR. Full-pattern compare: NestedJIT body
         // metachar classify can miss '(' and treat "/(/" as literal → silent 0 (#27561).
@@ -103,10 +113,35 @@ final class PregAotFastPath
         }
         // Single class char \d/\s/\w (#27250) — NestedJIT cannot defer to host PCRE.
         if ($kind >= 10 && $kind <= 15) {
-            return self::matchClassOnce($kind, $subject, $offset);
+            $rc = self::matchClassOnce($kind, $subject, $offset);
+            self::rememberNamedCapAfterMatch($pattern, $rc);
+
+            return $rc;
         }
 
-        return self::matchClassPlus($kind, $subject, $offset);
+        $rc = self::matchClassPlus($kind, $subject, $offset);
+        self::rememberNamedCapAfterMatch($pattern, $rc);
+
+        return $rc;
+    }
+
+    /**
+     * NestedJIT may drop {@see $kindName} across calls — re-bind name by exact pattern (#28611).
+     */
+    private static function rememberNamedCapAfterMatch(string $pattern, int $rc): void
+    {
+        if (1 !== $rc) {
+            return;
+        }
+        if ('/(?<n>\\d+)/' === $pattern || '#(?<n>\\d+)#' === $pattern
+            || '/(?<n>\\d)/' === $pattern || '#(?<n>\\d)#' === $pattern) {
+            self::$capName1 = 'n';
+
+            return;
+        }
+        if ('/(?<digit>\\d+)/' === $pattern || '#(?<digit>\\d+)#' === $pattern) {
+            self::$capName1 = 'digit';
+        }
     }
 
     public static function lastCapCount(): int
@@ -145,8 +180,47 @@ final class PregAotFastPath
         return '';
     }
 
+    /** Named key for capture group (1-based group index); empty when unnamed (#28611). */
+    public static function lastCapName(int $groupIndex): string
+    {
+        if (1 === $groupIndex) {
+            return '' . self::$capName1;
+        }
+
+        return '';
+    }
+
+    /** @return int 1 when group 1 has a named subpattern */
+    public static function lastCapHasName(int $groupIndex): int
+    {
+        if (1 === $groupIndex && '' !== self::$capName1) {
+            return 1;
+        }
+
+        return 0;
+    }
+
     public static function patternKind(string $pattern): int
     {
+        self::$kindName = '';
+        // Named digit-plus — exact compares (NestedJIT-safe; #28611).
+        // Unsupported named patterns previously hit kind=0 → NestedJIT -1→1 corruption + empty $matches.
+        if ('/(?<n>\\d+)/' === $pattern || '#(?<n>\\d+)#' === $pattern) {
+            self::$kindName = 'n';
+
+            return 3;
+        }
+        if ('/(?<digit>\\d+)/' === $pattern || '#(?<digit>\\d+)#' === $pattern) {
+            self::$kindName = 'digit';
+
+            return 3;
+        }
+        // Named single class char.
+        if ('/(?<n>\\d)/' === $pattern || '#(?<n>\\d)#' === $pattern) {
+            self::$kindName = 'n';
+
+            return 11;
+        }
         // Full-pattern compares — NestedJIT body/substr classify missed metachar bodies.
         // Single class char (no +) — issue #27250 silent wrong-0 under thin AOT.
         if ('/\\d/' === $pattern || '#\\d#' === $pattern) {
@@ -371,6 +445,7 @@ final class PregAotFastPath
         self::$cap6 = '';
         self::$cap7 = '';
         self::$capCount = 0;
+        self::$capName1 = '';
     }
 
     private static function storeCapAt(int $index, string $value): void
@@ -391,6 +466,21 @@ final class PregAotFastPath
             self::$cap6 = $value;
         } elseif (7 === $index) {
             self::$cap7 = $value;
+        }
+    }
+
+    private static function storeCaps(string $full, bool $hasGroup): void
+    {
+        self::storeCapAt(0, $full);
+        if ($hasGroup) {
+            self::storeCapAt(1, $full);
+            self::$capCount = 2;
+            if ('' !== self::$kindName) {
+                self::$capName1 = '' . self::$kindName;
+            }
+        } else {
+            self::storeCapAt(1, '');
+            self::$capCount = 1;
         }
     }
 
@@ -627,18 +717,6 @@ final class PregAotFastPath
         }
 
         return 0;
-    }
-
-    private static function storeCaps(string $full, bool $hasGroup): void
-    {
-        self::storeCapAt(0, $full);
-        if ($hasGroup) {
-            self::storeCapAt(1, $full);
-            self::$capCount = 2;
-        } else {
-            self::storeCapAt(1, '');
-            self::$capCount = 1;
-        }
     }
 
     private static function matchLiteral(string $pattern, string $subject, int $offset): int

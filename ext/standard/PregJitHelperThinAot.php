@@ -90,6 +90,18 @@ final class PregJitHelper
         return '' . PregAotFastPath::lastCap($index);
     }
 
+    /** Named subpattern key for group index — empty when unnamed (#28611). */
+    public static function thinMatchExCapName(int $groupIndex): string
+    {
+        return '' . PregAotFastPath::lastCapName($groupIndex);
+    }
+
+    /** @return int 1 when group has a name */
+    public static function thinMatchExHasCapName(int $groupIndex): int
+    {
+        return PregAotFastPath::lastCapHasName($groupIndex);
+    }
+
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
         self::$lastMatchAllExHt = null;
