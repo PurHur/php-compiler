@@ -49,7 +49,18 @@ final class HashTable {
     public const NEXT_ELEMENT_OCCUPIED_MESSAGE =
         'Cannot add element to the array as the next element is already occupied';
 
+    /**
+     * php-src Zend/zend_hash.c {@see zend_hash_compare()} — GC_IS_RECURSIVE (#28794).
+     */
+    public const NESTING_TOO_DEEP_MESSAGE = 'Nesting level too deep - recursive dependency?';
+
     private Refcount $refcount;
+    /**
+     * Zend GC_PROTECTED during hash compare — re-entry fatals (#28794).
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_hash.c zend_hash_compare
+     */
+    private bool $gcRecursive = false;
     private int $flags = 0;
     private MaskedArray $indexes;
     private MaskedArray $buckets;
@@ -781,32 +792,37 @@ final class HashTable {
         if ($this === $other) {
             return 0;
         }
-        $leftCount = $this->getNumElements();
-        $rightCount = $other->getNumElements();
-        if ($leftCount > $rightCount) {
-            return 1;
-        }
-        if ($leftCount < $rightCount) {
-            return -1;
-        }
-
-        foreach ($this->iterateKeyed(true) as [$leftKey, $leftVal]) {
-            $rightStored = $other->findVariable($leftKey, false);
-            if (null === $rightStored) {
-                // Missing key on the right: Zend returns 1 (not a key-order walk).
+        $this->enterHashCompare();
+        try {
+            $leftCount = $this->getNumElements();
+            $rightCount = $other->getNumElements();
+            if ($leftCount > $rightCount) {
                 return 1;
             }
-            $rightVal = $rightStored->resolveIndirect();
-            if ($rightVal->isUndefined()) {
-                return 1;
+            if ($leftCount < $rightCount) {
+                return -1;
             }
-            $valCmp = Variable::spaceshipCompare($leftVal, $rightVal);
-            if (0 !== $valCmp) {
-                return $valCmp;
-            }
-        }
 
-        return 0;
+            foreach ($this->iterateKeyed(true) as [$leftKey, $leftVal]) {
+                $rightStored = $other->findVariable($leftKey, false);
+                if (null === $rightStored) {
+                    // Missing key on the right: Zend returns 1 (not a key-order walk).
+                    return 1;
+                }
+                $rightVal = $rightStored->resolveIndirect();
+                if ($rightVal->isUndefined()) {
+                    return 1;
+                }
+                $valCmp = Variable::spaceshipCompare($leftVal, $rightVal);
+                if (0 !== $valCmp) {
+                    return $valCmp;
+                }
+            }
+
+            return 0;
+        } finally {
+            $this->leaveHashCompare();
+        }
     }
 
     /**
@@ -818,25 +834,30 @@ final class HashTable {
         if ($this === $other) {
             return true;
         }
-        if ($this->getNumElements() !== $other->getNumElements()) {
-            return false;
-        }
+        $this->enterHashCompare();
+        try {
+            if ($this->getNumElements() !== $other->getNumElements()) {
+                return false;
+            }
 
-        foreach ($this->iterateKeyed(true) as [$leftKey, $leftVal]) {
-            $rightStored = $other->findVariable($leftKey, false);
-            if (null === $rightStored) {
-                return false;
+            foreach ($this->iterateKeyed(true) as [$leftKey, $leftVal]) {
+                $rightStored = $other->findVariable($leftKey, false);
+                if (null === $rightStored) {
+                    return false;
+                }
+                $rightVal = $rightStored->resolveIndirect();
+                if ($rightVal->isUndefined()) {
+                    return false;
+                }
+                if (!$leftVal->identicalTo($rightVal) && !$leftVal->equals($rightVal)) {
+                    return false;
+                }
             }
-            $rightVal = $rightStored->resolveIndirect();
-            if ($rightVal->isUndefined()) {
-                return false;
-            }
-            if (!$leftVal->identicalTo($rightVal) && !$leftVal->equals($rightVal)) {
-                return false;
-            }
-        }
 
-        return true;
+            return true;
+        } finally {
+            $this->leaveHashCompare();
+        }
     }
 
     /**
@@ -848,24 +869,85 @@ final class HashTable {
         if ($this === $other) {
             return true;
         }
-        if ($this->getNumElements() !== $other->getNumElements()) {
-            return false;
-        }
-
-        $leftItems = iterator_to_array($this->iterateKeyed(true));
-        $rightItems = iterator_to_array($other->iterateKeyed(true));
-        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
-            [$leftKey, $leftVal] = $leftItems[$i];
-            [$rightKey, $rightVal] = $rightItems[$i];
-            if (!$leftKey->identicalTo($rightKey)) {
+        $this->enterHashCompare();
+        try {
+            if ($this->getNumElements() !== $other->getNumElements()) {
                 return false;
             }
-            if (!$leftVal->identicalTo($rightVal)) {
-                return false;
-            }
-        }
 
-        return true;
+            $leftItems = iterator_to_array($this->iterateKeyed(true));
+            $rightItems = iterator_to_array($other->iterateKeyed(true));
+            for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+                [$leftKey, $leftVal] = $leftItems[$i];
+                [$rightKey, $rightVal] = $rightItems[$i];
+                if (!$leftKey->identicalTo($rightKey)) {
+                    return false;
+                }
+                if (!$leftVal->identicalTo($rightVal)) {
+                    return false;
+                }
+            }
+
+            return true;
+        } finally {
+            $this->leaveHashCompare();
+        }
+    }
+
+    /**
+     * php-src GC_TRY_PROTECT_RECURSION / GC_IS_RECURSIVE for zend_hash_compare (#28794).
+     * Only the left table is protected (false positives when ht2 is reachable from ht1).
+     */
+    private function enterHashCompare(): void
+    {
+        if ($this->gcRecursive) {
+            self::raiseNestingTooDeepFatal();
+        }
+        $this->gcRecursive = true;
+    }
+
+    private function leaveHashCompare(): void
+    {
+        $this->gcRecursive = false;
+    }
+
+    /**
+     * @return never
+     */
+    private static function raiseNestingTooDeepFatal(): void
+    {
+        $message = self::NESTING_TOO_DEEP_MESSAGE;
+        $file = '';
+        $line = 0;
+        $displayErrors = false;
+        $vm = VmEngine::running();
+        if (null !== $vm) {
+            // Active opcode frame is not on runStack (#14132); prefer it for == site.
+            $frame = $vm->currentExecutingFrame()
+                ?? $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $vm->context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
+            if (null !== $frame) {
+                [$file, $line] = ExceptionSupport::userFatalSite($frame);
+            }
+            $displayErrors = $vm->context->errors->getDisplayErrors();
+            $vm->context->errors->recordLastError(
+                ErrorReporter::E_ERROR,
+                $message,
+                $file,
+                $line
+            );
+        }
+        ErrorReporter::writeCliErrorOutput(
+            ErrorReporter::E_ERROR,
+            $message,
+            '' !== $file ? $file : null,
+            $line,
+            $displayErrors
+        );
+        throw new ScriptExit(255);
     }
 
     /**
