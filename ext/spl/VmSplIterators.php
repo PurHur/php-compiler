@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
@@ -34,36 +35,46 @@ final class VmSplIterators
 
     private static function registerRecursiveIteratorInterface(Context $ctx): void
     {
-        if (isset($ctx->classes['recursiveiterator'])) {
-            return;
+        if (!isset($ctx->classes['recursiveiterator'])) {
+            $entry = new ClassEntry('RecursiveIterator');
+            $entry->isInterface = true;
+            if (isset($ctx->classes['iterator'])) {
+                $entry->interfaces[] = 'iterator';
+            }
+            $ctx->classes['recursiveiterator'] = $entry;
         }
 
-        $entry = new ClassEntry('RecursiveIterator');
+        $entry = $ctx->classes['recursiveiterator'];
         $entry->isInterface = true;
-        if (isset($ctx->classes['iterator'])) {
-            $entry->interfaces[] = 'iterator';
+        // php-src spl_iterators.stub.php — hasChildren()/getChildren() on the interface (#28562).
+        if (!isset($entry->abstractMethods['haschildren'])) {
+            BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['hasChildren', 'getChildren']);
         }
-        $ctx->classes['recursiveiterator'] = $entry;
     }
 
     private static function registerOuterIteratorInterface(Context $ctx): void
     {
-        if (isset($ctx->classes['outeriterator'])) {
-            return;
+        if (!isset($ctx->classes['outeriterator'])) {
+            $entry = new ClassEntry('OuterIterator');
+            $entry->isInterface = true;
+            // Zend ce->interfaces is flattened: Iterator then Traversable (spl_iterators.c).
+            // Reverse-parent insert expands OuterIterator to OuterIterator,Traversable,Iterator
+            // (IteratorIterator / parent-walk order). class_implements(OuterIterator) lists
+            // parents in declaration order → Iterator,Traversable (#25798).
+            if (isset($ctx->classes['iterator'])) {
+                $entry->interfaces[] = 'iterator';
+            }
+            if (isset($ctx->classes['traversable'])) {
+                $entry->interfaces[] = 'traversable';
+            }
+            $ctx->classes['outeriterator'] = $entry;
         }
 
-        $entry = new ClassEntry('OuterIterator');
+        $entry = $ctx->classes['outeriterator'];
         $entry->isInterface = true;
-        // Zend ce->interfaces is flattened: Iterator then Traversable (spl_iterators.c).
-        // Reverse-parent insert expands OuterIterator to OuterIterator,Traversable,Iterator
-        // (IteratorIterator / parent-walk order). class_implements(OuterIterator) lists
-        // parents in declaration order → Iterator,Traversable (#25798).
-        if (isset($ctx->classes['iterator'])) {
-            $entry->interfaces[] = 'iterator';
+        // php-src spl_iterators.stub.php — getInnerIterator() on the interface (#28562).
+        if (!isset($entry->abstractMethods['getinneriterator'])) {
+            BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['getInnerIterator']);
         }
-        if (isset($ctx->classes['traversable'])) {
-            $entry->interfaces[] = 'traversable';
-        }
-        $ctx->classes['outeriterator'] = $entry;
     }
 }
