@@ -2163,11 +2163,15 @@ final class BuiltinClasses
         $ctx->classes[$lcKey] = $entry;
     }
 
-    /** Zend JsonSerializable interface (ext/json/php_json.c, issue #3370). */
+    /** Zend JsonSerializable interface (ext/json/php_json.c / php_json.stub.php, #3370, #28561). */
     private static function registerJsonSerializable(Context $ctx): void
     {
         $entry = new ClassEntry('JsonSerializable');
         $entry->isInterface = true;
+        // Mirror Countable: abstract public method so method_exists/Reflection see jsonSerialize (#28561).
+        self::registerBuiltinInterfaceMethods($entry, ['jsonSerialize']);
+        // php-src stub declares jsonSerialize(): mixed — explicit Literal (CfgType\Mixed_ = undeclared).
+        $entry->methodReturnDeclaredTypes['jsonserialize'] = new CfgType\Literal('mixed');
         $ctx->classes['jsonserializable'] = $entry;
     }
 
