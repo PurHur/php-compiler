@@ -43,6 +43,8 @@ final class VmHashContext
         }
         $entry = new \PHPCompiler\VM\ClassEntry('HashContext');
         $entry->isInternal = true;
+        // php-src `final class HashContext` (ext/hash/hash.stub.php; #28384).
+        $entry->isFinal = true;
         // PHP 8.4+ only — Zend 8.2/8.3 stubs omit HashContext::__debugInfo (#22563, re-#7084).
         if (CompilerVersion::supportsHashContextDebugInfo()) {
             $entry->methods['__debuginfo'] = new HashContextDebugInfo();

@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  * (+ Fiber/FiberError from zend_fibers.stub.php; #28389;
  * Socket/AddressInfo from sockets.stub.php; #28391;
  * InflateContext/DeflateContext from zlib.stub.php; #28385;
+ * HashContext from ext/hash/hash.stub.php; #28384;
  * Random\\Randomizer + Engine\\* from random.stub.php; #28387;
  * XMLParser from ext/xml/xml.stub.php; #28386;
  * AllowDynamicProperties/ReturnTypeWillChange/SensitiveParameter/Override/Deprecated
@@ -133,6 +134,8 @@ final class ReflectionClassIsFinalRuntime
             'Fiber',
             'FiberError',
             'Generator',
+            // php-src ext/hash/hash.stub.php — final class HashContext (#28384)
+            'HashContext',
             'InflateContext',
             'Random\\Engine\\Mt19937',
             'Random\\Engine\\PcgOneseq128XslRr64',

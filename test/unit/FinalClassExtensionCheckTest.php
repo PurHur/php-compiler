@@ -495,6 +495,36 @@ PHP;
         $this->assertSame("true\ntrue\n", ob_get_clean());
     }
 
+    /** @covers issue #28384 — php-src ext/hash/hash.stub.php final class HashContext */
+    public function testExtendHashContextFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadHashContext extends HashContext {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadHashContext cannot extend final class HashContext');
+        $runtime->parseAndCompile($code, 'extend_hashcontext.php');
+    }
+
+    /** @covers issue #28384 */
+    public function testHashContextReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+hash_init('sha256');
+var_export((new ReflectionClass(HashContext::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'hashcontext_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\n", ob_get_clean());
+    }
+
     /** @covers issue #26531 */
     public function testExtendUnitEnumFailsAtCompileTime(): void
     {
