@@ -6665,6 +6665,7 @@ require_once __DIR__.'/../../../lib/VM/CycleCollector.php';
 require_once __DIR__.'/../../../lib/VM/DateIntervalSupport.php';
 require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SplHeapJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/SplObjectStorageJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/DirectoryIteratorJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/GlobIteratorJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SplHtPosIteratorJitHelper.php';

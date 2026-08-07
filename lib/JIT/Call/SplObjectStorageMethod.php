@@ -37,6 +37,24 @@ final class SplObjectStorageMethod implements Call
                 return $this->callOffsetGet($context, ...$args);
             case 'offsetset':
                 return $this->callOffsetSet($context, ...$args);
+            case 'rewind':
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileRewind($context, $args[0]);
+            case 'next':
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileNext($context, $args[0]);
+            case 'valid':
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileValid($context, $args[0]);
+            case 'key':
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileKey($context, $args[0]);
+            case 'current':
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileCurrent($context, $args[0]);
+            case 'getinfo':
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileGetInfo($context, $args[0]);
+            case 'setinfo':
+                if (count($args) < 2) {
+                    throw new \LogicException('SplObjectStorage::setInfo() requires an info value');
+                }
+
+                return \PHPCompiler\VM\SplObjectStorageJitHelper::compileSetInfo($context, $args[0], $args[1]);
             default:
                 throw new \LogicException(
                     'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
