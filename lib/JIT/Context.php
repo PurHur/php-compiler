@@ -888,7 +888,6 @@ class Context {
             'phpc_fpow_kernel',
             'phpc_nextafter_kernel',
             'phpc_cosh_kernel',
-            'phpc_sinh_kernel',
             'phpc_tanh_kernel',
             'phpc_atan_kernel',
             'phpc_atan2_kernel',
