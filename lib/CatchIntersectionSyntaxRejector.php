@@ -8,10 +8,10 @@ use PHPCompiler\Ast\CatchIntersectionSupport;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject catch intersection types below PHP 8.1 / mixed `|`+`&` lists (#28205).
+ * Reject catch intersection / parenthesized catch types like Zend (#28439).
  *
  * Must run before {@see Ast\CatchIntersectionSupport::rewrite()}.
- * php-src: Zend/zend_language_parser.y catch_list.
+ * php-src: Zend/zend_language_parser.y catch_name_list (`|` only).
  */
 final class CatchIntersectionSyntaxRejector
 {

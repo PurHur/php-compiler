@@ -8,21 +8,25 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\ReferenceProfileTokenScan;
 
 /**
- * Rewrite catch intersection types for nikic/php-parser 4.x (#28205).
+ * Reject (and historically rewrite) catch intersection types (#28439 / #28205).
  *
- * php-src accepts `catch (Countable&Throwable $e)` since intersection types (PHP 8.1);
- * php-parser 4.x only allows `|` in catch type lists. Rewrite `&` → `|` and mark the
- * Catch_ node so php-cfg / TYPE_CATCH encode `a&b` (all must match) rather than `a|b`.
+ * php-src `catch_name_list` is union-only (`|`); intersection `&` and parenthesized
+ * catch types are ParseErrors. php-parser 4.x agrees; an earlier rewrite path that
+ * accepted `A&B` under PROFILE≥8.1 was inverted vs Zend and is gated off.
  *
- * php-src: Zend/zend_language_parser.y catch_list; Zend/zend_compile.c zend_compile_try.
+ * php-src: Zend/zend_language_parser.y catch_name_list.
  */
 final class CatchIntersectionSupport
 {
     public const ATTRIBUTE = 'compilerCatchIntersection';
 
-    /** Zend-shaped message when intersection catch is used below PHP 8.1. */
+    /** Zend-shaped message when `&` appears in a catch type list. */
     public const REFERENCE_PROFILE_UNEXPECTED_AMPERSAND =
         'syntax error, unexpected token "&", expecting ")"';
+
+    /** Zend-shaped message when `(` appears in a catch type list (`catch ((A&B) $e)`). */
+    public const REFERENCE_PROFILE_UNEXPECTED_PAREN =
+        'syntax error, unexpected token "(", expecting ")"';
 
     /** Mixing `|` and `&` in one catch type list is a parse error in php-src. */
     public const MIXED_UNION_INTERSECTION_MESSAGE =
@@ -53,7 +57,7 @@ final class CatchIntersectionSupport
         if (ReferenceProfileTokenScan::exceedsTokenScanBudget($code)) {
             return null;
         }
-        if (!str_contains($code, '&') || !preg_match('/\bcatch\b/i', $code)) {
+        if (!preg_match('/\bcatch\b/i', $code)) {
             return null;
         }
 
@@ -63,6 +67,13 @@ final class CatchIntersectionSupport
             $hasOr = false;
             for ($i = $span['open'] + 1; $i < $span['close']; ++$i) {
                 $text = self::tokenText($tokens[$i]);
+                // Nested `(` is never legal in catch_name_list (Zend: unexpected "(").
+                if ('(' === $text) {
+                    return [
+                        'line' => self::tokenLineAt($tokens, $i),
+                        'message' => self::REFERENCE_PROFILE_UNEXPECTED_PAREN,
+                    ];
+                }
                 if ('&' === $text) {
                     $hasAnd = true;
                 } elseif ('|' === $text) {
@@ -72,6 +83,7 @@ final class CatchIntersectionSupport
             if (!$hasAnd) {
                 continue;
             }
+            // php-src never accepts `&` in catch lists (#28439).
             if ($hasOr || !CompilerVersion::supportsCatchIntersectionTypes()) {
                 return [
                     'line' => self::tokenLineAt($tokens, $span['open']),
@@ -87,6 +99,8 @@ final class CatchIntersectionSupport
 
     /**
      * Rewrite `catch (A&B $e)` → `catch (A|B $e)` and queue intersection flags.
+     *
+     * No-op while {@see CompilerVersion::supportsCatchIntersectionTypes()} is false (#28439).
      */
     public static function rewrite(string $code): string
     {

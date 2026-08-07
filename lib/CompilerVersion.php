@@ -4122,14 +4122,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.1+ catch intersection types `catch (A&B $e)` (#28205).
+     * Catch intersection types `catch (A&B $e)` — always false (php-src-strict).
      *
-     * php-parser 4.x rejects `&` in catch lists; {@see Ast\CatchIntersectionSupport} rewrites.
-     * php-src: Zend/zend_language_parser.y catch_list; intersection types RFC (8.1).
+     * php-src `catch_name_list` allows only `|` (union), never `&` (#28439; #28205 was inverted).
+     * {@see Ast\CatchIntersectionSupport} rejects `&` / parenthesized catch types like Zend.
+     * php-src: Zend/zend_language_parser.y catch_name_list.
      */
     public static function supportsCatchIntersectionTypes(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.1.0', '>=');
+        return false;
     }
 
     /**

@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Ast\CatchIntersectionSupport;
+use PHPCompiler\Compiler\CompileFatal;
+
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for catch intersection types (issue #28205). */
+/**
+ * Catch intersection rejected like Zend (#28439; #28205 was inverted).
+ */
 final class CatchIntersectionTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -24,25 +29,52 @@ final class CatchIntersectionTest extends BaseTest
         );
     }
 
-    public function testCatchIntersectionTypeListLowering(): void
+    public function testCatchIntersectionRejectedAsParseError(): void
     {
         $code = <<<'PHP'
 <?php
-class A extends Exception implements Countable {
-    public function count(): int { return 0; }
-}
-try {
-    throw new A();
-} catch (Countable&Throwable $e) {
-    echo "ok";
-}
+interface A {}
+interface B {}
+class E extends Exception implements A, B {}
+try { throw new E("x"); }
+catch (A&B $e) { echo "caught"; }
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(CatchIntersectionSupport::REFERENCE_PROFILE_UNEXPECTED_AMPERSAND);
+        (new Runtime(Runtime::MODE_NORMAL))->parseAndCompile($code, 'catch_intersection_reject.php');
+    }
+
+    public function testParenthesizedCatchIntersectionRejected(): void
+    {
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+class E extends Exception implements A, B {}
+try { throw new E("x"); }
+catch ((A&B) $e) { echo "caught"; }
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(CatchIntersectionSupport::REFERENCE_PROFILE_UNEXPECTED_PAREN);
+        (new Runtime(Runtime::MODE_NORMAL))->parseAndCompile($code, 'catch_paren_reject.php');
+    }
+
+    public function testUnionCatchStillWorks(): void
+    {
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+class E extends Exception implements A, B {}
+try { throw new E("x"); }
+catch (A|B $e) { echo "caught"; }
 PHP;
         $runtime = new Runtime(Runtime::MODE_NORMAL);
-        $block = $runtime->parseAndCompile($code, 'catch_intersection_unit.php');
+        $block = $runtime->parseAndCompile($code, 'catch_union_ok.php');
         $this->assertNotNull($block);
-        $catch = $this->findFirstOpcode($block, OpCode::TYPE_CATCH);
-        $this->assertNotNull($catch);
-        $this->assertSame('countable&throwable', $catch->catchTypes);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('caught', ob_get_clean());
     }
 
     public function testParamIntersectionUnchanged(): void
@@ -62,28 +94,5 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         $this->assertSame('1', $out);
-    }
-
-    private function findFirstOpcode(Block $block, int $opcode): ?OpCode
-    {
-        foreach ($block->opCodes as $op) {
-            if ($opcode === $op->type) {
-                return $op;
-            }
-            if (null !== $op->block1) {
-                $found = $this->findFirstOpcode($op->block1, $opcode);
-                if (null !== $found) {
-                    return $found;
-                }
-            }
-            if (null !== $op->block2) {
-                $found = $this->findFirstOpcode($op->block2, $opcode);
-                if (null !== $found) {
-                    return $found;
-                }
-            }
-        }
-
-        return null;
     }
 }

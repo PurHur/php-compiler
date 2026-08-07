@@ -106,8 +106,8 @@ class OpCode {
     /**
      * Catch handler entry (issue #57, multi-type #1362).
      * block1 = catch body; block2 = merge after try/catch.
-     * catchTypes = pipe-separated lowercase caught class names (`a|b`);
-     * intersection catch uses `&` (`a&b`, #28205).
+     * catchTypes = pipe-separated lowercase caught class names (`a|b`).
+     * Encoded `&` (`a&b`) is not produced under php-src-strict (#28439).
      * arg3 = catch variable scope slot in catch body, or null.
      */
     const TYPE_CATCH = 93;
@@ -290,7 +290,7 @@ class OpCode {
     public bool $classIsAbstract = false;
     /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */
     public ?\PHPCompiler\Compiler\DeprecatedMetadata $deprecatedMetadata = null;
-    /** Pipe-/ampersand-separated lowercase catch class names for TYPE_CATCH (#1362, #28205). */
+    /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362; `&` unused under php-src-strict #28439). */
     public ?string $catchTypes = null;
     /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
     public ?string $instanceofUnionTypes = null;
