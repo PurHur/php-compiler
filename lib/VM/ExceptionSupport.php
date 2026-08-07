@@ -254,7 +254,14 @@ final class ExceptionSupport
         if (array_key_exists($messageArgIndex + 2, $frame->calledArgs)) {
             $prevArg = $frame->calledArgs[$messageArgIndex + 2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $prevArg->type) {
-                self::setExceptionPrevious($receiver, $prevArg);
+                // Zend: ?Throwable $previous — TypeError, not LogicException (#28798).
+                self::setExceptionPrevious(
+                    $receiver,
+                    $prevArg,
+                    $receiver->class->name,
+                    2,
+                    $frame->vmContext ?? $frame->parent?->vmContext
+                );
             }
         }
         $receiver->constructed = true;
@@ -350,7 +357,14 @@ final class ExceptionSupport
         if (array_key_exists(6, $frame->calledArgs)) {
             $prevArg = $frame->calledArgs[6]->resolveIndirect();
             if (Variable::TYPE_NULL !== $prevArg->type) {
-                self::setExceptionPrevious($receiver, $frame->calledArgs[6]);
+                // Zend: ?Throwable $previous — Argument #6 (#28798).
+                self::setExceptionPrevious(
+                    $receiver,
+                    $prevArg,
+                    $receiver->class->name,
+                    5,
+                    $frame->vmContext ?? $frame->parent?->vmContext
+                );
             }
         }
         $receiver->constructed = true;
@@ -637,18 +651,41 @@ final class ExceptionSupport
 
     /**
      * Zend zend_exception_set_previous — link $previous when outer has none (#5486).
+     *
+     * Construct call sites pass $constructClassName so a bad $previous raises Zend's
+     * TypeError (`?Throwable`) instead of a host LogicException (#28798).
+     * Internal chain (finally) omits the class name and skips silently on junk.
      */
-    public static function setExceptionPrevious(ObjectEntry $receiver, Variable $previous): void
-    {
+    public static function setExceptionPrevious(
+        ObjectEntry $receiver,
+        Variable $previous,
+        ?string $constructClassName = null,
+        int $previousParamIndex = 2,
+        ?Context $ctx = null
+    ): void {
         $previous = $previous->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $previous->type) {
-            throw new \LogicException('Exception previous must be an object');
+        if (Variable::TYPE_NULL === $previous->type) {
+            return;
+        }
+        $isObject = Variable::TYPE_OBJECT === $previous->type;
+        $implements = $isObject && self::objectImplementsThrowable($previous->toObject(), $ctx);
+        if (!$implements) {
+            if (null === $constructClassName) {
+                // Internal finally-chain: both sides should already be Throwable.
+                return;
+            }
+            throw ParamTypeError::forUserCallWithExpectedType(
+                $constructClassName.'::__construct',
+                $previousParamIndex,
+                'previous',
+                '?Throwable',
+                $previous,
+                '',
+                0
+            );
         }
         if ($receiver === $previous->toObject()) {
             return;
-        }
-        if (!self::objectImplementsThrowable($previous->toObject())) {
-            throw new \LogicException('Exception previous must implement Throwable');
         }
         $slot = $receiver->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
         if (Variable::TYPE_NULL !== $slot->type) {

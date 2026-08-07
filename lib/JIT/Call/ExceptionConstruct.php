@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPLLVM\Value;
@@ -21,9 +24,21 @@ use PHPLLVM\Value;
  * Returns a null value box like other void JIT ctors ({@see ReflectionClassConstruct}) so
  * FUNCCALL_EXEC_RETURN does not replace the `new` object with a bare `__object__*` in a way
  * that loses Throwable typing for subsequent `throw` (#23641).
+ *
+ * `$previous` (?Throwable) is validated and stored (#28798).
  */
 final class ExceptionConstruct implements Call
 {
+    /**
+     * @param string $constructClassName Class used in TypeError wire text (Exception/Error/…)
+     * @param int    $previousArgIndex   Index in $args including $this (3 for Exception/Error, 6 for ErrorException)
+     */
+    public function __construct(
+        private readonly string $constructClassName = 'Exception',
+        private readonly int $previousArgIndex = 3,
+    ) {
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
         if ([] === $args) {
@@ -90,6 +105,21 @@ final class ExceptionConstruct implements Call
             }
         }
 
+        // Zend ?Throwable $previous — TypeError on wrong type (#28798).
+        // Argument #N matches $previousArgIndex ($this is args[0], formals start at 1).
+        if (
+            isset($args[$this->previousArgIndex])
+            && Variable::TYPE_NULL !== $args[$this->previousArgIndex]->type
+        ) {
+            $this->storePreviousOrTypeError(
+                $context,
+                $object,
+                $obj,
+                $decl,
+                $args[$this->previousArgIndex]
+            );
+        }
+
         $object->markObjectConstructed($obj);
 
         // Void ctor result — do not overwrite `new` temp (VM #4540 / ReflectionClassConstruct).
@@ -100,5 +130,77 @@ final class ExceptionConstruct implements Call
         );
 
         return $slot;
+    }
+
+    private function storePreviousOrTypeError(
+        Context $context,
+        mixed $object,
+        Value $obj,
+        string $decl,
+        Variable $previous
+    ): void {
+        $prefix = sprintf(
+            '%s::__construct(): Argument #%d ($previous) must be of type ?Throwable, ',
+            $this->constructClassName,
+            $this->previousArgIndex
+        );
+
+        if (
+            Variable::TYPE_OBJECT !== $previous->type
+            && Variable::TYPE_VALUE !== $previous->type
+        ) {
+            TryCatchHelper::emitCatchableClassError(
+                $context,
+                'TypeError',
+                $prefix.$this->jitTypeLabel($previous).' given'
+            );
+
+            return;
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'exception_prev_check');
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert) {
+            TryCatchHelper::emitCatchableClassError(
+                $context,
+                'TypeError',
+                $prefix.'object given'
+            );
+
+            return;
+        }
+        $func = $insert->getParent();
+        $okBb = $func->appendBasicBlock('exception_prev_ok');
+        $badBb = $func->appendBasicBlock('exception_prev_bad');
+        $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $previous, 'Throwable');
+        $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+            ? $isThrowable->value
+            : $context->helper->loadValue($isThrowable);
+        $context->builder->branchIf($isBool, $okBb, $badBb);
+
+        $context->builder->positionAtEnd($badBb);
+        // Zend wire text uses the runtime class name; compile-time path uses "object"
+        // when the concrete class is not known here (NestedJIT/VM covers literal stdClass).
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'TypeError',
+            $prefix.'object given'
+        );
+
+        $context->builder->positionAtEnd($okBb);
+        $object->storeInstanceProperty($obj, $decl, ExceptionSupport::PROP_PREVIOUS, $previous);
+    }
+
+    private function jitTypeLabel(Variable $value): string
+    {
+        return match ($value->type) {
+            Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_HASHTABLE => 'array',
+            default => 'mixed',
+        };
     }
 }
