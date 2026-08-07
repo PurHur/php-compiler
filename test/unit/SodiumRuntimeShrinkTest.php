@@ -68,4 +68,22 @@ final class SodiumRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('StringSodiumAead.php', $spine);
     }
+
+    /** #27292 — AOT/JIT sodium_crypto_generichash via thin libsodium (peer AEAD #27318). */
+    public function testSodiumGenerichashCallUsesStringSodiumGenerichash(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/sodium/SodiumGenerichashFunction.php');
+        $this->assertStringContainsString('JitSodium::invokeGenerichash', $source);
+        $this->assertStringContainsString('lowerZparamStr', $source);
+        $this->assertStringNotContainsString('JIT is not supported', $source);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSodiumGenerichash.php');
+        $this->assertStringContainsString('crypto_generichash', $bridge);
+        $this->assertStringContainsString('libsodium', $bridge);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('\\FFI::', $bridge);
+
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('StringSodiumGenerichash.php', $spine);
+    }
 }
