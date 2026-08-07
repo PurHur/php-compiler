@@ -944,4 +944,25 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('array', $deflateOpts['type']);
         // Optionality for deflate_init $options is from BuiltinParamNames `options=` (#24568), not InternalArgInfo.
     }
+
+    /**
+     * ext/standard/basic_functions.stub.php — StreamBucket Reflection under PROFILE≥8.4 (#27797).
+     *
+     * @runInSeparateProcess
+     */
+    public function testStreamBucketReflectionStubsUnderProfile84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        $this->assertTrue(CompilerVersion::supportsStreamBucketClass());
+        $this->assertSame('StreamBucket', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_bucket_new'));
+        $this->assertSame('?StreamBucket', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_bucket_make_writeable'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_bucket_append'));
+        $this->assertSame('void', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_bucket_prepend'));
+        $this->assertSame('StreamBucket', BuiltinInternalArgInfo::stubParamTypeOverride('stream_bucket_append', 1));
+        $this->assertSame('StreamBucket', BuiltinInternalArgInfo::stubParamTypeOverride('stream_bucket_prepend', 1));
+        $bucket = BuiltinInternalArgInfo::paramInfoForFunction('stream_bucket_append', 1);
+        $this->assertNotNull($bucket);
+        $this->assertSame('StreamBucket', $bucket['type']);
+    }
 }

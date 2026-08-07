@@ -60,6 +60,20 @@ final class BuiltinInternalArgInfo
      */
     public static function stubReturnTypeLabelForFunction(string $callableLc): ?string
     {
+        // ext/standard/basic_functions.stub.php — StreamBucket shapes on PROFILE≥8.4 (#27797)
+        // ≤8.3 keeps InternalArgInfo resource/object/empty (pre-StreamBucket stubs).
+        if (CompilerVersion::supportsStreamBucketClass()) {
+            $bucketReturn = match ($callableLc) {
+                'stream_bucket_new' => 'StreamBucket',
+                'stream_bucket_make_writeable' => '?StreamBucket',
+                'stream_bucket_append', 'stream_bucket_prepend' => 'void',
+                default => null,
+            };
+            if (null !== $bucketReturn) {
+                return $bucketReturn;
+            }
+        }
+
         return match ($callableLc) {
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',
@@ -448,6 +462,14 @@ final class BuiltinInternalArgInfo
      */
     public static function stubParamTypeOverride(string $callableLc, int $index): ?string
     {
+        // ext/standard/basic_functions.stub.php — StreamBucket $bucket on PROFILE≥8.4 (#27797)
+        if (CompilerVersion::supportsStreamBucketClass()
+            && ('stream_bucket_append' === $callableLc || 'stream_bucket_prepend' === $callableLc)
+            && 1 === $index
+        ) {
+            return 'StreamBucket';
+        }
+
         return match ($callableLc) {
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
