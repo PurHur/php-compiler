@@ -11229,7 +11229,11 @@ class JIT {
 
                         $boundThis = JIT\ClosureHelper::nullCapture($this->context);
                         if (!$isStaticClosure) {
-                            $thisVar = $this->context->variableForScopedName('this');
+                            // Prefer resolveThisVariable so methods that never mention $this in the
+                            // enclosing body still bind via LLVM param 0 / implicitThisArgument
+                            // (#28612 — AOT arrow/closure $this was null and segfaulted on invoke).
+                            $thisVar = $this->resolveThisVariable($block)
+                                ?? $this->context->variableForScopedName('this');
                             if (null !== $thisVar) {
                                 $boundThis = JIT\ClosureHelper::snapshotCapture($this->context, $thisVar);
                             }
@@ -21079,17 +21083,21 @@ class JIT {
     private function resolveThisVariable(Block $block): ?Variable
     {
         if (null === $block->func || null === $block->func->cfg) {
+            if (null !== $this->context->implicitThisArgument) {
+                return $this->context->implicitThisArgument;
+            }
+
             return null;
         }
         foreach ($block->func->cfg->hoistedOperands as $hoisted) {
             if ('this' !== JIT\OperandName::resolve($hoisted)) {
                 continue;
             }
-            if (!$this->context->hasVariableOpInScopes($hoisted)) {
-                return null;
+            if ($this->context->hasVariableOpInScopes($hoisted)) {
+                return $this->context->getVariableFromOpInScopes($hoisted);
             }
-
-            return $this->context->getVariableFromOpInScopes($hoisted);
+            // Hoisted $this not materialized yet — fall through to LLVM param 0.
+            break;
         }
 
         if (null !== $this->context->implicitThisArgument) {
