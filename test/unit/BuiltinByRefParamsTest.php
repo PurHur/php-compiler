@@ -235,8 +235,9 @@ final class BuiltinByRefParamsTest extends TestCase
     {
         $this->assertSame([0], BuiltinByRefParams::forFunction('pcntl_wait'));
         $this->assertSame([0], BuiltinByRefParams::forFunction('PCNTL_WAIT'));
-        $this->assertSame([1], BuiltinByRefParams::forFunction('pcntl_waitpid'));
-        $this->assertSame([1], BuiltinByRefParams::forFunction('PCNTL_WAITPID'));
+        // &$status + &$resource_usage — php-src ext/pcntl/pcntl.stub.php (#19564, #27849)
+        $this->assertSame([1, 3], BuiltinByRefParams::forFunction('pcntl_waitpid'));
+        $this->assertSame([1, 3], BuiltinByRefParams::forFunction('PCNTL_WAITPID'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('pcntl_sigprocmask'));
         $this->assertSame([1], BuiltinByRefParams::forFunction('pcntl_sigtimedwait'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('pcntl_waitid'));

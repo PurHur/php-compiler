@@ -4547,6 +4547,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #27849 — php-src ext/pcntl/pcntl.stub.php */
+    public function testPcntlWaitpidNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('pcntl_waitpid');
+        self::assertSame(['process_id', '&status', 'flags=', '&resource_usage='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'process_id', 'pcntl_waitpid'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'status', 'pcntl_waitpid'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'pcntl_waitpid'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'resource_usage', 'pcntl_waitpid'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'pid', 'pcntl_waitpid'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'pcntl_waitpid'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'rusage', 'pcntl_waitpid'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('pcntl_waitpid'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('pcntl_waitpid'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('pcntl_waitpid', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('pcntl_waitpid', 3));
+        self::assertSame(
+            ['process_id', '&status', 'flags=', '&resource_usage='],
+            BuiltinParamNames::paramNamesForInternalFunction('pcntl_waitpid')
+        );
+    }
+
     /** @covers issue #24563 */
     public function testHashUpdateFileNamedParamsResolve(): void
     {

@@ -892,6 +892,11 @@ final class BuiltinInternalArgInfo
                 4, 5 => '?array',
                 default => null,
             },
+            // ext/pcntl/pcntl.stub.php — &$status / &$resource_usage untyped (InternalArgInfo int/array) (#27849)
+            'pcntl_waitpid' => match ($index) {
+                1, 3 => '',
+                default => null,
+            },
             // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
             'stream_socket_enable_crypto' => 2 === $index ? '?int' : null,
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)

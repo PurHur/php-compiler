@@ -1521,6 +1521,9 @@ final class BuiltinParamNames
             // php-src ext/pcntl/pcntl.stub.php — InternalArgInfo still says signo/handle (#24551)
             case 'pcntl_signal':
                 return ['signal', 'handler', 'restart_syscalls'];
+            // php-src ext/pcntl/pcntl.stub.php — InternalArgInfo still pid/options/rusage (#27849)
+            case 'pcntl_waitpid':
+                return ['process_id', '&status', 'flags=', '&resource_usage='];
             // php-src ext/standard/basic_functions.stub.php — long_options=[]; &$rest_index=null (#25144)
             case 'getopt':
                 return ['short_options', 'long_options=', '&rest_index='];
