@@ -662,6 +662,62 @@ PHP;
     }
 
     /**
+     * @covers issue #28437 — AOT TYPE_EVAL must Fatal on outer-unit final property
+     * override (not emitFalse → redef_ok). VM/JIT already inheritFromParent (#22988).
+     */
+    public function testIssue28437AotEvalOverrideFatalUnderProfile84(): void
+    {
+        $repro = dirname(__DIR__) . '/repro/issue_28437_final_plain_eval_override.php';
+        self::assertFileExists($repro);
+        $code = file_get_contents($repro);
+        self::assertNotFalse($code);
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        // VM: isFinal then inheritFromParent Fatal.
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'issue_28437_vm.php');
+        try {
+            ob_start();
+            $runtime->run($block, false);
+            ob_end_clean();
+            $this->fail('Expected Fatal on eval final property override under PROFILE=8.4 (#28437)');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $out = ob_get_clean();
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+            self::assertStringNotContainsString('redef_ok', (string) $out);
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $out = ob_get_clean();
+            self::assertSame(255, $e->status);
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringNotContainsString('redef_ok', (string) $out);
+        } catch (\CompileError $e) {
+            $out = ob_get_clean();
+            self::assertStringContainsString('isFinal=1', (string) $out);
+            self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+            self::assertStringNotContainsString('redef_ok', (string) $out);
+        }
+
+        // AOT emit path: EvalRuntime must surface CompileFatal before emitFalse (#28437).
+        if (!\PHPCompiler\LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available — VM path covered; AOT emit needs Docker');
+        }
+        try {
+            $aot = new Runtime(Runtime::MODE_AOT);
+            $aotBlock = $aot->parseAndCompile($code, 'issue_28437_aot.php');
+            $aot->jit($aotBlock);
+            $this->fail('Expected CompileFatal during AOT emit of eval final override (#28437)');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+        } catch (\FFI\Exception $e) {
+            $this->markTestSkipped('LLVM FFI unavailable on host: '.$e->getMessage());
+        }
+    }
+
+    /**
      * @covers issue #27818 — trait-imported final plain property: isFinal=1 + child
      * override CompileFatal (same Zend inheritance rules as class-declared finals).
      */
