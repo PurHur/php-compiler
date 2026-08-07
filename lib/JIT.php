@@ -9092,9 +9092,13 @@ class JIT {
                         $this->context,
                         $from
                     );
+                    // Force: php-cfg leaves FuncCall args on dead temps while ARG_SEND is
+                    // remapped to this empty/isset result; empty usages would skip the store
+                    // and ARG_SEND would materialize a null box (AOT var_export NULL, #28622).
                     $this->assignOperandValue(
                         $block->getOperand($op->arg1),
-                        $emptyResult
+                        $emptyResult,
+                        true
                     );
                     break;
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
@@ -9109,7 +9113,7 @@ class JIT {
                         $dimOp,
                         $containerOp
                     );
-                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult, true);
                     break;
                 case OpCode::TYPE_EMPTY_STATIC_PROPERTY:
                     $classOp = $block->getOperand($op->arg2);
@@ -9119,7 +9123,7 @@ class JIT {
                         $classOp,
                         $nameOp
                     );
-                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult, true);
                     break;
                 case OpCode::TYPE_EMPTY_DIMENSION:
                     $containerOp = $block->getOperand($op->arg2);
@@ -9133,7 +9137,7 @@ class JIT {
                         $dimOp,
                         $containerOp
                     );
-                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult, true);
                     break;
                 case OpCode::TYPE_EVAL:
                     JIT\EvalHelper::compile($this, $func, $block, $op);
@@ -9147,7 +9151,7 @@ class JIT {
                             $containerOp,
                             $dimOp
                         );
-                        $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
+                        $this->assignOperandValue($block->getOperand($op->arg1), $issetResult, true);
                         break;
                     }
                     $container = $this->context->getVariableFromOp($containerOp);
@@ -9160,7 +9164,8 @@ class JIT {
                         $containerOp,
                         $op->issetOnProperty
                     );
-                    $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
+                    // Force store: see TYPE_EMPTY above (#28622 / peer #11498).
+                    $this->assignOperandValue($block->getOperand($op->arg1), $issetResult, true);
                     break;
                 case OpCode::TYPE_ITER_RESET:
                     $arrayOp = $block->getOperand($op->arg1);
