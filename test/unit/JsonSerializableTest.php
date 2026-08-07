@@ -9,9 +9,30 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmJson;
 use PHPUnit\Framework\TestCase;
 
-/** JsonSerializable json_encode export (issue #3370). */
+/** JsonSerializable json_encode export (issue #3370) + interface method table (#28561). */
 final class JsonSerializableTest extends TestCase
 {
+    public function testJsonSerializableInterfaceExposesJsonSerialize(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            '<?php echo method_exists(JsonSerializable::class, "jsonSerialize") ? "y" : "n";',
+            'json_serializable_iface.php'
+        );
+        self::assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $out = (string) ob_get_clean();
+        self::assertSame('y', $out);
+
+        $entry = $runtime->vmContext->classes['jsonserializable'] ?? null;
+        self::assertNotNull($entry);
+        self::assertTrue($entry->isInterface);
+        self::assertArrayHasKey('jsonserialize', $entry->abstractMethods);
+        self::assertSame('jsonSerialize', $entry->methodNames['jsonserialize'] ?? null);
+        self::assertTrue(($entry->methodVisibility['jsonserialize'] ?? 0) === \PHPCfg\Func::FLAG_PUBLIC);
+    }
+
     public function testJsonEncodeInvokesJsonSerialize(): void
     {
         $source = <<<'PHP'
