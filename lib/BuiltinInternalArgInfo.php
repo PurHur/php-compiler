@@ -1105,6 +1105,22 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — int|float $timestamp (PHP 8.4+; missing from InternalArgInfo) (#26097)
             'datetime::createfromtimestamp',
             'datetimeimmutable::createfromtimestamp' => 0 === $index ? 'int|float' : null,
+            // ext/pdo/pdo_dbh.stub.php — ?string/?array optionals; InternalArgInfo required string/array (#24590)
+            'pdo::__construct' => match ($index) {
+                0 => 'string',
+                1, 2 => '?string',
+                3 => '?array',
+                default => null,
+            },
+            // ext/pdo/pdo_dbh.stub.php — string $query (InternalArgInfo still statement) (#24590)
+            'pdo::prepare' => 0 === $index ? 'string' : null,
+            // ext/pdo/pdo_dbh.stub.php — query + ?int $fetchMode = null + mixed ...$fetchModeArgs (#24590)
+            'pdo::query' => match ($index) {
+                0 => 'string',
+                1 => '?int',
+                2 => 'mixed',
+                default => null,
+            },
             // ext/pdo/pdo_dbh.stub.php — PHP 8.4+ connect (absent from InternalArgInfo) (#26223)
             'pdo::connect' => match ($index) {
                 0 => 'string',
