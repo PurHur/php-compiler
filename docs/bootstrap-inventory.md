@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7200 |
-| Phase A inventory files (M2 ratio SSOT) | 7200 |
+| PHP files on vm.php path | 7201 |
+| Phase A inventory files (M2 ratio SSOT) | 7201 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23106 |
+| Source constructs flagged (warnings) | 23107 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5781,6 +5781,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketPairIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodium.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodiumAead.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSodiumGenerichash.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSoundex.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSscanfArray.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSscanfByRef.php` | 0 | 1 |
@@ -24816,7 +24817,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/JitSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/sodium/Module.php`
 
@@ -49162,6 +49163,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 15 class method(s)
+
+### `lib/JIT/Builtin/StringSodiumGenerichash.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `lib/JIT/Builtin/StringSoundex.php`
 

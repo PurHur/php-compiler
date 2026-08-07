@@ -9,13 +9,14 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * Shared VM wiring for sodium_crypto_generichash() (php-src ext/sodium/libsodium.c; #15530, #20696).
+ * Shared VM/JIT wiring for sodium_crypto_generichash() (php-src ext/sodium/libsodium.c; #15530, #20696, #27292).
  */
 abstract class SodiumGenerichashFunction extends Internal
 {
@@ -42,6 +43,32 @@ abstract class SodiumGenerichashFunction extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException($this->getName().'() JIT is not supported in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, $this->getName(), 1, 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        $message = JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $args[0],
+            $this->getName(),
+            0,
+            'message'
+        );
+        $key = $context->builder->load($context->constantStringFromString(''));
+        if (\count($args) >= 2) {
+            $key = JitStringBuiltinArg::lowerZparamStr(
+                $context,
+                $args[1],
+                $this->getName(),
+                1,
+                'key'
+            );
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $length = $i64->constInt(VmSodium::CRYPTO_GENERICHASH_BYTES, true);
+        if (\count($args) >= 3) {
+            $length = $this->jitLong($context, $args[2], $this->getName().' length');
+        }
+
+        return JitSodium::invokeGenerichash($context, $message, $key, $length);
     }
 }

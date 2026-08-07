@@ -5554,6 +5554,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketExportStream.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketImportStream.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSodium.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSodiumAead.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringSodiumGenerichash.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSoundex.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSscanfArray.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSscanfByRef.php';
