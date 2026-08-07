@@ -921,6 +921,11 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\mailparse\MailparseExtensionPolicy::isMailparseComplianceCase($name)) {
                 continue;
             }
+            // Functional uploadprogress cases set PHP_COMPILER_ENABLE_UPLOADPROGRESS via --ENV--; phantoms when withheld (#26744).
+            if (!\PHPCompiler\ext\uploadprogress\UploadprogressExtensionPolicy::runsUploadprogressCompliance($name)
+                && \PHPCompiler\ext\uploadprogress\UploadprogressExtensionPolicy::isUploadprogressComplianceCase($name)) {
+                continue;
+            }
             // Functional dba cases set PHP_COMPILER_ENABLE_DBA via --ENV--; phantoms when withheld (#24134).
             if (!\PHPCompiler\ext\dba\DbaExtensionPolicy::runsDbaCompliance($name)
                 && \PHPCompiler\ext\dba\DbaExtensionPolicy::isDbaComplianceCase($name)) {

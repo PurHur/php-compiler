@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7201 |
-| Phase A inventory files (M2 ratio SSOT) | 7201 |
+| PHP files on vm.php path | 7202 |
+| Phase A inventory files (M2 ratio SSOT) | 7202 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23107 |
+| Source constructs flagged (warnings) | 23108 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4703,6 +4703,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/types/is_type.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
 | `ext/uploadprogress/Module.php` | 0 | 3 |
+| `ext/uploadprogress/UploadprogressExtensionPolicy.php` | 0 | 1 |
 | `ext/uploadprogress/VmUploadprogress.php` | 0 | 1 |
 | `ext/uploadprogress/uploadprogress_get_contents.php` | 0 | 2 |
 | `ext/uploadprogress/uploadprogress_get_info.php` | 0 | 2 |
@@ -41709,9 +41710,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uploadprogress/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new uploadprogress_get_info (line 19)
-- new uploadprogress_get_contents (line 20)
+- new uploadprogress_get_info (line 25)
+- new uploadprogress_get_contents (line 26)
 - 1 class method(s)
+
+### `ext/uploadprogress/UploadprogressExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/uploadprogress/VmUploadprogress.php`
 

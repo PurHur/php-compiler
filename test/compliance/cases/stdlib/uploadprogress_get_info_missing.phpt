@@ -1,5 +1,13 @@
 --TEST--
 stdlib uploadprogress_get_info() — missing identifier returns null (#6386, ext/uploadprogress)
+--ENV--
+PHP_COMPILER_ENABLE_UPLOADPROGRESS=1
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\uploadprogress\UploadprogressExtensionPolicy::advertisesExtension()) {
+    die('skip uploadprogress withheld (#26744)');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);
