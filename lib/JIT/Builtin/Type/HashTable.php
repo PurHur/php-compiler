@@ -3872,14 +3872,19 @@ class HashTable extends Type
         $numElements = $this->context->builder->load(
             $this->context->builder->structGep($ht, $map['numElements'])
         );
+        $sizeT = $need->typeOf();
+        // zend_hash: storing at ZEND_LONG_MAX wraps nNextFreeElement to negative (#28762).
+        $maxIdx = $sizeT->constInt(\PHP_INT_MAX, false);
+        $overflowSentinel = $sizeT->constInt(\PHP_INT_MIN, true);
+        $isMax = $this->context->builder->icmp(Builder::INT_EQ, $index, $maxIdx);
+        $advanced = $this->context->builder->select($isMax, $overflowSentinel, $need);
         $updateNext = $this->context->builder->icmp(Builder::INT_UGE, $index, $nextFree);
-        $newNext = $this->context->builder->select($updateNext, $need, $nextFree);
+        $newNext = $this->context->builder->select($updateNext, $advanced, $nextFree);
         $this->context->builder->store(
             $newNext,
             $this->context->builder->structGep($ht, $map['nextFreeElement'])
         );
         if ($countNewElements) {
-            $sizeT = $need->typeOf();
             $one = $sizeT->constInt(1, false);
             $incr = $this->context->builder->zExt(
                 $this->context->builder->not($wasSetBeforeWrite),
@@ -3888,7 +3893,7 @@ class HashTable extends Type
             $newNum = $this->context->builder->addNoSignedWrap($numElements, $incr);
         } else {
             $updateNum = $this->context->builder->icmp(Builder::INT_UGE, $index, $numElements);
-            $newNum = $this->context->builder->select($updateNum, $need, $numElements);
+            $newNum = $this->context->builder->select($updateNum, $advanced, $numElements);
         }
         $this->context->builder->store(
             $newNum,
