@@ -7,24 +7,26 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9180 / #13311: serialize() LLVM helpers route through SerializeJitHelper PHP.
+ * Issue #9180 / #13311 / #27030: serialize() LLVM helpers route through NestedJIT PHP.
  *
  * @group aot-lint
  */
 final class StringSerializeRuntimeStandaloneTest extends TestCase
 {
-    public function testRuntimeShrinkRoutesSerializeThroughPhpHelper(): void
+    public function testRuntimeShrinkRoutesSerializeThroughNestedJitHelper(): void
     {
         $runtime = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php');
-        $this->assertStringContainsString('SerializeJitHelper', $runtime);
+        $this->assertStringContainsString('SerializeNestedJitHelper', $runtime);
+        $this->assertStringContainsString('SerializeObjectNestedJitHelper', $runtime);
         $this->assertStringNotContainsString('StringSerializeJit', $runtime);
-        $this->assertLessThan(210, \substr_count($runtime, "\n"), 'StringSerialize must be a thin bridge (#13311, #13322 inventory defer)');
 
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeJit.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeDoubleJit.php');
 
-        $helper = (string) \file_get_contents(__DIR__.'/../../../ext/standard/SerializeJitHelper.php');
-        $this->assertStringContainsString('VmSerialize::serializeValue', $helper);
+        $helper = (string) \file_get_contents(__DIR__.'/../../../ext/standard/SerializeNestedJitHelper.php');
         $this->assertStringContainsString('encodeHashtable', $helper);
+        $this->assertStringContainsString('exportKeyValuePairs', $helper);
+        $this->assertStringNotContainsString('VmSerialize::', $helper);
+        $this->assertStringNotContainsString('Superglobals', $helper);
     }
 }

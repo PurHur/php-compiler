@@ -1367,7 +1367,8 @@ class Type extends Builtin {
         $fntypeSerializeHashtable = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
-            $this->context->getTypeFromString('__hashtable__*')
+            $this->context->getTypeFromString('__hashtable__*'),
+            $this->context->getTypeFromString('int64')
         );
         $fnSerializeHashtable = $this->context->module->addFunction(
             '__compiler_serialize_hashtable',
@@ -1377,13 +1378,25 @@ class Type extends Builtin {
         $fntypeSerializeValue = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
-            $valuePtr
+            $valuePtr,
+            $this->context->getTypeFromString('int64')
         );
         $fnSerializeValue = $this->context->module->addFunction(
             '__compiler_serialize_value',
             $fntypeSerializeValue
         );
         $this->context->registerFunction('__compiler_serialize_value', $fnSerializeValue);
+        $fntypeSerializeObject = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $strPtr,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $fnSerializeObject = $this->context->module->addFunction(
+            '__compiler_serialize_object',
+            $fntypeSerializeObject
+        );
+        $this->context->registerFunction('__compiler_serialize_object', $fnSerializeObject);
         // Returns __value__* (ArrayPop #12647 / #20785) — not void+out-pointer.
         $fnUnserialize = $this->context->module->addFunction(
             '__compiler_unserialize',

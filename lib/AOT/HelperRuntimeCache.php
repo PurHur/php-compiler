@@ -100,6 +100,12 @@ final class HelperRuntimeCache
         // NestedJIT JsonEncodeNestedJitHelper (Context-free) into the user AOT module.
         'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodevalue' => true,
         'phpcompiler\\ext\\standard\\jsonencodenestedjithelper::encodehashtable' => true,
+        // #27030 — SerializeJitHelper → VmSerialize SIGSEGVs on thin AOT (arrays/objects).
+        // NestedJIT SerializeNestedJitHelper (Context-free) into the user AOT module.
+        'phpcompiler\\ext\\standard\\serializenestedjithelper::encodevalue' => true,
+        'phpcompiler\\ext\\standard\\serializenestedjithelper::encodehashtable' => true,
+        'phpcompiler\\ext\\standard\\serializeobjectnestedjithelper::formatobjectheader' => true,
+        'phpcompiler\\ext\\standard\\serializeobjectnestedjithelper::encodeobjectprops' => true,
         // #27056 — prelinked StrtrArrayJitHelper unit.o still linked the old
         // VmString::strtrArrayFromHashTable path (list-assign / ExternalMethod stubs)
         // and SIGSEGVd after c:main_before_php. Force NestedJIT of the self-contained

@@ -10,11 +10,12 @@ use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * Lowered into JIT/AOT modules for unserialize() runtime (#9163, #20785, php-in-PHP).
+ * Lowered into JIT/AOT modules for unserialize() runtime (#9163, #20785, #27030, php-in-PHP).
  *
  * Thin AOT NestedJIT cannot yet lower full {@see VmUnserializeFormat} or Variable returns.
  * This helper NestedJIT-decodes integer wire (`i:N;`) as a bare int (bridge boxes to
  * `__value__*`). Other payloads return 0 here and need a follow-up NestedJIT slice.
+ * Do not call {@see requireActiveContext} from NestedJIT decode — thin AOT TypeError (#27030).
  * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391).
  * php-src: ext/standard/var_unserializer.c
  */
@@ -25,7 +26,6 @@ final class UnserializeJitHelper
      */
     public static function decode(string $payload): int
     {
-        self::requireActiveContext();
         $len = \strlen($payload);
         if ($len < 4 || 'i' !== $payload[0] || ':' !== $payload[1] || ';' !== $payload[$len - 1]) {
             return 0;
