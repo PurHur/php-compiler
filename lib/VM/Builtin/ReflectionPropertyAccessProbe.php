@@ -15,7 +15,9 @@ use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * ReflectionProperty::{isReadable,isWritable} — PHP 8.4 probes (ext/reflection/php_reflection.c; #13065).
+ * ReflectionProperty::{isReadable,isWritable} — PHP 8.5 probes (ext/reflection/php_reflection.stub.php; #28533).
+ *
+ * Signature: (?string $scope, ?object $object = null): bool
  */
 final class ReflectionPropertyAccessProbe extends VmClassMethod
 {

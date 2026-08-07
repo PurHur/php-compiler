@@ -1450,12 +1450,27 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsReflectionPropertyAccessProbes());
     }
 
-    public function testSupportsReflectionPropertyAccessProbesTrueWhenProfile84(): void
+    public function testSupportsReflectionPropertyAccessProbesTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyAccessProbes());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsReflectionPropertyAccessProbesFalseWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsReflectionPropertyAccessProbes());
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyAccessProbes());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -3332,13 +3347,32 @@ final class CompilerVersionGateTest extends TestCase
     public function testVmRegistersReflectionPropertyAccessProbesOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $runtime = new Runtime();
             $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
             $this->assertNotNull($rp);
             $this->assertTrue(isset($rp->methods['isreadable']));
             $this->assertTrue(isset($rp->methods['iswritable']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterReflectionPropertyAccessProbesOn84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertFalse(isset($rp->methods['isreadable']));
+            $this->assertFalse(isset($rp->methods['iswritable']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

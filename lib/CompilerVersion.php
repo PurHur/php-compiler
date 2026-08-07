@@ -1734,14 +1734,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionProperty::{isReadable,isWritable} (ext/reflection/php_reflection.c, #13065, #13663, #15664).
+     * PHP 8.5+ ReflectionProperty::{isReadable,isWritable} (ext/reflection/php_reflection.stub.php, #28533).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * php-src adds these on PHP 8.5 only — PHP-8.4 stub has neither. Withheld on PROFILE≤8.4
+     * (including forward 8.4). Enable via stable 8.5.0+ or `PHP_COMPILER_PROFILE=8.5`.
      */
     public static function supportsReflectionPropertyAccessProbes(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
