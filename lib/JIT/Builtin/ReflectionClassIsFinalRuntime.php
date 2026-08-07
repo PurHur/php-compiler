@@ -19,6 +19,8 @@ use PHPLLVM\Value;
  * Socket/AddressInfo from sockets.stub.php; #28391;
  * InflateContext/DeflateContext from zlib.stub.php; #28385;
  * HashContext from ext/hash/hash.stub.php; #28384;
+ * OpenSSLCertificate / OpenSSLAsymmetricKey / OpenSSLCertificateSigningRequest
+ * from ext/openssl/openssl.stub.php; #28370;
  * Random\\Randomizer + Engine\\* from random.stub.php; #28387;
  * XMLParser from ext/xml/xml.stub.php; #28386;
  * AllowDynamicProperties/ReturnTypeWillChange/SensitiveParameter/Override/Deprecated
@@ -137,6 +139,10 @@ final class ReflectionClassIsFinalRuntime
             // php-src ext/hash/hash.stub.php — final class HashContext (#28384)
             'HashContext',
             'InflateContext',
+            // php-src ext/openssl/openssl.stub.php — final OpenSSL object classes (#28370)
+            'OpenSSLAsymmetricKey',
+            'OpenSSLCertificate',
+            'OpenSSLCertificateSigningRequest',
             'Random\\Engine\\Mt19937',
             'Random\\Engine\\PcgOneseq128XslRr64',
             'Random\\Engine\\Secure',
