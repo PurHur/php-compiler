@@ -1171,6 +1171,18 @@ final class BuiltinInternalArgInfo
                 2 => '?string',
                 default => null,
             },
+            // ext/dom/php_dom.stub.php — getElementById(string $elementId) / saveHtml/saveXml (#28740)
+            'dom\\document::getelementbyid',
+            'dom\\htmldocument::getelementbyid',
+            'dom\\xmldocument::getelementbyid' => 0 === $index ? 'string' : null,
+            'dom\\htmldocument::savehtml' => 0 === $index ? '?Dom\\Node' : null,
+            'dom\\document::savexml',
+            'dom\\htmldocument::savexml',
+            'dom\\xmldocument::savexml' => match ($index) {
+                0 => '?Dom\\Node',
+                1 => 'int',
+                default => null,
+            },
             // ext/fileinfo/fileinfo.stub.php — ?string $magic_database = null (InternalArgInfo string) (#26181)
             'finfo::__construct' => 1 === $index ? '?string' : null,
             // ext/bcmath/bcmath.stub.php — string|int $num (InternalArgInfo empty) (#24626)

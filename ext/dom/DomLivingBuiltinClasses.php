@@ -457,6 +457,15 @@ final class DomLivingBuiltinClasses
         );
         // Living Dom casing (php-src HTMLDocument/XMLDocument::saveXml; #20556).
         $document->methodNames['savexml'] = 'saveXml';
+        // php-src php_dom.stub.php — Document instance Reflection (#28740).
+        $elementRet = ReflectionTypeSupport::cfgTypeFromLabel('?Dom\\Element');
+        if (null !== $elementRet) {
+            $document->methodReturnDeclaredTypes['getelementbyid'] = $elementRet;
+        }
+        $saveXmlRet = ReflectionTypeSupport::cfgTypeFromLabel('string|false');
+        if (null !== $saveXmlRet) {
+            $document->methodReturnDeclaredTypes['savexml'] = $saveXmlRet;
+        }
         // Document alias of Element::getElementsByClassName — PHP 8.5+ (#27593).
         if (CompilerVersion::supportsDomElementGetElementsByClassName()) {
             $document->methods['getelementsbyclassname'] = new DocumentGetElementsByClassName();
@@ -503,6 +512,17 @@ final class DomLivingBuiltinClasses
         $htmlDocument->methods['savehtml'] = new HtmlDocumentSaveHtml();
         $htmlDocument->methodVisibility['savehtml'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['savehtml'] = 'saveHtml';
+        // php-src php_dom.stub.php — HTMLDocument instance Reflection (#28740).
+        if (null !== $elementRet) {
+            $htmlDocument->methodReturnDeclaredTypes['getelementbyid'] = $elementRet;
+        }
+        $stringRet = ReflectionTypeSupport::cfgTypeFromLabel('string');
+        if (null !== $stringRet) {
+            $htmlDocument->methodReturnDeclaredTypes['savehtml'] = $stringRet;
+        }
+        if (null !== $saveXmlRet) {
+            $htmlDocument->methodReturnDeclaredTypes['savexml'] = $saveXmlRet;
+        }
         self::copySelectedMethods(
             $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
             $htmlDocument,
@@ -541,6 +561,13 @@ final class DomLivingBuiltinClasses
             $xmlDocument->methodReturnDeclaredTypes['createfromstring'] = $xmlDocRet;
             $xmlDocument->methodReturnDeclaredTypes['createfromfile'] = $xmlDocRet;
             $xmlDocument->methodReturnDeclaredTypes['createempty'] = $xmlDocRet;
+        }
+        // Inherited getElementById / saveXml Reflection when looked up on XMLDocument (#28740).
+        if (null !== $elementRet) {
+            $xmlDocument->methodReturnDeclaredTypes['getelementbyid'] = $elementRet;
+        }
+        if (null !== $saveXmlRet) {
+            $xmlDocument->methodReturnDeclaredTypes['savexml'] = $saveXmlRet;
         }
         self::copySelectedMethods(
             $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
