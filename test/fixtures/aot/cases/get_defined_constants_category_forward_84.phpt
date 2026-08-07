@@ -1,10 +1,14 @@
 --TEST--
-AOT: get_defined_constants(category:) on PHP_COMPILER_PROFILE=8.4 (#17436, ext/standard/basic_functions.c)
+AOT: get_defined_constants() rejects $category on PROFILE=8.4 — php-src never shipped it (#28522, re-#17436)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$core = get_defined_constants(category: 'Core');
-echo array_key_exists('PHP_VERSION', $core) ? "ok\n" : "fail\n";
+try {
+    get_defined_constants(category: 'Core');
+    echo "fail\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-ok
+Unknown named parameter $category

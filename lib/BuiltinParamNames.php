@@ -1029,9 +1029,8 @@ final class BuiltinParamNames
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':
-                return \PHPCompiler\CompilerVersion::supportsGetDefinedConstantsCategory()
-                    ? ['categorize', 'category']
-                    : ['categorize'];
+                // php-src Zend/zend_builtin_functions.stub.php — arity 1 on every version (#28522).
+                return ['categorize'];
             case 'get_declared_classes':
             case 'get_declared_interfaces':
             case 'get_declared_traits':

@@ -2335,6 +2335,33 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    /** php-src never shipped $category — withhold on PROFILE=8.4/8.5 too (#28522). */
+    public function testSupportsGetDefinedConstantsCategoryAlwaysFalse(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGetDefinedConstantsCategory());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGetDefinedConstantsCategory());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGetDefinedConstantsCategory());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsGetDefinedFunctionsExcludeDisabledTrueOnReferenceProfile(): void
     {
         $this->assertTrue(CompilerVersion::supportsGetDefinedFunctionsExcludeDisabled());
