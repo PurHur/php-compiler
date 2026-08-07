@@ -1458,6 +1458,8 @@ class Context {
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         // NumberFormatter::format — avoid ExternalMethod silent NULL on thin AOT (#28648).
         $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();
+        // Collator::compare — avoid ExternalMethod silent NULL on thin AOT (#28649).
+        $this->functionProxies['collator::compare'] = new Call\CollatorCompare();
         // finfo::__construct / finfo::file / finfo::buffer — thin AOT MIME sniff (#27196, #28660).
         $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
         $this->functionProxies['finfo::file'] = new Call\FinfoFile();

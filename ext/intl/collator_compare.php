@@ -58,6 +58,6 @@ final class collator_compare extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('collator_compare() is not implemented for JIT in this compiler build (issue #20753)');
+        return JitCollatorCompare::invokeProcedural($context, ...$args);
     }
 }
