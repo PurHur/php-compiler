@@ -842,6 +842,9 @@ final class BuiltinParamNames
             // php-src ext/session/session.stub.php — ?string $id = null; InternalArgInfo still says newid (#23402, #26460)
             case 'session_id':
                 return ['id='];
+            // php-src ext/session/session.stub.php — string $prefix = ""; InternalArgInfo required (#27725)
+            case 'session_create_id':
+                return ['prefix='];
             // php-src ext/session/session.stub.php — open required; close…update_timestamp optional (#23958)
             case 'session_set_save_handler':
                 return [
