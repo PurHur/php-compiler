@@ -719,6 +719,24 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReflectionPropertyParameterIsDeprecatedNeverOnAnyProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyParameterIsDeprecated());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach (['8.2', '8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(
+                CompilerVersion::supportsReflectionPropertyParameterIsDeprecated(),
+                'Parameter/Property isDeprecated phantoms must stay off on PROFILE='.$profile.' (#28529)'
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
     public function testSupportsReflectionPropertyPhp84RawValueApisFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReflectionPropertyPhp84RawValueApis());

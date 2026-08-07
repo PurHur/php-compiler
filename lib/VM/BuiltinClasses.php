@@ -815,6 +815,8 @@ final class BuiltinClasses
             $rparam->methods['issensitiveparameter'] = new ReflectionParameterIsSensitiveParameter();
             $rparam->methodVisibility['issensitiveparameter'] = $pub;
         }
+        // ReflectionParameter::isDeprecated: phantom vs php-src (#28529) — never register.
+        // Builtin class kept for spine; Function/ClassConstant isDeprecated stay gated separately.
         if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
             $rparam->methods['isdeprecated'] = new ReflectionParameterIsDeprecated();
             $rparam->methodVisibility['isdeprecated'] = $pub;
@@ -1245,6 +1247,7 @@ final class BuiltinClasses
             $rp->methods['isdynamic'] = new ReflectionPropertyIsDynamic();
             $rp->methodVisibility['isdynamic'] = $pub;
         }
+        // ReflectionProperty::isDeprecated: phantom vs php-src (#28529) — never register.
         if (CompilerVersion::supportsReflectionPropertyParameterIsDeprecated()) {
             $rp->methods['isdeprecated'] = new ReflectionPropertyIsDeprecated();
             $rp->methodVisibility['isdeprecated'] = $pub;
