@@ -3,6 +3,7 @@ Pdo\Mysql / Pdo\Pgsql subclasses (#20548)
 --ENV--
 PHP_COMPILER_ENABLE_PGSQL=1
 PHP_COMPILER_ENABLE_PDO_MYSQL=1
+PHP_COMPILER_ENABLE_PDO_PGSQL=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
@@ -36,7 +37,14 @@ try {
     PDO::connect('pgsql:host=127.0.0.1;dbname=test');
     echo "pgsql_connect=OK\n";
 } catch (PDOException $e) {
-    echo 'pgsql_connect=', $e->getMessage(), "\n";
+    $msg = $e->getMessage();
+    if (str_contains($msg, 'could not find driver')) {
+        echo "pgsql_connect=could not find driver\n";
+    } elseif (str_contains($msg, 'Connection refused') || str_contains($msg, 'connect')) {
+        echo "pgsql_connect=connect_err\n";
+    } else {
+        echo 'pgsql_connect=', $msg, "\n";
+    }
 }
 
 $drivers = PDO::getAvailableDrivers();
@@ -55,6 +63,6 @@ pgsql_dis=1000
 pgsql_idle=0
 pgsql_esc=true
 mysql_connect=could not find driver
-pgsql_connect=could not find driver
+pgsql_connect=connect_err
 has_mysql_driver=false
-has_pgsql_driver=false
+has_pgsql_driver=true

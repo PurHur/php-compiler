@@ -23,6 +23,9 @@ use PHPCompiler\CompilerVersion;
  * {@see Pdo\Mysql} requires the mysql driver gate ({@see advertisesMysqlSubclass()}; #27332) —
  * PROFILE≥8.4 alone must not invent {@code class_exists('Pdo\\Mysql')} when host Zend has no
  * {@code pdo_mysql}.
+ * {@see Pdo\Pgsql} requires the pgsql driver gate ({@see advertisesPgsqlSubclass()}; #28158) —
+ * PROFILE≥8.4 alone must not invent {@code class_exists('Pdo\\Pgsql')} when host Zend has no
+ * {@code pdo_pgsql}.
  *
  * Logical {@code pdo_pgsql} follows the host {@code extension_loaded('pdo_pgsql')} gate
  * (sqlite-style; #26140) — not the PHP 8.4 {@see Pdo\Pgsql} subclass profile alone —
@@ -153,9 +156,16 @@ final class PdoExtensionPolicy
             && self::advertisesDriverSpecificSubclasses();
     }
 
+    /**
+     * PHP 8.4+ {@see Pdo\Pgsql} subclass (pdo_pgsql.stub.php; #20548 / #28158).
+     *
+     * Requires both the pgsql driver (host pdo_pgsql or ENABLE + libpq) and the
+     * driver-specific subclass profile gate. PROFILE≥8.4 alone must match Zend: no phantom class.
+     */
     public static function advertisesPgsqlSubclass(): bool
     {
-        return self::advertisesDriverSpecificSubclasses();
+        return self::advertisesPgsqlDriver()
+            && self::advertisesDriverSpecificSubclasses();
     }
 
     /** Compliance filenames that exercise pdo_sqlite / sqlite DSN / PDO::sqlite* (#24523). */

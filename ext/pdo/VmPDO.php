@@ -184,9 +184,8 @@ final class VmPDO
      * Legacy PDO::pgsql* driver methods (php-src pgsql_driver.stub.php PDO_PGSql_Ext; #20566).
      *
      * Registered on PDO when the pgsql driver is advertised ({@see PdoExtensionPolicy::advertisesPgsqlDriver()})
-     * or the PHP 8.4 {@see Pdo\Pgsql} surface ships ({@see PdoExtensionPolicy::advertisesPgsqlSubclass()})
-     * so method_exists(PDO::class, 'pgsqlGetPid') matches Zend / #20566. Live libpq
-     * I/O remains #3741 — calls without a pgsql handle throw like the Pdo\Pgsql stubs.
+     * (PHP 8.4 {@see Pdo\Pgsql} requires the same driver gate — #28158) so method_exists(PDO::class, 'pgsqlGetPid')
+     * matches Zend / #20566. Live libpq I/O remains #3741 — calls without a pgsql handle throw like the Pdo\Pgsql stubs.
      * Marked methodNotInherited so Pdo\Mysql / Pdo\Sqlite do not advertise them (#21552).
      */
     public static function registerPgsqlExtensionMethods(ClassEntry $entry): void
