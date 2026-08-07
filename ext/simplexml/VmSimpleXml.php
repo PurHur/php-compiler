@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\simplexml;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\VmDomSimpleXmlBridge;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
@@ -343,6 +344,8 @@ final class VmSimpleXml
      */
     public static function objectIsTruthy(ObjectEntry $entry): bool
     {
+        // php-src sxe_object_cast_ex(_IS_BOOL) → php_sxe_get_first_node (resets on <8.4; #27717).
+        self::maybeImplicitlyResetIterator($entry);
         if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
             $name = SimpleXmlRegistry::attributeNodeName($entry);
 
@@ -882,6 +885,8 @@ final class VmSimpleXml
     public static function elementName(ObjectEntry $entry): string
     {
         self::assertNodeInitialized($entry, 'SimpleXMLElement::getName()');
+        // php-src zim_SimpleXMLElement_getName → php_sxe_get_first_node (resets on <8.4; #27717).
+        self::maybeImplicitlyResetIterator($entry);
         if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
             $name = SimpleXmlRegistry::attributeNodeName($entry);
             $owner = SimpleXmlRegistry::state($entry);
@@ -1040,6 +1045,9 @@ final class VmSimpleXml
     public static function asXml(ObjectEntry $entry, bool $includeDeclaration = false): string|false
     {
         self::assertNodeInitialized($entry, 'SimpleXMLElement::asXML()');
+        // php-src zim_SimpleXMLElement_asXML → php_sxe_get_first_node (resets on <8.4; #27717).
+        // Must run before ATTRLIST early-false — Zend still rewinds then (#27717 attrs LOOP).
+        self::maybeImplicitlyResetIterator($entry);
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return false;
         }
@@ -1494,6 +1502,8 @@ final class VmSimpleXml
 
     public static function textContent(ObjectEntry $entry): string
     {
+        // php-src sxe_object_cast_ex(IS_STRING/IS_LONG/IS_DOUBLE) → get_first_node (resets on <8.4; #27717).
+        self::maybeImplicitlyResetIterator($entry);
         if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
             $name = SimpleXmlRegistry::attributeNodeName($entry);
             $owner = SimpleXmlRegistry::state($entry);
@@ -1867,6 +1877,25 @@ final class VmSimpleXml
             $elements,
             static fn (SimpleXmlNodeState $element): bool => false === strpos($element->name, ':')
         ));
+    }
+
+    /**
+     * Pre-8.4 php-src php_sxe_get_first_node: when iter.type != SXE_ITER_NONE, reset the
+     * iterator (php_sxe_reset_iterator). PHP 8.4+ uses the non-destructive variant so
+     * asXML()/getName()/casts no longer rewind mid-foreach (UPGRADING / #27717).
+     *
+     * Our named-child / children() / attributes() / multi-match views map to non-NONE
+     * iter types; plain element nodes are SXE_ITER_NONE and must not rewind.
+     */
+    private static function maybeImplicitlyResetIterator(ObjectEntry $entry): void
+    {
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+            return;
+        }
+        if (!SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isAttributesView($entry)) {
+            return;
+        }
+        SimpleXmlIteratorStorage::rewind($entry);
     }
 
     /** Detached xpath/node handles throw like php-src "not properly initialized" (#20483). */
