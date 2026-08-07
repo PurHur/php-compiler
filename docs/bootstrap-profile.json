@@ -1555,11 +1555,16 @@
         "ext/mongodb/MongodbExtensionPolicy.php",
         "ext/mongodb/QueryConstruct.php",
         "ext/mongodb/VmMongodb.php",
+        "ext/msgpack/BuiltinClasses.php",
         "ext/msgpack/Module.php",
+        "ext/msgpack/MsgpackConstants.php",
         "ext/msgpack/MsgpackExtensionPolicy.php",
+        "ext/msgpack/VmMessagePack.php",
         "ext/msgpack/VmMsgpack.php",
         "ext/msgpack/msgpack_pack.php",
+        "ext/msgpack/msgpack_serialize.php",
         "ext/msgpack/msgpack_unpack.php",
+        "ext/msgpack/msgpack_unserialize.php",
         "ext/mysqli/BuiltinClasses.php",
         "ext/mysqli/Module.php",
         "ext/mysqli/MysqliClassMethod.php",
@@ -7407,9 +7412,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7173,
+        "inventory_files": 7178,
         "excluded": 0,
-        "eligible": 7173,
+        "eligible": 7178,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
