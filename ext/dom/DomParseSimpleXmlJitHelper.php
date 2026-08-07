@@ -62,14 +62,22 @@ final class DomParseSimpleXmlJitHelper
                 : (false !== stripos($openTag, $attr.'="'.str_replace('"', '', $value).'"')
                     || false !== stripos($openTag, $attr."='".str_replace("'", '', $value)."'"));
             if ($matched) {
-                $close = stripos($xml, '</'.$tag.'>', $gt + 1);
-                if (false !== $close) {
-                    $text = substr($xml, $gt + 1, $close - $gt - 1);
-                    if (0 === $count) {
-                        $firstText = $text;
+                // Self-closing empty elements (e.g. <a id="1"/>) have no </tag> (#28647).
+                // Mirror nthTagTextArgv: count them with empty textContent.
+                if ($gt > $pos && '/' === $xml[$gt - 1]) {
+                    $text = '';
+                } else {
+                    $close = stripos($xml, '</'.$tag.'>', $gt + 1);
+                    if (false === $close) {
+                        $text = '';
+                    } else {
+                        $text = substr($xml, $gt + 1, $close - $gt - 1);
                     }
-                    ++$count;
                 }
+                if (0 === $count) {
+                    $firstText = $text;
+                }
+                ++$count;
             }
             $offset = $pos + 1;
         }
