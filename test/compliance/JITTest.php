@@ -308,13 +308,13 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'connection_status_cli')
                     || str_contains($name, 'parse_url_enum')
                     || str_contains($name, 'property_hook_type_enum')
-                    || str_contains($name, 'exit_status_enum')
                     || str_contains($name, 'socket_type_enum')
                     || str_contains($name, 'ftp_ssl_connect')
                     || str_contains($name, 'ftp_connect')
                     || str_contains($name, 'ftp_fget')
                     || str_contains($name, 'ftp_connection_class'))
-                && !str_contains($name, 'builtin_stub_enums_phantom')) {
+                && !str_contains($name, 'builtin_stub_enums_phantom')
+                && !str_contains($name, 'exit_status_enum')) {
                 continue;
             }
             if (CompilerVersion::supportsBuiltinStubEnums()
@@ -2228,10 +2228,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'property_hook')) {
                 continue;
             }
-            // Builtin enums (PropertyHookType, ExitStatus): VM + enum registration; MCJIT execute gated (#7222, #7294).
-            if (str_contains($name, 'exit_status_enum')) {
-                continue;
-            }
+            // Builtin enums (PropertyHookType): VM + enum registration; MCJIT execute gated (#7222).
+            // ExitStatus phantom retired — exit_status_enum.phpt asserts absence (#28500, re-#28200).
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             // enum_case_name_value: ->name/->value JIT dispatch (#4953); compliance when jit-runtime-probe green (#98).

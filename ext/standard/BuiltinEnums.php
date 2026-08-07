@@ -21,7 +21,7 @@ final class BuiltinEnums
         $before = array_keys($ctx->classes);
         if (CompilerVersion::supportsBuiltinStubEnums()) {
             self::registerPropertyHookType($ctx);
-            self::registerExitStatus($ctx);
+            // ExitStatus retired — php-src never ships it (#28500, re-#28200 / #7294)
             self::registerStringTrimMode($ctx);
             self::registerPadType($ctx);
             self::registerMemoryUsage($ctx);
@@ -158,32 +158,6 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'propertyhooktype';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
-     * PHP 8.4 ExitStatus: int-backed enum for exit()/die() status (#7294).
-     *
-     * php-src: Zend/zend_enum.def — register_exit_status_enum
-     */
-    private static function registerExitStatus(Context $ctx): void
-    {
-        if (isset($ctx->classes['exitstatus'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('ExitStatus');
-        $entry->isEnum = true;
-        $entry->backedType = 'int';
-
-        self::registerBackedEnumCase($entry, 'Success', 0);
-        self::registerBackedEnumCase($entry, 'Failure', 1);
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'exitstatus';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7205 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23252 |
+| Source constructs flagged (warnings) | 23251 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2492,7 +2492,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BrowscapEngine.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 22 |
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
-| `ext/standard/BuiltinEnums.php` | 0 | 22 |
+| `ext/standard/BuiltinEnums.php` | 0 | 21 |
 | `ext/standard/BuiltinIntrospectionPolicy.php` | 0 | 1 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
 | `ext/standard/CaseCompareJitHelper.php` | 0 | 1 |
@@ -27647,23 +27647,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 127)
 - new ClassEntry (line 150)
 - new ClassEntry (line 176)
-- new ClassEntry (line 202)
-- new ClassEntry (line 229)
+- new ClassEntry (line 203)
+- new ClassEntry (line 230)
 - new ClassEntry (line 256)
-- new ClassEntry (line 282)
-- new ClassEntry (line 309)
+- new ClassEntry (line 283)
+- new ClassEntry (line 310)
 - new ClassEntry (line 336)
-- new ClassEntry (line 362)
-- new ClassEntry (line 387)
-- new ClassEntry (line 412)
-- new ClassEntry (line 448)
-- new ClassEntry (line 480)
-- new ClassEntry (line 507)
-- new ClassEntry (line 539)
-- new Variable (line 557)
-- new Variable (line 571)
-- new Variable (line 585)
-- 22 class method(s)
+- new ClassEntry (line 361)
+- new ClassEntry (line 386)
+- new ClassEntry (line 422)
+- new ClassEntry (line 454)
+- new ClassEntry (line 481)
+- new ClassEntry (line 513)
+- new Variable (line 531)
+- new Variable (line 545)
+- new Variable (line 559)
+- 21 class method(s)
 
 ### `ext/standard/BuiltinIntrospectionPolicy.php`
 
@@ -34000,11 +33999,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ScriptExit (line 31)
-- new Error (line 78)
-- new Error (line 93)
-- new Error (line 146)
-- new Error (line 151)
-- 6 class method(s)
+- new Error (line 76)
+- new Error (line 83)
+- new Error (line 136)
+- new Error (line 141)
+- 5 class method(s)
 
 ### `ext/standard/VmFastCgi.php`
 
@@ -49827,7 +49826,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 6813)
 - new Variable (line 6846)
 - new Variable (line 6869)
-- new Variable (line 7255)
+- new Variable (line 7257)
 - 297 class method(s)
 - 8 closure(s)
 

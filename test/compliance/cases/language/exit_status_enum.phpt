@@ -1,20 +1,13 @@
 --TEST--
-Language: ExitStatus builtin enum for exit()/die() (#7294, Zend/zend_enum.def)
+Language: ExitStatus phantom absent under PROFILE=8.4; exit(0) ok (#28500, re-#28200 / #7294)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 var_export(enum_exists('ExitStatus', false));
 echo "\n";
-var_export(ExitStatus::Success->name);
-echo "\n";
-var_export(ExitStatus::Success->value);
-echo "\n";
-var_export(ExitStatus::Failure->value);
-echo "\n";
-exit(ExitStatus::Success);
+exit(0);
 --EXPECT--
-true
-'Success'
-0
-1
+false
 --EXPECT_EXIT--
 0
