@@ -1000,6 +1000,8 @@ final class VmString
                 return '';
             }
         }
+        // Oversize positive length clamps silently in php-src php_substr — including PHP_INT_MAX
+        // (#28556). $warnOnClip is retained for mb_substr callers that still opt in.
         if ($warnOnClip && $length > 0 && $offset + $length > $len) {
             self::emitSubstrTruncatedWarning($frame, $function);
         }

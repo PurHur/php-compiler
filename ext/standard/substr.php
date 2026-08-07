@@ -25,7 +25,10 @@ use PHPLLVM\Value;
 /**
  * substr() for strings with integer offset and optional length (subset of PHP).
  *
- * PHP 8.4+ optional $truncate silences Z_STR_TRUNCATED warnings (#17239, ext/standard/string.c).
+ * php-src `ext/standard/string.c` `php_substr` clamps oversize positive lengths silently —
+ * there is no Z_STR_TRUNCATED / "String is truncated" E_WARNING (#28556; re-#22489).
+ * Forward-profile `$truncate` remains accepted for now (phantom arity — #27749) but must not
+ * enable a clip warning Zend never emits.
  */
 final class substr extends Internal
 {
@@ -55,24 +58,23 @@ final class substr extends Internal
             return;
         }
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'substr', 2, 'offset');
-        $truncate = false;
+        // Accept phantom 4th $truncate on forward profile (#27749) but never warn on clip (#28556).
         if ($supportsTruncate && 4 === $argc) {
-            $truncate = VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'substr', 4, 'truncate');
+            VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'substr', 4, 'truncate');
         }
-        $warnOnClip = $supportsTruncate && !$truncate;
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $length->type) {
-                $frame->returnVar->string(VmString::substr($string, $offsetInt, null, $warnOnClip, $frame));
+                $frame->returnVar->string(VmString::substr($string, $offsetInt, null, false, $frame));
 
                 return;
             }
             $lengthInt = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr', 3, 'length');
-            $frame->returnVar->string(VmString::substr($string, $offsetInt, $lengthInt, $warnOnClip, $frame));
+            $frame->returnVar->string(VmString::substr($string, $offsetInt, $lengthInt, false, $frame));
 
             return;
         }
-        $frame->returnVar->string(VmString::substr($string, $offsetInt, null, $warnOnClip, $frame));
+        $frame->returnVar->string(VmString::substr($string, $offsetInt, null, false, $frame));
     }
 
     public Context $context;
@@ -96,11 +98,10 @@ final class substr extends Internal
                 $argc
             ));
         }
-        $truncate = false;
+        // Phantom 4th $truncate accepted on forward profile (#27749); never emit clip warning (#28556).
         if ($supportsTruncate && 4 === $argc) {
-            $truncate = self::compileTimeBool($context, $args[3]) ?? false;
+            self::compileTimeBool($context, $args[3]);
         }
-        $warnOnClip = $supportsTruncate && !$truncate;
 
         $strLit = $args[0]->compileTimeString ?? null;
         if (null === $strLit
@@ -120,15 +121,15 @@ final class substr extends Internal
                 if (3 === $argc) {
                     // php-src basic_functions.stub.php — ?int $length = null means "to end" (#25749)
                     if (JITVariable::TYPE_NULL === $args[2]->type || ($args[2]->isNullConstant ?? false)) {
-                        $folded = VmString::substr($strLit, $offsetLit, null, $warnOnClip);
+                        $folded = VmString::substr($strLit, $offsetLit, null, false);
                     } else {
                         $lengthLit = self::compileTimeSignedLong($context, $args[2]);
                         if (null !== $lengthLit) {
-                            $folded = VmString::substr($strLit, $offsetLit, $lengthLit, $warnOnClip);
+                            $folded = VmString::substr($strLit, $offsetLit, $lengthLit, false);
                         }
                     }
                 } else {
-                    $folded = VmString::substr($strLit, $offsetLit, null, $warnOnClip);
+                    $folded = VmString::substr($strLit, $offsetLit, null, false);
                 }
                 if (null !== $folded) {
                     if ('' === $strLit && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
@@ -187,45 +188,13 @@ final class substr extends Internal
                 $remaining
             );
             $sliceLen = $context->builder->select($hasLength, $bounded, $toEnd);
-            if ($warnOnClip) {
-                // Truncation warn only for an explicit (non-null) length.
-                $warnChk = BasicBlockHelper::append($context, 'substr_len_warn_chk');
-                $warnSkip = BasicBlockHelper::append($context, 'substr_len_warn_skip');
-                $context->builder->branchIf($hasLength, $warnChk, $warnSkip);
-                $context->builder->positionAtEnd($warnChk);
-                self::maybeEmitJitTruncationWarning($context, $adjustedLen, $remaining);
-                $context->builder->branch($warnSkip);
-                $context->builder->positionAtEnd($warnSkip);
-            }
+            // No Z_STR_TRUNCATED path — php-src clamps silently (#28556).
         } else {
             $sliceLen = $context->builder->sub($len, $start);
             $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
         }
 
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
-    }
-
-    private static function maybeEmitJitTruncationWarning(Context $context, Value $adjustedLen, Value $remaining): void
-    {
-        $zero = JitStringIndex::zero($context);
-        // remaining == 0 (start at/past end): Zend-silent empty result — no warn (#22489)
-        $hasRemaining = $context->builder->icmp(Builder::INT_SGT, $remaining, $zero);
-        $positiveLen = $context->builder->icmp(Builder::INT_SGT, $adjustedLen, $zero);
-        $wouldClip = $context->builder->icmp(Builder::INT_SGT, $adjustedLen, $remaining);
-        $warnCond = $context->builder->and(
-            $hasRemaining,
-            $context->builder->and($positiveLen, $wouldClip)
-        );
-
-        $warnBb = BasicBlockHelper::append($context, 'substr_trunc_warn');
-        $contBb = BasicBlockHelper::append($context, 'substr_trunc_cont');
-        $context->builder->branchIf($warnCond, $warnBb, $contBb);
-
-        $context->builder->positionAtEnd($warnBb);
-        JitBuiltinWarning::emit($context, 'substr(): String is truncated');
-        $context->builder->branch($contBb);
-
-        $context->builder->positionAtEnd($contBb);
     }
 
     private static function compileTimeBool(Context $context, JITVariable $arg): ?bool
