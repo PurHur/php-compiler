@@ -4504,6 +4504,7 @@ require_once __DIR__.'/../../../ext/types/Module.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/uploadprogress/Module.php';
+require_once __DIR__.'/../../../ext/uploadprogress/UploadprogressExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/uploadprogress/VmUploadprogress.php';
 require_once __DIR__.'/../../../ext/uploadprogress/uploadprogress_get_contents.php';
 require_once __DIR__.'/../../../ext/uploadprogress/uploadprogress_get_info.php';
