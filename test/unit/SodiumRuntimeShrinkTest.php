@@ -40,4 +40,32 @@ final class SodiumRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('lowerTrimFamilyString', $source);
         $this->assertStringNotContainsString('JIT is not supported', $source);
     }
+
+    /** #27318 — AOT/JIT xchacha AEAD via thin libsodium LLVM (no NestedJIT FFI). */
+    public function testSodiumAeadXchachaCallUsesStringSodiumAead(): void
+    {
+        $encrypt = (string) file_get_contents(
+            __DIR__.'/../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php'
+        );
+        $decrypt = (string) file_get_contents(
+            __DIR__.'/../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php'
+        );
+        $this->assertStringContainsString('JitSodium::invokeAeadXchachaIetfEncrypt', $encrypt);
+        $this->assertStringContainsString('JitSodium::invokeAeadXchachaIetfDecrypt', $decrypt);
+        $this->assertStringNotContainsString('JIT is not supported', $encrypt);
+        $this->assertStringNotContainsString('JIT is not supported', $decrypt);
+
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSodiumAead.php');
+        $this->assertStringContainsString('crypto_aead_xchacha20poly1305_ietf_encrypt', $runtime);
+        $this->assertStringContainsString('libsodium', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('\\FFI::', $runtime);
+
+        $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
+        $this->assertStringContainsString('libsodium.so.23', $linker);
+        $this->assertStringContainsString('sodiumRuntimeAvailable', $linker);
+
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('StringSodiumAead.php', $spine);
+    }
 }

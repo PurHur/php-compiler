@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7201 |
-| Phase A inventory files (M2 ratio SSOT) | 7201 |
+| PHP files on vm.php path | 7202 |
+| Phase A inventory files (M2 ratio SSOT) | 7202 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23108 |
+| Source constructs flagged (warnings) | 23109 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5782,6 +5782,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSocketImportStream.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketPairIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSodium.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSodiumAead.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSoundex.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSscanfArray.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSscanfByRef.php` | 0 | 1 |
@@ -24817,7 +24818,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/JitSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `ext/sodium/Module.php`
 
@@ -25346,12 +25347,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_keygen.php`
 
@@ -42869,58 +42870,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/VmXmlWriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 31)
-- new XmlWriterOpenMemory (line 32)
-- new XmlWriterOpenURI (line 35)
-- new XmlWriterSetIndent (line 39)
-- new XmlWriterSetIndentString (line 42)
-- new XmlWriterStartDocument (line 45)
-- new XmlWriterStartElement (line 48)
-- new XmlWriterWriteAttribute (line 51)
-- new XmlWriterWriteAttributeNS (line 54)
-- new XmlWriterStartElementNS (line 57)
-- new XmlWriterStartAttributeNS (line 60)
-- new XmlWriterStartAttribute (line 63)
-- new XmlWriterEndAttribute (line 66)
-- new XmlWriterWriteElement (line 69)
-- new XmlWriterWriteElementNS (line 72)
-- new XmlWriterWriteCData (line 75)
-- new XmlWriterStartCData (line 78)
-- new XmlWriterEndCData (line 81)
-- new XmlWriterStartPI (line 84)
-- new XmlWriterEndPI (line 87)
-- new XmlWriterWritePI (line 90)
-- new XmlWriterWriteRaw (line 93)
-- new XmlWriterWriteComment (line 96)
-- new XmlWriterStartComment (line 99)
-- new XmlWriterEndComment (line 102)
-- new XmlWriterStartDtd (line 105)
-- new XmlWriterEndDtd (line 108)
-- new XmlWriterWriteDtd (line 111)
-- new XmlWriterWriteDtdElement (line 114)
-- new XmlWriterStartDtdElement (line 117)
-- new XmlWriterEndDtdElement (line 120)
-- new XmlWriterWriteDtdAttlist (line 123)
-- new XmlWriterStartDtdAttlist (line 126)
-- new XmlWriterEndDtdAttlist (line 129)
-- new XmlWriterStartDtdEntity (line 132)
-- new XmlWriterEndDtdEntity (line 135)
-- new XmlWriterWriteDtdEntity (line 138)
-- new XmlWriterText (line 141)
-- new XmlWriterEndElement (line 144)
-- new XmlWriterFullEndElement (line 147)
-- new XmlWriterEndDocument (line 150)
-- new XmlWriterOutputMemory (line 153)
-- new XmlWriterFlush (line 156)
-- new XmlWriterToMemory (line 161)
-- new XmlWriterToUri (line 164)
-- new XmlWriterToStream (line 167)
-- new XmlWriterState (line 188)
-- new ObjectEntry (line 210)
-- new Error (line 234)
-- new Error (line 247)
-- new Error (line 1355)
-- new Error (line 1359)
+- new ClassEntry (line 32)
+- new XmlWriterOpenMemory (line 33)
+- new XmlWriterOpenURI (line 36)
+- new XmlWriterSetIndent (line 40)
+- new XmlWriterSetIndentString (line 43)
+- new XmlWriterStartDocument (line 46)
+- new XmlWriterStartElement (line 49)
+- new XmlWriterWriteAttribute (line 52)
+- new XmlWriterWriteAttributeNS (line 55)
+- new XmlWriterStartElementNS (line 58)
+- new XmlWriterStartAttributeNS (line 61)
+- new XmlWriterStartAttribute (line 64)
+- new XmlWriterEndAttribute (line 67)
+- new XmlWriterWriteElement (line 70)
+- new XmlWriterWriteElementNS (line 73)
+- new XmlWriterWriteCData (line 76)
+- new XmlWriterStartCData (line 79)
+- new XmlWriterEndCData (line 82)
+- new XmlWriterStartPI (line 85)
+- new XmlWriterEndPI (line 88)
+- new XmlWriterWritePI (line 91)
+- new XmlWriterWriteRaw (line 94)
+- new XmlWriterWriteComment (line 97)
+- new XmlWriterStartComment (line 100)
+- new XmlWriterEndComment (line 103)
+- new XmlWriterStartDtd (line 106)
+- new XmlWriterEndDtd (line 109)
+- new XmlWriterWriteDtd (line 112)
+- new XmlWriterWriteDtdElement (line 115)
+- new XmlWriterStartDtdElement (line 118)
+- new XmlWriterEndDtdElement (line 121)
+- new XmlWriterWriteDtdAttlist (line 124)
+- new XmlWriterStartDtdAttlist (line 127)
+- new XmlWriterEndDtdAttlist (line 130)
+- new XmlWriterStartDtdEntity (line 133)
+- new XmlWriterEndDtdEntity (line 136)
+- new XmlWriterWriteDtdEntity (line 139)
+- new XmlWriterText (line 142)
+- new XmlWriterEndElement (line 145)
+- new XmlWriterFullEndElement (line 148)
+- new XmlWriterEndDocument (line 151)
+- new XmlWriterOutputMemory (line 154)
+- new XmlWriterFlush (line 157)
+- new XmlWriterToMemory (line 162)
+- new XmlWriterToUri (line 165)
+- new XmlWriterToStream (line 168)
+- new XmlWriterState (line 196)
+- new ObjectEntry (line 218)
+- new Error (line 242)
+- new Error (line 255)
+- new Error (line 1363)
+- new Error (line 1367)
 - 69 class method(s)
 
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
@@ -44309,7 +44310,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 28 class method(s)
+- 29 class method(s)
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
 
@@ -44613,7 +44614,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1240)
+- new InternalArgInfo (line 1243)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44629,8 +44630,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2290)
-- new ArgumentCountError (line 2301)
+- new ArgumentCountError (line 2294)
+- new ArgumentCountError (line 2305)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -49170,6 +49171,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 14 class method(s)
 
+### `lib/JIT/Builtin/StringSodiumAead.php`
+
+**Warnings** (review for bootstrap subset):
+- 15 class method(s)
+
 ### `lib/JIT/Builtin/StringSoundex.php`
 
 **Warnings** (review for bootstrap subset):
@@ -52197,7 +52203,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 502)
+- new Variable (line 503)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`

@@ -34,6 +34,9 @@ final class Linker
     /** Appended when libargon2 is present — PasswordJitHelper NestedJIT thin argon2 (#26773). */
     private const ARGON2_LINK_LIB = '-l:libargon2.so.1';
 
+    /** libsodium for thin AEAD LLVM (#27318) — versioned .so like libz (no -dev symlink required). */
+    private const SODIUM_LINK_LIB = '-l:libsodium.so.23';
+
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';
 
@@ -237,6 +240,9 @@ final class Linker
         if (self::argon2RuntimeAvailable()) {
             $libs .= ' '.self::ARGON2_LINK_LIB;
         }
+        if (self::sodiumRuntimeAvailable()) {
+            $libs .= ' '.self::SODIUM_LINK_LIB;
+        }
 
         return $libs;
     }
@@ -247,7 +253,23 @@ final class Linker
         foreach ([
             '/usr/lib/x86_64-linux-gnu/libargon2.so.1',
             '/usr/lib/libargon2.so.1',
-            '/lib/x86_64-linux-gnu/libargon2.so.1',
+        ] as $path) {
+            if (\is_file($path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** libsodium.so.23 for AOT sodium AEAD thin LLVM (#27318). */
+    private static function sodiumRuntimeAvailable(): bool
+    {
+        foreach ([
+            '/usr/lib/x86_64-linux-gnu/libsodium.so.23',
+            '/usr/lib/libsodium.so.23',
+            '/usr/lib/x86_64-linux-gnu/libsodium.so',
+            '/usr/lib/libsodium.so',
         ] as $path) {
             if (\is_file($path)) {
                 return true;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\sodium;
 
 use PHPCompiler\JIT\Builtin\StringSodium;
+use PHPCompiler\JIT\Builtin\StringSodiumAead;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -12,6 +13,26 @@ use PHPLLVM\Value;
 /** LLVM lowering for sodium builtins via __compiler_sodium_* runtime (#13078). */
 final class JitSodium
 {
+    public static function invokeAeadXchachaIetfEncrypt(
+        Context $context,
+        Value $message,
+        Value $additionalData,
+        Value $nonce,
+        Value $key
+    ): Value {
+        return StringSodiumAead::invokeEncrypt($context, $message, $additionalData, $nonce, $key);
+    }
+
+    public static function invokeAeadXchachaIetfDecrypt(
+        Context $context,
+        Value $ciphertext,
+        Value $additionalData,
+        Value $nonce,
+        Value $key
+    ): Value {
+        return StringSodiumAead::invokeDecrypt($context, $ciphertext, $additionalData, $nonce, $key);
+    }
+
     public static function invoke(
         Context $context,
         string $name,
