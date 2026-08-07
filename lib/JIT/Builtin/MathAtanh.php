@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitAtanhKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for atanh() via AtanhJitHelper PHP (#15221, #27058).
+ * JIT/AOT link for atanh() via AtanhJitHelper PHP (#15221, #27058, #28377).
  *
- * Embed + thin standalone AOT: {@see AtanhJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27005 cosh shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering AtanhJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathAsinh #28355 / MathAcosh #28331 shape).
+ * NestedJIT no longer needs a libc atanh(3) kernel — helper uses NestedJIT-safe log.
  * php-src: ext/standard/math.c — PHP_FUNCTION(atanh)
  */
 final class MathAtanh
@@ -45,10 +42,6 @@ final class MathAtanh
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitAtanhKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathAtanh
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_ATANH);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_ATANH, $probe);
@@ -80,7 +69,7 @@ final class MathAtanh
             self::ATANH_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27058'
+            '#28377'
         );
     }
 }

@@ -90,7 +90,7 @@ final class AsinhRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
         $this->assertStringNotContainsString('phpc_asinh_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
-        $this->assertStringContainsString('phpc_atanh_kernel', $source);
+        $this->assertStringNotContainsString('phpc_atanh_kernel', $source);
         $this->assertStringContainsString('phpc_atan_kernel', $source);
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
         $this->assertStringContainsString('phpc_expm1_kernel', $source);

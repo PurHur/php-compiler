@@ -688,7 +688,6 @@ class Module extends ModuleAbstract
             new phpc_tanh_kernel(),
             new phpc_atan_kernel(),
             new phpc_atan2_kernel(),
-            new phpc_atanh_kernel(),
             new phpc_expm1_kernel(),
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
