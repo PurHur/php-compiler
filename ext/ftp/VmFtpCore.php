@@ -37,9 +37,41 @@ final class VmFtpCore
      */
     private static array $state = [];
 
+    /**
+     * JIT/AOT ftp_connect owned libc fds keyed by object address (#27393).
+     *
+     * @var array<int, array{fd: int, port: int, timeout: int, closed: bool}>
+     */
+    private static array $jitOwned = [];
+
     public static function connect(string $hostname, int $port, int $timeout, Context $ctx): Variable|false
     {
         return self::openConnection($hostname, $port, $timeout, $ctx, false);
+    }
+
+    /**
+     * ftp_connect() under JIT/AOT — owned TCP fd keyed by object address (#27393).
+     */
+    public static function registerJitOwnedFd(int $objAddr, int $fd, int $port, int $timeout): void
+    {
+        if ($objAddr <= 0 || $fd < 0) {
+            return;
+        }
+        self::$jitOwned[$objAddr] = [
+            'fd' => $fd,
+            'port' => $port,
+            'timeout' => $timeout > 0 ? $timeout : 90,
+            'closed' => false,
+        ];
+    }
+
+    public static function jitOwnedFdForLookupKey(int $key): ?int
+    {
+        if ($key <= 0 || !isset(self::$jitOwned[$key]) || self::$jitOwned[$key]['closed']) {
+            return null;
+        }
+
+        return self::$jitOwned[$key]['fd'];
     }
 
     public static function sslConnect(string $hostname, int $port, int $timeout, Context $ctx): Variable|false
