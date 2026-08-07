@@ -9026,8 +9026,14 @@ class Compiler {
             return;
         }
         $constName = $nameOp instanceof Operand\Literal ? (string) $nameOp->value : 'constant';
+        $className = $this->compilingClassDisplayName;
         try {
-            TypeCheck::assertClassConstantTypedValue($value, $block->constants[$typeSlot], $constName);
+            TypeCheck::assertClassConstantTypedValue(
+                $value,
+                $block->constants[$typeSlot],
+                $constName,
+                $className
+            );
         } catch (\TypeError $e) {
             $this->throwCompileError($e->getMessage());
         }

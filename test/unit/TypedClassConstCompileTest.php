@@ -169,8 +169,38 @@ class C { const string X = 123; }
 PHP;
             $runtime = new Runtime();
             $this->expectException(\CompileError::class);
-            $this->expectExceptionMessage('Cannot assign int to class constant X of type string');
+            $this->expectExceptionMessage(
+                'Cannot use int as value for class constant C::X of type string'
+            );
             $runtime->parseAndCompile($code, 'issue_23757_typed_class_const_mismatch.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #28501 — Zend wording includes Class::CONST (#28501 / zend_compile.c). */
+    public function testTypedClassConstantTypeMismatchMatchesZendWording(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require forward profile 8.3+ (#28501)');
+            }
+            $code = <<<'PHP'
+<?php
+class D { public const string NAME = 1; }
+PHP;
+            $runtime = new Runtime();
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Cannot use int as value for class constant D::NAME of type string'
+            );
+            $runtime->parseAndCompile($code, 'issue_28501_typed_class_const_mismatch.php');
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

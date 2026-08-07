@@ -395,12 +395,38 @@ final class TypeCheck
     }
 
     /**
+     * Zend typed class-constant mismatch (zend_compile.c):
+     * "Cannot use {given} as value for class constant {Class}::{NAME} of type {expected}" (#28501).
+     */
+    public static function classConstantTypeMismatchMessage(
+        string $given,
+        string $expected,
+        ?string $constName = null,
+        ?string $className = null
+    ): string {
+        $qualified = null;
+        if (null !== $constName && '' !== $constName) {
+            if (null !== $className && '' !== $className) {
+                $qualified = ltrim($className, '\\').'::'.$constName;
+            } else {
+                $qualified = $constName;
+            }
+        }
+        if (null !== $qualified) {
+            return "Cannot use {$given} as value for class constant {$qualified} of type {$expected}";
+        }
+
+        return "Cannot use {$given} as value for class constant of type {$expected}";
+    }
+
+    /**
      * PHP 8.3 typed class constants: strict match; int literal allowed for float (zend_compile.c, #4541).
      */
     public static function assertClassConstantValue(
         Variable $value,
         int $constraint,
-        ?string $constName = null
+        ?string $constName = null,
+        ?string $className = null
     ): void {
         $target = $value->resolveIndirect();
         if (self::isExactType($target, $constraint)) {
@@ -413,11 +439,13 @@ final class TypeCheck
         }
         $expected = self::typeName($constraint);
         $given = self::typeName($target->type);
-        if (null !== $constName && '' !== $constName) {
-            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
-        }
 
-        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
+        throw new \TypeError(self::classConstantTypeMismatchMessage(
+            $given,
+            $expected,
+            $constName,
+            $className
+        ));
     }
 
     /**
@@ -429,7 +457,7 @@ final class TypeCheck
         ?string $constName = null
     ): void {
         try {
-            self::assertClassConstantTypedValue($value, $typeMeta, $constName);
+            self::assertClassConstantTypedValue($value, $typeMeta, $constName, null);
         } catch (\TypeError $e) {
             throw new \TypeError(str_replace('class constant', 'constant', $e->getMessage()), $e->getCode(), $e);
         }
@@ -441,14 +469,16 @@ final class TypeCheck
     public static function assertClassConstantTypedValue(
         Variable $value,
         Variable $typeMeta,
-        ?string $constName = null
+        ?string $constName = null,
+        ?string $className = null
     ): void {
         if (null !== $typeMeta->unionTypeConstraints) {
             self::assertClassConstantUnionValue(
                 $value,
                 $typeMeta->unionTypeConstraints,
                 $constName,
-                $typeMeta->declaredTypeLabel
+                $typeMeta->declaredTypeLabel,
+                $className
             );
 
             return;
@@ -461,7 +491,12 @@ final class TypeCheck
             ) {
                 return;
             }
-            self::assertClassConstantValue($value, $typeMeta->typeConstraint, $constName);
+            self::assertClassConstantValue(
+                $value,
+                $typeMeta->typeConstraint,
+                $constName,
+                $className
+            );
         }
     }
 
@@ -472,7 +507,8 @@ final class TypeCheck
         Variable $value,
         array $constraints,
         ?string $constName = null,
-        ?string $typeLabel = null
+        ?string $typeLabel = null,
+        ?string $className = null
     ): void {
         if ([] === $constraints) {
             return;
@@ -482,7 +518,7 @@ final class TypeCheck
             $trial = new Variable();
             $trial->copyFrom($target);
             try {
-                self::assertClassConstantValue($trial, $constraint, null);
+                self::assertClassConstantValue($trial, $constraint, null, null);
                 $value->copyFrom($trial);
 
                 return;
@@ -492,11 +528,13 @@ final class TypeCheck
         }
         $expected = $typeLabel ?? 'mixed';
         $given = self::typeName($target->type);
-        if (null !== $constName && '' !== $constName) {
-            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
-        }
 
-        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
+        throw new \TypeError(self::classConstantTypeMismatchMessage(
+            $given,
+            $expected,
+            $constName,
+            $className
+        ));
     }
 
     public static function assertVoidReturn(?Variable $value): void
