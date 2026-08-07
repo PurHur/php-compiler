@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
@@ -18,15 +20,15 @@ use PHPLLVM\Value;
  *
  * php-src: ext/hash/hash_hkdf.c / hash.stub.php — Z_PARAM_STR algo/key/info/salt.
  * Non-strict null is E_DEPRECATED + '' on 8.4 (re-#21079 / #21319); empty key → ValueError (#19341).
+ * Excess argc → ArgumentCountError (#28315).
  */
 final class hash_hkdf extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/hash/hash.stub.php — ArgumentCountError (#28315).
+        $this->requireArgCountRange($frame, 'hash_hkdf', 2, 5);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('hash_hkdf() requires two to five arguments in this compiler build');
-        }
         // Soft-null then empty-key ValueError (#21319 / #19341).
         $algo = self::vmZparamStrArg($frame, 0, 'algo');
         $key = self::vmZparamStrArg($frame, 1, 'key');
@@ -66,8 +68,18 @@ final class hash_hkdf extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 5) {
-            throw new \LogicException('hash_hkdf() requires two to five arguments in this compiler build');
+        $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer hash_equals #28315.
+        if ($argc < 2 || $argc > 5) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 2
+                    ? \sprintf('hash_hkdf() expects at least 2 arguments, %d given', $argc)
+                    : \sprintf('hash_hkdf() expects at most 5 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
         $length = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[2])) {
