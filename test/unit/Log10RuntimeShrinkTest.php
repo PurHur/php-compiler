@@ -8,10 +8,12 @@ use PHPCompiler\ext\standard\Log10JitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** log10() JIT: always Log10JitHelper via JitVmHelperLink + phpc_log10_kernel (#15101, #27047). */
+/**
+ * log10() NestedJIT via JitVmHelperLink::ensureBridge (#28642 / peer #28574).
+ */
 final class Log10RuntimeShrinkTest extends TestCase
 {
-    public function testLog10UsesJitHelperNotLibcLookup(): void
+    public function testLog10UsesJitHelperNotKernel(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/log10.php');
         $this->assertStringContainsString('MathLog10::invoke', $builtin);
@@ -20,50 +22,69 @@ final class Log10RuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog10.php');
         $this->assertStringContainsString('Log10JitHelper', $bridge);
         $this->assertStringContainsString('phpc_log10', $bridge);
-        $this->assertStringContainsString('JitLog10Kernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitLog10Kernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
     }
 
-    public function testLog10JitHelperDelegatesToKernel(): void
+    public function testLog10JitHelperInlinesNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Log10JitHelper.php');
-        $this->assertStringContainsString('phpc_log10_kernel', $source);
-        $this->assertMatchesRegularExpression(
-            '/function log10Argv\(.*?\{[^}]*phpc_log10_kernel/s',
-            $source
-        );
+        $this->assertStringContainsString('logPositive', $source);
+        $this->assertStringContainsString('2.30258509299404568402', $source);
+        $this->assertStringContainsString('2048', $source);
+        $this->assertStringNotContainsString('phpc_log10_kernel', $source);
+        $this->assertStringNotContainsString('while (', $source);
+        $this->assertStringNotContainsString('pack(', $source);
+        $this->assertStringNotContainsString('unpack(', $source);
         $this->assertDoesNotMatchRegularExpression(
             '/function log10Argv\(.*?\{[^}]*VmMath::log10/s',
             $source
         );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function log10Argv\(.*?\{[^}]*\\\\log10\(/s',
+            $source
+        );
 
-        if (!\function_exists('phpc_log10_kernel')) {
-            $this->markTestSkipped('phpc_log10_kernel requires compiler runtime');
-        }
-        $this->assertSame(
-            VmMath::log10(100.0),
-            Log10JitHelper::log10Argv(100.0)
-        );
-        $this->assertSame(
-            VmMath::log10(1.0),
-            Log10JitHelper::log10Argv(1.0)
-        );
+        $this->assertSame(VmMath::log10(1.0), Log10JitHelper::log10Argv(1.0));
+        $this->assertEqualsWithDelta(VmMath::log10(10.0), Log10JitHelper::log10Argv(10.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log10(100.0), Log10JitHelper::log10Argv(100.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log10(0.1), Log10JitHelper::log10Argv(0.1), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log10(2.0), Log10JitHelper::log10Argv(2.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log10(1e-8), Log10JitHelper::log10Argv(1e-8), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log10(1e8), Log10JitHelper::log10Argv(1e8), 1e-12);
+        $this->assertTrue(\is_infinite(Log10JitHelper::log10Argv(0.0)));
+        $this->assertLessThan(0.0, Log10JitHelper::log10Argv(0.0));
+        $this->assertTrue(\is_infinite(Log10JitHelper::log10Argv(\INF)));
+        $this->assertTrue(\is_nan(Log10JitHelper::log10Argv(-\INF)));
+        $this->assertTrue(\is_nan(Log10JitHelper::log10Argv(\NAN)));
+        $this->assertTrue(\is_nan(Log10JitHelper::log10Argv(-1.0)));
     }
 
-    public function testContextAllowlistsLog10KernelForNestedJit(): void
+    public function testLog10KernelFilesRemoved(): void
+    {
+        $root = __DIR__.'/../..';
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitLog10Kernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_log10_kernel.php');
+    }
+
+    public function testContextNoLongerAllowlistsLog10Kernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
-        $this->assertStringContainsString('phpc_log10_kernel', $source);
+        $this->assertStringNotContainsString('phpc_log10_kernel', $source);
+        // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
+        $this->assertStringContainsString('phpc_nextafter_kernel', $source);
     }
 
-    public function testSpineBundleIncludesLog10JitHelper(): void
+    public function testSpineBundleIncludesLog10HelperWithoutKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('Log10JitHelper.php', $spine);
         $this->assertStringContainsString('MathLog10.php', $spine);
-        $this->assertStringContainsString('JitLog10Kernel.php', $spine);
-        $this->assertStringContainsString('phpc_log10_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitLog10Kernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_log10_kernel.php', $spine);
     }
 }
