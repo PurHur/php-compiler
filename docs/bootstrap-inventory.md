@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7216 |
-| Phase A inventory files (M2 ratio SSOT) | 7216 |
+| PHP files on vm.php path | 7220 |
+| Phase A inventory files (M2 ratio SSOT) | 7220 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23310 |
+| Source constructs flagged (warnings) | 23316 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1115,6 +1115,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGrapheme.php` | 0 | 4 |
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
+| `ext/intl/JitNumberFormatterFormat.php` | 0 | 3 |
 | `ext/intl/LocaleAcceptFromHttp.php` | 0 | 2 |
 | `ext/intl/LocaleAddLikelySubtags.php` | 0 | 2 |
 | `ext/intl/LocaleCanonicalize.php` | 0 | 3 |
@@ -1144,6 +1145,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
+| `ext/intl/NumberFormatterFormatJitHelper.php` | 0 | 1 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmBreakIterator.php` | 0 | 66 |
 | `ext/intl/VmCollator.php` | 0 | 55 |
@@ -1330,7 +1332,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/normalizer_is_normalized.php` | 0 | 2 |
 | `ext/intl/normalizer_normalize.php` | 0 | 3 |
 | `ext/intl/numfmt_create.php` | 0 | 3 |
-| `ext/intl/numfmt_format.php` | 0 | 3 |
+| `ext/intl/numfmt_format.php` | 0 | 2 |
 | `ext/intl/numfmt_format_currency.php` | 0 | 3 |
 | `ext/intl/numfmt_get_attribute.php` | 0 | 3 |
 | `ext/intl/numfmt_get_error_code.php` | 0 | 3 |
@@ -5481,6 +5483,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/NumberFormatterFormatRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObGzhandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObGzhandlerJitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
@@ -6063,6 +6066,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/NestedClosureInvoke.php` | 0 | 2 |
 | `lib/JIT/Call/NestedJitCompileScopeIsActiveTrue.php` | 0 | 1 |
 | `lib/JIT/Call/NoOpConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/NumberFormatterFormat.php` | 0 | 1 |
 | `lib/JIT/Call/ObjectCompareSpaceship.php` | 0 | 1 |
 | `lib/JIT/Call/ObjectNestedReceiver.php` | 0 | 1 |
 | `lib/JIT/Call/ParentIteratorConstruct.php` | 0 | 4 |
@@ -6186,7 +6190,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 170 |
+| `lib/JIT/Context.php` | 0 | 171 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -15209,6 +15213,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/intl/JitNumberFormatterFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 47)
+- 3 class method(s)
+
 ### `ext/intl/LocaleAcceptFromHttp.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15584,6 +15595,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 1 class method(s)
+
+### `ext/intl/NumberFormatterFormatJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -16267,35 +16283,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 2229)
 - new ArgumentCountError (line 2265)
 - new Error (line 2273)
-- new ArgumentCountError (line 2305)
-- new Error (line 2313)
-- new ArgumentCountError (line 2342)
-- new Error (line 2350)
-- new ArgumentCountError (line 2405)
-- new Error (line 2413)
-- new ArgumentCountError (line 2466)
-- new Error (line 2474)
-- new ArgumentCountError (line 2506)
-- new Error (line 2514)
-- new ArgumentCountError (line 2538)
-- new Error (line 2546)
-- new ArgumentCountError (line 2574)
-- new Error (line 2582)
-- new ArgumentCountError (line 2606)
-- new Error (line 2614)
-- new ArgumentCountError (line 2642)
-- new Error (line 2650)
-- new ArgumentCountError (line 2674)
-- new Error (line 2682)
-- new ArgumentCountError (line 2709)
-- new Error (line 2717)
-- new ArgumentCountError (line 2740)
-- new Error (line 2748)
-- new ArgumentCountError (line 2775)
-- new Error (line 2783)
-- new ArgumentCountError (line 2804)
-- new Error (line 2812)
-- 76 class method(s)
+- new ArgumentCountError (line 2310)
+- new Error (line 2318)
+- new ArgumentCountError (line 2347)
+- new Error (line 2355)
+- new ArgumentCountError (line 2410)
+- new Error (line 2418)
+- new ArgumentCountError (line 2471)
+- new Error (line 2479)
+- new ArgumentCountError (line 2511)
+- new Error (line 2519)
+- new ArgumentCountError (line 2543)
+- new Error (line 2551)
+- new ArgumentCountError (line 2579)
+- new Error (line 2587)
+- new ArgumentCountError (line 2611)
+- new Error (line 2619)
+- new ArgumentCountError (line 2647)
+- new Error (line 2655)
+- new ArgumentCountError (line 2679)
+- new Error (line 2687)
+- new ArgumentCountError (line 2714)
+- new Error (line 2722)
+- new ArgumentCountError (line 2745)
+- new Error (line 2753)
+- new ArgumentCountError (line 2780)
+- new Error (line 2788)
+- new ArgumentCountError (line 2809)
+- new Error (line 2817)
+- 77 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
 
@@ -17619,7 +17635,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
-- new Error (line 60)
 - 2 class method(s)
 
 ### `ext/intl/numfmt_format_currency.php`
@@ -44781,7 +44796,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1323)
+- new InternalArgInfo (line 1334)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -47792,6 +47807,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/Builtin/NumberFormatterFormatRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ObGzhandler.php`
 
@@ -50882,6 +50902,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/NumberFormatterFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/ObjectCompareSpaceship.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51745,27 +51770,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetTransitions (line 1455)
 - new Call\DateTimeZoneGetName (line 1457)
 - new Call\DateTimeZoneGetOffset (line 1459)
-- new Call\FinfoConstruct (line 1463)
-- new Call\FinfoFile (line 1464)
-- new Call\FinfoBuffer (line 1465)
-- new Call\PdoConstruct (line 1467)
-- new Call\PdoGetAvailableDrivers (line 1468)
-- new Call\PdoQuote (line 1469)
-- new Call\DomXmlDocumentCreateFromString (line 1472)
-- new Call\DomHtmlDocumentCreateFromString (line 1473)
-- new Result (line 1850)
-- new Result (line 1872)
-- new Variable (line 2550)
-- new Variable (line 2722)
-- new Variable (line 2990)
-- new Variable (line 3048)
-- new VMVariable (line 3210)
-- new VMVariable (line 3226)
-- new VMVariable (line 3232)
-- new VMVariable (line 3238)
-- new VMVariable (line 3249)
-- new Variable (line 3279)
-- new Variable (line 3324)
+- new Call\NumberFormatterFormat (line 1463)
+- new Call\FinfoConstruct (line 1465)
+- new Call\FinfoFile (line 1466)
+- new Call\FinfoBuffer (line 1467)
+- new Call\PdoConstruct (line 1469)
+- new Call\PdoGetAvailableDrivers (line 1470)
+- new Call\PdoQuote (line 1471)
+- new Call\DomXmlDocumentCreateFromString (line 1474)
+- new Call\DomHtmlDocumentCreateFromString (line 1475)
+- new Result (line 1852)
+- new Result (line 1874)
+- new Variable (line 2552)
+- new Variable (line 2724)
+- new Variable (line 2992)
+- new Variable (line 3050)
+- new VMVariable (line 3212)
+- new VMVariable (line 3228)
+- new VMVariable (line 3234)
+- new VMVariable (line 3240)
+- new VMVariable (line 3251)
+- new Variable (line 3281)
+- new Variable (line 3326)
 - 111 class method(s)
 - 32 closure(s)
 

@@ -18,6 +18,7 @@ use PHPCompiler\VM;
  * formatters / Collator / MessageFormatter / Transliterator / ResourceBundle / IntlBreakIterator /
  * IntlChar / UConverter / Spoofchecker gate together — no phantom class_exists (#19670, #11768,
  * #17694, #19593, #19594, #6366, #6171, #6139, #6187, #6188, #20035, #20630, #22691).
+ * JIT/AOT: {@see JitNumberFormatterFormat} / {@see NumberFormatterFormatJitHelper} (#28648).
  */
 class Module extends ModuleAbstract
 {
