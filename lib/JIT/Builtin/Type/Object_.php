@@ -4100,7 +4100,7 @@ class Object_ extends Type {
             }
         }
         if ('splpriorityqueue' === $lcname) {
-            // Thin AOT: parallel `__spl_data` / `__spl_prio` + extract (#27277).
+            // Thin AOT: parallel `__spl_data` / `__spl_prio` + Iterator extract-on-next (#27277, #28708).
             $this->ensureTraversableBuiltinInterfaces();
             $this->setClassInterfaces($displayName, ['Countable', 'Iterator']);
             $this->defineProperty($id, \PHPCompiler\VM\SplPriorityQueueJitHelper::PROP_DATA, Variable::TYPE_HASHTABLE);

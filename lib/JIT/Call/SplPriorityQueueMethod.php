@@ -11,7 +11,7 @@ use PHPCompiler\VM\SplPriorityQueueJitHelper;
 use PHPLLVM\Value;
 
 /**
- * SplPriorityQueue thin-AOT methods (#27277, ext/spl/spl_heap.c).
+ * SplPriorityQueue thin-AOT methods (#27277, #28708, ext/spl/spl_heap.c).
  */
 final class SplPriorityQueueMethod implements Call
 {
@@ -45,6 +45,11 @@ final class SplPriorityQueueMethod implements Call
             'extract' => SplPriorityQueueJitHelper::compileExtract($context, $args[0]),
             'top' => SplPriorityQueueJitHelper::compileTop($context, $args[0]),
             'count' => SplPriorityQueueJitHelper::compileCount($context, $args[0]),
+            'rewind' => SplPriorityQueueJitHelper::compileRewind($context, $args[0]),
+            'valid' => SplPriorityQueueJitHelper::compileValid($context, $args[0]),
+            'current' => SplPriorityQueueJitHelper::compileCurrent($context, $args[0]),
+            'key' => SplPriorityQueueJitHelper::compileKey($context, $args[0]),
+            'next' => SplPriorityQueueJitHelper::compileNext($context, $args[0]),
             default => throw new \LogicException(
                 'SplPriorityQueue JIT lowering is not implemented for '.$this->method.'()'
             ),
