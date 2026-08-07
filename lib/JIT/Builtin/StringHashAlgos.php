@@ -9,11 +9,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_hash_algos via HashAlgosJitHelper PHP (#14909, #19355, #20050, #20652).
+ * JIT/AOT link for __compiler_hash_algos via HashAlgosJitHelper PHP (#14909, #19355, #20050, #20652, #28750).
  *
- * Embed + thin standalone AOT: {@see HashAlgosJitHelper} via {@see JitVmHelperLink}
- * (Rename #20603 / password_algos #9908 shape — no thin registry ABI fork).
- * NestedJIT leaf: {@see \PHPCompiler\ext\hash\phpc_hash_algos_kernel} (registry emit in ext/hash).
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (password_algos #9908 / nextafter #28716 shape).
+ * NestedJIT no longer needs a registry kernel — helper returns {@see \PHPCompiler\ext\standard\HashAlgosRegistry}.
  * SSOT for VM: {@see \PHPCompiler\ext\standard\VmHash::algos()}
  * php-src: ext/hash/hash.c — php_hash_algos()
  */
@@ -60,7 +59,7 @@ final class StringHashAlgos
             self::ALGOS_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20652'
+            '#28750'
         );
     }
 }
