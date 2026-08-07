@@ -31,15 +31,17 @@ final class shmop_close extends Internal
 
         ShmopArgs::requireAvailable('shmop_close');
         $object = ShmopArgs::parseShmop($frame, 'shmop_close');
-        $host = ShmopArgs::requireHost($object, 'shmop_close');
-        VmShmop::close($host, $object);
+        VmShmop::closeForObject($object);
         $frame->returnVar->null();
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'shmop_close() is not supported for JIT/AOT in this compiler build (issue #3344)'
-        );
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitShmopClose::emitArgumentCountError($context, $argc);
+        }
+
+        return JitShmopClose::invoke($context, $args[0]);
     }
 }

@@ -40,7 +40,7 @@ final class ShmopArgs
     public static function parseMode(Frame $frame, string $fn, int $index = 1): string
     {
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[$index], $fn, $index, 'mode');
-        if (!\in_array($mode, ['a', 'w', 'c'], true)) {
+        if (!\in_array($mode, ['a', 'w', 'c', 'n'], true)) {
             throw new \ValueError($fn.'(): Argument #'.($index + 1).' ($mode) must be a valid access mode');
         }
 

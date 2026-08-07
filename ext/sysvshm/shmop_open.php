@@ -49,9 +49,12 @@ final class shmop_open extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'shmop_open() is not supported for JIT/AOT in this compiler build (issue #3344)'
-        );
+        $argc = \count($args);
+        if (4 !== $argc) {
+            return JitShmopOpen::emitArgumentCountError($context, $argc);
+        }
+
+        return JitShmopOpen::invoke($context, $args[0], $args[1], $args[2], $args[3]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

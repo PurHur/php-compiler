@@ -32,11 +32,10 @@ final class shmop_read extends Internal
 
         ShmopArgs::requireAvailable('shmop_read');
         $object = ShmopArgs::parseShmop($frame, 'shmop_read');
-        $host = ShmopArgs::requireHost($object, 'shmop_read');
         $start = ShmopArgs::parseOffset($frame, 'shmop_read', 1);
         $count = ShmopArgs::parseCount($frame, 'shmop_read', 2);
 
-        $result = VmShmop::read($host, $start, $count);
+        $result = VmShmop::readForObject($object, $start, $count);
         if (false === $result) {
             $this->triggerWarning($frame, 'shmop_read() failed');
             $frame->returnVar->bool(false);
@@ -49,9 +48,12 @@ final class shmop_read extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'shmop_read() is not supported for JIT/AOT in this compiler build (issue #3344)'
-        );
+        $argc = \count($args);
+        if (3 !== $argc) {
+            return JitShmopRead::emitArgumentCountError($context, $argc);
+        }
+
+        return JitShmopRead::invoke($context, $args[0], $args[1], $args[2]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

@@ -32,9 +32,8 @@ final class shmop_size extends Internal
 
         ShmopArgs::requireAvailable('shmop_size');
         $object = ShmopArgs::parseShmop($frame, 'shmop_size');
-        $host = ShmopArgs::requireHost($object, 'shmop_size');
 
-        $result = VmShmop::size($host);
+        $result = VmShmop::sizeForObject($object);
         if (false === $result) {
             $this->triggerWarning($frame, 'shmop_size() failed');
             $frame->returnVar->bool(false);
@@ -47,9 +46,12 @@ final class shmop_size extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'shmop_size() is not supported for JIT/AOT in this compiler build (issue #3344)'
-        );
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitShmopSize::emitArgumentCountError($context, $argc);
+        }
+
+        return JitShmopSize::invoke($context, $args[0]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

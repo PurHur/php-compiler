@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7176 |
-| Phase A inventory files (M2 ratio SSOT) | 7176 |
+| PHP files on vm.php path | 7187 |
+| Phase A inventory files (M2 ratio SSOT) | 7187 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23084 |
+| Source constructs flagged (warnings) | 23099 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4618,11 +4618,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvsem/sem_get.php` | 0 | 2 |
 | `ext/sysvsem/sem_release.php` | 0 | 2 |
 | `ext/sysvsem/sem_remove.php` | 0 | 2 |
+| `ext/sysvshm/JitShmopClose.php` | 0 | 1 |
+| `ext/sysvshm/JitShmopDelete.php` | 0 | 1 |
+| `ext/sysvshm/JitShmopHandle.php` | 0 | 1 |
+| `ext/sysvshm/JitShmopOpen.php` | 0 | 1 |
+| `ext/sysvshm/JitShmopRead.php` | 0 | 1 |
+| `ext/sysvshm/JitShmopSize.php` | 0 | 1 |
+| `ext/sysvshm/JitShmopWrite.php` | 0 | 1 |
 | `ext/sysvshm/Module.php` | 0 | 14 |
 | `ext/sysvshm/ShmopArgs.php` | 0 | 2 |
+| `ext/sysvshm/ShmopJitHelper.php` | 0 | 2 |
+| `ext/sysvshm/ShmopLibcThinAbi.php` | 0 | 1 |
 | `ext/sysvshm/SysvIpcSerializeDeny.php` | 0 | 3 |
 | `ext/sysvshm/SysvShmArgs.php` | 0 | 2 |
-| `ext/sysvshm/VmShmop.php` | 0 | 4 |
+| `ext/sysvshm/VmShmop.php` | 0 | 7 |
 | `ext/sysvshm/VmSysvShm.php` | 0 | 4 |
 | `ext/sysvshm/shm_attach.php` | 0 | 2 |
 | `ext/sysvshm/shm_detach.php` | 0 | 2 |
@@ -5565,6 +5574,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionUnset.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/SettypeRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ShmopRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 1 |
@@ -5751,6 +5761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringRename.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRmdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringShmop.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
@@ -13827,11 +13838,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/VmHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashContextDebugInfo (line 48)
-- new ObjectEntry (line 132)
-- new Variable (line 152)
-- new ObjectEntry (line 241)
-- new Variable (line 250)
+- new HashContextDebugInfo (line 50)
+- new ObjectEntry (line 134)
+- new Variable (line 154)
+- new ObjectEntry (line 243)
+- new Variable (line 252)
 - 12 class method(s)
 
 ### `ext/hash/VmMhash.php`
@@ -41045,6 +41056,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - 3 class method(s)
 
+### `ext/sysvshm/JitShmopClose.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvshm/JitShmopDelete.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvshm/JitShmopHandle.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
+### `ext/sysvshm/JitShmopOpen.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/sysvshm/JitShmopRead.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvshm/JitShmopSize.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvshm/JitShmopWrite.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/sysvshm/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -41069,6 +41115,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 20)
 - 10 class method(s)
 
+### `ext/sysvshm/ShmopJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 139)
+- 11 class method(s)
+
+### `ext/sysvshm/ShmopLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s)
+
 ### `ext/sysvshm/SysvIpcSerializeDeny.php`
 
 **Warnings** (review for bootstrap subset):
@@ -41085,10 +41142,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sysvshm/VmShmop.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 35)
-- new Variable (line 43)
-- new ObjectEntry (line 44)
-- 12 class method(s)
+- new ClassEntry (line 44)
+- new Variable (line 52)
+- new ObjectEntry (line 53)
+- new Variable (line 110)
+- new ObjectEntry (line 111)
+- new Error (line 258)
+- 23 class method(s)
 
 ### `ext/sysvshm/VmSysvShm.php`
 
@@ -45277,11 +45337,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/FinalClassExtensionCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 67)
-- new DeclarationFinder (line 75)
-- new Traverser (line 76)
-- new Traverser (line 94)
-- new CompileError (line 139)
+- new self (line 69)
+- new DeclarationFinder (line 77)
+- new Traverser (line 78)
+- new Traverser (line 96)
+- new CompileError (line 141)
 - 10 class method(s)
 
 ### `lib/Compiler/FinalMethodOverrideCheck.php`
@@ -48057,6 +48117,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/ShmopRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s)
+
 ### `lib/JIT/Builtin/ShuffleRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48990,6 +49055,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `lib/JIT/Builtin/StringShmop.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSimilarText.php`
 
