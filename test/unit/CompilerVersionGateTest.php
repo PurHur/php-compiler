@@ -430,23 +430,20 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsClassUsesRecursiveFalseOnReferenceProfile(): void
+    public function testSupportsClassUsesRecursiveAlwaysFalse(): void
     {
+        // php-src has class_uses only — class_uses_recursive is a phantom (#28365).
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
-    }
-
-    public function testSupportsClassUsesRecursiveTrueOnForwardProfile(): void
-    {
+        $this->assertFalse(CompilerVersion::advertisesClassUsesRecursive());
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsClassUsesRecursive());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        foreach (['8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsClassUsesRecursive(), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
