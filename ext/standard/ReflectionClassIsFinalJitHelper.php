@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Web\Superglobals;
 
-/** ReflectionClass::isFinal() AOT bridge (#18297). */
+/** ReflectionClass::isFinal() AOT/VM probe helper (#18297). Kept for NestedJIT callers. */
 final class ReflectionClassIsFinalJitHelper
 {
     public static function probe(string $name): bool
@@ -20,6 +20,6 @@ final class ReflectionClassIsFinalJitHelper
         $lc = strtolower(ltrim($name, '\\'));
         $entry = $ctx->classes[$lc] ?? null;
 
-        return null !== $entry && $entry->isFinal;
+        return null !== $entry && ($entry->isFinal || $entry->isEnum);
     }
 }

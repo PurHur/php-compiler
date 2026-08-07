@@ -120,6 +120,55 @@ PHP;
         $this->assertSame("true\nok\n", ob_get_clean());
     }
 
+    /** @covers issue #28135 — php-src 8.4+ final class GMP */
+    public function testExtendGmpFailsUnderForward84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class BadGmp extends GMP {}
+PHP;
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Class BadGmp cannot extend final class GMP');
+            $runtime->parseAndCompile($code, 'extend_gmp.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #28135 */
+    public function testGmpReflectionIsFinalUnderForward84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+var_export((new ReflectionClass(GMP::class))->isFinal());
+echo "\n";
+PHP;
+            $block = $runtime->parseAndCompile($code, 'gmp_isfinal.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame("true\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** @covers issue #26531 */
     public function testExtendUnitEnumFailsAtCompileTime(): void
     {

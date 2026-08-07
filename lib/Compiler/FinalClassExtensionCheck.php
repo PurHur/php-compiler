@@ -129,8 +129,15 @@ final class FinalClassExtensionCheck
                 ? $this->classes[$parentLc]['display']
                 : null;
         }
+        if (isset(self::INTERNAL_FINAL[$parentLc])) {
+            return self::INTERNAL_FINAL[$parentLc];
+        }
+        // php-src 8.4+ `final class GMP` (ext/gmp/gmp.stub.php; #28135) — not in script AST.
+        if ('gmp' === $parentLc && \PHPCompiler\CompilerVersion::supportsGmp()) {
+            return 'GMP';
+        }
 
-        return self::INTERNAL_FINAL[$parentLc] ?? null;
+        return null;
     }
 
     private function operandLcName(Operand $op): ?string
