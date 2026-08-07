@@ -7,16 +7,17 @@ namespace PHPCompiler\ext\ftp;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * ftp_connect() — TCP connect + FTP greeting (php-src ext/ftp/php_ftp.c; #3353).
+ * ftp_connect() — TCP connect + FTP greeting (php-src ext/ftp/php_ftp.c; #3353, #27393).
  *
  * $hostname — nullable internal string: DEP+coerce on 8.4 forward profile (#21757, ext/ftp/ftp.c).
+ *
+ * JIT/AOT: {@see JitFtpConnect} → NestedJIT {@see FtpConnectJitHelper} (#27393).
  */
 final class ftp_connect extends Internal
 {
@@ -67,21 +68,6 @@ final class ftp_connect extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException(\sprintf(
-                'ftp_connect() expects from 1 to 3 arguments, %d given',
-                $argc
-            ));
-        }
-        JitStringBuiltinArg::lowerTrimFamilyString(
-            $context,
-            $args[0],
-            'ftp_connect',
-            0,
-            'hostname'
-        );
-
-        throw new \LogicException('ftp_connect() is not implemented for JIT in this compiler build (issue #3353)');
+        return JitFtpConnect::invoke($context, ...$args);
     }
 }
