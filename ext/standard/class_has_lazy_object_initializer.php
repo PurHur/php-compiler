@@ -14,10 +14,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * class_has_lazy_object_initializer() — PHP 8.4 lazy ghost probe (#6052).
+ * class_has_lazy_object_initializer() — historical free-function lazy ghost probe (#6052).
  *
- * @see Zend/zend_lazy_objects.c — zend_object_is_lazy_without_initializer
- * @see ext/standard/basic_functions.c — PHP_FUNCTION(class_has_lazy_object_initializer)
+ * Never registered: php-src introspects via ReflectionClass::isUninitializedLazyObject /
+ * getLazyInitializer only (#28517). File kept for inventory/spine + internal LazyObjectSupport.
+ *
+ * @see Zend/zend_lazy_objects.c
  */
 final class class_has_lazy_object_initializer extends Internal
 {

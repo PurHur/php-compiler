@@ -1037,15 +1037,14 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'lazy_property_init_once'))) {
                 continue;
             }
-            // lazy_object_factories_phantom always runs — free createLazy* never advertised (#28414).
+            // lazy_object_factories_phantom + class_has_lazy_object_* phantom PHPTs always run (#28414, #28517).
             if (!CompilerVersion::supportsLazyObjectFactories()
                 && (str_contains($name, 'create_lazy_ghost')
                     || str_contains($name, 'create_lazy_proxy')
                     || str_contains($name, 'lazy_ghost_create')
                     || str_contains($name, 'lazy_ghost_trait')
-                    || str_contains($name, 'class_has_lazy_object_initializer')
-                    || str_contains($name, 'class_has_lazy_object_uninitializer')
                     || str_contains($name, 'is_uninitialized_lazy_object')
+                    || str_contains($name, 'lazy_object_introspection')
                     || str_contains($name, 'reflection_lazy_property')
                     || str_contains($name, 'reflection_property_set_raw_without_lazy')
                     || str_contains($name, 'reflection_property_skip_lazy'))

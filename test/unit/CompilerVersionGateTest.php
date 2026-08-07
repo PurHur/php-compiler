@@ -744,6 +744,8 @@ final class CompilerVersionGateTest extends TestCase
             $this->assertTrue(CompilerVersion::supportsLazyObjectFactories());
             // Free-function createLazy* stay off on every profile (#28414).
             $this->assertFalse(CompilerVersion::supportsLazyObjectFreeFunctions());
+            // Free-function class_has_lazy_object_* stay off on every profile (#28517).
+            $this->assertFalse(CompilerVersion::supportsClassHasLazyObjectFreeFunctions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -770,6 +772,32 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $this->assertFalse(CompilerVersion::supportsLazyObjectFreeFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsClassHasLazyObjectFreeFunctionsAlwaysFalse(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassHasLazyObjectFreeFunctions());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsClassHasLazyObjectFreeFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertFalse(CompilerVersion::supportsClassHasLazyObjectFreeFunctions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

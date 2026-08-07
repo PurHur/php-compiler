@@ -86,7 +86,7 @@ PHP;
         $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
     }
 
-    /** @covers issue #6052 */
+    /** @covers issue #6052 / #28517 — free class_has_* phantoms; use ReflectionClass */
     public function testClassHasLazyObjectInitializer(): void
     {
         $runtime = new Runtime();
@@ -95,12 +95,12 @@ PHP;
 class Svc { public string $id = ''; }
 $ref = new ReflectionClass(Svc::class);
 $lazy = $ref->newLazyGhost(function (Svc $o) { $o->id = 'x'; });
-var_export(class_has_lazy_object_initializer($lazy));
+var_export($ref->isUninitializedLazyObject($lazy));
 echo "\n";
-var_export(class_has_lazy_object_initializer(new Svc()));
+var_export($ref->isUninitializedLazyObject(new Svc()));
 echo "\n";
 $ref->markLazyObjectAsInitialized($lazy);
-var_export(class_has_lazy_object_initializer($lazy));
+var_export($ref->isUninitializedLazyObject($lazy));
 echo "\n";
 PHP;
         ob_start();
@@ -117,10 +117,10 @@ PHP;
 class Svc { public string $id = ''; }
 $ref = new ReflectionClass(Svc::class);
 $lazy = $ref->newLazyGhost(function (Svc $o) { $o->id = 'x'; });
-echo class_has_lazy_object_initializer($lazy) ? 'true' : 'false';
+echo $ref->isUninitializedLazyObject($lazy) ? 'true' : 'false';
 echo "\n";
 $lazy->id;
-echo class_has_lazy_object_initializer($lazy) ? 'true' : 'false';
+echo $ref->isUninitializedLazyObject($lazy) ? 'true' : 'false';
 echo "\n";
 PHP;
         ob_start();
@@ -148,7 +148,7 @@ PHP;
         $this->assertSame("true\nfalse\n", ob_get_clean());
     }
 
-    /** @covers issue #6097 */
+    /** @covers issue #6097 / #28517 — free class_has_* phantoms; use ReflectionClass */
     public function testClassHasLazyObjectUninitializer(): void
     {
         $runtime = new Runtime();
@@ -159,17 +159,31 @@ class Svc {
 }
 $ref = new ReflectionClass(Svc::class);
 $lazy = $ref->newLazyProxy(static fn (): Svc => new Svc('proxy'));
-var_export(class_has_lazy_object_uninitializer($lazy));
+var_export($ref->isUninitializedLazyObject($lazy));
 echo "\n";
-var_export(class_has_lazy_object_uninitializer(new Svc('eager')));
+var_export($ref->isUninitializedLazyObject(new Svc('eager')));
 echo "\n";
 $lazy->id;
-var_export(class_has_lazy_object_uninitializer($lazy));
+var_export($ref->isUninitializedLazyObject($lazy));
 echo "\n";
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'class_has_lazy_object_uninitializer.php'));
         $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
+    }
+
+    /** @covers issue #28517 — free class_has_lazy_object_* never registered */
+    public function testClassHasLazyObjectFreeFunctionsAbsent(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo (int) function_exists('class_has_lazy_object_initializer'), "\n";
+echo (int) function_exists('class_has_lazy_object_uninitializer'), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'class_has_lazy_object_phantoms.php'));
+        $this->assertSame("0\n0\n", ob_get_clean());
     }
 
     /** @covers issue #6096 */

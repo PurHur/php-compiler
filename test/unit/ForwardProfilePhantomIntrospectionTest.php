@@ -47,19 +47,30 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsLazyObjectFactories());
             $this->assertFalse(CompilerVersion::supportsLazyObjectFreeFunctions());
+            $this->assertFalse(CompilerVersion::supportsClassHasLazyObjectFreeFunctions());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             $this->assertFalse(isset($ctx->functions['createlazyghost']));
             $this->assertFalse(isset($ctx->functions['createlazyproxy']));
+            $this->assertFalse(isset($ctx->functions['class_has_lazy_object_initializer']));
+            $this->assertFalse(isset($ctx->functions['class_has_lazy_object_uninitializer']));
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'createLazyGhost')
             );
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'createLazyProxy')
             );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'class_has_lazy_object_initializer')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'class_has_lazy_object_uninitializer')
+            );
             $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['newlazyghost']));
             $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['newlazyproxy']));
+            $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['isuninitializedlazyobject']));
+            $this->assertTrue(isset($ctx->classes['reflectionclass']->methods['getlazyinitializer']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

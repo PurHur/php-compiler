@@ -754,7 +754,8 @@ class Module extends ModuleAbstract
                 new create_lazy_ghost(),
                 new create_lazy_proxy(),
             ] : []),
-            ...(CompilerVersion::supportsLazyObjectFactories() ? [
+            // Free-function class_has_lazy_object_* — never advertise (#28517); php-src has ReflectionClass probes only.
+            ...(CompilerVersion::supportsClassHasLazyObjectFreeFunctions() ? [
                 new class_has_lazy_object_initializer(),
                 new class_has_lazy_object_uninitializer(),
             ] : []),
