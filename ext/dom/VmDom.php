@@ -23,6 +23,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VariableObject;
 
@@ -632,6 +633,15 @@ final class VmDom
         $document->methods['loadhtmlfile'] = new DocumentLoadHTMLFile();
         $document->methodVisibility['loadhtmlfile'] = $pub;
         $document->methodNames['loadhtmlfile'] = 'loadHTMLFile';
+        // php-src ext/dom/php_dom.stub.php — load*/loadHTML*: bool (#28713).
+        // InternalArgInfo omits return on load/loadXML and omits $options on loadHTML*.
+        $loadBoolRet = ReflectionTypeSupport::cfgTypeFromLabel('bool');
+        if (null !== $loadBoolRet) {
+            $document->methodReturnDeclaredTypes['load'] = $loadBoolRet;
+            $document->methodReturnDeclaredTypes['loadxml'] = $loadBoolRet;
+            $document->methodReturnDeclaredTypes['loadhtml'] = $loadBoolRet;
+            $document->methodReturnDeclaredTypes['loadhtmlfile'] = $loadBoolRet;
+        }
         $document->methods['createelement'] = new DocumentCreateElement();
         $document->methodVisibility['createelement'] = $pub;
         $document->methods['createelementns'] = new DocumentCreateElementNS();
