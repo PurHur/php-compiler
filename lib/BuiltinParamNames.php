@@ -976,6 +976,9 @@ final class BuiltinParamNames
             // php-src streamsfuncs.stub.php — InternalArgInfo still says stream/want_peer (#23938)
             case 'stream_socket_get_name':
                 return ['socket', 'remote'];
+            // php-src streamsfuncs.stub.php — InternalArgInfo cryptokind/sessionstream (#27684)
+            case 'stream_socket_enable_crypto':
+                return ['stream', 'enable', 'crypto_method=', 'session_stream='];
             // php-src streamsfuncs.stub.php — InternalArgInfo still says fp/buffer (#23939)
             case 'stream_set_write_buffer':
                 return ['stream', 'size'];

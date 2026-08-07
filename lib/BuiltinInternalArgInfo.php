@@ -106,6 +106,8 @@ final class BuiltinInternalArgInfo
             'stream_socket_client' => '',
             // ext/standard/proc_open.stub.php — no return type; InternalArgInfo says resource (#27847)
             'proc_open' => '',
+            // ext/standard/streamsfuncs.stub.php — InternalArgInfo return int (missing |bool) (#27684)
+            'stream_socket_enable_crypto' => 'int|bool',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#25480, #28223)
             'restore_error_handler', 'restore_exception_handler' => 'true',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; PHP 8.4+: true (#28222)
@@ -826,6 +828,8 @@ final class BuiltinInternalArgInfo
                 4, 5 => '?array',
                 default => null,
             },
+            // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
+            'stream_socket_enable_crypto' => 2 === $index ? '?int' : null,
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
             'header_remove' => 0 === $index ? '?string' : null,
             // ext/standard/head.stub.php — &$filename / &$line untyped (InternalArgInfo string/int) (#25381)
