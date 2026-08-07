@@ -168,9 +168,10 @@ final class BuiltinInternalArgInfo
             'inflate_init' => 'InflateContext|false',
             // ext/standard/base64.c + string.stub.php — InternalArgInfo omits |false (#25477)
             'base64_decode', 'hex2bin' => 'string|false',
-            // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471)
+            // ext/fileinfo/fileinfo.stub.php — InternalArgInfo return resource / string (missing |false) (#25471, #28569)
             'finfo_open' => 'finfo|false',
             'finfo_file', 'finfo_buffer' => 'string|false',
+            'finfo_close' => 'bool',
             // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#25510)
             'simplexml_load_string', 'simplexml_load_file' => 'SimpleXMLElement|false',
             // ext/dom/php_dom.stub.php — php-types typo somNode (#26464)
@@ -783,8 +784,9 @@ final class BuiltinInternalArgInfo
             'preg_match', 'preg_match_all' => 2 === $index ? '' : null,
             // ext/standard/basic_functions.stub.php — ?string $encoding = null (InternalArgInfo string) (#24970, #23265)
             'htmlentities', 'htmlspecialchars', 'html_entity_decode' => 2 === $index ? '?string' : null,
-            // ext/fileinfo/fileinfo.stub.php — finfo object + string (InternalArgInfo resource/char) (#25471)
+            // ext/fileinfo/fileinfo.stub.php — finfo object + string (InternalArgInfo resource/char) (#25471, #28569)
             'finfo_open' => 1 === $index ? '?string' : null,
+            'finfo_close' => 0 === $index ? 'finfo' : null,
             'finfo_file', 'finfo_buffer' => match ($index) {
                 0 => 'finfo',
                 1 => 'string',
