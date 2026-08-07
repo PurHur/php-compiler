@@ -9,7 +9,8 @@ namespace PHPCompiler\ext\standard;
  *
  * Pairs {@see VmHttpFetchNative} (thin alias). https:// via {@see VmHttpTlsNative} on adopted socket fd.
  *
- * php-src: ext/standard/http_fopen_wrapper.c — php_stream_url_wrap_http_ex (HTTP/1.1 request line; #28789)
+ * php-src: ext/standard/http_fopen_wrapper.c — php_stream_url_wrap_http_ex
+ * (HTTP/1.1, user_agent, follow_location / max_redirects; #28789 #28792 #28791)
  */
 final class VmHttpFetchPure
 {
@@ -102,7 +103,8 @@ final class VmHttpFetchPure
 
         $statusCode = self::statusCodeFromStatusLine($headers[0]);
         $ignoreErrors = self::httpOptionIgnoreErrors($httpOptions);
-        if (!$ignoreErrors && (null === $statusCode || $statusCode < 200 || $statusCode >= 300)) {
+        // php-src: 3xx responses still yield the body when not followed; 4xx/5xx need ignore_errors (#28791).
+        if (!$ignoreErrors && !self::isFetchableStatus($statusCode)) {
             return false;
         }
 
@@ -149,6 +151,58 @@ final class VmHttpFetchPure
         VmHttpLastResponseHeaders::clear();
         self::$lastOpenFailureDetail = null;
 
+        $follow = self::httpOptionFollowLocation($httpOptions);
+        $maxRedirects = self::httpOptionMaxRedirects($httpOptions);
+        $currentUrl = $url;
+        $currentMethod = $method;
+        $redirects = 0;
+
+        while (true) {
+            $response = self::requestOnce($currentUrl, $currentMethod, $httpOptions);
+            if (null === $response) {
+                return null;
+            }
+
+            if (!$follow) {
+                return $response;
+            }
+
+            $statusCode = self::statusCodeFromStatusLine($response['headers'][0]);
+            if (null === $statusCode || $statusCode < 300 || $statusCode >= 400) {
+                return $response;
+            }
+
+            $location = self::headerValue($response['headers'], 'Location');
+            if (null === $location || '' === $location) {
+                return $response;
+            }
+
+            if ($redirects >= $maxRedirects) {
+                // php-src: exceeding max_redirects fails the stream open (#28791).
+                return null;
+            }
+
+            $nextUrl = self::resolveRedirectUrl($currentUrl, $location);
+            if (null === $nextUrl) {
+                return $response;
+            }
+
+            ++$redirects;
+            $currentUrl = $nextUrl;
+            // php-src: 303 always GET; 301/302 historically force GET for non-HEAD methods.
+            if (303 === $statusCode || ((301 === $statusCode || 302 === $statusCode) && 'HEAD' !== $currentMethod)) {
+                $currentMethod = 'GET';
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $httpOptions
+     *
+     * @return array{headers: list<string>, body: string}|null
+     */
+    private static function requestOnce(string $url, string $method, array $httpOptions = []): ?array
+    {
         if (!self::available()) {
             return null;
         }
@@ -243,6 +297,44 @@ final class VmHttpFetchPure
     }
 
     /**
+     * Resolve a Location header against the current request URL (php-src http_fopen_wrapper.c).
+     */
+    private static function resolveRedirectUrl(string $currentUrl, string $location): ?string
+    {
+        $location = \trim($location);
+        if ('' === $location) {
+            return null;
+        }
+
+        $locParts = VmString::parseUrl($location);
+        if (\is_array($locParts) && isset($locParts['scheme']) && '' !== (string) $locParts['scheme']) {
+            return $location;
+        }
+
+        $base = VmString::parseUrl($currentUrl);
+        if (!\is_array($base) || !isset($base['scheme'], $base['host'])) {
+            return null;
+        }
+
+        $scheme = \strtolower((string) $base['scheme']);
+        $useTls = 'https' === $scheme;
+        $host = (string) $base['host'];
+        $port = isset($base['port']) ? (int) $base['port'] : ($useTls ? 443 : 80);
+        $defaultPort = $useTls ? 443 : 80;
+        $authority = $host.($port !== $defaultPort ? ':'.$port : '');
+
+        if (\str_starts_with($location, '/')) {
+            return $scheme.'://'.$authority.$location;
+        }
+
+        $basePath = isset($base['path']) && '' !== $base['path'] ? (string) $base['path'] : '/';
+        $slash = \strrpos($basePath, '/');
+        $dir = false === $slash ? '/' : \substr($basePath, 0, $slash + 1);
+
+        return $scheme.'://'.$authority.$dir.$location;
+    }
+
+    /**
      * @param array<string, mixed> $parts
      * @param array<string, mixed> $httpOptions
      */
@@ -314,6 +406,51 @@ final class VmHttpFetchPure
         $v = $httpOptions['ignore_errors'];
 
         return true === $v || 1 === $v || '1' === $v;
+    }
+
+    /**
+     * php-src default follow_location=1 (#28791).
+     *
+     * @param array<string, mixed> $httpOptions
+     */
+    private static function httpOptionFollowLocation(array $httpOptions): bool
+    {
+        if (!isset($httpOptions['follow_location'])) {
+            return true;
+        }
+        $v = $httpOptions['follow_location'];
+
+        return !(false === $v || 0 === $v || '0' === $v || '' === $v);
+    }
+
+    /**
+     * php-src default max_redirects=20 (#28791).
+     *
+     * @param array<string, mixed> $httpOptions
+     */
+    private static function httpOptionMaxRedirects(array $httpOptions): int
+    {
+        if (!isset($httpOptions['max_redirects'])) {
+            return 20;
+        }
+        $v = $httpOptions['max_redirects'];
+        if (\is_int($v)) {
+            return \max(0, $v);
+        }
+        if (\is_string($v) && \ctype_digit($v)) {
+            return (int) $v;
+        }
+        if (\is_float($v)) {
+            return \max(0, (int) $v);
+        }
+
+        return 20;
+    }
+
+    /** 2xx success or 3xx redirect body (when not followed) are fetchable without ignore_errors. */
+    private static function isFetchableStatus(?int $statusCode): bool
+    {
+        return null !== $statusCode && $statusCode >= 200 && $statusCode < 400;
     }
 
     /**
