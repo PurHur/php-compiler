@@ -1,21 +1,21 @@
 --TEST--
-ReflectionClass::getReadOnlyProperties() — readonly property list (issue #7186, ext/reflection/php_reflection.c)
+ReflectionClass::getReadOnlyProperties() phantom — use getProperties+isReadOnly (#28516, re-#7186)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+echo 'getReadOnlyProperties=', method_exists(ReflectionClass::class, 'getReadOnlyProperties') ? '1' : '0', "\n";
+
 readonly class R {
     public function __construct(public int $id, public string $name) {}
 }
 
 $r = new ReflectionClass(R::class);
-var_export(method_exists($r, 'getReadOnlyProperties'));
-echo "\n";
-$props = $r->getReadOnlyProperties();
-echo count($props), "\n";
 $names = [];
-foreach ($props as $p) {
-    $names[] = $p->getName();
+foreach ($r->getProperties() as $p) {
+    if ($p->isReadOnly()) {
+        $names[] = $p->getName();
+    }
 }
 sort($names);
 echo implode(',', $names), "\n";
@@ -33,13 +33,14 @@ class C {
 
 $c = new ReflectionClass(C::class);
 $roNames = [];
-foreach ($c->getReadOnlyProperties() as $p) {
-    $roNames[] = $p->getName();
+foreach ($c->getProperties() as $p) {
+    if ($p->isReadOnly()) {
+        $roNames[] = $p->getName();
+    }
 }
 sort($roNames);
 echo implode(',', $roNames), "\n";
 --EXPECT--
-true
-2
+getReadOnlyProperties=0
 id,name
 ro

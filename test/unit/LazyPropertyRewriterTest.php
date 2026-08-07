@@ -44,9 +44,7 @@ class LazyDecl {
     public lazy string $a = '1';
     public string $b = '2';
 }
-$names = (new ReflectionClass(LazyDecl::class))->getLazyPropertyNames();
-sort($names);
-echo implode(',', $names), "\n";
+echo method_exists(ReflectionClass::class, 'getLazyPropertyNames') ? "phantom\n" : "absent\n";
 $c = new LazyDecl();
 $rp = new ReflectionProperty(LazyDecl::class, 'a');
 echo $rp->isLazy($c) ? "lazy\n" : "not-lazy\n";
@@ -55,6 +53,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("a\nlazy\n", ob_get_clean());
+        self::assertSame("absent\nlazy\n", ob_get_clean());
     }
 }

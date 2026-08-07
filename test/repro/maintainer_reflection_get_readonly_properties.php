@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * #7186 / #28516 — getReadOnlyProperties is phantom; filter getProperties() + isReadOnly().
+ */
 readonly class R {
     public function __construct(public int $id, public string $name) {}
 }
@@ -7,13 +9,14 @@ readonly class R {
 $r = new ReflectionClass(R::class);
 var_export(method_exists($r, 'getReadOnlyProperties'));
 echo "\n";
-$props = $r->getReadOnlyProperties();
-echo count($props), "\n";
 $names = [];
-foreach ($props as $p) {
-    $names[] = $p->getName();
+foreach ($r->getProperties() as $p) {
+    if ($p->isReadOnly()) {
+        $names[] = $p->getName();
+    }
 }
 sort($names);
+echo count($names), "\n";
 echo implode(',', $names), "\n";
 
 class C {
@@ -29,8 +32,12 @@ class C {
 
 $c = new ReflectionClass(C::class);
 $roNames = [];
-foreach ($c->getReadOnlyProperties() as $p) {
-    $roNames[] = $p->getName();
+foreach ($c->getProperties() as $p) {
+    if ($p->isReadOnly()) {
+        $roNames[] = $p->getName();
+    }
 }
 sort($roNames);
-echo implode(',', $roNames), "\n";
+foreach ($roNames as $n) {
+    echo $n, "\n";
+}
