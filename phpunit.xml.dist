@@ -88,6 +88,7 @@
             <file>./test/compliance/OpensslErrorStringReflectionVMTest.php</file>
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
             <file>./test/compliance/StreamCopyToStreamReflectionVMTest.php</file>
+            <file>./test/compliance/StreamBucketReflectionStreamBucketVMTest.php</file>
             <file>./test/compliance/StreamSelectReflectionVMTest.php</file>
             <file>./test/compliance/StreamSocketClientReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorReflectionVMTest.php</file>
