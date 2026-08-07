@@ -746,6 +746,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('gethostname'));
     }
 
+    /** php-src session.stub.php — empty/absent return → bool / void (#28464). */
+    public function testSessionLifecycleReflectionReturns(): void
+    {
+        foreach ([
+            'session_write_close',
+            'session_commit',
+            'session_abort',
+            'session_reset',
+            'session_unset',
+        ] as $f) {
+            $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction($f), $f);
+        }
+        $this->assertSame(
+            'void',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('session_register_shutdown')
+        );
+    }
+
     /** php-src iconv.stub.php — InternalArgInfo return int / string encoding (#27629). */
     public function testIconvStrlenReflectionStubTypes(): void
     {
