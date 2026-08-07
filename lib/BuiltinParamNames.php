@@ -265,6 +265,10 @@ final class BuiltinParamNames
             'xmlwriter::writeattributens' => ['prefix', 'name', 'namespace', 'value'],
             'xmlwriter::startelementns' => ['prefix', 'name', 'namespace'],
             'xmlwriter::writeelementns' => ['prefix', 'name', 'namespace', 'content'],
+            // php-src ext/xmlwriter/php_xmlwriter.stub.php — PHP 8.4+ factories (#27922)
+            'xmlwriter::tomemory' => [],
+            'xmlwriter::touri' => ['uri'],
+            'xmlwriter::tostream' => ['stream'],
             // php-src ext/fileinfo/fileinfo.stub.php — methods missing from InternalArgInfo (#23410)
             'finfo::buffer' => ['string', 'flags=', 'context='],
             'finfo::file' => ['filename', 'flags=', 'context='],

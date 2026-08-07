@@ -43,9 +43,12 @@ final class sem_release extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'sem_release() is not supported for JIT/AOT in this compiler build (issue #3704)'
-        );
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitSemRelease::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSemRelease::invoke($context, $args[0]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void
