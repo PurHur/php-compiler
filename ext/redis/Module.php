@@ -21,9 +21,10 @@ class Module extends ModuleAbstract
 
     public function init(Runtime $runtime): void
     {
-        if (RedisExtensionPolicy::advertisesExtension()) {
-            require_once __DIR__.'/bootstrap_redisexception.php';
-        }
+        // Host-side exception classes must exist for VM catch bridges even when redis is
+        // withheld from advertisement (instanceof checks in lib/VM.php; #6098 / #28094).
+        require_once __DIR__.'/bootstrap_redisexception.php';
+        require_once __DIR__.'/bootstrap_redisclusterexception.php';
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
     }

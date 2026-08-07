@@ -11331,6 +11331,8 @@ restart:
             return $this->dispatchVmPharException($e, $callerFrame);
         } catch (\SoapFault $e) {
             return $this->dispatchVmSoapFault($e, $callerFrame);
+        } catch (\RedisClusterException $e) {
+            return $this->dispatchVmRedisClusterException($e, $callerFrame);
         } catch (\RuntimeException $e) {
             return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
@@ -12101,6 +12103,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeRedisException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native RedisClusterException into user catch handlers (#28094). */
+    private function dispatchVmRedisClusterException(\RedisClusterException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeRedisClusterException(
             $this->context,
             $error->getMessage(),
             $file,

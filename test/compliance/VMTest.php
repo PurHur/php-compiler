@@ -824,9 +824,11 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'yaml_phantom')) {
                 continue;
             }
+            // redis_*_forward84 sets PROFILE via --ENV--; always include (#28094).
             if (!CompilerVersion::supportsRedis()
                 && str_contains($name, 'redis')
-                && !str_contains($name, 'redis_phantom')) {
+                && !str_contains($name, 'redis_phantom')
+                && !str_contains($name, 'forward84')) {
                 continue;
             }
             if (CompilerVersion::supportsRedis()
