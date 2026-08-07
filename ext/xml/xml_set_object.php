@@ -13,12 +13,15 @@ use PHPCompiler\VM\Variable;
  * xml_set_object() — bind handler method prefix object (php-src ext/xml/xml.c; #18203).
  *
  * Z_PARAM_OBJECT — null/non-object → TypeError; prior binding kept (#22798).
+ * PROFILE≥8.4 stub #[\Deprecated] for Reflection (#28172, xml.stub.php).
  */
 final class xml_set_object extends XmlFunction
 {
     public function __construct()
     {
         parent::__construct('xml_set_object');
+        $this->attributeEntries = XmlHandlerDeprecation::xmlSetObjectAttributeEntries();
+        $this->deprecated = XmlHandlerDeprecation::xmlSetObjectDeprecatedMetadata();
     }
 
     public function execute(Frame $frame): void
