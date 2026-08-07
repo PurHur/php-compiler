@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\libxml;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
-/** libxml_use_internal_errors() — toggle internal error buffer (php-src ext/libxml/libxml.c; #6058). */
+/** libxml_use_internal_errors() — toggle internal error buffer (php-src ext/libxml/libxml.c; #6058, #28659). */
 final class libxml_use_internal_errors extends LibxmlFunction
 {
     public function __construct()
@@ -37,5 +40,10 @@ final class libxml_use_internal_errors extends LibxmlFunction
             return;
         }
         $frame->returnVar->bool($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitLibxmlUseInternalErrors::invoke($context, ...$args);
     }
 }

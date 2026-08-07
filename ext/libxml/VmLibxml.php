@@ -25,8 +25,6 @@ final class VmLibxml
 {
     public const CLASS_LC = 'libxmlerror';
 
-    private static bool $useInternalErrors = false;
-
     private static ?Variable $streamsContext = null;
 
     private static bool $entityLoaderDisabled = false;
@@ -60,17 +58,12 @@ final class VmLibxml
 
     public static function useInternalErrors(?bool $useErrors): bool
     {
-        $previous = self::$useInternalErrors;
-        if (null !== $useErrors) {
-            self::$useInternalErrors = $useErrors;
-        }
-
-        return $previous;
+        return LibxmlInternalErrorsJitHelper::exchange(null !== $useErrors, $useErrors ?? false);
     }
 
     public static function usingInternalErrors(): bool
     {
-        return self::$useInternalErrors;
+        return LibxmlInternalErrorsJitHelper::using();
     }
 
     /** php-src ext/libxml/libxml.c — libxml_set_streams_context() global IO context (#14495). */
@@ -354,7 +347,7 @@ final class VmLibxml
         ?string $file = null,
         ?string $warningMessage = null
     ): void {
-        if (self::$useInternalErrors) {
+        if (LibxmlInternalErrorsJitHelper::using()) {
             self::$errors[] = $record;
 
             return;
