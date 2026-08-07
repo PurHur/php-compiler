@@ -710,6 +710,10 @@ final class VmMbstring
         if ('8BIT' === $canon || 'BINARY' === $canon) {
             return $cp <= 0xFF ? \chr($cp) : null;
         }
+        // libmbfl utf16be/utf16le filters — was missing, so ASCII fell through to '?' (#28525).
+        if ('UTF-16BE' === $canon || 'UTF-16LE' === $canon) {
+            return self::unicodeCodepointToUtf16($cp, 'UTF-16BE' === $canon);
+        }
 
         return null;
     }
@@ -732,6 +736,35 @@ final class VmMbstring
             .\chr(0x80 | (($cp >> 12) & 0x3F))
             .\chr(0x80 | (($cp >> 6) & 0x3F))
             .\chr(0x80 | ($cp & 0x3F));
+    }
+
+    /**
+     * Encode one Unicode scalar as UTF-16BE or UTF-16LE (php-src libmbfl utf16* filters).
+     *
+     * Surrogate halves are not scalar values — return null so mb_substitute_character applies.
+     */
+    private static function unicodeCodepointToUtf16(int $cp, bool $be): ?string
+    {
+        if ($cp < 0 || $cp > 0x10FFFF) {
+            return null;
+        }
+        if ($cp >= 0xD800 && $cp <= 0xDFFF) {
+            return null;
+        }
+        if ($cp < 0x10000) {
+            return $be
+                ? \chr(($cp >> 8) & 0xFF).\chr($cp & 0xFF)
+                : \chr($cp & 0xFF).\chr(($cp >> 8) & 0xFF);
+        }
+        $cp -= 0x10000;
+        $hi = 0xD800 | (($cp >> 10) & 0x3FF);
+        $lo = 0xDC00 | ($cp & 0x3FF);
+
+        return $be
+            ? \chr(($hi >> 8) & 0xFF).\chr($hi & 0xFF)
+                .\chr(($lo >> 8) & 0xFF).\chr($lo & 0xFF)
+            : \chr($hi & 0xFF).\chr(($hi >> 8) & 0xFF)
+                .\chr($lo & 0xFF).\chr(($lo >> 8) & 0xFF);
     }
 
     /**
