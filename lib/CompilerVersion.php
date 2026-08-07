@@ -1050,8 +1050,9 @@ final class CompilerVersion
      * nextafter() — absent from php-src as a userland builtin (libc nextafter(3) only;
      * ext/standard/math.c has fpow/fdiv/fmod, not nextafter).
      *
-     * Never register or advertise on php-src-strict profiles. Keep {@see phpc_nextafter_kernel}
-     * as an internal IEEE helper for sin/cos/etc. (#28565; re-#9241/#15584/#15677).
+     * Never register or advertise on php-src-strict profiles. IEEE nextafter for NestedJIT
+     * lives in {@see \PHPCompiler\ext\standard\NextafterJitHelper} (#28716; #28565;
+     * re-#9241/#15584/#15677).
      */
     public static function supportsNextafter(): bool
     {

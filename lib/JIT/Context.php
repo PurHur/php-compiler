@@ -909,8 +909,6 @@ class Context {
         return match ($lc) {
             'phpc_file_put_contents_kernel',
             'phpc_readfile_kernel',
-            // Float math always-helper NestedJIT leaves (#20664) — peer rename/fpc (#20290).
-            'phpc_nextafter_kernel',
 
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',
