@@ -9,13 +9,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM array_udiff_uassoc()/array_uintersect_uassoc() for thin standalone AOT (#27243).
+ * Pure LLVM key+value assoc filters for thin standalone AOT (#27243, #27218).
  *
- * Dual key+value match with spaceship-equivalent strcmp (strings) / int64 icmp (otherwise),
- * mirroring {@see ArrayUserSetOpsKeyLlvm}. NestedJIT of dual-closure helpers aborts under thin
- * AOT (same class as ukey NestedJIT — #27228).
+ * Covers array_udiff_uassoc()/array_uintersect_uassoc() (dual callbacks) and
+ * array_diff_uassoc()/array_intersect_uassoc()/array_udiff_assoc()/array_uintersect_assoc()
+ * (single callback) — LLVM uses spaceship-equivalent strcmp (strings) / int64 icmp
+ * (otherwise) for both key and value, mirroring {@see ArrayUserSetOpsKeyLlvm}. NestedJIT of
+ * dual-closure helpers aborts under thin AOT (same class as ukey NestedJIT — #27228).
  *
- * php-src: ext/standard/array.c — php_array_udiff_uassoc / php_array_uintersect_uassoc
+ * php-src: ext/standard/array.c — php_array_*uassoc / php_array_u*assoc
  */
 final class ArrayUserSetOpsUassocLlvm
 {

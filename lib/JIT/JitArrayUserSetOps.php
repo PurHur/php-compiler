@@ -8,7 +8,7 @@ use PHPCompiler\JIT\Builtin\ArrayUserSetOpsRuntime;
 use PHPLLVM\Value;
 
 /**
- * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515, #27228, #27243).
+ * JIT lowering for user-comparator array diff/intersect builtins (php-src ext/standard/array.c; #9155, #18515, #27228, #27243, #27218).
  *
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}.
  * JIT/AOT: {@see ArrayUserSetOpsRuntime} → Value/Key/Uassoc LLVM (#27533); VM SSOT {@see \PHPCompiler\ext\standard\VmArrayUserSetOps}.
@@ -97,5 +97,57 @@ final class JitArrayUserSetOps
             $first,
             ...$others
         );
+    }
+
+    public static function arrayDiffUassoc(
+        Context $context,
+        Variable $callback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_diff_uassoc() expects at least 3 arguments, 2 given');
+        }
+
+        return ArrayUserSetOpsRuntime::diffByAssocPair($context, $callback, $first, ...$others);
+    }
+
+    public static function arrayIntersectUassoc(
+        Context $context,
+        Variable $callback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_intersect_uassoc() expects at least 3 arguments, 2 given');
+        }
+
+        return ArrayUserSetOpsRuntime::intersectByAssocPair($context, $callback, $first, ...$others);
+    }
+
+    public static function arrayUdiffAssoc(
+        Context $context,
+        Variable $callback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_udiff_assoc() expects at least 3 arguments, 2 given');
+        }
+
+        return ArrayUserSetOpsRuntime::diffByAssocPair($context, $callback, $first, ...$others);
+    }
+
+    public static function arrayUintersectAssoc(
+        Context $context,
+        Variable $callback,
+        Variable $first,
+        Variable ...$others
+    ): Value {
+        if ([] === $others) {
+            throw new \ArgumentCountError('array_uintersect_assoc() expects at least 3 arguments, 2 given');
+        }
+
+        return ArrayUserSetOpsRuntime::intersectByAssocPair($context, $callback, $first, ...$others);
     }
 }

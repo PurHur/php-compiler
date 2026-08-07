@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** array_udiff()/array_uintersect()/ukey/uassoc JIT routes (#18515, #27228, #27243, #27533). */
+/** array_udiff()/array_uintersect()/ukey/uassoc JIT routes (#18515, #27228, #27243, #27218, #27533). */
 final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
 {
-    private const JIT_HELPER_MAX_LINES = 120;
+    private const JIT_HELPER_MAX_LINES = 180;
 
     public function testJitArrayUserSetOpsDelegatesToArrayUserSetOpsRuntime(): void
     {
@@ -19,6 +19,8 @@ final class ArrayUserSetOpsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayUserSetOpsRuntime::intersectByKey', $helper);
         $this->assertStringContainsString('ArrayUserSetOpsRuntime::diffByKeyValue', $helper);
         $this->assertStringContainsString('ArrayUserSetOpsRuntime::intersectByKeyValue', $helper);
+        $this->assertStringContainsString('ArrayUserSetOpsRuntime::diffByAssocPair', $helper);
+        $this->assertStringContainsString('ArrayUserSetOpsRuntime::intersectByAssocPair', $helper);
         $this->assertStringNotContainsString('filterFirstHashTableByValueCompare', $helper);
         $this->assertStringNotContainsString('scanHashTableValuesWithClosure', $helper);
         $this->assertStringNotContainsString('closureCompareToI32', $helper);
