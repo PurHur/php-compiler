@@ -6222,7 +6222,18 @@ restart:
                             }
                         }
 
-                        return $this->raise("Unknown class for constant fetch: {$className}", $frame);
+                        // Missing class on Class::CONST / Enum::Case — catchable Error
+                        // (zend_execute.c), not LogicException via raise() (#28480).
+                        $catchFrame = $this->dispatchVmError(
+                            $this->classNotFoundMessage($className),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     $classEntry = $this->context->classes[$lcClass];
                     $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
