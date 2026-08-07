@@ -407,6 +407,30 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($length['isOptional']);
     }
 
+    /**
+     * php-src ext/hash/hash.stub.php — hash_update(): true under PROFILE≥8.4 (#28742).
+     *
+     * @runInSeparateProcess
+     */
+    public function testHashUpdateReflectionReturnTrueUnderProfile84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        $this->assertSame('true', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_update'));
+    }
+
+    /**
+     * php-src ≤8.3 hash_update(): bool — InternalArgInfo when PROFILE is below 8.4 (#28742).
+     *
+     * @runInSeparateProcess
+     */
+    public function testHashUpdateReflectionReturnBoolUnderProfile83(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.3';
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_update'));
+    }
+
     /** php-src ext/json/json.stub.php — InternalArgInfo omits mixed / |false / ?bool (#25458). */
     public function testJsonDecodeEncodeReflectionStubTypes(): void
     {
