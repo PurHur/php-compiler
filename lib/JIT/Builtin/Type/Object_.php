@@ -6996,7 +6996,9 @@ class Object_ extends Type {
     }
 
     /**
-     * exit()/die() status: ExitStatus enum → backing int; other enums → Error; else TypeError (#7214, #7294).
+     * Historical ExitStatus class id lookup — always null under php-src-strict (#28200, re-#7294).
+     *
+     * exit()/die() accept string|int only; enum status → Error / TypeError (#7214).
      */
     public function exitStatusEnumClassId(): ?int
     {

@@ -71,10 +71,8 @@ final class VmExit
             return 0;
         }
         if (Variable::TYPE_ENUM_CASE === $v->type) {
+            // php-src has no ExitStatus; any enum status → Error like Zend (#28200, re-#7294).
             $case = $v->toEnumCase();
-            if (self::isExitStatusEnum($case->enumClass->name)) {
-                return $case->backingValue->toInt();
-            }
             throw new \Error(
                 'Object of class '.$case->enumClass->name.' could not be converted to string'
             );
@@ -82,14 +80,6 @@ final class VmExit
         if (Variable::TYPE_OBJECT === $v->type) {
             $obj = $v->toObject();
             if (EnumCaseSupport::isEnumCase($obj)) {
-                if (self::isExitStatusEnum($obj->class->name)) {
-                    $backing = $obj->enumCaseValue;
-                    if (null === $backing) {
-                        throw new \LogicException('ExitStatus case missing backing value');
-                    }
-
-                    return $backing->toInt();
-                }
                 throw new \Error(
                     'Object of class '.$obj->class->name.' could not be converted to string'
                 );
@@ -157,11 +147,6 @@ final class VmExit
             'exit(): Argument #2 ($message) must be of type string, %s given',
             TypeCheck::typeNameForConstraint($v->type)
         ));
-    }
-
-    private static function isExitStatusEnum(string $className): bool
-    {
-        return 0 === strcasecmp(ltrim($className, '\\'), 'ExitStatus');
     }
 
     private static function typeErrorForStatus(Variable $value): \TypeError

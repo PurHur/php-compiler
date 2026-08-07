@@ -424,11 +424,7 @@ final class ScriptExit
             ? JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
             : null;
         if (null !== $enumClass) {
-            if (0 === strcasecmp(ltrim($enumClass, '\\'), 'ExitStatus')) {
-                $context->type->object->emitExitStatusFromEnumCaseObject($context, $objPtr);
-
-                return;
-            }
+            // No ExitStatus builtin (#28200); any compile-time enum status → Error like Zend.
             self::emitEnumStringConversionError($context, $enumClass);
             $context->builder->call($context->lookupFunction('abort'));
 

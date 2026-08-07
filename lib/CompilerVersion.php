@@ -2016,9 +2016,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ builtin stub enums (StringTrimMode, PadType, MemoryUsage, ExitStatus, …).
+     * PHP 8.4+ builtin stub enums (StringTrimMode, PadType, MemoryUsage, …).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13630, #15692).
+     * ExitStatus is not among these — php-src never ships it (#28200, re-#7294).
      * php-src: Zend/zend_enum.def; ext/standard/basic_functions.stub.php
      */
     public static function supportsBuiltinStubEnums(): bool

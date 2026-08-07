@@ -15,7 +15,7 @@ use PHPLLVM;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for exit()/die() object status — ExitStatus enum vs other enums (#9938).
+ * LLVM lowering for exit()/die() object status — enums → Error; Stringable → echo (#9938, #28200).
  */
 final class ObjectExitStatusLlvm
 {
