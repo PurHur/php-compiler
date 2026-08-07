@@ -186,6 +186,8 @@ final class BuiltinInternalArgInfo
             'dom_import_simplexml' => 'DOMAttr|DOMElement',
             // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#26464)
             'simplexml_import_dom' => '?SimpleXMLElement',
+            // pecl-networking-uuid uuid.stub.php — absent from InternalArgInfo (#27836)
+            'uuid_generate_md5', 'uuid_generate_sha1' => 'string',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
@@ -206,6 +208,8 @@ final class BuiltinInternalArgInfo
             'sodium_crypto_pwhash_str' => 'string',
             // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27630)
             'sodium_memzero' => 'void',
+            // ext/pgsql/pgsql.stub.php — InternalArgInfo empty return; Zend string|int|false (#27703)
+            'pg_field_table' => 'string|int|false',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
@@ -508,6 +512,11 @@ final class BuiltinInternalArgInfo
         }
 
         return match ($callableLc) {
+            // pecl-networking-uuid uuid.stub.php — string $uuid_ns, string $name (#27836)
+            'uuid_generate_md5', 'uuid_generate_sha1' => match ($index) {
+                0, 1 => 'string',
+                default => null,
+            },
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
@@ -682,6 +691,11 @@ final class BuiltinInternalArgInfo
             },
             // ext/sodium/libsodium.stub.php — string &$string; absent from InternalArgInfo (#27630)
             'sodium_memzero' => 0 === $index ? 'string' : null,
+            // ext/pgsql/pgsql.stub.php — ?PgSql\Result $result; InternalArgInfo untyped (#27703)
+            'pg_field_table' => match ($index) {
+                0 => '?PgSql\\Result',
+                default => null,
+            },
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
             // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#27629)

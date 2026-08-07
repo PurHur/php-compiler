@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\hash\HashAlgosJitHelper;
+use PHPCompiler\ext\standard\HashAlgosRegistry;
 use PHPUnit\Framework\TestCase;
 
-/** hash_hmac_algos JIT: always HashAlgosJitHelper via JitVmHelperLink — no thin kernel fork (#18908, #20652). */
+/** hash_hmac_algos JIT: NestedJIT-safe HashAlgosRegistry list — no registry kernel (#18908, #20652, #28750). */
 final class StringHashHmacAlgosRuntimeShrinkTest extends TestCase
 {
     public function testStringHashHmacAlgosAlwaysUsesHelperBridge(): void
@@ -16,25 +18,24 @@ final class StringHashHmacAlgosRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $runtime);
         $this->assertStringNotContainsString('JitHashAlgosKernel', $runtime);
-        $this->assertStringNotContainsString('hash_hmac_algos_kernel_entry', $runtime);
-        $this->assertStringNotContainsString('implementThinKernel', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
-        $this->assertStringNotContainsString('implementUserScriptKernel', $runtime);
-        $this->assertStringNotContainsString('implementInlineRegistry', $runtime);
-        $this->assertStringNotContainsString('HashAlgosRegistry::HMAC_ALGOS', $runtime);
-        $this->assertStringNotContainsString('__hashtable__setStringAt', $runtime);
+        $this->assertStringNotContainsString('phpc_hash_hmac_algos_kernel', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/hash/HashAlgosJitHelper.php');
-        $this->assertStringContainsString('phpc_hash_hmac_algos_kernel', $helper);
+        $this->assertStringContainsString('HashAlgosRegistry::HMAC_ALGOS', $helper);
         $this->assertStringContainsString('hmacAlgosArgv(): array', $helper);
-        $this->assertFileExists(__DIR__.'/../../ext/hash/phpc_hash_hmac_algos_kernel.php');
+        $this->assertStringNotContainsString('phpc_hash_hmac_algos_kernel', $helper);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/hash/phpc_hash_hmac_algos_kernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/hash/JitHashAlgosKernel.php');
+
+        $this->assertSame(HashAlgosRegistry::HMAC_ALGOS, HashAlgosJitHelper::hmacAlgosArgv());
     }
 
-    public function testSpineBundleIncludesHashHmacAlgosHelperAndKernel(): void
+    public function testSpineBundleOmitsHashHmacAlgosKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
-        $this->assertStringContainsString('StringHashHmacAlgos.php', $spine);
         $this->assertStringContainsString('HashAlgosJitHelper.php', $spine);
-        $this->assertStringContainsString('phpc_hash_hmac_algos_kernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_hash_hmac_algos_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitHashAlgosKernel.php', $spine);
     }
 }

@@ -938,7 +938,6 @@
         "ext/hash/HashCryptoKernelArgs.php",
         "ext/hash/HashFunction.php",
         "ext/hash/JitHashAlgos.php",
-        "ext/hash/JitHashAlgosKernel.php",
         "ext/hash/JitHashContext.php",
         "ext/hash/JitHashCryptoKernel.php",
         "ext/hash/MhashRegistry.php",
@@ -959,12 +958,10 @@
         "ext/hash/mhash_get_block_size.php",
         "ext/hash/mhash_get_hash_name.php",
         "ext/hash/mhash_keygen_s2k.php",
-        "ext/hash/phpc_hash_algos_kernel.php",
         "ext/hash/phpc_hash_crypto_hash.php",
         "ext/hash/phpc_hash_crypto_hkdf.php",
         "ext/hash/phpc_hash_crypto_hmac.php",
         "ext/hash/phpc_hash_crypto_pbkdf2.php",
-        "ext/hash/phpc_hash_hmac_algos_kernel.php",
         "ext/iconv/CharsetEngine.php",
         "ext/iconv/CharsetString.php",
         "ext/iconv/IconvConstants.php",
@@ -7450,9 +7447,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7216,
+        "inventory_files": 7213,
         "excluded": 0,
-        "eligible": 7216,
+        "eligible": 7213,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

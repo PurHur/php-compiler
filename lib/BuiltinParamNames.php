@@ -899,6 +899,9 @@ final class BuiltinParamNames
                 return ['stream', 'format', 'values'];
             case 'pack':
                 return ['format', 'values'];
+            // php-src ext/pgsql/pgsql.stub.php — InternalArgInfo still field_number (#27703)
+            case 'pg_field_table':
+                return ['result', 'field', 'oid_only='];
             // php-src ext/standard/array.stub.php — array ...$arrays (0 required); InternalArgInfo still arr1+... (#25382)
             case 'array_merge':
             case 'array_merge_recursive':
@@ -1707,6 +1710,10 @@ final class BuiltinParamNames
                 return ['path', 'suffix='];
             case 'uniqid':
                 return ['prefix', 'more_entropy'];
+            // pecl-networking-uuid uuid.stub.php — uuid_generate_md5/sha1 (#27836)
+            case 'uuid_generate_md5':
+            case 'uuid_generate_sha1':
+                return ['uuid_ns', 'name'];
             case 'gettype':
                 // InternalArgInfo still says `var`; Zend stub is value
                 return ['value'];

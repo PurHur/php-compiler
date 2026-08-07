@@ -40,8 +40,6 @@ class Module extends ModuleAbstract
             new hash_final(),
             new hash_copy(),
             new hash_algos(),
-            new phpc_hash_algos_kernel(),
-            new phpc_hash_hmac_algos_kernel(),
             new phpc_hash_crypto_hash(),
             new phpc_hash_crypto_hmac(),
             new phpc_hash_crypto_pbkdf2(),
