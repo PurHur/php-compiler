@@ -60,6 +60,23 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame('12', PregAotFastPath::lastCap(1));
     }
 
+    /** Issue #28611 — named digit-plus under thin AOT. */
+    public function testNamedDigitPlusCapture(): void
+    {
+        $this->assertSame(3, PregAotFastPath::patternKind('/(?<n>\d+)/'));
+        $this->assertSame(1, PregAotFastPath::matchCount('/(?<n>\d+)/', 'a12', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('12', PregAotFastPath::lastCap(0));
+        $this->assertSame('12', PregAotFastPath::lastCap(1));
+        $this->assertSame('n', PregAotFastPath::lastCapName(1));
+        $this->assertSame(1, PregAotFastPath::lastCapHasName(1));
+        $this->assertSame(0, PregAotFastPath::lastCapHasName(0));
+        // Unnamed still clears name.
+        $this->assertSame(1, PregAotFastPath::matchCount('/(\d+)/', 'a12', 0));
+        $this->assertSame('', PregAotFastPath::lastCapName(1));
+        $this->assertSame(0, PregAotFastPath::lastCapHasName(1));
+    }
+
     public function testSpacePlusReplace(): void
     {
         $this->assertSame(4, PregAotFastPath::patternKind('/\s+/'));

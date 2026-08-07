@@ -52,6 +52,10 @@ final class PregMatchRuntime
 
     private const THIN_MATCH_EX_CAP = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExCap';
 
+    private const THIN_MATCH_EX_CAP_NAME = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExCapName';
+
+    private const THIN_MATCH_EX_HAS_CAP_NAME = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExHasCapName';
+
     private const THIN_SPLIT_PART_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinSplitPartCount';
 
     private const THIN_SPLIT_PART = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinSplitPart';
@@ -91,6 +95,8 @@ final class PregMatchRuntime
         self::TAKE_MATCH_EX_HT,
         self::THIN_MATCH_EX_CAP_COUNT,
         self::THIN_MATCH_EX_CAP,
+        self::THIN_MATCH_EX_CAP_NAME,
+        self::THIN_MATCH_EX_HAS_CAP_NAME,
         self::THIN_SPLIT_PART_COUNT,
         self::THIN_SPLIT_PART,
         self::MATCH_ALL_EX_HELPER,
@@ -353,6 +359,7 @@ final class PregMatchRuntime
 
     /**
      * Build $matches from PregJitHelper::thinMatchExCap* (NestedJIT-safe strings).
+     * Named groups: php-src order is numeric 0, name, numeric 1 (#28611 / ext/pcre/php_pcre.c).
      */
     private static function emitThinMatchExHashtableFromCaps(Context $context, LlvmFunction $fn): Value
     {
@@ -374,6 +381,8 @@ final class PregMatchRuntime
 
         $context->builder->positionAtEnd($fillBb);
         // Bound to 8 slots (full match + up to 7 groups) for thin fast path (#26888).
+        // Named group: write numeric indices then the string key. HT iteration order is
+        // 0,1,n (Zend is 0,n,1); values and isset($m['n']) match php-src (#28611).
         $max = 8;
         for ($i = 0; $i < $max; ++$i) {
             $idxBb = $fn->appendBasicBlock('preg_match_ex_thin_cap_'.$i);
@@ -398,6 +407,40 @@ final class PregMatchRuntime
                 $capStr
             );
             HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $slot);
+            if (1 === $i) {
+                $hasNameRaw = $context->builder->call(
+                    self::helperFunction($context, self::THIN_MATCH_EX_HAS_CAP_NAME),
+                    $i64->constInt(1, true)
+                );
+                $hasName = JitNestedHelperCoerce::scalarToI64(
+                    $context,
+                    $hasNameRaw,
+                    $hasNameRaw->typeOf()
+                );
+                $nameBb = $fn->appendBasicBlock('preg_match_ex_thin_name_1');
+                $afterNameBb = $fn->appendBasicBlock('preg_match_ex_thin_after_name_1');
+                $wantName = $context->builder->icmp(
+                    Builder::INT_SGT,
+                    $hasName,
+                    $i64->constInt(0, true)
+                );
+                $context->builder->branchIf($wantName, $nameBb, $afterNameBb);
+                $context->builder->positionAtEnd($nameBb);
+                $nameRaw = $context->builder->call(
+                    self::helperFunction($context, self::THIN_MATCH_EX_CAP_NAME),
+                    $i64->constInt(1, true)
+                );
+                $nameStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $nameRaw);
+                $nameSlot = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $capStr
+                );
+                HashTableHelper::setAtStringKey($context, $ht, $nameStr, $nameSlot);
+                $context->builder->branch($afterNameBb);
+                $context->builder->positionAtEnd($afterNameBb);
+            }
             $context->builder->branch($skipBb);
 
             $context->builder->positionAtEnd($skipBb);

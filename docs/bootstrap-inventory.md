@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7206 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23262 |
+| Source constructs flagged (warnings) | 23263 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5522,7 +5522,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PowIntRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 10 |
+| `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 11 |
 | `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
@@ -32506,7 +32506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregAotFastPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 39 class method(s)
+- 42 class method(s)
 
 ### `ext/standard/PregCallbackInvokeJitHelper.php`
 
@@ -32531,12 +32531,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 24 class method(s)
 
 ### `ext/standard/PregJitHelperThinAot.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 23 class method(s)
 
 ### `ext/standard/PregQuoteJitHelper.php`
 
@@ -47981,14 +47981,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 394)
-- new Variable (line 457)
-- new Variable (line 467)
-- new Variable (line 930)
-- new Variable (line 1165)
-- new Variable (line 1184)
-- new Variable (line 1202)
-- new Variable (line 1282)
+- new Variable (line 403)
+- new Variable (line 434)
+- new Variable (line 500)
+- new Variable (line 510)
+- new Variable (line 973)
+- new Variable (line 1208)
+- new Variable (line 1227)
+- new Variable (line 1245)
+- new Variable (line 1325)
 - 25 class method(s)
 - 1 closure(s)
 
