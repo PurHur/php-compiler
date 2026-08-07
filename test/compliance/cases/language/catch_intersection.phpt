@@ -1,41 +1,19 @@
 --TEST--
-Language: catch intersection types (A&B $e) (#28205)
+Language: catch (A&B $e) / catch ((A&B) $e) ParseError like Zend (#28439, Zend/zend_language_parser.y catch_name_list)
 --FILE--
 <?php
-class A extends Exception implements Countable {
-    public function count(): int { return 0; }
-}
-class B extends Exception {}
+interface A {}
+interface B {}
+class E extends Exception implements A, B {}
 
-try {
-    throw new A();
-} catch (Countable&Throwable $e) {
-    echo "caught:", get_class($e), "\n";
+foreach (['catch (A&B $e) { echo "and\n"; }', 'catch ((A&B) $e) { echo "paren\n"; }', 'catch (A|B $e) { echo "or\n"; }'] as $arm) {
+    try {
+        eval('try { throw new E("x"); } '.$arm);
+    } catch (Throwable $e) {
+        echo get_class($e), ':', explode("\n", $e->getMessage())[0], "\n";
+    }
 }
-
-try {
-    throw new B();
-} catch (Countable&Throwable $e) {
-    echo "wrong\n";
-} catch (Exception $e) {
-    echo "fallback:", get_class($e), "\n";
-}
-
-try {
-    throw new A();
-} catch (Countable&Traversable&Throwable $e) {
-    echo "triple\n";
-} catch (Countable&Throwable $e) {
-    echo "double:", get_class($e), "\n";
-}
-
-try {
-    throw new A();
-} catch (Countable&Throwable) {
-    echo "noncapturing\n";
-}
---EXPECT--
-caught:A
-fallback:B
-double:A
-noncapturing
+--EXPECTF--
+ParseError:%Asyntax error, unexpected token "&"%A
+ParseError:%Asyntax error, unexpected token "("%A
+or

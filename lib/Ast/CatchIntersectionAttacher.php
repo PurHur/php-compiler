@@ -9,7 +9,7 @@ use PhpParser\Node\Stmt\Catch_;
 use PhpParser\NodeVisitorAbstract;
 
 /**
- * Mark Catch_ nodes rewritten from intersection types (#28205).
+ * Mark Catch_ nodes rewritten from intersection types (legacy #28205; gated off #28439).
  */
 final class CatchIntersectionAttacher extends NodeVisitorAbstract
 {

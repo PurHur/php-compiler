@@ -41,8 +41,8 @@ final class VmTryCatch
         if ('' === $encoded) {
             return true;
         }
-        // Intersection catch `A&B` (#28205): all members must match. Union `A|B`: any.
-        // php-src forbids mixing `|` and `&` in one catch list without DNF parens.
+        // Union `A|B`: any member. Encoded `&` is unreachable under php-src-strict
+        // (catch_name_list is `|` only — #28439); kept as defensive all-must-match.
         if (str_contains($encoded, '&')) {
             foreach (explode('&', $encoded) as $typeName) {
                 if ('' === $typeName) {

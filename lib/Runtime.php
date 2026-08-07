@@ -392,6 +392,9 @@ class Runtime {
         PipeOperatorSyntaxRejector::reject($code, $filename);
         ListSpreadAssignSyntaxRejector::reject($code, $filename);
         ReadonlyAnonymousClassSyntaxRejector::reject($code, $filename);
+        // Before DnfParenIntersection: catch `((A&B) $e)` must ParseError with Zend's
+        // unexpected "(" (#28439), not DNF rewriter's "$e expecting |" message.
+        CatchIntersectionSyntaxRejector::reject($code, $filename);
         DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
         TypedFunctionStaticSyntaxRejector::reject($code, $filename);
@@ -400,7 +403,6 @@ class Runtime {
         PropertyHookSyntaxRejector::reject($code, $filename);
         FinalPromotedPropertySyntaxRejector::reject($code, $filename);
         TryCatchElseSyntaxRejector::reject($code, $filename);
-        CatchIntersectionSyntaxRejector::reject($code, $filename);
         TryCatchElseSupport::beginCompilationUnit();
         CatchIntersectionSupport::beginCompilationUnit();
         $code = TryCatchElseSupport::extract($code);
