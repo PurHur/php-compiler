@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sockets;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Linux socket constants for get_defined_constants(true)['sockets'] (php-src ext/sockets/sockets.c; #17799).
  *
  * Values match Zend 8.2 on Linux x86_64 in the CI Docker image.
+ * SHUT_* are PHP 8.5+ only (#26760) — withheld on the default 8.2 reference profile.
  */
 final class SocketConstants
 {
@@ -64,9 +67,12 @@ final class SocketConstants
             'SO_BINDTODEVICE' => 25,
             'SOL_SOCKET' => 1,
             'SOMAXCONN' => 4096,
-            'SHUT_RD' => 0,
-            'SHUT_WR' => 1,
-            'SHUT_RDWR' => 2,
+            // php-src SHUT_* — PHP 8.5+ only (ext/sockets/sockets.stub.php; #26760)
+            ...(CompilerVersion::supportsSocketShutConstants() ? [
+                'SHUT_RD' => 0,
+                'SHUT_WR' => 1,
+                'SHUT_RDWR' => 2,
+            ] : []),
             'SO_MARK' => 36,
             'SO_INCOMING_CPU' => 49,
             'SO_MEMINFO' => 55,
