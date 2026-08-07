@@ -213,6 +213,52 @@ PHP;
         $this->assertSame("true\ntrue\n", ob_get_clean());
     }
 
+    /** @covers issue #28385 — php-src ext/zlib/zlib.stub.php final class InflateContext */
+    public function testExtendInflateContextFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadInflateContext extends InflateContext {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadInflateContext cannot extend final class InflateContext');
+        $runtime->parseAndCompile($code, 'extend_inflatecontext.php');
+    }
+
+    /** @covers issue #28385 — php-src ext/zlib/zlib.stub.php final class DeflateContext */
+    public function testExtendDeflateContextFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadDeflateContext extends DeflateContext {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadDeflateContext cannot extend final class DeflateContext');
+        $runtime->parseAndCompile($code, 'extend_deflatecontext.php');
+    }
+
+    /** @covers issue #28385 */
+    public function testZlibContextReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+inflate_init(ZLIB_ENCODING_RAW);
+deflate_init(ZLIB_ENCODING_RAW);
+var_export((new ReflectionClass(InflateContext::class))->isFinal());
+echo "\n";
+var_export((new ReflectionClass(DeflateContext::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'zlib_context_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\ntrue\n", ob_get_clean());
+    }
+
     /** @covers issue #28391 — php-src ext/sockets/sockets.stub.php final class Socket */
     public function testExtendSocketFailsAtCompileTime(): void
     {

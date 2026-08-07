@@ -33,6 +33,8 @@ final class VmZlibContext
             }
             $entry = new \PHPCompiler\VM\ClassEntry($name);
             $entry->isInternal = true;
+            // php-src `final class InflateContext` / `DeflateContext` (ext/zlib/zlib.stub.php; #28385).
+            $entry->isFinal = true;
             $ctx->classes[$lc] = $entry;
         }
     }

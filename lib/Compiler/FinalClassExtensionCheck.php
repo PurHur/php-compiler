@@ -32,9 +32,12 @@ final class FinalClassExtensionCheck
         'addressinfo' => 'AddressInfo',
         'attribute' => 'Attribute',
         'closure' => 'Closure',
+        // php-src ext/zlib/zlib.stub.php — final class DeflateContext / InflateContext (#28385).
+        'deflatecontext' => 'DeflateContext',
         'fiber' => 'Fiber',
         'fibererror' => 'FiberError',
         'generator' => 'Generator',
+        'inflatecontext' => 'InflateContext',
         'socket' => 'Socket',
         // php-src Zend/zend_weakrefs.stub.php — final class WeakReference / WeakMap (#28390).
         'weakmap' => 'WeakMap',
