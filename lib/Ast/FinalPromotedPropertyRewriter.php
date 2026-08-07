@@ -58,10 +58,13 @@ final class FinalPromotedPropertyRewriter
             return $source;
         }
 
+        // Locate __construct on the blanked view so string/heredoc bodies are ignored (#28481),
+        // then rewrite the matching spans in the original source (offsets stay aligned).
+        $inspectable = self::blankOpaqueRegions($source);
         $offset = 0;
         $out = '';
         $cursor = 0;
-        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $inspectable, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $openPos = $m[0][1] + strlen($m[0][0]) - 1;
             $paramsText = self::extractBalancedParenContent($source, $openPos);
             if (null === $paramsText) {
@@ -107,16 +110,21 @@ final class FinalPromotedPropertyRewriter
 
     /**
      * Byte offset of the first `final` token in a promoted ctor param, or null.
+     *
+     * Scans a blanked view so `eval('… public final …')` / string literals do not
+     * false-positive as declarations (#28481, cf. AsymmetricVisibilityRewriter).
      */
     private static function firstFinalPromotedOffset(string $source): ?int
     {
-        if (!preg_match('/\bfunction\s+__construct\s*\(/i', $source)) {
+        $inspectable = self::blankOpaqueRegions($source);
+        if (!preg_match('/\bfunction\s+__construct\s*\(/i', $inspectable)) {
             return null;
         }
 
         $offset = 0;
-        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $inspectable, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            // Params text from original source — blanking only spaces opaque regions.
             $paramsText = self::extractBalancedParenContent($source, $openPos);
             if (null !== $paramsText && self::paramsContainFinalPromoted($paramsText)) {
                 $paramsStart = $openPos + 1;
@@ -142,6 +150,52 @@ final class FinalPromotedPropertyRewriter
         }
 
         return null;
+    }
+
+    /**
+     * Blank comments / string / heredoc-nowdoc bodies while preserving newlines (#28481).
+     *
+     * Matches {@see AsymmetricVisibilityRewriter} so eval()/string payloads that mention
+     * `function __construct(… final …)` are not treated as real declarations.
+     */
+    private static function blankOpaqueRegions(string $source): string
+    {
+        $tokens = token_get_all($source);
+        $out = '';
+        $inHeredoc = false;
+        foreach ($tokens as $token) {
+            if (is_string($token)) {
+                if ($inHeredoc) {
+                    $out .= preg_replace('/[^\r\n]/', ' ', $token) ?? $token;
+                    continue;
+                }
+                $out .= $token;
+                continue;
+            }
+            [$id, $text] = $token;
+            if (T_START_HEREDOC === $id) {
+                $inHeredoc = true;
+                $out .= $text;
+                continue;
+            }
+            if (T_END_HEREDOC === $id) {
+                $inHeredoc = false;
+                $out .= $text;
+                continue;
+            }
+            $opaque = $inHeredoc
+                || T_COMMENT === $id
+                || T_DOC_COMMENT === $id
+                || T_CONSTANT_ENCAPSED_STRING === $id
+                || T_ENCAPSED_AND_WHITESPACE === $id;
+            if ($opaque) {
+                $out .= preg_replace('/[^\r\n]/', ' ', $text) ?? $text;
+                continue;
+            }
+            $out .= $text;
+        }
+
+        return $out;
     }
 
     private static function rewriteParams(string $paramsText): string

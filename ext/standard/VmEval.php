@@ -216,8 +216,10 @@ final class VmEval
         if (1 === preg_match('/^Multiple [A-Za-z_]+ modifiers are not allowed$/', $message)) {
             return true;
         }
-        // "Cannot use the final modifier on an abstract method|property|class member"
-        if (str_starts_with($message, 'Cannot use the final modifier on an abstract')) {
+        // php-src zend_throw_exception(CompileError): abstract final members (#25114) and
+        // `final` on promoted ctor params under PROFILE≤8.4 (#28481, Zend/zend_compile.c) —
+        // "Cannot use the final modifier on an abstract …" / "… on a parameter".
+        if (str_starts_with($message, 'Cannot use the final modifier on a')) {
             return true;
         }
 

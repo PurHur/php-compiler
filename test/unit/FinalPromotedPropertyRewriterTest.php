@@ -108,4 +108,28 @@ PHP;
         $src = '<?php class C { public function __construct(public final string $x) {} }';
         self::assertSame($src, FinalPromotedPropertyRewriter::rewrite($src));
     }
+
+    /** #28481 — eval()/string payloads must not look like real promoted-final decls. */
+    public function testIgnoresFinalPromotedSyntaxInsideStrings(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertFalse(CompilerVersion::supportsFinalPromotedProperties());
+            $src = <<<'PHP'
+<?php
+$s = 'class C { public function __construct(public final int $x) {} }';
+eval('class D { public function __construct(public final int $y) {} }');
+echo "ok\n";
+PHP;
+            self::assertNull(FinalPromotedPropertyRewriter::referenceProfileSyntaxError($src));
+            self::assertFalse(FinalPromotedPropertyRewriter::containsFinalPromotedPropertySyntax($src));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
