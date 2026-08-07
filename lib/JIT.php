@@ -19655,7 +19655,16 @@ class JIT {
         }
         // Legacy: appendChild was briefly remapped to ParentNode::append (#19208). Keep the
         // early-return shape but force DomNodeAppendChild so the child is returned (#27480).
-        if ('appendchild' === $methodLc && 'domnode::append' === $proxyName) {
+        // Also force when proxy is already domnode::appendchild: documentElement temps keep
+        // TYPE_OBJECT but lose userType (:object) and would otherwise take RuntimeIndirect
+        // with Document/Node candidates only — Element class_id miss aborts (#28509, re-#27044).
+        if (
+            'appendchild' === $methodLc
+            && (
+                'domnode::append' === $proxyName
+                || 'domnode::appendchild' === strtolower($proxyName)
+            )
+        ) {
             JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::appendchild');
             if ($this->context->functionIsRegistered('domnode::appendchild')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnode::appendchild');

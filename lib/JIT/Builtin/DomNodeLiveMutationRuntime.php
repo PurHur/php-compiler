@@ -219,6 +219,10 @@ final class DomNodeLiveMutationRuntime
                 && 1 === $extraArgCount
                 && \in_array($extraArgs[0]->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)
             ) {
+                // Held `$list = $node->childNodes` (#28509 / #27044): bump the existing
+                // OBJECT list *before* LiveSlots may replace the parent pointer. After sync,
+                // syncChildNodesLengthSlot would clobber move-path absolute lengths (#27476).
+                self::bumpHeldObjectChildNodesLength($context, $receiver, $extraArgCount);
                 JitDomAppendChildLiveSlots::sync(
                     $context,
                     self::receiverObject($context, $receiver),
@@ -492,6 +496,49 @@ final class DomNodeLiveMutationRuntime
             $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_CHILD_NODES),
             $listJit,
             Variable::TYPE_VALUE
+        );
+    }
+
+    /**
+     * Increment in-place length on a held childNodes DOMNodeList object (#28509, #27044).
+     *
+     * Unlike {@see bumpChildNodesLengthSlot}, never allocates / absolute-sets via
+     * syncChildNodesLengthSlot — that path clobbers move-path writeChildNodesList (#27476).
+     */
+    private static function bumpHeldObjectChildNodesLength(
+        Context $context,
+        Variable $receiver,
+        int $delta
+    ): void {
+        if ($delta <= 0) {
+            return;
+        }
+        $objectType = $context->type->object;
+        $nodeClassId = $objectType->lookup('DOMNode');
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
+            return;
+        }
+        if (!$objectType->hasProperty($listClassId, 'length')) {
+            return;
+        }
+        $receiverObj = self::receiverObject($context, $receiver);
+        $listVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $receiverObj,
+            'DOMNode',
+            VmDom::PROP_CHILD_NODES,
+            $nodeClassId
+        );
+        if (Variable::TYPE_OBJECT !== $listVar->type) {
+            return;
+        }
+        self::bumpExistingChildNodesLength(
+            $context,
+            $objectType,
+            $listClassId,
+            $context->helper->loadValue($listVar),
+            $delta
         );
     }
 
