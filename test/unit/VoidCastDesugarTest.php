@@ -8,7 +8,7 @@ use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\CompilerVersion;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #28183 #7346 #23037 */
+/** @covers issue #28441 #7346 #28183 */
 final class VoidCastDesugarTest extends TestCase
 {
     protected function tearDown(): void
@@ -16,21 +16,30 @@ final class VoidCastDesugarTest extends TestCase
         putenv('PHP_COMPILER_PROFILE');
     }
 
-    public function testSupportsVoidCastOffForAllProfiles(): void
+    public function testSupportsVoidCastOnProfile85Only(): void
     {
-        foreach (['8.2', '8.4', '8.5'] as $profile) {
-            putenv('PHP_COMPILER_PROFILE='.$profile);
-            $this->assertFalse(
-                CompilerVersion::supportsVoidCast(),
-                "PROFILE={$profile} must reject (void) like Zend 8.5.8 (#28183)"
-            );
-        }
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        $this->assertFalse(CompilerVersion::supportsVoidCast());
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $this->assertFalse(CompilerVersion::supportsVoidCast());
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        $this->assertTrue(CompilerVersion::supportsVoidCast());
     }
 
-    public function testProfile85LeavesVoidCastUntouched(): void
+    public function testProfile85DesugarsStatementVoidCast(): void
     {
         putenv('PHP_COMPILER_PROFILE=8.5');
         $code = '<?php (void) f();';
+        $this->assertSame(
+            '<?php '.VoidCastDesugar::MARKER.'(f());',
+            VoidCastDesugar::desugar($code)
+        );
+    }
+
+    public function testProfile85LeavesAssignmentVoidCastUntouched(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        $code = '<?php $x = (void)1;';
         $this->assertSame($code, VoidCastDesugar::desugar($code));
     }
 

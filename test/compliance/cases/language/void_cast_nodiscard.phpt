@@ -1,5 +1,5 @@
 --TEST--
-Language: (void) cast ParseError on PROFILE=8.5 (#28183, Zend/zend_language_scanner.l)
+Language: (void) cast assignment still ParseError on PROFILE=8.5 (#28441, statement-only)
 --ENV--
 PHP_COMPILER_PROFILE=8.5
 --FILE--

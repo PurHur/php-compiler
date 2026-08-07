@@ -92,7 +92,7 @@ PHP;
         }
     }
 
-    public function testVoidCastParseErrorsOnProfile85(): void
+    public function testVoidCastAssignmentStillParseErrorsOnProfile85(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.5');
@@ -110,6 +110,37 @@ PHP;
             ob_start();
             $runtime->run($runtime->parseAndCompile($code, 'void_cast_profile85.php'));
             $this->assertSame("ParseError\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** @covers issue #28441 */
+    public function testVoidCastStatementSuppressesNoDiscardWarning(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+ini_set('error_reporting', '32767');
+error_clear_last();
+#[\NoDiscard]
+function must_use(): int {
+    return 42;
+}
+(void) must_use();
+$last = error_get_last();
+echo null === $last ? 'ok' : ($last['message'] ?? 'warn');
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'void_cast_nodiscard.php'));
+            $this->assertSame('ok', ob_get_clean());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

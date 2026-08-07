@@ -1,5 +1,5 @@
 <?php
-// Issue #28183 — PROFILE=8.5 (void) cast must ParseError like Zend 8.5.8
+// Issue #28441 / #28183 — PROFILE=8.5: assignment (void) remains ParseError (statement-only)
 try {
     eval('$b = (void)1; var_export($b);');
     echo "\n";

@@ -7,10 +7,11 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar `(void)` cast for nikic/php-parser when the language profile enables it (#7346).
+ * Desugar statement-level `(void)` cast for nikic/php-parser when PROFILE≥8.5 (#7346, #28441).
  *
- * php-src through 8.5.8 has no T_VOID_CAST (Zend/zend_language_scanner.l) — see #28183.
- * Gated on {@see CompilerVersion::supportsVoidCast()} (currently always false).
+ * php-src: Zend/zend_language_parser.y — `T_VOID_CAST expr ';'` is a statement (not an expression).
+ * `$x = (void)1` must remain a ParseError; only rewrite at statement boundaries.
+ * Gated on {@see CompilerVersion::supportsVoidCast()}.
  */
 final class VoidCastDesugar
 {
@@ -29,6 +30,9 @@ final class VoidCastDesugar
         $replacements = [];
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             if (!self::isVoidCastPrefix($tokens, $i, $voidCloseIdx)) {
+                continue;
+            }
+            if (!self::isStatementBoundaryBefore($tokens, $i)) {
                 continue;
             }
             $exprStartIdx = $voidCloseIdx + 1;
@@ -63,6 +67,35 @@ final class VoidCastDesugar
         }
 
         return $code;
+    }
+
+
+    /**
+     * Zend only accepts T_VOID_CAST as a statement (or for-expr list), not inside expressions.
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function isStatementBoundaryBefore(array $tokens, int $i): bool
+    {
+        $pos = $i - 1;
+        while ($pos >= 0 && self::isIgnorable($tokens[$pos])) {
+            --$pos;
+        }
+        if ($pos < 0) {
+            return true;
+        }
+        $prev = $tokens[$pos];
+        if (\is_string($prev)) {
+            // Statement start after `;` `{` `}` `:` (Zend statement production).
+            // Do not treat `(`/`,` as boundaries — that would accept expr contexts like
+            // `foo((void)1)` / `$x=((void)1)`; for-list `(void)` can land in a follow-up.
+            return \in_array($prev, [';', '{', '}', ':'], true);
+        }
+        if (!\is_array($prev)) {
+            return false;
+        }
+
+        return \in_array($prev[0], [\T_OPEN_TAG, \T_OPEN_TAG_WITH_ECHO], true);
     }
 
     /**
