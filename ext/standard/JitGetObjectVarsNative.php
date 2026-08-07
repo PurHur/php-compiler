@@ -56,10 +56,11 @@ final class JitGetObjectVarsNative
                 $context->builder->structGep($valuePtr, $typeField)
             );
             $i8 = $context->getTypeFromString('int8');
+            $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
             $isEnumCase = $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_ENUM_CASE, false)
+                $kind,
+                $i8->constInt(Variable::TYPE_ENUM_CASE & 0x7f, false)
             );
             $enumBlock = BasicBlockHelper::append($context, 'get_object_vars_enum_box');
             $plainBlock = BasicBlockHelper::append($context, 'get_object_vars_plain_box');
@@ -450,10 +451,12 @@ final class JitGetObjectVarsNative
             $context->builder->structGep($valuePtr, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED — boxed objects often carry type|0x80 (#28638).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $okBlock = BasicBlockHelper::append($context, 'get_object_vars_ok');
         $errBlock = BasicBlockHelper::append($context, 'get_object_vars_err');

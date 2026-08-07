@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringJsonEncode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableReplaceRecursiveLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -18,6 +19,7 @@ use PHPLLVM\Value;
  *
  * Boxed `__value__*` arrays (get_object_vars AOT) must use the hashtable ABI —
  * NestedJIT encodeValue resolveIndirect on those boxes SIGSEGVs (#27020).
+ * Objects: NestedJIT encodeValue quotes class names — route via get_object_vars (#28638).
  */
 final class JitJsonEncode
 {
@@ -31,6 +33,8 @@ final class JitJsonEncode
             $ht = JITVariable::TYPE_HASHTABLE === $arg->type
                 ? $context->helper->loadValue($arg)
                 : ArrayBuiltinHelper::loadHashTable($context, $arg);
+            // gov / string-key HTs: rematerialize so NestedJIT export is non-empty (#28638 / #26977).
+            $ht = HashTableReplaceRecursiveLlvm::replaceSingle($context, $ht);
 
             return self::stringOrFalse(
                 $context,
@@ -39,6 +43,12 @@ final class JitJsonEncode
                     $ht,
                     $flags
                 )
+            );
+        }
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return self::stringOrFalse(
+                $context,
+                self::encodeObjectPublicProps($context, $arg, $flags)
             );
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
@@ -63,7 +73,30 @@ final class JitJsonEncode
     }
 
     /**
-     * Route boxed hashtables to `__compiler_json_encode_array` (#27020).
+     * Public props via get_object_vars + FORCE_OBJECT so empty objects encode as {} (#28638).
+     * php-src: ext/json/json_encoder.c — php_json_encode_object / zend_get_properties_for
+     */
+    private static function encodeObjectPublicProps(Context $context, JITVariable $arg, Value $flags): Value
+    {
+        $boxed = JitGetObjectVars::invoke($context, $arg, false);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $boxed
+        );
+        // get_object_vars HTs are dim/count-green but NestedJIT export-empty (#28638 / #26977).
+        $ht = HashTableReplaceRecursiveLlvm::replaceSingle($context, $ht);
+        $force = $context->getTypeFromString('int64')->constInt(VmJsonFlags::FORCE_OBJECT, false);
+        $flagsObj = $context->builder->or($flags, $force);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_json_encode_array'),
+            $ht,
+            $flagsObj
+        );
+    }
+
+    /**
+     * Route boxed hashtables / objects — NestedJIT encodeValue quotes class names (#27020 / #28638).
      */
     private static function encodeBoxedValue(Context $context, Value $valuePtr, Value $flags): Value
     {
@@ -79,24 +112,41 @@ final class JitJsonEncode
             $kind,
             $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false)
         );
+        $isObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JITVariable::TYPE_OBJECT & 0x7f, false)
+        );
 
         $id = (string) (++self::$blockSerial);
         $htBlock = BasicBlockHelper::append($context, 'json_encode_boxed_ht_'.$id);
+        $objCheck = BasicBlockHelper::append($context, 'json_encode_boxed_objchk_'.$id);
+        $objBlock = BasicBlockHelper::append($context, 'json_encode_boxed_obj_'.$id);
         $valueBlock = BasicBlockHelper::append($context, 'json_encode_boxed_value_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'json_encode_boxed_done_'.$id);
-        $context->builder->branchIf($isHt, $htBlock, $valueBlock);
+        $context->builder->branchIf($isHt, $htBlock, $objCheck);
 
         $context->builder->positionAtEnd($htBlock);
         $ht = $context->builder->call(
             $context->lookupFunction('__value__readHashtable'),
             $valuePtr
         );
+        $ht = HashTableReplaceRecursiveLlvm::replaceSingle($context, $ht);
         $htResult = $context->builder->call(
             $context->lookupFunction('__compiler_json_encode_array'),
             $ht,
             $flags
         );
         $htEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objCheck);
+        $context->builder->branchIf($isObj, $objBlock, $valueBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $objVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VALUE, $valuePtr);
+        $objResult = self::encodeObjectPublicProps($context, $objVar, $flags);
+        $objEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($valueBlock);
@@ -112,6 +162,7 @@ final class JitJsonEncode
         $strPtr = $context->getTypeFromString('__string__*');
         $phi = $context->builder->phi($strPtr, 'json_encode_boxed_phi_'.$id);
         $phi->addIncoming($htResult, $htEnd);
+        $phi->addIncoming($objResult, $objEnd);
         $phi->addIncoming($valueResult, $valueEnd);
 
         return $phi;

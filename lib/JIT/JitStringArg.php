@@ -169,6 +169,12 @@ final class JitStringArg
 
     public static function compileTimeLiteral(Variable $arg): ?string
     {
+        // Object temps stash the class name in compileTimeString (#26872) — that is not a
+        // string literal (json_encode would fold to "\"stdClass\"" — #28638).
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return null;
+        }
+
         return $arg->compileTimeString ?? null;
     }
 

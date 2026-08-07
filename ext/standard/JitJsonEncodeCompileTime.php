@@ -47,6 +47,10 @@ final class JitJsonEncodeCompileTime
         if (null === $block || null === $operand) {
             return null;
         }
+        $stdClass = self::tryCompileTimeStdClassFromOperand($block, $operand);
+        if (null !== $stdClass) {
+            return self::emitEncodedExported($context, $stdClass, $flags);
+        }
         $vmArray = CallUnpackHelper::tryCompileTimeArrayFromOperand($block, $operand);
         if (null === $vmArray) {
             $vmArray = self::tryCompileTimeArrayFromPregSplit($block, $operand);
@@ -158,6 +162,190 @@ final class JitJsonEncodeCompileTime
         JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
 
         return JitValueBox::pointer($context, $slot);
+    }
+
+    /**
+     * True when the operand is rooted at `new ClassName` (class-name stamp, not a string) (#28638).
+     */
+    public static function operandIsNewObject(?Block $block, ?Operand $operand): bool
+    {
+        if (null === $block || null === $operand) {
+            return false;
+        }
+
+        return null !== self::findNewResultSlot($block, $block->getVarSlot($operand, true));
+    }
+
+    /**
+     * Fold `json_encode($o)` when $o is `new stdClass` plus literal property writes (#28638).
+     *
+     * Thin AOT NestedJIT cannot yet encode get_object_vars() hashtables (SIGSEGV) — same
+     * class of gap as array_* folds above. php-src: ext/json/json_encoder.c object walk.
+     */
+    private static function tryCompileTimeStdClassFromOperand(Block $block, Operand $operand): ?\stdClass
+    {
+        $holderSlot = $block->getVarSlot($operand, true);
+        $newSlot = self::findNewResultSlot($block, $holderSlot);
+        if (null === $newSlot || !self::newResultIsStdClass($block, $newSlot)) {
+            return null;
+        }
+        $props = self::collectLiteralPropertyWrites($block, $holderSlot);
+        if (null === $props) {
+            return null;
+        }
+        $obj = new \stdClass();
+        foreach ($props as $name => $value) {
+            $obj->{$name} = $value;
+        }
+
+        return $obj;
+    }
+
+    /** @return Value|null */
+    private static function emitEncodedExported(Context $context, mixed $exported, int $flags): ?Value
+    {
+        try {
+            $encoded = VmJsonFormat::encodeExported($exported, $flags);
+        } catch (VmJsonExportException $e) {
+            if (VmJsonFlags::throwsOnError($flags)) {
+                return JitJsonThrow::emitFromException(
+                    $context,
+                    new \JsonException(VmJson::errorMsgForCode($e->errorCode), $e->errorCode)
+                );
+            }
+            self::emitSetLastError($context, $e->errorCode);
+
+            return self::emitFalse($context);
+        } catch (\JsonException $e) {
+            return JitJsonThrow::emitFromException($context, $e);
+        }
+        $sticky = VmJson::lastError();
+        if (false === $encoded) {
+            if (VmJsonFlags::throwsOnError($flags)) {
+                throw new \LogicException('json_encode() THROW path returned false');
+            }
+            self::emitSetLastError($context, $sticky);
+
+            return self::emitFalse($context);
+        }
+        if (0 !== $sticky) {
+            self::emitSetLastError($context, $sticky);
+        }
+
+        return $context->builder->load($context->constantStringFromString($encoded));
+    }
+
+    /**
+     * Walk ASSIGN chains to the TYPE_NEW result slot, or null if not from `new`.
+     *
+     * @param array<int, true> $visited
+     */
+    private static function findNewResultSlot(Block $block, int $slot, array &$visited = []): ?int
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type && $op->arg1 === $slot) {
+                return $slot;
+            }
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $slot || null === $op->arg3) {
+                continue;
+            }
+            $found = self::findNewResultSlot($block, (int) $op->arg3, $visited);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    private static function newResultIsStdClass(Block $block, int $newResultSlot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW !== $op->type || $op->arg1 !== $newResultSlot) {
+                continue;
+            }
+            if (null === $op->arg2 || !isset($block->constants[$op->arg2])) {
+                return false;
+            }
+            $class = $block->constants[$op->arg2];
+            if (VmVariable::TYPE_STRING !== $class->type) {
+                return false;
+            }
+
+            return 0 === \strcasecmp(\ltrim($class->toString(), '\\'), 'stdClass');
+        }
+
+        return false;
+    }
+
+    /**
+     * Literal `$obj->prop = …` writes on $objSlot. Null if any write is non-literal.
+     *
+     * @return array<string, mixed>|null
+     */
+    private static function collectLiteralPropertyWrites(Block $block, int $objSlot): ?array
+    {
+        $props = [];
+        $n = \count($block->opCodes);
+        for ($i = 0; $i < $n; ++$i) {
+            $op = $block->opCodes[$i];
+            if (
+                OpCode::TYPE_PROPERTY_FETCH !== $op->type
+                && OpCode::TYPE_PROPERTY_FETCH_WRITE !== $op->type
+            ) {
+                continue;
+            }
+            if ($op->arg2 !== $objSlot || null === $op->arg1 || null === $op->arg3) {
+                continue;
+            }
+            if (!isset($block->constants[$op->arg3]) || VmVariable::TYPE_STRING !== $block->constants[$op->arg3]->type) {
+                return null;
+            }
+            $name = $block->constants[$op->arg3]->toString();
+            $propSlot = (int) $op->arg1;
+            $assigned = false;
+            for ($j = $i + 1; $j < $n; ++$j) {
+                $assign = $block->opCodes[$j];
+                if (OpCode::TYPE_ASSIGN !== $assign->type || $assign->arg2 !== $propSlot || null === $assign->arg3) {
+                    continue;
+                }
+                $php = self::compileTimeExportedValue($block, (int) $assign->arg3);
+                if (false === $php) {
+                    return null;
+                }
+                $props[$name] = $php;
+                $assigned = true;
+                break;
+            }
+            if (!$assigned) {
+                continue;
+            }
+        }
+
+        return $props;
+    }
+
+    /**
+     * @return mixed|false false = not a compile-time scalar/array
+     */
+    private static function compileTimeExportedValue(Block $block, int $slot): mixed
+    {
+        if (!isset($block->constants[$slot])) {
+            return false;
+        }
+        $vm = new VmVariable();
+        $vm->copyFrom($block->constants[$slot]);
+        try {
+            return VmJson::export($vm);
+        } catch (VmJsonExportException $e) {
+            return false;
+        }
     }
 
     /**
