@@ -683,7 +683,6 @@ class Module extends ModuleAbstract
             new phpc_access_kernel(),
             new phpc_fpow_kernel(),
             new phpc_nextafter_kernel(),
-            new phpc_atan2_kernel(),
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
 
