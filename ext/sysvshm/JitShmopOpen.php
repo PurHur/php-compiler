@@ -47,8 +47,17 @@ final class JitShmopOpen
             $i64
         );
 
+        // Allocate first, then open+register in one NestedJIT call so segment
+        // metadata is not passed via pending statics (thin AOT #28433 / #27423).
+        $objPtr = self::allocateShmopObject($context);
+        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $objAddr = $context->builder->ptrToInt(
+            $context->builder->pointerCast($objPtr, $voidp),
+            $i64
+        );
         $shmid = $context->builder->call(
-            $context->lookupFunction('__compiler_shmop_open'),
+            $context->lookupFunction('__compiler_shmop_open_register'),
+            $objAddr,
             $key,
             $modeChar,
             $permissions,
@@ -70,23 +79,6 @@ final class JitShmopOpen
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($okBb);
-        $objPtr = self::allocateShmopObject($context);
-        $voidp = $context->getTypeFromString('void')->pointerType(0);
-        $objAddr = $context->builder->ptrToInt(
-            $context->builder->pointerCast($objPtr, $voidp),
-            $i64
-        );
-        $addr = $context->builder->call($context->lookupFunction('__compiler_shmop_pending_addr'));
-        $segSize = $context->builder->call($context->lookupFunction('__compiler_shmop_pending_size'));
-        $readonly = $context->builder->call($context->lookupFunction('__compiler_shmop_pending_readonly'));
-        $context->builder->call(
-            $context->lookupFunction('__compiler_shmop_register'),
-            $objAddr,
-            $shmid,
-            $addr,
-            $segSize,
-            $readonly
-        );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

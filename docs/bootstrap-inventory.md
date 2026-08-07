@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7187 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23099 |
+| Source constructs flagged (warnings) | 23097 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4627,7 +4627,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/JitShmopWrite.php` | 0 | 1 |
 | `ext/sysvshm/Module.php` | 0 | 14 |
 | `ext/sysvshm/ShmopArgs.php` | 0 | 2 |
-| `ext/sysvshm/ShmopJitHelper.php` | 0 | 2 |
 | `ext/sysvshm/ShmopLibcThinAbi.php` | 0 | 1 |
 | `ext/sysvshm/SysvIpcSerializeDeny.php` | 0 | 3 |
 | `ext/sysvshm/SysvShmArgs.php` | 0 | 2 |
@@ -41115,12 +41114,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 20)
 - 10 class method(s)
 
-### `ext/sysvshm/ShmopJitHelper.php`
-
-**Warnings** (review for bootstrap subset):
-- new Error (line 139)
-- 11 class method(s)
-
 ### `ext/sysvshm/ShmopLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
@@ -48120,7 +48113,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ShmopRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/ShuffleRuntime.php`
 

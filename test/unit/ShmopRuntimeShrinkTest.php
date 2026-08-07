@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** shmop_* JIT routes through ShmopJitHelper / ShmopRuntime (#27408). */
+/** shmop_* JIT routes through ShmopRuntime LLVM libc (#27408 / #28433). */
 final class ShmopRuntimeShrinkTest extends TestCase
 {
     public function testShmopOpenCallUsesJitShmopOpen(): void
@@ -30,19 +30,15 @@ final class ShmopRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('not supported for JIT/AOT', $source);
     }
 
-    public function testShmopJitHelperUsesLibcThinAbi(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/sysvshm/ShmopJitHelper.php');
-        $this->assertStringContainsString('ShmopLibcThinAbi::', $source);
-        $this->assertStringContainsString('openLibc', $source);
-    }
-
-    public function testShmopRuntimeUsesJitVmHelperLinkEnsureCompiled(): void
+    public function testShmopRuntimeIsPureLlvmNoNestedJitMap(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ShmopRuntime.php');
-        $this->assertStringContainsString('::openArgv', $source);
-        $this->assertStringContainsString('__compiler_shmop_open', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('__compiler_shmop_open_register', $source);
+        $this->assertStringContainsString('shmget', $source);
+        $this->assertStringContainsString('shmat', $source);
+        $this->assertStringContainsString('memcpy', $source);
+        $this->assertStringContainsString('__compiler_shmop_owned_map', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
     }
