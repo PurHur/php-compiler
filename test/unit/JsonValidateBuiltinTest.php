@@ -88,8 +88,10 @@ final class JsonValidateBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
-    public function testNullJsonThrowsTypeErrorOnForwardProfile84(): void
+    public function testNullJsonSoftNullFalseOnForwardProfile84(): void
     {
+        // Zend 8.4: soft-null → '' → false (#28333). E_DEPRECATED is emitted when VM::running()
+        // is set (compliance/json_validate_null_forward_profile.phpt); direct execute() skips it.
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
@@ -100,8 +102,9 @@ final class JsonValidateBuiltinTest extends TestCase
             $jsonVar->null();
             $frame->calledArgs = [$jsonVar];
             $frame->returnVar = new VMVariable();
-            $this->expectException(\TypeError::class);
             $fn->execute($frame);
+            $this->assertFalse($frame->returnVar->resolveIndirect()->toBool());
+            $this->assertFalse(\PHPCompiler\CompilerVersion::jsonValidateStringOperandRequiresStrictType());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

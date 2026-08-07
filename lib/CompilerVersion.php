@@ -1034,8 +1034,7 @@ final class CompilerVersion
     /**
      * json_decode() $json — soft-null (DEP+coerce) on 8.4 forward profile, matching Zend (#21223).
      *
-     * Distinct from {@see jsonValidateStringOperandRequiresStrictType()}: ext/json/json.c uses
-     * Z_PARAM_STRING for json_validate but json_decode(null) still DEP+coerces in Zend 8.4.
+     * Same soft-null path as {@see jsonValidateStringOperandRequiresStrictType()} (#28333).
      */
     public static function jsonStringOperandRequiresStrictType(): bool
     {
@@ -1043,13 +1042,15 @@ final class CompilerVersion
     }
 
     /**
-     * json_validate() $json — Z_PARAM_STRING TypeError on null under PROFILE≥8.4 (#27995, #26190).
+     * json_validate() $json — soft-null (DEP+coerce to '') then false under PROFILE≥8.4 (#28333).
      *
-     * php-src: ext/json/json.c `PHP_FUNCTION(json_validate)` / `Z_PARAM_STRING(str, str_len)`.
+     * Prior tickets (#27995/#26190) claimed Zend TypeError; real Zend 8.4 uses Z_PARAM_STR soft-null
+     * (E_DEPRECATED + empty string → invalid JSON → false). Kept returning false so leftover gates
+     * stay soft. php-src: ext/json/json.stub.php `json_validate(string $json, …): bool`.
      */
     public static function jsonValidateStringOperandRequiresStrictType(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
