@@ -37,10 +37,6 @@ final class JitNativeString
             return $var;
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast($context, $var);
-            if (null !== $sxeFold) {
-                return $sxeFold;
-            }
             // Operand PHPTypes userType — Variable::$type is an int, so echo/cast must pass the hint (#26821).
             if (null === $classHint || '' === $classHint) {
                 $fromOp = $sourceOperand?->type?->userType ?? null;
@@ -57,6 +53,15 @@ final class JitNativeString
                 $classHint = $var->magicGetOverloadedClass;
             }
             $classHint = null !== $classHint ? ltrim($classHint, '\\') : null;
+            // Resolve class hint before SXE fold — baked SXE slots must not run on plain objects (#28646).
+            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
+                $context,
+                $var,
+                $classHint
+            );
+            if (null !== $sxeFold) {
+                return $sxeFold;
+            }
             $magic = MagicMethodDispatch::coerceObjectToString(
                 $context,
                 $var,
@@ -112,7 +117,21 @@ final class JitNativeString
         }
         if (Variable::TYPE_VALUE === $var->type) {
             self::ensureInsertBlock($context);
-            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast($context, $var);
+            // Named locals are often value-boxed objects; strval() does not call __toString (#26821).
+            if (null === $classHint || '' === $classHint) {
+                $fromOp = $sourceOperand?->type?->userType ?? null;
+                if (\is_string($fromOp) && '' !== ltrim($fromOp, '\\')) {
+                    $classHint = ltrim($fromOp, '\\');
+                }
+            } else {
+                $classHint = ltrim($classHint, '\\');
+            }
+            // Class hint before SXE fold — same #28646 guard as TYPE_OBJECT.
+            $sxeFold = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryFoldStringCast(
+                $context,
+                $var,
+                $classHint
+            );
             if (null !== $sxeFold) {
                 return $sxeFold;
             }
@@ -125,15 +144,6 @@ final class JitNativeString
                     Variable::KIND_VALUE,
                     $context->builder->load($context->constantStringFromString($bcCt['value']))
                 );
-            }
-            // Named locals are often value-boxed objects; strval() does not call __toString (#26821).
-            if (null === $classHint || '' === $classHint) {
-                $fromOp = $sourceOperand?->type?->userType ?? null;
-                if (\is_string($fromOp) && '' !== ltrim($fromOp, '\\')) {
-                    $classHint = ltrim($fromOp, '\\');
-                }
-            } else {
-                $classHint = ltrim($classHint, '\\');
             }
             if (
                 null !== $classHint

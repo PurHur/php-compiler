@@ -290,9 +290,14 @@ final class JitSimpleXmlUserScript
      * Fold string cast of a known SXE without a class hint (#26863).
      * Exact host-tree match, else baked text on a TYPE_OBJECT SXE (#27535).
      * Must not treat opaque TYPE_VALUE (e.g. `$k = "a"`) as SXE (#28625).
+     * Must not read SXE baked slots on unrelated TYPE_OBJECT (plain `__toString`
+     * classes) — that GEPs past the object header and segfaults under AOT (#28646).
      */
-    public static function tryFoldStringCast(Context $context, JITVariable $var): ?JITVariable
-    {
+    public static function tryFoldStringCast(
+        Context $context,
+        JITVariable $var,
+        ?string $classHint = null
+    ): ?JITVariable {
         if (!UserScriptAotEnv::isActive() || !\extension_loaded('simplexml')) {
             return null;
         }
@@ -310,6 +315,10 @@ final class JitSimpleXmlUserScript
         if (JITVariable::TYPE_OBJECT !== $var->type) {
             return null;
         }
+        // Known non-SXE class → leave cast to MagicMethod / __toString (#28646).
+        if (!self::classHintMayBeSimpleXmlElement($context, $classHint)) {
+            return null;
+        }
         $boxed = self::readBakedStringProp($context, $var, self::BAKED_TEXT_PROP);
         if (null === $boxed) {
             return null;
@@ -325,6 +334,34 @@ final class JitSimpleXmlUserScript
             JITVariable::KIND_VALUE,
             $str
         );
+    }
+
+    /**
+     * Whether a compile-time class hint may refer to SimpleXMLElement (or subclass).
+     * Null / object / unknown keep the legacy baked path for untyped SXE temps.
+     */
+    private static function classHintMayBeSimpleXmlElement(Context $context, ?string $classHint): bool
+    {
+        if (null === $classHint || '' === $classHint) {
+            return true;
+        }
+        $lc = strtolower(ltrim($classHint, '\\'));
+        if ('object' === $lc || 'unknown' === $lc) {
+            return true;
+        }
+        if ('simplexmlelement' === $lc || 'simplemxml_element' === $lc) {
+            return true;
+        }
+        $object = $context->type->object;
+        try {
+            if ($object->classIsSubclassOf($lc, 'simplexmlelement')) {
+                return true;
+            }
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return false;
     }
 
     /**
