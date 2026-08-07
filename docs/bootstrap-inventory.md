@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7207 |
-| Phase A inventory files (M2 ratio SSOT) | 7207 |
+| PHP files on vm.php path | 7210 |
+| Phase A inventory files (M2 ratio SSOT) | 7210 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23264 |
+| Source constructs flagged (warnings) | 23271 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1383,8 +1383,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/ldap_result_builtins.php` | 0 | 10 |
 | `ext/ldap/ldap_search_builtins.php` | 0 | 14 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
+| `ext/libxml/JitLibxmlUseInternalErrors.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
+| `ext/libxml/LibxmlInternalErrorsJitHelper.php` | 0 | 1 |
 | `ext/libxml/Module.php` | 0 | 10 |
 | `ext/libxml/VmLibxml.php` | 0 | 20 |
 | `ext/libxml/libxml_clear_errors.php` | 0 | 1 |
@@ -2880,8 +2882,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitIteratorToArray.php` | 0 | 14 |
 | `ext/standard/JitIteratorWalk.php` | 0 | 3 |
 | `ext/standard/JitJsonDecode.php` | 0 | 1 |
-| `ext/standard/JitJsonEncode.php` | 0 | 1 |
-| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 24 |
+| `ext/standard/JitJsonEncode.php` | 0 | 2 |
+| `ext/standard/JitJsonEncodeCompileTime.php` | 0 | 27 |
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
 | `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitJsonThrow.php` | 0 | 1 |
@@ -5419,6 +5421,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Lcg.php` | 0 | 1 |
 | `lib/JIT/Builtin/LdapRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LibcryptRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LocaleParser.php` | 0 | 1 |
@@ -10138,9 +10141,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomXPathQueryUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 148)
-- new DOMDocument (line 197)
-- new DOMXPath (line 203)
+- new JITVariable (line 149)
+- new DOMDocument (line 198)
+- new DOMXPath (line 204)
 - 7 class method(s)
 - 1 closure(s)
 
@@ -18048,6 +18051,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/libxml/JitLibxmlUseInternalErrors.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/libxml/LibxmlConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18057,6 +18065,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/libxml/LibxmlInternalErrorsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/libxml/Module.php`
 
@@ -18075,25 +18088,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/VmLibxml.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 49)
-- new ClassEntry (line 50)
+- new Variable (line 46)
+- new Variable (line 47)
+- new ClassEntry (line 48)
+- new ClassProperty (line 50)
+- new ClassProperty (line 51)
 - new ClassProperty (line 52)
 - new ClassProperty (line 53)
 - new ClassProperty (line 54)
 - new ClassProperty (line 55)
-- new ClassProperty (line 56)
-- new ClassProperty (line 57)
-- new Variable (line 116)
-- new Variable (line 164)
-- new Variable (line 170)
-- new HashTable (line 228)
-- new Variable (line 230)
-- new Variable (line 234)
-- new HashTable (line 308)
-- new Variable (line 321)
-- new ObjectEntry (line 384)
-- new Variable (line 393)
+- new Variable (line 109)
+- new Variable (line 157)
+- new Variable (line 163)
+- new HashTable (line 221)
+- new Variable (line 223)
+- new Variable (line 227)
+- new HashTable (line 301)
+- new Variable (line 314)
+- new ObjectEntry (line 377)
+- new Variable (line 386)
 - 21 class method(s)
 
 ### `ext/libxml/libxml_clear_errors.php`
@@ -18138,8 +18151,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/libxml_use_internal_errors.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
+- new ArgumentCountError (line 25)
+- 2 class method(s)
 
 ### `ext/lz4/JitLz4.php`
 
@@ -29372,7 +29385,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetObjectVarsNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 348)
+- new JITVariable (line 349)
 - 22 class method(s)
 
 ### `ext/standard/JitGetParentClass.php`
@@ -29774,35 +29787,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitJsonEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new JITVariable (line 147)
+- 4 class method(s)
 
 ### `ext/standard/JitJsonEncodeCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 113)
-- new VmVariable (line 173)
-- new HashTable (line 191)
-- new VmVariable (line 193)
-- new VmVariable (line 197)
-- new HashTable (line 255)
-- new VmVariable (line 257)
-- new VmVariable (line 263)
-- new VmVariable (line 267)
-- new VmVariable (line 390)
-- new VmVariable (line 417)
-- new VmVariable (line 449)
-- new VmVariable (line 483)
-- new VmVariable (line 521)
-- new VmVariable (line 587)
-- new VmVariable (line 621)
-- new VmVariable (line 649)
-- new VmVariable (line 683)
-- new VmVariable (line 706)
-- new VmVariable (line 714)
-- new VmVariable (line 900)
-- new VmVariable (line 908)
-- new VmVariable (line 916)
-- 28 class method(s)
+- new JsonException (line 117)
+- new stdClass (line 196)
+- new JsonException (line 213)
+- new VmVariable (line 342)
+- new VmVariable (line 361)
+- new HashTable (line 379)
+- new VmVariable (line 381)
+- new VmVariable (line 385)
+- new HashTable (line 443)
+- new VmVariable (line 445)
+- new VmVariable (line 451)
+- new VmVariable (line 455)
+- new VmVariable (line 578)
+- new VmVariable (line 605)
+- new VmVariable (line 637)
+- new VmVariable (line 671)
+- new VmVariable (line 709)
+- new VmVariable (line 775)
+- new VmVariable (line 809)
+- new VmVariable (line 837)
+- new VmVariable (line 871)
+- new VmVariable (line 894)
+- new VmVariable (line 902)
+- new VmVariable (line 1088)
+- new VmVariable (line 1096)
+- new VmVariable (line 1104)
+- 35 class method(s)
 
 ### `ext/standard/JitJsonLastError.php`
 
@@ -47445,6 +47462,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `lib/JIT/Builtin/LibxmlUseInternalErrorsRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/ListSpreadTailRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49809,25 +49831,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2602)
 - new Variable (line 2615)
 - new Variable (line 2814)
-- new VMVariable (line 4380)
-- new VMVariable (line 4400)
-- new VMVariable (line 4410)
-- new VMVariable (line 4430)
-- new ReflectionClassConstant (line 6201)
-- new Variable (line 6620)
-- new Variable (line 6646)
-- new Variable (line 6654)
-- new Variable (line 6677)
-- new Variable (line 6703)
-- new Variable (line 6711)
-- new Variable (line 6785)
-- new Literal (line 6802)
-- new Literal (line 6807)
-- new Literal (line 6812)
-- new Variable (line 6823)
-- new Variable (line 6856)
-- new Variable (line 6879)
-- new Variable (line 7267)
+- new VMVariable (line 4383)
+- new VMVariable (line 4403)
+- new VMVariable (line 4413)
+- new VMVariable (line 4433)
+- new ReflectionClassConstant (line 6204)
+- new Variable (line 6623)
+- new Variable (line 6649)
+- new Variable (line 6657)
+- new Variable (line 6680)
+- new Variable (line 6706)
+- new Variable (line 6714)
+- new Variable (line 6788)
+- new Literal (line 6805)
+- new Literal (line 6810)
+- new Literal (line 6815)
+- new Variable (line 6826)
+- new Variable (line 6859)
+- new Variable (line 6882)
+- new Variable (line 7270)
 - 297 class method(s)
 - 8 closure(s)
 
