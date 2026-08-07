@@ -2284,11 +2284,15 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ ReflectionClass::{getDeprecatedMessage,getDeprecatedVersion,getLazyPropertyNames,
-     * getReadOnlyProperties,isStatic} and ReflectionMethod::{getDeprecatedMessage,getDeprecatedVersion}
+     * getReadOnlyProperties} and ReflectionMethod::{getDeprecatedMessage,getDeprecatedVersion}
      * (ext/reflection/php_reflection.stub.php, #22599, #25058; re-#6917/#6606).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev / PROFILE=8.2 matches Zend 8.2
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     *
+     * Note: ReflectionClass::isStatic() is withheld on every profile — the static-class RFC never
+     * landed in php-src; isStatic exists only on ReflectionFunctionAbstract / ReflectionProperty
+     * (#28518). Do not re-advertise it under this gate.
      */
     public static function supportsReflectionClassPhp84Apis(): bool
     {

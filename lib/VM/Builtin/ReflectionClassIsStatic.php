@@ -8,7 +8,13 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionClass::isStatic() — VM (#6929, ext/reflection/php_reflection.c, PHP 8.4). */
+/**
+ * Former ReflectionClass::isStatic() implementation (#6929).
+ *
+ * Unregistered on every profile: static-class RFC never merged; php-src stub has isStatic only on
+ * ReflectionFunctionAbstract / ReflectionProperty (#28518). Kept loadable for spine/inventory
+ * stability — do not re-register on ReflectionClass.
+ */
 final class ReflectionClassIsStatic extends VmClassMethod
 {
     public function __construct()
