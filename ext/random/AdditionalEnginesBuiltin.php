@@ -35,6 +35,8 @@ final class AdditionalEnginesBuiltin
             return;
         }
         $entry = $ctx->classes[self::SECURE_LC] ?? new ClassEntry('Random\\Engine\\Secure');
+        // php-src `final class Secure` (ext/random/random.stub.php; #28387).
+        $entry->isFinal = true;
         $entry->interfaces = ['random\\cryptosafeengine'];
         $entry->methods['generate'] = new SecureGenerate();
         $entry->methodVisibility['generate'] = CfgFunc::FLAG_PUBLIC;
@@ -48,6 +50,8 @@ final class AdditionalEnginesBuiltin
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry = $ctx->classes[self::XOSHIRO_LC] ?? new ClassEntry('Random\\Engine\\Xoshiro256StarStar');
+        // php-src `final class Xoshiro256StarStar` (ext/random/random.stub.php; #28387).
+        $entry->isFinal = true;
         $entry->interfaces = ['random\\engine'];
         $entry->constructor = new XoshiroConstruct();
         $entry->methods['__construct'] = $entry->constructor;
@@ -71,6 +75,8 @@ final class AdditionalEnginesBuiltin
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry = $ctx->classes[self::PCG_LC] ?? new ClassEntry('Random\\Engine\\PcgOneseq128XslRr64');
+        // php-src `final class PcgOneseq128XslRr64` (ext/random/random.stub.php; #28387).
+        $entry->isFinal = true;
         $entry->interfaces = ['random\\engine'];
         $entry->constructor = new PcgConstruct();
         $entry->methods['__construct'] = $entry->constructor;

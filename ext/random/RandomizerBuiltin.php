@@ -309,6 +309,8 @@ final class RandomizerBuiltin
         $entry = isset($ctx->classes[self::MT19937_LC])
             ? $ctx->classes[self::MT19937_LC]
             : new ClassEntry('Random\\Engine\\Mt19937');
+        // php-src `final class Mt19937` (ext/random/random.stub.php; #28387).
+        $entry->isFinal = true;
 
         $entry->constructor = new Mt19937Construct();
         $entry->methods['__construct'] = $entry->constructor;
@@ -337,6 +339,8 @@ final class RandomizerBuiltin
         $entry = isset($ctx->classes[self::RANDOMIZER_LC])
             ? $ctx->classes[self::RANDOMIZER_LC]
             : new ClassEntry('Random\\Randomizer');
+        // php-src `final class Randomizer` (ext/random/random.stub.php; #28387).
+        $entry->isFinal = true;
 
         $entry->properties[] = new \PHPCompiler\VM\ClassProperty('engine', null, new Variable(Variable::TYPE_OBJECT), true);
 
