@@ -13522,6 +13522,12 @@ class Compiler {
                 if (in_array($name, $funcBlock->paramNames, true)) {
                     continue;
                 }
+                // $this is bound via Closure::$this / LLVM __object__*, not use()-style capture
+                // (zend_closures.c). Auto-capturing it made AOT emit (object, value) ABI + an
+                // unreachable assign-from-capture that segfaulted on invoke (#28612).
+                if ('this' === $name) {
+                    continue;
+                }
                 $seenCaptureSlots[$slot] = true;
                 $seenCaptureNames[$name] = true;
                 $funcBlock->closureCaptureSlots[$slot] = true;
@@ -13545,6 +13551,9 @@ class Compiler {
                         continue;
                     }
                     if (in_array($capName, $funcBlock->paramNames, true)) {
+                        continue;
+                    }
+                    if ('this' === $capName) {
                         continue;
                     }
                     $seenCaptureNames[$capName] = true;
