@@ -2289,13 +2289,13 @@ class VM {
             } catch (VM\MagicMethodInvocationAborted $e) {
                 throw $e;
             } catch (\Throwable $hookException) {
-                $this->raiseDebugInfoMustReturnArrayFatal($frame, $hookException);
+                $this->raiseDebugInfoMustReturnArrayFatal($frame, $hookException, $object);
             }
             if (Variable::TYPE_NULL === $result->type) {
                 return [];
             }
             if (Variable::TYPE_ARRAY !== $result->type) {
-                $this->raiseDebugInfoMustReturnArrayFatal($frame, null);
+                $this->raiseDebugInfoMustReturnArrayFatal($frame, null, $object);
             }
             $props = [];
             foreach ($result->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -2340,15 +2340,22 @@ class VM {
     /**
      * php-src zend_std_get_debug_info failure: optional Warning for hook throw, then E_ERROR (#25748).
      *
+     * Warning stack frames match Zend engine-invoke shape (#28618):
+     * `[internal function]: Class->__debugInfo()` then `var_dump()`/`print_r()`/…
+     *
      * @return never
      */
-    private function raiseDebugInfoMustReturnArrayFatal(?Frame $frame, ?\Throwable $hookException): never
-    {
+    private function raiseDebugInfoMustReturnArrayFatal(
+        ?Frame $frame,
+        ?\Throwable $hookException,
+        ObjectEntry $object,
+    ): never {
         if (null !== $hookException) {
             VM\ExceptionSupport::emitNativeUncaughtWarning(
                 $hookException,
                 null,
-                $this->context->errors->getDisplayErrors()
+                $this->context->errors->getDisplayErrors(),
+                VM\ExceptionTrace::buildDebugInfoEngineInvokeTrace($object, $frame),
             );
         }
         $message = '__debuginfo() must return an array';
