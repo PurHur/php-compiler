@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\stats;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MathSqrt;
 use PHPCompiler\JIT\Builtin\Stats;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
@@ -14,7 +15,12 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stats_* builtins via __compiler_stats_* runtime (#5748). */
+/**
+ * LLVM lowering for stats_* builtins via __compiler_stats_* runtime (#5748).
+ *
+ * `stats_standard_deviation` takes √variance via {@see MathSqrt::invoke} — not libc
+ * `sqrt` — so LibcExtern can drop math decls (#28808 / MathSqrt #27888).
+ */
 final class JitStats
 {
     public static function variance(Context $context, JITVariable ...$args): Value
@@ -60,7 +66,7 @@ final class JitStats
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $sqrtVal = $context->builder->call($context->lookupFunction('sqrt'), $var);
+        $sqrtVal = MathSqrt::invoke($context, $var);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $ptr,

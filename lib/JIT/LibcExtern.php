@@ -97,27 +97,9 @@ final class LibcExtern
             'fsync' => [$i32, false, [$i32]],
             'fdatasync' => [$i32, false, [$i32]],
             'flock' => [$i32, false, [$i32, $i32]],
-            'pow' => [$dbl, false, [$dbl, $dbl]],
-            'hypot' => [$dbl, false, [$dbl, $dbl]],
-            'cos' => [$dbl, false, [$dbl]],
-            'cosh' => [$dbl, false, [$dbl]],
-            'sin' => [$dbl, false, [$dbl]],
-            'sinh' => [$dbl, false, [$dbl]],
-            'tan' => [$dbl, false, [$dbl]],
-            'tanh' => [$dbl, false, [$dbl]],
-            'acos' => [$dbl, false, [$dbl]],
-            'asin' => [$dbl, false, [$dbl]],
-            'atan' => [$dbl, false, [$dbl]],
-            'atan2' => [$dbl, false, [$dbl, $dbl]],
-            'acosh' => [$dbl, false, [$dbl]],
-            'asinh' => [$dbl, false, [$dbl]],
-            'atanh' => [$dbl, false, [$dbl]],
-            'exp' => [$dbl, false, [$dbl]],
-            'expm1' => [$dbl, false, [$dbl]],
-            'log' => [$dbl, false, [$dbl]],
-            'log10' => [$dbl, false, [$dbl]],
-            'log1p' => [$dbl, false, [$dbl]],
-            'sqrt' => [$dbl, false, [$dbl]],
+            // Math libc decls removed (#28808): userland Math* + NestedJIT helpers are
+            // PHP SSOT (MathSqrt #27888 … MathNextafter #28716); stats_standard_deviation
+            // routes through MathSqrt::invoke.
 
             // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
             'syscall' => [$i64, true, [$i64]],
