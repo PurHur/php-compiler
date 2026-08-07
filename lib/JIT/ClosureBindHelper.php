@@ -470,6 +470,34 @@ final class ClosureBindHelper
         );
     }
 
+    /**
+     * Persist FCC / fromCallable bound $this + scope on the Closure object.
+     *
+     * AOT invoke goes through {@see Call\RuntimeIndirectClosureCall} →
+     * {@see wrapCallWithBindingFromObject}; without these slots, instance-method
+     * FCC aborts (empty output / SIGABRT) while JIT still works via Variable::closureCall (#28613).
+     */
+    public static function storeFccBoundThisAndScope(
+        Context $context,
+        Value $closureObj,
+        Variable $boundThis,
+        Variable $boundScope
+    ): void {
+        self::ensureClosureBindingProperties($context);
+        $context->type->object->storeInstanceProperty(
+            $closureObj,
+            'Closure',
+            self::BOUND_THIS_PROPERTY,
+            $boundThis
+        );
+        $context->type->object->storeInstanceProperty(
+            $closureObj,
+            'Closure',
+            self::BOUND_SCOPE_PROPERTY,
+            $boundScope
+        );
+    }
+
     /** Mark FCC / fromCallable method wrappers for unbind diagnostics (#23421). */
     public static function storeMethodFakeClosureFlag(Context $context, Value $closureObj): void
     {

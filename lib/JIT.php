@@ -15721,12 +15721,25 @@ class JIT {
         if (null === $value->closureCall) {
             return;
         }
+        // FCC `$b = $obj->m(...)` is CFG-typed as array, so `$b` starts as a hashtable.
+        // Stamping closureCall onto that HT leaves `$b()` aborting under AOT while
+        // `((new C)->m(...))(3)` (temp, still object) works (#28613, peer #24106).
+        if (Variable::TYPE_OBJECT === $value->type && Variable::TYPE_OBJECT !== $result->type) {
+            $this->context->setVariableOp($resultOp, $value);
+            $result = $value;
+        }
         $result->closureCall = $value->closureCall;
         $result->closureIsStatic = $value->closureIsStatic;
         $result->closureIsMethodFake = $value->closureIsMethodFake;
         $resolved = JIT\OperandName::resolve($resultOp);
         if (null !== $resolved && '' !== $resolved) {
             $this->context->bindVariableByName($resolved, $result);
+        }
+        if (null !== $this->context->jitCurrentBlock) {
+            $slot = $this->context->jitCurrentBlock->slotForOperand($resultOp);
+            if (null !== $slot) {
+                $this->context->fccClosureCallByResultSlot[$slot] = $value->closureCall;
+            }
         }
     }
 
@@ -16853,6 +16866,20 @@ class JIT {
                     $result->writableIndex,
                     $value
                 );
+
+                return;
+            }
+            // FCC `$b = $obj->m(...)` is CFG-typed as array, so `$b` is a hashtable slot.
+            // Pointer-casting the Closure to `__hashtable__*` corrupts `$b()` under AOT
+            // (inline `((new C)->m(...))(3)` works; assigned local aborts) (#28613).
+            if (null !== $value->closureCall) {
+                $result->free();
+                $this->context->setVariableOp($resultOp, $value);
+                $this->preserveClosureInvokeMetadata($resultOp, $value, $value);
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $value);
+                }
 
                 return;
             }
