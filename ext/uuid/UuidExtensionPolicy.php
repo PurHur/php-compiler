@@ -44,6 +44,10 @@ final class UuidExtensionPolicy
     /** Run functional uuid compliance when advertised, else phantom only (#23962). */
     public static function runsUuidCompliance(string $testFileName): bool
     {
+        // *_forward84 cases set PROFILE via --ENV--; always include (#27836).
+        if (str_contains($testFileName, 'forward84')) {
+            return true;
+        }
         if (self::advertisesExtension()) {
             return !self::isUuidPhantomComplianceCase($testFileName);
         }

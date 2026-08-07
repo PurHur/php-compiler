@@ -1707,6 +1707,10 @@ final class BuiltinParamNames
                 return ['path', 'suffix='];
             case 'uniqid':
                 return ['prefix', 'more_entropy'];
+            // pecl-networking-uuid uuid.stub.php — uuid_generate_md5/sha1 (#27836)
+            case 'uuid_generate_md5':
+            case 'uuid_generate_sha1':
+                return ['uuid_ns', 'name'];
             case 'gettype':
                 // InternalArgInfo still says `var`; Zend stub is value
                 return ['value'];

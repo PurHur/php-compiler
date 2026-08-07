@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7213 |
-| Phase A inventory files (M2 ratio SSOT) | 7213 |
+| PHP files on vm.php path | 7215 |
+| Phase A inventory files (M2 ratio SSOT) | 7215 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23305 |
+| Source constructs flagged (warnings) | 23311 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4709,7 +4709,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/UriClassMethods.php` | 0 | 71 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
 | `ext/uri/VmUri.php` | 0 | 9 |
-| `ext/uuid/Module.php` | 0 | 13 |
+| `ext/uuid/Module.php` | 0 | 15 |
 | `ext/uuid/UuidConstants.php` | 0 | 1 |
 | `ext/uuid/UuidExtensionPolicy.php` | 0 | 1 |
 | `ext/uuid/UuidFunction.php` | 0 | 1 |
@@ -4718,6 +4718,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uuid/uuid_compare.php` | 0 | 2 |
 | `ext/uuid/uuid_create.php` | 0 | 2 |
 | `ext/uuid/uuid_generate.php` | 0 | 3 |
+| `ext/uuid/uuid_generate_md5.php` | 0 | 2 |
+| `ext/uuid/uuid_generate_sha1.php` | 0 | 2 |
 | `ext/uuid/uuid_is_null.php` | 0 | 2 |
 | `ext/uuid/uuid_is_valid.php` | 0 | 2 |
 | `ext/uuid/uuid_mac.php` | 0 | 2 |
@@ -42127,15 +42129,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\Variable (line 23)
 - new uuid_create (line 36)
 - new uuid_generate (line 37)
-- new uuid_is_valid (line 38)
-- new uuid_parse (line 39)
-- new uuid_unparse (line 40)
-- new uuid_compare (line 41)
-- new uuid_is_null (line 42)
-- new uuid_type (line 43)
-- new uuid_variant (line 44)
-- new uuid_time (line 45)
-- new uuid_mac (line 46)
+- new uuid_generate_md5 (line 38)
+- new uuid_generate_sha1 (line 39)
+- new uuid_is_valid (line 40)
+- new uuid_parse (line 41)
+- new uuid_unparse (line 42)
+- new uuid_compare (line 43)
+- new uuid_is_null (line 44)
+- new uuid_type (line 45)
+- new uuid_variant (line 46)
+- new uuid_time (line 47)
+- new uuid_mac (line 48)
 - 2 class method(s)
 
 ### `ext/uuid/UuidConstants.php`
@@ -42162,7 +42166,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uuid/VmUuid.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- 19 class method(s)
 
 ### `ext/uuid/uuid_compare.php`
 
@@ -42181,6 +42185,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
 - new Variable (line 29)
+- 1 class method(s)
+
+### `ext/uuid/uuid_generate_md5.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_generate_sha1.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/uuid/uuid_is_null.php`
@@ -44761,7 +44777,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1327)
+- new InternalArgInfo (line 1341)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44777,8 +44793,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2305)
-- new ArgumentCountError (line 2316)
+- new ArgumentCountError (line 2309)
+- new ArgumentCountError (line 2320)
 - 19 class method(s)
 - 1 closure(s)
 

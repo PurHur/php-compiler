@@ -4522,6 +4522,8 @@ require_once __DIR__.'/../../../ext/uuid/UuidFunction.php';
 require_once __DIR__.'/../../../ext/uuid/VmUuid.php';
 require_once __DIR__.'/../../../ext/uuid/uuid_create.php';
 require_once __DIR__.'/../../../ext/uuid/uuid_generate.php';
+require_once __DIR__.'/../../../ext/uuid/uuid_generate_md5.php';
+require_once __DIR__.'/../../../ext/uuid/uuid_generate_sha1.php';
 require_once __DIR__.'/../../../ext/uuid/UuidStringArg.php';
 require_once __DIR__.'/../../../ext/uuid/uuid_is_valid.php';
 require_once __DIR__.'/../../../ext/uuid/uuid_parse.php';
