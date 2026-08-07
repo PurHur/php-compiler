@@ -203,6 +203,9 @@ final class BuiltinInternalArgInfo
             'mb_convert_encoding' => 'array|string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
+            // ext/session/session.stub.php — InternalArgInfo empty / absent return; Zend bool / void (#28464)
+            'session_write_close', 'session_commit', 'session_abort', 'session_reset', 'session_unset' => 'bool',
+            'session_register_shutdown' => 'void',
             // ext/iconv/iconv.stub.php — InternalArgInfo return int (missing |false) (#27629)
             'iconv_strlen' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
