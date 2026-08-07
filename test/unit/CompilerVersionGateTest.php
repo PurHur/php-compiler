@@ -192,12 +192,12 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
     }
 
-    public function testSupportsClassHasFunctionsTrueOnForwardProfile(): void
+    public function testSupportsClassHasFunctionsFalseOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
+            $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2862,7 +2862,7 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersClassHasFunctionsOnForwardProfile(): void
+    public function testVmDoesNotRegisterClassHasFunctionsOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
@@ -2870,7 +2870,7 @@ final class CompilerVersionGateTest extends TestCase
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach (['class_has_method', 'class_has_property', 'class_has_constant'] as $fn) {
-                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
             if (false === $prev) {

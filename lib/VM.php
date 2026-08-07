@@ -5100,7 +5100,16 @@ restart:
                             }
                             throw new \LogicException('[] is only supported for arrays');
                         }
-                        $appendCell = $container->toArray()->append(new Variable);
+                        try {
+                            $appendCell = $container->toArray()->append(new Variable);
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                         $arg1->indirect($appendCell);
                         $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                         break;

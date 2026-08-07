@@ -1552,6 +1552,53 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #28740 */
+    public function testDomDocumentInstanceMethodNamedParameters(): void
+    {
+        self::assertSame(
+            ['elementId'],
+            BuiltinParamNames::forClassMethod('Dom\\HTMLDocument::getElementById')
+        );
+        self::assertSame(
+            ['elementId'],
+            BuiltinParamNames::forClassMethod('Dom\\XMLDocument::getElementById')
+        );
+        self::assertSame(
+            ['elementId'],
+            BuiltinParamNames::forClassMethod('Dom\\Document::getElementById')
+        );
+        self::assertSame(
+            ['node='],
+            BuiltinParamNames::forClassMethod('Dom\\HTMLDocument::saveHtml')
+        );
+        $saveXml = ['node=', 'options='];
+        foreach (['Dom\\HTMLDocument::saveXml', 'Dom\\XMLDocument::saveXml', 'Dom\\Document::saveXml'] as $qual) {
+            self::assertSame($saveXml, BuiltinParamNames::forClassMethod($qual), $qual);
+        }
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('Dom\\HTMLDocument', 'getElementById'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Dom\\HTMLDocument', 'getElementById'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('Dom\\HTMLDocument', 'saveHtml'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Dom\\HTMLDocument', 'saveHtml'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('Dom\\HTMLDocument', 'saveXml'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('Dom\\HTMLDocument', 'saveXml'));
+        self::assertSame(
+            'string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\htmldocument', 'getelementbyid', 0)
+        );
+        self::assertSame(
+            '?Dom\\Node',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\htmldocument', 'savehtml', 0)
+        );
+        self::assertSame(
+            '?Dom\\Node',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\htmldocument', 'savexml', 0)
+        );
+        self::assertSame(
+            'int',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('dom\\htmldocument', 'savexml', 1)
+        );
+    }
+
     /** @covers issue #27713 */
     public function testXmlReaderFactoryNamedParameters(): void
     {

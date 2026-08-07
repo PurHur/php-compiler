@@ -15,9 +15,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * class_has_constant() — ReflectionClass::hasConstant() as a function (#9989).
+ * class_has_constant() — historical phantom free-function wrapping ReflectionClass::hasConstant (#9989).
  *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_has_constant)
+ * Not registered on php-src-strict profiles (#28413): php-src has only ReflectionClass::hasConstant.
+ * Kept for Module gating / JIT helper wiring only.
  */
 final class class_has_constant_ extends Internal
 {

@@ -15,9 +15,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * class_has_property() — ReflectionClass::hasProperty() as a function (#9989).
+ * class_has_property() — historical phantom free-function wrapping ReflectionClass::hasProperty (#9989).
  *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_has_property)
+ * Not registered on php-src-strict profiles (#28413): php-src has only ReflectionClass::hasProperty.
+ * Kept for Module gating / JIT helper wiring only.
  */
 final class class_has_property_ extends Internal
 {
