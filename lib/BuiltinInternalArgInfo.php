@@ -97,6 +97,8 @@ final class BuiltinInternalArgInfo
             'stream_context_create' => '',
             // ext/standard/streamsfuncs.stub.php — no return type; InternalArgInfo says resource (#27848)
             'stream_socket_client' => '',
+            // ext/standard/proc_open.stub.php — no return type; InternalArgInfo says resource (#27847)
+            'proc_open' => '',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return (#25480, #28223)
             'restore_error_handler', 'restore_exception_handler' => 'true',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; PHP 8.4+: true (#28222)
@@ -807,6 +809,14 @@ final class BuiltinInternalArgInfo
                 1 => 'array|string',
                 2 => '?string',
                 3 => 'mixed',
+                default => null,
+            },
+            // ext/standard/proc_open.stub.php — untyped &$pipes; ?string/?array optionals (#27847)
+            // InternalArgInfo still has pipes:array and non-nullable cwd/env/other_options.
+            'proc_open' => match ($index) {
+                2 => '',
+                3 => '?string',
+                4, 5 => '?array',
                 default => null,
             },
             // ext/standard/head.stub.php — ?string $name = null (InternalArgInfo string) (#25381)
