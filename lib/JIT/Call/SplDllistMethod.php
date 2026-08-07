@@ -50,6 +50,8 @@ final class SplDllistMethod implements Call
             ),
             'pop' => SplDllistJitHelper::compilePop($context, $args[0]),
             'shift', 'dequeue' => SplDllistJitHelper::compileShift($context, $args[0]),
+            'top' => SplDllistJitHelper::compileTop($context, $args[0]),
+            'bottom' => SplDllistJitHelper::compileBottom($context, $args[0]),
             default => throw new \LogicException(
                 $this->className.' JIT lowering is not implemented for '.$this->method.'()'
             ),
