@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT SplFixedArray — object `__spl_ht` packed storage (#26793).
  *
- * php-src: ext/spl/spl_fixedarray.c — construct / fromArray / count / ArrayAccess.
+ * php-src: ext/spl/spl_fixedarray.c — construct / fromArray / count / ArrayAccess / foreach.
  */
 final class SplFixedArrayJitHelper
 {

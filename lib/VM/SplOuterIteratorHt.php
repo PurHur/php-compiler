@@ -32,6 +32,8 @@ final class SplOuterIteratorHt
             // FIFO packed `__spl_ht` deque — not SplStack (LIFO foreach) (#27311 / #26790).
             'spldoublylinkedlist',
             'splqueue',
+            // Packed fixed slots including null pads — nextFreeElement walk (#28640 / #26793).
+            'splfixedarray',
         ];
     }
 
