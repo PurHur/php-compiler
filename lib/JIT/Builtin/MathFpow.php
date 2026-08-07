@@ -6,16 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitFpowKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189, #19259, #20034, #20664).
+ * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189, #19259, #20034, #20664, #28674).
  *
- * Embed + thin standalone AOT: {@see FpowJitHelper} via {@see JitVmHelperLink}
- * (Rename #20603 shape — no thin libc ABI fork; double results via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
- * Nested helper compile: libc leaf without re-entering FpowJitHelper (#17279).
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathLog10 #28642 / MathLog #28574 shape).
+ * NestedJIT no longer needs a libc pow(3) kernel — helper uses NestedJIT-safe log+exp.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * php-src: ext/standard/math.c — PHP_FUNCTION(fpow)
  */
 final class MathFpow
@@ -45,12 +43,6 @@ final class MathFpow
 
     public static function invoke(Context $context, Value $num, Value $exponent): Value
     {
-        // Nested helper compile of unrelated units that still call pow(): libc leaf
-        // without re-entering FpowJitHelper (#17279, #19259).
-        if (NestedJitCompileScope::isActive()) {
-            return JitFpowKernel::invoke($context, $num, $exponent);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -62,10 +54,6 @@ final class MathFpow
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_FPOW);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_FPOW, $probe);
@@ -83,7 +71,7 @@ final class MathFpow
             self::FPOW_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20664'
+            '#28674'
         );
     }
 }

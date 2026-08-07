@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\FpowJitHelper;
+use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** fpow()/pow float JIT: always FpowJitHelper via JitVmHelperLink — no thin libc fork (#15189, #20664). */
+/**
+ * fpow()/pow float NestedJIT via JitVmHelperLink::ensureBridge (#28674 / peer #28642).
+ */
 final class FpowRuntimeShrinkTest extends TestCase
 {
     public function testFpowUsesJitHelperNotLibcPow(): void
@@ -25,14 +28,15 @@ final class FpowRuntimeShrinkTest extends TestCase
     public function testMathFpowAlwaysUsesHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFpow.php');
-        $this->assertStringContainsString('JitFpowKernel', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('FpowJitHelper', $source);
+        $this->assertStringContainsString('phpc_fpow', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('JitFpowKernel', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementKernelBody', $source);
         $this->assertStringNotContainsString('fpow_kernel_entry', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringContainsString('FpowJitHelper', $source);
         $this->assertStringNotContainsString('invokeLibcPow', $source);
         $this->assertStringNotContainsString("lookupFunction('pow')", $source);
         $this->assertStringNotContainsString("addFunction('pow'", $source);
@@ -70,26 +74,63 @@ final class FpowRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testFpowJitHelperDelegatesToKernel(): void
+    public function testFpowJitHelperInlinesNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FpowJitHelper.php');
-        $this->assertStringContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringNotContainsString('\\pow(', $source);
-        $this->assertStringNotContainsString('return VmMath::fpow', $source);
+        $this->assertStringContainsString('logPositive', $source);
+        $this->assertStringContainsString('expOf', $source);
+        $this->assertStringContainsString('powByInt', $source);
+        $this->assertStringContainsString('2048', $source);
+        $this->assertStringNotContainsString('phpc_fpow_kernel', $source);
+        $this->assertStringNotContainsString('while (', $source);
+        $this->assertStringNotContainsString('pack(', $source);
+        $this->assertStringNotContainsString('unpack(', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function fpowArgv\(.*?\{[^}]*VmMath::fpow/s',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function fpowArgv\(.*?\{[^}]*\\\\pow\(/s',
+            $source
+        );
 
-        if (!\function_exists('phpc_fpow_kernel')) {
-            $this->markTestSkipped('phpc_fpow_kernel requires compiler runtime');
-        }
-        $this->assertSame(8.0, FpowJitHelper::fpowArgv(2.0, 3.0));
-        $this->assertSame(\pow(2.5, 1.5), FpowJitHelper::fpowArgv(2.5, 1.5));
+        $this->assertSame(VmMath::fpow(2.0, 3.0), FpowJitHelper::fpowArgv(2.0, 3.0));
+        $this->assertEqualsWithDelta(VmMath::fpow(2.5, 1.5), FpowJitHelper::fpowArgv(2.5, 1.5), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::fpow(4.0, 0.5), FpowJitHelper::fpowArgv(4.0, 0.5), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::fpow(2.0, -3.0), FpowJitHelper::fpowArgv(2.0, -3.0), 1e-15);
+        $this->assertSame(VmMath::fpow(-2.0, 3.0), FpowJitHelper::fpowArgv(-2.0, 3.0));
+        $this->assertSame(VmMath::fpow(-2.0, 4.0), FpowJitHelper::fpowArgv(-2.0, 4.0));
+        $this->assertSame(1.0, FpowJitHelper::fpowArgv(10.0, 0.0));
+        $this->assertSame(1.0, FpowJitHelper::fpowArgv(\NAN, 0.0));
+        $this->assertSame(1.0, FpowJitHelper::fpowArgv(1.0, \NAN));
+        $this->assertTrue(\is_nan(FpowJitHelper::fpowArgv(-2.0, 0.5)));
+        $this->assertTrue(\is_infinite(FpowJitHelper::fpowArgv(0.0, -1.0)));
+        $this->assertSame(0.0, FpowJitHelper::fpowArgv(0.0, 5.0));
+        $this->assertEqualsWithDelta(VmMath::fpow(100.0, 0.5), FpowJitHelper::fpowArgv(100.0, 0.5), 1e-12);
+        $this->assertEqualsWithDelta(VmMath::fpow(0.1, 3.0), FpowJitHelper::fpowArgv(0.1, 3.0), 1e-15);
     }
 
-    public function testSpineBundleIncludesFpowJitHelperAndKernel(): void
+    public function testFpowKernelFilesRemoved(): void
+    {
+        $root = __DIR__.'/../..';
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitFpowKernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_fpow_kernel.php');
+    }
+
+    public function testContextNoLongerAllowlistsFpowKernel(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringNotContainsString('phpc_fpow_kernel', $source);
+        // Peer math NestedJIT leaf still allowlisted after this shrink.
+        $this->assertStringContainsString('phpc_nextafter_kernel', $source);
+    }
+
+    public function testSpineBundleIncludesFpowHelperWithoutKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FpowJitHelper.php', $spine);
         $this->assertStringContainsString('MathFpow.php', $spine);
-        $this->assertStringContainsString('JitFpowKernel.php', $spine);
-        $this->assertStringContainsString('phpc_fpow_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitFpowKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_fpow_kernel.php', $spine);
     }
 }
