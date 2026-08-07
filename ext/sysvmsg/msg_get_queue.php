@@ -48,9 +48,12 @@ final class msg_get_queue extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'msg_get_queue() is not supported for JIT/AOT in this compiler build (issue #3666)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            return JitMsgGet::emitArgumentCountError($context, $argc);
+        }
+
+        return JitMsgGet::invoke($context, $args);
     }
 
     private function triggerWarning(Frame $frame, string $message): void
