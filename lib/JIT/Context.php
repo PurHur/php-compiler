@@ -1453,10 +1453,12 @@ class Context {
             $this->functionProxies['dom\\xmldocument::createfromstring'] = new Call\DomXmlDocumentCreateFromString();
             $this->functionProxies['dom\\htmldocument::createfromstring'] = new Call\DomHtmlDocumentCreateFromString();
         }
-        // XMLReader::fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299).
+        // XMLReader::XML / fromString / read — avoid ExternalMethod silent NULL on thin AOT (#27299, #28670).
+        // XML() exists on all profiles; fromString is PROFILE≥8.4 only.
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::xml');
+        XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         if (CompilerVersion::supportsXmlReaderFactories()) {
             XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::fromstring');
-            XmlReaderInstanceMethodJit::ensureProxy($this, 'xmlreader::read');
         }
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);

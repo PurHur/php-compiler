@@ -58,6 +58,15 @@ final class VmXmlReader
         $entry->methods['xml'] = new XmlReaderXML();
         $entry->methodVisibility['xml'] = $pubStatic;
         $entry->methodNames['xml'] = 'XML';
+        // Static XML()/open() return XMLReader|false; declare `static` like fromString so
+        // PHPCfg does not type the result as boolean (InternalArgInfo) and AOT property
+        // fetch does not take the non-object path (#28670). Avoid self-named `XMLReader`
+        // labels — those hung NestedJIT/AOT type init.
+        $xmlOpenRet = ReflectionTypeSupport::cfgTypeFromLabel('static');
+        if (null !== $xmlOpenRet) {
+            $entry->methodReturnDeclaredTypes['xml'] = $xmlOpenRet;
+            $entry->methodReturnDeclaredTypes['open'] = $xmlOpenRet;
+        }
         $entry->methods['read'] = new XmlReaderRead();
         $entry->methodVisibility['read'] = $pub;
         $entry->methodNames['read'] = 'read';
