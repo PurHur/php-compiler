@@ -27,6 +27,17 @@ class Helper {
             case Variable::TYPE_NATIVE_LONG:
                 switch ($opcode->type) {
                     case OpCode::TYPE_UNARY_MINUS:
+                        // Compile-time PHP_INT_MIN → double (#28761). Runtime overflow uses VmUnaryMinus.
+                        if (Variable::KIND_VALUE === $var->kind
+                            && null !== $var->value
+                            && \PHPLLVM\Value::KIND_CONSTANT_INT === $var->value->getKind()
+                        ) {
+                            $const = (int) $this->context->llvm->lib->LLVMConstIntGetSExtValue($var->value->value);
+                            if (\PHP_INT_MIN === $const) {
+                                $result = $this->context->constantFromFloat(-(float) $const, 'double');
+                                goto return_double;
+                            }
+                        }
                         $result = $this->context->builder->negate($varValue);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_NOT:
@@ -89,9 +100,11 @@ class Helper {
                                 $this->context->lookupFunction('__value__readLong'),
                                 $valuePtr
                             );
-                            $lneg = $this->context->builder->negate($lval);
+                            // fneg(sitofp): sitofp(negate(INT_MIN)) wraps and keeps the wrong sign (#28761).
                             $f64 = $this->context->getTypeFromString('double');
-                            $lnegFloat = $this->context->builder->sitofp($lneg, $f64);
+                            $lnegFloat = $this->context->builder->fNegate(
+                                $this->context->builder->sitofp($lval, $f64)
+                            );
                             $longEnd = $this->context->builder->getInsertBlock();
                             $this->context->builder->branch($doneBlock);
                             $this->context->builder->positionAtEnd($doneBlock);
