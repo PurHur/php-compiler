@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -16,10 +17,9 @@ final class basename extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/file.stub.php — ArgumentCountError (#28286).
+        $this->requireArgCountRange($frame, 'basename', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('basename() expects 1 or 2 arguments');
-        }
         $path = VmFilestatArg::pathComponentFilenameArgForFrame($frame, 0, 'basename', 'path');
         if (null === $frame->returnVar) {
             return;
@@ -34,8 +34,17 @@ final class basename extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer ucwords #28317 / #28286.
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('basename() expects 1 or 2 arguments');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('basename() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('basename() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
         $path = JitFilestatArg::lowerPathComponentFilename($context, $args[0], 'basename', 0, 'path');
         if (2 === $argc) {

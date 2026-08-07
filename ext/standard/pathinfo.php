@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -17,10 +18,9 @@ final class pathinfo extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/file.stub.php — ArgumentCountError (#28286).
+        $this->requireArgCountRange($frame, 'pathinfo', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
-        }
         $path = VmFilestatArg::pathComponentFilenameArgForFrame($frame, 0, 'pathinfo', 'path');
         $flags = 15;
         if (2 === $argc) {
@@ -48,8 +48,17 @@ final class pathinfo extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        // Catchable ArgumentCountError (AOT try/catch) — peer basename #28286.
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('pathinfo() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('pathinfo() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
         $flags = 2 === $argc ? $args[1] : null;
 
