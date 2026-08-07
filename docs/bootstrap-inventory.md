@@ -58119,8 +58119,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 29)
-- new JITVariable (line 217)
-- 11 class method(s)
+- new JITVariable (line 300)
+- 13 class method(s)
 
 ### `lib/VM/SplFixedArrayJitHelper.php`
 

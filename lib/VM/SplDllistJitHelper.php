@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * Thin-AOT SplDoublyLinkedList / SplQueue / SplStack — object `__spl_ht` deque (#26790).
  *
- * php-src: ext/spl/spl_dllist.c — push/pop/shift/unshift; SplQueue enqueue/dequeue; SplStack push/pop.
+ * php-src: ext/spl/spl_dllist.c — push/pop/shift/unshift/top/bottom; SplQueue enqueue/dequeue; SplStack push/pop/top.
  */
 final class SplDllistJitHelper
 {
@@ -132,6 +132,89 @@ final class SplDllistJitHelper
             $context->lookupFunction('__hashtable__unsetLongAt'),
             $ht,
             $lastIdx
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $out;
+    }
+
+    /**
+     * SplDoublyLinkedList::top / SplStack::top — peek last packed slot without removal (#28704).
+     * Empty: thin AOT returns null (Zend throws; VM covers throw).
+     */
+    public static function compileTop(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $out = JitValueBox::alloc($context);
+        $emptyBb = BasicBlockHelper::append($context, 'spldllist_top_empty');
+        $bodyBb = BasicBlockHelper::append($context, 'spldllist_top_body');
+        $doneBb = BasicBlockHelper::append($context, 'spldllist_top_done');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyBb, $bodyBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $lastIdx = $context->builder->sub($n, $sizeT->constInt(1, false));
+        $fetched = HashTableHelper::readIndexedToValueBox($context, $ht, $lastIdx);
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $fetched)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $out;
+    }
+
+    /**
+     * SplDoublyLinkedList::bottom — peek first packed slot without removal (#28704).
+     * Empty: thin AOT returns null (Zend throws; VM covers throw).
+     */
+    public static function compileBottom(Context $context, JITVariable $receiver): Value
+    {
+        $obj = self::loadObject($context, $receiver);
+        $ht = self::htPtr($context, $obj);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $n = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $out = JitValueBox::alloc($context);
+        $emptyBb = BasicBlockHelper::append($context, 'spldllist_bottom_empty');
+        $bodyBb = BasicBlockHelper::append($context, 'spldllist_bottom_body');
+        $doneBb = BasicBlockHelper::append($context, 'spldllist_bottom_done');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $n, $sizeT->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyBb, $bodyBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $out)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $fetched = HashTableHelper::readIndexedToValueBox(
+            $context,
+            $ht,
+            $sizeT->constInt(0, false)
+        );
+        JitValueBox::copyFromPointer(
+            $context,
+            $out,
+            JitValueBox::valuePtrFromVariable($context, $fetched)
         );
         $context->builder->branch($doneBb);
 
