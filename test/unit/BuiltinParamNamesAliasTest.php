@@ -4445,6 +4445,48 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_pkey_derive', 2));
     }
 
+    /** @covers issue #28754 */
+    public function testOpensslSealOpenNamedParamsResolve(): void
+    {
+        $seal = BuiltinParamNames::forFunction('openssl_seal');
+        self::assertSame(
+            ['data', 'sealed_data', 'encrypted_keys', 'public_key', 'cipher_algo', 'iv='],
+            $seal
+        );
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($seal, 'sealed_data', 'openssl_seal'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($seal, 'encrypted_keys', 'openssl_seal'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($seal, 'public_key', 'openssl_seal'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($seal, 'cipher_algo', 'openssl_seal'));
+        self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($seal, 'iv', 'openssl_seal'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($seal, 'sealdata', 'openssl_seal'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($seal, 'ekeys', 'openssl_seal'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($seal, 'pubkeys', 'openssl_seal'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($seal, 'method', 'openssl_seal'));
+        self::assertSame(5, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_seal'));
+        self::assertSame(6, BuiltinParamNames::paramCountForInternalFunction('openssl_seal'));
+        self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_seal'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_seal', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_seal', 2));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_seal', 5));
+
+        $open = BuiltinParamNames::forFunction('openssl_open');
+        self::assertSame(
+            ['data', 'output', 'encrypted_key', 'private_key', 'cipher_algo', 'iv='],
+            $open
+        );
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($open, 'output', 'openssl_open'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($open, 'encrypted_key', 'openssl_open'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($open, 'private_key', 'openssl_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($open, 'opendata', 'openssl_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($open, 'ekey', 'openssl_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($open, 'privkey', 'openssl_open'));
+        self::assertSame(5, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_open'));
+        self::assertSame(6, BuiltinParamNames::paramCountForInternalFunction('openssl_open'));
+        self::assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_open'));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_open', 1));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_open', 5));
+    }
+
     /** @covers issue #27884 */
     public function testGraphemeNamedParamsResolve(): void
     {

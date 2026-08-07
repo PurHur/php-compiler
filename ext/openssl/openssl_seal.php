@@ -15,6 +15,10 @@ use PHPLLVM\Value;
 
 /**
  * openssl_seal() — public-key envelope encryption (php-src ext/openssl/openssl.c; #6523).
+ *
+ * Reflection / named args: Zend stub `data`, `&$sealed_data`, `&$encrypted_keys`, `array $public_key`,
+ * `string $cipher_algo`, `&$iv = null`: `int|false` (InternalArgInfo still says sealdata/ekeys/pubkeys/method
+ * — see BuiltinParamNames / BuiltinInternalArgInfo; #28754).
  */
 final class openssl_seal extends Internal
 {

@@ -306,6 +306,13 @@ final class BuiltinInternalDefaultValues
         'openssl_pkey_derive' => [
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/openssl/openssl.stub.php — &$iv = null / ?string $iv = null (#28754)
+        'openssl_seal' => [
+            5 => ['kind' => 'null'],
+        ],
+        'openssl_open' => [
+            5 => ['kind' => 'null'],
+        ],
         // php-src ext/intl/grapheme/grapheme.stub.php — ?int $length = null (InternalArgInfo int→0) (#27884)
         'grapheme_substr' => [
             2 => ['kind' => 'null'],
