@@ -197,6 +197,8 @@ final class BuiltinInternalArgInfo
             'sodium_crypto_box',
             'sodium_crypto_sign',
             'sodium_crypto_pwhash_str' => 'string',
+            // ext/sodium/libsodium.stub.php — absent from InternalArgInfo (#27630)
+            'sodium_memzero' => 'void',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26283)
             'mb_trim', 'mb_ltrim', 'mb_rtrim' => 'string',
             // ext/mbstring/mbstring.stub.php — PHP 8.4+; InternalArgInfo omits (#26282)
@@ -671,6 +673,8 @@ final class BuiltinInternalArgInfo
                 1, 2 => 'int',
                 default => null,
             },
+            // ext/sodium/libsodium.stub.php — string &$string; absent from InternalArgInfo (#27630)
+            'sodium_memzero' => 0 === $index ? 'string' : null,
             // ext/session/session.stub.php — ?string $id = null (InternalArgInfo string) (#26460)
             'session_id' => 0 === $index ? '?string' : null,
             // ext/iconv/iconv.stub.php — ?string $encoding = null (InternalArgInfo string) (#27629)
