@@ -525,6 +525,46 @@ PHP;
         $this->assertSame("true\n", ob_get_clean());
     }
 
+    /** @covers issue #28370 — php-src ext/openssl/openssl.stub.php final OpenSSL object classes */
+    public function testExtendOpenSslObjectClassesFailAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        foreach ([
+            'OpenSSLCertificate' => 'BadOpenSSLCertificate',
+            'OpenSSLAsymmetricKey' => 'BadOpenSSLAsymmetricKey',
+            'OpenSSLCertificateSigningRequest' => 'BadOpenSSLCertificateSigningRequest',
+        ] as $parent => $child) {
+            $code = "<?php\nclass {$child} extends {$parent} {}\n";
+            try {
+                $runtime->parseAndCompile($code, "extend_{$parent}.php");
+                $this->fail("expected CompileError extending {$parent}");
+            } catch (\CompileError $e) {
+                $this->assertSame(
+                    "Class {$child} cannot extend final class {$parent}",
+                    $e->getMessage()
+                );
+            }
+        }
+    }
+
+    /** @covers issue #28370 */
+    public function testOpenSslObjectClassesReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+foreach (['OpenSSLCertificate', 'OpenSSLAsymmetricKey', 'OpenSSLCertificateSigningRequest'] as $c) {
+    var_export((new ReflectionClass($c))->isFinal());
+    echo "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'openssl_objects_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\ntrue\ntrue\n", ob_get_clean());
+    }
+
     /** @covers issue #26531 */
     public function testExtendUnitEnumFailsAtCompileTime(): void
     {

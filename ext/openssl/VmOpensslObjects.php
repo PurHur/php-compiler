@@ -704,6 +704,9 @@ final class VmOpensslObjects
         }
         $entry = new ClassEntry($name);
         $entry->isInternal = true;
+        // php-src `final class` OpenSSLCertificate / OpenSSLAsymmetricKey /
+        // OpenSSLCertificateSigningRequest (ext/openssl/openssl.stub.php; #28370).
+        $entry->isFinal = true;
         $ctx->classes[$lc] = $entry;
     }
 

@@ -35,6 +35,7 @@ PEM;
         foreach (['OpenSSLCertificate', 'OpenSSLAsymmetricKey', 'OpenSSLCertificateSigningRequest'] as $class) {
             self::assertTrue(VmReflection::classExists($ctx, $class), $class);
             self::assertTrue($ctx->classes[strtolower($class)]->isInternal, $class.' internal');
+            self::assertTrue($ctx->classes[strtolower($class)]->isFinal, $class.' final (#28370)');
         }
 
         $code = <<<'PHP'
@@ -47,6 +48,24 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'openssl_classes.php'));
         self::assertSame(
             "OpenSSLCertificate:1:0\nOpenSSLAsymmetricKey:1:0\nOpenSSLCertificateSigningRequest:1:0\n",
+            ob_get_clean()
+        );
+    }
+
+    /** @covers issue #28370 — php-src ext/openssl/openssl.stub.php final classes */
+    public function test_openssl_object_classes_are_final(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+foreach (['OpenSSLCertificate', 'OpenSSLAsymmetricKey', 'OpenSSLCertificateSigningRequest'] as $c) {
+    echo $c, ':', (new ReflectionClass($c))->isFinal() ? '1' : '0', "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'openssl_classes_final.php'));
+        self::assertSame(
+            "OpenSSLCertificate:1\nOpenSSLAsymmetricKey:1\nOpenSSLCertificateSigningRequest:1\n",
             ob_get_clean()
         );
     }
