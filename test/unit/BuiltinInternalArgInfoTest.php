@@ -17,6 +17,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         self::assertSame('array|string', $params[0]['type']);
     }
 
+    /** ext/standard/proc_open.stub.php — untyped &$pipes, nullable optionals, no return (#27847). */
+    public function testProcOpenReflectionStubTypes(): void
+    {
+        $this->assertNull(BuiltinInternalArgInfo::returnTypeLabelForFunction('proc_open'));
+        $this->assertSame('', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('proc_open'));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('proc_open', 2));
+        $this->assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('proc_open', 3));
+        $this->assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('proc_open', 4));
+        $this->assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('proc_open', 5));
+        $pipes = BuiltinInternalArgInfo::paramInfoForFunction('proc_open', 2);
+        $this->assertNotNull($pipes);
+        $this->assertSame('', $pipes['type']);
+        $cwd = BuiltinInternalArgInfo::paramInfoForFunction('proc_open', 3);
+        $this->assertNotNull($cwd);
+        $this->assertSame('?string', $cwd['type']);
+        $this->assertTrue($cwd['isOptional']);
+    }
+
     public function testArrayMapParamCount(): void
     {
         $this->assertSame(3, BuiltinInternalArgInfo::paramCountForFunction('array_map'));
