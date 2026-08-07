@@ -12,6 +12,8 @@ use PHPLLVM\Value;
 
 /**
  * http_get_last_response_headers() — last HTTP wrapper response header list (ext/standard/basic_functions.c, #7236).
+ *
+ * Excess argc → ArgumentCountError (#28683; peer #28690).
  */
 class http_get_last_response_headers extends Internal
 {
@@ -22,9 +24,8 @@ class http_get_last_response_headers extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException($this->getName().'() takes no arguments');
-        }
+        // php-src ext/standard/http.c — ArgumentCountError (#28683).
+        $this->requireExactArgCount($frame, $this->getName(), 0);
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,8 +40,9 @@ class http_get_last_response_headers extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException($this->getName().'() takes no arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #28683.
+        if (!$this->requireExactJitArgCount($context, $args, $this->getName(), 0)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         return JitHttpLastResponseHeaders::invoke($context);
