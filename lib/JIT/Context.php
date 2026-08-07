@@ -632,6 +632,24 @@ class Context {
         $resolved = $this->resolveRefAliasName($name);
         if (isset($this->namedVariableBindings[$resolved])) {
             $existing = $this->namedVariableBindings[$resolved];
+            // Instance-method FCC / fromCallable Closures must replace array-typed locals
+            // (CFG types `$obj->m(...)` as array) so `$b()` sees the Closure object (#28613).
+            if (
+                null !== $var->closureCall
+                && Variable::TYPE_OBJECT === $var->type
+            ) {
+                $this->namedVariableBindings[$resolved] = $var;
+                foreach ($this->scope->variables as $scopeOp) {
+                    if (!$scopeOp instanceof Operand) {
+                        continue;
+                    }
+                    if ($resolved === OperandName::resolve($scopeOp)) {
+                        $this->scope->variables[$scopeOp] = $var;
+                    }
+                }
+
+                return;
+            }
             // Closure use() snapshot reads must not rebind enclosing locals to MCJIT rvalues (#72).
             if (
                 Variable::KIND_VARIABLE === $existing->kind

@@ -186,22 +186,22 @@ final class VmFromCallable
         if ($parentScope) {
             $scopeName = $className;
         }
-        $scopeConst = $context->context->constString((string) $scopeName, true);
+        // Snapshot receiver into a value-box so AOT RuntimeIndirect can reload
+        // __closure_bound_this (peer #28612 method-closure bind; #28613).
+        $boundThis = \PHPCompiler\JIT\ClosureHelper::snapshotCapture($context, $receiverVar);
         $boundScope = new JitVariable(
             $context,
             JitVariable::TYPE_STRING,
             JitVariable::KIND_VALUE,
-            $scopeConst
+            $context->builder->load($context->constantStringFromString((string) $scopeName))
         );
         $boundScope->compileTimeString = (string) $scopeName;
-        $closureCall = new ClosureWithBinding($inner, $receiverVar, $boundScope);
+        $closureCall = new ClosureWithBinding($inner, $boundThis, $boundScope);
         $closureVar = self::wrapCallableProxy($context, $closureCall, $proxyName);
         $closureVar->closureIsMethodFake = true;
-        ClosureBindHelper::ensureClosureBindingProperties($context);
-        ClosureBindHelper::storeMethodFakeClosureFlag(
-            $context,
-            $context->helper->loadValue($closureVar)
-        );
+        $closureObj = $context->helper->loadValue($closureVar);
+        ClosureBindHelper::storeFccBoundThisAndScope($context, $closureObj, $boundThis, $boundScope);
+        ClosureBindHelper::storeMethodFakeClosureFlag($context, $closureObj);
 
         return $closureVar;
     }
