@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\Variable;
+
 /**
  * HTTP fetch entry alias — delegates to {@see VmHttpFetchPure} (#8939, #8552).
  *
@@ -21,9 +24,13 @@ final class VmHttpFetchNative
      *
      * @return string|false response body; false on transport/parse failure
      */
-    public static function fetch(string $url, array $httpOptions = []): string|false
-    {
-        return VmHttpFetchPure::fetch($url, $httpOptions);
+    public static function fetch(
+        string $url,
+        array $httpOptions = [],
+        ?Context $ctx = null,
+        ?Variable $streamContext = null
+    ): string|false {
+        return VmHttpFetchPure::fetch($url, $httpOptions, $ctx, $streamContext);
     }
 
     /**
@@ -31,8 +38,12 @@ final class VmHttpFetchNative
      *
      * @return list<string>|false
      */
-    public static function fetchHeaders(string $url, array $httpOptions = []): array|false
-    {
-        return VmHttpFetchPure::fetchHeaders($url, $httpOptions);
+    public static function fetchHeaders(
+        string $url,
+        array $httpOptions = [],
+        ?Context $ctx = null,
+        ?Variable $streamContext = null
+    ): array|false {
+        return VmHttpFetchPure::fetchHeaders($url, $httpOptions, $ctx, $streamContext);
     }
 }

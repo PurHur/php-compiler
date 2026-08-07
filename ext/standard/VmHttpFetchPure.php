@@ -10,7 +10,7 @@ namespace PHPCompiler\ext\standard;
  * Pairs {@see VmHttpFetchNative} (thin alias). https:// via {@see VmHttpTlsNative} on adopted socket fd.
  *
  * php-src: ext/standard/http_fopen_wrapper.c — php_stream_url_wrap_http_ex
- * (HTTP/1.1, user_agent, follow_location / max_redirects; #28789 #28792 #28791)
+ * (HTTP/1.1, user_agent, follow_location / max_redirects, STREAM_NOTIFY_*; #28789 #28792 #28791 #28790)
  */
 final class VmHttpFetchPure
 {
@@ -90,10 +90,14 @@ final class VmHttpFetchPure
      *
      * @return string|false response body; false on transport/parse failure
      */
-    public static function fetch(string $url, array $httpOptions = []): string|false
-    {
+    public static function fetch(
+        string $url,
+        array $httpOptions = [],
+        ?\PHPCompiler\VM\Context $ctx = null,
+        ?\PHPCompiler\VM\Variable $streamContext = null
+    ): string|false {
         $method = self::httpOptionMethod($httpOptions);
-        $response = self::request($url, $method, $httpOptions);
+        $response = self::request($url, $method, $httpOptions, $ctx, $streamContext);
         if (null === $response) {
             return false;
         }
@@ -127,10 +131,14 @@ final class VmHttpFetchPure
      *
      * @return list<string>|false
      */
-    public static function fetchHeaders(string $url, array $httpOptions = []): array|false
-    {
+    public static function fetchHeaders(
+        string $url,
+        array $httpOptions = [],
+        ?\PHPCompiler\VM\Context $ctx = null,
+        ?\PHPCompiler\VM\Variable $streamContext = null
+    ): array|false {
         $method = self::httpOptionMethod($httpOptions, 'HEAD');
-        $response = self::request($url, $method, $httpOptions);
+        $response = self::request($url, $method, $httpOptions, $ctx, $streamContext);
         if (null === $response) {
             return false;
         }
@@ -146,8 +154,13 @@ final class VmHttpFetchPure
      *
      * @return array{headers: list<string>, body: string}|null
      */
-    private static function request(string $url, string $method, array $httpOptions = []): ?array
-    {
+    private static function request(
+        string $url,
+        string $method,
+        array $httpOptions = [],
+        ?\PHPCompiler\VM\Context $ctx = null,
+        ?\PHPCompiler\VM\Variable $streamContext = null
+    ): ?array {
         VmHttpLastResponseHeaders::clear();
         self::$lastOpenFailureDetail = null;
 
@@ -158,7 +171,7 @@ final class VmHttpFetchPure
         $redirects = 0;
 
         while (true) {
-            $response = self::requestOnce($currentUrl, $currentMethod, $httpOptions);
+            $response = self::requestOnce($currentUrl, $currentMethod, $httpOptions, $ctx, $streamContext);
             if (null === $response) {
                 return null;
             }
@@ -187,6 +200,17 @@ final class VmHttpFetchPure
                 return $response;
             }
 
+            self::notify(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_REDIRECTED,
+                VmStreamNotification::SEVERITY_INFO,
+                $nextUrl,
+                0,
+                0,
+                0
+            );
+
             ++$redirects;
             $currentUrl = $nextUrl;
             // php-src: 303 always GET; 301/302 historically force GET for non-HEAD methods.
@@ -201,8 +225,13 @@ final class VmHttpFetchPure
      *
      * @return array{headers: list<string>, body: string}|null
      */
-    private static function requestOnce(string $url, string $method, array $httpOptions = []): ?array
-    {
+    private static function requestOnce(
+        string $url,
+        string $method,
+        array $httpOptions = [],
+        ?\PHPCompiler\VM\Context $ctx = null,
+        ?\PHPCompiler\VM\Variable $streamContext = null
+    ): ?array {
         if (!self::available()) {
             return null;
         }
@@ -249,6 +278,17 @@ final class VmHttpFetchPure
             return null;
         }
 
+        self::notify(
+            $ctx,
+            $streamContext,
+            VmStreamNotification::NOTIFY_CONNECT,
+            VmStreamNotification::SEVERITY_INFO,
+            '',
+            0,
+            0,
+            0
+        );
+
         $tls = null;
         try {
             if ($useTls) {
@@ -287,6 +327,8 @@ final class VmHttpFetchPure
                 return null;
             }
 
+            self::notifyResponseProgress($ctx, $streamContext, $headers, $body);
+
             return ['headers' => $headers, 'body' => $body];
         } finally {
             if (null !== $tls) {
@@ -294,6 +336,102 @@ final class VmHttpFetchPure
             }
             VmFs::fclose($handle);
         }
+    }
+
+    /**
+     * php-src http_fopen_wrapper.c — MIME_TYPE_IS / FILE_SIZE_IS / PROGRESS after headers (#28790).
+     *
+     * @param list<string> $headers
+     */
+    private static function notifyResponseProgress(
+        ?\PHPCompiler\VM\Context $ctx,
+        ?\PHPCompiler\VM\Variable $streamContext,
+        array $headers,
+        string $body
+    ): void {
+        $mime = self::headerValue($headers, 'Content-Type');
+        if (null !== $mime && '' !== $mime) {
+            self::notify(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_MIME_TYPE_IS,
+                VmStreamNotification::SEVERITY_INFO,
+                $mime,
+                0,
+                0,
+                0
+            );
+        }
+
+        $bytesMax = 0;
+        $contentLength = self::headerValue($headers, 'Content-Length');
+        if (null !== $contentLength && \ctype_digit($contentLength)) {
+            $bytesMax = (int) $contentLength;
+            self::notify(
+                $ctx,
+                $streamContext,
+                VmStreamNotification::NOTIFY_FILE_SIZE_IS,
+                VmStreamNotification::SEVERITY_INFO,
+                'Content-Length',
+                $bytesMax,
+                0,
+                $bytesMax
+            );
+        }
+
+        // php-src: progress_init then progress after body bytes (#28790).
+        self::notify(
+            $ctx,
+            $streamContext,
+            VmStreamNotification::NOTIFY_PROGRESS,
+            VmStreamNotification::SEVERITY_INFO,
+            '',
+            0,
+            0,
+            $bytesMax
+        );
+        $transferred = \strlen($body);
+        if (null !== $contentLength && \ctype_digit($contentLength)) {
+            $expected = (int) $contentLength;
+            if ($transferred > $expected) {
+                $transferred = $expected;
+            }
+        }
+        self::notify(
+            $ctx,
+            $streamContext,
+            VmStreamNotification::NOTIFY_PROGRESS,
+            VmStreamNotification::SEVERITY_INFO,
+            '',
+            0,
+            $transferred,
+            $bytesMax
+        );
+    }
+
+    private static function notify(
+        ?\PHPCompiler\VM\Context $ctx,
+        ?\PHPCompiler\VM\Variable $streamContext,
+        int $notificationCode,
+        int $severity,
+        ?string $message,
+        int $messageCode,
+        int $bytesTransferred,
+        int $bytesMax
+    ): void {
+        if (null === $ctx) {
+            return;
+        }
+        VmStreamNotification::dispatch(
+            $ctx,
+            $streamContext,
+            $notificationCode,
+            $severity,
+            $message,
+            $messageCode,
+            $bytesTransferred,
+            $bytesMax
+        );
     }
 
     /**

@@ -784,7 +784,12 @@ final class VmFs
             return $data;
         }
         if (VmHttpLastResponseHeaders::isHttpUrl($path)) {
-            $data = VmHttpFetchNative::fetch($path, $httpOptions);
+            $data = VmHttpFetchNative::fetch(
+                $path,
+                $httpOptions,
+                $ctx,
+                $streamContext instanceof \PHPCompiler\VM\Variable ? $streamContext : null
+            );
             if (false === $data) {
                 return false;
             }
