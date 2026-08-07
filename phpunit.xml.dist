@@ -57,6 +57,7 @@
             <file>./test/compliance/IncludeScopeVMTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
+            <file>./test/compliance/RoundingModeMissingClassErrorVMTest.php</file>
             <file>./test/compliance/ClassConstSelfInheritedVMTest.php</file>
             <file>./test/compliance/ClassConstPrivateSelfChildVMTest.php</file>
             <file>./test/compliance/TraitParentScopeVMTest.php</file>
