@@ -10,7 +10,10 @@ use PHPCompiler\VM\ReflectionPropertyTypeSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
 
-/** ReflectionProperty::getReadableType() — VM (#7053, ext/reflection/php_reflection.c). */
+/**
+ * ReflectionProperty::getReadableType() — phantom vs php-src (#28532, re-#7053).
+ * Class kept on the spine; never registered under php-src-strict profiles.
+ */
 final class ReflectionPropertyGetReadableType extends VmClassMethod
 {
     public function __construct()

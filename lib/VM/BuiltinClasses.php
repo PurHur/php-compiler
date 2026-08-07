@@ -1194,9 +1194,13 @@ final class BuiltinClasses
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
         }
-        if (CompilerVersion::supportsReflectionPropertyReadableSettableType()) {
+        // ReflectionProperty::getReadableType: phantom vs php-src (#28532) — never register.
+        // Builtin class kept for spine; getSettableType stays gated on 8.4+.
+        if (CompilerVersion::supportsReflectionPropertyGetReadableType()) {
             $rp->methods['getreadabletype'] = new ReflectionPropertyGetReadableType();
             $rp->methodVisibility['getreadabletype'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyReadableSettableType()) {
             $rp->methods['getsettabletype'] = new ReflectionPropertyGetSettableType();
             $rp->methodVisibility['getsettabletype'] = $pub;
         }

@@ -8,14 +8,17 @@ use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\Func;
 
 /**
- * ReflectionProperty::{getType,getReadableType,getSettableType} helpers
- * (#4384, #7053, #22481, ext/reflection/php_reflection.c).
+ * ReflectionProperty::{getType,getSettableType} helpers
+ * (#4384, #7053, #22481, #28532, ext/reflection/php_reflection.c).
+ *
+ * readableType() remains an internal helper (hook return type) used by the retired
+ * getReadableType builtin class; php-src exposes getType() for the declared ZEND_TYPE.
  */
 final class ReflectionPropertyTypeSupport
 {
     /**
      * Declared property ZEND_TYPE — ReflectionProperty::getType() (#22481).
-     * Must not substitute the get-hook return type (that path is getReadableType).
+     * Must not substitute the get-hook return type (internal readableType() helper).
      */
     public static function declaredType(
         ClassEntry $entry,

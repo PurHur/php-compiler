@@ -81,6 +81,11 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(isset($ctx->classes['reflectionproperty']->methods['isdeprecated']));
             $this->assertTrue(isset($ctx->classes['reflectionfunction']->methods['isdeprecated']));
             $this->assertTrue(isset($ctx->classes['reflectionclassconstant']->methods['isdeprecated']));
+            // ReflectionProperty::getReadableType is a phantom; getSettableType is real (#28532).
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyGetReadableType());
+            $this->assertFalse(isset($ctx->classes['reflectionproperty']->methods['getreadabletype']));
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyReadableSettableType());
+            $this->assertTrue(isset($ctx->classes['reflectionproperty']->methods['getsettabletype']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

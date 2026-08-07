@@ -1561,6 +1561,24 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReflectionPropertyGetReadableTypeNeverOnAnyProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyGetReadableType());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach (['8.2', '8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(
+                CompilerVersion::supportsReflectionPropertyGetReadableType(),
+                'getReadableType phantom must stay off on PROFILE='.$profile.' (#28532)'
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
     public function testSupportsReflectionPropertyReadableSettableTypeFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReflectionPropertyReadableSettableType());
@@ -1572,6 +1590,7 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsReflectionPropertyReadableSettableType());
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyGetReadableType());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

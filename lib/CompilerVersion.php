@@ -1759,11 +1759,25 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionProperty::{getReadableType,getSettableType}
-     * (ext/reflection/php_reflection.c, #7053, #9873, #22309).
+     * ReflectionProperty::getReadableType() — phantom vs php-src (#28532, re-#7053 / #9873).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * php-src ships getType() + getSettableType() only (ext/reflection/php_reflection.stub.php on
+     * 8.2–8.5 / master). Never advertise getReadableType on any php-src-strict profile.
+     * getSettableType stays gated via {@see supportsReflectionPropertyReadableSettableType}.
+     */
+    public static function supportsReflectionPropertyGetReadableType(): bool
+    {
+        return false;
+    }
+
+    /**
+     * PHP 8.4+ ReflectionProperty::getSettableType()
+     * (ext/reflection/php_reflection.c, #7053, #9873, #22309, #28532).
+     *
+     * Historically paired with a phantom getReadableType(); that method is never registered
+     * ({@see supportsReflectionPropertyGetReadableType}). Gated on stable 8.4.0 /
+     * {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionPropertyReadableSettableType(): bool
     {
