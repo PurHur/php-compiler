@@ -180,6 +180,8 @@ final class BuiltinInternalArgInfo
             'iconv_strlen' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
+            // ext/openssl/openssl.stub.php — InternalArgInfo omits return (#28368)
+            'openssl_error_string' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
             'openssl_cipher_key_length' => 'int|false',
             // ext/intl/grapheme/grapheme.stub.php — InternalArgInfo size_t/string/int without |false (#27884)
