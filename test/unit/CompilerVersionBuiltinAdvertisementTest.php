@@ -577,15 +577,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testIsAnonymousClassAdvertisedOnForwardProfile(): void
+    public function testIsAnonymousClassNeverAdvertisedOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsIsAnonymousClass());
-            $this->assertTrue(CompilerVersion::advertisesIsAnonymousClass());
+            $this->assertFalse(CompilerVersion::supportsIsAnonymousClass());
+            $this->assertFalse(CompilerVersion::advertisesIsAnonymousClass());
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['isanonymousclass']));
+            $this->assertFalse(isset($runtime->vmContext->functions['isanonymousclass']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

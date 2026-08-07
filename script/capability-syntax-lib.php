@@ -1317,6 +1317,7 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/attribute_exists_.php',
         ],
         [
+            // Free-function phantom vs php-src (#28616); gate always false — ReflectionClass::isAnonymous remains.
             'names' => ['isAnonymousClass'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsIsAnonymousClass'],
             'since' => '8.4.0',

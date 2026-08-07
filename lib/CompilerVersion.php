@@ -1945,42 +1945,21 @@ final class CompilerVersion
     }
 
     /**
-     * isAnonymousClass() global probe (#19969) — kept on forward 8.4+ until a dedicated phantom issue.
+     * isAnonymousClass() free function — phantom vs php-src (#28616, re-#19969).
      *
-     * Not part of php-src basic_functions / reflection stubs as a free function (ReflectionClass::isAnonymous
-     * is the Zend API); gated separately from the #22584 trio so PROFILE=8.4 still exercises the helper.
+     * php-src ships only ReflectionClass::isAnonymous() / ReflectionFunction::isAnonymous()
+     * (ext/reflection/php_reflection.stub.php). Never register or advertise the free function on
+     * any php-src-strict profile (including PROFILE=8.4/8.5).
      */
     public static function supportsIsAnonymousClass(): bool
     {
-        if (version_compare(self::VERSION, '8.4', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
-    /** isAnonymousClass() visible to function_exists() — stable runtime or forward 8.4+ (#19969). */
+    /** isAnonymousClass() visible to function_exists() — never (php-src absent, #28616). */
     public static function advertisesIsAnonymousClass(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
