@@ -8,7 +8,7 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * ext/ds module — Ds\Vector / Ds\Map / Ds\Set MVP (#22549, php-ds/ext-ds, #25086).
+ * ext/ds module — Ds\* collections (#22549 / #28062, php-ds/ext-ds, #25086).
  *
  * Advertise extension_loaded('ds') / Ds\* classes only when
  * {@see DsExtensionPolicy::advertisesExtension()}.
@@ -26,6 +26,16 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
-        return [];
+        if (!DsExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+        require_once __DIR__.'/DsFactories.php';
+
+        return [
+            new ds_seq(),
+            new ds_map(),
+            new ds_set(),
+            new ds_heap(),
+        ];
     }
 }

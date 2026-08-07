@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7203 |
-| Phase A inventory files (M2 ratio SSOT) | 7203 |
+| PHP files on vm.php path | 7206 |
+| Phase A inventory files (M2 ratio SSOT) | 7206 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23137 |
+| Source constructs flagged (warnings) | 23227 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -568,8 +568,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/dom/ns_import_simplexml.php` | 0 | 2 |
 | `ext/ds/BuiltinClasses.php` | 0 | 19 |
+| `ext/ds/DsDepthClasses.php` | 0 | 43 |
 | `ext/ds/DsExtensionPolicy.php` | 0 | 1 |
-| `ext/ds/Module.php` | 0 | 1 |
+| `ext/ds/DsFactories.php` | 0 | 13 |
+| `ext/ds/Module.php` | 0 | 5 |
+| `ext/ds/VmDsDepth.php` | 0 | 30 |
 | `ext/ds/VmDsStorage.php` | 0 | 15 |
 | `ext/eio/BuiltinClasses.php` | 0 | 1 |
 | `ext/eio/EioConstants.php` | 0 | 1 |
@@ -11202,35 +11205,137 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ds/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 37)
-- new DsVectorConstruct (line 41)
-- new DsVectorCount (line 44)
-- new ClassEntry (line 56)
-- new DsMapConstruct (line 60)
-- new DsMapCount (line 63)
-- new DsMapGet (line 65)
-- new ClassEntry (line 77)
-- new DsSetConstruct (line 81)
-- new DsSetCount (line 84)
-- new DsSetAdd (line 86)
-- new DsSetContains (line 88)
-- new HashTable (line 104)
-- new HashTable (line 144)
-- new ArgumentCountError (line 186)
-- new HashTable (line 209)
-- new ArgumentCountError (line 251)
-- new ArgumentCountError (line 273)
+- new ClassEntry (line 40)
+- new DsVectorConstruct (line 44)
+- new DsVectorCount (line 47)
+- new ClassEntry (line 59)
+- new DsMapConstruct (line 63)
+- new DsMapCount (line 66)
+- new DsMapGet (line 68)
+- new ClassEntry (line 80)
+- new DsSetConstruct (line 84)
+- new DsSetCount (line 87)
+- new DsSetAdd (line 89)
+- new DsSetContains (line 91)
+- new HashTable (line 107)
+- new HashTable (line 147)
+- new ArgumentCountError (line 189)
+- new HashTable (line 212)
+- new ArgumentCountError (line 254)
+- new ArgumentCountError (line 276)
 - 13 class method(s)
+
+### `ext/ds/DsDepthClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 49)
+- new ClassEntry (line 54)
+- new ClassEntry (line 65)
+- new ClassEntry (line 78)
+- new DsPairConstruct (line 79)
+- new DsPairToArray (line 82)
+- new ClassEntry (line 94)
+- new DsDequeConstruct (line 98)
+- new DsDequeCount (line 101)
+- new DsDequePush (line 104)
+- new ClassEntry (line 116)
+- new DsStackConstruct (line 120)
+- new DsStackCount (line 123)
+- new DsStackPush (line 125)
+- new DsStackPop (line 127)
+- new ClassEntry (line 138)
+- new DsQueueConstruct (line 142)
+- new DsQueueCount (line 145)
+- new DsQueuePush (line 147)
+- new DsQueuePop (line 149)
+- new ClassEntry (line 160)
+- new DsHeapConstruct (line 164)
+- new DsHeapCount (line 167)
+- new DsHeapPush (line 169)
+- new DsHeapPop (line 171)
+- new ClassEntry (line 182)
+- new DsPriorityQueueConstruct (line 186)
+- new DsPriorityQueueCount (line 189)
+- new DsPriorityQueuePush (line 191)
+- new DsPriorityQueuePop (line 193)
+- new ArgumentCountError (line 211)
+- new HashTable (line 232)
+- new HashTable (line 249)
+- new ArgumentCountError (line 286)
+- new Variable (line 290)
+- new HashTable (line 307)
+- new ArgumentCountError (line 344)
+- new HashTable (line 379)
+- new ArgumentCountError (line 416)
+- new HashTable (line 451)
+- new ArgumentCountError (line 488)
+- new ArgumentCountError (line 556)
+- 29 class method(s)
 
 ### `ext/ds/DsExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/ds/DsFactories.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 42)
+- new HashTable (line 44)
+- new ObjectEntry (line 51)
+- new Error (line 71)
+- new HashTable (line 73)
+- new ObjectEntry (line 80)
+- new Error (line 100)
+- new HashTable (line 102)
+- new ObjectEntry (line 109)
+- new Error (line 129)
+- new HashTable (line 131)
+- new ObjectEntry (line 138)
+- 5 class method(s)
+
 ### `ext/ds/Module.php`
 
 **Warnings** (review for bootstrap subset):
+- new ds_seq (line 35)
+- new ds_map (line 36)
+- new ds_set (line 37)
+- new ds_heap (line 38)
 - 2 class method(s)
+
+### `ext/ds/VmDsDepth.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 46)
+- new Variable (line 48)
+- new Variable (line 57)
+- new Variable (line 59)
+- new HashTable (line 74)
+- new HashTable (line 84)
+- new HashTable (line 90)
+- new Variable (line 92)
+- new UnderflowException (line 101)
+- new UnderflowException (line 108)
+- new Variable (line 110)
+- new HashTable (line 124)
+- new HashTable (line 130)
+- new Variable (line 132)
+- new UnderflowException (line 141)
+- new UnderflowException (line 149)
+- new Variable (line 151)
+- new Variable (line 162)
+- new Variable (line 180)
+- new UnderflowException (line 189)
+- new UnderflowException (line 195)
+- new Variable (line 211)
+- new UnderflowException (line 225)
+- new HashTable (line 244)
+- new Variable (line 246)
+- new HashTable (line 256)
+- new Variable (line 264)
+- new HashTable (line 274)
+- new Variable (line 281)
+- 23 class method(s)
 
 ### `ext/ds/VmDsStorage.php`
 

@@ -36,6 +36,8 @@ final class DsExtensionPolicy
         return str_contains($testFileName, 'ds_vector')
             || str_contains($testFileName, 'ds_map')
             || str_contains($testFileName, 'ds_set')
+            || str_contains($testFileName, 'ds_depth')
+            || str_contains($testFileName, 'ds_pair')
             || str_contains($testFileName, 'extension_loaded_ds')
             || str_contains($testFileName, 'maintainer_gap_ds')
             || str_contains($testFileName, 'ds_phantom')
