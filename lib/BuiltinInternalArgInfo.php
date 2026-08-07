@@ -1055,6 +1055,13 @@ final class BuiltinInternalArgInfo
                 1 => 'mixed',
                 default => null,
             },
+            // ext/reflection/php_reflection.stub.php — PHP 8.5+ isReadable/isWritable (#28533)
+            'reflectionproperty::isreadable',
+            'reflectionproperty::iswritable' => match ($index) {
+                0 => '?string',
+                1 => '?object',
+                default => null,
+            },
             // ext/reflection/php_reflection.stub.php — PHP 8.4+ lazy factories (#27741)
             'reflectionclass::newlazyghost' => match ($index) {
                 0 => 'callable',

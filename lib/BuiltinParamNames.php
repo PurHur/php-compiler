@@ -51,6 +51,9 @@ final class BuiltinParamNames
             // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+; absent from InternalArgInfo (#27599)
             'reflectionproperty::getrawvalue' => ['object'],
             'reflectionproperty::setrawvalue' => ['object', 'value'],
+            // php-src ext/reflection/php_reflection.stub.php — PHP 8.5+; absent from InternalArgInfo (#28533)
+            'reflectionproperty::isreadable' => ['scope', 'object='],
+            'reflectionproperty::iswritable' => ['scope', 'object='],
             // php-src ext/reflection/php_reflection.stub.php — PHP 8.4+ lazy factories; absent from InternalArgInfo (#27741)
             'reflectionclass::newlazyghost' => ['initializer', 'options='],
             'reflectionclass::newlazyproxy' => ['factory', 'options='],

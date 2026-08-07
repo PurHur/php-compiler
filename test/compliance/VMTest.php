@@ -447,7 +447,8 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (CompilerVersion::supportsReflectionPropertyAccessProbes()
-                && str_contains($name, 'reflection_property_isreadable_profile')) {
+                && str_contains($name, 'reflection_property_isreadable_profile')
+                && !str_contains($name, 'forward_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsReflectionPropertyHookProbes()
