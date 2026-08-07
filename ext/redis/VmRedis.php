@@ -459,7 +459,8 @@ final class VmRedis
         ));
     }
 
-    private static function typeLabel(Variable $var): string
+    /** Public type label for sibling Redis* class receivers (#28094). */
+    public static function typeLabel(Variable $var): string
     {
         $var = $var->resolveIndirect();
 

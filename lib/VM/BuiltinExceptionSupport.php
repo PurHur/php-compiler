@@ -28,6 +28,7 @@ final class BuiltinExceptionSupport
     public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
     public const CLASS_INTL_EXCEPTION = 'intlexception';
     public const CLASS_REDIS_EXCEPTION = 'redisexception';
+    public const CLASS_REDIS_CLUSTER_EXCEPTION = 'redisclusterexception';
     public const CLASS_RAR_EXCEPTION = 'rarexception';
     public const CLASS_SIMDJSON_EXCEPTION = 'simdjsonexception';
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
@@ -342,6 +343,20 @@ final class BuiltinExceptionSupport
         }
 
         return self::materializeThrowable($ctx, self::CLASS_REDIS_EXCEPTION, $message, $file, $line);
+    }
+
+    /** Materialize RedisClusterException (extends RuntimeException; #28094). */
+    public static function materializeRedisClusterException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_REDIS_CLUSTER_EXCEPTION])) {
+            return self::materializeRuntimeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_REDIS_CLUSTER_EXCEPTION, $message, $file, $line);
     }
 
     public static function materializeRarException(
