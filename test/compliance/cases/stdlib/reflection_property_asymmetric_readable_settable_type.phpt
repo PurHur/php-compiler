@@ -1,5 +1,5 @@
 --TEST--
-ReflectionProperty::getReadableType()/getSettableType() asymmetric typed property (#7053, #9873)
+ReflectionProperty::getType()/getSettableType() asymmetric typed property (#7053, #9873, #28532)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -20,20 +20,20 @@ class C {
 }
 
 $p = new ReflectionProperty(C::class, 'x');
-echo 'x_readable=', (string) $p->getReadableType(), "\n";
+echo 'x_type=', (string) $p->getType(), "\n";
 echo 'x_settable=', (string) $p->getSettableType(), "\n";
 
 $q = new ReflectionProperty(C::class, 'p');
-echo 'p_readable=', (string) $q->getReadableType(), "\n";
+echo 'p_type=', (string) $q->getType(), "\n";
 echo 'p_settable=', (string) $q->getSettableType(), "\n";
 
 $plain = new ReflectionProperty(C::class, 'plain');
-echo 'plain_readable=', (string) $plain->getReadableType(), "\n";
+echo 'plain_type=', (string) $plain->getType(), "\n";
 echo 'plain_settable=', (string) $plain->getSettableType(), "\n";
 --EXPECT--
-x_readable=int
+x_type=int
 x_settable=int
-p_readable=string
+p_type=string
 p_settable=string
-plain_readable=int
+plain_type=int
 plain_settable=int

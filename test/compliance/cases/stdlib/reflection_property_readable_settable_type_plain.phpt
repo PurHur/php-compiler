@@ -1,5 +1,5 @@
 --TEST--
-ReflectionProperty::getReadableType()/getSettableType() plain typed property (#9873)
+ReflectionProperty::getType()/getSettableType() plain typed property (#9873, #28532)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -11,18 +11,18 @@ class C {
 }
 
 $r = new ReflectionProperty(C::class, 'x');
-echo (string) $r->getReadableType(), "\n";
+echo (string) $r->getType(), "\n";
 echo (string) $r->getSettableType(), "\n";
-var_export($r->getReadableType());
+var_export($r->getType());
 echo "\n";
 --EXPECT--
 string
 string
 \ReflectionNamedType::__set_state(array(
-  'typeString' => 'string',
-  'allowsNullFlag' => false,
-  'typeName' => 'string',
-  'typeBuiltin' => true,
-  'typeMembers' => array (
+   'typeString' => 'string',
+   'allowsNullFlag' => false,
+   'typeName' => 'string',
+   'typeBuiltin' => true,
+   'typeMembers' => array (
   ),
 ))

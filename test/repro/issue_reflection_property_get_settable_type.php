@@ -9,5 +9,5 @@ class C {
 $r = new ReflectionProperty(C::class, 'x');
 var_export($r->getSettableType());
 echo "\n";
-var_export($r->getReadableType());
+var_export($r->getType());
 echo "\n";
