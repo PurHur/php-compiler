@@ -85,11 +85,13 @@ final class VmMbstring
 
     /**
      * mb_strlen() character count (php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_strlen); #4405).
+     *
+     * UTF-8: each illegal byte is one character (libmbfl), matching mb_get_substr unit count (#28629).
      */
     public static function strlen(string $string, string $encoding): int
     {
         if ('UTF-8' === $encoding) {
-            return VmString::utf8CharLength($string);
+            return \count(self::utf8MbflCharUnits($string));
         }
         if ('ASCII' === $encoding || '8BIT' === $encoding || 'ISO-8859-1' === $encoding) {
             return VmString::byteLength($string);
@@ -1063,10 +1065,32 @@ final class VmMbstring
         };
     }
 
+    /**
+     * UTF-8 case mapping with libmbfl illegal-byte substitution (php_unicode_convert_case; #28629).
+     *
+     * Invalid sequences become MBFL_BAD_INPUT markers (null here), pass through without case change,
+     * then encode via mb_substitute_character — same policy as mb_scrub / mb_convert_encoding.
+     *
+     * @return list<int|null>
+     */
+    private static function utf8CodepointsForCaseMap(string $source): array
+    {
+        return self::decodeUtf8ToCodepointsWithIllegal($source)['codepoints'];
+    }
+
+    private static function emitUtf8IllegalSubst(): string
+    {
+        return MbstringState::substitutionOutput('UTF-8', null);
+    }
+
     private static function utf8Upper(string $source): string
     {
         $out = '';
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             foreach (Utf8CaseMap::toUpperCodepoints($cp) as $upperCp) {
                 $out .= self::encodeUtf8Codepoint($upperCp);
             }
@@ -1078,7 +1102,11 @@ final class VmMbstring
     private static function utf8Lower(string $source): string
     {
         $out = '';
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             foreach (Utf8CaseMap::toLowerCodepoints($cp) as $lowerCp) {
                 $out .= self::encodeUtf8Codepoint($lowerCp);
             }
@@ -1090,7 +1118,11 @@ final class VmMbstring
     private static function utf8Fold(string $source): string
     {
         $out = '';
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             foreach (Utf8CaseMap::toFoldCodepoints($cp) as $foldCp) {
                 $out .= self::encodeUtf8Codepoint($foldCp);
             }
@@ -1102,7 +1134,11 @@ final class VmMbstring
     private static function utf8UpperSimple(string $source): string
     {
         $out = '';
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toUpperSimple($cp));
         }
 
@@ -1112,7 +1148,11 @@ final class VmMbstring
     private static function utf8LowerSimple(string $source): string
     {
         $out = '';
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLowerSimple($cp));
         }
 
@@ -1122,7 +1162,11 @@ final class VmMbstring
     private static function utf8FoldSimple(string $source): string
     {
         $out = '';
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toFoldSimple($cp));
         }
 
@@ -1133,7 +1177,12 @@ final class VmMbstring
     {
         $out = '';
         $upperNext = true;
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                // php_unicode_convert_case: BAD_INPUT skips title_mode updates.
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             if ($upperNext) {
                 // Digraph TITLE forms are 1:1 (Ǆ→ǅ); otherwise simple upper.
                 $titleCps = Utf8CaseMap::toTitleCodepoints($cp);
@@ -1156,7 +1205,11 @@ final class VmMbstring
     {
         $out = '';
         $upperNext = true;
-        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+        foreach (self::utf8CodepointsForCaseMap($source) as $cp) {
+            if (null === $cp) {
+                $out .= self::emitUtf8IllegalSubst();
+                continue;
+            }
             if ($upperNext) {
                 // SpecialCasing TITLE when distinct from UPPER (Ǆ→ǅ); else upper + lower tail (ß→Ss).
                 $titleCps = Utf8CaseMap::toTitleCodepoints($cp);
@@ -1176,6 +1229,30 @@ final class VmMbstring
         }
 
         return $out;
+    }
+
+    /**
+     * mb_get_substr / mbfl character units for UTF-8: valid sequences as-is; each illegal byte
+     * becomes the current substitute character (php-src ext/mbstring; #28629).
+     *
+     * @return list<string>
+     */
+    private static function utf8MbflCharUnits(string $string): array
+    {
+        $units = [];
+        $len = \strlen($string);
+        for ($i = 0; $i < $len; ) {
+            $need = 0;
+            if (!self::utf8SequenceValidAt($string, $len, $i, $need)) {
+                $units[] = self::emitUtf8IllegalSubst();
+                ++$i;
+                continue;
+            }
+            $units[] = \substr($string, $i, $need + 1);
+            $i += $need + 1;
+        }
+
+        return $units;
     }
 
     private static function asciiUpper(string $source): string
@@ -1329,6 +1406,44 @@ final class VmMbstring
         ?\PHPCompiler\Frame $frame = null,
     ): string {
         $encoding = self::assertSubstrCountEncoding($encoding, 'mb_substr', 3);
+        if ('UTF-8' === $encoding) {
+            // mb_get_substr: illegal bytes are substitute units (#28629) — required for php_mb_ulcfirst.
+            $units = self::utf8MbflCharUnits($string);
+            $charLen = \count($units);
+            if ($start < 0) {
+                $start += $charLen;
+            }
+            if ($start < 0) {
+                $start = 0;
+            }
+            if ($start >= $charLen) {
+                return '';
+            }
+            if (null === $length) {
+                $length = $charLen - $start;
+            } elseif ($length < 0) {
+                $length = $charLen - $start + $length;
+                if ($length < 0) {
+                    return '';
+                }
+            }
+            if ($length <= 0) {
+                return '';
+            }
+            if ($warnOnClip && $start + $length > $charLen) {
+                if (null !== $frame?->vmContext) {
+                    $frame->vmContext->errors->triggerError(
+                        'mb_substr(): String is truncated',
+                        \PHPCompiler\VM\ErrorReporter::E_WARNING,
+                        '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                        $frame->vmContext,
+                        $frame
+                    );
+                }
+            }
+
+            return \implode('', \array_slice($units, $start, $length));
+        }
         $charLen = VmString::utf8CharLength($string);
         if ($start < 0) {
             $start += $charLen;
