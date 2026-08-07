@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7185 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23094 |
+| Source constructs flagged (warnings) | 23095 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5328,7 +5328,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ErrorHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/ErrorReporting.php` | 0 | 1 |
-| `lib/JIT/Builtin/EvalRuntime.php` | 0 | 4 |
+| `lib/JIT/Builtin/EvalRuntime.php` | 0 | 5 |
 | `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ExceptionHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
@@ -46813,10 +46813,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/EvalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Runtime (line 97)
-- new Variable (line 156)
-- new Variable (line 165)
-- 4 class method(s)
+- new Runtime (line 100)
+- new CompileFatal (line 209)
+- new Variable (line 314)
+- new Variable (line 323)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php`
 
