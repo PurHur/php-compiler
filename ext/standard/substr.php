@@ -11,11 +11,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -27,29 +27,15 @@ use PHPLLVM\Value;
  *
  * php-src `ext/standard/string.c` `php_substr` clamps oversize positive lengths silently —
  * there is no Z_STR_TRUNCATED / "String is truncated" E_WARNING (#28556; re-#22489).
- * Forward-profile `$truncate` remains accepted for now (phantom arity — #27749) but must not
- * enable a clip warning Zend never emits.
+ * php-src stub arity is 3 — no `$truncate` under any profile (#27749; reverts #17239).
  */
 final class substr extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.stub.php — arity 3; no $truncate (#27749).
+        $this->requireArgCountRange($frame, 'substr', 2, 3);
         $argc = count($frame->calledArgs);
-        $supportsTruncate = CompilerVersion::supportsSubstrTruncate();
-        $maxArgs = $supportsTruncate ? 4 : 3;
-        if ($argc < 2) {
-            throw new \ArgumentCountError(\sprintf(
-                'substr() expects at least 2 arguments, %d given',
-                $argc
-            ));
-        }
-        if ($argc > $maxArgs) {
-            throw new \ArgumentCountError(\sprintf(
-                'substr() expects at most %d arguments, %d given',
-                $maxArgs,
-                $argc
-            ));
-        }
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#24817; reverts #24694/#18980 TypeError).
         // TypeError for null→string is PHP 9.0 (RFC deprecate_null_to_scalar_internal_arg), not 8.4.
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'substr', 0, 'string');
@@ -58,10 +44,6 @@ final class substr extends Internal
             return;
         }
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'substr', 2, 'offset');
-        // Accept phantom 4th $truncate on forward profile (#27749) but never warn on clip (#28556).
-        if ($supportsTruncate && 4 === $argc) {
-            VmMath::parseBoolBuiltinArgForFrame($frame, 3, 'substr', 4, 'truncate');
-        }
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $length->type) {
@@ -82,25 +64,18 @@ final class substr extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
+        // Catchable ArgumentCountError (AOT try/catch) — peer str_rot13 #28313 / #27749.
         $argc = count($args);
-        $supportsTruncate = CompilerVersion::supportsSubstrTruncate();
-        $maxArgs = $supportsTruncate ? 4 : 3;
-        if ($argc < 2) {
-            throw new \ArgumentCountError(\sprintf(
-                'substr() expects at least 2 arguments, %d given',
-                $argc
-            ));
-        }
-        if ($argc > $maxArgs) {
-            throw new \ArgumentCountError(\sprintf(
-                'substr() expects at most %d arguments, %d given',
-                $maxArgs,
-                $argc
-            ));
-        }
-        // Phantom 4th $truncate accepted on forward profile (#27749); never emit clip warning (#28556).
-        if ($supportsTruncate && 4 === $argc) {
-            self::compileTimeBool($context, $args[3]);
+        if ($argc < 2 || $argc > 3) {
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 2
+                    ? \sprintf('substr() expects at least 2 arguments, %d given', $argc)
+                    : \sprintf('substr() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $unreachable;
         }
 
         $strLit = $args[0]->compileTimeString ?? null;
@@ -195,18 +170,6 @@ final class substr extends Internal
         }
 
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
-    }
-
-    private static function compileTimeBool(Context $context, JITVariable $arg): ?bool
-    {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
-            $lib = $context->llvm->lib;
-            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
-                return 0 !== (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
-            }
-        }
-
-        return null;
     }
 
     private static function compileTimeSignedLong(Context $context, JITVariable $arg): ?int
