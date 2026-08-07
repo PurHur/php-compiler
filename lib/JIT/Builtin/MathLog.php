@@ -6,17 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitLogKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for log() via LogJitHelper PHP (#15117, #21980, #27047).
+ * JIT/AOT link for log() via LogJitHelper PHP (#15117, #21980, #27047, #28574).
  *
- * Embed + thin standalone AOT: {@see LogJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27003 shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering LogJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathLog1p #28495 / MathExpm1 #28487 shape).
+ * NestedJIT no longer needs a libc log(3) kernel — helper uses NestedJIT-safe series.
  * Optional `$base` is pure LLVM on phpc_log / phpc_log10.
  * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * php-src: ext/standard/math.c — PHP_FUNCTION(log)
@@ -50,10 +47,6 @@ final class MathLog
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitLogKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -107,10 +100,6 @@ final class MathLog
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_LOG);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_LOG, $probe);
@@ -128,7 +117,7 @@ final class MathLog
             self::LOG_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27047'
+            '#28574'
         );
     }
 }

@@ -73,7 +73,7 @@ final class HypotRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_hypot_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringContainsString('phpc_log_kernel', $source);
+        $this->assertStringContainsString('phpc_log10_kernel', $source);
         $this->assertStringContainsString('phpc_nextafter_kernel', $source);
     }
 
