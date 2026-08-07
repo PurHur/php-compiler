@@ -641,8 +641,8 @@ final class BuiltinInternalArgInfo
                 0, 1 => 'string',
                 default => null,
             },
-            // ext/zlib/zlib.stub.php — inflate_init $options omitted from InternalArgInfo (#27627)
-            'inflate_init' => 1 === $index ? 'array' : null,
+            // ext/zlib/zlib.stub.php — array|object $options (InternalArgInfo array / omitted) (#27627, #28592)
+            'deflate_init', 'inflate_init' => 1 === $index ? 'object|array' : null,
             // ext/hash/hash.stub.php — HashContext $context; InternalArgInfo untyped / resource (#27745, #27737)
             'hash_copy', 'hash_update', 'hash_final' => 0 === $index ? 'HashContext' : null,
             'hash_update_file' => 0 === $index ? 'HashContext' : null,
