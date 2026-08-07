@@ -53,6 +53,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($crypto['isOptional']);
     }
 
+    /** basic_functions.stub.php — stream_isatty(): bool (#27774). */
+    public function testStreamIsattyReflectionReturnBool(): void
+    {
+        $this->assertSame('bool', BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_isatty'));
+        $this->assertSame(['stream'], BuiltinParamNames::forFunction('stream_isatty'));
+    }
+
     public function testArrayMapParamCount(): void
     {
         $this->assertSame(3, BuiltinInternalArgInfo::paramCountForFunction('array_map'));

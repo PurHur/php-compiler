@@ -248,6 +248,8 @@ final class BuiltinInternalArgInfo
             'get_object_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : int (#26376)
             'get_resource_id' => 'int',
+            // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : bool (#27774)
+            'stream_isatty' => 'bool',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo omits return; Zend : string (#26375)
             'get_debug_type' => 'string',
             // Zend/zend_builtin_functions.stub.php — InternalArgInfo empty return; Zend string|false (#27902)

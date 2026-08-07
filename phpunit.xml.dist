@@ -92,6 +92,7 @@
             <file>./test/compliance/StreamBucketReflectionStreamBucketVMTest.php</file>
             <file>./test/compliance/StreamContextSetOptionReturnTrueVMTest.php</file>
             <file>./test/compliance/StreamSocketEnableCryptoReflectionVMTest.php</file>
+            <file>./test/compliance/StreamIsattyReflectionVMTest.php</file>
             <file>./test/compliance/StreamSelectReflectionVMTest.php</file>
             <file>./test/compliance/StreamSocketClientReflectionVMTest.php</file>
             <file>./test/compliance/TriggerErrorUserErrorReflectionVMTest.php</file>
