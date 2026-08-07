@@ -24,10 +24,9 @@ final class array_column extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.stub.php — ArgumentCountError (#28691).
+        $this->requireArgCountRange($frame, 'array_column', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_column() requires two or three arguments in this compiler build');
-        }
         $ht = VmArray::requireArrayParam(
             $frame->calledArgs[0]->resolveIndirect(),
             'array_column',
@@ -66,10 +65,11 @@ final class array_column extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_column() requires two or three arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_column', 2, 3)) {
+            return HashTableHelper::alloc($context);
         }
+        $argc = \count($args);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_column', 1, 'array');
         if (!JitArrayColumnArg::guardStrIntNullOperand($context, $args[1], 'array_column', 1, 'column_key')) {
             return HashTableHelper::alloc($context);

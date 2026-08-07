@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -23,10 +24,9 @@ final class hrtime extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28691).
+        $this->requireAtMostArgCount($frame, 'hrtime', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('hrtime() accepts at most one argument');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -57,8 +57,9 @@ final class hrtime extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('hrtime() accepts at most one argument');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'hrtime', 1)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         $asNumber = $context->constantFromBool(false);
         if (isset($args[0])) {
