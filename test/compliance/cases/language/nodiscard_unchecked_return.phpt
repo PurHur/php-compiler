@@ -1,5 +1,5 @@
 --TEST--
-Language: (void) cast ParseError on PROFILE=8.5 under NoDiscard profile (#28183, re-#7346)
+Language: (void) statement cast accepted on PROFILE=8.5 (#28441, re-#7346)
 --ENV--
 PHP_COMPILER_PROFILE=8.5
 --FILE--
@@ -12,5 +12,5 @@ try {
 }
 echo "ok\n";
 --EXPECT--
-ParseError
+void_ok
 ok
