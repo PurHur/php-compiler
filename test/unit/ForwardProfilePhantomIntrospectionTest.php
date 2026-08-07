@@ -400,6 +400,30 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
+    /** Issue #28367: stream_supports remains absent under PROFILE≥8.4 (php-src has lock only). */
+    public function testStreamSupportsPhantomAbsentOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsStreamSupports());
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('stream_supports'));
+            $runtime = new Runtime();
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'stream_supports')
+            );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'stream_supports_lock')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testReferenceProfileGraphemeBuiltinsNotCallableWithoutIntl(): void
     {
         if (\extension_loaded('intl')) {

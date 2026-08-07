@@ -2052,44 +2052,21 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #13238, #15692, #16741).
+     * stream_supports() / STREAM_SUPPORT_* — absent from php-src (only stream_supports_lock();
+     * ext/standard/streams.c / basic_functions.stub.php).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — stream_supports absent). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.3/8.4/8.5).
+     * Forward-profile enable (#16741/#17007) retired by #28367 (re-#12422/#17697).
      */
     public static function supportsStreamSupports(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
-    /**
-     * stream_supports() visible to function_exists() — stable runtime or forward 8.3+ (#17007).
-     */
+    /** stream_supports() visible to function_exists() — never (php-src absent, #28367). */
     public static function advertisesStreamSupports(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /**
@@ -2138,14 +2115,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ STREAM_SUPPORT_READ/WRITE constants (ext/standard/streams.c, issue #16846).
+     * STREAM_SUPPORT_READ/WRITE — absent from php-src (tied to phantom stream_supports(); #16846/#28367).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
-     * matches Zend 8.2/8.3 phantom gate. Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     * Never advertise on php-src-strict profiles. Keep {@see stream_supports_lock()} only.
      */
     public static function supportsStreamSupportReadWriteConstants(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

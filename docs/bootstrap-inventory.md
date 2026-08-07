@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7174 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23071 |
+| Source constructs flagged (warnings) | 23072 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6872,7 +6872,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ClassReadonly.php` | 0 | 1 |
 | `lib/VM/ClassSealed.php` | 0 | 1 |
 | `lib/VM/ClassStatic.php` | 0 | 1 |
-| `lib/VM/ClassValidator.php` | 0 | 10 |
+| `lib/VM/ClassValidator.php` | 0 | 11 |
 | `lib/VM/CloneSupport.php` | 0 | 1 |
 | `lib/VM/CloneWithSupport.php` | 0 | 1 |
 | `lib/VM/ClosureBindJitHelper.php` | 0 | 1 |
@@ -13770,9 +13770,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/JitHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 52)
-- new JITVariable (line 377)
-- new JITVariable (line 408)
+- new ArgumentCountError (line 53)
+- new JITVariable (line 403)
+- new JITVariable (line 434)
 - 20 class method(s)
 
 ### `ext/hash/JitHashCryptoKernel.php`
@@ -44502,7 +44502,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1238)
+- new InternalArgInfo (line 1240)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -52945,11 +52945,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassPreprocessor (line 407)
 - new StaticClassPreprocessor (line 410)
 - new SourcePreprocessor\PropertyHooks (line 413)
-- new State (line 567)
-- new ReflectionProperty (line 601)
-- new ReflectionProperty (line 604)
-- new LintCompiler (line 1016)
-- new Variable (line 1147)
+- new State (line 568)
+- new ReflectionProperty (line 602)
+- new ReflectionProperty (line 605)
+- new LintCompiler (line 1017)
+- new Variable (line 1148)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
@@ -56608,16 +56608,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ClassValidator.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 76)
-- new Error (line 79)
-- new Error (line 82)
-- new Error (line 85)
-- new Error (line 88)
-- new CompileError (line 141)
-- new CompileError (line 158)
-- new CompileError (line 179)
-- 9 class method(s)
-- 1 closure(s)
+- new Error (line 77)
+- new Error (line 80)
+- new Error (line 83)
+- new Error (line 86)
+- new Error (line 89)
+- new CompileError (line 142)
+- new CompileError (line 186)
+- new CompileError (line 293)
+- new CompileError (line 314)
+- 14 class method(s)
+- 2 closure(s)
 
 ### `lib/VM/CloneSupport.php`
 

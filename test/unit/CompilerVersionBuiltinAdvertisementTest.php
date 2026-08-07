@@ -541,35 +541,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testStreamSupportsAdvertisedOnForwardProfile(): void
+    public function testStreamSupportsNeverAdvertisedOnForwardProfiles(): void
     {
+        // php-src: stream_supports_lock only (#28367).
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsStreamSupports());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
-    }
-
-    public function testStreamSupportsAdvertisedOn83ForwardProfile(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsStreamSupports());
+        foreach (['8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsStreamSupports(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesStreamSupports(), $profile);
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['stream_supports']));
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+            $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']), $profile);
+            $this->assertTrue(isset($runtime->vmContext->functions['stream_supports_lock']), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
@@ -652,9 +639,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'stream_supports'] as $fn) {
+            foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul'] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]), $fn);
             }
+            $this->assertFalse(isset($ctx->functions['stream_supports']));
+            $this->assertTrue(isset($ctx->functions['stream_supports_lock']));
             $this->assertFalse(isset($ctx->functions['attribute_exists']));
             $this->assertTrue(isset($ctx->classes['roundingmode']));
         } finally {
@@ -1222,22 +1211,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
-    }
-
-    public function testVmRegistersStreamSupportsOnForwardProfile(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['stream_supports']));
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        $this->assertTrue(isset($runtime->vmContext->functions['stream_supports_lock']));
     }
 
     public function testVmDoesNotRegisterReadonlyBuiltinOnReferenceProfile(): void
