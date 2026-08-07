@@ -701,6 +701,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsReflectionClassPhp84Apis());
     }
 
+    public function testSupportsReflectionParameterIsSensitiveParameterNeverOnAnyProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionParameterIsSensitiveParameter());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach (['8.2', '8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(
+                CompilerVersion::supportsReflectionParameterIsSensitiveParameter(),
+                'isSensitive* phantoms must stay off on PROFILE='.$profile.' (#28528)'
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
     public function testSupportsReflectionPropertyPhp84RawValueApisFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsReflectionPropertyPhp84RawValueApis());

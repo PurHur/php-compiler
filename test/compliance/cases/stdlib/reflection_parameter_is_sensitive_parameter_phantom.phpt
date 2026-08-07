@@ -1,5 +1,5 @@
 --TEST--
-ReflectionParameter::isSensitiveParameter() phantom withheld on 8.2 reference profile (#16130, ext/reflection/php_reflection.c)
+ReflectionParameter::isSensitiveParameter() phantom withheld on all profiles (#28528, re-#16130)
 --FILE--
 <?php
 declare(strict_types=1);

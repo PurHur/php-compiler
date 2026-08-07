@@ -1,12 +1,12 @@
 --TEST--
-AOT: ReflectionParameter::isSensitiveParameter() on PHP 8.4 profile (#16130)
+AOT: ReflectionParameter::isSensitiveParameter() phantom (skipped; never in php-src) (#16130, #28528)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
 if (!PHPCompiler\CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
-    die('skip requires PHP_COMPILER_PROFILE=8.4');
+    die('skip ReflectionParameter::isSensitiveParameter absent from php-src (#28528)');
 }
 ?>
 --ENV--
