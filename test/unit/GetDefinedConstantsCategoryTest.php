@@ -9,7 +9,10 @@ use PHPCompiler\VM\Variable;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** get_defined_constants(category:) category filter (#12947, #17436). */
+/**
+ * get_defined_constants() category filter — internal categorized buckets remain;
+ * userland $category param retired (#28522, re-#12947/#17436).
+ */
 final class GetDefinedConstantsCategoryTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -27,6 +30,23 @@ final class GetDefinedConstantsCategoryTest extends BaseTest
             'get_defined_constants_category_forward_84.phpt',
         ] as $file) {
             yield $file => self::parsePHPT($root.'/'.$file, $file);
+        }
+    }
+
+    public function testCategoryGateAlwaysFalse(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGetDefinedConstantsCategory());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGetDefinedConstantsCategory());
+            $this->assertSame(['categorize'], BuiltinParamNames::forFunction('get_defined_constants'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
         }
     }
 
