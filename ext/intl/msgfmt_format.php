@@ -52,6 +52,6 @@ final class msgfmt_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('msgfmt_format() is not implemented for JIT in this compiler build (issue #6366)');
+        return JitMessageFormatterFormat::invokeProcedural($context, ...$args);
     }
 }
