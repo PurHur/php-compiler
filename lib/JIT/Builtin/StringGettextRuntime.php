@@ -13,19 +13,31 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_gettext* via GettextJitHelper PHP (#9859, #12828, #26226).
+ * JIT/AOT link for __compiler_gettext* via GettextJitHelper PHP (#9859, #12828, #26226, #27391).
  *
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Getopt #26213 / Checkdate #26196).
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\gettext\GettextJitHelper}; thin LLVM bridges
- * forward the ABI. SSOT: {@see \PHPCompiler\ext\gettext\VmGettextNative}.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiledBundle} — solo GettextJitHelper NestedJIT
+ * stubs VmGettextNative/Pure (fingerprint deps are not NestedJIT'd; peer metaphone #26794).
+ * Thin LLVM bridges forward the ABI. SSOT: {@see \PHPCompiler\ext\gettext\VmGettextNative}.
  * php-src: ext/gettext/gettext.c
  */
 final class StringGettextRuntime
 {
     private const HELPER_PATH = '/ext/gettext/GettextJitHelper.php';
 
-    private const GETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::gettextArgv';
+    /**
+     * NestedJIT domain-state SSOT with the helper — solo GettextJitHelper left
+     * VmGettextNative unbound under thin AOT (#27391 / peer metaphone #26794).
+     * VmGettextPure (MO parser) is intentionally not NestedJIT'd: it OOMs the
+     * helper TU; unbound-catalog paths short-circuit in Native before Pure.
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/gettext/VmGettextNative.php',
+        '/ext/gettext/GettextJitHelper.php',
+    ];
 
+    private const GETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::gettextArgv';
     private const DGETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::dgettextArgv';
 
     private const DCGETTEXT_HELPER = 'PHPCompiler\\ext\\gettext\\GettextJitHelper::dcgettextArgv';
@@ -439,11 +451,11 @@ final class StringGettextRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
-            '#26226'
+            '#27391'
         );
     }
 
