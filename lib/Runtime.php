@@ -411,14 +411,12 @@ class Runtime {
         [$code, $staticLines] = $staticPreprocessor->preprocess($code, $filename);
         $this->staticClassAnnotator->setStaticLines($staticLines);
         [$code, $newRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
-        if (\PHPCompiler\ext\standard\VmEval::isEvalScriptPath($filename)) {
-            $this->vmContext->propertyHookRegistry = self::mergePropertyHookRegistry(
-                $this->vmContext->propertyHookRegistry,
-                $newRegistry
-            );
-        } else {
-            $this->vmContext->propertyHookRegistry = $newRegistry;
-        }
+        // Request-lifetime registry: merge on every compile unit (require/include/eval).
+        // Replacing wiped interface/abstract hook metadata before DECLARE of later files (#28374, #7031).
+        $this->vmContext->propertyHookRegistry = self::mergePropertyHookRegistry(
+            $this->vmContext->propertyHookRegistry,
+            $newRegistry
+        );
         CurlyBraceOffsetRejector::reject($code, $filename);
         ClassConstBraceDerefRejector::reject($code, $filename);
         ClassConstDynamicFetchRejector::reject($code, $filename);
@@ -439,7 +437,10 @@ class Runtime {
     }
 
     /**
-     * eval() compile units append hook metadata; file units replace (#7030, #7031).
+     * Compile units append hook metadata for the request (#7030, #7031, #28374).
+     *
+     * require/include and eval() must keep prior interface/abstract hook obligations so
+     * DECLARE-time checks still see them after a later file is preprocessed.
      *
      * @param array<string, array<string, array<string, mixed>>> $existing
      * @param array<string, array<string, array<string, mixed>>> $incoming

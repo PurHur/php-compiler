@@ -213,6 +213,64 @@ PHP;
         $runtime->parseAndCompile($code, 'missing_iface_property.php');
     }
 
+    /** Exact #28374 shape: string $name hooks; plain Good OK; BadI omission fatals. */
+    public function testIssue28374InterfaceHookedPropertyOmissionFails(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public string $name { get; set; }
+}
+class Good implements I {
+    public string $name = "g";
+}
+echo (new Good())->name, "\n";
+class BadI implements I {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadI must implement 1 interface property');
+        $this->expectExceptionMessage('I::$name');
+        $this->expectExceptionMessage('{ get; set; }');
+        $runtime->parseAndCompile($code, 'issue_28374_iface_hook.php');
+    }
+
+    /** #28374: require-split interface — omission must fatal at DECLARE (not only same-script compile). */
+    public function testIssue28374RequireSplitMissingInterfaceHookedPropertyFails(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $dir = sys_get_temp_dir().'/phpc_28374_'.bin2hex(random_bytes(4));
+        mkdir($dir);
+        $iface = $dir.'/iface.php';
+        $bad = $dir.'/bad.php';
+        $main = $dir.'/main.php';
+        try {
+            file_put_contents($iface, "<?php\ninterface I { public string \$name { get; set; } }\n");
+            file_put_contents($bad, "<?php\nclass BadI implements I {}\necho \"BadI ok\\n\";\n");
+            file_put_contents($main, '<?php'."\nrequire ".var_export($iface, true).";\nrequire ".var_export($bad, true).";\n");
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(file_get_contents($main), $main);
+            $this->assertNotNull($block);
+            ob_start();
+            try {
+                $runtime->run($block, false);
+                ob_end_clean();
+                $this->fail('Expected ScriptExit for BadI missing interface hooked property');
+            } catch (\PHPCompiler\VM\ScriptExit $e) {
+                $out = (string) ob_get_clean();
+                $this->assertSame(255, $e->status);
+                $this->assertStringNotContainsString('BadI ok', $out);
+                // Message text: compliance case interface_property_hook_missing_require.phpt
+            }
+        } finally {
+            @unlink($iface);
+            @unlink($bad);
+            @unlink($main);
+            @rmdir($dir);
+        }
+    }
+
     public function testImplementedInterfacePropertyHookCompiles(): void
     {
         $this->skipUnlessPropertyHooksEnabled();

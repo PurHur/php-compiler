@@ -61,6 +61,26 @@ PHP;
         self::assertArrayHasKey('evalhooked', $runtime->vmContext->propertyHookRegistry);
     }
 
+    public function testFileCompileUnitsMergePropertyHookRegistryAcrossRequires(): void
+    {
+        $runtime = new Runtime();
+        $first = <<<'PHP'
+<?php
+interface FirstIface {
+    public string $label { get; set; }
+}
+PHP;
+        $runtime->preprocessSourceForParse($first, 'first_iface.php');
+        self::assertArrayHasKey('firstiface', $runtime->vmContext->propertyHookRegistry);
+
+        $second = <<<'PHP'
+<?php
+class SecondPlain {}
+PHP;
+        $runtime->preprocessSourceForParse($second, 'second_plain.php');
+        self::assertArrayHasKey('firstiface', $runtime->vmContext->propertyHookRegistry);
+    }
+
     public function testEvalConcretePropertyHookRuns(): void
     {
         $runtime = new Runtime();
