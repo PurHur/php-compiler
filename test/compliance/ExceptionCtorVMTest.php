@@ -7,7 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * VM compliance for Throwable ctor message coercion (#18189, Zend/zend_exceptions.c).
+ * VM compliance for Throwable ctor message/code coercion (#18189, #28797, Zend/zend_exceptions.c).
  */
 final class ExceptionCtorVMTest extends BaseTest
 {
@@ -26,6 +26,10 @@ final class ExceptionCtorVMTest extends BaseTest
         yield 'exception_ctor_enum_typeerror.phpt' => self::parsePHPT(
             __DIR__.'/cases/language/exception_ctor_enum_typeerror.phpt',
             'exception_ctor_enum_typeerror.phpt'
+        );
+        yield 'exception_ctor_code_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/exception_ctor_code_coerce.phpt',
+            'exception_ctor_code_coerce.phpt'
         );
     }
 

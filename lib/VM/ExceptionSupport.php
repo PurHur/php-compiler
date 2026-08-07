@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\ThrowableManifest;
+use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 
@@ -212,6 +214,95 @@ final class ExceptionSupport
         return ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR);
     }
 
+    /**
+     * Zend Z_PARAM_LONG / typed int $code for Exception/Error/ErrorException::__construct (#28797).
+     *
+     * Weak mode coerces numeric strings, floats, and bools; declare(strict_types=1) requires int.
+     * php-src: Zend/zend_exceptions.c — zend_parse_parameters(..., "|SlO!", …) / typed stubs.
+     *
+     * @throws \TypeError when the operand cannot be coerced like Zend
+     */
+    public static function coerceConstructCodeArg(
+        Frame $frame,
+        Variable $codeVar,
+        string $className,
+        int $userArgIndex = 1
+    ): int {
+        $codeVar = $codeVar->resolveIndirect();
+        $function = "{$className}::__construct";
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            if (Variable::TYPE_INTEGER !== $codeVar->type) {
+                throw new \TypeError(self::constructCodeTypeError(
+                    $function,
+                    $userArgIndex,
+                    EnumCaseSupport::typeNameForVariable($codeVar)
+                ));
+            }
+
+            return $codeVar->toInt();
+        }
+
+        switch ($codeVar->type) {
+            case Variable::TYPE_INTEGER:
+                return $codeVar->toInt();
+            case Variable::TYPE_BOOLEAN:
+                return $codeVar->toBool() ? 1 : 0;
+            case Variable::TYPE_NULL:
+                // Zend 8.1+ typed int $code — null coerces to 0 with E_DEPRECATED.
+                VmNullNumberParamDeprecation::emit(
+                    $frame,
+                    $function,
+                    $userArgIndex + 1,
+                    'code',
+                    'int'
+                );
+
+                return 0;
+            case Variable::TYPE_FLOAT:
+                $float = $codeVar->toFloat();
+                if (!\is_finite($float)) {
+                    throw new \TypeError(self::constructCodeTypeError($function, $userArgIndex, 'float'));
+                }
+                $vm = \PHPCompiler\VM::running();
+                $ctx = $vm?->context ?? $frame->vmContext ?? $frame->parent?->vmContext;
+                if (null !== $ctx) {
+                    VmMath::warnFloatToIntPrecisionLoss(
+                        $float,
+                        $ctx,
+                        $vm?->currentExecutingFrame() ?? $frame
+                    );
+                }
+
+                return VmMath::floatToZendLong($float);
+            case Variable::TYPE_STRING:
+                $s = $codeVar->toString();
+                if ('' === $s || !\is_numeric($s)) {
+                    throw new \TypeError(self::constructCodeTypeError($function, $userArgIndex, 'string'));
+                }
+
+                return (int) (float) $s;
+            default:
+                throw new \TypeError(self::constructCodeTypeError(
+                    $function,
+                    $userArgIndex,
+                    EnumCaseSupport::typeNameForVariable($codeVar)
+                ));
+        }
+    }
+
+    private static function constructCodeTypeError(
+        string $function,
+        int $userArgIndex,
+        string $given
+    ): string {
+        return \sprintf(
+            '%s(): Argument #%d ($code) must be of type int, %s given',
+            $function,
+            $userArgIndex + 1,
+            $given
+        );
+    }
+
     public static function initFromConstruct(ObjectEntry $receiver, Frame $frame, int $messageArgIndex = 1): void
     {
         $message = '';
@@ -230,13 +321,12 @@ final class ExceptionSupport
         }
         $code = 0;
         if (array_key_exists($messageArgIndex + 1, $frame->calledArgs)) {
-            $codeVar = $frame->calledArgs[$messageArgIndex + 1]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $codeVar->type) {
-                if (Variable::TYPE_INTEGER !== $codeVar->type) {
-                    throw new \LogicException('Exception::__construct() code must be an integer');
-                }
-                $code = $codeVar->toInt();
-            }
+            $code = self::coerceConstructCodeArg(
+                $frame,
+                $frame->calledArgs[$messageArgIndex + 1],
+                $receiver->class->name,
+                1
+            );
         }
         $receiver->getProperty(self::PROP_MESSAGE)->string($message);
         $receiver->getProperty(self::PROP_CODE)->int($code);
@@ -305,13 +395,7 @@ final class ExceptionSupport
         }
         $code = 0;
         if (array_key_exists(2, $frame->calledArgs)) {
-            $codeVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $codeVar->type) {
-                if (Variable::TYPE_INTEGER !== $codeVar->type) {
-                    throw new \LogicException('ErrorException::__construct() code must be an integer');
-                }
-                $code = $codeVar->toInt();
-            }
+            $code = self::coerceConstructCodeArg($frame, $frame->calledArgs[2], $className, 1);
         }
         $severity = \E_ERROR;
         if (array_key_exists(3, $frame->calledArgs)) {
