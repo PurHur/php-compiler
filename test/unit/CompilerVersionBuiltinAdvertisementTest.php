@@ -257,25 +257,21 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::advertisesMbUcfirstLcfirst());
     }
 
-    public function testGetObjectIdWithheldOnReferenceProfile(): void
+    public function testGetObjectIdWithheldAlways(): void
     {
+        // php-src has spl_object_id only — get_object_id is a phantom (#28405).
         $this->assertFalse(CompilerVersion::supportsGetObjectId());
         $this->assertFalse(CompilerVersion::advertisesGetObjectId());
-    }
-
-    public function testGetObjectIdAdvertisedOnForwardProfile(): void
-    {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsGetObjectId());
-            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        foreach (['8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsGetObjectId(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesGetObjectId(), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
