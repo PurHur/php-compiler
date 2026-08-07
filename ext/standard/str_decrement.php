@@ -28,9 +28,8 @@ final class str_decrement extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('str_decrement() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#28679; peer #28691).
+        $this->requireExactArgCount($frame, 'str_decrement', 1);
         $input = self::vmStringArg($frame);
         $result = VmString::strDecrement($input);
         if (null === $frame->returnVar) {
@@ -44,8 +43,9 @@ final class str_decrement extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== \count($args)) {
-            throw new \LogicException('str_decrement() requires exactly one argument in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28679.
+        if (!$this->requireExactJitArgCount($context, $args, 'str_decrement', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
 
         $input = self::jitStringArg($context, $args[0]);
