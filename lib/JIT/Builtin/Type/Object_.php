@@ -565,6 +565,23 @@ class Object_ extends Type {
                 $this->context->builder->pointerCast($ht, $voidPtr),
                 $this->propertySlotPtr($obj, 0)
             );
+            // Iterator position for getInfo/current (#28707).
+            $i64 = $this->context->getTypeFromString('int64');
+            $posSlot = $this->propertySlotFor(
+                $obj,
+                'SplObjectStorage',
+                \PHPCompiler\VM\SplObjectStorageJitHelper::PROP_ITER_POS
+            );
+            $this->propertyStore(
+                $posSlot,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $i64->constInt(0, false)
+                ),
+                Variable::TYPE_NATIVE_LONG
+            );
         }
 
         $propCount = \count($this->properties[$classId] ?? []);
@@ -3645,7 +3662,9 @@ class Object_ extends Type {
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
-            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+            // Slot 0 must stay `__spl_ht` for splBackingHashtable (#26787 / #28707).
+            $this->defineProperty($id, \PHPCompiler\VM\SplObjectStorageJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplObjectStorageJitHelper::PROP_ITER_POS, Variable::TYPE_NATIVE_LONG);
             // php-src ext/spl/spl_observer.stub.php — Countable + Iterator + Serializable + ArrayAccess.
             // Thin AOT TYPE_VALUE dim needs ArrayAccess so object keys avoid Illegal offset (#26787 / #24681).
             $this->ensureZendBuiltinInterfaces();

@@ -1693,8 +1693,8 @@ class HashTable extends Type
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $long
         );
-        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
-        $this->context->builder->store($newNode, $headSlot);
+        // Append for insertion-order foreach (SplObjectStorage / WeakMap; #28707).
+        $this->appendObjKeyNode($fn, $headSlot, $head, $newNode, 'objkey_long');
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
@@ -1767,13 +1767,70 @@ class HashTable extends Type
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $object
         );
-        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
-        $this->context->builder->store($newNode, $headSlot);
+        // Append for insertion-order foreach (SplObjectStorage / WeakMap; #28707).
+        $this->appendObjKeyNode($fn, $headSlot, $head, $newNode, 'objkey_obj');
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
+    }
+
+    /**
+     * Link a new `__objkey_node__` at the tail so foreach walks insertion order (#28707).
+     *
+     * Builder must be positioned in the "create new node" block; leaves the builder
+     * at a join block so the caller can branch to its done block.
+     */
+    private function appendObjKeyNode(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\Value $headSlot,
+        PHPLLVM\Value $head,
+        PHPLLVM\Value $newNode,
+        string $prefix
+    ): void {
+        $nodeMap = $this->context->structFieldMap['__objkey_node__'];
+        $nodePtrType = $head->typeOf();
+        $from = $this->context->builder->getInsertBlock();
+        $this->context->builder->store(
+            $nodePtrType->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $empty = $fn->appendBasicBlock($prefix.'_append_empty');
+        $loop = $fn->appendBasicBlock($prefix.'_append_loop');
+        $advance = $fn->appendBasicBlock($prefix.'_append_advance');
+        $link = $fn->appendBasicBlock($prefix.'_append_link');
+        $joined = $fn->appendBasicBlock($prefix.'_append_joined');
+        $headNull = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $head,
+            $nodePtrType->constNull()
+        );
+        $this->context->builder->branchIf($headNull, $empty, $loop);
+
+        $this->context->builder->positionAtEnd($empty);
+        $this->context->builder->store($newNode, $headSlot);
+        $this->context->builder->branch($joined);
+
+        $this->context->builder->positionAtEnd($loop);
+        $cur = $this->context->builder->phi($nodePtrType);
+        $cur->addIncoming($head, $from);
+        $next = $this->context->builder->load($this->context->builder->structGep($cur, $nodeMap['next']));
+        $atTail = $this->context->builder->icmp(Builder::INT_EQ, $next, $nodePtrType->constNull());
+        $this->context->builder->branchIf($atTail, $link, $advance);
+
+        $this->context->builder->positionAtEnd($advance);
+        $this->context->builder->branch($loop);
+        $cur->addIncoming($next, $advance);
+
+        $this->context->builder->positionAtEnd($link);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($cur, $nodeMap['next'])
+        );
+        $this->context->builder->branch($joined);
+
+        $this->context->builder->positionAtEnd($joined);
     }
 
     private function implementOffsetIsSetObjectKey(): void

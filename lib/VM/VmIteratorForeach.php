@@ -324,11 +324,13 @@ final class VmIteratorForeach
         }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
+            // SplObjectStorage: walk objKeys; index tracks Zend key() (#28707).
             $nodePtrType = $context->getTypeFromString('__objkey_node__*');
             $context->builder->store(
                 $nodePtrType->constNull(),
                 self::objNodeSlot($context, $slotKey)
             );
+            self::initHashtableIndex($context, $slotKey);
 
             return;
         }
@@ -402,11 +404,19 @@ final class VmIteratorForeach
         $context->builder->positionAtEnd($init);
         $head = $context->builder->load($context->builder->structGep($ht, $map['objKeys']));
         $context->builder->store($head, $walkSlot);
+        // SplObjectStorage::key() is the 0-based insertion index (#28707 / php-src).
+        $sizeT = $context->getTypeFromString('size_t');
+        $context->builder->store($sizeT->constInt(0, false), self::indexSlot($context, $slotKey));
         $context->builder->branch($check);
 
         $context->builder->positionAtEnd($advance);
         $next = $context->builder->load($context->builder->structGep($current, $nodeMap['next']));
         $context->builder->store($next, $walkSlot);
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $sizeT->constInt(1, false)),
+            self::indexSlot($context, $slotKey)
+        );
         $context->builder->branch($check);
 
         $context->builder->positionAtEnd($check);
@@ -670,17 +680,19 @@ final class VmIteratorForeach
         );
     }
 
+    /**
+     * SplObjectStorage foreach key — insertion index, not the object (#28707).
+     * php-src: spl_object_storage_get_current_key
+     */
     private static function compileKeyObject(Context $context, JitVariable $slotKey): JitVariable
     {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
-        $nodeMap = $context->structFieldMap['__objkey_node__'];
-        $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
-        $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
+            $context->lookupFunction('__value__writeLong'),
             $destPtr,
-            $keyObj
+            $context->builder->truncOrBitCast($idx, $context->getTypeFromString('int64'))
         );
 
         return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
@@ -857,16 +869,22 @@ final class VmIteratorForeach
         return $var;
     }
 
+    /**
+     * SplObjectStorage foreach value — the stored object key, not the info (#28707).
+     * php-src: spl_object_storage_get_current_data; info via getInfo() / offsetGet.
+     */
     private static function compileValueObject(Context $context, JitVariable $slotKey): JitVariable
     {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $nodeMap = $context->structFieldMap['__objkey_node__'];
-        $valueMap = $context->structFieldMap['__value__'];
         $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
-        $valField = $context->builder->structGep($node, $nodeMap['value']);
-        $fn = $context->builder->getInsertBlock()->getParent();
-        self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
+        $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $keyObj
+        );
 
         return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
     }

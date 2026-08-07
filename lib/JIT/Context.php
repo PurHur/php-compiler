@@ -1130,6 +1130,14 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetexists'] = new Call\SplObjectStorageMethod('offsetexists');
         $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
+        // Iterator + getInfo/setInfo for thin AOT (#28707; php-src spl_observer.c).
+        $this->functionProxies['splobjectstorage::rewind'] = new Call\SplObjectStorageMethod('rewind');
+        $this->functionProxies['splobjectstorage::next'] = new Call\SplObjectStorageMethod('next');
+        $this->functionProxies['splobjectstorage::valid'] = new Call\SplObjectStorageMethod('valid');
+        $this->functionProxies['splobjectstorage::key'] = new Call\SplObjectStorageMethod('key');
+        $this->functionProxies['splobjectstorage::current'] = new Call\SplObjectStorageMethod('current');
+        $this->functionProxies['splobjectstorage::getinfo'] = new Call\SplObjectStorageMethod('getinfo');
+        $this->functionProxies['splobjectstorage::setinfo'] = new Call\SplObjectStorageMethod('setinfo');
         // ArrayIterator / RecursiveArrayIterator — `__spl_ht` for thin AOT foreach (#26783, #26775).
         $this->functionProxies['arrayiterator::__construct'] = new Call\ArrayIteratorConstruct('ArrayIterator');
         $this->functionProxies['recursivearrayiterator::__construct'] = new Call\ArrayIteratorConstruct(
