@@ -186,6 +186,26 @@ final class VmUuid
         return \bin2hex(\substr($bin, 10, 6));
     }
 
+    /**
+     * PECL uuid_generate_md5 — RFC 4122 name-based UUID v3 (MD5).
+     *
+     * @throws \ValueError
+     */
+    public static function generateMd5(string $uuidNs, string $name): string
+    {
+        return self::generateNameBased($uuidNs, $name, 'md5', 3, 'uuid_generate_md5');
+    }
+
+    /**
+     * PECL uuid_generate_sha1 — RFC 4122 name-based UUID v5 (SHA-1).
+     *
+     * @throws \ValueError
+     */
+    public static function generateSha1(string $uuidNs, string $name): string
+    {
+        return self::generateNameBased($uuidNs, $name, 'sha1', 5, 'uuid_generate_sha1');
+    }
+
     /** @return ?string 16-byte binary or null when invalid */
     public static function tryParse(string $uuid): ?string
     {
@@ -248,6 +268,33 @@ final class VmUuid
             \substr($h, 16, 4),
             \substr($h, 20, 12)
         );
+    }
+
+    /**
+     * libuuid uuid_generate_md5 / uuid_generate_sha1 (php/pecl-networking-uuid uuid.c; #27836).
+     *
+     * @throws \ValueError
+     */
+    private static function generateNameBased(
+        string $uuidNs,
+        string $name,
+        string $algo,
+        int $version,
+        string $fn
+    ): string {
+        $nsBin = self::tryParse($uuidNs);
+        if (null === $nsBin) {
+            throw new \ValueError($fn.'(): Argument #1 ($uuid_ns) UUID expected');
+        }
+        $digest = \hash($algo, $nsBin.$name, true);
+        if (false === $digest || \strlen($digest) < self::BIN_LEN) {
+            throw new \RuntimeException($fn.'(): hash() failed');
+        }
+        $bin = \substr($digest, 0, self::BIN_LEN);
+        $bin[6] = \chr((\ord($bin[6]) & 0x0F) | (($version & 0x0F) << 4));
+        $bin[8] = \chr((\ord($bin[8]) & 0x3F) | 0x80);
+
+        return self::formatCanonical($bin);
     }
 
     private static function generateRandom(): string

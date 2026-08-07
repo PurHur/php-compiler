@@ -186,6 +186,8 @@ final class BuiltinInternalArgInfo
             'dom_import_simplexml' => 'DOMAttr|DOMElement',
             // ext/simplexml/simplexml.stub.php — php-types typo simplemxml_element (#26464)
             'simplexml_import_dom' => '?SimpleXMLElement',
+            // pecl-networking-uuid uuid.stub.php — absent from InternalArgInfo (#27836)
+            'uuid_generate_md5', 'uuid_generate_sha1' => 'string',
             // ext/hash/hash.stub.php — missing from InternalArgInfo (#25470)
             'hash_equals' => 'bool',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits / untyped (#25469)
@@ -508,6 +510,11 @@ final class BuiltinInternalArgInfo
         }
 
         return match ($callableLc) {
+            // pecl-networking-uuid uuid.stub.php — string $uuid_ns, string $name (#27836)
+            'uuid_generate_md5', 'uuid_generate_sha1' => match ($index) {
+                0, 1 => 'string',
+                default => null,
+            },
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,

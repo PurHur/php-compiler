@@ -47,6 +47,8 @@ final class UuidModuleTest extends TestCase
 
         self::assertTrue(VmReflection::functionExists($ctx, 'uuid_create'));
         self::assertTrue(VmReflection::functionExists($ctx, 'uuid_generate'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'uuid_generate_md5'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'uuid_generate_sha1'));
         self::assertTrue(VmReflection::functionExists($ctx, 'uuid_is_valid'));
         self::assertTrue(VmReflection::functionExists($ctx, 'uuid_parse'));
         self::assertTrue(VmReflection::functionExists($ctx, 'uuid_unparse'));
@@ -57,15 +59,39 @@ final class UuidModuleTest extends TestCase
 <?php
 echo (int) defined('UUID_TYPE_RANDOM');
 echo (int) function_exists('uuid_create');
+echo (int) function_exists('uuid_generate_md5');
+echo (int) function_exists('uuid_generate_sha1');
 echo UUID_TYPE_RANDOM;
 $id = uuid_create(UUID_TYPE_RANDOM);
 echo (int) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $id);
+$ns = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+echo uuid_generate_md5($ns, 'php.net');
 PHP;
         $block = $runtime->parseAndCompile($code, 'uuid_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1141', ob_get_clean());
+        self::assertSame('11114111a38b9a-b3da-360f-9353-a5a725514269', ob_get_clean());
         self::assertSame(4, UuidConstants::UUID_TYPE_RANDOM);
+    }
+
+    public function test_uuid_generate_md5_sha1_named_args_and_reflection(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$ns = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+echo uuid_generate_sha1(uuid_ns: $ns, name: 'php.net'), "\n";
+$rf = new ReflectionFunction('uuid_generate_sha1');
+echo $rf->getParameters()[0]->getName(), ',', $rf->getParameters()[1]->getName(), "\n";
+echo (string) $rf->getReturnType(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'uuid_md5_sha1.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "c4a760a8-dbcf-5254-a0d9-6a4474bd1b62\nuuid_ns,name\nstring\n",
+            ob_get_clean()
+        );
     }
 
     public function test_uuid_parse_unparse_roundtrip(): void

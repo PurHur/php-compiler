@@ -2,7 +2,7 @@
 ext uuid parse/unparse/compare/type surface (issue #22228)
 --FILE--
 <?php
-foreach (['uuid_is_valid','uuid_parse','uuid_unparse','uuid_compare','uuid_is_null','uuid_type','uuid_variant','uuid_time','uuid_mac'] as $f) {
+foreach (['uuid_is_valid','uuid_parse','uuid_unparse','uuid_compare','uuid_is_null','uuid_type','uuid_variant','uuid_time','uuid_mac','uuid_generate_md5','uuid_generate_sha1'] as $f) {
     echo $f, '=', (int) function_exists($f), "\n";
 }
 echo (int) defined('UUID_TYPE_NULL'), "\n";
@@ -54,6 +54,8 @@ uuid_type=1
 uuid_variant=1
 uuid_time=1
 uuid_mac=1
+uuid_generate_md5=1
+uuid_generate_sha1=1
 1
 1
 1
