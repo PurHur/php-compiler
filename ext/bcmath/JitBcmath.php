@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bcmath;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\Bcmath;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -250,7 +254,8 @@ final class JitBcmath
 
         $numLit = self::compileTimeString($args[0]);
         $precisionLit = isset($args[1]) ? self::compileTimeLong($args[1]) : 0;
-        $modeLit = isset($args[2]) ? self::compileTimeRoundMode($context, $args[2]) : null;
+        // Enum-only — legacy int PHP_ROUND_* is TypeError under PROFILE≥8.4 (#28566).
+        $modeLit = isset($args[2]) ? RoundingModeJit::compileTimeRoundMode($context, $args[2]) : null;
         $canFold = null !== $numLit
             && (!isset($args[1]) || null !== $precisionLit)
             && (!isset($args[2]) || null !== $modeLit);
@@ -283,12 +288,72 @@ final class JitBcmath
 
     private static function lowerRoundModeArg(Context $context, JITVariable $arg): Value
     {
-        $mode = self::compileTimeRoundMode($context, $arg);
+        // php-src bcmath.stub.php — RoundingMode only (#28566); reject legacy int / null.
+        $mode = RoundingModeJit::compileTimeRoundMode($context, $arg);
         if (null !== $mode) {
             return $context->getTypeFromString('int64')->constInt($mode, false);
         }
 
-        throw new \LogicException('bcround(): Argument #3 ($mode) must be a compile-time RoundingMode or int in this compiler build');
+        $given = self::compileTimeNonEnumModeTypeName($arg) ?? 'mixed';
+
+        return self::emitRoundModeTypeError($context, $given);
+    }
+
+    /** Catchable TypeError for non-RoundingMode $mode under AOT/JIT (#28566; mirrors php_uname #28136). */
+    private static function emitRoundModeTypeError(Context $context, string $given): Value
+    {
+        $message = sprintf(
+            'bcround(): Argument #3 ($mode) must be of type RoundingMode, %s given',
+            $given
+        );
+        ExceptionBridge::ensureLinked($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            TypeErrorRaise::ensureStandaloneBodies($context);
+        }
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'bcround_mode_typeerror_dead');
+        } else {
+            TypeErrorRaise::emitRaise($context, $message);
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+            } else {
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'bcround_mode_typeerror_dead');
+        }
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    /** @return null|string Zend type name when $arg is a known non-RoundingMode compile-time value */
+    private static function compileTimeNonEnumModeTypeName(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return 'null';
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type
+            || JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return 'int';
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return 'int';
+            }
+        }
+        if (null !== ($arg->compileTimeLong ?? null) || null !== self::compileTimeLong($arg)) {
+            return 'int';
+        }
+        // Constant fetch of PHP_ROUND_* / other ints often arrives as VALUE box (#28566).
+        if (null !== $arg->compileTimeConstantName) {
+            return 'int';
+        }
+
+        return null;
     }
 
     /** @param array<int, JITVariable> $args */
@@ -500,11 +565,6 @@ final class JitBcmath
 
     private static function compileTimeRoundMode(Context $context, JITVariable $arg): ?int
     {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind
-            && method_exists($arg->value, 'isConstant') && $arg->value->isConstant()) {
-            return (int) $arg->value->getConstantValue();
-        }
-
         return RoundingModeJit::compileTimeRoundMode($context, $arg);
     }
 

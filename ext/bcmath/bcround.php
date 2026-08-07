@@ -35,9 +35,10 @@ final class bcround extends BcmathFunction
             );
         }
 
+        // php-src bcmath.stub.php — RoundingMode $mode = HalfAwayFromZero (#28566).
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
         if ($argc >= 3) {
-            $mode = VmRoundMode::resolveRoundModeArg(
+            $mode = VmRoundMode::resolveRoundingModeOnlyArg(
                 $frame->calledArgs[2]->resolveIndirect(),
                 'bcround'
             );

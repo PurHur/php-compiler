@@ -79,6 +79,11 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'enum_case', 'class' => 'RoundingMode', 'case' => 'HalfAwayFromZero'],
         ],
+        // php-src ext/bcmath/bcmath.stub.php — RoundingMode::HalfAwayFromZero (#28566)
+        'bcround' => [
+            1 => ['kind' => 'int', 'value' => 0],
+            2 => ['kind' => 'enum_case', 'class' => 'RoundingMode', 'case' => 'HalfAwayFromZero'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — flags=11, encoding=null (#23265)
         'html_entity_decode' => [
             1 => ['kind' => 'int', 'value' => 11],
