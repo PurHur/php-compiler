@@ -1,4 +1,5 @@
 <?php
-// repro #27030 — AOT serialize(new C) must not segfault; full roundtrip follow-up
+// repro #27030 — AOT unserialize(serialize(new C))->a must print 1 (no segfault)
 class C { public $a = 1; }
-echo serialize(new C), PHP_EOL;
+$o = unserialize(serialize(new C));
+echo $o->a, PHP_EOL;

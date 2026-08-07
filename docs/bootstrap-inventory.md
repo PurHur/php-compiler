@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7204 |
-| Phase A inventory files (M2 ratio SSOT) | 7204 |
+| PHP files on vm.php path | 7207 |
+| Phase A inventory files (M2 ratio SSOT) | 7207 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23260 |
+| Source constructs flagged (warnings) | 23264 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3007,7 +3007,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRoundModeResolve.php` | 0 | 1 |
 | `ext/standard/JitScalarEnumCoerce.php` | 0 | 1 |
 | `ext/standard/JitScalarTypeCoerce.php` | 0 | 3 |
-| `ext/standard/JitSerialize.php` | 0 | 1 |
+| `ext/standard/JitSerialize.php` | 0 | 2 |
 | `ext/standard/JitSessionAbort.php` | 0 | 1 |
 | `ext/standard/JitSessionCacheExpire.php` | 0 | 1 |
 | `ext/standard/JitSessionCreateId.php` | 0 | 1 |
@@ -3270,6 +3270,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ScandirFailureJitHelper.php` | 0 | 1 |
 | `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 7 |
 | `ext/standard/SerializeJitHelper.php` | 0 | 2 |
+| `ext/standard/SerializeNestedJitHelper.php` | 0 | 1 |
+| `ext/standard/SerializeObjectNestedJitHelper.php` | 0 | 1 |
 | `ext/standard/SessionCookieParams.php` | 0 | 4 |
 | `ext/standard/SessionCreateIdJitHelper.php` | 0 | 1 |
 | `ext/standard/SessionEncodeJitHelper.php` | 0 | 1 |
@@ -3368,6 +3370,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
 | `ext/standard/UnpackJitHelper.php` | 0 | 1 |
 | `ext/standard/UnserializeJitHelper.php` | 0 | 2 |
+| `ext/standard/UnserializeObjectNestedJitHelper.php` | 0 | 1 |
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlScannerEx.php` | 0 | 1 |
 | `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
@@ -30471,7 +30474,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new JITVariable (line 143)
+- 4 class method(s)
 
 ### `ext/standard/JitSessionAbort.php`
 
@@ -32757,6 +32761,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 31)
 - 3 class method(s)
 
+### `ext/standard/SerializeNestedJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/standard/SerializeObjectNestedJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/SessionCookieParams.php`
 
 **Warnings** (review for bootstrap subset):
@@ -33308,8 +33322,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UnserializeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 59)
+- new HashTable (line 58)
 - 3 class method(s)
+
+### `ext/standard/UnserializeObjectNestedJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/UploadTempJitHelper.php`
 
@@ -49238,7 +49257,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/StringShmop.php`
 
@@ -49566,7 +49585,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 13 class method(s)
 
 ### `lib/JIT/Builtin/StringUrldecode.php`
 

@@ -58,7 +58,19 @@ final class SerializeRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('SerializeNestedJitHelper.php', $spine);
         $this->assertStringContainsString('SerializeObjectNestedJitHelper.php', $spine);
+        $this->assertStringContainsString('UnserializeObjectNestedJitHelper.php', $spine);
         $this->assertStringContainsString('StringSerialize.php', $spine);
         $this->assertStringNotContainsString('StringSerializeJit.php', $spine);
+    }
+
+    public function testUnserializeObjectNestedJitHelperIsContextFree(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnserializeObjectNestedJitHelper.php');
+        $this->assertStringContainsString('firstIntProp', $source);
+        $this->assertStringContainsString('phpc_native_ht_set_long_at', $source);
+        $this->assertStringContainsString('propsInto', $source);
+        $this->assertStringNotContainsString('VmUnserialize', $source);
+        $this->assertStringNotContainsString('Superglobals', $source);
+        $this->assertStringNotContainsString('->runtime->vm', $source);
     }
 }

@@ -3200,6 +3200,7 @@ require_once __DIR__.'/../../../ext/standard/UnlinkJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnpackEngine.php';
 require_once __DIR__.'/../../../ext/standard/UnpackJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UnserializeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/UnserializeObjectNestedJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UploadTempJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UrldecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UrlencodeJitHelper.php';
