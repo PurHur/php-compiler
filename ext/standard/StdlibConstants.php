@@ -331,8 +331,9 @@ final class StdlibConstants
             && !\PHPCompiler\CompilerVersion::supportsArrayPadPadType()) {
             return null;
         }
-        if (isset(self::PHP84_ROUND_MODE_LC[$lc])
-            && !\PHPCompiler\CompilerVersion::supportsRoundingModeEnum()) {
+        // php-src never defines PHP_ROUND_CEILING/FLOOR/TOWARD_ZERO/AWAY_FROM_ZERO —
+        // only Half* ints 1–4 exist; RoundingMode is a unit enum (#28535, re-#16875).
+        if (isset(self::PHP84_ROUND_MODE_LC[$lc])) {
             return null;
         }
 

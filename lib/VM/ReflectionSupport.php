@@ -9,6 +9,7 @@ use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
@@ -2147,7 +2148,7 @@ final class ReflectionSupport
             self::throwReflectionException('Internal error: Failed to retrieve the default value');
         }
         if (self::parameterIsInternal($ctx, $reflection)) {
-            return false;
+            return null !== self::internalParameterDefaultConstantName($ctx, $reflection);
         }
         $block = self::resolveParameterBlock($ctx, $reflection);
         $index = self::parameterIndexForReflection($reflection);
@@ -2167,12 +2168,29 @@ final class ReflectionSupport
             self::throwReflectionException('Internal error: Failed to retrieve the default value');
         }
         if (self::parameterIsInternal($ctx, $reflection)) {
-            return null;
+            return self::internalParameterDefaultConstantName($ctx, $reflection);
         }
         $block = self::resolveParameterBlock($ctx, $reflection);
         $index = self::parameterIndexForReflection($reflection);
 
         return $block->paramDefaultConstantNames[$index] ?? null;
+    }
+
+    /** php-src round() $mode = RoundingMode::HalfAwayFromZero (#28535). */
+    private static function internalParameterDefaultConstantName(
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): ?string {
+        if (!CompilerVersion::supportsRoundingModeEnum()) {
+            return null;
+        }
+        $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
+        $index = self::parameterIndexForReflection($reflection);
+        if ('round' === $callableLc && 2 === $index) {
+            return 'RoundingMode::HalfAwayFromZero';
+        }
+
+        return null;
     }
 
     /**
@@ -2744,7 +2762,7 @@ final class ReflectionSupport
         $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
         $info = self::internalParameterInfo($ctx, $reflection);
 
-        return BuiltinInternalDefaultValues::materialize($dest, $callableLc, $index, $info);
+        return BuiltinInternalDefaultValues::materialize($dest, $callableLc, $index, $info, $ctx);
     }
 
     private static function internalParameterIsVariadic(

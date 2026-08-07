@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -71,6 +73,11 @@ final class BuiltinInternalDefaultValues
         // php-src ext/standard/basic_functions.stub.php — flags=ENT_QUOTES|ENT_SUBSTITUTE (#23265)
         'htmlspecialchars_decode' => [
             1 => ['kind' => 'int', 'value' => 11],
+        ],
+        // php-src ext/standard/basic_functions.stub.php — RoundingMode::HalfAwayFromZero (#28535)
+        'round' => [
+            1 => ['kind' => 'int', 'value' => 0],
+            2 => ['kind' => 'enum_case', 'class' => 'RoundingMode', 'case' => 'HalfAwayFromZero'],
         ],
         // php-src ext/standard/basic_functions.stub.php — flags=11, encoding=null (#23265)
         'html_entity_decode' => [
@@ -792,6 +799,7 @@ final class BuiltinInternalDefaultValues
         string $callableLc,
         int $index,
         ?array $info,
+        ?Context $ctx = null,
     ): bool {
         if (null === $info) {
             return false;
@@ -800,7 +808,14 @@ final class BuiltinInternalDefaultValues
         if (null === $spec) {
             return false;
         }
-        self::writeSpec($dest, $spec);
+        // Profile-gate RoundingMode default — reference profile has no RoundingMode (#28535).
+        if (($spec['kind'] ?? '') === 'enum_case'
+            && 'RoundingMode' === ($spec['class'] ?? '')
+            && !CompilerVersion::supportsRoundingModeEnum()
+        ) {
+            $spec = ['kind' => 'int', 'value' => 1]; // PHP_ROUND_HALF_UP
+        }
+        self::writeSpec($dest, $spec, $ctx);
 
         return true;
     }
@@ -883,9 +898,9 @@ final class BuiltinInternalDefaultValues
     }
 
     /**
-     * @param array{kind: string, value?: mixed} $spec
+     * @param array{kind: string, value?: mixed, class?: string, case?: string} $spec
      */
-    private static function writeSpec(Variable $dest, array $spec): void
+    private static function writeSpec(Variable $dest, array $spec, ?Context $ctx = null): void
     {
         switch ($spec['kind']) {
             case 'null':
@@ -905,6 +920,21 @@ final class BuiltinInternalDefaultValues
                 break;
             case 'array':
                 $dest->newArray();
+                break;
+            case 'enum_case':
+                $className = (string) ($spec['class'] ?? '');
+                $caseName = (string) ($spec['case'] ?? '');
+                if (null === $ctx || '' === $className || '' === $caseName) {
+                    throw new \LogicException('enum_case default requires Context, class, and case');
+                }
+                $enum = $ctx->classes[strtolower($className)] ?? null;
+                if (null === $enum || !$enum->isEnum) {
+                    throw new \LogicException('enum_case default: '.$className.' is not a registered enum');
+                }
+                $memberLc = ClassConstName::key($caseName);
+                if (!EnumCaseSupport::fetchCaseByMemberName($enum, $memberLc, $dest, $ctx)) {
+                    throw new \LogicException('enum_case default: '.$className.'::'.$caseName.' missing');
+                }
                 break;
             default:
                 throw new \LogicException('Unknown internal default kind: '.$spec['kind']);
