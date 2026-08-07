@@ -35,6 +35,24 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertTrue($cwd['isOptional']);
     }
 
+    /** streamsfuncs.stub.php — crypto_method/session_stream + int|bool (#27684). */
+    public function testStreamSocketEnableCryptoReflectionStubTypes(): void
+    {
+        $this->assertSame(
+            ['stream', 'enable', 'crypto_method=', 'session_stream='],
+            BuiltinParamNames::forFunction('stream_socket_enable_crypto')
+        );
+        $this->assertSame(
+            'int|bool',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('stream_socket_enable_crypto')
+        );
+        $this->assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('stream_socket_enable_crypto', 2));
+        $crypto = BuiltinInternalArgInfo::paramInfoForFunction('stream_socket_enable_crypto', 2);
+        $this->assertNotNull($crypto);
+        $this->assertSame('?int', $crypto['type']);
+        $this->assertTrue($crypto['isOptional']);
+    }
+
     public function testArrayMapParamCount(): void
     {
         $this->assertSame(3, BuiltinInternalArgInfo::paramCountForFunction('array_map'));
