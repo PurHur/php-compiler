@@ -84,7 +84,8 @@ final class JitDomXPathQueryUserScript
             );
             self::$lastCacheKey = null;
             self::$lastQueryTag = null;
-            DomUserScriptLiveTagListLlvm::initCount($context, $axisMatches[1], $count);
+            // XPath NodeLists are snapshots — force count rewrite (#28647).
+            DomUserScriptLiveTagListLlvm::initCount($context, $axisMatches[1], $count, true);
 
             return self::boxNodeList($context, $count);
         }
@@ -101,7 +102,7 @@ final class JitDomXPathQueryUserScript
             self::$lastCacheKey = null;
             self::$lastQueryTag = strtolower($tag);
             $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
-            DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
+            DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count, true);
 
             return self::boxNodeList($context, $count);
         }
@@ -117,7 +118,7 @@ final class JitDomXPathQueryUserScript
         if (null === $matched) {
             self::$lastCacheKey = null;
             self::$lastQueryTag = null;
-            DomUserScriptLiveTagListLlvm::initCount($context, $tag, 0);
+            DomUserScriptLiveTagListLlvm::initCount($context, $tag, 0, true);
 
             return self::boxNodeList($context, 0);
         }
@@ -125,7 +126,7 @@ final class JitDomXPathQueryUserScript
         self::$lastCacheKey = strtolower($tag.'@'.$matches[2].'='.$attrValue.($numeric ? '#n' : ''));
         // Predicate lists keep the first-match element cache; do not use unfiltered nth-tag (#27275).
         self::$lastQueryTag = null;
-        DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
+        DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count, true);
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         $cacheKey = $context->builder->load(
             $context->constantStringFromString(self::$lastCacheKey)
