@@ -19,6 +19,7 @@ final class JitXsltMethod
             'getsecurityprefs' => JitXsltUserScript::tryGetSecurityPrefs($context, ...$args),
             'setprofiling' => JitXsltUserScript::trySetProfiling($context, ...$args),
             'importstylesheet' => JitXsltUserScript::tryImportStylesheet($context, ...$args),
+            'transformtoxml' => JitXsltUserScript::tryTransformToXml($context, ...$args),
             default => null,
         };
         if (null === $result) {
@@ -27,7 +28,8 @@ final class JitXsltMethod
                 .(('setsecurityprefs' === $methodLc) ? ' and compile-time int prefs' : '')
                 .(('setprofiling' === $methodLc) ? ' and compile-time ?string filename' : '')
                 .(('importstylesheet' === $methodLc) ? ' and compile-time stylesheet XML' : '')
-                .' (#20392/#22272/#22367)'
+                .(('transformtoxml' === $methodLc) ? ' and compile-time source document XML' : '')
+                .' (#20392/#22272/#22367/#27392)'
             );
         }
 
