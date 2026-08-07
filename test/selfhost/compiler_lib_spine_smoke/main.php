@@ -5848,6 +5848,10 @@ require_once __DIR__.'/../../../lib/JIT/Call/NestedClosureInvoke.php';
 require_once __DIR__.'/../../../lib/JIT/Call/NestedJitCompileScopeIsActiveTrue.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ObjectCompareSpaceship.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ObjectNestedReceiver.php';
+// Thin AOT PDO driver honesty (#27619 / #28643) — inventory units must stay on spine (#1922).
+require_once __DIR__.'/../../../lib/JIT/Call/PdoConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/PdoGetAvailableDrivers.php';
+require_once __DIR__.'/../../../lib/JIT/Call/PdoQuote.php';
 require_once __DIR__.'/../../../lib/JIT/Call/PhpTokenConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/PhpTokenGetTokenName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/PhpTokenTokenize.php';
