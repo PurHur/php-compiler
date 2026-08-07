@@ -1,5 +1,5 @@
 --TEST--
-date DateTime(Immutable)::modify invalid string throws DateMalformedStringException on forward 8.3+ profile (#22663, ext/date/php_date.c)
+date DateTime(Immutable)::modify invalid string throws DateMalformedStringException on forward 8.3+ profile (#22663, #28524, ext/date/php_date.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -16,13 +16,25 @@ try {
     echo $im->format('Y-m-d'), "\n";
 }
 $dt = new DateTime('2024-01-01');
-$bad = @$dt->modify('not a date');
-var_export([$bad, $dt->format('Y-m-d')]);
+try {
+    $dt->modify('not a date');
+    echo "mutable no throw\n";
+} catch (DateMalformedStringException $e) {
+    echo 'mutable:', get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+    echo $dt->format('Y-m-d'), "\n";
+}
+$proc = new DateTime('2024-01-01');
+$bad = @date_modify($proc, 'not a date');
+var_export([$bad, $proc->format('Y-m-d')]);
 echo "\n";
 --EXPECT--
 true
 immutable:DateMalformedStringException
-Failed to parse time string (not a date) at position 0 (n): The timezone could not be found in the database
+DateTimeImmutable::modify(): Failed to parse time string (not a date) at position 0 (n): The timezone could not be found in the database
+2024-01-01
+mutable:DateMalformedStringException
+DateTime::modify(): Failed to parse time string (not a date) at position 0 (n): The timezone could not be found in the database
 2024-01-01
 array (
   0 => false,
