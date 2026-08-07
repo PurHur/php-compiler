@@ -628,6 +628,40 @@ PHP;
     }
 
     /**
+     * @covers issue #28393 — exact issue-body repros A+B (final public write/isFinal,
+     * then non-eval child redeclaration Fatal). Durable guard against false refiles.
+     */
+    public function testIssue28393BodyWriteIsFinalAndDirectChildOverrideFatal(): void
+    {
+        $isfinal = dirname(__DIR__) . '/repro/issue_28393_final_plain_isfinal.php';
+        $override = dirname(__DIR__) . '/repro/issue_28393_final_plain_override.php';
+        self::assertFileExists($isfinal);
+        self::assertFileExists($override);
+        $isfinalCode = file_get_contents($isfinal);
+        $overrideCode = file_get_contents($override);
+        self::assertNotFalse($isfinalCode);
+        self::assertNotFalse($overrideCode);
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        self::assertTrue(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($isfinalCode, 'issue_28393_isfinal.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("wrote\nisFinal=1\n", ob_get_clean());
+
+        try {
+            $runtime->parseAndCompile($overrideCode, 'issue_28393_override.php');
+            $this->fail('Expected CompileFatal on direct child override (#28393)');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString('Cannot override final property A::$x', $e->getMessage());
+            self::assertStringStartsWith('PHP Fatal error:', $e->zendStderrLine());
+        }
+    }
+
+    /**
      * @covers issue #27818 — trait-imported final plain property: isFinal=1 + child
      * override CompileFatal (same Zend inheritance rules as class-declared finals).
      */
