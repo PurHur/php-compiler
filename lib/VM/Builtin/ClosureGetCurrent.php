@@ -8,7 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
- * Closure::getCurrent(): Closure — PHP 8.5+ active closure introspection (Zend/zend_closures.stub.php, #22583).
+ * Closure::getCurrent(): Closure — PHP 8.5+ active closure introspection
+ * (Zend/zend_closures.stub.php, #22583, #28710).
  */
 final class ClosureGetCurrent extends VmClassMethod
 {
