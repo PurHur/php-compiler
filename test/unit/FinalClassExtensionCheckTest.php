@@ -169,6 +169,50 @@ PHP;
         }
     }
 
+    /** @covers issue #28389 — php-src Zend/zend_fibers.stub.php final class Fiber */
+    public function testExtendFiberFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadFiber extends Fiber {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadFiber cannot extend final class Fiber');
+        $runtime->parseAndCompile($code, 'extend_fiber.php');
+    }
+
+    /** @covers issue #28389 — php-src Zend/zend_fibers.stub.php final class FiberError */
+    public function testExtendFiberErrorFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadFiberError extends FiberError {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadFiberError cannot extend final class FiberError');
+        $runtime->parseAndCompile($code, 'extend_fibererror.php');
+    }
+
+    /** @covers issue #28389 */
+    public function testFiberAndFiberErrorReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export((new ReflectionClass(Fiber::class))->isFinal());
+echo "\n";
+var_export((new ReflectionClass(FiberError::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'fiber_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\ntrue\n", ob_get_clean());
+    }
+
     /** @covers issue #26531 */
     public function testExtendUnitEnumFailsAtCompileTime(): void
     {

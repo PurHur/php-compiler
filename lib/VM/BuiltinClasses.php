@@ -2081,6 +2081,10 @@ final class BuiltinClasses
             : ThrowableManifest::LC_EXCEPTION;
 
         $entry = new ClassEntry($name);
+        // php-src Zend/zend_fibers.stub.php — final class FiberError (#28389).
+        if (ThrowableManifest::LC_FIBER_ERROR === $lcKey) {
+            $entry->isFinal = true;
+        }
         if (null !== $parentLc) {
             $entry->parentLc = $parentLc;
         } else {
@@ -2177,6 +2181,8 @@ final class BuiltinClasses
     private static function registerFiber(Context $ctx): void
     {
         $entry = new ClassEntry('Fiber');
+        // php-src Zend/zend_fibers.stub.php — final class Fiber (#28389).
+        $entry->isFinal = true;
         // ZEND_ACC_NO_DYNAMIC_PROPERTIES (zend_fibers.c; #26371).
         $entry->noDynamicProperties = true;
         $pub = CfgFunc::FLAG_PUBLIC;
