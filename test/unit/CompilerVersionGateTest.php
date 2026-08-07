@@ -1140,39 +1140,23 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsStreamSupportsFalseOnReferenceProfile(): void
+    public function testSupportsStreamSupportsAlwaysFalse(): void
     {
+        // php-src has stream_supports_lock only — stream_supports is a phantom (#28367).
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
-    }
-
-    public function testSupportsStreamSupportsTrueOnForwardProfile(): void
-    {
+        $this->assertFalse(CompilerVersion::advertisesStreamSupports());
+        $this->assertFalse(CompilerVersion::supportsStreamSupportReadWriteConstants());
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsStreamSupports());
-            $this->assertFalse(CompilerVersion::supportsStreamSupportReadWriteConstants());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        foreach (['8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsStreamSupports(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesStreamSupports(), $profile);
+            $this->assertFalse(CompilerVersion::supportsStreamSupportReadWriteConstants(), $profile);
         }
-    }
-
-    public function testSupportsStreamSupportReadWriteConstantsTrueOnForwardProfile84(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsStreamSupportReadWriteConstants());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
