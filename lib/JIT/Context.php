@@ -890,7 +890,6 @@ class Context {
             'phpc_atan2_kernel',
             'phpc_log_kernel',
             'phpc_log10_kernel',
-            'phpc_log1p_kernel',
 
             'phpc_rename_kernel',
             'phpc_ob_write_stdout_kernel',

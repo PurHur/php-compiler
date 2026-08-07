@@ -686,7 +686,6 @@ class Module extends ModuleAbstract
             new phpc_atan2_kernel(),
             new phpc_log_kernel(),
             new phpc_log10_kernel(),
-            new phpc_log1p_kernel(),
 
             new sys_get_temp_dir(),
             new sys_getloadavg(),

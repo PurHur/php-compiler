@@ -10,11 +10,11 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
 /**
- * log1p() still NestedJIT kernel; expm1() NestedJIT-safe PHP (#28487 / peer MathExp #28241).
+ * log1p()/expm1() NestedJIT via JitVmHelperLink::ensureBridge (#28495 / #28487).
  */
 final class Log1pExpm1RuntimeShrinkTest extends TestCase
 {
-    public function testLog1pUsesJitHelperNotLibcLookup(): void
+    public function testLog1pUsesJitHelperNotKernel(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/log1p.php');
         $this->assertStringContainsString('MathLog1p::invoke', $builtin);
@@ -23,8 +23,10 @@ final class Log1pExpm1RuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog1p.php');
         $this->assertStringContainsString('Log1pJitHelper', $bridge);
         $this->assertStringContainsString('phpc_log1p', $bridge);
-        $this->assertStringContainsString('JitLog1pKernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitLog1pKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
     public function testExpm1UsesJitHelperNotKernel(): void
@@ -40,6 +42,50 @@ final class Log1pExpm1RuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitExpm1Kernel', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+    }
+
+    public function testLog1pJitHelperInlinesNestedJitSafeAlgorithm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Log1pJitHelper.php');
+        $this->assertStringContainsString('logPositive', $source);
+        $this->assertStringContainsString('-0.292893', $source);
+        $this->assertStringContainsString('2.0 + $num', $source);
+        $this->assertStringNotContainsString('phpc_log1p_kernel', $source);
+        $this->assertStringNotContainsString('LogJitHelper::', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function log1pArgv\(.*?\{[^}]*LogJitHelper/s',
+            $source
+        );
+        $this->assertStringNotContainsString('while (', $source);
+        $this->assertStringNotContainsString('pack(', $source);
+        $this->assertStringNotContainsString('unpack(', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/function log1pArgv\(.*?\{[^}]*VmMath::log1p/s',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/function log1pArgv\(.*?\{[^}]*\\\\log1p\(/s',
+            $source
+        );
+
+        $this->assertSame(VmMath::log1p(0.0), Log1pJitHelper::log1pArgv(0.0));
+        $this->assertEqualsWithDelta(VmMath::log1p(1.0), Log1pJitHelper::log1pArgv(1.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(-0.5), Log1pJitHelper::log1pArgv(-0.5), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(0.5), Log1pJitHelper::log1pArgv(0.5), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(0.1), Log1pJitHelper::log1pArgv(0.1), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(-0.1), Log1pJitHelper::log1pArgv(-0.1), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(0.01), Log1pJitHelper::log1pArgv(0.01), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(-0.01), Log1pJitHelper::log1pArgv(-0.01), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(2.0), Log1pJitHelper::log1pArgv(2.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(10.0), Log1pJitHelper::log1pArgv(10.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(-0.9), Log1pJitHelper::log1pArgv(-0.9), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::log1p(-0.999), Log1pJitHelper::log1pArgv(-0.999), 1e-14);
+        $this->assertEqualsWithDelta(VmMath::log1p(1e-8), Log1pJitHelper::log1pArgv(1e-8), 1e-20);
+        $this->assertSame(VmMath::log1p(-1.0), Log1pJitHelper::log1pArgv(-1.0));
+        $this->assertTrue(\is_infinite(Log1pJitHelper::log1pArgv(\INF)));
+        $this->assertTrue(\is_nan(Log1pJitHelper::log1pArgv(-\INF)));
+        $this->assertTrue(\is_nan(Log1pJitHelper::log1pArgv(\NAN)));
+        $this->assertTrue(\is_nan(Log1pJitHelper::log1pArgv(-1.5)));
     }
 
     public function testExpm1JitHelperInlinesNestedJitSafeAlgorithm(): void
@@ -82,20 +128,11 @@ final class Log1pExpm1RuntimeShrinkTest extends TestCase
         $this->assertTrue(\is_nan(Expm1JitHelper::expm1Argv(\NAN)));
     }
 
-    public function testLog1pJitHelperStillDelegatesToKernel(): void
+    public function testLog1pKernelFilesRemoved(): void
     {
-        $log1p = (string) file_get_contents(__DIR__.'/../../ext/standard/Log1pJitHelper.php');
-        $this->assertStringContainsString('phpc_log1p_kernel', $log1p);
-        $this->assertDoesNotMatchRegularExpression(
-            '/function log1pArgv\(.*?\{[^}]*VmMath::log1p/s',
-            $log1p
-        );
-
-        if (!\function_exists('phpc_log1p_kernel')) {
-            $this->markTestSkipped('phpc_log1p_kernel requires compiler runtime');
-        }
-        $this->assertSame(VmMath::log1p(0.0), Log1pJitHelper::log1pArgv(0.0));
-        $this->assertSame(VmMath::log1p(1.0), Log1pJitHelper::log1pArgv(1.0));
+        $root = __DIR__.'/../..';
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitLog1pKernel.php');
+        $this->assertFileDoesNotExist($root.'/ext/standard/phpc_log1p_kernel.php');
     }
 
     public function testExpm1KernelFilesRemoved(): void
@@ -105,26 +142,27 @@ final class Log1pExpm1RuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($root.'/ext/standard/phpc_expm1_kernel.php');
     }
 
-    public function testContextNoLongerAllowlistsExpm1Kernel(): void
+    public function testContextNoLongerAllowlistsLog1pOrExpm1Kernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringNotContainsString('phpc_log1p_kernel', $source);
         $this->assertStringNotContainsString('phpc_expm1_kernel', $source);
         // Peer math NestedJIT leaf still allowlisted after this shrink.
-        $this->assertStringContainsString('phpc_log1p_kernel', $source);
         $this->assertStringContainsString('phpc_log_kernel', $source);
         $this->assertStringContainsString('phpc_atan2_kernel', $source);
+        $this->assertStringContainsString('phpc_fpow_kernel', $source);
     }
 
-    public function testSpineBundleIncludesExpm1HelperWithoutKernel(): void
+    public function testSpineBundleIncludesHelpersWithoutKernels(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('Log1pJitHelper.php', $spine);
+        $this->assertStringContainsString('MathLog1p.php', $spine);
         $this->assertStringContainsString('Expm1JitHelper.php', $spine);
         $this->assertStringContainsString('MathExpm1.php', $spine);
+        $this->assertStringNotContainsString('JitLog1pKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_log1p_kernel.php', $spine);
         $this->assertStringNotContainsString('JitExpm1Kernel.php', $spine);
         $this->assertStringNotContainsString('phpc_expm1_kernel.php', $spine);
-        // log1p peer still on kernel path.
-        $this->assertStringContainsString('Log1pJitHelper.php', $spine);
-        $this->assertStringContainsString('JitLog1pKernel.php', $spine);
-        $this->assertStringContainsString('phpc_log1p_kernel.php', $spine);
     }
 }
