@@ -25,6 +25,14 @@ final class JitDomLoadXMLUserScript
 
     private static ?string $lastCompileTimeXml = null;
 
+    /** @var \SplObjectStorage<JITVariable, string>|null Per-document compile-time XML (#27392). */
+    private static ?\SplObjectStorage $xmlByReceiver = null;
+
+    /** @var array<string, string> Token → XML when Variable identity rematerializes (#27392). */
+    private static array $xmlByToken = [];
+
+    private static int $xmlTokenSeq = 0;
+
     /** True when loadXML used the compile-time user-script path (no DomLoadXMLRuntime tree). */
     private static bool $lastLoadWasPureUserScript = false;
 
@@ -34,6 +42,61 @@ final class JitDomLoadXMLUserScript
     public static function lastCompileTimeXml(): ?string
     {
         return self::$lastCompileTimeXml;
+    }
+
+    /**
+     * Compile-time XML for a specific DOMDocument receiver (stylesheet vs source doc) (#27392).
+     */
+    public static function compileTimeXmlFor(?JITVariable $document): ?string
+    {
+        if (null === $document) {
+            return null;
+        }
+        if (null !== self::$xmlByReceiver && isset(self::$xmlByReceiver[$document])) {
+            return self::$xmlByReceiver[$document];
+        }
+        $token = $document->compileTimeString;
+        if (null !== $token && isset(self::$xmlByToken[$token])) {
+            return self::$xmlByToken[$token];
+        }
+
+        return null;
+    }
+
+    /**
+     * Pick a remembered loadXML() literal that is not the imported stylesheet (#27392).
+     *
+     * Method args often rematerialize as TYPE_VALUE boxes, so SplObjectStorage identity
+     * and compileTimeString tokens do not survive from loadXML() to transformToXML().
+     */
+    public static function compileTimeXmlExcluding(?string $excludeXml): ?string
+    {
+        $seen = [];
+        $candidates = [];
+        foreach (self::$xmlByToken as $xml) {
+            if (isset($seen[$xml])) {
+                continue;
+            }
+            $seen[$xml] = true;
+            if (null !== $excludeXml && $xml === $excludeXml) {
+                continue;
+            }
+            $candidates[] = $xml;
+        }
+        if (1 === \count($candidates)) {
+            return $candidates[0];
+        }
+        if (\count($candidates) > 1) {
+            // Source document is typically loadXML'd before the stylesheet.
+            return $candidates[0];
+        }
+        if (null !== self::$lastCompileTimeXml
+            && (null === $excludeXml || self::$lastCompileTimeXml !== $excludeXml)
+        ) {
+            return self::$lastCompileTimeXml;
+        }
+
+        return null;
     }
 
     public static function lastLoadWasPureUserScript(): bool
@@ -63,6 +126,20 @@ final class JitDomLoadXMLUserScript
         self::$lastLoadWasPureUserScript = false;
         self::$lastDocumentClass = $documentClass;
         JitDomXPathRegisterUserScript::reset();
+    }
+
+    /** Bind compile-time XML to the loadXML() document receiver (#27392). */
+    public static function rememberCompileTimeXmlFor(JITVariable $document, string $xml): void
+    {
+        self::$lastCompileTimeXml = $xml;
+        if (null === self::$xmlByReceiver) {
+            self::$xmlByReceiver = new \SplObjectStorage();
+        }
+        self::$xmlByReceiver[$document] = $xml;
+        // Do not overwrite compileTimeString — object locals often carry the class name
+        // ('DOMDocument') used elsewhere; index under a dedicated token only.
+        $token = '__phpc_domxml_'.(++self::$xmlTokenSeq);
+        self::$xmlByToken[$token] = $xml;
     }
 
     public static function rememberLivingDocumentClass(string $documentClass): void
@@ -111,7 +188,7 @@ final class JitDomLoadXMLUserScript
         // LIBXML_NOBLANKS / non-zero options already fall through above (#20476). NestedJIT
         // DomLoadXMLRuntime cannot run VmDom::loadXML (no preg_match in lean helpers).
 
-        self::$lastCompileTimeXml = $lit;
+        self::rememberCompileTimeXmlFor($args[0], $lit);
         self::$lastDocumentClass = self::CLASS_DOCUMENT;
         self::markLastLoadPureUserScript();
         // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips

@@ -1,0 +1,22 @@
+--TEST--
+AOT XSLTProcessor::transformToXML returns string not NULL (#27392, ext/xsl/xsltprocessor.c)
+--SKIPIF--
+<?php
+if (!extension_loaded('xsl') || !extension_loaded('dom')) {
+    echo 'skip';
+}
+?>
+--FILE--
+<?php
+$xml = new DOMDocument();
+$xml->loadXML('<a><b>1</b></a>');
+$xsl = new DOMDocument();
+$xsl->loadXML('<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:template match="/"><out><xsl:value-of select="a/b"/></out></xsl:template></xsl:stylesheet>');
+$p = new XSLTProcessor();
+$p->importStylesheet($xsl);
+var_dump($p->transformToXML($xml));
+?>
+--EXPECT--
+string(35) "<?xml version="1.0"?>
+<out>1</out>
+"

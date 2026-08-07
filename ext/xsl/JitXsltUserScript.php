@@ -18,8 +18,8 @@ use PHPLLVM\Value;
  * User-script AOT: compile-time XSLTProcessor methods via host ext/xsl (#20392).
  *
  * Tracks processors allocated in the user script so hasExsltSupport / setSecurityPrefs /
- * getSecurityPrefs / setProfiling / importStylesheet can fold to constants matching VM/Zend.
- * No runtime/*.c growth.
+ * getSecurityPrefs / setProfiling / importStylesheet / transformToXML can fold to constants
+ * matching VM/Zend. No runtime/*.c growth.
  */
 final class JitXsltUserScript
 {
@@ -28,6 +28,9 @@ final class JitXsltUserScript
 
     /** @var array<string, \XSLTProcessor> */
     private static array $processorsByToken = [];
+
+    /** @var array<int, string> spl_object_id(processor) → stylesheet XML imported at compile time (#27392). */
+    private static array $stylesheetXmlByProcessor = [];
 
     private static ?\XSLTProcessor $lastProcessor = null;
 
@@ -87,8 +90,8 @@ final class JitXsltUserScript
     /**
      * XSLTProcessor::importStylesheet(DOMDocument $stylesheet): bool — user-script AOT (#22367).
      *
-     * Uses the most recent compile-time DOMDocument::loadXML() literal (same pattern as
-     * other DOM user-script folds) to drive the host bridge and fold the Zend bool return.
+     * Prefers the compile-time XML bound to the stylesheet document receiver (#27392);
+     * falls back to the most recent loadXML() literal.
      */
     public static function tryImportStylesheet(Context $context, JITVariable ...$args): ?Value
     {
@@ -96,7 +99,8 @@ final class JitXsltUserScript
         if (null === $proc || !isset($args[1])) {
             return null;
         }
-        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($args[1])
+            ?? JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml || '' === $xml) {
             return null;
         }
@@ -110,8 +114,46 @@ final class JitXsltUserScript
             return self::boolValue($context, false);
         }
         $ok = @XsltHostBridge::importStylesheet($proc, $hostDoc);
+        if ($ok) {
+            self::$stylesheetXmlByProcessor[spl_object_id($proc)] = $xml;
+        }
 
         return self::boolValue($context, $ok);
+    }
+
+    /**
+     * XSLTProcessor::transformToXML(DOMDocument $doc): string|false — user-script AOT (#27392).
+     *
+     * Runs the host transform at compile time against the stylesheet already imported into the
+     * tracked processor and the source document's compile-time XML. Avoids ExternalMethod NULL.
+     */
+    public static function tryTransformToXml(Context $context, JITVariable ...$args): ?Value
+    {
+        $proc = self::requireProcessor($args[0] ?? null);
+        if (null === $proc || !isset($args[1])) {
+            return null;
+        }
+        $xml = JitDomLoadXMLUserScript::compileTimeXmlFor($args[1])
+            ?? JitDomLoadXMLUserScript::compileTimeXmlExcluding(
+                self::$stylesheetXmlByProcessor[spl_object_id($proc)] ?? null
+            );
+        if (null === $xml || '' === $xml) {
+            return null;
+        }
+        $hostDoc = new \DOMDocument();
+        $prev = libxml_use_internal_errors(true);
+        $loaded = @$hostDoc->loadXML($xml);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        if (!$loaded) {
+            return self::falseValue($context);
+        }
+        $result = @XsltHostBridge::transformToXml($proc, $hostDoc);
+        if (false === $result) {
+            return self::falseValue($context);
+        }
+
+        return self::stringValue($context, $result);
     }
 
     /**
@@ -234,6 +276,37 @@ final class JitXsltUserScript
     {
         // Native i1 — boxed __value__ bool via this Call path reads as false under user-script AOT (#20392).
         return $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false);
+    }
+
+    private static function falseValue(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->builder->zext($i1->constInt(0, false), $i32)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function stringValue(Context $context, string $xml): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($xml));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function intValue(Context $context, int $n): Value
