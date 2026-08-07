@@ -165,6 +165,14 @@ final class BuiltinParamNames
             // php-src ext/dom/php_dom.stub.php — createFromFile(string $path, int $options = 0, ?string $overrideEncoding = null) (#27924)
             'dom\\htmldocument::createfromfile',
             'dom\\xmldocument::createfromfile' => ['path', 'options=', 'overrideEncoding='],
+            // php-src ext/dom/php_dom.stub.php — Document/HTMLDocument/XMLDocument instance methods (#28740)
+            'dom\\document::getelementbyid',
+            'dom\\htmldocument::getelementbyid',
+            'dom\\xmldocument::getelementbyid' => ['elementId'],
+            'dom\\htmldocument::savehtml' => ['node='],
+            'dom\\document::savexml',
+            'dom\\htmldocument::savexml',
+            'dom\\xmldocument::savexml' => ['node=', 'options='],
             'domdocument::appendchild' => ['node'],
             'domdocument::createattribute' => ['localName'],
             'domdocument::createattributens' => ['namespace', 'qualifiedName'],
