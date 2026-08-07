@@ -9,7 +9,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Computed DOMDocument property bridge (php-src ext/dom/document.c; #14420).
+ * Computed DOMDocument property bridge (php-src ext/dom/document.c; #14420, #28587).
  */
 final class DomDocumentPropertySupport
 {
@@ -29,6 +29,17 @@ final class DomDocumentPropertySupport
                 'Cannot write read-only property DOMDocument::$xmlEncoding'
             );
         }
+        // php-src document.c — actualEncoding / config are private(set) / write handlers throw (#28587).
+        if (strtolower(VmDom::PROP_ACTUAL_ENCODING) === strtolower($name)) {
+            throw new \Error(
+                'Cannot write read-only property DOMDocument::$actualEncoding'
+            );
+        }
+        if (strtolower(VmDom::PROP_CONFIG) === strtolower($name)) {
+            throw new \Error(
+                'Cannot write read-only property DOMDocument::$config'
+            );
+        }
     }
 
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
@@ -40,8 +51,12 @@ final class DomDocumentPropertySupport
 
         return strtolower(VmDom::PROP_ENCODING) === $lc
             || strtolower(VmDom::PROP_XML_ENCODING) === $lc
+            || strtolower(VmDom::PROP_ACTUAL_ENCODING) === $lc
             || strtolower(VmDom::PROP_XML_VERSION) === $lc
+            || strtolower(VmDom::PROP_VERSION) === $lc
             || strtolower(VmDom::PROP_XML_STANDALONE) === $lc
+            || strtolower(VmDom::PROP_STANDALONE) === $lc
+            || strtolower(VmDom::PROP_CONFIG) === $lc
             || strtolower(VmDom::PROP_DOCUMENT_URI) === $lc
             || strtolower(VmDom::PROP_IMPLEMENTATION) === $lc
             || strtolower(VmDom::PROP_DOCTYPE) === $lc;
@@ -56,7 +71,8 @@ final class DomDocumentPropertySupport
         $var->objectPropertyOwner = $object;
         $var->objectPropertyName = $lc;
         if (strtolower(VmDom::PROP_ENCODING) === $lc
-            || strtolower(VmDom::PROP_XML_ENCODING) === $lc) {
+            || strtolower(VmDom::PROP_XML_ENCODING) === $lc
+            || strtolower(VmDom::PROP_ACTUAL_ENCODING) === $lc) {
             if (null === $state->encoding) {
                 $var->null();
             } else {
@@ -65,13 +81,21 @@ final class DomDocumentPropertySupport
 
             return $var;
         }
-        if (strtolower(VmDom::PROP_XML_VERSION) === $lc) {
+        if (strtolower(VmDom::PROP_XML_VERSION) === $lc
+            || strtolower(VmDom::PROP_VERSION) === $lc) {
             $var->string($state->xmlVersion);
 
             return $var;
         }
-        if (strtolower(VmDom::PROP_XML_STANDALONE) === $lc) {
+        if (strtolower(VmDom::PROP_XML_STANDALONE) === $lc
+            || strtolower(VmDom::PROP_STANDALONE) === $lc) {
             $var->bool($state->xmlStandalone);
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_CONFIG) === $lc) {
+            // php-src dom_document_config_read — always null (#28587).
+            $var->null();
 
             return $var;
         }
@@ -137,27 +161,53 @@ final class DomDocumentPropertySupport
 
             return true;
         }
-        if (strtolower(VmDom::PROP_XML_VERSION) === $lc) {
-            if (Variable::TYPE_STRING !== $resolved->type) {
+        if (strtolower(VmDom::PROP_XML_VERSION) === $lc
+            || strtolower(VmDom::PROP_VERSION) === $lc) {
+            // php-src ?string — null becomes "" (document.c version/xmlVersion write; #28587).
+            if (Variable::TYPE_NULL === $resolved->type) {
+                $state->xmlVersion = '';
+            } elseif (Variable::TYPE_STRING === $resolved->type
+                || Variable::TYPE_INTEGER === $resolved->type
+                || Variable::TYPE_FLOAT === $resolved->type) {
+                $state->xmlVersion = $resolved->toString();
+            } else {
+                $label = strtolower(VmDom::PROP_VERSION) === $lc
+                    ? 'DOMDocument::$version'
+                    : 'DOMDocument::$xmlVersion';
                 throw new \TypeError(sprintf(
-                    'Cannot assign %s to property DOMDocument::$xmlVersion of type string',
-                    VmDom::typeLabel($resolved)
+                    'Cannot assign %s to property %s of type ?string',
+                    VmDom::typeLabel($resolved),
+                    $label
                 ));
             }
-            $state->xmlVersion = $resolved->toString();
 
             return true;
         }
-        if (strtolower(VmDom::PROP_XML_STANDALONE) === $lc) {
-            if (Variable::TYPE_BOOLEAN !== $resolved->type) {
+        if (strtolower(VmDom::PROP_XML_STANDALONE) === $lc
+            || strtolower(VmDom::PROP_STANDALONE) === $lc) {
+            $label = strtolower(VmDom::PROP_STANDALONE) === $lc
+                ? 'DOMDocument::$standalone'
+                : 'DOMDocument::$xmlStandalone';
+            // php-src bool — null is TypeError; other scalars coerce (zend_parse bool; #28587).
+            if (Variable::TYPE_NULL === $resolved->type) {
                 throw new \TypeError(sprintf(
-                    'Cannot assign %s to property DOMDocument::$xmlStandalone of type bool',
-                    VmDom::typeLabel($resolved)
+                    'Cannot assign null to property %s of type bool',
+                    $label
                 ));
             }
-            $state->xmlStandalone = $resolved->toBool();
+            if (Variable::TYPE_BOOLEAN === $resolved->type
+                || Variable::TYPE_INTEGER === $resolved->type
+                || Variable::TYPE_FLOAT === $resolved->type
+                || Variable::TYPE_STRING === $resolved->type) {
+                $state->xmlStandalone = $resolved->toBool();
 
-            return true;
+                return true;
+            }
+            throw new \TypeError(sprintf(
+                'Cannot assign %s to property %s of type bool',
+                VmDom::typeLabel($resolved),
+                $label
+            ));
         }
         if (strtolower(VmDom::PROP_DOCUMENT_URI) === $lc) {
             if (Variable::TYPE_NULL === $resolved->type) {

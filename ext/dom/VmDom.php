@@ -108,9 +108,21 @@ final class VmDom
 
     public const PROP_XML_ENCODING = 'xmlEncoding';
 
+    /** Legacy DOM Level-3 alias of {@see PROP_XML_ENCODING}/encoding (php-src document.c; #28587). */
+    public const PROP_ACTUAL_ENCODING = 'actualEncoding';
+
     public const PROP_XML_VERSION = 'xmlVersion';
 
+    /** Legacy DOM Level-3 alias of {@see PROP_XML_VERSION} (php-src document.c; #28587). */
+    public const PROP_VERSION = 'version';
+
     public const PROP_XML_STANDALONE = 'xmlStandalone';
+
+    /** Legacy DOM Level-3 alias of {@see PROP_XML_STANDALONE} (php-src document.c; #28587). */
+    public const PROP_STANDALONE = 'standalone';
+
+    /** Legacy DOM Level-3 stub — always null / read-only (php-src document.c; #28587). */
+    public const PROP_CONFIG = 'config';
 
     public const PROP_DOCUMENT_URI = 'documentURI';
 
@@ -596,8 +608,13 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_STRICT_ERROR_CHECKING, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_ENCODING, $nullProto, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_ENCODING, $nullProto, $strProto);
+        // Legacy Level-3 aliases (php-src php_dom.stub.php / document.c; #28587).
+        $document->properties[] = new ClassProperty(self::PROP_ACTUAL_ENCODING, $nullProto, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
+        $document->properties[] = new ClassProperty(self::PROP_VERSION, null, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_STANDALONE, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_CONFIG, $nullProto, $nullProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
         $document->properties[] = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
