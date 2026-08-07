@@ -27,6 +27,7 @@ final class ClassValidator
 
         self::rebuildAbstractMethods($entry, $context);
         self::validateInterfaceImplementation($entry, $context);
+        self::validateInterfaceProperties($entry, $context);
         self::validateAbstractMethodsResolved($entry);
         self::validateAbstractPropertyHooksResolved($entry, $context);
     }
@@ -143,6 +144,140 @@ final class ClassValidator
             .(1 === $count ? '' : 's')
             ." and must therefore be declared abstract or implement the remaining methods ({$ifaceName}::{$method})"
         );
+    }
+
+    /**
+     * Concrete classes must declare properties required by implemented interfaces (#28374, re-#6965/#6770).
+     *
+     * Same-script omissions are caught by {@see \PHPCompiler\Compiler\InterfaceImplementationCheck};
+     * require/include splits only see the interface ClassEntry at DECLARE time (zend_inheritance.c).
+     */
+    private static function validateInterfaceProperties(ClassEntry $entry, Context $context): void
+    {
+        if ($entry->isAbstract) {
+            return;
+        }
+
+        $missing = [];
+        foreach ($entry->interfaces as $ifaceLc) {
+            foreach (self::collectInterfaceProperties($ifaceLc, $context) as [$ifaceDisplay, $propDisplay, $propLc]) {
+                if (self::classProvidesProperty($entry, $propLc, $context)) {
+                    continue;
+                }
+                $missing[] = [
+                    $ifaceDisplay,
+                    $propDisplay,
+                    self::interfacePropertyHookSummary($ifaceLc, $propDisplay, $context),
+                ];
+            }
+        }
+
+        if ([] === $missing) {
+            return;
+        }
+
+        $count = count($missing);
+        $list = implode(', ', array_map(
+            static fn (array $triple): string => $triple[0].'::$'.$triple[1].$triple[2],
+            $missing
+        ));
+
+        // php-src: zend_do_implement_interface / property hook obligations — E_COMPILE_ERROR at DECLARE.
+        throw new \CompileError(
+            "Class {$entry->name} must implement {$count} interface propert"
+            .(1 === $count ? 'y' : 'ies')
+            ." ({$list})"
+        );
+    }
+
+    /**
+     * @return list<array{0: string, 1: string, 2: string}> iface display, prop display, prop lc
+     */
+    private static function collectInterfaceProperties(string $ifaceLc, Context $context): array
+    {
+        $required = [];
+        $visited = [];
+        $queue = [$ifaceLc];
+        while ([] !== $queue) {
+            $lc = array_shift($queue);
+            if (isset($visited[$lc])) {
+                continue;
+            }
+            $visited[$lc] = true;
+            if (!isset($context->classes[$lc])) {
+                continue;
+            }
+            $iface = $context->classes[$lc];
+            if (!$iface->isInterface) {
+                continue;
+            }
+            $ifaceDisplay = self::shortClassDisplayName($iface->name);
+            foreach ($iface->properties as $prop) {
+                $propLc = strtolower($prop->name);
+                if (!isset($required[$propLc])) {
+                    $required[$propLc] = [$ifaceDisplay, $prop->name, $propLc];
+                }
+            }
+            foreach ($iface->interfaces as $parentIface) {
+                $queue[] = $parentIface;
+            }
+        }
+
+        return array_values($required);
+    }
+
+    private static function classProvidesProperty(ClassEntry $entry, string $propLc, Context $context): bool
+    {
+        $visited = [];
+        $current = $entry;
+        while (!isset($visited[strtolower($current->name)])) {
+            $visited[strtolower($current->name)] = true;
+            foreach ($current->properties as $prop) {
+                if (strtolower($prop->name) === $propLc) {
+                    return true;
+                }
+            }
+            $parentLc = $current->parentLc;
+            if (null === $parentLc || '' === $parentLc || !isset($context->classes[$parentLc])) {
+                break;
+            }
+            $current = $context->classes[$parentLc];
+        }
+
+        return false;
+    }
+
+    private static function interfacePropertyHookSummary(string $ifaceLc, string $propName, Context $context): string
+    {
+        $meta = $context->propertyHookRegistry[$ifaceLc][$propName]
+            ?? $context->propertyHookRegistry[$ifaceLc][strtolower($propName)]
+            ?? [];
+        $hooks = [];
+        if (!empty($meta['requiresGet'])) {
+            $hooks[] = 'get';
+        }
+        if (!empty($meta['requiresSet'])) {
+            $hooks[] = 'set';
+        }
+        if (!empty($meta['requiresUnset'])) {
+            $hooks[] = 'unset';
+        }
+        if ([] === $hooks) {
+            return '';
+        }
+
+        return ' { '.implode('; ', $hooks).'; }';
+    }
+
+    private static function shortClassDisplayName(string $name): string
+    {
+        $trim = ltrim($name, '\\');
+        if (!str_contains($trim, '\\')) {
+            return $trim;
+        }
+        $parts = explode('\\', $trim);
+
+        return end($parts) ?: $trim;
     }
 
     private static function validateAbstractMethodsResolved(ClassEntry $entry): void
