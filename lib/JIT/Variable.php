@@ -121,6 +121,11 @@ final class Variable {
     public ?string $compileTimeDomTagName = null;
 
     /**
+     * Direct-child index under a loadXML root when fetched via firstChild/lastChild (#28671).
+     */
+    public ?int $compileTimeDomChildIndex = null;
+
+    /**
      * DatePeriod end-date form — ordered Unix timestamps for foreach snapshot (#26772).
      *
      * @var list<int>|null

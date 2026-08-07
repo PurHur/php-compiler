@@ -475,6 +475,75 @@ final class DomParseSimpleXmlJitHelper
     }
 
     /**
+     * Replace the outer markup of direct child {@code $index} under the document
+     * element — used by thin-AOT replaceChild so saveXML keeps siblings (#28671).
+     *
+     * @return string|null New root-inner XML, or null when index is out of range
+     */
+    public static function rootInnerXmlReplaceChildAt(
+        string $xml,
+        int $index,
+        string $replacementMarkup
+    ): ?string {
+        $inner = self::rootInnerXmlArgv($xml);
+        if ('' === $inner) {
+            return 0 === $index ? $replacementMarkup : null;
+        }
+        $chunks = self::directChildMarkupChunks($inner);
+        if ($index < 0 || $index >= \count($chunks)) {
+            return null;
+        }
+        $chunks[$index] = $replacementMarkup;
+
+        return implode('', $chunks);
+    }
+
+    /**
+     * Outer-markup slices of each direct child under {@code $inner} (#28671).
+     *
+     * @return list<string>
+     */
+    public static function directChildMarkupChunks(string $inner): array
+    {
+        $chunks = [];
+        $len = \strlen($inner);
+        $i = 0;
+        while ($i < $len) {
+            if (1 === preg_match('/\G<!--.*?-->/s', $inner, $comment, 0, $i)) {
+                $chunks[] = $comment[0];
+                $i += \strlen($comment[0]);
+
+                continue;
+            }
+            if (1 === preg_match('/\G<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)(\/?)>/', $inner, $el, 0, $i)) {
+                $start = $i;
+                $tag = $el[1];
+                $selfClosing = '/' === ($el[3] ?? '');
+                $i += \strlen($el[0]);
+                if (!$selfClosing) {
+                    $close = stripos($inner, '</'.$tag.'>', $i);
+                    if (false !== $close) {
+                        $i = $close + \strlen('</'.$tag.'>');
+                    }
+                }
+                $chunks[] = substr($inner, $start, $i - $start);
+
+                continue;
+            }
+            if (1 === preg_match('/\G([^<]+)/', $inner, $text, 0, $i)) {
+                $chunks[] = $text[1];
+                $i += \strlen($text[1]);
+
+                continue;
+            }
+
+            break;
+        }
+
+        return $chunks;
+    }
+
+    /**
      * Direct element-child tag names under the document element (#23251 / #26757).
      *
      * @return list<string>

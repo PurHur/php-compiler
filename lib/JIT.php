@@ -17315,6 +17315,10 @@ class JIT {
         if ($force || null !== $src->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $src->compileTimeDomTagName;
         }
+        // firstChild/lastChild index for thin-AOT replaceChild INNER_XML rebuild (#28671).
+        if ($force || null !== $src->compileTimeDomChildIndex) {
+            $dest->compileTimeDomChildIndex = $src->compileTimeDomChildIndex;
+        }
     }
 
     private function syncCompileTimeDatePeriod(Variable $dest, Variable $src, bool $force): void
@@ -21816,6 +21820,9 @@ class JIT {
         }
         if (null !== $source->compileTimeDomTagName && null === $dest->compileTimeDomTagName) {
             $dest->compileTimeDomTagName = $source->compileTimeDomTagName;
+        }
+        if (null !== $source->compileTimeDomChildIndex && null === $dest->compileTimeDomChildIndex) {
+            $dest->compileTimeDomChildIndex = $source->compileTimeDomChildIndex;
         }
         $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
     }
