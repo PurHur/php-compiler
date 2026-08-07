@@ -1151,6 +1151,7 @@ class Block {
     /**
      * Match unhandled-error lowering reads the scrutinee again on JUMPIF targets (#13955).
      * Concat/?? chains read prefix temps on COALESCE/JUMP merge arms (#17375).
+     * Nullsafe merge (block3) may pack earlier array-element temps after a method call (#28555).
      */
     public function scopeSlotReadInJumpTargets(int $slot): bool
     {
@@ -1176,6 +1177,9 @@ class Block {
     {
         return match ($op->type) {
             OpCode::TYPE_JUMPIF, OpCode::TYPE_COALESCE => [$op->block1, $op->block2],
+            // Nullsafe merge (block3) holds post-?-> consumers (e.g. INIT_ARRAY packing a prior
+            // DOM length temp). Omitting it lets FUNCCALL dead-temp release null the slot (#28555).
+            OpCode::TYPE_NULLSAFE => [$op->block1, $op->block2, $op->block3],
             OpCode::TYPE_JUMP => [$op->block1],
             default => [],
         };
@@ -1238,6 +1242,16 @@ class Block {
             }
             if (OpCode::TYPE_JUMPIF === $branchOp->type) {
                 foreach ([$branchOp->block1, $branchOp->block2] as $target) {
+                    if (
+                        $target instanceof self
+                        && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
+                    ) {
+                        return true;
+                    }
+                }
+            }
+            if (OpCode::TYPE_NULLSAFE === $branchOp->type) {
+                foreach ([$branchOp->block1, $branchOp->block2, $branchOp->block3] as $target) {
                     if (
                         $target instanceof self
                         && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
