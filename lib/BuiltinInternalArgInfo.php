@@ -248,6 +248,8 @@ final class BuiltinInternalArgInfo
             'sizeof' => 'int',
             // ext/standard/basic_functions.stub.php — PHP 8.3+; InternalArgInfo omits (#26210)
             'get_object_id' => 'int',
+            // ext/spl/spl.stub.php — InternalArgInfo omits; Zend object→int (#27707, re-#24569)
+            'spl_object_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : int (#26376)
             'get_resource_id' => 'int',
             // ext/standard/basic_functions.stub.php — absent from InternalArgInfo; Zend : bool (#27774)
@@ -540,6 +542,8 @@ final class BuiltinInternalArgInfo
             'get_mangled_object_vars' => 0 === $index ? 'object' : null,
             // ext/standard/basic_functions.stub.php — object $object (InternalArgInfo omits) (#26210)
             'get_object_id' => 0 === $index ? 'object' : null,
+            // ext/spl/spl.stub.php — object $object (InternalArgInfo omits) (#27707, re-#24569)
+            'spl_object_id' => 0 === $index ? 'object' : null,
             // Zend/zend_builtin_functions.stub.php — object|string; InternalArgInfo empty type (#27706, re-#23401)
             'get_class_methods' => 0 === $index ? 'object|string' : null,
             // Zend/zend_builtin_functions.stub.php — object|string; InternalArgInfo empty type (#27902)

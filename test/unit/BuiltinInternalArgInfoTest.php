@@ -455,6 +455,20 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame(['object'], BuiltinParamNames::paramNamesForInternalFunction('get_object_id'));
     }
 
+    /** php-src ext/spl/spl.stub.php — spl_object_id(object $object): int (#27707, re-#24569). */
+    public function testSplObjectIdReflectionStubTypes(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::returnTypeLabelForFunction('spl_object_id'));
+        $this->assertSame('object', BuiltinInternalArgInfo::stubParamTypeOverride('spl_object_id', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('spl_object_id', 0);
+        $this->assertNotNull($info);
+        $this->assertSame('object', $info['name']);
+        $this->assertSame('object', $info['type']);
+        $this->assertFalse($info['isOptional']);
+        $this->assertSame(1, BuiltinParamNames::paramCountForInternalFunction('spl_object_id'));
+        $this->assertSame(['object'], BuiltinParamNames::paramNamesForInternalFunction('spl_object_id'));
+    }
+
     /** php-src ext/curl/curl.stub.php — CurlHandle stubs; InternalArgInfo still resource/ch (#26186). */
     public function testCurlEasyReflectionStubTypes(): void
     {
