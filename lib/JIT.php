@@ -17733,6 +17733,8 @@ class JIT {
                 && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\DirectoryIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
+            || ($toCall instanceof JIT\Call\SplFileObjectMethod
+                && '__construct' === strtolower($toCall->methodName()))
             || ($toCall instanceof JIT\Call\GlobIteratorMethod
                 && '__construct' === strtolower($toCall->methodName()))
         ) {

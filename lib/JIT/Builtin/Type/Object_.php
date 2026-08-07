@@ -3999,6 +3999,33 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('splfileobject' === $lcname) {
+            // Thin AOT: line snapshot `__spl_ht` + foreach walk (#28709).
+            // php-src ext/spl/spl_directory.c — SplFileObject / fgets iterator.
+            $this->ensureZendBuiltinInterfaces();
+            $this->markInterfaceClass('RecursiveIterator');
+            $this->setInterfaceExtends('RecursiveIterator', ['Iterator', 'Traversable']);
+            $this->markInterfaceClass('SeekableIterator');
+            $this->setInterfaceExtends('SeekableIterator', ['Iterator', 'Traversable']);
+            $this->setClassInterfaces($displayName, [
+                'Stringable',
+                'RecursiveIterator',
+                'SeekableIterator',
+                'Traversable',
+                'Iterator',
+            ]);
+            // Slot 0 must be `__spl_ht` for splBackingHashtable (#26783).
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_HT, Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, \PHPCompiler\VM\SplFileObjectJitHelper::PROP_PATH, Variable::TYPE_STRING);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'rewind', 'valid', 'current', 'key', 'next', 'seek',
+                'fgets', 'eof', 'getfilename',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('directoryiterator' === $lcname || 'filesystemiterator' === $lcname || 'globiterator' === $lcname) {
             // Thin AOT: snapshot `__spl_ht` + Iterator; current() returns $this (#27289 / #27422).
             // php-src ext/spl/spl_directory.c — DirectoryIterator / FilesystemIterator / GlobIterator.

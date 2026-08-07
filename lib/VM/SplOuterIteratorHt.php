@@ -34,6 +34,8 @@ final class SplOuterIteratorHt
             'splqueue',
             // Packed fixed slots including null pads — nextFreeElement walk (#28640 / #26793).
             'splfixedarray',
+            // Line snapshot at construct — fgets-shaped packed walk (#28709).
+            'splfileobject',
         ];
     }
 
