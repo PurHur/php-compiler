@@ -926,6 +926,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'subject', 'preg_replace'));
     }
 
+    /** @covers issue #25580 */
+    public function testPregMatchReflectionStubClearsMatchesTypeAndAddsFalseReturn(): void
+    {
+        foreach (['preg_match', 'preg_match_all'] as $fn) {
+            self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride($fn, 2), $fn);
+            self::assertSame('int|false', BuiltinInternalArgInfo::returnTypeLabelForFunction($fn), $fn);
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($fn, 2);
+            self::assertNotNull($info, $fn);
+            self::assertSame('', $info['type'], $fn);
+        }
+    }
+
     /** @covers issue #19697 */
     public function testPregReplaceCallbackArrayNamedParameters(): void
     {

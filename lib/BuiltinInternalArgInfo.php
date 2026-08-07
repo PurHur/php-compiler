@@ -117,9 +117,9 @@ final class BuiltinInternalArgInfo
             'error_clear_last' => 'void',
             // ext/standard/basic_functions.stub.php — InternalArgInfo return empty; Zend void (#27998)
             'clearstatcache' => 'void',
-            // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324)
+            // ext/pcre/php_pcre.stub.php — InternalArgInfo omits |false (#26324, #25580)
             'preg_grep' => 'array|false',
-            'preg_match_all' => 'int|false',
+            'preg_match', 'preg_match_all' => 'int|false',
             // ext/standard/basic_functions.stub.php — InternalArgInfo omits void (#26104)
             'memory_reset_peak_usage' => 'void',
             // ext/standard/file.stub.php — InternalArgInfo omits |false (#25509)
@@ -779,6 +779,8 @@ final class BuiltinInternalArgInfo
             'substr_count' => 3 === $index ? '?int' : null,
             // ext/standard/string.stub.php — ?string $delimiter = null (InternalArgInfo string, OPT no default) (#25472)
             'preg_quote' => 1 === $index ? '?string' : null,
+            // ext/pcre/php_pcre.stub.php — &$matches untyped; InternalArgInfo array (#25580)
+            'preg_match', 'preg_match_all' => 2 === $index ? '' : null,
             // ext/standard/basic_functions.stub.php — ?string $encoding = null (InternalArgInfo string) (#24970, #23265)
             'htmlentities', 'htmlspecialchars', 'html_entity_decode' => 2 === $index ? '?string' : null,
             // ext/fileinfo/fileinfo.stub.php — finfo object + string (InternalArgInfo resource/char) (#25471)
