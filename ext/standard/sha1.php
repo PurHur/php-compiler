@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -24,10 +26,9 @@ final class sha1 extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28313).
+        $this->requireArgCountRange($frame, 'sha1', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('sha1() requires one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -51,8 +52,18 @@ final class sha1 extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('sha1() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT try/catch) — peer basename #28286 / #28313.
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            $slot = JitValueBox::alloc($context);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('sha1() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('sha1() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $slot;
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[1])) {

@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitAsinhKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for asinh() via AsinhJitHelper PHP (#15221, #27058).
+ * JIT/AOT link for asinh() via AsinhJitHelper PHP (#15221, #27058, #28355).
  *
- * Embed + thin standalone AOT: {@see AsinhJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27005 cosh shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering AsinhJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathAcosh #28331 / MathAsin #28263 shape).
+ * NestedJIT no longer needs a libc asinh(3) kernel — helper uses NestedJIT-safe log+sqrt.
  * php-src: ext/standard/math.c — PHP_FUNCTION(asinh)
  */
 final class MathAsinh
@@ -45,10 +42,6 @@ final class MathAsinh
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitAsinhKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathAsinh
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_ASINH);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_ASINH, $probe);
@@ -80,7 +69,7 @@ final class MathAsinh
             self::ASINH_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27058'
+            '#28355'
         );
     }
 }

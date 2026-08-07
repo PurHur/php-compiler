@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -21,9 +22,8 @@ final class str_shuffle extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('str_shuffle() requires exactly one argument');
-        }
+        // php-src ext/standard/string.stub.php — ArgumentCountError (#28313).
+        $this->requireExactArgCount($frame, 'str_shuffle', 1);
         $subject = self::vmStringArg($frame);
         BuiltinExecute::writeReturn(
             $frame,
@@ -33,8 +33,15 @@ final class str_shuffle extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT try/catch) — peer basename #28286 / #28313.
         if (1 !== \count($args)) {
-            throw new \LogicException('str_shuffle() requires exactly one argument');
+            $unreachable = $context->getTypeFromString('__string__*')->constNull();
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('str_shuffle() expects exactly 1 argument, %d given', \count($args))
+            );
+
+            return $unreachable;
         }
 
         return JitStrShuffle::shuffle(
