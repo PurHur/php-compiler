@@ -3561,6 +3561,16 @@ class Object_ extends Type {
             // Thin user-script AOT must call __construct (not allocate-only) (#26772).
             $this->markHasConstructor($id);
         }
+        if ('pdo' === $lcname) {
+            // Thin user-script AOT must call __construct (not allocate-only) so missing
+            // drivers throw PDOException instead of silent success (#27619).
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
+            $this->defineMethodVisibility($id, '__construct', $pub);
+            $this->defineMethodVisibility($id, 'getavailabledrivers', $pubStatic, 'getAvailableDrivers');
+            $this->defineMethodVisibility($id, 'quote', $pub);
+        }
         if ('datetimezone' === $lcname) {
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TZ_NAME_PROPERTY, Variable::TYPE_STRING);
             // Thin user-script AOT must call __construct (not allocate-only) (#26772).
