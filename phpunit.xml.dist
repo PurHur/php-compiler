@@ -86,6 +86,7 @@
             <file>./test/compliance/FuncGetArgReflectionMixedVMTest.php</file>
             <file>./test/compliance/GcControlReflectionReturnsVMTest.php</file>
             <file>./test/compliance/HashHmacAlgosReflectionReturnVMTest.php</file>
+            <file>./test/compliance/HashFileReflectionReturnVMTest.php</file>
             <file>./test/compliance/OpensslErrorStringReflectionVMTest.php</file>
             <file>./test/compliance/ProcOpenReflectionVMTest.php</file>
             <file>./test/compliance/IconvStrlenReflectionVMTest.php</file>
