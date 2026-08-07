@@ -94,6 +94,33 @@ final class VmRoundMode
         return $mode;
     }
 
+    /**
+     * bcround() / BcMath\Number::round() — RoundingMode only (php-src bcmath.stub.php; #28566).
+     *
+     * Unlike {@see resolveRoundModeArg()} (round() accepts RoundingMode|int), legacy int
+     * PHP_ROUND_* flags are TypeError under PROFILE≥8.4.
+     */
+    public static function resolveRoundingModeOnlyArg(
+        Variable $var,
+        string $fn,
+        string $paramName = 'mode',
+        int $argNum = 3
+    ): int {
+        $var = $var->resolveIndirect();
+        $fromEnum = self::tryRoundModeInt($var);
+        if (null !== $fromEnum) {
+            return $fromEnum;
+        }
+
+        throw new \TypeError(sprintf(
+            '%s(): Argument #%d ($%s) must be of type RoundingMode, %s given',
+            $fn,
+            $argNum,
+            $paramName,
+            EnumCaseSupport::typeNameForVariable($var)
+        ));
+    }
+
     public static function tryRoundModeInt(Variable $var): ?int
     {
         if (!EnumCaseSupport::isEnumCaseVariable($var)) {

@@ -34,9 +34,10 @@ final class NumberRound extends BcMathNumberMethod
                 'precision'
             );
         }
+        // php-src bcmath.stub.php — RoundingMode $mode only (#28566).
         $mode = StdlibConstants::PHP_ROUND_HALF_UP;
         if ($argc >= 3) {
-            $mode = VmRoundMode::resolveRoundModeArg(
+            $mode = VmRoundMode::resolveRoundingModeOnlyArg(
                 $frame->calledArgs[2]->resolveIndirect(),
                 'BcMath\\Number::round',
                 'mode',

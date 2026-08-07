@@ -526,6 +526,10 @@ final class BuiltinInternalArgInfo
             'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
                 ? 'RoundingMode|int'
                 : null,
+            // ext/bcmath/bcmath.stub.php — RoundingMode $mode = HalfAwayFromZero (#28566)
+            'bcround' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
+                ? 'RoundingMode'
+                : null,
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)
             'idate' => 1 === $index ? '?int' : null,
             'getdate' => 0 === $index ? '?int' : null,
@@ -1200,6 +1204,10 @@ final class BuiltinInternalArgInfo
             'finfo::__construct' => 1 === $index ? '?string' : null,
             // ext/bcmath/bcmath.stub.php — string|int $num (InternalArgInfo empty) (#24626)
             'bcmath\\number::__construct' => 0 === $index ? 'string|int' : null,
+            // ext/bcmath/bcmath.stub.php — RoundingMode $mode (#28566)
+            'bcmath\\number::round' => (1 === $index && CompilerVersion::supportsRoundingModeEnum())
+                ? 'RoundingMode'
+                : (0 === $index ? 'int' : null),
             // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
             'dateperiod::__construct' => '',
             // ext/date/php_date.stub.php — PHP 8.4+ createFromISO8601String (absent from InternalArgInfo) (#27923)
