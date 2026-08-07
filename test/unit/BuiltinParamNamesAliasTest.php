@@ -3706,6 +3706,32 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'indent', 'xmlwriter_set_indent'));
     }
 
+    /** @covers issue #27922 */
+    public function testXmlWriterFactoryNamedParameters(): void
+    {
+        self::assertSame([], BuiltinParamNames::forClassMethod('XMLWriter::toMemory'));
+        self::assertSame(0, BuiltinParamNames::paramCountForInternalMethod('XMLWriter', 'toMemory'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('XMLWriter', 'toMemory'));
+
+        $toUri = BuiltinParamNames::forClassMethod('XMLWriter::toUri');
+        self::assertSame(['uri'], $toUri);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($toUri, 'uri', 'XMLWriter::toUri'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('XMLWriter', 'toUri'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('XMLWriter', 'toUri'));
+        self::assertSame(
+            'string',
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlwriter', 'touri', 0)
+        );
+
+        $toStream = BuiltinParamNames::forClassMethod('XMLWriter::toStream');
+        self::assertSame(['stream'], $toStream);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($toStream, 'stream', 'XMLWriter::toStream'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('XMLWriter', 'toStream'));
+        self::assertNull(
+            BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod('xmlwriter', 'tostream', 0)
+        );
+    }
+
     /** @covers issue #23608 */
     public function testXmlWriterProceduralStubNamedParamsResolve(): void
     {

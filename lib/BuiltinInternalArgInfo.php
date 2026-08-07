@@ -1055,6 +1055,9 @@ final class BuiltinInternalArgInfo
                 3 => '?string',
                 default => null,
             },
+            // ext/xmlwriter/php_xmlwriter.stub.php — PHP 8.4+ factories (#27922)
+            'xmlwriter::touri' => 0 === $index ? 'string' : null,
+            // toStream($stream) is untyped (@param resource) — no type override
             // ext/dom/php_dom.stub.php — string $path / int $options = 0 / ?string $overrideEncoding = null (#27924)
             'dom\\htmldocument::createfromfile',
             'dom\\xmldocument::createfromfile' => match ($index) {

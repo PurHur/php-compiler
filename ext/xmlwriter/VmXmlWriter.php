@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
@@ -167,6 +168,13 @@ final class VmXmlWriter
             $entry->methods['tostream'] = new XmlWriterToStream();
             $entry->methodVisibility['tostream'] = $pubStatic;
             $entry->methodNames['tostream'] = 'toStream';
+            // php-src stub returns static (#27922).
+            $staticRet = ReflectionTypeSupport::cfgTypeFromLabel('static');
+            if (null !== $staticRet) {
+                $entry->methodReturnDeclaredTypes['tomemory'] = $staticRet;
+                $entry->methodReturnDeclaredTypes['touri'] = $staticRet;
+                $entry->methodReturnDeclaredTypes['tostream'] = $staticRet;
+            }
         }
 
         $ctx->classes[self::CLASS_LC] = $entry;
