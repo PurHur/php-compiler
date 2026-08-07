@@ -183,6 +183,8 @@ final class BuiltinInternalArgInfo
             'hash_pbkdf2' => 'string',
             // ext/hash/hash.stub.php — return string; InternalArgInfo omits the function (#25845)
             'hash_hkdf' => 'string',
+            // ext/hash/hash.stub.php — InternalArgInfo return string (missing |false) (#28318)
+            'hash_file', 'hash_hmac_file' => 'string|false',
             // ext/hash/hash.stub.php — return array; InternalArgInfo omits the function (#27942)
             'hash_hmac_algos' => 'array',
             // ext/hash/hash.stub.php — InternalArgInfo return resource; Zend HashContext (#27745)

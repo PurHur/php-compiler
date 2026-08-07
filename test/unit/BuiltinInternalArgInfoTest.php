@@ -355,6 +355,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('hash_equals', 1));
     }
 
+    /** php-src ext/hash/hash.stub.php — InternalArgInfo return string (missing |false) (#28318). */
+    public function testHashFileReflectionReturnUnion(): void
+    {
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_file'));
+        $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('hash_hmac_file'));
+    }
+
     /** php-src ext/hash/hash.stub.php — HashContext on hash_copy (#27745). */
     public function testHashCopyReflectionStubTypes(): void
     {
