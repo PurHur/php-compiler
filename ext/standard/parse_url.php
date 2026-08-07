@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -18,10 +19,9 @@ final class parse_url extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28691).
+        $this->requireArgCountRange($frame, 'parse_url', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
-        }
         // Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/url.c)
         $url = VmString::trimFamilyStringArgForFrame(
             $frame,
@@ -75,10 +75,11 @@ final class parse_url extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireArgCountRangeJit($context, $args, 'parse_url', 1, 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
+        $argc = \count($args);
         $component = 2 === $argc ? $args[1] : null;
 
         return JitParseUrl::parseUrl($context, $args[0], $component);

@@ -30,9 +30,8 @@ final class array_combine extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_combine() requires exactly two arguments');
-        }
+        // php-src ext/standard/array.stub.php — ArgumentCountError (#28691).
+        $this->requireExactArgCount($frame, 'array_combine', 2);
         $keysArg = $frame->calledArgs[0];
         $valuesArg = $frame->calledArgs[1];
         VmArray::requireArrayParam($keysArg, 'array_combine', 1, 'keys');
@@ -49,8 +48,9 @@ final class array_combine extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('array_combine() requires exactly two arguments');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireExactJitArgCount($context, $args, 'array_combine', 2)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         TypeErrorRaise::ensureLinked($context);
 

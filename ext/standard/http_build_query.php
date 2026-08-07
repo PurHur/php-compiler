@@ -26,14 +26,10 @@ final class http_build_query extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!\array_key_exists(0, $frame->calledArgs)) {
-            throw new \LogicException('http_build_query() requires at least one argument');
-        }
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28691).
+        $this->requireArgCountRange($frame, 'http_build_query', 1, 4);
         if (null === $frame->returnVar) {
             return;
-        }
-        if (\count($frame->calledArgs) > 4) {
-            throw new \LogicException('http_build_query() accepts at most four arguments in this compiler build');
         }
 
         // php-src Z_PARAM_ARRAY_OR_OBJECT — TypeError text still says "array" on 8.2 (#21950).
@@ -135,11 +131,9 @@ final class http_build_query extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('http_build_query() requires at least one argument');
-        }
-        if (\count($args) > 4) {
-            throw new \LogicException('http_build_query() accepts at most four arguments in this compiler build');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireArgCountRangeJit($context, $args, 'http_build_query', 1, 4)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
 
         TypeErrorRaise::ensureLinked($context);

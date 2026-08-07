@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -21,10 +22,9 @@ final class microtime extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28691).
+        $this->requireAtMostArgCount($frame, 'microtime', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc > 1) {
-            throw new \LogicException('microtime() accepts at most one argument');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,8 +42,9 @@ final class microtime extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 1) {
-            throw new \LogicException('microtime() accepts at most one argument');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireAtMostJitArgCount($context, $args, 'microtime', 1)) {
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {

@@ -15,9 +15,8 @@ final class sleep extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('sleep() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.stub.php — ArgumentCountError (#28691).
+        $this->requireExactArgCount($frame, 'sleep', 1);
         $seconds = VmMath::parseZParamLongBuiltinArgForFrame($frame, 0, 'sleep', 1, 'seconds');
         if (null === $frame->returnVar) {
             return;
@@ -32,8 +31,9 @@ final class sleep extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('sleep() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28691.
+        if (!$this->requireExactJitArgCount($context, $args, 'sleep', 1)) {
+            return $context->constantFromInteger(0);
         }
 
         return JitSleep::sleep($context, $args[0]);
