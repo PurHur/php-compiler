@@ -76,11 +76,28 @@ final class JitLongArg {
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $doneBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_done');
+
+        // Null box → 0 (Z_PARAM_LONG / zval_get_long; #28797 Exception::$code).
+        $nullBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_null');
+        $afterNull = BasicBlockHelper::append($context, 'jit_long_arg_vbox_after_null');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+        $context->builder->positionAtEnd($nullBlock);
+        $nullLong = $i64->constInt(0, false);
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
         $stringTy = $i8->constInt(Variable::TYPE_STRING, false);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy);
         $stringBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_string');
         $afterString = BasicBlockHelper::append($context, 'jit_long_arg_vbox_after_str');
-        $doneBlock = BasicBlockHelper::append($context, 'jit_long_arg_vbox_done');
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
@@ -132,8 +149,8 @@ final class JitLongArg {
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $i64 = $context->getTypeFromString('int64');
         $phi = $context->builder->phi($i64, 'jit_long_arg_vbox_phi');
+        $phi->addIncoming($nullLong, $nullEnd);
         $phi->addIncoming($stringLong, $stringEnd);
         $phi->addIncoming($doubleLong, $doubleEnd);
         $phi->addIncoming($numericLong, $numericEnd);

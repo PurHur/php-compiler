@@ -8,6 +8,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -96,12 +98,43 @@ final class ExceptionConstruct implements Call
         );
         $object->storeInstanceProperty($obj, $decl, ExceptionSupport::PROP_LINE, $lineVar);
 
-        if (isset($args[2]) && Variable::TYPE_NULL !== $args[2]->type) {
-            if (
+        if (isset($args[2])) {
+            if (Variable::TYPE_NULL === $args[2]->type) {
+                // Zend 8.1+ typed int $code — null→0 with E_DEPRECATED (#28797).
+                JitStringBuiltinArg::emitNullStringParamDeprecation(
+                    $context,
+                    $this->constructClassName.'::__construct',
+                    1,
+                    'code',
+                    'int'
+                );
+                $codeVar = new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $context->constantFromInteger(0)
+                );
+                $object->storeInstanceProperty($obj, $decl, ExceptionSupport::PROP_CODE, $codeVar);
+            } elseif (
                 Variable::TYPE_NATIVE_LONG === $args[2]->type
+                || Variable::TYPE_NATIVE_DOUBLE === $args[2]->type
+                || Variable::TYPE_NATIVE_BOOL === $args[2]->type
+                || Variable::TYPE_STRING === $args[2]->type
                 || Variable::TYPE_VALUE === $args[2]->type
             ) {
-                $object->storeInstanceProperty($obj, $decl, ExceptionSupport::PROP_CODE, $args[2]);
+                // Zend Z_PARAM_LONG — coerce float/bool/numeric string / value boxes (#28797).
+                $longVal = JitLongArg::lower(
+                    $context,
+                    $args[2],
+                    $this->constructClassName.'::__construct code'
+                );
+                $codeVar = new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $longVal
+                );
+                $object->storeInstanceProperty($obj, $decl, ExceptionSupport::PROP_CODE, $codeVar);
             }
         }
 
