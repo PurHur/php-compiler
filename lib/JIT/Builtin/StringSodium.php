@@ -91,7 +91,7 @@ final class StringSodium
         }
 
         $restore = self::captureInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
+        self::ensurePadJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
@@ -106,7 +106,7 @@ final class StringSodium
         $context->builder->positionAtEnd($entry);
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, $helper),
+            self::padHelperFunction($context, $helper),
             [$fn->getParam(0), $fn->getParam(1)]
         );
         $context->builder->returnValue(
