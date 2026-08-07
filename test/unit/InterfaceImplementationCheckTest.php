@@ -312,6 +312,49 @@ PHP;
         $runtime->parseAndCompile($code, 'missing_parent_hooks.php');
     }
 
+    /** Exact #28373 shape: `abstract public … { get; set; }` on abstract parent. */
+    public function testMissingParentAbstractKeywordPropertyHooksFailsAtCompileTime(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A {
+    abstract public string $x { get; set; }
+}
+class Bad extends A {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class Bad contains 2 abstract methods');
+        $this->expectExceptionMessage('A::$x::get');
+        $this->expectExceptionMessage('A::$x::set');
+        $runtime->parseAndCompile($code, 'issue_28373_missing_parent_abstract_hooks.php');
+    }
+
+    /** Plain typed property still satisfies abstract parent hooked property (#28373). */
+    public function testPlainPropertySatisfiesParentAbstractHookedProperty(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A {
+    abstract public string $x { get; set; }
+}
+class Plain extends A {
+    public string $x;
+}
+$p = new Plain();
+$p->x = 'hi';
+echo $p->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'issue_28373_plain_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
+
     public function testEvalAbstractPropertyHookFailsAtCompileTime(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
