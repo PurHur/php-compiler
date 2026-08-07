@@ -3059,12 +3059,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ proc_get_status() pending_signals array (ext/standard/proc_open.c, #16707, #17907).
+     * PHP 8.3+ proc_get_status() cached bool — exit wait status cached after child exit
+     * (php-src ext/standard/proc_open.c GH-10239 / PHP_FUNCTION(proc_get_status), #17362, #17883, #28527).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 status array). Enable via stable 8.4.0+
      * or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
-    public static function supportsProcGetStatusPendingSignals(): bool
+    public static function supportsProcGetStatusCached(): bool
     {
         if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
@@ -3080,6 +3081,15 @@ final class CompilerVersion
         }
 
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
+     * proc_get_status() pending_signals — never shipped in php-src / Zend 8.3–8.5
+     * (phantom from #16707/#17907; retired #28527). Gate kept so call sites stay explicit.
+     */
+    public static function supportsProcGetStatusPendingSignals(): bool
+    {
+        return false;
     }
 
     /**

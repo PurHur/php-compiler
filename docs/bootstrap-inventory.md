@@ -45844,7 +45844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 316 class method(s)
+- 317 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
