@@ -28,7 +28,6 @@ final class ParentIteratorBuiltin
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        $prot = CfgFunc::FLAG_PROTECTED;
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('ParentIterator');
@@ -44,8 +43,9 @@ final class ParentIteratorBuiltin
         $entry->constructor = new ParentIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        // php-src — public function accept(): bool (#28560).
         $entry->methods['accept'] = new ParentIteratorAccept();
-        $entry->methodVisibility['accept'] = $prot;
+        $entry->methodVisibility['accept'] = $pub;
         foreach ([
             'rewind' => ParentIteratorRewind::class,
             'valid' => ParentIteratorValid::class,
