@@ -114,6 +114,45 @@ PHP;
         $this->assertSame('AB', ob_get_clean());
     }
 
+    /** Concat binds tighter than |>, so RHS is FCC . "x" — Zend Closure→string Error (#28438). */
+    public function testDesugarRhsConcatLosesToPipe(): void
+    {
+        $this->assertSame(
+            '<?php echo (strtoupper(...) . "x")("a"), "\n";',
+            PipeOperatorDesugar::desugar('<?php echo "a" |> strtoupper(...) . "x", "\n";')
+        );
+        $this->assertSame(
+            '<?php echo (strtoupper("a")) . "x", "\n";',
+            PipeOperatorDesugar::desugar('<?php echo ("a" |> strtoupper(...)) . "x", "\n";')
+        );
+    }
+
+    public function testVmPipeRhsConcatMatchesZendError(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo "a" |> strtoupper(...) . "x", "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Object of class Closure could not be converted to string');
+        $rt->run($block);
+    }
+
+    public function testVmPipeParenthesizedThenConcat(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo ("a" |> strtoupper(...)) . "x", "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("Ax\n", ob_get_clean());
+    }
+
     public function testDesugarRewritesSinglePipe(): void
     {
         $this->assertSame(
