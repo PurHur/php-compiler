@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-08-07T00:12:05+00:00",
+    "generated_at": "2026-08-07T00:35:25+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "747b497bf86e7191943b",
@@ -8,6 +8,6 @@
     "unit_count": 361,
     "published_fresh": 361,
     "kept_live_unpublished": 0,
-    "total_bytes": 618296597,
+    "total_bytes": 618283221,
     "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env; live-site prune guard #25377)"
 }
