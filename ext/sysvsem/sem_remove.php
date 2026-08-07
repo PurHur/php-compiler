@@ -45,9 +45,12 @@ final class sem_remove extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'sem_remove() is not supported for JIT/AOT in this compiler build (issue #3704)'
-        );
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitSemRemove::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSemRemove::invoke($context, $args[0]);
     }
 
     private function triggerWarning(Frame $frame, string $message): void

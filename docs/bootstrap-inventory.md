@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7183 |
-| Phase A inventory files (M2 ratio SSOT) | 7183 |
+| PHP files on vm.php path | 7192 |
+| Phase A inventory files (M2 ratio SSOT) | 7192 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23092 |
+| Source constructs flagged (warnings) | 23100 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4607,8 +4607,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvmsg/msg_send.php` | 0 | 3 |
 | `ext/sysvmsg/msg_set_queue.php` | 0 | 2 |
 | `ext/sysvmsg/msg_stat_queue.php` | 0 | 2 |
+| `ext/sysvsem/JitSemAcquire.php` | 0 | 1 |
+| `ext/sysvsem/JitSemGet.php` | 0 | 1 |
+| `ext/sysvsem/JitSemHandle.php` | 0 | 1 |
+| `ext/sysvsem/JitSemRelease.php` | 0 | 1 |
+| `ext/sysvsem/JitSemRemove.php` | 0 | 1 |
 | `ext/sysvsem/Module.php` | 0 | 5 |
 | `ext/sysvsem/SemArgs.php` | 0 | 2 |
+| `ext/sysvsem/SemLibcThinAbi.php` | 0 | 1 |
 | `ext/sysvsem/VmSem.php` | 0 | 4 |
 | `ext/sysvsem/sem_acquire.php` | 0 | 2 |
 | `ext/sysvsem/sem_get.php` | 0 | 2 |
@@ -5550,6 +5556,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ScalarDimFetchRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScopeBuiltinRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
+| `lib/JIT/Builtin/SemRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SensitiveParamRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/SessionAbort.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionCreateIdRuntime.php` | 0 | 1 |
@@ -5755,6 +5762,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringRealpath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRename.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRmdir.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringSem.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringShmop.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
@@ -40982,6 +40990,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - 3 class method(s)
 
+### `ext/sysvsem/JitSemAcquire.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvsem/JitSemGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/sysvsem/JitSemHandle.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `ext/sysvsem/JitSemRelease.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sysvsem/JitSemRemove.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/sysvsem/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -40996,6 +41029,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 19)
 - 7 class method(s)
+
+### `ext/sysvsem/SemLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s)
 
 ### `ext/sysvsem/VmSem.php`
 
@@ -45304,11 +45342,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/FinalClassExtensionCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 69)
-- new DeclarationFinder (line 77)
-- new Traverser (line 78)
-- new Traverser (line 96)
-- new CompileError (line 141)
+- new self (line 73)
+- new DeclarationFinder (line 81)
+- new Traverser (line 82)
+- new Traverser (line 100)
+- new CompileError (line 145)
 - 10 class method(s)
 
 ### `lib/Compiler/FinalMethodOverrideCheck.php`
@@ -47989,6 +48027,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 14 class method(s)
 
+### `lib/JIT/Builtin/SemRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
+
 ### `lib/JIT/Builtin/SensitiveParamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -49018,6 +49061,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/StringSem.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringSerialize.php`
 
