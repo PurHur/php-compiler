@@ -16,7 +16,8 @@ use PHPLLVM\Value;
  * under thin AOT (ret i64 vs i1 / terminator-in-block). Builtin finals are known at
  * link time; matches FinalClassExtensionCheck::INTERNAL_FINAL + profile-gated GMP
  * (+ Fiber/FiberError from zend_fibers.stub.php; #28389;
- * Socket/AddressInfo from sockets.stub.php; #28391).
+ * Socket/AddressInfo from sockets.stub.php; #28391;
+ * InflateContext/DeflateContext from zlib.stub.php; #28385).
  */
 final class ReflectionClassIsFinalRuntime
 {
@@ -123,9 +124,11 @@ final class ReflectionClassIsFinalRuntime
             'AddressInfo',
             'Attribute',
             'Closure',
+            'DeflateContext',
             'Fiber',
             'FiberError',
             'Generator',
+            'InflateContext',
             'Socket',
         ];
         // php-src 8.4+ final class GMP (ext/gmp/gmp.stub.php; #28135)
