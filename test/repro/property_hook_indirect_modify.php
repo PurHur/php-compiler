@@ -1,4 +1,5 @@
 <?php
+// Repro #28590 — dim/append without &get must Error (php-src-strict).
 class C {
     public array $items {
         get => $this->items ?? [];
@@ -6,5 +7,9 @@ class C {
     }
 }
 $c = new C();
-$c->items[] = 1;
-var_export($c->items);
+try {
+    $c->items[] = 1;
+    echo "WROTE ", var_export($c->items, true), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ": ", $e->getMessage(), "\n";
+}
