@@ -18596,22 +18596,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 297)
 - new Variable (line 299)
-- new HashTable (line 965)
-- new Variable (line 968)
-- new ArgumentCountError (line 2150)
-- new ArgumentCountError (line 2158)
-- new HashTable (line 3381)
-- new Error (line 3487)
-- new Error (line 3491)
-- new Variable (line 3607)
-- new HashTable (line 3666)
-- new Variable (line 3668)
-- new HashTable (line 3685)
-- new Variable (line 3687)
-- new ArgumentCountError (line 3702)
-- new MailBuiltin (line 3916)
-- new Variable (line 3921)
-- 176 class method(s)
+- new HashTable (line 998)
+- new Variable (line 1001)
+- new ArgumentCountError (line 2183)
+- new ArgumentCountError (line 2191)
+- new HashTable (line 3414)
+- new Error (line 3520)
+- new Error (line 3524)
+- new Variable (line 3640)
+- new HashTable (line 3699)
+- new Variable (line 3701)
+- new HashTable (line 3718)
+- new Variable (line 3720)
+- new ArgumentCountError (line 3735)
+- new MailBuiltin (line 3949)
+- new Variable (line 3954)
+- 177 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -18637,8 +18637,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_convert_encoding.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 35)
-- 2 class method(s)
+- new ArgumentCountError (line 36)
+- 4 class method(s)
 - 3 closure(s)
 
 ### `ext/mbstring/mb_convert_kana.php`
@@ -26104,8 +26104,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 39)
-- new CallbackFilterIteratorConstruct (line 48)
+- new ClassEntry (line 38)
+- new CallbackFilterIteratorConstruct (line 47)
 - new CallbackFilterIteratorAccept (line 51)
 - new Variable (line 106)
 - new ArgumentCountError (line 144)
@@ -26166,8 +26166,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/FilterIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 34)
-- new FilterIteratorConstruct (line 44)
+- new ClassEntry (line 33)
+- new FilterIteratorConstruct (line 43)
 - new FilterIteratorAccept (line 47)
 - new ClassEntry (line 126)
 - new RecursiveFilterIteratorConstruct (line 135)
@@ -26307,8 +26307,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/ParentIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 34)
-- new ParentIteratorConstruct (line 44)
+- new ClassEntry (line 33)
+- new ParentIteratorConstruct (line 43)
 - new ParentIteratorAccept (line 47)
 - new ObjectEntry (line 80)
 - new Variable (line 83)
@@ -26344,8 +26344,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 38)
-- new RecursiveCallbackFilterIteratorConstruct (line 47)
+- new ClassEntry (line 37)
+- new RecursiveCallbackFilterIteratorConstruct (line 46)
 - new RecursiveCallbackFilterIteratorAccept (line 50)
 - new RecursiveCallbackFilterIteratorRewind (line 52)
 - new RecursiveCallbackFilterIteratorNext (line 54)
@@ -26374,12 +26374,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RegexIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 56)
+- new ClassEntry (line 55)
+- new Variable (line 76)
 - new Variable (line 77)
-- new Variable (line 78)
-- new ClassProperty (line 79)
-- new RegexIteratorConstruct (line 89)
-- new RegexIteratorAccept (line 92)
+- new ClassProperty (line 78)
+- new RegexIteratorConstruct (line 88)
+- new RegexIteratorAccept (line 91)
 - new Variable (line 291)
 - new Variable (line 316)
 - new Variable (line 335)
@@ -26766,8 +26766,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/VmSplIterators.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 41)
-- new ClassEntry (line 55)
+- new ClassEntry (line 39)
+- new ClassEntry (line 58)
 - 4 class method(s)
 
 ### `ext/spl/VmSplObserver.php`
@@ -44740,7 +44740,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1301)
+- new InternalArgInfo (line 1305)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
