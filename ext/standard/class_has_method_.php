@@ -15,9 +15,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * class_has_method() — ReflectionClass::hasMethod() as a function (#9989).
+ * class_has_method() — historical phantom free-function wrapping ReflectionClass::hasMethod (#9989).
  *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_has_method)
+ * Not registered on php-src-strict profiles (#28413): php-src has only ReflectionClass::hasMethod
+ * (ext/reflection/php_reflection.stub.php). Kept for Module gating / JIT helper wiring only.
  */
 final class class_has_method_ extends Internal
 {

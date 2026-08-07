@@ -1,5 +1,5 @@
 --TEST--
-stdlib class_has_method/property/constant() — not advertised on PHP 8.2 reference profile (#16664)
+stdlib class_has_method/property/constant() — never advertised (php-src-strict; #16664, #28413)
 --FILE--
 <?php
 echo function_exists('class_has_method') ? "chm_fail\n" : "chm_ok\n";
