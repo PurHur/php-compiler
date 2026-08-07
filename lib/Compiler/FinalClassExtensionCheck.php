@@ -30,6 +30,8 @@ final class FinalClassExtensionCheck
     private const INTERNAL_FINAL = [
         'attribute' => 'Attribute',
         'closure' => 'Closure',
+        'fiber' => 'Fiber',
+        'fibererror' => 'FiberError',
         'generator' => 'Generator',
     ];
 
