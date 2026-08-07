@@ -39,8 +39,18 @@ final class ListUnpackRuntimeShrinkTest extends TestCase
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsArray(JitVariable::TYPE_HASHTABLE));
         // i8 ABI sign-extends TYPE_HASHTABLE (135) to -121 (#23971 e08_spread).
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsArray(-121));
+        $this->assertTrue(ListUnpackJitHelper::valueBoxIsArray(0x87));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsArray(VmVariable::TYPE_NULL));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsArray(VmVariable::TYPE_STRING));
+    }
+
+    public function testListUnpackJitHelperUsesNestedJitSafeLiterals(): void
+    {
+        // NestedJIT only folds int literals in === / if — not JitVariable:: or self:: consts (#28641).
+        $source = (string) file_get_contents(__DIR__.'/../../lib/VM/ListUnpackJitHelper.php');
+        $this->assertStringNotContainsString('JitVariable::', $source);
+        $this->assertStringContainsString('135 === $typeByte', $source);
+        $this->assertStringContainsString('132 === $typeByte', $source);
     }
 
     public function testListUnpackJitHelperValueBoxIsString(): void
@@ -48,6 +58,7 @@ final class ListUnpackRuntimeShrinkTest extends TestCase
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsString(VmVariable::TYPE_STRING));
         // i8 sign-extend of JIT TYPE_STRING (132) → -124.
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsString((JitVariable::TYPE_STRING << 24) >> 24));
+        $this->assertTrue(ListUnpackJitHelper::valueBoxIsString(0x84));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsString(VmVariable::TYPE_ARRAY));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsString(VmVariable::TYPE_NULL));
     }
