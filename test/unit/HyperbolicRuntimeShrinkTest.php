@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\TanhJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** cosh()/sinh()/tanh() JIT routes through JitHelper PHP (#15156, #27005, #28446). */
+/** cosh()/sinh()/tanh() JIT routes through JitHelper PHP (#15156, #27005, #28446, #28459). */
 final class HyperbolicRuntimeShrinkTest extends TestCase
 {
     public function testCoshUsesJitHelperNotLibcLookup(): void
@@ -50,8 +50,9 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathTanh.php');
         $this->assertStringContainsString('TanhJitHelper', $bridge);
         $this->assertStringContainsString('phpc_tanh', $bridge);
-        $this->assertStringContainsString('JitTanhKernel', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
+        $this->assertStringNotContainsString('JitTanhKernel', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $bridge);
     }
 
     public function testCoshJitHelperInlinesNestedJitSafeAlgorithm(): void
@@ -69,21 +70,19 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertEqualsWithDelta(VmMath::cosh(2.0), CoshJitHelper::coshArgv(2.0), 1e-15);
     }
 
-    public function testTanhJitHelperDelegatesToKernel(): void
+    public function testTanhJitHelperInlinesNestedJitSafeAlgorithm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/TanhJitHelper.php');
-        $this->assertStringContainsString('phpc_tanh_kernel', $source);
+        $this->assertStringContainsString('expPositive', $source);
+        $this->assertStringNotContainsString('phpc_tanh_kernel', $source);
         $this->assertDoesNotMatchRegularExpression(
             '/function tanhArgv\(.*?\{[^}]*VmMath::tanh/s',
             $source
         );
 
-        if (!\function_exists('phpc_tanh_kernel')) {
-            $this->markTestSkipped('phpc_tanh_kernel requires compiler runtime');
-        }
         $this->assertSame(VmMath::tanh(0.0), TanhJitHelper::tanhArgv(0.0));
-        $this->assertSame(VmMath::tanh(1.0), TanhJitHelper::tanhArgv(1.0));
-        $this->assertSame(VmMath::tanh(2.0), TanhJitHelper::tanhArgv(2.0));
+        $this->assertEqualsWithDelta(VmMath::tanh(1.0), TanhJitHelper::tanhArgv(1.0), 1e-15);
+        $this->assertEqualsWithDelta(VmMath::tanh(2.0), TanhJitHelper::tanhArgv(2.0), 1e-15);
     }
 
     public function testSinhJitHelperInlinesNestedJitSafeAlgorithm(): void
@@ -112,10 +111,10 @@ final class HyperbolicRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MathTanh.php', $spine);
         $this->assertStringNotContainsString('JitCoshKernel.php', $spine);
         $this->assertStringNotContainsString('JitSinhKernel.php', $spine);
-        $this->assertStringContainsString('JitTanhKernel.php', $spine);
+        $this->assertStringNotContainsString('JitTanhKernel.php', $spine);
         $this->assertStringNotContainsString('phpc_cosh_kernel.php', $spine);
         $this->assertStringNotContainsString('phpc_sinh_kernel.php', $spine);
-        $this->assertStringContainsString('phpc_tanh_kernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_tanh_kernel.php', $spine);
         $this->assertStringNotContainsString('JitAtanhKernel.php', $spine);
         $this->assertStringNotContainsString('JitAsinhKernel.php', $spine);
         $this->assertStringNotContainsString('JitAcoshKernel.php', $spine);

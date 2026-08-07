@@ -359,18 +359,24 @@ final class JitSimpleXmlUserScript
         return self::materializeElement($context, $child);
     }
 
-    /** SimpleXMLElement::offsetGet — host dim/attr (#26863). */
+    /** SimpleXMLElement::offsetGet — host dim/attr (#26863, #27438). */
     public static function tryOffsetGet(Context $context, JITVariable ...$args): ?Value
     {
         if (\count($args) < 2 || !\extension_loaded('simplexml')) {
             return null;
         }
         // XPath node-sets are arrays. Never dim-fold them as the last host element (#27413).
-        if (self::isArrayShapedCountOperand($args[0])) {
-            return null;
-        }
         $token = $args[0]->compileTimeString;
         if (null !== $token && isset(self::$xpathListsByToken[$token])) {
+            return null;
+        }
+        // Only skip real array shapes — TYPE_VALUE is how load_string / child views are
+        // boxed under thin AOT; treating it as array-shaped made `$sxe['attr']` miss and
+        // fall through to a null/segfault path (#27438). Hashtable/native-array still
+        // refuse (xpath packed lists use the token check above).
+        if (JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || 0 !== ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
             return null;
         }
         $tree = self::lookup($args[0]);

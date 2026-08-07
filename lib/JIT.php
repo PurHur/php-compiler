@@ -8604,13 +8604,29 @@ class JIT {
                     $dim = $this->context->getVariableFromOp($dimOp);
                     $containerOp = $block->getOperand($op->arg2);
                     $containerUserType = $containerOp->type->userType ?? '';
-                    // User-script AOT: SimpleXMLElement dim via host tree (#26863).
-                    // CFG types the child view as "unknown", so ArrayAccess is skipped; fold here.
+                    // User-script AOT: SimpleXMLElement dim via host tree (#26863, #27438).
+                    // CFG types child views as "unknown", so ArrayAccess is skipped; fold here.
+                    // Root from simplexml_load_* never gets magicGetOverloadedClass (only __get /
+                    // prior dim results do) — also accept php-types userType / typo alias
+                    // simplemxml_element, same as property-fetch fold (#26863).
+                    $sxeDimClass = $value->magicGetOverloadedClass ?? null;
+                    if (
+                        (null === $sxeDimClass || '' === $sxeDimClass)
+                        && \is_string($containerUserType)
+                        && '' !== $containerUserType
+                    ) {
+                        $sxeDimClass = $containerUserType;
+                    }
+                    $sxeDimClassLc = null !== $sxeDimClass
+                        ? strtolower(ltrim((string) $sxeDimClass, '\\'))
+                        : '';
                     if (
                         !$forWrite
                         && JIT\UserScriptAotEnv::isActive()
-                        && null !== ($value->magicGetOverloadedClass ?? null)
-                        && 0 === strcasecmp((string) $value->magicGetOverloadedClass, 'SimpleXMLElement')
+                        && (
+                            'simplexmlelement' === $sxeDimClassLc
+                            || 'simplemxml_element' === $sxeDimClassLc
+                        )
                     ) {
                         $sxeDim = \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::tryOffsetGet(
                             $this->context,
@@ -8625,6 +8641,11 @@ class JIT {
                             }
                             $dimVar = $this->context->getVariableFromOp($resultOp);
                             $dimVar->magicGetOverloadedClass = 'SimpleXMLElement';
+                            // Bind host tree + baked name/text onto the dim result Variable
+                            // so (string)$sxe['attr'] / getName fold without NestedJIT (#27438).
+                            \PHPCompiler\ext\simplexml\JitSimpleXmlUserScript::applyPendingElementAssign(
+                                $dimVar
+                            );
                             break;
                         }
                     }

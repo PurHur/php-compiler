@@ -11,11 +11,17 @@ use PHPCompiler\CompilerVersion;
  *
  * Lowering matches Zend: $lhs |> $callable(...) becomes $callable($lhs, ...).
  * php-src: Zend/zend_compile.c pipe expression handling (PHP 8.5+).
+ *
+ * Precedence (php.net): concat/arithmetic bind tighter than |>, which binds tighter
+ * than comparison — so `"a" |> f(...) . "x"` is `"a" |> (f(...) . "x")` (#28438).
  */
 final class PipeOperatorDesugar
 {
-    /** Pipe binds tighter than comparison (php.net operator precedence). */
-    private const PREC_LHS_STOP = 18;
+    /**
+     * Pipe precedence sits between string concat (22) and comparison (18).
+     * LHS/RHS atoms absorb only operators with precedence strictly above this.
+     */
+    private const PIPE_PREC = 20;
 
     /** Zend 8.2 profile message for `|>` pipe syntax (#12424, #18007). */
     public const REFERENCE_PROFILE_UNEXPECTED_GT = 'syntax error, unexpected token ">"';
@@ -158,7 +164,7 @@ final class PipeOperatorDesugar
             return null;
         }
 
-        $startIdx = self::scanLhsStart($tokens, $endIdx, self::PREC_LHS_STOP);
+        $startIdx = self::scanLhsStart($tokens, $endIdx, self::PIPE_PREC);
         if ($startIdx < 0) {
             return null;
         }
@@ -188,7 +194,8 @@ final class PipeOperatorDesugar
 
         while ($pos >= 0) {
             $opPrec = self::infixPrecLeft($tokens[$pos]);
-            if (null === $opPrec || $opPrec < $minPrec) {
+            // Include only ops tighter than pipe (concat/arithmetic); stop at pipe/comparison/etc.
+            if (null === $opPrec || $opPrec <= $minPrec) {
                 break;
             }
 
@@ -304,6 +311,7 @@ final class PipeOperatorDesugar
                 return null;
             }
             $endIdx = self::extendWithTrailingEmptyInvoke($tokens, $endIdx);
+            $endIdx = self::extendRhsWithTighterOps($tokens, $endIdx, self::PIPE_PREC);
 
             $start = self::tokenByteOffset($tokens, $startIdx);
             $end = self::tokenByteEnd($tokens, $endIdx);
@@ -326,6 +334,7 @@ final class PipeOperatorDesugar
         if (null === $endIdx) {
             return null;
         }
+        $endIdx = self::extendRhsWithTighterOps($tokens, $endIdx, self::PIPE_PREC);
 
         $start = self::tokenByteOffset($tokens, $startIdx);
         $end = self::tokenByteEnd($tokens, $endIdx);
@@ -339,6 +348,93 @@ final class PipeOperatorDesugar
             'endIdx' => $endIdx,
             'text' => trim(substr($code, $start, $end - $start)),
         ];
+    }
+
+    /**
+     * Absorb RHS infix ops tighter than |>, matching Zend (concat before pipe) (#28438).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function extendRhsWithTighterOps(array $tokens, int $endIdx, int $pipePrec): int
+    {
+        $pos = $endIdx + 1;
+        while ($pos < \count($tokens)) {
+            while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= \count($tokens)) {
+                break;
+            }
+
+            $opPrec = self::infixPrecLeft($tokens[$pos]);
+            if (null === $opPrec || $opPrec <= $pipePrec) {
+                break;
+            }
+
+            ++$pos;
+            while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= \count($tokens)) {
+                break;
+            }
+
+            $atomEnd = self::scanCallLikeForward($tokens, $pos);
+            if (null === $atomEnd) {
+                $atomEnd = self::scanAtomForward($tokens, $pos);
+            }
+            if (null === $atomEnd) {
+                break;
+            }
+
+            $endIdx = $atomEnd;
+            $pos = $atomEnd + 1;
+        }
+
+        return $endIdx;
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanAtomForward(array $tokens, int $startIdx): ?int
+    {
+        $pos = $startIdx;
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens)) {
+            return null;
+        }
+
+        $token = $tokens[$pos];
+        if (\is_string($token) && '(' === $token) {
+            $depth = 0;
+            for ($i = $pos; $i < \count($tokens); ++$i) {
+                $t = $tokens[$i];
+                if (\is_string($t) && '(' === $t) {
+                    ++$depth;
+                } elseif (\is_string($t) && ')' === $t) {
+                    --$depth;
+                    if (0 === $depth) {
+                        return $i;
+                    }
+                } elseif (\is_array($t) && \T_CURLY_OPEN === $t[0]) {
+                    ++$depth;
+                }
+            }
+
+            return null;
+        }
+
+        if (\is_array($token) && \in_array($token[0], [
+            \T_VARIABLE, \T_STRING, \T_CONSTANT_ENCAPSED_STRING, \T_LNUMBER, \T_DNUMBER,
+            \T_NAME_QUALIFIED, \T_NAME_FULLY_QUALIFIED, \T_NAME_RELATIVE,
+        ], true)) {
+            return $pos;
+        }
+
+        return null;
     }
 
     /**
@@ -720,9 +816,15 @@ final class PipeOperatorDesugar
 
     private static function rewritePipe(string $lhs, string $rhs): string
     {
-        $trimmed = ltrim($rhs);
+        $trimmed = trim($rhs);
+        // Composite RHS (e.g. FCC . "x"): invoke the expression as callable — Zend errors on
+        // Closure→string concat before the pipe call (#28438).
+        if (!self::isSimplePipeCallableRhs($trimmed)) {
+            return '('.$trimmed.')('.$lhs.')';
+        }
+
         if (preg_match('/^\(\s*fn\s*\(/s', $trimmed)) {
-            $callable = rtrim($rhs);
+            $callable = $trimmed;
             // (fn(...))() — drop empty invoke; pipe LHS becomes the sole argument (#7244).
             if (preg_match('/\(\s*\)$/', $callable)) {
                 $callable = preg_replace('/\(\s*\)$/', '', $callable);
@@ -732,7 +834,7 @@ final class PipeOperatorDesugar
         }
 
         if (preg_match('/^fn\s*\(/s', $trimmed)) {
-            $callable = rtrim($rhs);
+            $callable = $trimmed;
             if (preg_match('/\(\s*\)$/', $callable)) {
                 $callable = preg_replace('/\(\s*\)$/', '', $callable);
             }
@@ -740,18 +842,18 @@ final class PipeOperatorDesugar
             return '('.$callable.')('.$lhs.')';
         }
 
-        $open = strpos($rhs, '(');
+        $open = strpos($trimmed, '(');
         if (false === $open) {
-            return $rhs.'('.$lhs.')';
+            return $trimmed.'('.$lhs.')';
         }
 
-        $prefix = substr($rhs, 0, $open + 1);
-        $suffix = substr($rhs, $open + 1);
+        $prefix = substr($trimmed, 0, $open + 1);
+        $suffix = substr($trimmed, $open + 1);
         $inner = ltrim($suffix);
-        $callee = substr($rhs, 0, $open);
 
         // First-class callable: func(...) → func($lhs) (zend_compile.c pipe + ZEND_AST_CALLABLE_CONVERT).
-        if (preg_match('/^\\.\\.\\.(\\s*\\))/s', $inner, $m)) {
+        // Require the FCC to consume the entire RHS (no trailing concat/arithmetic) (#28438).
+        if (preg_match('/^\\.\\.\\.(\\s*\\))\\s*$/s', $inner, $m)) {
             return $prefix.$lhs.$m[1];
         }
 
@@ -760,6 +862,53 @@ final class PipeOperatorDesugar
         }
 
         return $prefix.$lhs.', '.$suffix;
+    }
+
+    /**
+     * True when $rhs is a single pipe callable step (FCC/call/arrow/bare), not a composite expr.
+     */
+    private static function isSimplePipeCallableRhs(string $rhs): bool
+    {
+        $rhs = trim($rhs);
+        if (preg_match('/^\(\s*fn\s*\(/s', $rhs)) {
+            return self::balancedCallSpansEntire($rhs) || preg_match('/^\(.*\)\s*\(\s*\)$/s', $rhs) === 1;
+        }
+        if (preg_match('/^fn\s*\(/s', $rhs)) {
+            return true;
+        }
+        // Bare callable name / property fetch without call or infix.
+        if (!str_contains($rhs, '(')) {
+            return (bool) preg_match(
+                '/^[\\$a-zA-Z_\x80-\xff][\\$a-zA-Z0-9_\x80-\xff]*(?:\s*(?:->|::)\s*[\\$a-zA-Z_\x80-\xff][\\$a-zA-Z0-9_\x80-\xff]*)*$/s',
+                $rhs
+            );
+        }
+
+        // Call or FCC: callee + balanced (...) consuming the whole string.
+        return self::balancedCallSpansEntire($rhs);
+    }
+
+    private static function balancedCallSpansEntire(string $rhs): bool
+    {
+        $open = strpos($rhs, '(');
+        if (false === $open) {
+            return false;
+        }
+        $depth = 0;
+        $len = \strlen($rhs);
+        for ($i = $open; $i < $len; ++$i) {
+            $ch = $rhs[$i];
+            if ('(' === $ch) {
+                ++$depth;
+            } elseif (')' === $ch) {
+                --$depth;
+                if (0 === $depth) {
+                    return trim(substr($rhs, $i + 1)) === '';
+                }
+            }
+        }
+
+        return false;
     }
 
     private static function byteOffsetToLine(string $code, int $offset): int

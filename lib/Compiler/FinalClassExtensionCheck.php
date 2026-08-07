@@ -42,6 +42,10 @@ final class FinalClassExtensionCheck
         // php-src ext/hash/hash.stub.php — final class HashContext (#28384).
         'hashcontext' => 'HashContext',
         'inflatecontext' => 'InflateContext',
+        // php-src ext/openssl/openssl.stub.php — final OpenSSL object classes (#28370).
+        'opensslasymmetrickey' => 'OpenSSLAsymmetricKey',
+        'opensslcertificate' => 'OpenSSLCertificate',
+        'opensslcertificatesigningrequest' => 'OpenSSLCertificateSigningRequest',
         // php-src ext/random/random.stub.php — final Randomizer + Engine\* (#28387).
         'random\\engine\\mt19937' => 'Random\\Engine\\Mt19937',
         'random\\engine\\pcgoneseq128xslrr64' => 'Random\\Engine\\PcgOneseq128XslRr64',

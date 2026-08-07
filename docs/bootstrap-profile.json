@@ -3173,7 +3173,6 @@
         "ext/standard/JitSysGetTempDir.php",
         "ext/standard/JitSysGetloadavg.php",
         "ext/standard/JitSyslog.php",
-        "ext/standard/JitTanhKernel.php",
         "ext/standard/JitTempnam.php",
         "ext/standard/JitTempnamKernel.php",
         "ext/standard/JitTimezoneAbbreviationsList.php",
@@ -4352,7 +4351,6 @@
         "ext/standard/phpc_rewrite_vars_set_tags_kernel.php",
         "ext/standard/phpc_run_command.php",
         "ext/standard/phpc_stat_mode_kernel.php",
-        "ext/standard/phpc_tanh_kernel.php",
         "ext/standard/phpc_url_rewriter_apply_kernel.php",
         "ext/standard/phpc_weakref_null_slot.php",
         "ext/standard/phpc_weakref_unset_map_key.php",
@@ -7419,9 +7417,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7185,
+        "inventory_files": 7183,
         "excluded": 0,
-        "eligible": 7185,
+        "eligible": 7183,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

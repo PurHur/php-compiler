@@ -6,16 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitTanhKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for tanh() via TanhJitHelper PHP (#15156, #27126).
+ * JIT/AOT link for tanh() via TanhJitHelper PHP (#15156, #27126, #28459).
  *
- * Embed + thin standalone AOT: {@see TanhJitHelper} via {@see JitVmHelperLink}
- * (Ceil/Sqrt #20664 / #27005 cosh shape — double via helper result coerce).
- * Nested helper compile: libc leaf without re-entering TanhJitHelper.
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} (MathCosh #28446 / MathSinh #28418 shape).
+ * NestedJIT no longer needs a libc tanh(3) kernel — helper uses NestedJIT-safe exp.
  * php-src: ext/standard/math.c — PHP_FUNCTION(tanh)
  */
 final class MathTanh
@@ -45,10 +42,6 @@ final class MathTanh
 
     public static function invoke(Context $context, Value $num): Value
     {
-        if (NestedJitCompileScope::isActive()) {
-            return JitTanhKernel::invoke($context, $num);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -59,10 +52,6 @@ final class MathTanh
 
     private static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_TANH);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_TANH, $probe);
@@ -80,7 +69,7 @@ final class MathTanh
             self::TANH_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#27126'
+            '#28459'
         );
     }
 }
