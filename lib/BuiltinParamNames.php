@@ -336,11 +336,9 @@ final class BuiltinParamNames
             case 'strncmp':
             case 'strncasecmp':
                 return ['string1', 'string2', 'length'];
-            // php-src ext/standard/basic_functions.stub.php — ?int $length = null (#25749)
+            // php-src ext/standard/string.stub.php — arity 3; no $truncate (#25749, #27749)
             case 'substr':
-                return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
-                    ? ['string', 'offset', 'length=', 'truncate=']
-                    : ['string', 'offset', 'length='];
+                return ['string', 'offset', 'length='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says cut (#23191)
             case 'wordwrap':
                 return ['string', 'width', 'break', 'cut_long_words'];

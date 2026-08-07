@@ -2001,6 +2001,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #27749 (reverts #17239 phantom substr $truncate) */
+    public function testSubstrNoTruncateNamedParamOnForwardProfile(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $names = BuiltinParamNames::forFunction('substr');
+            self::assertSame(['string', 'offset', 'length='], $names);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'truncate', 'substr'));
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('substr'));
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     /** @covers issue #17092 */
     public function testTimersAndHttpNamedParamsResolve(): void
     {

@@ -1,12 +1,10 @@
 --TEST--
-stdlib substr() excess positional args on reference profile (#17252, ext/standard/string.c)
+stdlib substr() excess positional args (#17252 / #27749, ext/standard/string.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);
-
-if ((new ReflectionFunction('substr'))->getNumberOfParameters() >= 4) {
-    die('skip substr truncate enabled on forward profile');
-}
 
 try {
     substr('abc', 0, 1, 99);

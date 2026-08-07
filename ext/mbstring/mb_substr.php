@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
@@ -60,11 +59,11 @@ final class mb_substr extends Internal
         $encoding = isset($frame->calledArgs[3])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_substr', 3)
             : 'UTF-8';
-        $warnOnClip = CompilerVersion::supportsSubstrTruncate();
+        // No Z_STR_TRUNCATED / clip E_WARNING in php-src mbstring (#22489, #28556, #27749).
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(
-                VmMbstring::substr($string, $start, $length, $encoding, $warnOnClip, $frame)
+                VmMbstring::substr($string, $start, $length, $encoding, false, $frame)
             )
         );
     }

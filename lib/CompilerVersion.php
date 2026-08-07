@@ -3228,17 +3228,15 @@ final class CompilerVersion
     }
 
     /**
-     * Forward-profile phantom substr() `$truncate` arity gate (#17239 / #27749).
+     * substr() optional `$truncate` — never advertised (#27749; reverts #17239).
      *
-     * php-src `string.stub.php` keeps arity 3 through 8.4+ — there is no `$truncate` and no
-     * Z_STR_TRUNCATED warning on oversize length (#28556). This flag still widens Reflection
-     * arity under PROFILE≥8.4 until #27749 retires the phantom; clip warnings must stay off.
-     *
-     * mb_substr has no `$truncate` in php-src either (#23603).
+     * php-src `string.stub.php` keeps arity 3 through 8.4+ (`string`, `offset`, `?int $length`).
+     * There is no `$truncate` and no Z_STR_TRUNCATED warning on oversize length (#28556).
+     * mb_substr likewise has no `$truncate` (#23603). Always false under php-src-strict.
      */
     public static function supportsSubstrTruncate(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

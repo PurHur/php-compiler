@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 7203 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23248 |
+| Source constructs flagged (warnings) | 23244 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4521,7 +4521,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/strtr.php` | 0 | 2 |
 | `ext/standard/strval.php` | 0 | 1 |
 | `ext/standard/strxfrm.php` | 0 | 1 |
-| `ext/standard/substr.php` | 0 | 5 |
+| `ext/standard/substr.php` | 0 | 1 |
 | `ext/standard/substr_compare.php` | 0 | 1 |
 | `ext/standard/substr_count.php` | 0 | 1 |
 | `ext/standard/substr_replace.php` | 0 | 3 |
@@ -9948,7 +9948,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomGetElementsByTagNameUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 51)
+- new JITVariable (line 52)
 - 3 class method(s)
 
 ### `ext/dom/JitDomHtmlDocumentCreateFromString.php`
@@ -19036,8 +19036,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/mb_substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 39)
-- new ArgumentCountError (line 45)
+- new ArgumentCountError (line 38)
+- new ArgumentCountError (line 44)
 - 6 class method(s)
 - 1 closure(s)
 
@@ -40629,11 +40629,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 41)
-- new ArgumentCountError (line 47)
-- new ArgumentCountError (line 89)
-- new ArgumentCountError (line 95)
-- 4 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/substr_compare.php`
 
@@ -44762,8 +44758,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2307)
-- new ArgumentCountError (line 2318)
+- new ArgumentCountError (line 2305)
+- new ArgumentCountError (line 2316)
 - 19 class method(s)
 - 1 closure(s)
 

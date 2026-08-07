@@ -1,15 +1,36 @@
 --TEST--
-stdlib substr() truncate: named parameter on PHP 8.4 forward profile (#17239, ext/standard/string.c)
+stdlib substr() rejects phantom $truncate on PROFILE=8.4 — php-src arity 3 (#27749, re-#17239)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-if ((new ReflectionFunction('substr'))->getNumberOfParameters() < 4) {
-    die('skip substr truncate not on active profile');
+declare(strict_types=1);
+
+$r = new ReflectionFunction('substr');
+echo 'argc=', $r->getNumberOfParameters(), "\n";
+foreach ($r->getParameters() as $p) {
+    echo $p->getName(), "\n";
 }
-echo substr('hello world', 0, 50, truncate: true), "\n";
-echo (new ReflectionFunction('substr'))->getNumberOfParameters(), "\n";
+
+try {
+    echo substr('abcdef', 0, 3, true), "\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
+
+try {
+    echo substr(string: 'abcdef', offset: 0, length: 3, truncate: true), "\n";
+} catch (ArgumentCountError|Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+
+echo substr('abcdef', 0, 3), "\n";
 ?>
 --EXPECT--
-hello world
-4
+argc=3
+string
+offset
+length
+substr() expects at most 3 arguments, 4 given
+Error: Unknown named parameter $truncate
+abc
