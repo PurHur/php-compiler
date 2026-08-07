@@ -77,7 +77,6 @@ final class LibcExtern
             'remove' => [$i32, false, [$i8p]],
             'rename' => [$i32, false, [$i8p, $i8p]],
             'chdir' => [$i32, false, [$i8p]],
-            'gethostname' => [$i32, false, [$i8p, $sizeT]],
             'getenv' => [$i8p, false, [$i8p]],
             'putenv' => [$i32, false, [$i8p]],
             'setenv' => [$i32, false, [$i8p, $i8p, $i32]],

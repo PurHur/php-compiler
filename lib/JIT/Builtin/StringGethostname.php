@@ -15,7 +15,8 @@ use PHPLLVM\Value;
  *
  * Embed + thin standalone AOT: {@see GethostnameJitHelper} via {@see JitVmHelperLink}
  * (chdir #21147 / getenv #20644 shape — no thin libc ABI fork).
- * Nested helper compile: libc leaf without re-entering GethostnameJitHelper.
+ * Nested helper compile: /proc+/etc leaf ({@see JitGethostnameKernel}) without re-entering
+ * GethostnameJitHelper — no libc gethostname(2) (#28544).
  * SSOT for VM: {@see \PHPCompiler\ext\standard\VmHost::gethostname()} / {@see VmHostPure}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(gethostname)
  */

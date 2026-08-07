@@ -11,10 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * @internal libc gethostname(2) kernel for GethostnameJitHelper (#21166).
+ * @internal hostname NestedJIT kernel for GethostnameJitHelper (#21166, #28544).
  *
- * Avoids compiling {@see VmHostPure} when the helper TU is NestedJIT'd into
- * user-script AOT (same shape as {@see phpc_chdir_kernel} / {@see phpc_getenv_kernel}).
+ * VM execute uses {@see VmHostPure}; JIT NestedJIT leaf emits /proc+/etc open/read
+ * ({@see JitGethostnameKernel}) — avoids compiling Pure into the helper TU and drops
+ * libc gethostname(2) (peer {@see phpc_random_bytes_kernel} / #21186).
  */
 final class phpc_gethostname_kernel extends Internal
 {
@@ -32,7 +33,7 @@ final class phpc_gethostname_kernel extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $host = @\gethostname();
+        $host = VmHostPure::gethostname();
         if (false === $host || '' === $host) {
             $frame->returnVar->string('');
         } else {
