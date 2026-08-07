@@ -203,6 +203,8 @@ final class BuiltinInternalArgInfo
             'mb_convert_encoding' => 'array|string|false',
             // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#26460)
             'session_id' => 'string|false',
+            // ext/session/session.stub.php — InternalArgInfo return string (missing |false) (#27726)
+            'session_encode' => 'string|false',
             // ext/session/session.stub.php — InternalArgInfo empty / absent return; Zend bool / void (#28464)
             'session_write_close', 'session_commit', 'session_abort', 'session_reset', 'session_unset' => 'bool',
             'session_register_shutdown' => 'void',
