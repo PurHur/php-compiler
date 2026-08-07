@@ -2936,7 +2936,6 @@
         "ext/standard/JitLocale.php",
         "ext/standard/JitLocaltime.php",
         "ext/standard/JitLog10Kernel.php",
-        "ext/standard/JitLog1pKernel.php",
         "ext/standard/JitLogKernel.php",
         "ext/standard/JitMathNumberArg.php",
         "ext/standard/JitMd5.php",
@@ -4321,7 +4320,6 @@
         "ext/standard/phpc_libcrypt_kernel.php",
         "ext/standard/phpc_libcrypt_verify.php",
         "ext/standard/phpc_log10_kernel.php",
-        "ext/standard/phpc_log1p_kernel.php",
         "ext/standard/phpc_log_kernel.php",
         "ext/standard/phpc_match_unhandled_format_scalar.php",
         "ext/standard/phpc_match_unhandled_operand_is_object.php",
@@ -7434,9 +7432,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 7200,
+        "inventory_files": 7198,
         "excluded": 0,
-        "eligible": 7200,
+        "eligible": 7198,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

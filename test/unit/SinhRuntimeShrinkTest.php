@@ -97,7 +97,7 @@ final class SinhRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_cosh_kernel', $source);
         $this->assertStringNotContainsString('phpc_tanh_kernel', $source);
         $this->assertStringContainsString('phpc_fpow_kernel', $source);
-        $this->assertStringContainsString('phpc_log1p_kernel', $source);
+        $this->assertStringContainsString('phpc_log_kernel', $source);
     }
 
     public function testSpineBundleIncludesSinhHelperWithoutKernel(): void
