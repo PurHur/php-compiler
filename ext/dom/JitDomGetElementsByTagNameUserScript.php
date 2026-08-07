@@ -34,6 +34,7 @@ final class JitDomGetElementsByTagNameUserScript
             return null;
         }
         $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tagLit);
+        // Preserve live appendChild increments when re-querying the same tag (#28605).
         DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
 
         return self::boxNodeList($context, $count);
