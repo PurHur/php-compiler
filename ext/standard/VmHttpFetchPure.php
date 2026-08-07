@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * HTTP/1.0 GET/HEAD via {@see VmStreamSocketNative} + VM stream I/O — no duplicate libc socket FFI (#8939).
+ * HTTP/1.1 GET/HEAD via {@see VmStreamSocketNative} + VM stream I/O — no duplicate libc socket FFI (#8939).
  *
  * Pairs {@see VmHttpFetchNative} (thin alias). https:// via {@see VmHttpTlsNative} on adopted socket fd.
  *
- * php-src: ext/standard/streams.c — http wrapper
+ * php-src: ext/standard/http_fopen_wrapper.c — php_stream_url_wrap_http_ex (HTTP/1.1 request line; #28789)
  */
 final class VmHttpFetchPure
 {
@@ -253,7 +253,8 @@ final class VmHttpFetchPure
         bool $useTls,
         array $parts
     ): string {
-        $request = $method.' '.$path." HTTP/1.0\r\n";
+        // php-src http_fopen_wrapper.c: request version is HTTP/1.1 (#28789).
+        $request = $method.' '.$path." HTTP/1.1\r\n";
         $request .= "Host: {$host}";
         $defaultPort = $useTls ? 443 : 80;
         if ($port !== $defaultPort) {
