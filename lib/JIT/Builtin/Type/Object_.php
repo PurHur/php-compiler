@@ -3006,11 +3006,14 @@ class Object_ extends Type {
     {
         $ids = [];
         foreach ($this->classIdToName as $id => $_name) {
-            if ($this->isExternalOnlyClass((int) $id)) {
+            $classId = (int) $id;
+            // External-only classes (stdClass) still need get_object_vars dispatch when
+            // DECLARE_PROPERTY / pending dynamic writes registered slots (#28638 / #26797).
+            if ($this->isExternalOnlyClass($classId) && !$this->allowsDynamicProperties($classId)) {
                 continue;
             }
-            if ([] !== ($this->properties[$id] ?? [])) {
-                $ids[] = (int) $id;
+            if ([] !== ($this->properties[$classId] ?? [])) {
+                $ids[] = $classId;
             }
         }
 

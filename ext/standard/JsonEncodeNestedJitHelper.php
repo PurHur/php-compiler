@@ -16,6 +16,7 @@ use PHPCompiler\VM\Variable;
  * `$val->toArray()` for first-level pair values (#27074 / #27182).
  * Numeric type codes — NestedJIT mis-types Variable::TYPE_* class constants (#27075 / #27020).
  * No str_replace — NestedJIT helper emit lacks phpc_str_replace (#27078).
+ * JSON_FORCE_OBJECT: empty packed HT → {} (#28638).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class JsonEncodeNestedJitHelper
@@ -49,7 +50,14 @@ final class JsonEncodeNestedJitHelper
 
     public static function encodeHashtable(HashTable $ht, int $flags): ?string
     {
+        // JSON_FORCE_OBJECT=16 — empty get_object_vars() is a packed list; Zend still emits {} (#28638).
         $packed = $ht->isPackedList();
+        if (0 !== ($flags & 16) && $packed) {
+            return '{}';
+        }
+        if (0 !== ($flags & 16)) {
+            $packed = false;
+        }
         $out = $packed ? '[' : '{';
         $n = 0;
         foreach ($ht->exportKeyValuePairs(true) as $pair) {

@@ -78,7 +78,28 @@ final class json_encode extends Internal
         // Resolve compile-time flags before lowerIntBuiltinArg mutates the arg shape.
         $knownFlags = self::tryCompileTimeFlags($context, $args);
         $flagsVal = self::lowerFlagsJitValue($context, $args);
+        // Arrays / stdClass with literal props before string fold — object temps stash
+        // class names in compileTimeString (#26872) and would fold to "\"stdClass\"" (#28638).
+        $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(
+            $context,
+            $context->jitEnclosingBlock,
+            $context->jitJsonEncodeValueOperand,
+            $knownFlags ?? 0
+        );
+        if (null !== $arrayLiteral) {
+            return $arrayLiteral;
+        }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal && (
+            JITVariable::TYPE_OBJECT === $args[0]->type
+            || null !== ($args[0]->classUserType ?? null)
+            || JitJsonEncodeCompileTime::operandIsNewObject(
+                $context->jitEnclosingBlock,
+                $context->jitJsonEncodeValueOperand
+            )
+        )) {
+            $literal = null;
+        }
         if (null !== $literal && null !== $knownFlags) {
             // PHP-in-PHP fold — same encoder as VM/runtime (#21723); avoid host ext/json skew.
             try {
@@ -109,15 +130,6 @@ final class json_encode extends Internal
             }
 
             return $context->builder->load($context->constantStringFromString($encoded));
-        }
-        $arrayLiteral = JitJsonEncodeCompileTime::tryEncode(
-            $context,
-            $context->jitEnclosingBlock,
-            $context->jitJsonEncodeValueOperand,
-            $knownFlags ?? 0
-        );
-        if (null !== $arrayLiteral) {
-            return $arrayLiteral;
         }
         if (null !== $knownFlags && 0 !== ($knownFlags & ~VmJsonFlags::ENCODE_SUPPORTED)) {
             throw new \LogicException('json_encode() flags not supported at runtime in this compiler build');
