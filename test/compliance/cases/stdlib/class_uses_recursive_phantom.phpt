@@ -9,5 +9,7 @@ if (getenv('PHP_COMPILER_PROFILE') !== '8.2') {
 --FILE--
 <?php
 echo function_exists('class_uses_recursive') ? "fail\n" : "ok\n";
+echo function_exists('class_uses') ? "uses-ok\n" : "uses-fail\n";
 --EXPECT--
 ok
+uses-ok

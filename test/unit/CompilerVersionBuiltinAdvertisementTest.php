@@ -392,21 +392,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testClassUsesRecursiveAdvertisedOn83ForwardProfile(): void
+    public function testClassUsesRecursiveNeverAdvertisedOnForwardProfiles(): void
     {
+        // php-src: class_uses() only (#28365).
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsClassUsesRecursive());
-            $this->assertTrue(CompilerVersion::advertisesClassUsesRecursive());
+        foreach (['8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsClassUsesRecursive(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesClassUsesRecursive(), $profile);
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['class_uses_recursive']));
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+            $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']), $profile);
+            $this->assertTrue(isset($runtime->vmContext->functions['class_uses']), $profile);
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 

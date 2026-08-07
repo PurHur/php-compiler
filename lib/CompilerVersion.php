@@ -544,35 +544,21 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ class_uses_recursive() (ext/standard/basic_functions.c, issue #6469, #12816, #16708).
+     * class_uses_recursive() — absent from php-src (class_uses() only; ext/spl/spl.stub.php /
+     * basic_functions.stub.php).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.3/8.4/8.5).
+     * Forward-profile enable (#16708/#17137) retired by #28365 (re-#12816).
      */
     public static function supportsClassUsesRecursive(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
-    /**
-     * class_uses_recursive() visible to function_exists() — same gate as {@see supportsClassUsesRecursive()}.
-     */
+    /** class_uses_recursive() visible to function_exists() — never (php-src absent, #28365). */
     public static function advertisesClassUsesRecursive(): bool
     {
-        return self::supportsClassUsesRecursive();
+        return false;
     }
 
     /**
