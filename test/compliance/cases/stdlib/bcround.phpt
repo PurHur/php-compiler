@@ -28,9 +28,15 @@ try {
 }
 try {
     bcround('1', 0, 99);
-    echo bcround('1', 0, 99), "\n";
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
+    echo "int-mode-uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    bcround('1.25', 1, PHP_ROUND_HALF_UP);
+    echo "legacy-int-uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
 }
 --EXPECT--
 true
@@ -45,4 +51,5 @@ true
 0
 bcround(): Argument #1 ($num) is not well-formed
 bcround(): Argument #1 ($num) must be of type string, E given
-1
+bcround(): Argument #3 ($mode) must be of type RoundingMode, int given
+bcround(): Argument #3 ($mode) must be of type RoundingMode, int given

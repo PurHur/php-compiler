@@ -3102,8 +3102,14 @@ restart:
                     ));
                 }
                 if ($resolved->type === Variable::TYPE_INTEGER) {
-                    $this->copyFrom($resolved);
-                    $this->integer *= -1;
+                    // zend_operators.c zendi_negate_function — PHP_INT_MIN overflows to double (#28761).
+                    $negated = -$resolved->integer;
+                    if (\is_int($negated)) {
+                        $this->int($negated);
+                    } else {
+                        $this->float($negated);
+                    }
+
                     return;
                 }
                 if ($resolved->type === Variable::TYPE_FLOAT) {
@@ -3119,10 +3125,12 @@ restart:
                     return;
                 }
                 $number = self::coerceUnaryPlusOperand($resolved, $vm, $frame);
-                if (is_int($number)) {
-                    $this->int(-$number);
+                // Same INT_MIN → float promotion as the TYPE_INTEGER branch (#28761).
+                $negated = -$number;
+                if (\is_int($negated)) {
+                    $this->int($negated);
                 } else {
-                    $this->float(-$number);
+                    $this->float((float) $negated);
                 }
 
                 return;

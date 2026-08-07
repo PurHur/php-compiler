@@ -265,13 +265,28 @@ final class VmPcntl
         throw new \Error('pcntl_fork() is not available in this compiler build');
     }
 
-    public static function waitpid(int $pid, int &$status, int $options): int
-    {
+    /**
+     * @param array<string, mixed>|null $resourceUsage
+     */
+    public static function waitpid(
+        int $pid,
+        int &$status,
+        int $options,
+        bool $captureRusage = false,
+        ?array &$resourceUsage = null
+    ): int {
         if (PcntlHostBridge::forkAvailable()) {
-            return PcntlHostBridge::waitpid($pid, $status, $options);
+            return PcntlHostBridge::waitpid($pid, $status, $options, $captureRusage, $resourceUsage);
         }
         if (PcntlLibcThinAbi::processAvailable()) {
-            return PcntlLibcThinAbi::waitpid($pid, $status, $options);
+            $rc = PcntlLibcThinAbi::waitpid($pid, $status, $options);
+            // Thin ABI has waitpid(2) only — Zend fills rusage via wait4; empty on capture matches
+            // the no-child path and keeps arity/named-arg writeback working (#27849).
+            if ($captureRusage) {
+                $resourceUsage = [];
+            }
+
+            return $rc;
         }
 
         throw new \Error('pcntl_waitpid() is not available in this compiler build');

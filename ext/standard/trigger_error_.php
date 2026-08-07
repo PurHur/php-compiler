@@ -27,10 +27,9 @@ final class trigger_error_ extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28690).
+        $this->requireArgCountRange($frame, 'trigger_error', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('trigger_error() requires one or two arguments');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('trigger_error() requires VM context');
         }
@@ -69,10 +68,11 @@ final class trigger_error_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('trigger_error() requires one or two arguments');
+        // Catchable ArgumentCountError (AOT/JIT) — #28690.
+        if (!$this->requireArgCountRangeJit($context, $args, 'trigger_error', 1, 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        $argc = \count($args);
         // Soft-null DEP+coerce on 8.4 (#21480, reverts #21035 TypeError).
         $msgStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'trigger_error', 0, 'message');
         $levelVal = 2 === $argc

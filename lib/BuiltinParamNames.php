@@ -1191,6 +1191,12 @@ final class BuiltinParamNames
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];
             case 'openssl_decrypt':
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad'];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says sealdata/ekeys/pubkeys/method (#28754)
+            case 'openssl_seal':
+                return ['data', 'sealed_data', 'encrypted_keys', 'public_key', 'cipher_algo', 'iv='];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says opendata/ekey/privkey/method (#28754)
+            case 'openssl_open':
+                return ['data', 'output', 'encrypted_key', 'private_key', 'cipher_algo', 'iv='];
             case 'openssl_cms_verify':
                 // php-src ext/openssl/openssl.stub.php (#22368, re-#6592)
                 return [
@@ -1515,6 +1521,9 @@ final class BuiltinParamNames
             // php-src ext/pcntl/pcntl.stub.php — InternalArgInfo still says signo/handle (#24551)
             case 'pcntl_signal':
                 return ['signal', 'handler', 'restart_syscalls'];
+            // php-src ext/pcntl/pcntl.stub.php — InternalArgInfo still pid/options/rusage (#27849)
+            case 'pcntl_waitpid':
+                return ['process_id', '&status', 'flags=', '&resource_usage='];
             // php-src ext/standard/basic_functions.stub.php — long_options=[]; &$rest_index=null (#25144)
             case 'getopt':
                 return ['short_options', 'long_options=', '&rest_index='];

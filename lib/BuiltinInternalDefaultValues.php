@@ -79,6 +79,11 @@ final class BuiltinInternalDefaultValues
             1 => ['kind' => 'int', 'value' => 0],
             2 => ['kind' => 'enum_case', 'class' => 'RoundingMode', 'case' => 'HalfAwayFromZero'],
         ],
+        // php-src ext/bcmath/bcmath.stub.php — RoundingMode::HalfAwayFromZero (#28566)
+        'bcround' => [
+            1 => ['kind' => 'int', 'value' => 0],
+            2 => ['kind' => 'enum_case', 'class' => 'RoundingMode', 'case' => 'HalfAwayFromZero'],
+        ],
         // php-src ext/standard/basic_functions.stub.php — flags=11, encoding=null (#23265)
         'html_entity_decode' => [
             1 => ['kind' => 'int', 'value' => 11],
@@ -265,6 +270,11 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],
         ],
+        // php-src ext/pcntl/pcntl.stub.php — int $flags = 0; &$resource_usage = [] (#27849)
+        'pcntl_waitpid' => [
+            2 => ['kind' => 'int', 'value' => 0],
+            3 => ['kind' => 'array'],
+        ],
         'preg_filter' => [
             3 => ['kind' => 'int', 'value' => -1],
             4 => ['kind' => 'null'],
@@ -305,6 +315,13 @@ final class BuiltinInternalDefaultValues
         // php-src ext/openssl/openssl.stub.php — int $key_length = 0 (#27685)
         'openssl_pkey_derive' => [
             2 => ['kind' => 'int', 'value' => 0],
+        ],
+        // php-src ext/openssl/openssl.stub.php — &$iv = null / ?string $iv = null (#28754)
+        'openssl_seal' => [
+            5 => ['kind' => 'null'],
+        ],
+        'openssl_open' => [
+            5 => ['kind' => 'null'],
         ],
         // php-src ext/intl/grapheme/grapheme.stub.php — ?int $length = null (InternalArgInfo int→0) (#27884)
         'grapheme_substr' => [

@@ -231,6 +231,8 @@ final class BuiltinInternalArgInfo
             'iconv_strlen' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
+            // ext/openssl/openssl.stub.php — InternalArgInfo return int (missing |false) (#28754)
+            'openssl_seal' => 'int|false',
             // ext/openssl/openssl.stub.php — InternalArgInfo omits return (#28368)
             'openssl_error_string' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
@@ -524,6 +526,10 @@ final class BuiltinInternalArgInfo
             'round' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
                 ? 'RoundingMode|int'
                 : null,
+            // ext/bcmath/bcmath.stub.php — RoundingMode $mode = HalfAwayFromZero (#28566)
+            'bcround' => (2 === $index && CompilerVersion::supportsRoundingModeEnum())
+                ? 'RoundingMode'
+                : null,
             // ext/date/php_date.stub.php — ?int $timestamp = null (InternalArgInfo int) (#25440)
             'idate' => 1 === $index ? '?int' : null,
             'getdate' => 0 === $index ? '?int' : null,
@@ -618,6 +624,17 @@ final class BuiltinInternalArgInfo
             'openssl_pkey_derive' => match ($index) {
                 0, 1 => '',
                 2 => 'int',
+                default => null,
+            },
+            // ext/openssl/openssl.stub.php — &$sealed_data/&$encrypted_keys/&$iv untyped; trailing iv (#28754)
+            'openssl_seal' => match ($index) {
+                1, 2, 5 => '',
+                default => null,
+            },
+            // ext/openssl/openssl.stub.php — &$output untyped; ?string $iv = null trailing (#28754)
+            'openssl_open' => match ($index) {
+                1 => '',
+                5 => '?string',
                 default => null,
             },
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo; string $cipher_algo (#27916)
@@ -877,6 +894,11 @@ final class BuiltinInternalArgInfo
                 2 => '',
                 3 => '?string',
                 4, 5 => '?array',
+                default => null,
+            },
+            // ext/pcntl/pcntl.stub.php — &$status / &$resource_usage untyped (InternalArgInfo int/array) (#27849)
+            'pcntl_waitpid' => match ($index) {
+                1, 3 => '',
                 default => null,
             },
             // ext/standard/streamsfuncs.stub.php — ?int $crypto_method = null (#27684)
@@ -1187,6 +1209,10 @@ final class BuiltinInternalArgInfo
             'finfo::__construct' => 1 === $index ? '?string' : null,
             // ext/bcmath/bcmath.stub.php — string|int $num (InternalArgInfo empty) (#24626)
             'bcmath\\number::__construct' => 0 === $index ? 'string|int' : null,
+            // ext/bcmath/bcmath.stub.php — RoundingMode $mode (#28566)
+            'bcmath\\number::round' => (1 === $index && CompilerVersion::supportsRoundingModeEnum())
+                ? 'RoundingMode'
+                : (0 === $index ? 'int' : null),
             // ext/date/php_date.stub.php — untyped UNKNOWN params (InternalArgInfo object/DateInterval/int) (#25164)
             'dateperiod::__construct' => '',
             // ext/date/php_date.stub.php — PHP 8.4+ createFromISO8601String (absent from InternalArgInfo) (#27923)

@@ -252,8 +252,8 @@ final class BuiltinByRefParams
                 // php-src ext/pcntl/pcntl.stub.php — &$status (#19565)
                 return [0];
             case 'pcntl_waitpid':
-                // php-src ext/pcntl/pcntl.stub.php — &$status (#19564)
-                return [1];
+                // php-src ext/pcntl/pcntl.stub.php — &$status, &$resource_usage (#19564, #27849)
+                return [1, 3];
             case 'pcntl_sigprocmask':
                 // &$old_signals
                 return [2];

@@ -14,6 +14,10 @@ use PHPLLVM\Value;
 
 /**
  * openssl_open() — decrypt openssl_seal() output (php-src ext/openssl/openssl.c; #6523).
+ *
+ * Reflection / named args: Zend stub `data`, `&$output`, `string $encrypted_key`, `$private_key`,
+ * `string $cipher_algo`, `?string $iv = null`: `bool` (InternalArgInfo still says opendata/ekey/privkey/method
+ * — see BuiltinParamNames / BuiltinInternalArgInfo; #28754).
  */
 final class openssl_open extends Internal
 {

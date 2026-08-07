@@ -26,9 +26,8 @@ final class putenv_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('putenv() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28690).
+        $this->requireExactArgCount($frame, 'putenv', 1);
         // Soft-null — Zend Z_PARAM_STR DEP+coerce; empty → ValueError (#21312).
         $assignment = VmString::trimFamilyStringArgForFrame($frame, 0, 'putenv', 0, 'assignment');
         $ok = VmEnv::putenv($assignment);
@@ -39,8 +38,9 @@ final class putenv_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('putenv() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28690.
+        if (!$this->requireExactJitArgCount($context, $args, 'putenv', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         // Compile-time "NAME=value" when CTS is trustworthy. Slot-backed concat temps may
         // carry partial CTS like "REQUEST_BODY=" (empty value) after `$body = …; putenv(…)`,

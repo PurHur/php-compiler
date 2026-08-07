@@ -110,8 +110,24 @@ final class PcntlHostBridge
         return (int) \pcntl_fork();
     }
 
-    public static function waitpid(int $pid, int &$status, int $options): int
-    {
+    /**
+     * @param array<string, mixed>|null $resourceUsage
+     */
+    public static function waitpid(
+        int $pid,
+        int &$status,
+        int $options,
+        bool $captureRusage = false,
+        ?array &$resourceUsage = null
+    ): int {
+        if ($captureRusage) {
+            $ru = [];
+            $rc = (int) \pcntl_waitpid($pid, $status, $options, $ru);
+            $resourceUsage = $ru;
+
+            return $rc;
+        }
+
         return (int) \pcntl_waitpid($pid, $status, $options);
     }
 

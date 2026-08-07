@@ -20,9 +20,8 @@ final class ini_get_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('ini_get() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#28690).
+        $this->requireExactArgCount($frame, 'ini_get', 1);
         if (null === $frame->vmContext) {
             return;
         }
@@ -61,8 +60,9 @@ final class ini_get_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('ini_get() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT/JIT) — #28690.
+        if (!$this->requireExactJitArgCount($context, $args, 'ini_get', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         // Compile-time non-string TypeError (int/… on 8.4; null soft-coerces #21312):
         // emit abort without linking IniRuntime (thin AOT lacks full IniJitHelper; #20361).
