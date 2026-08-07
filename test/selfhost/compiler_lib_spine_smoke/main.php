@@ -1760,6 +1760,7 @@ require_once __DIR__.'/../../../ext/memcached/MemcachedClassMethod.php';
 require_once __DIR__.'/../../../ext/memcached/MemcachedConstants.php';
 require_once __DIR__.'/../../../ext/memcached/MemcachedConstruct.php';
 require_once __DIR__.'/../../../ext/memcached/MemcachedDelete.php';
+require_once __DIR__.'/../../../ext/memcached/MemcachedDepthMethods.php';
 require_once __DIR__.'/../../../ext/memcached/MemcachedExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/memcached/MemcachedGet.php';
 require_once __DIR__.'/../../../ext/memcached/MemcachedGetResultCode.php';
