@@ -231,6 +231,8 @@ final class BuiltinInternalArgInfo
             'iconv_strlen' => 'int|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27685)
             'openssl_pkey_derive' => 'string|false',
+            // ext/openssl/openssl.stub.php — InternalArgInfo return int (missing |false) (#28754)
+            'openssl_seal' => 'int|false',
             // ext/openssl/openssl.stub.php — InternalArgInfo omits return (#28368)
             'openssl_error_string' => 'string|false',
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo (#27916)
@@ -618,6 +620,17 @@ final class BuiltinInternalArgInfo
             'openssl_pkey_derive' => match ($index) {
                 0, 1 => '',
                 2 => 'int',
+                default => null,
+            },
+            // ext/openssl/openssl.stub.php — &$sealed_data/&$encrypted_keys/&$iv untyped; trailing iv (#28754)
+            'openssl_seal' => match ($index) {
+                1, 2, 5 => '',
+                default => null,
+            },
+            // ext/openssl/openssl.stub.php — &$output untyped; ?string $iv = null trailing (#28754)
+            'openssl_open' => match ($index) {
+                1 => '',
+                5 => '?string',
                 default => null,
             },
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo; string $cipher_algo (#27916)

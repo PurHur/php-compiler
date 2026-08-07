@@ -1191,6 +1191,12 @@ final class BuiltinParamNames
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];
             case 'openssl_decrypt':
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad'];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says sealdata/ekeys/pubkeys/method (#28754)
+            case 'openssl_seal':
+                return ['data', 'sealed_data', 'encrypted_keys', 'public_key', 'cipher_algo', 'iv='];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says opendata/ekey/privkey/method (#28754)
+            case 'openssl_open':
+                return ['data', 'output', 'encrypted_key', 'private_key', 'cipher_algo', 'iv='];
             case 'openssl_cms_verify':
                 // php-src ext/openssl/openssl.stub.php (#22368, re-#6592)
                 return [
