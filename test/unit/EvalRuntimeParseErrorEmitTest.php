@@ -25,5 +25,8 @@ final class EvalRuntimeParseErrorEmitTest extends TestCase
         // Decl probe must still rethrow non-syntax CompileFatal (#26169).
         $this->assertStringContainsString('isSyntaxParseErrorMessage', $src);
         $this->assertStringContainsString('zendStderrLine', $src);
+        // Cross-eval final property override vs outer Object_ tables (#28437).
+        $this->assertStringContainsString('rejectOuterUnitFinalPropertyOverride', $src);
+        $this->assertStringContainsString('Cannot override final property', $src);
     }
 }
