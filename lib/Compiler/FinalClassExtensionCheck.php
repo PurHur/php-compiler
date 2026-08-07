@@ -42,6 +42,8 @@ final class FinalClassExtensionCheck
         // php-src Zend/zend_weakrefs.stub.php — final class WeakReference / WeakMap (#28390).
         'weakmap' => 'WeakMap',
         'weakreference' => 'WeakReference',
+        // php-src ext/xml/xml.stub.php — final class XMLParser (#28386).
+        'xmlparser' => 'XMLParser',
     ];
 
     /** @var array<string, array{display: string, final: bool, extends: ?string}> */
