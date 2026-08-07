@@ -13,10 +13,11 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * json_decode()/json_validate() $json operand — profile-aware Z_PARAM parity (#21223, #27995).
+ * json_decode()/json_validate() $json operand — Z_PARAM_STR soft-null parity (#21223, #28333).
  *
- * json_decode: Z_PARAM_STR soft-null (DEP+coerce) on 8.4 (#21223). json_validate: Z_PARAM_STRING
- * TypeError on null under PROFILE≥8.4 (ext/json/json.c, #26190).
+ * Both soft-null (DEP+coerce) on 8.4; empty coerced json_validate → false (Zend 8.4.24).
+ * {@see CompilerVersion::jsonValidateStringOperandRequiresStrictType()} stays false (#28333;
+ * reverts inverted #27995/#26190 TypeError claim).
  */
 final class JsonStringOperandArg
 {

@@ -89,6 +89,19 @@ final class json_validate extends Internal
             VmJsonFlags::assertValidateFlags($flags);
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
+        // Null constant: soft-null DEP + coerce to '' then fold (Zend 8.4 / #28333; same as json_decode).
+        if (
+            null === $literal
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            if ($context->callerStrictTypes) {
+                JsonStringOperandArg::jitJson($context, $args[0], 'json_validate');
+
+                return $context->getTypeFromString('int1')->constInt(0, false);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'json_validate', 0, 'json');
+            $literal = '';
+        }
         if (null !== $literal) {
             // Compile-time fold via VmJsonValidate (same depth rules as VM). last_error is not
             // updated at runtime for folded calls — AOT fixtures check the bool; VM/JIT cover
