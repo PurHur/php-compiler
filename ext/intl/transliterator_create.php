@@ -47,6 +47,6 @@ final class transliterator_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('transliterator_create() is not implemented for JIT in this compiler build (issue #6139)');
+        return JitTransliteratorCreate::invoke($context, ...$args);
     }
 }

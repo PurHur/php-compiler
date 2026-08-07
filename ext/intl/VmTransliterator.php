@@ -885,7 +885,7 @@ C;
     }
 }
 
-/** Transliterator::create() — php-src transliterator_create (#6139). */
+/** Transliterator::create() — php-src transliterator_create (#6139, AOT #28657). */
 final class TransliteratorCreate extends VmClassMethod
 {
     public function __construct()
@@ -918,6 +918,11 @@ final class TransliteratorCreate extends VmClassMethod
             return;
         }
         $frame->returnVar->object($object);
+    }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        return JitTransliteratorCreate::invoke($context, ...$args);
     }
 }
 
@@ -1085,7 +1090,7 @@ final class TransliteratorGetErrorMessage extends VmClassMethod
     }
 }
 
-/** Transliterator::transliterate() — php-src transliterator_transliterate (#6139). */
+/** Transliterator::transliterate() — php-src transliterator_transliterate (#6139, AOT #28657). */
 final class TransliteratorTransliterate extends VmClassMethod
 {
     public function __construct()
@@ -1126,5 +1131,10 @@ final class TransliteratorTransliterate extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        return JitTransliteratorTransliterate::invokeMethod($context, ...$args);
     }
 }
