@@ -1456,6 +1456,8 @@ class Context {
         $this->functionProxies['datetimezone::getoffset'] = new Call\DateTimeZoneGetOffset();
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
+        // NumberFormatter::format — avoid ExternalMethod silent NULL on thin AOT (#28648).
+        $this->functionProxies['numberformatter::format'] = new Call\NumberFormatterFormat();
         // finfo::__construct / finfo::file / finfo::buffer — thin AOT MIME sniff (#27196, #28660).
         $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
         $this->functionProxies['finfo::file'] = new Call\FinfoFile();

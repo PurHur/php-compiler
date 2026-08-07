@@ -2250,7 +2250,7 @@ final class NumberFormatterCreate extends VmClassMethod
     }
 }
 
-/** NumberFormatter::format() — php-src numfmt_format (#5154). */
+/** NumberFormatter::format() — php-src numfmt_format (#5154, AOT #28648). */
 final class NumberFormatterFormat extends VmClassMethod
 {
     public function __construct()
@@ -2287,6 +2287,11 @@ final class NumberFormatterFormat extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+
+    public function call(\PHPCompiler\JIT\Context $context, \PHPCompiler\JIT\Variable ...$args): \PHPLLVM\Value
+    {
+        return JitNumberFormatterFormat::invokeMethod($context, ...$args);
     }
 }
 

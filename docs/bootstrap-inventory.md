@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7215 |
-| Phase A inventory files (M2 ratio SSOT) | 7215 |
+| PHP files on vm.php path | 7219 |
+| Phase A inventory files (M2 ratio SSOT) | 7219 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23311 |
+| Source constructs flagged (warnings) | 23317 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1112,6 +1112,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGrapheme.php` | 0 | 4 |
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
+| `ext/intl/JitNumberFormatterFormat.php` | 0 | 3 |
 | `ext/intl/LocaleAcceptFromHttp.php` | 0 | 2 |
 | `ext/intl/LocaleAddLikelySubtags.php` | 0 | 2 |
 | `ext/intl/LocaleCanonicalize.php` | 0 | 3 |
@@ -1141,6 +1142,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
+| `ext/intl/NumberFormatterFormatJitHelper.php` | 0 | 1 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmBreakIterator.php` | 0 | 66 |
 | `ext/intl/VmCollator.php` | 0 | 55 |
@@ -1327,7 +1329,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/normalizer_is_normalized.php` | 0 | 2 |
 | `ext/intl/normalizer_normalize.php` | 0 | 3 |
 | `ext/intl/numfmt_create.php` | 0 | 3 |
-| `ext/intl/numfmt_format.php` | 0 | 3 |
+| `ext/intl/numfmt_format.php` | 0 | 2 |
 | `ext/intl/numfmt_format_currency.php` | 0 | 3 |
 | `ext/intl/numfmt_get_attribute.php` | 0 | 3 |
 | `ext/intl/numfmt_get_error_code.php` | 0 | 3 |
@@ -5480,6 +5482,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/NumberFormatterFormatRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObGzhandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObGzhandlerJitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
@@ -6062,6 +6065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/NestedClosureInvoke.php` | 0 | 2 |
 | `lib/JIT/Call/NestedJitCompileScopeIsActiveTrue.php` | 0 | 1 |
 | `lib/JIT/Call/NoOpConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/NumberFormatterFormat.php` | 0 | 1 |
 | `lib/JIT/Call/ObjectCompareSpaceship.php` | 0 | 1 |
 | `lib/JIT/Call/ObjectNestedReceiver.php` | 0 | 1 |
 | `lib/JIT/Call/ParentIteratorConstruct.php` | 0 | 4 |
@@ -6185,7 +6189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 170 |
+| `lib/JIT/Context.php` | 0 | 171 |
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
@@ -15191,6 +15195,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/intl/JitNumberFormatterFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 47)
+- 3 class method(s)
+
 ### `ext/intl/LocaleAcceptFromHttp.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15356,198 +15367,198 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 83)
-- new locale_get_default (line 97)
-- new locale_set_default (line 98)
-- new locale_get_primary_language (line 99)
-- new locale_get_region (line 100)
-- new locale_get_script (line 101)
-- new locale_lookup (line 102)
-- new locale_filter_matches (line 103)
-- new locale_accept_from_http (line 104)
-- new locale_canonicalize (line 105)
-- new locale_parse (line 106)
-- new locale_compose (line 107)
-- new locale_get_keywords (line 108)
-- new locale_get_display_language (line 109)
-- new locale_get_display_name (line 110)
-- new locale_get_display_region (line 111)
-- new locale_get_display_script (line 112)
-- new locale_get_display_variant (line 113)
-- new locale_get_all_variants (line 114)
-- new locale_is_right_to_left (line 116)
-- new locale_add_likely_subtags (line 117)
-- new locale_minimize_subtags (line 118)
-- new locale_get_display_keyword (line 121)
-- new locale_get_display_keyword_value (line 122)
-- new normalizer_normalize (line 127)
-- new normalizer_is_normalized (line 128)
-- new normalizer_get_raw_decomposition (line 129)
-- new idn_to_ascii (line 133)
-- new idn_to_utf8 (line 133)
-- new collator_create (line 138)
-- new collator_compare (line 139)
-- new collator_sort (line 140)
-- new collator_asort (line 141)
-- new collator_sort_with_sort_keys (line 142)
-- new collator_get_attribute (line 143)
-- new collator_set_attribute (line 144)
-- new collator_get_strength (line 145)
-- new collator_set_strength (line 146)
-- new collator_get_sort_key (line 147)
-- new collator_get_locale (line 148)
-- new collator_get_error_code (line 149)
-- new collator_get_error_message (line 150)
-- new numfmt_create (line 156)
-- new numfmt_format (line 157)
-- new numfmt_parse (line 158)
-- new numfmt_parse_currency (line 159)
-- new numfmt_format_currency (line 160)
-- new numfmt_get_attribute (line 161)
-- new numfmt_set_attribute (line 162)
-- new numfmt_get_symbol (line 163)
-- new numfmt_set_symbol (line 164)
-- new numfmt_get_text_attribute (line 165)
-- new numfmt_set_text_attribute (line 166)
-- new numfmt_get_pattern (line 167)
-- new numfmt_set_pattern (line 168)
-- new numfmt_get_locale (line 169)
-- new numfmt_get_error_code (line 170)
-- new numfmt_get_error_message (line 171)
-- new msgfmt_create (line 177)
-- new msgfmt_format (line 178)
-- new msgfmt_format_message (line 179)
-- new msgfmt_parse (line 180)
-- new msgfmt_parse_message (line 181)
-- new msgfmt_get_locale (line 182)
-- new msgfmt_get_pattern (line 183)
-- new msgfmt_set_pattern (line 184)
-- new msgfmt_get_error_code (line 185)
-- new msgfmt_get_error_message (line 186)
-- new transliterator_create (line 192)
-- new transliterator_create_from_rules (line 193)
-- new transliterator_create_inverse (line 194)
-- new transliterator_list_ids (line 195)
-- new transliterator_transliterate (line 196)
-- new transliterator_get_error_code (line 197)
-- new transliterator_get_error_message (line 198)
-- new resourcebundle_create (line 204)
-- new resourcebundle_get (line 205)
-- new resourcebundle_locales (line 206)
-- new resourcebundle_count (line 207)
-- new resourcebundle_get_error_code (line 208)
-- new resourcebundle_get_error_message (line 209)
-- new datefmt_create (line 215)
-- new datefmt_format (line 216)
-- new datefmt_format_object (line 217)
-- new datefmt_parse (line 218)
-- new datefmt_localtime (line 219)
-- new datefmt_get_error_code (line 220)
-- new datefmt_get_error_message (line 221)
-- new datefmt_get_pattern (line 222)
-- new datefmt_set_pattern (line 223)
-- new datefmt_get_timezone (line 224)
-- new datefmt_set_timezone (line 225)
-- new datefmt_get_locale (line 226)
-- new datefmt_get_datetype (line 227)
-- new datefmt_get_timetype (line 228)
-- new datefmt_is_lenient (line 229)
-- new datefmt_set_lenient (line 230)
-- new datefmt_get_calendar (line 231)
-- new datefmt_set_calendar (line 232)
-- new datefmt_get_timezone_id (line 233)
-- new datefmt_get_calendar_object (line 234)
-- new intlcal_create_instance (line 240)
-- new intlcal_get_now (line 241)
-- new intlcal_from_date_time (line 242)
-- new intlcal_get (line 243)
-- new intlcal_set (line 244)
-- new intlcal_get_type (line 245)
-- new intlcal_add (line 246)
-- new intlcal_roll (line 247)
-- new intlcal_clear (line 248)
-- new intlcal_is_set (line 249)
-- new intlcal_equals (line 250)
-- new intlcal_get_time (line 251)
-- new intlcal_set_time (line 252)
-- new intlcal_get_time_zone (line 253)
-- new intlcal_to_date_time (line 254)
-- new intlcal_field_difference (line 255)
-- new intlcal_before (line 256)
-- new intlcal_after (line 257)
-- new intlcal_set_time_zone (line 258)
-- new intlcal_get_minimum (line 259)
-- new intlcal_get_maximum (line 260)
-- new intlcal_get_available_locales (line 261)
-- new intlcal_is_weekend (line 263)
-- new intlcal_get_actual_minimum (line 264)
-- new intlcal_get_actual_maximum (line 265)
-- new intlcal_get_least_maximum (line 266)
-- new intlcal_get_greatest_minimum (line 267)
-- new intlcal_get_day_of_week_type (line 268)
-- new intlcal_get_weekend_transition (line 269)
-- new intlcal_get_repeated_wall_time_option (line 270)
-- new intlcal_set_repeated_wall_time_option (line 271)
-- new intlcal_get_skipped_wall_time_option (line 272)
-- new intlcal_set_skipped_wall_time_option (line 273)
-- new intlcal_get_error_code (line 274)
-- new intlcal_get_error_message (line 275)
-- new intlcal_get_locale (line 277)
-- new intlcal_is_lenient (line 278)
-- new intlcal_set_lenient (line 279)
-- new intlcal_in_daylight_time (line 280)
-- new intlcal_get_first_day_of_week (line 281)
-- new intlcal_set_first_day_of_week (line 282)
-- new intlcal_get_minimal_days_in_first_week (line 283)
-- new intlcal_set_minimal_days_in_first_week (line 284)
-- new intlcal_get_keyword_values_for_locale (line 285)
-- new intlcal_is_equivalent_to (line 286)
-- new intlgregcal_create_instance (line 289)
-- new intlgregcal_is_leap_year (line 290)
-- new intlgregcal_get_gregorian_change (line 291)
-- new intlgregcal_set_gregorian_change (line 292)
-- new intltz_get_gmt (line 294)
-- new intltz_create_time_zone (line 295)
-- new intltz_create_default (line 296)
-- new intltz_get_id (line 297)
-- new intltz_get_display_name (line 298)
-- new intltz_get_raw_offset (line 299)
-- new intltz_get_dst_savings (line 300)
-- new intltz_from_date_time_zone (line 301)
-- new intltz_to_date_time_zone (line 302)
-- new intltz_get_canonical_id (line 303)
-- new intltz_get_region (line 304)
-- new intltz_count_equivalent_ids (line 307)
-- new intltz_get_equivalent_id (line 308)
-- new intltz_get_windows_id (line 309)
-- new intltz_get_id_for_windows_id (line 310)
-- new intltz_create_enumeration (line 311)
-- new intltz_create_time_zone_id_enumeration (line 312)
-- new intltz_get_unknown (line 313)
-- new intltz_get_tz_data_version (line 314)
-- new intltz_use_daylight_time (line 315)
-- new intltz_has_same_rules (line 316)
-- new intltz_get_error_code (line 317)
-- new intltz_get_error_message (line 318)
-- new intltz_get_offset (line 319)
-- new intltz_get_iana_id (line 324)
-- new grapheme_strlen (line 354)
-- new grapheme_substr (line 355)
-- new grapheme_strpos (line 356)
-- new grapheme_str_contains (line 358)
-- new grapheme_strstr (line 359)
-- new grapheme_stristr (line 360)
-- new grapheme_stripos (line 361)
-- new grapheme_strrpos (line 362)
-- new grapheme_strripos (line 363)
-- new grapheme_extract (line 364)
-- new grapheme_levenshtein (line 366)
-- new grapheme_str_split (line 367)
-- new grapheme_strimwidth (line 368)
-- new intl_get_error_code (line 369)
-- new intl_get_error_message (line 370)
-- new intl_is_failure (line 371)
-- new intl_error_name (line 372)
+- new VM\Variable (line 84)
+- new locale_get_default (line 98)
+- new locale_set_default (line 99)
+- new locale_get_primary_language (line 100)
+- new locale_get_region (line 101)
+- new locale_get_script (line 102)
+- new locale_lookup (line 103)
+- new locale_filter_matches (line 104)
+- new locale_accept_from_http (line 105)
+- new locale_canonicalize (line 106)
+- new locale_parse (line 107)
+- new locale_compose (line 108)
+- new locale_get_keywords (line 109)
+- new locale_get_display_language (line 110)
+- new locale_get_display_name (line 111)
+- new locale_get_display_region (line 112)
+- new locale_get_display_script (line 113)
+- new locale_get_display_variant (line 114)
+- new locale_get_all_variants (line 115)
+- new locale_is_right_to_left (line 117)
+- new locale_add_likely_subtags (line 118)
+- new locale_minimize_subtags (line 119)
+- new locale_get_display_keyword (line 122)
+- new locale_get_display_keyword_value (line 123)
+- new normalizer_normalize (line 128)
+- new normalizer_is_normalized (line 129)
+- new normalizer_get_raw_decomposition (line 130)
+- new idn_to_ascii (line 134)
+- new idn_to_utf8 (line 134)
+- new collator_create (line 139)
+- new collator_compare (line 140)
+- new collator_sort (line 141)
+- new collator_asort (line 142)
+- new collator_sort_with_sort_keys (line 143)
+- new collator_get_attribute (line 144)
+- new collator_set_attribute (line 145)
+- new collator_get_strength (line 146)
+- new collator_set_strength (line 147)
+- new collator_get_sort_key (line 148)
+- new collator_get_locale (line 149)
+- new collator_get_error_code (line 150)
+- new collator_get_error_message (line 151)
+- new numfmt_create (line 157)
+- new numfmt_format (line 158)
+- new numfmt_parse (line 159)
+- new numfmt_parse_currency (line 160)
+- new numfmt_format_currency (line 161)
+- new numfmt_get_attribute (line 162)
+- new numfmt_set_attribute (line 163)
+- new numfmt_get_symbol (line 164)
+- new numfmt_set_symbol (line 165)
+- new numfmt_get_text_attribute (line 166)
+- new numfmt_set_text_attribute (line 167)
+- new numfmt_get_pattern (line 168)
+- new numfmt_set_pattern (line 169)
+- new numfmt_get_locale (line 170)
+- new numfmt_get_error_code (line 171)
+- new numfmt_get_error_message (line 172)
+- new msgfmt_create (line 178)
+- new msgfmt_format (line 179)
+- new msgfmt_format_message (line 180)
+- new msgfmt_parse (line 181)
+- new msgfmt_parse_message (line 182)
+- new msgfmt_get_locale (line 183)
+- new msgfmt_get_pattern (line 184)
+- new msgfmt_set_pattern (line 185)
+- new msgfmt_get_error_code (line 186)
+- new msgfmt_get_error_message (line 187)
+- new transliterator_create (line 193)
+- new transliterator_create_from_rules (line 194)
+- new transliterator_create_inverse (line 195)
+- new transliterator_list_ids (line 196)
+- new transliterator_transliterate (line 197)
+- new transliterator_get_error_code (line 198)
+- new transliterator_get_error_message (line 199)
+- new resourcebundle_create (line 205)
+- new resourcebundle_get (line 206)
+- new resourcebundle_locales (line 207)
+- new resourcebundle_count (line 208)
+- new resourcebundle_get_error_code (line 209)
+- new resourcebundle_get_error_message (line 210)
+- new datefmt_create (line 216)
+- new datefmt_format (line 217)
+- new datefmt_format_object (line 218)
+- new datefmt_parse (line 219)
+- new datefmt_localtime (line 220)
+- new datefmt_get_error_code (line 221)
+- new datefmt_get_error_message (line 222)
+- new datefmt_get_pattern (line 223)
+- new datefmt_set_pattern (line 224)
+- new datefmt_get_timezone (line 225)
+- new datefmt_set_timezone (line 226)
+- new datefmt_get_locale (line 227)
+- new datefmt_get_datetype (line 228)
+- new datefmt_get_timetype (line 229)
+- new datefmt_is_lenient (line 230)
+- new datefmt_set_lenient (line 231)
+- new datefmt_get_calendar (line 232)
+- new datefmt_set_calendar (line 233)
+- new datefmt_get_timezone_id (line 234)
+- new datefmt_get_calendar_object (line 235)
+- new intlcal_create_instance (line 241)
+- new intlcal_get_now (line 242)
+- new intlcal_from_date_time (line 243)
+- new intlcal_get (line 244)
+- new intlcal_set (line 245)
+- new intlcal_get_type (line 246)
+- new intlcal_add (line 247)
+- new intlcal_roll (line 248)
+- new intlcal_clear (line 249)
+- new intlcal_is_set (line 250)
+- new intlcal_equals (line 251)
+- new intlcal_get_time (line 252)
+- new intlcal_set_time (line 253)
+- new intlcal_get_time_zone (line 254)
+- new intlcal_to_date_time (line 255)
+- new intlcal_field_difference (line 256)
+- new intlcal_before (line 257)
+- new intlcal_after (line 258)
+- new intlcal_set_time_zone (line 259)
+- new intlcal_get_minimum (line 260)
+- new intlcal_get_maximum (line 261)
+- new intlcal_get_available_locales (line 262)
+- new intlcal_is_weekend (line 264)
+- new intlcal_get_actual_minimum (line 265)
+- new intlcal_get_actual_maximum (line 266)
+- new intlcal_get_least_maximum (line 267)
+- new intlcal_get_greatest_minimum (line 268)
+- new intlcal_get_day_of_week_type (line 269)
+- new intlcal_get_weekend_transition (line 270)
+- new intlcal_get_repeated_wall_time_option (line 271)
+- new intlcal_set_repeated_wall_time_option (line 272)
+- new intlcal_get_skipped_wall_time_option (line 273)
+- new intlcal_set_skipped_wall_time_option (line 274)
+- new intlcal_get_error_code (line 275)
+- new intlcal_get_error_message (line 276)
+- new intlcal_get_locale (line 278)
+- new intlcal_is_lenient (line 279)
+- new intlcal_set_lenient (line 280)
+- new intlcal_in_daylight_time (line 281)
+- new intlcal_get_first_day_of_week (line 282)
+- new intlcal_set_first_day_of_week (line 283)
+- new intlcal_get_minimal_days_in_first_week (line 284)
+- new intlcal_set_minimal_days_in_first_week (line 285)
+- new intlcal_get_keyword_values_for_locale (line 286)
+- new intlcal_is_equivalent_to (line 287)
+- new intlgregcal_create_instance (line 290)
+- new intlgregcal_is_leap_year (line 291)
+- new intlgregcal_get_gregorian_change (line 292)
+- new intlgregcal_set_gregorian_change (line 293)
+- new intltz_get_gmt (line 295)
+- new intltz_create_time_zone (line 296)
+- new intltz_create_default (line 297)
+- new intltz_get_id (line 298)
+- new intltz_get_display_name (line 299)
+- new intltz_get_raw_offset (line 300)
+- new intltz_get_dst_savings (line 301)
+- new intltz_from_date_time_zone (line 302)
+- new intltz_to_date_time_zone (line 303)
+- new intltz_get_canonical_id (line 304)
+- new intltz_get_region (line 305)
+- new intltz_count_equivalent_ids (line 308)
+- new intltz_get_equivalent_id (line 309)
+- new intltz_get_windows_id (line 310)
+- new intltz_get_id_for_windows_id (line 311)
+- new intltz_create_enumeration (line 312)
+- new intltz_create_time_zone_id_enumeration (line 313)
+- new intltz_get_unknown (line 314)
+- new intltz_get_tz_data_version (line 315)
+- new intltz_use_daylight_time (line 316)
+- new intltz_has_same_rules (line 317)
+- new intltz_get_error_code (line 318)
+- new intltz_get_error_message (line 319)
+- new intltz_get_offset (line 320)
+- new intltz_get_iana_id (line 325)
+- new grapheme_strlen (line 355)
+- new grapheme_substr (line 356)
+- new grapheme_strpos (line 357)
+- new grapheme_str_contains (line 359)
+- new grapheme_strstr (line 360)
+- new grapheme_stristr (line 361)
+- new grapheme_stripos (line 362)
+- new grapheme_strrpos (line 363)
+- new grapheme_strripos (line 364)
+- new grapheme_extract (line 365)
+- new grapheme_levenshtein (line 367)
+- new grapheme_str_split (line 368)
+- new grapheme_strimwidth (line 369)
+- new intl_get_error_code (line 370)
+- new intl_get_error_message (line 371)
+- new intl_is_failure (line 372)
+- new intl_error_name (line 373)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -15566,6 +15577,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 1 class method(s)
+
+### `ext/intl/NumberFormatterFormatJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -16249,35 +16265,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 2229)
 - new ArgumentCountError (line 2265)
 - new Error (line 2273)
-- new ArgumentCountError (line 2305)
-- new Error (line 2313)
-- new ArgumentCountError (line 2342)
-- new Error (line 2350)
-- new ArgumentCountError (line 2405)
-- new Error (line 2413)
-- new ArgumentCountError (line 2466)
-- new Error (line 2474)
-- new ArgumentCountError (line 2506)
-- new Error (line 2514)
-- new ArgumentCountError (line 2538)
-- new Error (line 2546)
-- new ArgumentCountError (line 2574)
-- new Error (line 2582)
-- new ArgumentCountError (line 2606)
-- new Error (line 2614)
-- new ArgumentCountError (line 2642)
-- new Error (line 2650)
-- new ArgumentCountError (line 2674)
-- new Error (line 2682)
-- new ArgumentCountError (line 2709)
-- new Error (line 2717)
-- new ArgumentCountError (line 2740)
-- new Error (line 2748)
-- new ArgumentCountError (line 2775)
-- new Error (line 2783)
-- new ArgumentCountError (line 2804)
-- new Error (line 2812)
-- 76 class method(s)
+- new ArgumentCountError (line 2310)
+- new Error (line 2318)
+- new ArgumentCountError (line 2347)
+- new Error (line 2355)
+- new ArgumentCountError (line 2410)
+- new Error (line 2418)
+- new ArgumentCountError (line 2471)
+- new Error (line 2479)
+- new ArgumentCountError (line 2511)
+- new Error (line 2519)
+- new ArgumentCountError (line 2543)
+- new Error (line 2551)
+- new ArgumentCountError (line 2579)
+- new Error (line 2587)
+- new ArgumentCountError (line 2611)
+- new Error (line 2619)
+- new ArgumentCountError (line 2647)
+- new Error (line 2655)
+- new ArgumentCountError (line 2679)
+- new Error (line 2687)
+- new ArgumentCountError (line 2714)
+- new Error (line 2722)
+- new ArgumentCountError (line 2745)
+- new Error (line 2753)
+- new ArgumentCountError (line 2780)
+- new Error (line 2788)
+- new ArgumentCountError (line 2809)
+- new Error (line 2817)
+- 77 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
 
@@ -17601,7 +17617,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
-- new Error (line 60)
 - 2 class method(s)
 
 ### `ext/intl/numfmt_format_currency.php`
@@ -44777,7 +44792,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1341)
+- new InternalArgInfo (line 1348)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44793,8 +44808,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2309)
-- new ArgumentCountError (line 2320)
+- new ArgumentCountError (line 2312)
+- new ArgumentCountError (line 2323)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -47788,6 +47803,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/Builtin/NumberFormatterFormatRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ObGzhandler.php`
 
@@ -50878,6 +50898,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/NumberFormatterFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/ObjectCompareSpaceship.php`
 
 **Warnings** (review for bootstrap subset):
@@ -51741,27 +51766,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DateTimeZoneGetTransitions (line 1452)
 - new Call\DateTimeZoneGetName (line 1454)
 - new Call\DateTimeZoneGetOffset (line 1456)
-- new Call\FinfoConstruct (line 1460)
-- new Call\FinfoFile (line 1461)
-- new Call\FinfoBuffer (line 1462)
-- new Call\PdoConstruct (line 1464)
-- new Call\PdoGetAvailableDrivers (line 1465)
-- new Call\PdoQuote (line 1466)
-- new Call\DomXmlDocumentCreateFromString (line 1469)
-- new Call\DomHtmlDocumentCreateFromString (line 1470)
-- new Result (line 1847)
-- new Result (line 1869)
-- new Variable (line 2547)
-- new Variable (line 2719)
-- new Variable (line 2987)
-- new Variable (line 3045)
-- new VMVariable (line 3207)
-- new VMVariable (line 3223)
-- new VMVariable (line 3229)
-- new VMVariable (line 3235)
-- new VMVariable (line 3246)
-- new Variable (line 3276)
-- new Variable (line 3321)
+- new Call\NumberFormatterFormat (line 1460)
+- new Call\FinfoConstruct (line 1462)
+- new Call\FinfoFile (line 1463)
+- new Call\FinfoBuffer (line 1464)
+- new Call\PdoConstruct (line 1466)
+- new Call\PdoGetAvailableDrivers (line 1467)
+- new Call\PdoQuote (line 1468)
+- new Call\DomXmlDocumentCreateFromString (line 1471)
+- new Call\DomHtmlDocumentCreateFromString (line 1472)
+- new Result (line 1849)
+- new Result (line 1871)
+- new Variable (line 2549)
+- new Variable (line 2721)
+- new Variable (line 2989)
+- new Variable (line 3047)
+- new VMVariable (line 3209)
+- new VMVariable (line 3225)
+- new VMVariable (line 3231)
+- new VMVariable (line 3237)
+- new VMVariable (line 3248)
+- new Variable (line 3278)
+- new Variable (line 3323)
 - 111 class method(s)
 - 32 closure(s)
 

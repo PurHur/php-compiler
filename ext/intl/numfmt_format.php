@@ -57,7 +57,7 @@ final class numfmt_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('numfmt_format() is not implemented for JIT in this compiler build (issue #20754)');
+        return JitNumberFormatterFormat::invokeProcedural($context, ...$args);
     }
 }
 
