@@ -13,7 +13,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * stream_context_set_options() — batch merge stream wrapper options (PHP 8.4; ext/standard/streams.c).
+ * stream_context_set_options() — batch merge stream wrapper options (PHP 8.3+; ext/standard/streams.c).
+ *
+ * Wrong argc → ArgumentCountError (#28680; peer #28682).
  */
 final class stream_context_set_options extends Internal
 {
@@ -24,11 +26,8 @@ final class stream_context_set_options extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException(
-                'stream_context_set_options() requires exactly two arguments in this compiler build'
-            );
-        }
+        // php-src ext/standard/streamsfuncs.c — ArgumentCountError (#28680).
+        $this->requireExactArgCount($frame, 'stream_context_set_options', 2);
         $ok = VmStreamContext::setOptions($frame->calledArgs[0], $frame->calledArgs[1]);
         BuiltinExecute::writeReturn(
             $frame,
@@ -38,6 +37,11 @@ final class stream_context_set_options extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        // Catchable ArgumentCountError (AOT/JIT) — peer #28682 / #28680.
+        if (!$this->requireExactJitArgCount($context, $args, 'stream_context_set_options', 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
+
         return JitStreamContextSetOptions::invoke($context, ...$args);
     }
 }
