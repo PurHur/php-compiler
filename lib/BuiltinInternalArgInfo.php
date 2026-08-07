@@ -760,8 +760,8 @@ final class BuiltinInternalArgInfo
             'substr_count' => 3 === $index ? '?int' : null,
             // ext/standard/string.stub.php — ?string $delimiter = null (InternalArgInfo string, OPT no default) (#25472)
             'preg_quote' => 1 === $index ? '?string' : null,
-            // ext/standard/basic_functions.stub.php — ?string $encoding = null (InternalArgInfo string) (#24970)
-            'htmlentities', 'htmlspecialchars' => 2 === $index ? '?string' : null,
+            // ext/standard/basic_functions.stub.php — ?string $encoding = null (InternalArgInfo string) (#24970, #23265)
+            'htmlentities', 'htmlspecialchars', 'html_entity_decode' => 2 === $index ? '?string' : null,
             // ext/fileinfo/fileinfo.stub.php — finfo object + string (InternalArgInfo resource/char) (#25471)
             'finfo_open' => 1 === $index ? '?string' : null,
             'finfo_file', 'finfo_buffer' => match ($index) {

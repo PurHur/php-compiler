@@ -89,6 +89,41 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertTrue($double->toBool());
     }
 
+    /** @covers issue #23265 */
+    public function testHtmlDecodeZendStubFlagsNamedParams(): void
+    {
+        $decode = BuiltinParamNames::forFunction('htmlspecialchars_decode');
+        self::assertSame(['string', 'flags='], $decode);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($decode, 'flags', 'htmlspecialchars_decode'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($decode, 'quote_style', 'htmlspecialchars_decode'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('htmlspecialchars_decode'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('htmlspecialchars_decode'));
+
+        $entity = BuiltinParamNames::forFunction('html_entity_decode');
+        self::assertSame(['string', 'flags=', 'encoding='], $entity);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($entity, 'flags', 'html_entity_decode'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($entity, 'encoding', 'html_entity_decode'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($entity, 'quote_style', 'html_entity_decode'));
+        self::assertSame('?string', BuiltinInternalArgInfo::stubParamTypeOverride('html_entity_decode', 2));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('html_entity_decode'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('html_entity_decode'));
+
+        $infoFlags = ['name' => 'flags', 'type' => 'int', 'isOptional' => true];
+        $infoEncoding = ['name' => 'encoding', 'type' => '?string', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('htmlspecialchars_decode', 1, $infoFlags, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('html_entity_decode', 1, $infoFlags, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('html_entity_decode', 2, $infoEncoding, false));
+        $flags = new Variable();
+        $encoding = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($flags, 'htmlspecialchars_decode', 1, $infoFlags));
+        self::assertSame(11, $flags->toInt());
+        $flags2 = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($flags2, 'html_entity_decode', 1, $infoFlags));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($encoding, 'html_entity_decode', 2, $infoEncoding));
+        self::assertSame(11, $flags2->toInt());
+        self::assertSame(Variable::TYPE_NULL, $encoding->type);
+    }
+
     public function testLevenshteinNamedCostParamsResolve(): void
     {
         $names = BuiltinParamNames::forFunction('levenshtein');
