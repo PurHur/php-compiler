@@ -205,51 +205,31 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testGetObjectIdCallableAndAdvertisedOnForwardProfile83(): void
+    public function testGetObjectIdAbsentOnForwardProfiles(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsGetObjectId());
-            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
-            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('get_object_id'));
+        foreach (['8.3', '8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(CompilerVersion::supportsGetObjectId(), $profile);
+            $this->assertFalse(CompilerVersion::advertisesGetObjectId(), $profile);
+            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('get_object_id'), $profile);
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            $this->assertTrue(isset($ctx->functions['get_object_id']));
-            $this->assertTrue(
-                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_object_id')
+            $this->assertFalse(isset($ctx->functions['get_object_id']), $profile);
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_object_id'),
+                $profile
             );
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'spl_object_id'),
+                $profile
+            );
         }
-    }
-
-    public function testGetObjectIdCallableAndAdvertisedOnForwardProfile84(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsGetObjectId());
-            $this->assertTrue(CompilerVersion::advertisesGetObjectId());
-            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('get_object_id'));
-
-            $runtime = new Runtime();
-            $ctx = $runtime->vmContext;
-            $this->assertTrue(isset($ctx->functions['get_object_id']));
-            $this->assertTrue(
-                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'get_object_id')
-            );
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 

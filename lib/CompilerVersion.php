@@ -477,47 +477,21 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ get_object_id() (ext/standard/basic_functions.c, issue #3537, #17564).
+     * get_object_id() — absent from php-src (spl_object_id() / spl_object_hash() only;
+     * ext/spl/spl.stub.php / basic_functions.stub.php).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.3/8.4/8.5).
+     * Forward-profile enable (#17564/#17607) retired by #28405 (re-#3537).
      */
     public static function supportsGetObjectId(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
-    /**
-     * get_object_id() visible to function_exists() — stable runtime or forward 8.3+ (#17564, #17607).
-     *
-     * Callable under forward profile via {@see supportsGetObjectId()}; withheld from introspection on
-     * 8.4.0-dev reference harness like Zend 8.2.
-     */
+    /** get_object_id() visible to function_exists() — never (php-src absent, #28405). */
     public static function advertisesGetObjectId(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /**
