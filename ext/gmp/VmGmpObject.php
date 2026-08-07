@@ -31,6 +31,11 @@ final class VmGmpObject
 
         $entry = new ClassEntry('GMP');
         $entry->isInternal = true;
+        // php-src 8.4+ `final class GMP` (ext/gmp/gmp.stub.php; #28135). Pre-8.4 host
+        // advertisement keeps subclassable ClassEntry when profile < 8.4.
+        if (\PHPCompiler\CompilerVersion::supportsGmp()) {
+            $entry->isFinal = true;
+        }
         $entry->properties[] = new ClassProperty(VmGmp::PROP_VALUE, null, $strProto, true);
 
         $entry->methods['__tostring'] = new GmpToString();

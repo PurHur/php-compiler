@@ -13245,10 +13245,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 29)
 - new ClassEntry (line 32)
-- new ClassProperty (line 34)
-- new GmpToString (line 36)
-- new ObjectEntry (line 48)
-- new Variable (line 50)
+- new ClassProperty (line 39)
+- new GmpToString (line 41)
+- new ObjectEntry (line 53)
+- new Variable (line 55)
 - 13 class method(s)
 
 ### `ext/gmp/gmp_abs.php`
@@ -44515,7 +44515,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1234)
+- new InternalArgInfo (line 1238)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -47832,7 +47832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ReflectionClassIsFinalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/ReflectionClassIsIterateableRuntime.php`
 
