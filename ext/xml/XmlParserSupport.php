@@ -30,6 +30,8 @@ final class XmlParserSupport
 
         $entry = new ClassEntry(self::CLASS_NAME);
         $entry->isInternal = true;
+        // php-src ext/xml/xml.stub.php — `final class XMLParser` (PHP 8+; #28386).
+        $entry->isFinal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

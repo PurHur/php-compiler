@@ -303,6 +303,36 @@ PHP;
         $this->assertSame("true\ntrue\n", ob_get_clean());
     }
 
+    /** @covers issue #28386 — php-src ext/xml/xml.stub.php final class XMLParser */
+    public function testExtendXmlParserFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadXmlParser extends XMLParser {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadXmlParser cannot extend final class XMLParser');
+        $runtime->parseAndCompile($code, 'extend_xmlparser.php');
+    }
+
+    /** @covers issue #28386 */
+    public function testXmlParserReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+xml_parser_create();
+var_export((new ReflectionClass(XMLParser::class))->isFinal());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xmlparser_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\n", ob_get_clean());
+    }
+
     /** @covers issue #28390 — php-src Zend/zend_weakrefs.stub.php final class WeakReference */
     public function testExtendWeakReferenceFailsAtCompileTime(): void
     {

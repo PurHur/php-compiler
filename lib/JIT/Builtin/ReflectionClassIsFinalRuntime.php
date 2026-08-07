@@ -17,7 +17,8 @@ use PHPLLVM\Value;
  * link time; matches FinalClassExtensionCheck::INTERNAL_FINAL + profile-gated GMP
  * (+ Fiber/FiberError from zend_fibers.stub.php; #28389;
  * Socket/AddressInfo from sockets.stub.php; #28391;
- * InflateContext/DeflateContext from zlib.stub.php; #28385).
+ * InflateContext/DeflateContext from zlib.stub.php; #28385;
+ * XMLParser from ext/xml/xml.stub.php; #28386).
  */
 final class ReflectionClassIsFinalRuntime
 {
@@ -130,6 +131,8 @@ final class ReflectionClassIsFinalRuntime
             'Generator',
             'InflateContext',
             'Socket',
+            // php-src ext/xml/xml.stub.php — final class XMLParser (#28386)
+            'XMLParser',
         ];
         // php-src 8.4+ final class GMP (ext/gmp/gmp.stub.php; #28135)
         if (CompilerVersion::supportsGmp()) {
