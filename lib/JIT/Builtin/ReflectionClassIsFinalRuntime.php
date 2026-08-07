@@ -19,7 +19,9 @@ use PHPLLVM\Value;
  * Socket/AddressInfo from sockets.stub.php; #28391;
  * InflateContext/DeflateContext from zlib.stub.php; #28385;
  * Random\\Randomizer + Engine\\* from random.stub.php; #28387;
- * XMLParser from ext/xml/xml.stub.php; #28386).
+ * XMLParser from ext/xml/xml.stub.php; #28386;
+ * AllowDynamicProperties/ReturnTypeWillChange/SensitiveParameter/Override/Deprecated
+ * from Zend/zend_attributes.stub.php; #28402).
  */
 final class ReflectionClassIsFinalRuntime
 {
@@ -124,6 +126,7 @@ final class ReflectionClassIsFinalRuntime
     {
         $names = [
             'AddressInfo',
+            'AllowDynamicProperties',
             'Attribute',
             'Closure',
             'DeflateContext',
@@ -136,6 +139,8 @@ final class ReflectionClassIsFinalRuntime
             'Random\\Engine\\Secure',
             'Random\\Engine\\Xoshiro256StarStar',
             'Random\\Randomizer',
+            'ReturnTypeWillChange',
+            'SensitiveParameter',
             'Socket',
             // php-src ext/xml/xml.stub.php — final class XMLParser (#28386)
             'XMLParser',
@@ -143,6 +148,16 @@ final class ReflectionClassIsFinalRuntime
         // php-src 8.4+ final class GMP (ext/gmp/gmp.stub.php; #28135)
         if (CompilerVersion::supportsGmp()) {
             $names[] = 'GMP';
+        }
+        // php-src Zend/zend_attributes.stub.php — profile-gated finals (#28402)
+        if (CompilerVersion::advertisesOverrideAttributeClass()) {
+            $names[] = 'Override';
+        }
+        if (CompilerVersion::advertisesDeprecatedAttributeClass()) {
+            $names[] = 'Deprecated';
+        }
+        if (CompilerVersion::advertisesNoDiscardAttributeClass()) {
+            $names[] = 'NoDiscard';
         }
 
         return $names;
