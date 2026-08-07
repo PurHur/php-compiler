@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\GethostnameJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** gethostname() JIT: always GethostnameJitHelper via JitVmHelperLink — no thin libc fork (#21166). */
+/** gethostname() JIT: VmHostPure SSOT + /proc NestedJIT leaf — no libc gethostname(2) (#21166, #28544). */
 final class GethostnameRuntimeShrinkTest extends TestCase
 {
     public function testJitGethostnameUsesPhpBridgeNotLibc(): void
@@ -32,6 +32,30 @@ final class GethostnameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString("lookupFunction('gethostname')", $source);
         $this->assertStringNotContainsString('LibcExtern', $source);
+    }
+
+    public function testKernelUsesProcHostnameNotLibcGethostname(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitGethostnameKernel.php');
+        $this->assertStringContainsString('/proc/sys/kernel/hostname', $source);
+        $this->assertStringContainsString('/etc/hostname', $source);
+        $this->assertStringContainsString("lookupFunction('open')", $source);
+        $this->assertStringContainsString("lookupFunction('read')", $source);
+        $this->assertStringNotContainsString("lookupFunction('gethostname')", $source);
+        $this->assertStringContainsString('VmHostPure', $source);
+    }
+
+    public function testKernelExecuteUsesVmHostPure(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_gethostname_kernel.php');
+        $this->assertStringContainsString('VmHostPure::gethostname', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\gethostname\\s*\\(/', $source);
+    }
+
+    public function testLibcExternNoLongerDeclaresGethostname(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
+        $this->assertStringNotContainsString("'gethostname' =>", $source);
     }
 
     public function testGethostnameJitHelperDelegatesToKernel(): void
