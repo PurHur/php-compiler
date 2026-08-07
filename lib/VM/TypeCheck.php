@@ -681,11 +681,16 @@ final class TypeCheck
             throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, $expected, $returnCallableName);
         }
         if ($strict) {
-            if (!self::isExactType($value, $constraint)) {
-                throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, null, $returnCallableName);
+            if (self::isExactType($value, $constraint)) {
+                return;
+            }
+            // Zend zend_verify_scalar_type_hint: int→float widening is allowed under
+            // strict_types (params, returns, typed properties) — #28615.
+            if (self::widenStrictIntToFloat($target, $constraint, $value)) {
+                return;
             }
 
-            return;
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, null, $returnCallableName);
         }
         if (self::isExactType($value, $constraint)) {
             return;
@@ -705,8 +710,13 @@ final class TypeCheck
         if (null !== $literalBoolType) {
             return self::matchesLiteralBool($value, $literalBoolType);
         }
+        $resolved = $value->resolveIndirect();
+        if (self::isExactType($resolved, $constraint)) {
+            return true;
+        }
 
-        return self::isExactType($value->resolveIndirect(), $constraint);
+        // Call-site strict check: int is accepted for float (widened at ARG_RECV) — #28615.
+        return Variable::TYPE_FLOAT === $constraint && Variable::TYPE_INTEGER === $resolved->type;
     }
 
     /**
@@ -837,6 +847,21 @@ final class TypeCheck
     private static function isExactType(Variable $value, int $constraint): bool
     {
         return $value->type === $constraint;
+    }
+
+    /**
+     * Under strict_types, Zend still widens int→float (zend_execute.h / zend_types.h, #28615).
+     *
+     * @return bool true when the slot was widened in place
+     */
+    private static function widenStrictIntToFloat(Variable $dest, int $constraint, Variable $value): bool
+    {
+        if (Variable::TYPE_FLOAT !== $constraint || Variable::TYPE_INTEGER !== $value->type) {
+            return false;
+        }
+        $dest->float((float) $value->toInt());
+
+        return true;
     }
 
     private static function matchesLiteralBool(Variable $value, string $literal): bool

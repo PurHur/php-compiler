@@ -44,6 +44,23 @@ final class ScalarReturnCheck
         $expectedLabel = self::expectedLabel($constraint, $block->returnLiteralBoolType);
         $givenLabel = self::givenLabel($return);
         if ($block->strictTypes) {
+            // Zend zend_verify_return_type: int→float widening under strict_types (#28615).
+            if (
+                Variable::TYPE_NATIVE_DOUBLE === $expectedJit
+                && Variable::TYPE_NATIVE_LONG === $return->type
+            ) {
+                $return = new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_DOUBLE,
+                    Variable::KIND_VALUE,
+                    $context->builder->siToFp(
+                        $context->helper->loadValue($return),
+                        $context->getTypeFromString('double')
+                    )
+                );
+
+                return true;
+            }
             self::raiseReturnTypeError($context, $callableName, $expectedLabel, $givenLabel);
 
             return false;
