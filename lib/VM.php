@@ -8689,9 +8689,7 @@ restart:
                         $value = $this->materializeArrayElementForStorage(
                             $this->resolveOutgoingCallArgValue($frame, $op->arg2)
                         );
-                        if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
-                            throw new \TypeError('Illegal offset type');
-                        }
+                        // Array-literal keys share assignment's typed TypeError (#28628 / zend_illegal_container_offset).
                         VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
                         if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
                             VM\HashTable::warnFloatKeyWriteIfNeeded($key, $this->context, $frame);
@@ -8708,7 +8706,7 @@ restart:
                         } elseif ($key->is(Variable::TYPE_NULL)) {
                             $ht->update('', $value);
                         } else {
-                            throw new \TypeError('Illegal offset type');
+                            throw new \TypeError(VM\EnumCaseSupport::illegalArrayOffsetMessage($key));
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
@@ -20817,9 +20815,7 @@ restart:
                 }
                 $key = $this->resolveOutgoingCallArgValue($frame, $op->arg3)->resolveIndirect();
                 $value = $this->resolveOutgoingCallArgValue($frame, $op->arg2);
-                if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
-                    throw new \TypeError('Illegal offset type');
-                }
+                // Class-body array defaults: same typed offset TypeError as runtime literals (#28628).
                 VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
                 $storeIndirect = $value->isIndirect();
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
@@ -20844,7 +20840,7 @@ restart:
                         ? $ht->updateIndirect('', $value)
                         : $ht->update('', $value);
                 } else {
-                    throw new \TypeError('Illegal offset type');
+                    throw new \TypeError(VM\EnumCaseSupport::illegalArrayOffsetMessage($key));
                 }
                 break;
             case OpCode::TYPE_ARRAY_SPREAD:
