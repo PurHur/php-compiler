@@ -1465,6 +1465,9 @@ class Context {
         // MessageFormatter::__construct / format — avoid ExternalMethod silent NULL on thin AOT (#28655).
         $this->functionProxies['messageformatter::__construct'] = new Call\MessageFormatterConstruct();
         $this->functionProxies['messageformatter::format'] = new Call\MessageFormatterFormat();
+        // Transliterator::create / transliterate — avoid ExternalMethod silent NULL on thin AOT (#28657).
+        $this->functionProxies['transliterator::create'] = new Call\TransliteratorCreate();
+        $this->functionProxies['transliterator::transliterate'] = new Call\TransliteratorTransliterate();
         // finfo::__construct / finfo::file / finfo::buffer — thin AOT MIME sniff (#27196, #28660).
         $this->functionProxies['finfo::__construct'] = new Call\FinfoConstruct();
         $this->functionProxies['finfo::file'] = new Call\FinfoFile();
