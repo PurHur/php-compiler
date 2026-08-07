@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** array_last() — last element value (php-src array.c, #3491). */
+/**
+ * array_last() — last element value (php-src array.c, #3491).
+ *
+ * Excess argc → ArgumentCountError (#28682; peer #28679 / #28691).
+ */
 final class array_last extends Internal
 {
     public function __construct()
@@ -20,9 +24,8 @@ final class array_last extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_last() requires exactly one argument');
-        }
+        // php-src ext/standard/array.c — ArgumentCountError (#28682).
+        $this->requireExactArgCount($frame, 'array_last', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -38,8 +41,9 @@ final class array_last extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_last() requires exactly one argument');
+        // Catchable ArgumentCountError (AOT) — peer #28228 / #28682.
+        if (!$this->requireExactJitArgCount($context, $args, 'array_last', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
 
         return JitArrayElem::last($context, $args[0]);
