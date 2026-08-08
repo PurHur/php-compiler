@@ -20,12 +20,13 @@ final class VmCsv
         string $enclosure = '"',
         string $escape = '\\',
     ): array {
-        // php-src ext/standard/file.c — zero-length line is one NULL field (#4922).
+        // php-src php_fgetcsv / str_getcsv — strip trailing record terminators before
+        // parsing so the last field does not keep LF/CRLF (#28994). Matches fgetcsvNative
+        // rtrim and leaves quoted embedded newlines intact.
+        $line = \rtrim($line, "\r\n");
+        // php-src ext/standard/file.c — zero-length / terminator-only → one NULL field
+        // (#4922, #10623).
         if ('' === $line) {
-            return [null];
-        }
-        // php-src ext/standard/file.c — line-terminator-only rows yield one NULL field (#10623).
-        if (self::isLineTerminatorOnly($line)) {
             return [null];
         }
 
@@ -128,23 +129,6 @@ final class VmCsv
     private static function isCsvWhitespace(string $byte): bool
     {
         return ' ' === $byte || "\t" === $byte || "\n" === $byte || "\r" === $byte || "\v" === $byte || "\f" === $byte;
-    }
-
-    /** @return bool true when every byte is \\r or \\n (non-empty). */
-    private static function isLineTerminatorOnly(string $line): bool
-    {
-        $len = \strlen($line);
-        if (0 === $len) {
-            return false;
-        }
-        for ($i = 0; $i < $len; ++$i) {
-            $c = $line[$i];
-            if ("\n" !== $c && "\r" !== $c) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /**

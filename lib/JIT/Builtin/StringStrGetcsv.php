@@ -135,13 +135,32 @@ final class StringStrGetcsv
         $context->builder->returnValue(self::allocNullRowHashtable($context));
 
         $context->builder->positionAtEnd($parseBb);
+        // php-src / fgetcsv bridge — strip trailing CR/LF before NestedJIT parse (#28994).
+        // Helper also strips (VmCsv parity for host/JIT); double-strip is a no-op.
+        $strippedRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::STRIP_LINE_HELPER),
+            [$inputSep]
+        );
+        $stripped = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strippedRaw);
+        $strippedSep = $context->builder->call($context->lookupFunction('__string__separate'), $stripped);
+        $stripLen = $context->builder->load($context->builder->structGep($strippedSep, $map['length']));
+        $stripZero = $context->builder->icmp(Builder::INT_EQ, $stripLen, $sizeT->constInt(0, false));
+        $stripZeroBb = $fn->appendBasicBlock('str_getcsv_bridge_strip_zero');
+        $stripParseBb = $fn->appendBasicBlock('str_getcsv_bridge_strip_parse');
+        $context->builder->branchIf($stripZero, $stripZeroBb, $stripParseBb);
+
+        $context->builder->positionAtEnd($stripZeroBb);
+        $context->builder->returnValue(self::allocNullRowHashtable($context));
+
+        $context->builder->positionAtEnd($stripParseBb);
         $sepSep = self::coerceOptionalCsvString($context, $separator, ',');
         $encSep = self::coerceOptionalCsvString($context, $enclosure, '"');
         $escSep = self::coerceOptionalCsvString($context, $escape, '\\');
         $htRaw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::STR_GETCSV_HELPER),
-            [$inputSep, $sepSep, $encSep, $escSep]
+            [$strippedSep, $sepSep, $encSep, $escSep]
         );
         $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         // Line-terminator-only rows: helper returns [] → synthesize [null] (#27069 / #10623).
