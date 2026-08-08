@@ -7,7 +7,7 @@ $checks = [
     'post_max_size' => '8M',
     'allow_url_fopen' => '1',
     'engine' => '1',
-    'zend.assertions' => '-1',
+    'zend.assertions' => '1',
     'zend.enable_gc' => '1',
     'zend.exception_ignore_args' => '1',
 ];

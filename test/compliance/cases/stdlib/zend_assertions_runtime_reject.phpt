@@ -1,5 +1,7 @@
 --TEST--
 zend.assertions runtime ini_set from -1 rejected like Zend (#24396, Zend/zend.c OnUpdateAssertions)
+--INI--
+zend.assertions=-1
 --FILE--
 <?php
 error_reporting(E_ALL);
