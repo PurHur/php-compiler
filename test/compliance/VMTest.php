@@ -269,7 +269,8 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'array_all'))
                 && !str_contains($name, 'php84_array_search_phantom')
                 && !str_contains($name, 'array_any_key_forward_84')
-                && !str_contains($name, 'array_any_all_key_phantom')) {
+                && !str_contains($name, 'array_any_all_key_phantom')
+                && !str_contains($name, 'array_find_byref_callback_warning_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsPhp84ArraySearchFunctions()

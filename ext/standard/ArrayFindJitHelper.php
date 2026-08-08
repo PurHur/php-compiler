@@ -63,6 +63,8 @@ final class ArrayFindJitHelper
                 // Temporary slots unbound under NestedJIT (#26824).
                 $arg0 = $keyFirst ? $keyVar : $item;
                 $arg1 = $keyFirst ? $item : $keyVar;
+                // Zend zend_call_function by-ref mismatch Warning (#28928).
+                VmCallable::warnPhpFuncByRefValueArgs($ctx, null, $userFn, [$arg0, $arg1]);
 
                 return VmUserCall::invokeTwo($ctx, $userFn, $arg0, $arg1);
             };
@@ -102,6 +104,8 @@ final class ArrayFindJitHelper
             // Temporary slots unbound under NestedJIT (#26824).
             $arg0 = $keyFirst ? $keyVar : $item;
             $arg1 = $keyFirst ? $item : $keyVar;
+            // Zend zend_call_function by-ref mismatch Warning (#28928).
+            VmCallable::warnPhpFuncByRefValueArgs($ctx, null, $closureState->func, [$arg0, $arg1]);
 
             return VmClosureCall::invoke($ctx, $closureState, $arg0, $arg1);
         };
