@@ -2041,6 +2041,15 @@ restart:
         if ($self->type === self::TYPE_ARRAY || $other->type === self::TYPE_ARRAY) {
             return false;
         }
+        // Zend compare_function: plain object == number → Notice + legacy 1 (#29122).
+        if (
+            (self::TYPE_OBJECT === $self->type
+                && (self::TYPE_INTEGER === $other->type || self::TYPE_FLOAT === $other->type))
+            || (self::TYPE_OBJECT === $other->type
+                && (self::TYPE_INTEGER === $self->type || self::TYPE_FLOAT === $self->type))
+        ) {
+            return 0 === CompareUnlikeHelper::zendUnlikeValueSpaceship($self, $other, $vm);
+        }
         try {
             return $self->toNumeric() == $other->toNumeric();
         } catch (\LogicException|\TypeError) {
