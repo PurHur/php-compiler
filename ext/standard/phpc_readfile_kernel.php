@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * @internal libc open/read/write(stdout) kernel for ReadfileJitHelper (#19966).
  *
  * Avoids recursing through readfile()/fopen() when the helper TU is compiled
- * into user-script AOT (same shape as {@see phpc_rename_kernel}).
+ * into user-script AOT (same shape as NestedJIT FS leaves / {@see StringRename}).
  */
 final class phpc_readfile_kernel extends Internal
 {

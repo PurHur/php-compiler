@@ -37,7 +37,7 @@ final class VmFsPathPureRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RenameJitHelper.php');
         $this->assertStringContainsString('phpc_rename_kernel', $source);
         $this->assertStringContainsString('VmStatCache::invalidatePath', $source);
-        $this->assertStringNotContainsString('VmFs::rename(', $source);
+        $this->assertStringNotContainsString('VmFsPathPure::rename', $source);
         $this->assertStringNotContainsString('return VmFs::rename', $source);
     }
 

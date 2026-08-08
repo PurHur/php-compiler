@@ -17,7 +17,7 @@ use PHPLLVM\Value;
  * @internal libc fopen/fwrite kernel for FilePutContentsJitHelper (#19966).
  *
  * Avoids recursing through file_put_contents() when the helper TU is compiled
- * into user-script AOT (same shape as {@see phpc_rename_kernel}).
+ * into user-script AOT (NestedJIT FS leaf peer {@see \PHPCompiler\JIT\Builtin\StringRename}).
  */
 final class phpc_file_put_contents_kernel extends Internal
 {

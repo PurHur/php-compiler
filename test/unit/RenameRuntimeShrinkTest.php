@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\RenameJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** rename() JIT: always RenameJitHelper via JitVmHelperLink — no thin libc fork (#15533, #20603). */
+/** rename() JIT: RenameJitHelper + StringRename leaf — no JitRenameKernel / LibcExtern rename (#29090). */
 final class RenameRuntimeShrinkTest extends TestCase
 {
     public function testJitRenameUsesPhpBridgeNotLibc(): void
@@ -24,23 +24,22 @@ final class RenameRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('RenameJitHelper', $source);
-        $this->assertStringContainsString('JitRenameKernel::invoke', $source);
+        $this->assertStringContainsString('invokeNestedLeaf', $source);
+        $this->assertStringContainsString('__compiler_rename', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('JitRenameKernel', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementLibcBody', $source);
-        $this->assertStringNotContainsString('VmActiveContextInitLlvm', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('implementUserScriptKernel', $source);
-        $this->assertStringNotContainsString("lookupFunction('rename')", $source);
-        $this->assertStringNotContainsString('StatCacheRuntime', $source);
-        $this->assertStringNotContainsString('LibcExtern', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\LibcExtern', $source);
+        $this->assertStringNotContainsString('LibcExtern::', $source);
     }
 
-    public function testStringRenameBridgeUsesRenameJitHelper(): void
+    public function testPhpcRenameKernelUsesStringRenameLeaf(): void
     {
-        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
-        $this->assertStringContainsString('RenameJitHelper', $bridge);
-        $this->assertStringContainsString('INVOKE_HELPER', $bridge);
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_rename_kernel.php');
+        $this->assertStringContainsString('StringRename::invokeNestedLeaf', $source);
+        $this->assertStringNotContainsString('JitRenameKernel', $source);
+        $this->assertStringNotContainsString('LibcExtern::', $source);
     }
 
     public function testRenameJitHelperDelegatesToKernel(): void
@@ -72,11 +71,19 @@ final class RenameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('str_contains', $source);
     }
 
-    public function testSpineBundleIncludesRenameJitHelper(): void
+    public function testSpineBundleIncludesRenameHelperNotJitRenameKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('RenameJitHelper.php', $spine);
         $this->assertStringContainsString('StringRename.php', $spine);
-        $this->assertStringContainsString('JitRenameKernel.php', $spine);
+        $this->assertStringContainsString('phpc_rename_kernel.php', $spine);
+        $this->assertStringNotContainsString('JitRenameKernel.php', $spine);
+    }
+
+    public function testJitRenameKernelFileDeleted(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $this->assertFileDoesNotExist($root.'/ext/standard/JitRenameKernel.php');
+        $this->assertFileExists($root.'/ext/standard/phpc_rename_kernel.php');
     }
 }
