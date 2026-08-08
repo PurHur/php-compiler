@@ -132,11 +132,42 @@ final class JitGrapheme
         if (null === $string1 || null === $string2) {
             return null;
         }
+        $ins = 1;
+        $rep = 1;
+        $del = 1;
+        if (isset($args[2])) {
+            $insCt = self::compileTimeInt($args, 2);
+            if (null === $insCt) {
+                return null;
+            }
+            $ins = $insCt;
+        }
+        if (isset($args[3])) {
+            $repCt = self::compileTimeInt($args, 3);
+            if (null === $repCt) {
+                return null;
+            }
+            $rep = $repCt;
+        }
+        if (isset($args[4])) {
+            $delCt = self::compileTimeInt($args, 4);
+            if (null === $delCt) {
+                return null;
+            }
+            $del = $delCt;
+        }
+        if (isset($args[5])) {
+            // Locale must be a compile-time string for fold; value unused (canonical equality).
+            if (null === self::compileTimeString($args, 5)) {
+                return null;
+            }
+        }
+        $result = VmGrapheme::levenshtein($string1, $string2, $ins, $rep, $del);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
 
-        return $context->constantFromInteger(
-            VmGrapheme::levenshtein($string1, $string2),
-            'int64'
-        );
+        return $context->constantFromInteger($result, 'int64');
     }
 
     /**

@@ -51,6 +51,9 @@ final class VmGraphemeTest extends TestCase
         $this->assertSame(0, VmGrapheme::levenshtein($nfc, $nfd));
         $this->assertSame(3, VmGrapheme::levenshtein('kitten', 'sitting'));
         $this->assertSame(0, VmGrapheme::levenshtein('', ''));
+        $this->assertSame(4, VmGrapheme::levenshtein('ab', 'a', 2, 3, 4));
+        $this->assertSame(4, VmGrapheme::levenshtein('', 'ab', 2, 3, 4));
+        $this->assertSame(8, VmGrapheme::levenshtein('ab', '', 2, 3, 4));
     }
 
     public function testStrSplitGraphemeClusters(): void

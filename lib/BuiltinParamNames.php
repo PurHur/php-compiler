@@ -1913,6 +1913,9 @@ final class BuiltinParamNames
             case 'grapheme_strrpos':
             case 'grapheme_strripos':
                 return ['haystack', 'needle', 'offset='];
+            // php-src ext/intl/php_intl.stub.php — PHP 8.5+ (#27591)
+            case 'grapheme_levenshtein':
+                return ['string1', 'string2', 'insertion_cost=', 'replacement_cost=', 'deletion_cost=', 'locale='];
             // php-src ext/intl/resourcebundle/resourcebundle.stub.php — bundlename + fallback infer false (#25587)
             case 'resourcebundle_create':
                 return ['locale', 'bundle', 'fallback='];

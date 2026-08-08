@@ -386,6 +386,12 @@ final class IntlExtensionPolicy
         return self::advertisesBuiltins() && CompilerVersion::supportsGraphemeStrSplit();
     }
 
+    /** grapheme_levenshtein — PHP 8.5+ and loaded ext/intl (#27591, php-src php_intl.stub.php). */
+    public static function advertisesGraphemeLevenshtein(): bool
+    {
+        return self::advertisesBuiltins() && CompilerVersion::supportsGraphemeLevenshtein();
+    }
+
     /**
      * PHP 8.4 profile locale BCP-47 parsers registered without full ext/intl (#17072, #5125).
      *

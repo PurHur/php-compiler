@@ -1611,13 +1611,29 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testGraphemeLevenshteinWithheldOnForwardProfile(): void
+    public function testGraphemeLevenshteinWithheldOn84ForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertFalse(CompilerVersion::supportsGraphemeLevenshtein());
             $this->assertFalse(CompilerVersion::advertisesGraphemeLevenshtein());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testGraphemeLevenshteinEnabledOn85ForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGraphemeLevenshtein());
+            $this->assertTrue(CompilerVersion::advertisesGraphemeLevenshtein());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

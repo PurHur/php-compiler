@@ -2510,7 +2510,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BrowscapEngine.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 22 |
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
-| `ext/standard/BuiltinEnums.php` | 0 | 14 |
+| `ext/standard/BuiltinEnums.php` | 0 | 13 |
 | `ext/standard/BuiltinIntrospectionPolicy.php` | 0 | 1 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
 | `ext/standard/CaseCompareJitHelper.php` | 0 | 1 |
@@ -3711,7 +3711,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
 | `ext/standard/VmStreamWrapperMetadata.php` | 0 | 8 |
 | `ext/standard/VmStreamWrapperRegistry.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 0 | 3 |
+| `ext/standard/VmString.php` | 0 | 4 |
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
@@ -15207,10 +15207,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 401)
-- new locale_get_region (line 402)
-- new locale_get_script (line 403)
-- 35 class method(s)
+- new locale_get_primary_language (line 407)
+- new locale_get_region (line 408)
+- new locale_get_script (line 409)
+- 36 class method(s)
 
 ### `ext/intl/IntlSerializeDeny.php`
 
@@ -15229,8 +15229,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/JitGrapheme.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 362)
-- new Variable (line 364)
+- new HashTable (line 393)
+- new Variable (line 395)
 - 18 class method(s)
 - 4 closure(s)
 
@@ -16834,7 +16834,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/grapheme_levenshtein.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/intl/grapheme_str_contains.php`
@@ -27825,14 +27825,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 147)
 - new ClassEntry (line 173)
 - new ClassEntry (line 200)
-- new ClassEntry (line 227)
-- new ClassEntry (line 253)
-- new ClassEntry (line 288)
-- new ClassEntry (line 320)
-- new Variable (line 338)
-- new Variable (line 352)
-- new Variable (line 366)
-- 14 class method(s)
+- new ClassEntry (line 226)
+- new ClassEntry (line 261)
+- new ClassEntry (line 293)
+- new Variable (line 311)
+- new Variable (line 325)
+- new Variable (line 339)
+- 13 class method(s)
 
 ### `ext/standard/BuiltinIntrospectionPolicy.php`
 
@@ -35939,7 +35938,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1836)
 - new Error (line 1847)
-- 221 class method(s)
+- new ArgumentCountError (line 3833)
+- 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -44903,7 +44903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 1466)
+- new InternalArgInfo (line 1474)
 - 22 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -44919,8 +44919,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2362)
-- new ArgumentCountError (line 2373)
+- new ArgumentCountError (line 2365)
+- new ArgumentCountError (line 2376)
 - 19 class method(s)
 - 1 closure(s)
 

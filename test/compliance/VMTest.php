@@ -558,7 +558,8 @@ class VMTest extends BaseTest {
             if (!CompilerVersion::supportsGraphemeLevenshtein()
                 && str_contains($name, 'grapheme_levenshtein')
                 && !str_contains($name, 'grapheme_levenshtein_phantom')
-                && !str_contains($name, 'grapheme_levenshtein_forward')) {
+                && !str_contains($name, 'grapheme_levenshtein_forward')
+                && !str_contains($name, 'grapheme_levenshtein_profile_85')) {
                 continue;
             }
             if (CompilerVersion::supportsGraphemeLevenshtein()
