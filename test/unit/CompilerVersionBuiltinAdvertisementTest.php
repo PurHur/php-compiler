@@ -1173,6 +1173,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testVmDoesNotRegisterParseUrlOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->classes['parseurl']));
+        } finally {
+            unset($_ENV['PHP_COMPILER_PROFILE']);
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterJsonValidateOnDefault84DevReference(): void
     {
         $runtime = new Runtime();

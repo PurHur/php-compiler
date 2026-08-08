@@ -10,9 +10,9 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
- * parse_url() component resolution — ParseUrl enum + legacy PHP_URL_* ints (#7260).
+ * parse_url() component resolution — PHP_URL_* ints only (#28536, re-#7260).
  *
- * php-src: ext/standard/basic_functions.stub.php — enum ParseUrl: int
+ * php-src: ext/standard/basic_functions.stub.php — parse_url(..., int $component = -1)
  * php-src: ext/standard/url.c — Z_PARAM_LONG soft-null → E_DEPRECATED + 0 (#24942)
  */
 final class VmParseUrl
@@ -38,14 +38,14 @@ final class VmParseUrl
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, %s given',
+                'parse_url(): Argument #2 ($component) must be of type int, %s given',
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
         if (Variable::TYPE_NULL === $var->type) {
             if (InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(
-                    'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, null given'
+                    'parse_url(): Argument #2 ($component) must be of type int, null given'
                 );
             }
             // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 → PHP_URL_SCHEME (php-src url.c; #24942).
@@ -66,7 +66,7 @@ final class VmParseUrl
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, %s given',
+                'parse_url(): Argument #2 ($component) must be of type int, %s given',
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
@@ -78,7 +78,7 @@ final class VmParseUrl
         }
         if (Variable::TYPE_INTEGER !== $var->type) {
             throw new \TypeError(sprintf(
-                'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, %s given',
+                'parse_url(): Argument #2 ($component) must be of type int, %s given',
                 self::typeLabel($var)
             ));
         }

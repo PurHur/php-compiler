@@ -293,7 +293,6 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'phpinfo_infoview')
                     || str_contains($name, 'filter_input_phpinputfilter')
                     || str_contains($name, 'connection_status_cli')
-                    || str_contains($name, 'parse_url_enum')
                     || str_contains($name, 'property_hook_type_enum')
                     || str_contains($name, 'socket_type_enum')
                     || str_contains($name, 'ftp_ssl_connect')
@@ -305,7 +304,9 @@ class JITTest extends BaseTest {
                 // HTTP phantoms retired (#28931) — absence cases always run.
                 && !str_contains($name, 'http_response_code_enum')
                 && !str_contains($name, 'connection_status_enum')
-                && !str_contains($name, 'requestmethod_enum')) {
+                && !str_contains($name, 'requestmethod_enum')
+                // ParseUrl phantom retired (#28536) — absence cases always run.
+                && !str_contains($name, 'parse_url_enum')) {
                 continue;
             }
             if (CompilerVersion::supportsBuiltinStubEnums()
