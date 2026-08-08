@@ -328,6 +328,13 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src php_date.stub.php — timezone_open(): DateTimeZone|false (#27901). */
+    public function testTimezoneOpenReflectionReturnType(): void
+    {
+        $this->assertSame('DateTimeZone|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('timezone_open'));
+        $this->assertSame('DateTimeZone|false', BuiltinInternalArgInfo::stubReturnTypeLabelForFunction('timezone_open'));
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {
