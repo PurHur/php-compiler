@@ -251,7 +251,10 @@ final class VmFilterTest extends TestCase
     public function testIsValidIpAddressAcceptsIpv6(): void
     {
         $this->assertTrue(VmFilter::isValidIpAddress('::1'));
-        $this->assertTrue(VmFilter::isValidIpAddress('[2001:db8::1]'));
+        $this->assertTrue(VmFilter::isValidIpAddress('2001:db8::1'));
+        // php-src php_filter_validate_ip does not peel URI-style brackets (#29063).
+        $this->assertFalse(VmFilter::isValidIpAddress('[2001:db8::1]'));
+        $this->assertFalse(VmFilter::isValidIpAddress('[::1]'));
     }
 
     /** #29009 — 2001:db8::/32 reserved under FILTER_FLAG_NO_RES_RANGE (php-src ≤8.2). */
