@@ -365,6 +365,13 @@ final class BuiltinInternalDefaultValues
             6 => ['kind' => 'string', 'value' => ''],
             7 => ['kind' => 'int', 'value' => 16],
         ],
+        // php-src ext/openssl/openssl.stub.php — iv=""; tag=null; aad="" (string iv/aad have no infer) (#28593)
+        'openssl_decrypt' => [
+            3 => ['kind' => 'int', 'value' => 0],
+            4 => ['kind' => 'string', 'value' => ''],
+            5 => ['kind' => 'null'],
+            6 => ['kind' => 'string', 'value' => ''],
+        ],
         'array_slice' => [
             2 => ['kind' => 'null'],
             3 => ['kind' => 'bool', 'value' => false],
