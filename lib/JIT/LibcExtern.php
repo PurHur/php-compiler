@@ -22,12 +22,10 @@ final class LibcExtern
         $dbl = $context->getTypeFromString('double');
         $i8p = $context->getTypeFromString('int8*');
         $i8pp = $i8p->pointerType(0);
-        $i32p = $i32->pointerType(0);
 
         /** @var array<string, array{0: mixed, 1: bool, 2: list<mixed>}> $specs */
         $specs = [
             'malloc' => [$i8p, false, [$sizeT]],
-            'calloc' => [$i8p, false, [$sizeT, $sizeT]],
             'realloc' => [$i8p, false, [$i8p, $sizeT]],
             'free' => [$void, false, [$i8p]],
             'memcpy' => [$i8p, false, [$i8p, $i8p, $sizeT]],
@@ -41,13 +39,10 @@ final class LibcExtern
             'strcasecmp' => [$i32, false, [$i8p, $i8p]],
             'strncasecmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             'strcoll' => [$i32, false, [$i8p, $i8p]],
-            'strspn' => [$sizeT, false, [$i8p, $i8p]],
             'strcspn' => [$sizeT, false, [$i8p, $i8p]],
             'strchr' => [$i8p, false, [$i8p, $i32]],
             'strstr' => [$i8p, false, [$i8p, $i8p]],
             'strrchr' => [$i8p, false, [$i8p, $i32]],
-            'strpbrk' => [$i8p, false, [$i8p, $i8p]],
-            'strncpy' => [$i8p, false, [$i8p, $i8p, $sizeT]],
             'strtol' => [$i64, false, [$i8p, $i8pp, $i32]],
             'strtod' => [$dbl, false, [$i8p, $i8pp]],
             'strdup' => [$i8p, false, [$i8p]],
@@ -67,14 +62,8 @@ final class LibcExtern
             'access' => [$i32, false, [$i8p, $i32]],
             'lstat' => [$i32, false, [$i8p, $i8p]],
             'chmod' => [$i32, false, [$i8p, $i32]],
-            'utime' => [$i32, false, [$i8p, $i8p]],
             'mkstemp' => [$i32, false, [$i8p]],
-            'chown' => [$i32, false, [$i8p, $i32, $i32]],
-            'fchownat' => [$i32, false, [$i32, $i8p, $i32, $i32, $i32]],
-            'getgrnam' => [$i8p, false, [$i8p]],
-            'getpwnam' => [$i8p, false, [$i8p]],
             'mkdir' => [$i32, false, [$i8p, $i32]],
-            'remove' => [$i32, false, [$i8p]],
             'rename' => [$i32, false, [$i8p, $i8p]],
             'chdir' => [$i32, false, [$i8p]],
             'getenv' => [$i8p, false, [$i8p]],
@@ -85,21 +74,15 @@ final class LibcExtern
             'time' => [$i64, false, [$i8p]],
             'printf' => [$i32, true, [$i8p]],
             'snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
-            'sscanf' => [$i32, true, [$i8p, $i8p]],
             'popen' => [$i8p, false, [$i8p, $i8p]],
             'pclose' => [$i32, false, [$i8p]],
-            'pipe' => [$i32, false, [$i32p]],
-            'fork' => [$i32, false, []],
-            'dup2' => [$i32, false, [$i32, $i32]],
-            'waitpid' => [$i32, false, [$i32, $i32p, $i32]],
             '__phpc_resolve_stream' => [$i8p, false, [$i64]],
             'fileno' => [$i32, false, [$i8p]],
-            'fsync' => [$i32, false, [$i32]],
-            'fdatasync' => [$i32, false, [$i32]],
-            'flock' => [$i32, false, [$i32, $i32]],
             // Math libc decls removed (#28808): userland Math* + NestedJIT helpers are
             // PHP SSOT (MathSqrt #27888 … MathNextafter #28716); stats_standard_deviation
             // routes through MathSqrt::invoke.
+            // Dead FS/string/process decls removed (#28850): ChownRuntime / StringStrspn /
+            // StringStrpbrk / sync helpers own PHP or phpc_* ABIs — no lookupFunction remains.
 
             // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
             'syscall' => [$i64, true, [$i64]],

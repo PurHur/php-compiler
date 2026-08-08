@@ -39,11 +39,12 @@ final class LibcNameCollisionRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_strcoll', $source);
     }
 
-    public function testLibcExternDeclaresRealStrspnFamily(): void
+    public function testLibcExternDeclaresLiveStrcspnStrcollNotDeadStrspn(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/LibcExtern.php');
-        $this->assertStringContainsString("'strspn'", $source);
-        $this->assertStringContainsString("'strcspn'", $source);
-        $this->assertStringContainsString("'strcoll'", $source);
+        // strspn dropped — StringStrspn uses phpc_strspn_extended (#28850)
+        $this->assertStringNotContainsString("'strspn' =>", $source);
+        $this->assertStringContainsString("'strcspn' =>", $source);
+        $this->assertStringContainsString("'strcoll' =>", $source);
     }
 }
