@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\LibxmlUseInternalErrorsRuntime;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -184,6 +185,36 @@ final class JitDomLoadXMLUserScript
         }
         $lit = $forParse;
 
+        // Host well-formedness: thin path previously accepted unclosed roots like "<r>" (#29161).
+        // When host libxml rejects, bake errors into the AOT libxml ring and return false.
+        if (\extension_loaded('dom') && \class_exists(\DOMDocument::class, false)) {
+            $prevInternal = null;
+            if (\function_exists('libxml_use_internal_errors')) {
+                $prevInternal = \libxml_use_internal_errors(true);
+                if (\function_exists('libxml_clear_errors')) {
+                    \libxml_clear_errors();
+                }
+            }
+            $hostOk = false;
+            $hostErrs = [];
+            try {
+                $hostDoc = new \DOMDocument();
+                $hostOk = @$hostDoc->loadXML($lit);
+                if (\function_exists('libxml_get_errors')) {
+                    $hostErrs = \libxml_get_errors();
+                }
+            } catch (\Throwable) {
+                $hostOk = false;
+            } finally {
+                if (null !== $prevInternal && \function_exists('libxml_use_internal_errors')) {
+                    \libxml_use_internal_errors($prevInternal);
+                }
+            }
+            if (!$hostOk) {
+                return self::emitMalformedLoadFailure($context, $hostErrs);
+            }
+        }
+
         // Inter-element blank text is materialized as #text children at compile time (#27260).
         // LIBXML_NOBLANKS / non-zero options already fall through above (#20476). NestedJIT
         // DomLoadXMLRuntime cannot run VmDom::loadXML (no preg_match in lean helpers).
@@ -213,6 +244,52 @@ final class JitDomLoadXMLUserScript
             $context,
             $slot,
             $context->builder->zext($i1->constInt(1, false), $i32)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /**
+     * Seed AOT libxml ring from host LibXMLError list and return false (#29161).
+     *
+     * @param list<\LibXMLError>|list<object> $hostErrs
+     */
+    private static function emitMalformedLoadFailure(Context $context, array $hostErrs): Value
+    {
+        $rows = [];
+        foreach ($hostErrs as $err) {
+            if (!\is_object($err)) {
+                continue;
+            }
+            $rows[] = [
+                'level' => (int) ($err->level ?? 0),
+                'code' => (int) ($err->code ?? 0),
+                'column' => (int) ($err->column ?? 0),
+                'message' => (string) ($err->message ?? ''),
+                'file' => (string) ($err->file ?? ''),
+                'line' => (int) ($err->line ?? 0),
+            ];
+        }
+        // Match common libxml premature-end when host returned no structured errors.
+        if ([] === $rows) {
+            $rows[] = [
+                'level' => 3,
+                'code' => 77,
+                'column' => 0,
+                'message' => 'Premature end of data in tag line 1',
+                'file' => '',
+                'line' => 1,
+            ];
+        }
+        LibxmlUseInternalErrorsRuntime::emitSeedErrors($context, $rows);
+
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->builder->zext($i1->constInt(0, false), $i32)
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);

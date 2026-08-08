@@ -160,6 +160,10 @@ patch_already_applied() {
     php-types-stream-context-array-return.patch)
       grep -q "'stream_context_create' => \['array'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-libxml-get-errors-array-return.patch)
+      # php-src ext/libxml/libxml.stub.php — array; bogus object made AOT $errs[0] ArrayAccess-abort (#29161)
+      grep -q "'libxml_get_errors' => \['array'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-strpbrk-string-false.patch)
       grep -q "'strpbrk' => \['string|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -6967,6 +6971,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-get-meta-tags-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-array-combine-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-stream-context-array-return.patch"
+  apply_patch "$PATCH_DIR/php-types-libxml-get-errors-array-return.patch"
   apply_patch "$PATCH_DIR/php-types-strpbrk-string-false.patch"
   apply_patch "$PATCH_DIR/php-types-error-get-last-null.patch"
   apply_patch "$PATCH_DIR/php-types-crc32-int.patch"

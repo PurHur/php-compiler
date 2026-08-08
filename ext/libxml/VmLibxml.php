@@ -34,9 +34,6 @@ final class VmLibxml
     /** Pinned separately — VM GC may clear ObjectEntry::$closureState when only a PHP static holds the Variable (#21599). */
     private static ?\PHPCompiler\VM\ClosureState $externalEntityLoaderState = null;
 
-    /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
-    private static array $errors = [];
-
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -299,7 +296,7 @@ final class VmLibxml
     public static function getErrors(Context $ctx): HashTable
     {
         $ht = new HashTable();
-        foreach (self::$errors as $record) {
+        foreach (LibxmlInternalErrorsJitHelper::records() as $record) {
             $ht->append(self::createErrorObject($ctx, $record));
         }
 
@@ -312,19 +309,20 @@ final class VmLibxml
     public static function getLastError(Context $ctx): Variable
     {
         $var = new Variable();
-        if ([] === self::$errors) {
+        $errors = LibxmlInternalErrorsJitHelper::records();
+        if ([] === $errors) {
             $var->bool(false);
 
             return $var;
         }
-        $var->copyFrom(self::createErrorObject($ctx, self::$errors[\count(self::$errors) - 1]));
+        $var->copyFrom(self::createErrorObject($ctx, $errors[\count($errors) - 1]));
 
         return $var;
     }
 
     public static function clearErrors(): void
     {
-        self::$errors = [];
+        LibxmlInternalErrorsJitHelper::clear();
     }
 
     /**
@@ -334,7 +332,7 @@ final class VmLibxml
      */
     public static function recordError(array $record): void
     {
-        self::$errors[] = $record;
+        LibxmlInternalErrorsJitHelper::record($record);
     }
 
     /**
@@ -348,7 +346,7 @@ final class VmLibxml
         ?string $warningMessage = null
     ): void {
         if (LibxmlInternalErrorsJitHelper::using()) {
-            self::$errors[] = $record;
+            LibxmlInternalErrorsJitHelper::record($record);
 
             return;
         }
