@@ -1336,7 +1336,7 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_json_set_last_error', $fnJsonSetLastError);
         $fnJsonValidate = $this->context->module->addFunction(
             '__compiler_json_validate',
-            $this->context->context->functionType($i64, false, $strPtr, $i64)
+            $this->context->context->functionType($i64, false, $strPtr, $i64, $i64)
         );
         $this->context->registerFunction('__compiler_json_validate', $fnJsonValidate);
         $fntypeXmlrpcEncodeValue = $this->context->context->functionType(

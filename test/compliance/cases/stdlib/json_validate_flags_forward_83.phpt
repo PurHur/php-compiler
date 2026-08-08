@@ -1,5 +1,5 @@
 --TEST--
-stdlib json_validate() — JSON_INVALID_UTF8_* flags (issue #4085, #22544)
+stdlib json_validate() — only 0|JSON_INVALID_UTF8_IGNORE (issue #29069, #4085; php-src json.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.3
 --FILE--
@@ -15,19 +15,20 @@ echo json_validate($bad, 512, 0) ? '1' : '0';
 echo "\n";
 echo json_validate($bad, 512, JSON_INVALID_UTF8_IGNORE) ? '1' : '0';
 echo "\n";
-echo json_validate($bad, 512, JSON_INVALID_UTF8_SUBSTITUTE) ? '1' : '0';
-echo "\n";
 
-try {
-    json_validate('[]', 512, JSON_INVALID_UTF8_IGNORE | 1);
-    echo "no-error\n";
-} catch (ValueError $e) {
-    echo $e->getMessage(), "\n";
+foreach ([JSON_INVALID_UTF8_SUBSTITUTE, JSON_INVALID_UTF8_IGNORE | JSON_INVALID_UTF8_SUBSTITUTE, JSON_INVALID_UTF8_IGNORE | 1] as $flags) {
+    try {
+        json_validate($bad, 512, $flags);
+        echo "no-error\n";
+    } catch (ValueError $e) {
+        echo $e->getMessage(), "\n";
+    }
 }
 ?>
 --EXPECT--
 1
 0
 1
-1
-json_validate(): Argument #3 ($flags) must be a valid flag (allowed flags: JSON_INVALID_UTF8_IGNORE, JSON_INVALID_UTF8_SUBSTITUTE)
+json_validate(): Argument #3 ($flags) must be a valid flag (allowed flags: JSON_INVALID_UTF8_IGNORE)
+json_validate(): Argument #3 ($flags) must be a valid flag (allowed flags: JSON_INVALID_UTF8_IGNORE)
+json_validate(): Argument #3 ($flags) must be a valid flag (allowed flags: JSON_INVALID_UTF8_IGNORE)

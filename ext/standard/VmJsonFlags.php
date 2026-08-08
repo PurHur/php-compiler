@@ -83,8 +83,15 @@ final class VmJsonFlags
         | self::INVALID_UTF8_SUBSTITUTE
         | self::THROW_ON_ERROR;
 
-    /** Flags accepted by json_validate() (issue #4085). */
-    public const VALIDATE_ALLOWED = self::INVALID_UTF8_IGNORE | self::INVALID_UTF8_SUBSTITUTE;
+    /**
+     * Sole non-zero flag accepted by json_validate() (php-src ext/json/json.c — exact equality, not a bitmask).
+     * JSON_INVALID_UTF8_SUBSTITUTE is encode/decode-only (#29069 / #4085).
+     */
+    public const VALIDATE_ALLOWED = self::INVALID_UTF8_IGNORE;
+
+    /** Zend message for invalid json_validate() $flags (ext/json/json.c). */
+    public const VALIDATE_FLAGS_ERROR =
+        'json_validate(): Argument #3 ($flags) must be a valid flag (allowed flags: JSON_INVALID_UTF8_IGNORE)';
 
     /** @return array<string, int> */
     public static function constants(): array
@@ -124,11 +131,15 @@ final class VmJsonFlags
 
     public static function assertValidateFlags(int $flags): void
     {
-        if (0 !== ($flags & ~self::VALIDATE_ALLOWED)) {
-            throw new \ValueError(
-                'json_validate(): Argument #3 ($flags) must be a valid flag (allowed flags: JSON_INVALID_UTF8_IGNORE, JSON_INVALID_UTF8_SUBSTITUTE)'
-            );
+        // php-src: if ((options != 0) && (options != PHP_JSON_INVALID_UTF8_IGNORE))
+        if (0 !== $flags && self::INVALID_UTF8_IGNORE !== $flags) {
+            throw new \ValueError(self::VALIDATE_FLAGS_ERROR);
         }
+    }
+
+    public static function isValidValidateFlags(int $flags): bool
+    {
+        return 0 === $flags || self::INVALID_UTF8_IGNORE === $flags;
     }
 
     public static function ignoreInvalidUtf8(int $flags): bool
