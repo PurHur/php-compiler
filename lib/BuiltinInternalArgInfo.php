@@ -1141,6 +1141,9 @@ final class BuiltinInternalArgInfo
             'datetimezone::listidentifiers' => 1 === $index ? '?string' : null,
             // ext/date/php_date.stub.php — DateTimeInterface $datetime (InternalArgInfo lowercase datetime) (#28910)
             'datetimezone::getoffset' => 0 === $index ? 'DateTimeInterface' : null,
+            // ext/date/php_date.stub.php — DateTimeInterface $object (absent from InternalArgInfo) (#28896)
+            'datetime::createfrominterface',
+            'datetimeimmutable::createfrominterface' => 0 === $index ? 'DateTimeInterface' : null,
             // ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (InternalArgInfo datetimezone) (#25166)
             'datetime::createfromformat',
             'datetimeimmutable::createfromformat' => 2 === $index ? '?DateTimeZone' : null,

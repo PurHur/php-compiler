@@ -1742,6 +1742,11 @@ final class BuiltinClasses
         $dt->methodVisibility['createfromimmutable'] = $pubStatic;
         $dt->methods['createfrominterface'] = new DateTimeCreateFromInterface();
         $dt->methodVisibility['createfrominterface'] = $pubStatic;
+        // php-src php_date.stub.php — createFromInterface(DateTimeInterface $object): DateTime (#28896)
+        $dtCreateFromIfaceRet = ReflectionTypeSupport::cfgTypeFromLabel('DateTime');
+        if (null !== $dtCreateFromIfaceRet) {
+            $dt->methodReturnDeclaredTypes['createfrominterface'] = $dtCreateFromIfaceRet;
+        }
         if (CompilerVersion::supportsDateTimeCreateFromTimestamp()) {
             $dt->methods['createfromtimestamp'] = new DateTimeCreateFromTimestamp();
             $dt->methodVisibility['createfromtimestamp'] = $pubStatic;
@@ -1805,6 +1810,11 @@ final class BuiltinClasses
         $dti->methodVisibility['createfrommutable'] = $pubStatic;
         $dti->methods['createfrominterface'] = new DateTimeImmutableCreateFromInterface();
         $dti->methodVisibility['createfrominterface'] = $pubStatic;
+        // php-src php_date.stub.php — createFromInterface(DateTimeInterface $object): DateTimeImmutable (#28896)
+        $dtiCreateFromIfaceRet = ReflectionTypeSupport::cfgTypeFromLabel('DateTimeImmutable');
+        if (null !== $dtiCreateFromIfaceRet) {
+            $dti->methodReturnDeclaredTypes['createfrominterface'] = $dtiCreateFromIfaceRet;
+        }
         if (CompilerVersion::supportsDateTimeCreateFromTimestamp()) {
             $dti->methods['createfromtimestamp'] = new DateTimeImmutableCreateFromTimestamp();
             $dti->methodVisibility['createfromtimestamp'] = $pubStatic;
