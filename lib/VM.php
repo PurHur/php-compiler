@@ -17433,7 +17433,7 @@ restart:
         if ('parent' === $lcClass) {
             $declaring = $this->declaringClassLc($frame, 'parent');
             if (!isset($this->context->classes[$declaring])) {
-                PseudoClassScope::fatalInGlobalScope('parent');
+                PseudoClassScope::fatalNoActiveClassScope('parent');
             }
             $parentLc = $this->context->classes[$declaring]->parentLc;
             if (null === $parentLc) {
@@ -17478,10 +17478,7 @@ restart:
             return strtolower($frame->calledClass);
         }
 
-        if ('static' === $scopeKeyword) {
-            PseudoClassScope::fatalNoActiveClassScope('static');
-        }
-        PseudoClassScope::fatalInGlobalScope($scopeKeyword);
+        PseudoClassScope::fatalNoActiveClassScope($scopeKeyword);
     }
 
     protected function lateStaticClassLc(Frame $frame): string

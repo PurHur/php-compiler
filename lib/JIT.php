@@ -18770,7 +18770,7 @@ class JIT {
         $lc = strtolower($classOp->value);
         if ('self' === $lc) {
             if (null === $block->func || null === $block->func->class) {
-                PseudoClassScope::fatalInGlobalScope('self');
+                PseudoClassScope::fatalNoActiveClassScope('self');
             }
             $declaringClass = $block->func->class->value;
             $declaringLc = strtolower(ltrim($declaringClass, '\\'));
@@ -18808,11 +18808,11 @@ class JIT {
             if (null !== $block->func && null !== $block->func->class) {
                 return $block->func->class->value;
             }
-            PseudoClassScope::fatalInGlobalScope('static');
+            PseudoClassScope::fatalNoActiveClassScope('static');
         }
         if ('parent' === $lc) {
             if (null === $block->func || null === $block->func->class) {
-                PseudoClassScope::fatalInGlobalScope('parent');
+                PseudoClassScope::fatalNoActiveClassScope('parent');
             }
             $declaringClass = $block->func->class->value;
             $declaringLc = strtolower(ltrim($declaringClass, '\\'));

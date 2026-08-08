@@ -64,6 +64,8 @@
             <file>./test/compliance/TraitParentScopeJITTest.php</file>
             <file>./test/compliance/SelfStaticInstanceMethodCallVMTest.php</file>
             <file>./test/compliance/SelfStaticInstanceMethodCallJITTest.php</file>
+            <file>./test/compliance/SelfParentCallNoClassScopeVMTest.php</file>
+            <file>./test/compliance/SelfParentCallNoClassScopeJITTest.php</file>
             <file>./test/compliance/ThisBareCallArgVMTest.php</file>
             <file>./test/compliance/ThisBareCallArgJITTest.php</file>
             <file>./test/compliance/ClassStaticMethodVMTest.php</file>

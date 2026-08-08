@@ -417,7 +417,7 @@ trait ClassConstFetchHelperTrait
         if ('self' === $lc) {
             $scope = self::jitComposingScopeClassName($objectType, $block);
             if (null === $scope) {
-                PseudoClassScope::fatalInGlobalScope('self');
+                PseudoClassScope::fatalNoActiveClassScope('self');
             }
 
             return $scope;
@@ -425,7 +425,7 @@ trait ClassConstFetchHelperTrait
         if ('static' === $lc) {
             $scope = self::jitLateStaticClassName($objectType, $block);
             if (null === $scope) {
-                PseudoClassScope::fatalInGlobalScope('static');
+                PseudoClassScope::fatalNoActiveClassScope('static');
             }
 
             return $scope;
@@ -433,7 +433,7 @@ trait ClassConstFetchHelperTrait
         if ('parent' === $lc) {
             $scope = self::jitComposingScopeClassName($objectType, $block);
             if (null === $scope) {
-                PseudoClassScope::fatalInGlobalScope('parent');
+                PseudoClassScope::fatalNoActiveClassScope('parent');
             }
             $parent = $objectType->parentClassDisplayName($scope);
             if (null === $parent) {
