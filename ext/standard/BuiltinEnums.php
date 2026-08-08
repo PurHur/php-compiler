@@ -22,7 +22,7 @@ final class BuiltinEnums
         if (CompilerVersion::supportsBuiltinStubEnums()) {
             self::registerPropertyHookType($ctx);
             // ExitStatus retired — php-src never ships it (#28500, re-#28200 / #7294)
-            self::registerStringTrimMode($ctx);
+            // StringTrimMode retired — php-src never ships it (#28202, re-#7283); trim arity 2 (#28230)
             self::registerPadType($ctx);
             // MemoryUsage retired — php-src never ships it (#28411, re-#7247)
             // ConnectionStatus / ResponseCode / RequestMethod retired — php-src never ships them (#28931)
@@ -155,33 +155,6 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'propertyhooktype';
-        $ctx->classes[$lc] = $entry;
-        $ctx->enums[$lc] = true;
-    }
-
-    /**
-     * PHP 8.4 StringTrimMode: int-backed enum for trim()/ltrim()/rtrim() side parameter (#7283).
-     *
-     * php-src: ext/standard/basic_functions.stub.php — enum StringTrimMode: int
-     */
-    private static function registerStringTrimMode(Context $ctx): void
-    {
-        if (isset($ctx->classes['stringtrimmode'])) {
-            return;
-        }
-
-        $entry = new ClassEntry('StringTrimMode');
-        $entry->isEnum = true;
-        $entry->backedType = 'int';
-
-        self::registerBackedEnumCase($entry, 'Both', 0);
-        self::registerBackedEnumCase($entry, 'Left', 1);
-        self::registerBackedEnumCase($entry, 'Right', 2);
-
-        EnumSupport::ensureBuiltinCasesMethod($entry);
-        EnumSupport::ensureBuiltinEnumInterfaces($entry);
-
-        $lc = 'stringtrimmode';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }

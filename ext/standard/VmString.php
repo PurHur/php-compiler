@@ -3818,7 +3818,7 @@ final class VmString
     }
 
     /**
-     * @param list<Variable> $optionalArgs trim/ltrim/rtrim args after $string (0..2 entries)
+     * @param list<Variable> $optionalArgs trim/ltrim/rtrim args after $string (0..1 entries)
      *
      * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
      */
@@ -3828,71 +3828,22 @@ final class VmString
         int $defaultMode
     ): array {
         $argc = \count($optionalArgs);
+        if ($argc > 1) {
+            // php-src string.stub.php — arity ≤2; no $mode (#28230 / #28202).
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects at most 2 arguments, %d given',
+                $function,
+                $argc + 1
+            ));
+        }
         if (0 === $argc) {
             return [self::TRIM_DEFAULT, $defaultMode];
         }
-        if (1 === $argc) {
-            return self::resolveTrimOptionalArg(
-                $optionalArgs[0],
-                $function,
-                1,
-                'characters',
-                $defaultMode
-            );
-        }
 
-        $mask = self::coerceStringBuiltinArg($optionalArgs[0], $function, 1, 'characters');
-        $modeFromEnum = self::tryStringTrimModeBitmask($optionalArgs[1]);
-        if (null === $modeFromEnum) {
-            $var = $optionalArgs[1]->resolveIndirect();
-            $given = EnumCaseSupport::isEnumCaseVariable($var)
-                ? EnumCaseSupport::typeNameForVariable($var)
-                : match ($var->type) {
-                    Variable::TYPE_NULL => 'null',
-                    Variable::TYPE_BOOLEAN => 'bool',
-                    Variable::TYPE_INTEGER => 'int',
-                    Variable::TYPE_FLOAT => 'float',
-                    Variable::TYPE_STRING => 'string',
-                    Variable::TYPE_ARRAY => 'array',
-                    Variable::TYPE_OBJECT => $var->toObject()->class->name,
-                    default => 'mixed',
-                };
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #3 ($mode) must be of type StringTrimMode, %s given',
-                $function,
-                $given
-            ));
-        }
-
-        return [$mask, $modeFromEnum];
-    }
-
-    /**
-     * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
-     */
-    public static function resolveTrimOptionalArg(
-        Variable $var,
-        string $function,
-        int $argIndex,
-        string $paramName,
-        int $defaultMode
-    ): array {
-        $modeFromEnum = self::tryStringTrimModeBitmask($var);
-        if (null !== $modeFromEnum) {
-            return [self::TRIM_DEFAULT, $modeFromEnum];
-        }
-
-        return [self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName), $defaultMode];
-    }
-
-    public static function stringTrimModeBitmaskFromBacking(int $backing): int
-    {
-        return match ($backing) {
-            0 => self::TRIM_SIDE_BOTH,
-            1 => self::TRIM_SIDE_LEFT,
-            2 => self::TRIM_SIDE_RIGHT,
-            default => throw new \ValueError('Invalid StringTrimMode enum value '.$backing),
-        };
+        return [
+            self::coerceStringBuiltinArg($optionalArgs[0], $function, 1, 'characters'),
+            $defaultMode,
+        ];
     }
 
     public static function trimInt(string $string, string $characterMask, int $mode): string
@@ -3938,29 +3889,6 @@ final class VmString
     public static function charInTrimMask(string $ch, string $mask): bool
     {
         return self::charInMask($ch, $mask);
-    }
-
-    public static function tryStringTrimModeBitmask(Variable $var): ?int
-    {
-        $var = $var->resolveIndirect();
-        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
-            return null;
-        }
-        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
-        if (null === $enumClass || !self::isStringTrimModeEnum($enumClass->name)) {
-            return null;
-        }
-        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
-        if (null === $entry || null === $entry->backingValue) {
-            throw new \LogicException('StringTrimMode case missing backing value');
-        }
-
-        return self::stringTrimModeBitmaskFromBacking($entry->backingValue->resolveIndirect()->toInt());
-    }
-
-    private static function isStringTrimModeEnum(string $className): bool
-    {
-        return 0 === strcasecmp(ltrim($className, '\\'), 'StringTrimMode');
     }
 
     public static function asciiLower(string $string): string

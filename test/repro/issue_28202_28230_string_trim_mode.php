@@ -1,13 +1,8 @@
 <?php
-
-declare(strict_types=1);
-
-var_export(enum_exists('StringTrimMode', false));
-echo PHP_EOL;
-echo trim('  x  '), PHP_EOL;
 try {
     trim(' x ', ' ', true);
     echo "uncaught\n";
 } catch (Throwable $e) {
     echo get_class($e), ':', $e->getMessage(), PHP_EOL;
 }
+echo 'enum=', enum_exists('StringTrimMode') ? '1' : '0', PHP_EOL;
