@@ -874,6 +874,23 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame('string|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_error_string'));
     }
 
+    /** php-src openssl.stub.php — int $length; &$strong_result untyped (not integer / bool) (#28858). */
+    public function testOpensslRandomPseudoBytesReflectionStubTypes(): void
+    {
+        $this->assertSame('int', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_random_pseudo_bytes', 0));
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_random_pseudo_bytes', 1));
+        $length = BuiltinInternalArgInfo::paramInfoForFunction('openssl_random_pseudo_bytes', 0);
+        $this->assertNotNull($length);
+        $this->assertSame('int', $length['type']);
+        $this->assertFalse($length['isOptional']);
+        $strong = BuiltinInternalArgInfo::paramInfoForFunction('openssl_random_pseudo_bytes', 1);
+        $this->assertNotNull($strong);
+        $this->assertSame('', $strong['type']);
+        $this->assertTrue($strong['isOptional']);
+        $this->assertSame('string', BuiltinInternalArgInfo::returnTypeLabelForFunction('openssl_random_pseudo_bytes'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_random_pseudo_bytes'));
+    }
+
     /** php-src link.stub.php — InternalArgInfo return int; Zend bool (#26323). */
     public function testSymlinkReflectionReturnBool(): void
     {
