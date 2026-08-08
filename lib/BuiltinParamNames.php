@@ -427,7 +427,8 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — Reflection empty / InternalArgInfo pre-stub (#23289)
             case 'date_create_from_format':
             case 'date_create_immutable_from_format':
-                return ['format', 'datetime', 'timezone'];
+                // php-src php_date.stub.php — ?DateTimeZone $timezone = null (#27773)
+                return ['format', 'datetime', 'timezone='];
             case 'date_modify':
                 return ['object', 'modifier'];
             case 'date_add':

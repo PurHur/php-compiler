@@ -92,6 +92,10 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — absent from php-types InternalArgInfo (#25392)
             'date_create' => 'DateTime|false',
             'date_create_immutable' => 'DateTimeImmutable|false',
+            // ext/date/php_date.stub.php — absent from InternalArgInfo (#27773, re-#23289)
+            'date_create_from_format' => 'DateTime|false',
+            'date_create_immutable_from_format' => 'DateTimeImmutable|false',
+            'date_modify' => 'DateTime|false',
             // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#25440)
             'idate' => 'int|false',
             // ext/date/php_date.stub.php — InternalArgInfo return int (missing |false) (#26325)
@@ -541,6 +545,17 @@ final class BuiltinInternalArgInfo
             'date_create', 'date_create_immutable' => match ($index) {
                 0 => 'string',
                 1 => '?DateTimeZone',
+                default => null,
+            },
+            // ext/date/php_date.stub.php — absent from InternalArgInfo (#27773, re-#23289)
+            'date_create_from_format', 'date_create_immutable_from_format' => match ($index) {
+                0, 1 => 'string',
+                2 => '?DateTimeZone',
+                default => null,
+            },
+            'date_modify' => match ($index) {
+                0 => 'DateTime',
+                1 => 'string',
                 default => null,
             },
             // ext/date/php_date.stub.php — ?string $countryCode = null (InternalArgInfo string required) (#25173)

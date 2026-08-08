@@ -638,6 +638,13 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'string', 'value' => 'now'],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/date/php_date.stub.php — ?DateTimeZone $timezone = null (#27773)
+        'date_create_from_format' => [
+            2 => ['kind' => 'null'],
+        ],
+        'date_create_immutable_from_format' => [
+            2 => ['kind' => 'null'],
+        ],
         // php-src ext/spl/spl.stub.php — ?callable=null, bool $throw=true, bool $prepend=false (#25390)
         // InternalArgInfo empty callback type + bool infer defaults throw to false.
         'spl_autoload_register' => [
