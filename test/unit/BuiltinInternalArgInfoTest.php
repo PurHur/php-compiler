@@ -290,6 +290,30 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertFalse($info['isOptional']);
     }
 
+    /** php-src php_date.stub.php — DateTime(Immutable)::createFromInterface (#28896). */
+    public function testDateTimeCreateFromInterfaceReflectionStubs(): void
+    {
+        foreach (['DateTime', 'DateTimeImmutable'] as $class) {
+            $q = strtolower($class).'::createfrominterface';
+            $this->assertSame(['object'], BuiltinParamNames::forClassMethod($q), $class);
+            $this->assertSame(1, BuiltinParamNames::paramCountForInternalMethod($class, 'createFromInterface'), $class);
+            $this->assertSame(
+                'DateTimeInterface',
+                BuiltinInternalArgInfo::stubParamTypeOverrideForClassMethod(
+                    strtolower($class),
+                    'createfrominterface',
+                    0
+                ),
+                $class
+            );
+            $info = BuiltinInternalArgInfo::paramInfoForClassMethod($class, 'createFromInterface', 0);
+            $this->assertNotNull($info, $class);
+            $this->assertSame('object', $info['name'], $class);
+            $this->assertSame('DateTimeInterface', $info['type'], $class);
+            $this->assertFalse($info['isOptional'], $class);
+        }
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {
