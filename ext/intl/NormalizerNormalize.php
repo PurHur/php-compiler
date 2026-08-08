@@ -6,10 +6,13 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPLLVM\Value;
 
 /**
- * Normalizer::normalize() — OOP alias of normalizer_normalize() (#19535).
+ * Normalizer::normalize() — OOP alias of normalizer_normalize() (#19535, AOT #28654).
  *
  * Z_PARAM_STR null TypeError on 8.4 forward profile (#21063, normalizer.stub.php).
  */
@@ -42,5 +45,10 @@ final class NormalizerNormalize extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(VmNormalizer::normalize($input, $form));
         }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitNormalizerNormalize::invokeMethod($context, ...$args);
     }
 }
