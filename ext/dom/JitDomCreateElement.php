@@ -66,7 +66,43 @@ final class JitDomCreateElement
         return '' !== $name && 1 === preg_match('/^[A-Za-z_:][\w.:-]*$/', $name);
     }
 
-    private static function invokeViaHelper(Context $context, JITVariable ...$args): Value
+    /**
+     * Living Dom\Document::createElement — main-module materialize (no NestedJIT).
+     * User-script createFromString docs are not DomRegistry ObjectEntries; the helper
+     * path segfaults (#28958). HTMLDocument → Dom\HTMLElement + uppercase tagName.
+     */
+    public static function invokeLiving(
+        Context $context,
+        string $elementClass,
+        bool $htmlUppercase,
+        JITVariable ...$args
+    ): Value {
+        if (\count($args) < 2) {
+            throw new \LogicException('Dom\\Document::createElement() expects receiver and name');
+        }
+
+        $nameLit = self::compileTimeStringArg($args[1]);
+        if (null !== $nameLit) {
+            if (!self::isValidXmlNameLit($nameLit)) {
+                return self::invokeViaHelper($context, ...$args);
+            }
+            $tag = $htmlUppercase ? strtoupper($nameLit) : $nameLit;
+            $obj = self::materializeElementFromLiteral($context, $tag, $elementClass);
+            self::initTextContentSlot($context, $obj, $args[2] ?? null, $elementClass);
+            self::storeOwnerAndNullParent($context, $obj, $args[0], $elementClass);
+
+            return $obj;
+        }
+
+        // Runtime name — helper is document-aware but needs a real ObjectEntry document.
+        return self::invokeViaHelper($context, ...$args);
+    }
+
+    /**
+     * NestedJIT ABI for DOMDocument / living docs with a DomRegistry ObjectEntry (#18938).
+     * Prefer {@see invokeLiving} for user-script-materialized HTMLDocument receivers (#28958).
+     */
+    public static function invokeViaHelper(Context $context, JITVariable ...$args): Value
     {
         DomCreateElementRuntime::ensureLinked($context);
 
@@ -93,10 +129,14 @@ final class JitDomCreateElement
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
-    private static function initTextContentSlot(Context $context, Value $element, ?JITVariable $valueArg): void
-    {
+    private static function initTextContentSlot(
+        Context $context,
+        Value $element,
+        ?JITVariable $valueArg,
+        string $className = self::CLASS_ELEMENT
+    ): void {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
             $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
         }
@@ -111,7 +151,7 @@ final class JitDomCreateElement
         );
         $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
         $objectType->propertyStore(
-            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT),
+            $objectType->propertySlotFor($element, $className, self::PROP_TEXT_CONTENT),
             $propVar,
             JITVariable::TYPE_STRING
         );
@@ -342,10 +382,14 @@ final class JitDomCreateElement
     /**
      * #21687: null parentNode + ownerDocument so living-API walks do not read garbage slots.
      */
-    private static function storeOwnerAndNullParent(Context $context, Value $obj, JITVariable $documentArg): void
-    {
+    private static function storeOwnerAndNullParent(
+        Context $context,
+        Value $obj,
+        JITVariable $documentArg,
+        string $className = self::CLASS_ELEMENT
+    ): void {
         $objectType = $context->type->object;
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        $classId = $objectType->lookup($className);
         self::ensureElementPropertyLayout($objectType, $classId);
 
         $nullSlot = JitValueBox::alloc($context);
@@ -356,17 +400,17 @@ final class JitDomCreateElement
         $nullVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $nullSlot);
         $docObj = self::loadObjectArg($context, $documentArg);
         $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $docObj);
-        // DOMElement layout only — writing DOMNode slots into a DOMElement allocation corrupts memory.
+        // Element layout only — writing DOMNode slots into a mismatched allocation corrupts memory.
         if (!$objectType->hasProperty($classId, VmDom::PROP_OWNER_DOCUMENT)) {
             $objectType->defineProperty($classId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
         }
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
+            $objectType->propertySlotFor($obj, $className, VmDom::PROP_OWNER_DOCUMENT),
             $docJit,
             JITVariable::TYPE_VALUE
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $objectType->propertySlotFor($obj, $className, VmDom::PROP_PARENT_NODE),
             $nullVar,
             JITVariable::TYPE_VALUE
         );

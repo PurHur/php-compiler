@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7246 |
-| Phase A inventory files (M2 ratio SSOT) | 7246 |
+| PHP files on vm.php path | 7248 |
+| Phase A inventory files (M2 ratio SSOT) | 7248 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23377 |
+| Source constructs flagged (warnings) | 23394 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2510,7 +2510,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BrowscapEngine.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 22 |
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
-| `ext/standard/BuiltinEnums.php` | 0 | 21 |
+| `ext/standard/BuiltinEnums.php` | 0 | 14 |
 | `ext/standard/BuiltinIntrospectionPolicy.php` | 0 | 1 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
 | `ext/standard/CaseCompareJitHelper.php` | 0 | 1 |
@@ -3063,7 +3063,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrIreplace.php` | 0 | 1 |
 | `ext/standard/JitStrIreplaceMulti.php` | 0 | 1 |
 | `ext/standard/JitStrReplace.php` | 0 | 1 |
-| `ext/standard/JitStrReplaceArray.php` | 0 | 1 |
+| `ext/standard/JitStrReplaceArray.php` | 0 | 2 |
 | `ext/standard/JitStrReplaceMulti.php` | 0 | 1 |
 | `ext/standard/JitStrReplaceSearchReplaceGuard.php` | 0 | 1 |
 | `ext/standard/JitStrReplaceSubject.php` | 0 | 1 |
@@ -5992,6 +5992,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomHtmlDocumentCreateFromString.php` | 0 | 1 |
 | `lib/JIT/Call/DomImplementationCreateDocumentType.php` | 0 | 1 |
 | `lib/JIT/Call/DomInstanceMethod.php` | 0 | 1 |
+| `lib/JIT/Call/DomLivingDocumentCreateElement.php` | 0 | 1 |
+| `lib/JIT/Call/DomLivingDocumentCreateElementNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAfter.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAppend.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAppendChild.php` | 0 | 2 |
@@ -6219,7 +6221,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/DatePeriodForeachSnapshot.php` | 0 | 3 |
 | `lib/JIT/DeprecatedCallGuard.php` | 0 | 1 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 28 |
-| `lib/JIT/DomInstanceMethodJit.php` | 0 | 64 |
+| `lib/JIT/DomInstanceMethodJit.php` | 0 | 68 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
@@ -6940,7 +6942,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/CloneWithSupport.php` | 0 | 1 |
 | `lib/VM/ClosureBindJitHelper.php` | 0 | 1 |
 | `lib/VM/ClosureState.php` | 0 | 30 |
-| `lib/VM/ClosureSupport.php` | 0 | 22 |
+| `lib/VM/ClosureSupport.php` | 0 | 27 |
 | `lib/VM/CoalesceJitHelper.php` | 0 | 1 |
 | `lib/VM/CompareJitHelper.php` | 0 | 1 |
 | `lib/VM/CompareJitHelperScalars.php` | 0 | 1 |
@@ -7088,7 +7090,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmExecutingFrame.php` | 0 | 1 |
 | `lib/VM/VmFiberValue.php` | 0 | 1 |
 | `lib/VM/VmFloatCompare.php` | 0 | 1 |
-| `lib/VM/VmFromCallable.php` | 0 | 10 |
+| `lib/VM/VmFromCallable.php` | 0 | 22 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
 | `lib/VM/VmGenerator.php` | 0 | 4 |
 | `lib/VM/VmInclude.php` | 0 | 1 |
@@ -9913,24 +9915,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomCreateElement.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 112)
-- new JITVariable (line 201)
-- new JITVariable (line 229)
-- new JITVariable (line 314)
-- new JITVariable (line 334)
-- new JITVariable (line 356)
-- new JITVariable (line 358)
-- 16 class method(s)
+- new JITVariable (line 152)
+- new JITVariable (line 241)
+- new JITVariable (line 269)
+- new JITVariable (line 354)
+- new JITVariable (line 374)
+- new JITVariable (line 400)
+- new JITVariable (line 402)
+- 17 class method(s)
 
 ### `ext/dom/JitDomCreateElementNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 245)
-- new JITVariable (line 247)
-- new JITVariable (line 338)
-- new JITVariable (line 365)
-- new JITVariable (line 380)
-- 16 class method(s)
+- new JITVariable (line 309)
+- new JITVariable (line 311)
+- new JITVariable (line 407)
+- new JITVariable (line 439)
+- new JITVariable (line 454)
+- 17 class method(s)
 
 ### `ext/dom/JitDomCreateTextNode.php`
 
@@ -27817,27 +27819,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 64)
-- new ClassEntry (line 107)
-- new ClassEntry (line 127)
-- new ClassEntry (line 150)
-- new ClassEntry (line 176)
-- new ClassEntry (line 203)
-- new ClassEntry (line 230)
-- new ClassEntry (line 256)
-- new ClassEntry (line 283)
-- new ClassEntry (line 310)
-- new ClassEntry (line 336)
-- new ClassEntry (line 361)
-- new ClassEntry (line 387)
-- new ClassEntry (line 422)
-- new ClassEntry (line 454)
-- new ClassEntry (line 481)
-- new ClassEntry (line 513)
-- new Variable (line 531)
-- new Variable (line 545)
-- new Variable (line 559)
-- 21 class method(s)
+- new ClassEntry (line 61)
+- new ClassEntry (line 104)
+- new ClassEntry (line 124)
+- new ClassEntry (line 147)
+- new ClassEntry (line 173)
+- new ClassEntry (line 200)
+- new ClassEntry (line 227)
+- new ClassEntry (line 253)
+- new ClassEntry (line 288)
+- new ClassEntry (line 320)
+- new Variable (line 338)
+- new Variable (line 352)
+- new Variable (line 366)
+- 14 class method(s)
 
 ### `ext/standard/BuiltinIntrospectionPolicy.php`
 
@@ -30848,7 +30843,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStrReplaceArray.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new strval (line 90)
+- 2 class method(s)
 
 ### `ext/standard/JitStrReplaceMulti.php`
 
@@ -35432,7 +35428,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSapiHeaderGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmScalarType.php`
 
@@ -35941,9 +35937,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1807)
-- new Error (line 1818)
-- 220 class method(s)
+- new Error (line 1836)
+- new Error (line 1847)
+- 221 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -40245,8 +40241,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 80)
-- new Variable (line 96)
-- new Variable (line 102)
+- new Variable (line 92)
+- new Variable (line 98)
 - 9 class method(s)
 
 ### `ext/standard/str_pad.php`
@@ -40264,8 +40260,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 78)
-- new Variable (line 94)
-- new Variable (line 100)
+- new Variable (line 90)
+- new Variable (line 96)
 - 9 class method(s)
 
 ### `ext/standard/str_rot13.php`
@@ -44923,8 +44919,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 2357)
-- new ArgumentCountError (line 2368)
+- new ArgumentCountError (line 2362)
+- new ArgumentCountError (line 2373)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -46269,20 +46265,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 18995)
 - new VM\PropertyIsInitializedHandler (line 19092)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19150)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19615)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19843)
-- new JIT\Call\VmCoerceVariableToString (line 19970)
-- new JIT\Call\NoOpConstruct (line 20145)
-- new JIT\Call\IncludePathResolverResolve (line 20315)
-- new Operand\Literal (line 20402)
-- new Operand\Literal (line 20405)
-- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 20448)
-- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20601)
-- new VM (line 21775)
-- new VM\Variable (line 21784)
-- new Variable (line 21811)
-- new Variable (line 21857)
-- new Variable (line 22582)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19622)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 19861)
+- new JIT\Call\VmCoerceVariableToString (line 19988)
+- new JIT\Call\NoOpConstruct (line 20163)
+- new JIT\Call\IncludePathResolverResolve (line 20333)
+- new Operand\Literal (line 20420)
+- new Operand\Literal (line 20423)
+- new JIT\Call\NestedJitCompileScopeIsActiveTrue (line 20466)
+- new JIT\Call\RuntimeIndirectStaticMethodCall (line 20619)
+- new VM (line 21793)
+- new VM\Variable (line 21802)
+- new Variable (line 21829)
+- new Variable (line 21875)
+- new Variable (line 22600)
 - 428 class method(s)
 - 20 closure(s)
 
@@ -47446,7 +47442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/HttpResponseRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 22 class method(s)
 
 ### `lib/JIT/Builtin/Iconv.php`
 
@@ -50542,6 +50538,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DomLivingDocumentCreateElement.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomLivingDocumentCreateElementNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DomNodeAfter.php`
 
 **Warnings** (review for bootstrap subset):
@@ -52024,69 +52030,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\DomDocumentCreateElement (line 189)
-- new Call\DomDocumentCreateElementNS (line 194)
-- new Call\DomDocumentCreateComment (line 199)
-- new Call\DomDocumentLoad (line 204)
-- new Call\DomDocumentLoadHTML (line 209)
-- new Call\DomDocumentLoadHTMLFile (line 214)
-- new Call\DomDocumentGetElementById (line 219)
-- new Call\DomDocumentImportNode (line 224)
-- new Call\DomInstanceMethod (line 238)
-- new Call\DomElementGetAttributeNode (line 249)
-- new Call\DomElementGetAttribute (line 258)
-- new Call\DomElementGetAttributeNS (line 266)
-- new Call\DomElementHasAttribute (line 274)
-- new Call\DomAttrRename (line 279)
-- new Call\DomDocumentCreateAttribute (line 288)
-- new Call\DomElementGetAttributeNode (line 293)
-- new Call\DomElementGetAttribute (line 298)
-- new Call\DomElementSetAttribute (line 303)
-- new Call\DomElementRemoveAttribute (line 308)
-- new Call\DomElementGetAttributeNodeNS (line 313)
-- new Call\DomElementSetAttributeNodeNS (line 318)
-- new Call\DomDocumentCreateAttributeNS (line 323)
-- new Call\DomDocumentCreateAttribute (line 328)
-- new Call\DomElementSetAttributeNode (line 333)
-- new Call\DomDocumentLoadXML (line 338)
-- new Call\DomDocumentSaveXML (line 343)
-- new Call\DomDocumentSaveHTML (line 348)
-- new Call\DomDocumentSaveHTMLFile (line 353)
-- new Call\DomDocumentGetElementsByTagName (line 358)
-- new Call\DomDocumentAppendChild (line 363)
-- new Call\DomNodeAppendChild (line 368)
-- new Call\DomNodeAppendChild (line 373)
-- new Call\DomNodeAppendChild (line 378)
-- new Call\DomNodeAppend (line 387)
-- new Call\DomNodePrepend (line 396)
-- new Call\DomNodeReplaceChildren (line 405)
-- new Call\DomElementToggleAttribute (line 410)
-- new Call\DomNodeContains (line 415)
-- new Call\DomNodeCompareDocumentPosition (line 420)
-- new Call\DomNodeGetRootNode (line 425)
-- new Call\DomNodeIsEqualNode (line 430)
-- new Call\DomNodeIsSameNode (line 435)
-- new Call\DomNodeC14N (line 440)
-- new Call\DomNodeRemoveChild (line 445)
-- new Call\DomNodeReplaceChild (line 450)
-- new Call\DomNodeInsertBefore (line 455)
-- new Call\DomNodeAfter (line 465)
-- new Call\DomNodeBefore (line 475)
-- new Call\DomNodeReplaceWith (line 485)
-- new Call\DomNodeChildRemove (line 495)
-- new Call\DomNodeNormalize (line 504)
-- new Call\DomDocumentNormalizeDocument (line 509)
-- new Call\DomDocumentCreateDocumentFragment (line 514)
-- new Call\DomImplementationCreateDocumentType (line 519)
-- new Call\DomXPathQuery (line 524)
-- new Call\DomXPathEvaluate (line 529)
-- new Call\DomXPathRegisterNamespace (line 534)
-- new Call\DomXPathRegisterPhpFunctions (line 539)
-- new Call\DomNodeListItem (line 544)
-- new Call\DomInstanceMethod (line 566)
-- new Call\DomInstanceMethod (line 583)
-- new Call\DomInstanceMethod (line 597)
-- new Call\DomInstanceMethod (line 618)
+- new Call\DomDocumentCreateElement (line 196)
+- new Call\DomDocumentCreateElementNS (line 201)
+- new Call\DomLivingDocumentCreateElement (line 208)
+- new Call\DomLivingDocumentCreateElement (line 216)
+- new Call\DomLivingDocumentCreateElementNS (line 226)
+- new Call\DomLivingDocumentCreateElementNS (line 231)
+- new Call\DomDocumentCreateComment (line 236)
+- new Call\DomDocumentLoad (line 241)
+- new Call\DomDocumentLoadHTML (line 246)
+- new Call\DomDocumentLoadHTMLFile (line 251)
+- new Call\DomDocumentGetElementById (line 256)
+- new Call\DomDocumentImportNode (line 261)
+- new Call\DomInstanceMethod (line 275)
+- new Call\DomElementGetAttributeNode (line 286)
+- new Call\DomElementGetAttribute (line 295)
+- new Call\DomElementGetAttributeNS (line 303)
+- new Call\DomElementHasAttribute (line 311)
+- new Call\DomAttrRename (line 316)
+- new Call\DomDocumentCreateAttribute (line 325)
+- new Call\DomElementGetAttributeNode (line 330)
+- new Call\DomElementGetAttribute (line 335)
+- new Call\DomElementSetAttribute (line 340)
+- new Call\DomElementRemoveAttribute (line 345)
+- new Call\DomElementGetAttributeNodeNS (line 350)
+- new Call\DomElementSetAttributeNodeNS (line 355)
+- new Call\DomDocumentCreateAttributeNS (line 360)
+- new Call\DomDocumentCreateAttribute (line 365)
+- new Call\DomElementSetAttributeNode (line 370)
+- new Call\DomDocumentLoadXML (line 375)
+- new Call\DomDocumentSaveXML (line 380)
+- new Call\DomDocumentSaveHTML (line 385)
+- new Call\DomDocumentSaveHTMLFile (line 390)
+- new Call\DomDocumentGetElementsByTagName (line 395)
+- new Call\DomDocumentAppendChild (line 400)
+- new Call\DomNodeAppendChild (line 405)
+- new Call\DomNodeAppendChild (line 410)
+- new Call\DomNodeAppendChild (line 415)
+- new Call\DomNodeAppend (line 424)
+- new Call\DomNodePrepend (line 433)
+- new Call\DomNodeReplaceChildren (line 442)
+- new Call\DomElementToggleAttribute (line 447)
+- new Call\DomNodeContains (line 452)
+- new Call\DomNodeCompareDocumentPosition (line 457)
+- new Call\DomNodeGetRootNode (line 462)
+- new Call\DomNodeIsEqualNode (line 467)
+- new Call\DomNodeIsSameNode (line 472)
+- new Call\DomNodeC14N (line 477)
+- new Call\DomNodeRemoveChild (line 482)
+- new Call\DomNodeReplaceChild (line 487)
+- new Call\DomNodeInsertBefore (line 492)
+- new Call\DomNodeAfter (line 502)
+- new Call\DomNodeBefore (line 512)
+- new Call\DomNodeReplaceWith (line 522)
+- new Call\DomNodeChildRemove (line 532)
+- new Call\DomNodeNormalize (line 541)
+- new Call\DomDocumentNormalizeDocument (line 546)
+- new Call\DomDocumentCreateDocumentFragment (line 551)
+- new Call\DomImplementationCreateDocumentType (line 556)
+- new Call\DomXPathQuery (line 561)
+- new Call\DomXPathEvaluate (line 566)
+- new Call\DomXPathRegisterNamespace (line 571)
+- new Call\DomXPathRegisterPhpFunctions (line 576)
+- new Call\DomNodeListItem (line 581)
+- new Call\DomInstanceMethod (line 603)
+- new Call\DomInstanceMethod (line 620)
+- new Call\DomInstanceMethod (line 634)
+- new Call\DomInstanceMethod (line 655)
 - 7 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
@@ -57111,7 +57121,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/CallableCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `lib/VM/CastJitHelper.php`
 
@@ -57277,24 +57287,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 179)
 - new Error (line 188)
-- new Variable (line 286)
-- new Variable (line 293)
-- new Error (line 478)
-- new Variable (line 487)
-- new Variable (line 496)
-- new Variable (line 502)
-- new Variable (line 514)
-- new Error (line 544)
-- new NewCallableHandler (line 562)
-- new EnumFromHandler (line 596)
-- new Variable (line 644)
+- new Error (line 215)
+- new Variable (line 284)
+- new Variable (line 291)
+- new Error (line 476)
+- new Variable (line 485)
+- new Variable (line 494)
+- new Variable (line 500)
+- new Variable (line 512)
+- new Error (line 542)
+- new NewCallableHandler (line 560)
+- new EnumFromHandler (line 594)
+- new Variable (line 642)
+- new Variable (line 716)
 - new Variable (line 718)
-- new Variable (line 720)
-- new Variable (line 919)
-- new Variable (line 949)
-- new Error (line 1210)
-- new Error (line 1243)
-- new Error (line 1295)
+- new Error (line 741)
+- new Error (line 759)
+- new Error (line 768)
+- new Error (line 822)
+- new Variable (line 928)
+- new Variable (line 958)
+- new Error (line 1219)
+- new Error (line 1252)
+- new Error (line 1304)
 - 43 class method(s)
 - 9 closure(s)
 
@@ -58577,7 +58592,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmBoundMethodCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `lib/VM/VmClosure.php`
 
@@ -58626,16 +58641,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmFromCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Block (line 81)
-- new Error (line 137)
-- new JitVariable (line 152)
-- new JitVariable (line 192)
-- new ClosureWithBinding (line 199)
-- new Error (line 281)
-- new Error (line 361)
-- new Error (line 366)
-- new Error (line 409)
-- 15 class method(s)
+- new Error (line 56)
+- new VmVariable (line 150)
+- new VmVariable (line 155)
+- new VmVariable (line 160)
+- new VmVariable (line 187)
+- new VmVariable (line 189)
+- new Error (line 192)
+- new Error (line 199)
+- new Error (line 203)
+- new Error (line 206)
+- new VmVariable (line 215)
+- new VmVariable (line 217)
+- new Block (line 287)
+- new Error (line 343)
+- new JitVariable (line 358)
+- new JitVariable (line 398)
+- new ClosureWithBinding (line 405)
+- new Error (line 487)
+- new Error (line 567)
+- new Error (line 572)
+- new Error (line 615)
+- 20 class method(s)
 
 ### `lib/VM/VmFunctionStatic.php`
 
