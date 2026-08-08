@@ -678,6 +678,14 @@ final class BuiltinInternalArgInfo
                 1 => '',
                 default => null,
             },
+            // ext/openssl/openssl.stub.php — &$tag untyped; string $aad (InternalArgInfo string / ?string) (#28593)
+            'openssl_encrypt' => match ($index) {
+                5 => '',
+                6 => 'string',
+                default => null,
+            },
+            // ext/openssl/openssl.stub.php — string $aad = "" (InternalArgInfo ?string) (#28593)
+            'openssl_decrypt' => 6 === $index ? 'string' : null,
             // ext/openssl/openssl.stub.php — absent from InternalArgInfo; string $cipher_algo (#27916)
             'openssl_cipher_key_length' => 0 === $index ? 'string' : null,
             // ext/intl/grapheme/grapheme.stub.php — Zend names/types; &$next untyped (#27884)

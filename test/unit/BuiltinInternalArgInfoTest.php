@@ -1003,6 +1003,46 @@ final class BuiltinInternalArgInfoTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_random_pseudo_bytes'));
     }
 
+    /** php-src openssl.stub.php — encrypt &$tag untyped + string $aad; decrypt string $iv="" / $aad="" (#28593). */
+    public function testOpensslEncryptDecryptReflectionStubTypes(): void
+    {
+        $this->assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_encrypt', 5));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_encrypt', 6));
+        $this->assertSame('string', BuiltinInternalArgInfo::stubParamTypeOverride('openssl_decrypt', 6));
+
+        $encTag = BuiltinInternalArgInfo::paramInfoForFunction('openssl_encrypt', 5);
+        $this->assertNotNull($encTag);
+        $this->assertSame('tag', ltrim($encTag['name'], '&'));
+        $this->assertSame('', $encTag['type']);
+        $this->assertTrue($encTag['isOptional']);
+        $this->assertSame([5], BuiltinByRefParams::forFunction('openssl_encrypt'));
+        $this->assertSame('tag', BuiltinParamNames::forFunction('openssl_encrypt')[5]);
+
+        $encAad = BuiltinInternalArgInfo::paramInfoForFunction('openssl_encrypt', 6);
+        $this->assertNotNull($encAad);
+        $this->assertSame('aad', $encAad['name']);
+        $this->assertSame('string', $encAad['type']);
+        $this->assertTrue($encAad['isOptional']);
+
+        $decIv = BuiltinInternalArgInfo::paramInfoForFunction('openssl_decrypt', 4);
+        $this->assertNotNull($decIv);
+        $this->assertSame('iv', $decIv['name']);
+        $this->assertSame('string', $decIv['type']);
+        $this->assertTrue($decIv['isOptional']);
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('openssl_decrypt', 4, $decIv, false)
+        );
+
+        $decAad = BuiltinInternalArgInfo::paramInfoForFunction('openssl_decrypt', 6);
+        $this->assertNotNull($decAad);
+        $this->assertSame('aad', $decAad['name']);
+        $this->assertSame('string', $decAad['type']);
+        $this->assertTrue($decAad['isOptional']);
+        $this->assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('openssl_decrypt', 6, $decAad, false)
+        );
+    }
+
     /** php-src link.stub.php — InternalArgInfo return int; Zend bool (#26323). */
     public function testSymlinkReflectionReturnBool(): void
     {
