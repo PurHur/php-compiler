@@ -254,6 +254,28 @@ final class BuiltinInternalArgInfoTest extends TestCase
         }
     }
 
+    /** php-src php_date.stub.php — date_create*_from_format / date_modify Reflection (#27773). */
+    public function testDateCreateFromFormatFamilyReflectionStubs(): void
+    {
+        $this->assertSame('DateTime|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('date_create_from_format'));
+        $this->assertSame(
+            'DateTimeImmutable|false',
+            BuiltinInternalArgInfo::returnTypeLabelForFunction('date_create_immutable_from_format')
+        );
+        $this->assertSame('DateTime|false', BuiltinInternalArgInfo::returnTypeLabelForFunction('date_modify'));
+        foreach (['date_create_from_format', 'date_create_immutable_from_format'] as $f) {
+            $this->assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction($f, 0)['type'], $f);
+            $this->assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction($f, 1)['type'], $f);
+            $tz = BuiltinInternalArgInfo::paramInfoForFunction($f, 2);
+            $this->assertNotNull($tz, $f);
+            $this->assertSame('?DateTimeZone', $tz['type'], $f);
+            $this->assertTrue($tz['isOptional'], $f);
+            $this->assertSame(['format', 'datetime', 'timezone='], BuiltinParamNames::forFunction($f), $f);
+        }
+        $this->assertSame('DateTime', BuiltinInternalArgInfo::paramInfoForFunction('date_modify', 0)['type']);
+        $this->assertSame('string', BuiltinInternalArgInfo::paramInfoForFunction('date_modify', 1)['type']);
+    }
+
     /** php-src math.stub.php — InternalArgInfo float→int; Zend int|float→float (#25595). */
     public function testCeilFloorReflectionStubTypes(): void
     {
