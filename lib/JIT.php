@@ -21751,7 +21751,11 @@ class JIT {
     private function foldSortFamilyFlagsArg(string $name, array $args, array $operands, Block $block): array
     {
         $lc = strtolower($name);
-        if (!\in_array($lc, ['sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort'], true)) {
+        if (!\in_array($lc, [
+            'sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort',
+            // array_unique flags share SORT_*|SORT_FLAG_CASE folding (#29114).
+            'array_unique',
+        ], true)) {
             return $args;
         }
         if (2 !== \count($args) || !isset($operands[1])) {

@@ -261,6 +261,24 @@ final class VmInternalCompare
             if (OpCode::TYPE_CONST_FETCH === $op->type) {
                 return self::sortFlagsFromConstFetch($context, $block, $op);
             }
+            // Inline SORT_* | SORT_FLAG_CASE (and &/^) — peer pathinfo bitmask (#9278 / #29114).
+            if (OpCode::TYPE_BITWISE_AND === $op->type
+                || OpCode::TYPE_BITWISE_OR === $op->type
+                || OpCode::TYPE_BITWISE_XOR === $op->type
+            ) {
+                $left = null !== $op->arg2 ? self::slotSortFlags($context, $block, $op->arg2, $visited) : null;
+                $right = null !== $op->arg3 ? self::slotSortFlags($context, $block, $op->arg3, $visited) : null;
+                if (null === $left || null === $right) {
+                    return null;
+                }
+
+                return match ($op->type) {
+                    OpCode::TYPE_BITWISE_AND => $left & $right,
+                    OpCode::TYPE_BITWISE_OR => $left | $right,
+                    OpCode::TYPE_BITWISE_XOR => $left ^ $right,
+                    default => null,
+                };
+            }
         }
 
         return null;

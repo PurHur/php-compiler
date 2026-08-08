@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\lcfirst;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime;
 use PHPLLVM\Builder;
@@ -38,18 +39,18 @@ final class ArrayUniqueLlvm
         if (StdlibConstants::SORT_REGULAR === $sortType) {
             self::uniqueRegular($context, $src, $dest);
         } else {
-            self::uniqueBySeenKey($context, $src, $dest, $sortType);
+            self::uniqueBySeenKey($context, $src, $dest, $flags);
         }
 
         return $dest;
     }
 
     /** SORT_STRING / SORT_NUMERIC — dedupe via side hashtable of signature strings. */
-    private static function uniqueBySeenKey(Context $context, Value $src, Value $dest, int $sortType): void
+    private static function uniqueBySeenKey(Context $context, Value $src, Value $dest, int $flags): void
     {
         $seen = HashTableHelper::alloc($context);
-        self::uniquePackedBySeen($context, $src, $dest, $seen, $sortType);
-        self::uniqueStringKeysBySeen($context, $src, $dest, $seen, $sortType);
+        self::uniquePackedBySeen($context, $src, $dest, $seen, $flags);
+        self::uniqueStringKeysBySeen($context, $src, $dest, $seen, $flags);
     }
 
     private static function uniquePackedBySeen(
@@ -57,7 +58,7 @@ final class ArrayUniqueLlvm
         Value $src,
         Value $dest,
         Value $seen,
-        int $sortType
+        int $flags
     ): void {
         $tag = (string) (++self::$seq);
         $htMap = $context->structFieldMap['__hashtable__'];
@@ -92,7 +93,7 @@ final class ArrayUniqueLlvm
 
         $context->builder->positionAtEnd($keep);
         $valVar = HashTableReadLlvm::readIndexedToValueBox($context, $src, $idx);
-        $sig = self::signatureString($context, $valVar, $sortType);
+        $sig = self::signatureString($context, $valVar, $flags);
         $dup = HashTableReadLlvm::offsetIsSetValueBoxKey(
             $context,
             $seen,
@@ -117,7 +118,7 @@ final class ArrayUniqueLlvm
         Value $src,
         Value $dest,
         Value $seen,
-        int $sortType
+        int $flags
     ): void {
         $tag = (string) (++self::$seq);
         $htMap = $context->structFieldMap['__hashtable__'];
@@ -146,7 +147,7 @@ final class ArrayUniqueLlvm
         $valSlot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $valSlot, $valField);
         $valVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valSlot);
-        $sig = self::signatureString($context, $valVar, $sortType);
+        $sig = self::signatureString($context, $valVar, $flags);
         $dup = HashTableReadLlvm::offsetIsSetValueBoxKey(
             $context,
             $seen,
@@ -269,8 +270,9 @@ final class ArrayUniqueLlvm
         $context->builder->positionAtEnd($done);
     }
 
-    private static function signatureString(Context $context, Variable $valVar, int $sortType): Value
+    private static function signatureString(Context $context, Variable $valVar, int $flags): Value
     {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         $valPtr = JitValueBox::valuePtrFromVariable($context, $valVar);
         // SORT_NUMERIC: php-src numeric_compare_function — double equality (#29113).
         // __value__toNumeric + strval left int "1" and float/string "1.0" in different buckets.
@@ -283,10 +285,16 @@ final class ArrayUniqueLlvm
             );
         }
 
-        return $context->builder->call(
+        $sig = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             (new strval())->valueToString($context, $valPtr)
         );
+        // SORT_STRING|SORT_FLAG_CASE — ASCII case-fold for the uniqueness key (#29114).
+        if (0 !== ($flags & StdlibConstants::SORT_FLAG_CASE)) {
+            lcfirst::transformAllAscii($context, $sig, ord('A'), ord('Z'), 32);
+        }
+
+        return $sig;
     }
 
     /**
