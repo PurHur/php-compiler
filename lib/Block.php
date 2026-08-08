@@ -1633,7 +1633,12 @@ class Block {
         // Sparse slot indices must preserve keys; variadic spread reindexes (#137).
         $return = new Frame(null, $this, $frame);
         $return->scope = $scope;
+        // Empty function bodies often lack CFG ops with getFile(); inherit the caller path so
+        // user-arg TypeError traces are not `[internal function]` (#29023).
         $return->scriptPath = $this->scriptPath();
+        if ('' === $return->scriptPath && null !== $frame && '' !== $frame->scriptPath) {
+            $return->scriptPath = $frame->scriptPath;
+        }
         if (null !== $frame) {
             if (null !== $frame->returnVar) {
                 $return->returnVar = $frame->returnVar;

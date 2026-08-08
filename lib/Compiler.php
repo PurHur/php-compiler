@@ -11561,12 +11561,16 @@ class Compiler {
         }
         $this->maybeEmitImplicitNullableParamDeprecation($param, $defaultConst, $block);
 
-        return new OpCode(
+        $recv = new OpCode(
             OpCode::TYPE_ARG_RECV,
             $slot,
             $paramIdx,
             $defaultConst
         );
+        // Param declaration line for user-arg TypeError Exception::$line (#29023).
+        $recv->sourceLocation = SourceLocation::fromOp($param);
+
+        return $recv;
     }
 
     /**

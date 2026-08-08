@@ -22,6 +22,18 @@ final class FatalSite
         if ($frame->returnSiteLine > 0) {
             return self::normalizeDisplaySite($file, $frame->returnSiteLine, $frame);
         }
+        // User-arg TypeError / ArgumentCountError: Zend sets Exception::$line to the parameter
+        // definition (function start), not the call site — getTrace()[0] still has the call site (#29023).
+        if (self::isUserArgEntryFrame($frame)) {
+            $def = self::userFunctionDefinitionLine($frame);
+            if ($def > 0) {
+                if ('' === $file) {
+                    $file = self::userFunctionDefinitionFile($frame);
+                }
+
+                return self::normalizeDisplaySite($file, $def, $frame);
+            }
+        }
         $line = $frame->callSiteLine;
         if ($line <= 0) {
             for ($f = $frame->parent; null !== $f; $f = $f->parent) {
@@ -39,6 +51,52 @@ final class FatalSite
         }
 
         return self::normalizeDisplaySite($file, $line, $frame);
+    }
+
+    /**
+     * True when the active opcode is ARG_RECV in a user function/method (param type / argc).
+     */
+    public static function isUserArgEntryFrame(Frame $frame): bool
+    {
+        if (null === $frame->block || null === $frame->block->func || $frame->block->isMainScript()) {
+            return false;
+        }
+        $pos = $frame->pos > 0 ? $frame->pos - 1 : 0;
+        $op = $frame->block->opCodes[$pos] ?? null;
+
+        return null !== $op && OpCode::TYPE_ARG_RECV === $op->type;
+    }
+
+    /** php-src zend_wrong_parameter* — Exception line = function declaration line (#29023). */
+    public static function userFunctionDefinitionLine(Frame $frame): int
+    {
+        $phpFunc = self::userPhpFunc($frame);
+        if (null !== $phpFunc && null !== $phpFunc->sourceLocation && $phpFunc->sourceLocation->startLine > 0) {
+            return $phpFunc->sourceLocation->startLine;
+        }
+        $fromOp = self::lineFromOpcodes($frame);
+
+        return $fromOp > 0 ? $fromOp : 0;
+    }
+
+    public static function userFunctionDefinitionFile(Frame $frame): string
+    {
+        $phpFunc = self::userPhpFunc($frame);
+        if (null !== $phpFunc && null !== $phpFunc->sourceLocation && '' !== $phpFunc->sourceLocation->filename) {
+            return $phpFunc->sourceLocation->filename;
+        }
+
+        return ExceptionSupport::throwSiteFile($frame);
+    }
+
+    private static function userPhpFunc(Frame $frame): ?\PHPCompiler\Func\PHP
+    {
+        $call = $frame->call;
+        if (!($call instanceof \PHPCompiler\Func\PHP) && null !== $frame->parent) {
+            $call = $frame->parent->call;
+        }
+
+        return $call instanceof \PHPCompiler\Func\PHP ? $call : null;
     }
 
     /**
