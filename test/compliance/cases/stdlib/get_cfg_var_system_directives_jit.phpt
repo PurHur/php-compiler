@@ -7,5 +7,5 @@ echo get_cfg_var('zend.assertions'), "\n";
 echo get_cfg_var('zend.enable_gc'), "\n";
 --EXPECT--
 2M
--1
+1
 1

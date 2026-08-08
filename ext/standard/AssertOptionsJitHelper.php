@@ -12,7 +12,8 @@ namespace PHPCompiler\ext\standard;
  */
 final class AssertOptionsJitHelper
 {
-    private static int $zendAssertions = -1;
+    /** php-src Zend/zend_ini.c compiled default (`php -n`) is 1 — not distro php.ini (-1) (#28823). */
+    private static int $zendAssertions = 1;
 
     private static bool $active = true;
 

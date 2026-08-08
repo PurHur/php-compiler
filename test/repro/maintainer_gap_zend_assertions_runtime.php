@@ -3,7 +3,9 @@
 /**
  * Issue #24396 — zend.assertions cannot cross -1 at runtime (Zend/zend.c OnUpdateAssertions).
  *
- * Expectation (php-src-strict, default start -1):
+ * Start from -1 via CLI -d (startup stage); runtime ini_set to 1 must fail (#28823 default is 1).
+ *
+ * Expectation (php-src-strict):
  *   ini_set('zend.assertions', '1') → false + warning; value stays -1; assert(false) no-throw
  */
 declare(strict_types=1);

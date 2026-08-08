@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: assert() — enum case description with default zend.assertions (#9550, ext/standard/assert.c)
+Stdlib: assert() — enum case description TypeError with default zend.assertions (#9550 / #28823)
 --FILE--
 <?php
 enum E: string { case A = 'x'; }
@@ -12,4 +12,4 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-no TypeError
+TypeError: assert(): Argument #2 ($description) must be of type string|Throwable, E given

@@ -15,7 +15,7 @@ echo get_cfg_var('no_such_cfg_key_xyz') === false ? 'unknown_false' : 'unknown_b
 8M
 1
 1
--1
+1
 1
 1
 unknown_false
