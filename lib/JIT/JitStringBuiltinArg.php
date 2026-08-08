@@ -892,14 +892,17 @@ final class JitStringBuiltinArg
         $context->builder->branchIf($isBool, $boolErrBlock, $mixedErrBlock);
 
         // zend_execute.c — bool actuals print true/false (#29097).
+        // Use JitValueBox::readBoolByte — there is no __value__readBool (#29109; #21892).
         $context->builder->positionAtEnd($boolErrBlock);
-        $boolVal = $context->builder->call(
-            $context->lookupFunction('__value__readBool'),
-            $valuePtr
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $context->getTypeFromString('int8')->constInt(0, false)
         );
         $trueErr = BasicBlockHelper::append($context, 'str_req_scalar_true');
         $falseErr = BasicBlockHelper::append($context, 'str_req_scalar_false');
-        $context->builder->branchIf($boolVal, $trueErr, $falseErr);
+        $context->builder->branchIf($isTrue, $trueErr, $falseErr);
         $context->builder->positionAtEnd($trueErr);
         self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'true', $expectedType);
         $context->builder->positionAtEnd($falseErr);
