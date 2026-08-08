@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -82,26 +83,13 @@ final class JitStrReplaceArray
         $context->builder->branchIf($isSet, $replaceBlock, $skipUnset);
 
         $context->builder->positionAtEnd($replaceBlock);
-        $entry = self::listEntryAt($context, $src, $srcIdx);
-        $valueMap = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($entry, $valueMap['type'])
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
-        );
-        $doReplaceBlock = BasicBlockHelper::append($context, 'str_replace_do_'.$id);
-        $context->builder->branchIf($isString, $doReplaceBlock, $skipUnset);
-
-        $context->builder->positionAtEnd($doReplaceBlock);
+        // php-src convert_to_string per array subject value (#27165).
         $strPtrTy = $context->getTypeFromString('__string__*');
         $itemResultSlot = $context->builder->alloca($strPtrTy, 1, 'str_replace_arr_item_'.$id);
-        $subject = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $entry
+        $entryBox = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+        $subject = (new strval())->valueToString(
+            $context,
+            JitValueBox::pointer($context, $entryBox->value)
         );
         $itemCountSlot = null;
         if (null !== $countSlot) {
@@ -157,15 +145,5 @@ final class JitStrReplaceArray
         $phi->addIncoming($dest, $head);
 
         return $phi;
-    }
-
-    private static function listEntryAt(Context $context, Value $ht, Value $index): Value
-    {
-        $map = $context->structFieldMap['__hashtable__'];
-        $values = $context->builder->load(
-            $context->builder->structGep($ht, $map['values'])
-        );
-
-        return $context->builder->inBoundsGep($values, $index);
     }
 }
