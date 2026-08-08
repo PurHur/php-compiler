@@ -842,13 +842,15 @@ final class JitParseStrUserScriptCstrKernel
             $saveSlot
         );
 
+        // Store strtok result before branching — a store after the terminator is dead IR and
+        // leaves pairSlot uninitialized (reads as a code address → url_decode segfault, #29001).
+        $pairSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($pair, $pairSlot);
+
         $loopHead = $fn->appendBasicBlock('pdp_head');
         $loopBody = $fn->appendBasicBlock('pdp_body');
         $loopDone = $fn->appendBasicBlock('pdp_done');
         $context->builder->branch($loopHead);
-
-        $pairSlot = BasicBlockHelper::entryAlloca($context, $i8p);
-        $context->builder->store($pair, $pairSlot);
 
         $context->builder->positionAtEnd($loopHead);
         $pair = $context->builder->load($pairSlot);
