@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 7248 |
-| Phase A inventory files (M2 ratio SSOT) | 7248 |
+| PHP files on vm.php path | 7250 |
+| Phase A inventory files (M2 ratio SSOT) | 7250 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 23399 |
+| Source constructs flagged (warnings) | 23401 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3509,6 +3509,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsTempnam.php` | 0 | 1 |
 | `ext/standard/VmFsTempnamNative.php` | 0 | 1 |
 | `ext/standard/VmFsTempnamPure.php` | 0 | 1 |
+| `ext/standard/VmFsTouchLibcThinAbi.php` | 0 | 1 |
 | `ext/standard/VmFsTouchNative.php` | 0 | 1 |
 | `ext/standard/VmFsTouchPure.php` | 0 | 1 |
 | `ext/standard/VmFsUnlink.php` | 0 | 1 |
@@ -5883,6 +5884,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/TimezoneLocationRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TimezoneOffsetRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TokenGetAll.php` | 0 | 1 |
+| `lib/JIT/Builtin/TouchLibcRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TransliteratorTransliterateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TryCatchRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type.php` | 0 | 5 |
@@ -34372,6 +34374,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/VmFsTouchLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/standard/VmFsTouchNative.php`
 
 **Warnings** (review for bootstrap subset):
@@ -34380,7 +34387,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsTouchPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmFsUnlink.php`
 
@@ -49899,6 +49906,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 7 class method(s)
 
 ### `lib/JIT/Builtin/TokenGetAll.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/TouchLibcRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)

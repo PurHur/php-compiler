@@ -10,7 +10,8 @@ use PHPCompiler\ext\standard\VmFsTouchNative;
 use PHPUnit\Framework\TestCase;
 
 /**
- * touch/mkdir/tempnam JIT routes through FsDirJitHelper PHP not StringFsDirJit libc LLVM (#8999 / #25976).
+ * touch/mkdir/tempnam JIT — mkdir/tempnam via FsDirJitHelper NestedJIT; touch via
+ * TouchLibcRuntime libc utime (#8999 / #25976 / #28995).
  *
  * NestedJIT via {@see \PHPCompiler\JIT\JitVmHelperLink::ensureCompiled} (peer #25570).
  */
@@ -42,13 +43,13 @@ final class FsDirRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('mkstemp')", $source);
     }
 
-    public function testFsDirRuntimeUsesJitVmHelperLink(): void
+    public function testFsDirRuntimeUsesJitVmHelperLinkForMkdirTempnam(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FsDirRuntime.php');
         $this->assertStringContainsString('FsDirJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
-        $this->assertStringNotContainsString("lookupFunction('mkdir')", $source);
+        $this->assertStringContainsString('TouchLibcRuntime::emit', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('new JIT(', $source);
@@ -57,6 +58,14 @@ final class FsDirRuntimeShrinkTest extends TestCase
         $lineCount = \substr_count($source, "\n") + 1;
         $this->assertLessThan(290, $lineCount);
         $this->assertGreaterThan(10, 320 - $lineCount);
+    }
+
+    public function testTouchLibcRuntimeDeclaresUtime(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/TouchLibcRuntime.php');
+        $this->assertStringContainsString("lookupFunction('utime')", $source);
+        $this->assertStringContainsString('TOUCH_TIME_OMIT', $source);
+        $this->assertStringContainsString('#28995', $source);
     }
 
     public function testFsDirJitHelperTouchMatchesVmFs(): void

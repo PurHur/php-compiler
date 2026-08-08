@@ -34,8 +34,17 @@ final class VmFsTouchTempnamRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsTouchPure.php');
         $this->assertStringContainsString('VmFsOpenNative::open', $source);
+        $this->assertStringContainsString('VmFsTouchLibcThinAbi', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString('int utime', $source);
+    }
+
+    public function testTouchLibcThinAbiQuarantinesUtime(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsTouchLibcThinAbi.php');
+        $this->assertStringContainsString('FFI::cdef', $source);
+        $this->assertStringContainsString('int utime', $source);
+        $this->assertStringContainsString('#28995', $source);
     }
 
     public function testTempnamPureDoesNotUseLibcFfi(): void
