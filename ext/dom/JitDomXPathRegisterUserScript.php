@@ -98,6 +98,10 @@ final class JitDomXPathRegisterUserScript
         if (null === $prefix || null === $uri) {
             return null;
         }
+        // php-src xpath.c / xmlXPathRegisterNs — empty prefix → false (#29135).
+        if ('' === $prefix) {
+            return self::boxBool($context, false);
+        }
         self::$namespaces[$prefix] = $uri;
 
         return self::boxBool($context, true);
