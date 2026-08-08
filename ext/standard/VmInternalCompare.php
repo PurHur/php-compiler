@@ -89,8 +89,8 @@ final class VmInternalCompare
     }
 
     /**
-     * sort()/rsort() flags (php-src basic_functions.stub.php — no $direction; #23225).
-     * Sorting enum remains accepted as the flags operand when advertised (#9947).
+     * sort()/rsort() flags (php-src basic_functions.stub.php — int $flags only; #23225, #28930).
+     * Phantom Sorting enum retired — Zend never accepts enum flags.
      */
     public static function resolveSortFunctionFlags(Frame $frame, string $function): int
     {
@@ -103,13 +103,13 @@ final class VmInternalCompare
             $function,
             2,
             '$flags',
-            true
+            false
         );
     }
 
     /**
      * @throws \LogicException when $allowSortingEnum is false and operand is not int
-     * @throws \TypeError when $allowSortingEnum is true and operand is not int|Sorting
+     * @throws \TypeError when $allowSortingEnum is true and operand is not int (historical Sorting path)
      */
     public static function resolveFrameSortFlagsOperand(
         Variable $flagsArg,
@@ -128,7 +128,7 @@ final class VmInternalCompare
             }
             if (EnumCaseSupport::isEnumCaseVariable($flagsArg)) {
                 throw new \TypeError(sprintf(
-                    '%s(): Argument #%d (%s) must be of type int|Sorting, %s given',
+                    '%s(): Argument #%d (%s) must be of type int, %s given',
                     $function,
                     $argNum,
                     $paramName,
@@ -137,7 +137,7 @@ final class VmInternalCompare
             }
             if (Variable::TYPE_INTEGER !== $flagsArg->type) {
                 throw new \TypeError(sprintf(
-                    '%s(): Argument #%d (%s) must be of type int|Sorting, %s given',
+                    '%s(): Argument #%d (%s) must be of type int, %s given',
                     $function,
                     $argNum,
                     $paramName,

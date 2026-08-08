@@ -1,17 +1,11 @@
 --TEST--
-stdlib SortDirection enum — pure enum cases (#7261)
+stdlib SortDirection phantom absent (#28930, re-#7261)
 --FILE--
 <?php
 var_export(enum_exists('SortDirection', false));
 echo "\n";
-var_export(unitenum_exists('SortDirection'));
-echo "\n";
-var_export(SortDirection::Ascending->name);
-echo "\n";
-var_export(SortDirection::Descending->name);
+var_export(class_exists('SortDirection', false));
 echo "\n";
 --EXPECT--
-true
-true
-'Ascending'
-'Descending'
+false
+false

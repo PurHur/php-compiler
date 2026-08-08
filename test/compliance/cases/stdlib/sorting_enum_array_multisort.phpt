@@ -1,16 +1,16 @@
 --TEST--
-stdlib Sorting enum — array_multisort() ascending/descending (#7229)
+stdlib Sorting phantom absent; array_multisort() SORT_* ints (#28930, re-#7229)
 --FILE--
 <?php
 var_export(enum_exists('Sorting', false));
 echo "\n";
 $a = [3, 1, 2];
 $b = ['c', 'a', 'b'];
-array_multisort($a, Sorting::Ascending, $b);
+array_multisort($a, SORT_ASC, $b);
 echo implode(',', $a), "\n";
-array_multisort($a, Sorting::Descending, $b);
+array_multisort($a, SORT_DESC, $b);
 echo implode(',', $a), "\n";
 --EXPECT--
-true
+false
 1,2,3
 3,2,1

@@ -1,29 +1,21 @@
 --TEST--
-stdlib sort()/rsort() accept Sorting enum as flags (#9947; no phantom direction — #23225)
+stdlib Sorting phantom absent; sort()/rsort() int flags only (#28930, re-#9947)
 --SKIPIF--
 <?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
 <?php
 declare(strict_types=1);
 
+var_export(enum_exists('Sorting', false));
+echo "\n";
 $a = [3, 1, 2];
-sort($a, Sorting::Ascending);
+sort($a, SORT_REGULAR);
 echo implode(',', $a), "\n";
-
-$b = ['10', '2', '1'];
-sort($b, Sorting::Ascending);
-echo implode(',', $b), "\n";
-
-$c = [3, 1, 2];
-sort($c, flags: Sorting::Ascending);
-echo implode(',', $c), "\n";
-
 $d = [3, 1, 2];
-rsort($d, Sorting::Descending);
+rsort($d, SORT_REGULAR);
 echo implode(',', $d), "\n";
 ?>
 --EXPECT--
-1,2,3
-1,10,2
+false
 1,2,3
 3,2,1

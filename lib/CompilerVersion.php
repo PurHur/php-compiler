@@ -2008,13 +2008,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ Sorting / SortDirection builtin enums (ext/standard/basic_functions.stub.php, #7229, #7261, #12362).
+     * Sorting / SortDirection — absent from php-src (only SORT_ASC/SORT_DESC ints;
+     * ext/standard/basic_functions.stub.php / array.c).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.3/8.4/8.5).
+     * Forward-profile enable (#7229/#7261) retired by #28930 (re-#12362).
      */
     public static function supportsSortingEnum(): bool
     {
-        return self::supportsBuiltinStubEnums();
+        return false;
     }
 
     /**
