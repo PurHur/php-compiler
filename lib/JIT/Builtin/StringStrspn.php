@@ -243,7 +243,50 @@ final class StringStrspn
         $context->builder->branchIf($maskEmptyCspn, $cspnEmptyMaskBb, $loopSetupBb);
 
         $context->builder->positionAtEnd($cspnEmptyMaskBb);
-        $context->builder->returnValue($segLen);
+        // Unset PROFILE / PROFILE≥8.4 (GH-12592, #7088): empty mask → full segment length.
+        // Explicit PROFILE&lt;8.4 (#27716): stop at first embedded NUL like Zend 8.2.
+        if (!\PHPCompiler\ext\standard\VmString::strcspnEmptyMaskStopsAtNul()) {
+            $context->builder->returnValue($segLen);
+        } else {
+            $nulCountSlot = $context->builder->alloca($i64, 1, 'cspn_empty_nul_cnt');
+            $nulIdxSlot = $context->builder->alloca($i64, 1, 'cspn_empty_nul_i');
+            $context->builder->store($zero, $nulCountSlot);
+            $context->builder->store($start, $nulIdxSlot);
+            $nulEnd = $context->builder->add($start, $segLen);
+            $nulHead = $fn->appendBasicBlock('cspn_empty_nul_head');
+            $nulBody = $fn->appendBasicBlock('cspn_empty_nul_body');
+            $nulInc = $fn->appendBasicBlock('cspn_empty_nul_inc');
+            $nulDone = $fn->appendBasicBlock('cspn_empty_nul_done');
+            $context->builder->branch($nulHead);
+
+            $context->builder->positionAtEnd($nulHead);
+            $nulI = $context->builder->load($nulIdxSlot);
+            $nulAtEnd = $context->builder->icmp(Builder::INT_SGE, $nulI, $nulEnd);
+            $context->builder->branchIf($nulAtEnd, $nulDone, $nulBody);
+
+            $context->builder->positionAtEnd($nulBody);
+            $nulByte = $context->builder->load($context->builder->gep($strData, $nulI));
+            $isNul = $context->builder->icmp(
+                Builder::INT_EQ,
+                $nulByte,
+                $i8->constInt(0, false)
+            );
+            $context->builder->branchIf($isNul, $nulDone, $nulInc);
+
+            $context->builder->positionAtEnd($nulInc);
+            $context->builder->store(
+                $context->builder->add($context->builder->load($nulCountSlot), $one),
+                $nulCountSlot
+            );
+            $context->builder->store(
+                $context->builder->add($nulI, $one),
+                $nulIdxSlot
+            );
+            $context->builder->branch($nulHead);
+
+            $context->builder->positionAtEnd($nulDone);
+            $context->builder->returnValue($context->builder->load($nulCountSlot));
+        }
 
         $context->builder->positionAtEnd($loopSetupBb);
         $iSlot = $context->builder->alloca($i64, 1);
