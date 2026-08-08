@@ -52,13 +52,31 @@ final class CsvStrGetcsvJitHelper
         string $enclosure,
         string $escape,
     ): array {
-        if (!isset($input[0])) {
+        // php-src / VmCsv::parseLine — strip trailing CR/LF before parse (#28994).
+        // Inlined from stripLineTerminatorsArgv (no NestedJIT cross-method return).
+        $len = 0;
+        while (isset($input[$len])) {
+            ++$len;
+        }
+        while ($len > 0) {
+            $c = $input[$len - 1];
+            if ("\n" !== $c && "\r" !== $c) {
+                break;
+            }
+            --$len;
+        }
+        if (0 === $len) {
             // NestedJIT aborts on `return [null]` — empty array signals null-row to the bridge (#27069).
+            // Also covers terminator-only rows after strip (#10623).
             return [];
         }
-        if (self::isLineTerminatorOnly($input)) {
-            return [];
+        $trimmed = '';
+        $ti = 0;
+        while ($ti < $len) {
+            $trimmed .= $input[$ti];
+            ++$ti;
         }
+        $input = $trimmed;
 
         $delim = isset($separator[0]) ? $separator[0] : ',';
         $enc = isset($enclosure[0]) ? $enclosure[0] : '"';
@@ -67,10 +85,7 @@ final class CsvStrGetcsvJitHelper
 
         $fields = [];
         $n = 0;
-        $len = 0;
-        while (isset($input[$len])) {
-            ++$len;
-        }
+        // $len already counted after terminator strip.
         $i = 0;
         $guard = 0;
 
@@ -150,22 +165,5 @@ final class CsvStrGetcsvJitHelper
     private static function isCsvWhitespace(string $byte): bool
     {
         return ' ' === $byte || "\t" === $byte || "\n" === $byte || "\r" === $byte || "\v" === $byte || "\f" === $byte;
-    }
-
-    private static function isLineTerminatorOnly(string $line): bool
-    {
-        if (!isset($line[0])) {
-            return false;
-        }
-        $i = 0;
-        while (isset($line[$i])) {
-            $c = $line[$i];
-            if ("\n" !== $c && "\r" !== $c) {
-                return false;
-            }
-            ++$i;
-        }
-
-        return true;
     }
 }

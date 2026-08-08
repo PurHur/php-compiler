@@ -67,6 +67,26 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertSame($fields, $row);
     }
 
+    public function testCsvStrGetcsvJitHelperStripsTrailingRecordTerminator(): void
+    {
+        // #28994 — trailing LF/CRLF must not remain in the last field (php-src / VmCsv).
+        foreach (["a,b\n", "a,b\r\n", "a,\n", "a,\"b\nc\"\n"] as $input) {
+            $this->assertSame(
+                \PHPCompiler\ext\standard\VmCsv::parseLine($input),
+                \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper::strGetcsvArgv($input, ',', '"', '\\'),
+                'mismatch for '.json_encode($input)
+            );
+        }
+        $this->assertSame(
+            ['a', 'b'],
+            \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper::strGetcsvArgv("a,b\n", ',', '"', '\\')
+        );
+        $this->assertSame(
+            ['a', "b\nc"],
+            \PHPCompiler\ext\standard\CsvStrGetcsvJitHelper::strGetcsvArgv("a,\"b\nc\"\n", ',', '"', '\\')
+        );
+    }
+
     public function testCsvStrGetcsvJitHelperEmptySignalsNullRow(): void
     {
         // NestedJIT cannot materialize [null]; bridge expands [] → [null] (#27069).
