@@ -10,6 +10,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilterBoolean;
 use PHPCompiler\JIT\Builtin\StringFilterDomain;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
+use PHPCompiler\JIT\Builtin\StringFilterFloat;
 use PHPCompiler\JIT\Builtin\StringFilterInt;
 use PHPCompiler\JIT\Builtin\StringFilterIp;
 use PHPCompiler\JIT\Builtin\StringFilterMac;
@@ -295,6 +296,11 @@ final class JitFilter
         if (null === $options || JITVariable::TYPE_NULL === $options->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        // Named constants (e.g. FILTER_FLAG_ALLOW_THOUSAND) often carry compileTimeLong
+        // while the LLVM value is a load — prefer the foldable immediate for AOT (#29013).
+        if (null !== $options->compileTimeLong) {
+            return $context->getTypeFromString('int64')->constInt((int) $options->compileTimeLong, false);
+        }
 
         return self::loadFilterId($context, $options);
     }
@@ -399,7 +405,7 @@ final class JitFilter
         return self::stringToBooleanBox($context, $context->helper->loadValue($value), $nullOnFailure);
     }
 
-    public static function validateFloat(Context $context, JITVariable $value): Value
+    public static function validateFloat(Context $context, JITVariable $value, ?Value $flags = null): Value
     {
         if (JITVariable::TYPE_VALUE === $value->type) {
             return self::boxValueValidateFloat($context, $value);
@@ -408,6 +414,8 @@ final class JitFilter
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
+        $i64 = $context->getTypeFromString('int64');
+        $flagsVal = $flags ?? $i64->constInt(0, false);
 
         if (JITVariable::TYPE_NATIVE_LONG === $value->type) {
             $dblTy = $context->getTypeFromString('double');
@@ -436,7 +444,65 @@ final class JitFilter
             return $ptr;
         }
 
-        return self::stringToFloatBox($context, $context->helper->loadValue($value));
+        // Compile-time string + const flags — fold via VmFilter SSOT (#29013).
+        $lit = $value->compileTimeString ?? \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($value);
+        $lib = $context->llvm->lib;
+        $flagsInt = null;
+        if (null !== $lib->LLVMIsAConstantInt($flagsVal->value)) {
+            $flagsInt = (int) $lib->LLVMConstIntGetZExtValue($flagsVal->value);
+        }
+        if (null !== $lit && null !== $flagsInt) {
+            $parsed = VmFilter::parseFloatString($lit, $flagsInt, '.');
+            if (null === $parsed) {
+                JitValueBox::writeBool($context, $slot, $falseVal);
+
+                return $ptr;
+            }
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $ptr,
+                $context->constantFromFloat($parsed)
+            );
+
+            return $ptr;
+        }
+
+        // Always NestedJIT helper for string floats — AOT may lack compileTimeString (#29013).
+        StringFilterFloat::ensureLinked($context);
+        $str = $context->helper->loadValue($value);
+        $ok = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_float_string'),
+            $str,
+            $flagsVal
+        );
+        $isOk = $context->builder->icmp(Builder::INT_NE, $ok, $i64->constInt(0, false));
+
+        $id = (string) (++self::$blockSerial);
+        $okBlock = BasicBlockHelper::append($context, 'fvf_ok_'.$id);
+        $failBlock = BasicBlockHelper::append($context, 'fvf_fail_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvf_merge_'.$id);
+        $context->builder->branchIf($isOk, $okBlock, $failBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_parse_float_string'),
+            $str,
+            $flagsVal
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $ptr,
+            $parsed
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
     }
 
     public static function validateInt(Context $context, JITVariable $value, ?Value $flags = null): Value
