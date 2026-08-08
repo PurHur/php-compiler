@@ -119,6 +119,27 @@ final class VmFilterTest extends TestCase
         $this->assertSame('1,234.5e2', $out->toString());
     }
 
+    /** #29007 — options[decimal] single-byte separator (php-src php_filter_float). */
+    public function testValidateFloatCustomDecimalSeparator(): void
+    {
+        $this->assertSame(1.5, VmFilter::parseFloatString('1,5', 0, ','));
+        $this->assertNull(VmFilter::parseFloatString('1.5', 0, ','));
+        $this->assertSame(1.5, VmFilter::parseFloatString('1.5', 0, '.'));
+
+        $value = new Variable();
+        $value->string('1,5');
+        $options = new Variable();
+        $options->array(self::decimalOptions(','));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_FLOAT, $options);
+        $this->assertSame(Variable::TYPE_FLOAT, $out->type);
+        $this->assertSame(1.5, $out->toFloat());
+
+        $value->string('1.5');
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_FLOAT, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
     public function testValidateIntAcceptsPlainDecimal(): void
     {
         $v = new Variable();
@@ -435,6 +456,21 @@ final class VmFilterTest extends TestCase
         $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_IP, $options);
         $this->assertSame(Variable::TYPE_STRING, $out->type);
         $this->assertSame('8.8.8.8', $out->toString());
+    }
+
+    /** @return \PHPCompiler\VM\HashTable */
+    private static function decimalOptions(string $decimal): \PHPCompiler\VM\HashTable
+    {
+        $outer = new \PHPCompiler\VM\HashTable();
+        $inner = new \PHPCompiler\VM\HashTable();
+        $dec = new Variable();
+        $dec->string($decimal);
+        $inner->add('decimal', $dec);
+        $options = new Variable();
+        $options->array($inner);
+        $outer->add('options', $options);
+
+        return $outer;
     }
 
     /** @return \PHPCompiler\VM\HashTable */
