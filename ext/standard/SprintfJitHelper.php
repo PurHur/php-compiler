@@ -247,8 +247,8 @@ final class SprintfJitHelper
     }
 
     /**
-     * php-src conversion letters plus %a/%A (VmSprintf hex-float; AOT fixture #9059).
-     * %i is unknown on Zend — omit so JIT throws ValueError like php-src.
+     * php-src conversion letters (formatted_print.c).
+     * %a/%A / %i are unknown on Zend — omit so JIT throws ValueError (#29085, retract #9059).
      */
     private static function isKnownConversionSpecifier(string $spec): bool
     {
@@ -267,9 +267,7 @@ final class SprintfJitHelper
             || 'g' === $spec
             || 'G' === $spec
             || 'h' === $spec
-            || 'H' === $spec
-            || 'a' === $spec
-            || 'A' === $spec;
+            || 'H' === $spec;
     }
 
     /**

@@ -1,9 +1,17 @@
 --TEST--
-AOT: sprintf() %a/%A hex-float (#9059)
+AOT: sprintf() %a/%A unknown ValueError (#29085, retract #9059)
 --FILE--
 <?php
-echo sprintf('%a', 3.14159), "\n";
-echo sprintf('%A', 3.14159), "\n";
+try {
+    echo sprintf('%a', 3.14159), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
+try {
+    echo sprintf('%A', 3.14159), "\n";
+} catch (Throwable $e) {
+    echo get_class($e), ':', $e->getMessage(), "\n";
+}
 --EXPECT--
-0x1.921f9f01b866ep+1
-0X1.921F9F01B866EP+1
+ValueError:Unknown format specifier "a"
+ValueError:Unknown format specifier "A"

@@ -1,10 +1,14 @@
---JIT--
 --TEST--
-stdlib sprintf() %a/%A hex-float JIT (#9059)
+stdlib sprintf() %a/%A unknown JIT — Zend ValueError (#29085/#29059, retract #9059)
 --FILE--
 <?php
-echo sprintf('%a', 3.14159), "\n";
-echo sprintf('%A', 3.14159), "\n";
+foreach (['%a', '%A'] as $fmt) {
+    try {
+        echo sprintf($fmt, 1.5), "\n";
+    } catch (Throwable $e) {
+        echo get_class($e), ':', $e->getMessage(), "\n";
+    }
+}
 --EXPECT--
-0x1.921f9f01b866ep+1
-0X1.921F9F01B866EP+1
+ValueError:Unknown format specifier "a"
+ValueError:Unknown format specifier "A"
