@@ -5077,6 +5077,48 @@ PHP;
         self::assertNotSame($mergeSends[0], $mergeSends[1], 'merge sends='.json_encode($mergeSends));
     }
 
+    /**
+     * Issue #28822 — array_keys((array)$ao) must ARG_SEND the Cast result, not ctor INIT_ARRAY.
+     * rewireArrayKeysInlineInitArrayArgSendSlots must not undo Cast→arg0 (#15858 allowlist).
+     */
+    public function testArrayKeysArrayObjectCastInlineCallArgZeroSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = new ArrayObject(['b' => 2, 'a' => 1, 'c' => 3]);
+$a->asort();
+array_keys((array) $a);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_keys_arrayobject_cast.php');
+
+        $castSlot = null;
+        $keysSend = null;
+        $inKeys = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_ARRAY === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $name = $block->constants[$op->arg1] ?? null;
+                $inKeys = null !== $name
+                    && 'array_keys' === strtolower((string) $name->toString());
+            }
+            if ($inKeys && OpCode::TYPE_ARG_SEND === $op->type && null === $keysSend) {
+                $keysSend = $op->arg1;
+                $inKeys = false;
+            }
+        }
+
+        self::assertNotNull($castSlot, 'expected TYPE_CAST_ARRAY');
+        self::assertNotNull($keysSend, 'expected array_keys ARG_SEND');
+        self::assertSame(
+            $castSlot,
+            $keysSend,
+            'array_keys ARG_SEND must be Cast slot, not ctor INIT_ARRAY'
+        );
+    }
+
     /** Issue #10093 — array_merge([1], [2]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayMergeSiblingInlineLiteralRuntime(): void
     {

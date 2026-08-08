@@ -25375,6 +25375,7 @@ class Compiler {
     /**
      * array_merge((object)[...], [...]) — wire hoisted Cast result to arg #0 (#15207, #15858).
      * array_walk((object)[...], fn) — same for by-ref arg #0 (#15874).
+     * array_keys((array)$ao) — Cast over ctor INIT_ARRAY stolen by array_keys Array_ path (#28822).
      */
     private function resolveHoistedCastInlineCallArgZeroSlot(
         Block $block,
@@ -25404,6 +25405,8 @@ class Compiler {
                     'array_intersect_key',
                     'array_walk',
                     'array_walk_recursive',
+                    // array_keys((array)$ao) — prefer Cast over ctor INIT_ARRAY (#28822).
+                    'array_keys',
                 ],
                 true
             )
@@ -25449,10 +25452,11 @@ class Compiler {
         // Stmt-level `(string)$obj` then `$obj($arg)` must not steal the Cast (#22894).
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $cfgCallOp);
         $cast = null;
+        // Prefer the Cast nearest the call (last in oldest-first producers) so
+        // array_keys((array)(object)[...]) binds Array_ cast, not Object_ (#28822).
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\Cast) {
                 $cast = $producer;
-                break;
             }
         }
         if (null === $cast) {
@@ -55919,6 +55923,8 @@ class Compiler {
                     || $adjacent instanceof Op\Expr\NsFuncCall
                     || $adjacent instanceof Op\Expr\MethodCall
                     || $adjacent instanceof Op\Expr\StaticCall
+                    // array_keys((array)$ao) — Cast result already wired; do not steal ctor INIT_ARRAY (#28822).
+                    || $adjacent instanceof Op\Expr\Cast
                 ) {
                     return;
                 }
