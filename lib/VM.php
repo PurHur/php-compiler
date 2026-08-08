@@ -8812,6 +8812,13 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    // Zend/zend_lazy_objects.c zend_lazy_object_clone — init pending ghost/proxy
+                    // before clone so both original and clone are initialized (#29171).
+                    $catchFrame = $this->ensureLazyObjectInitialized($srcObject, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $cloned = $srcObject->cloneShallow();
                     $this->invokeCloneObjectHandler($srcObject, $cloned);
                     $catchFrame = $this->invokeCloneMagicMethod($cloned, $frame);

@@ -429,6 +429,34 @@ PHP;
         );
     }
 
+    /**
+     * Zend/zend_lazy_objects.c zend_lazy_object_clone — pending ghost init before clone (#29171).
+     *
+     * @covers issue #29171
+     */
+    public function testCloneUninitializedLazyGhostInitializesBoth(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C { public int $x = 1; }
+$r = new ReflectionClass(C::class);
+$g = $r->newLazyGhost(function (C $o) { $o->x = 42; echo "init\n"; });
+echo "before_clone uninit=", $r->isUninitializedLazyObject($g) ? "yes" : "no", "\n";
+$c = clone $g;
+echo "after_clone g_uninit=", $r->isUninitializedLazyObject($g) ? "yes" : "no",
+     " c_uninit=", $r->isUninitializedLazyObject($c) ? "yes" : "no", "\n";
+echo "c.x=", $c->x, "\n";
+echo "g.x=", $g->x, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_ghost_clone.php'));
+        $this->assertSame(
+            "before_clone uninit=yes\ninit\nafter_clone g_uninit=no c_uninit=no\nc.x=42\ng.x=42\n",
+            ob_get_clean()
+        );
+    }
+
     /** @covers issue #29170 */
     public function testNewLazyProxyFactoryReturningNullThrowsTypeError(): void
     {

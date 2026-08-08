@@ -73,6 +73,51 @@ PHP
             "before\ninit\nx\nx\n");
     }
 
+    /**
+     * @covers issue #29171 — zend_lazy_object_clone initializes before clone
+     *
+     * Uses bin/jit.php: isUninitializedLazyObject is VM-lowered, so pure MCJIT
+     * assertMcjitOutput cannot host this script (requiresVmLowering).
+     */
+    public function testCloneUninitializedLazyGhostInitializesViaJitCli(): void
+    {
+        $script = sys_get_temp_dir().'/phpc_lazy_ghost_clone_29171_'.getmypid().'.php';
+        file_put_contents($script, <<<'PHP'
+<?php
+class C { public int $x = 1; }
+$r = new ReflectionClass(C::class);
+$g = $r->newLazyGhost(function (C $o) { $o->x = 42; echo "init\n"; });
+echo "before_clone uninit=", $r->isUninitializedLazyObject($g) ? "yes" : "no", "\n";
+$c = clone $g;
+echo "after_clone g_uninit=", $r->isUninitializedLazyObject($g) ? "yes" : "no",
+     " c_uninit=", $r->isUninitializedLazyObject($c) ? "yes" : "no", "\n";
+echo "c.x=", $c->x, "\n";
+echo "g.x=", $g->x, "\n";
+PHP);
+        $env = array_merge(getenv(), [
+            'PHP_COMPILER_PROFILE' => '8.4',
+        ]);
+        $proc = proc_open(
+            [PHP_BINARY, $this->repoRoot.'/bin/jit.php', $script],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $this->repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        @unlink($script);
+        $this->assertSame(0, $code, $stderr);
+        $this->assertSame(
+            "before_clone uninit=yes\ninit\nafter_clone g_uninit=no c_uninit=no\nc.x=42\ng.x=42\n",
+            $stdout
+        );
+    }
+
     private function assertMcjitOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
