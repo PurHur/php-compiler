@@ -28,13 +28,28 @@ final class JitOperandTypeLabel
         return match ($arg->type) {
             Variable::TYPE_NATIVE_LONG => 'int',
             Variable::TYPE_NATIVE_DOUBLE => 'float',
-            Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_NATIVE_BOOL => self::nativeBoolLiteralLabel($arg),
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_HASHTABLE => 'array',
             Variable::TYPE_OBJECT => 'object',
             default => 'mixed',
         };
+    }
+
+    /**
+     * zend_execute.c — bool actuals print true/false, not bool (#29097).
+     */
+    private static function nativeBoolLiteralLabel(Variable $arg): string
+    {
+        $value = $arg->value;
+        if (method_exists($value, 'isConstant') && $value->isConstant()
+            && method_exists($value, 'getConstantValue')
+        ) {
+            return 0 !== (int) $value->getConstantValue() ? 'true' : 'false';
+        }
+
+        return 'bool';
     }
 
     public static function compileTimeEnumClassName(Context $context, Variable $arg): ?string

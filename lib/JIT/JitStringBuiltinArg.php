@@ -672,6 +672,7 @@ final class JitStringBuiltinArg
         $context->builder->positionAtEnd($scalarErrBlock);
         self::emitRuntimeBoxedNonStringScalarReject(
             $context,
+            $valuePtr,
             $typeKind,
             $function,
             $argIndex,
@@ -854,6 +855,7 @@ final class JitStringBuiltinArg
 
     private static function emitRuntimeBoxedNonStringScalarReject(
         Context $context,
+        Value $valuePtr,
         Value $typeKind,
         string $function,
         int $argIndex,
@@ -889,8 +891,19 @@ final class JitStringBuiltinArg
         $isBool = $context->builder->icmp(Builder::INT_EQ, $typeKind, $boolTy);
         $context->builder->branchIf($isBool, $boolErrBlock, $mixedErrBlock);
 
+        // zend_execute.c — bool actuals print true/false (#29097).
         $context->builder->positionAtEnd($boolErrBlock);
-        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'bool', $expectedType);
+        $boolVal = $context->builder->call(
+            $context->lookupFunction('__value__readBool'),
+            $valuePtr
+        );
+        $trueErr = BasicBlockHelper::append($context, 'str_req_scalar_true');
+        $falseErr = BasicBlockHelper::append($context, 'str_req_scalar_false');
+        $context->builder->branchIf($boolVal, $trueErr, $falseErr);
+        $context->builder->positionAtEnd($trueErr);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'true', $expectedType);
+        $context->builder->positionAtEnd($falseErr);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'false', $expectedType);
 
         $context->builder->positionAtEnd($mixedErrBlock);
         self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed', $expectedType);

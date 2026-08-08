@@ -313,6 +313,16 @@ final class ScalarReturnCheck
 
     private static function givenLabel(Variable $return): string
     {
+        if (Variable::TYPE_NATIVE_BOOL === $return->type) {
+            $value = $return->value;
+            if (method_exists($value, 'isConstant') && $value->isConstant()
+                && method_exists($value, 'getConstantValue')
+            ) {
+                // zend_execute.c — true/false returned (#29097).
+                return 0 !== (int) $value->getConstantValue() ? 'true' : 'false';
+            }
+        }
+
         return match ($return->type) {
             Variable::TYPE_NATIVE_LONG => 'int',
             Variable::TYPE_NATIVE_DOUBLE => 'float',

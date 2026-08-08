@@ -25,7 +25,7 @@ final class ParamTypeError
             $function,
             self::argumentLabel($paramIndex, $paramName, $omitParamName),
             TypeCheck::typeNameForConstraint($expectedConstraint, $literalBoolType),
-            EnumCaseSupport::typeNameForVariable($argument)
+            EnumCaseSupport::typeNameForTypeErrorActual($argument)
         );
         if ($callSiteLine > 0 && '' !== $scriptPath) {
             $message .= sprintf(', called in %s on line %d', $scriptPath, $callSiteLine);
@@ -74,6 +74,6 @@ final class ParamTypeError
             return $resolved->toObject()->class->name;
         }
 
-        return EnumCaseSupport::typeNameForVariable($argument);
+        return EnumCaseSupport::typeNameForTypeErrorActual($argument);
     }
 }

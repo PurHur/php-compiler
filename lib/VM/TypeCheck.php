@@ -1270,15 +1270,8 @@ final class TypeCheck
 
     private static function valueTypeLabel(Variable $value): string
     {
-        $resolved = $value->resolveIndirect();
-        if (Variable::TYPE_ENUM_CASE === $resolved->type) {
-            return $resolved->toEnumCase()->enumClass->name;
-        }
-        if (Variable::TYPE_OBJECT === $resolved->type) {
-            return $resolved->toObject()->class->name;
-        }
-
-        return self::typeName($resolved->type);
+        // zend_execute.c — bool actuals print true/false, not bool (#29097).
+        return EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 
     private static function assertGenericArrayShape(Variable $dest, GenericArrayTypeSpec $spec, string $kind): void

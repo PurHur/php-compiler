@@ -12,4 +12,4 @@ foreach (["5", true] as $v) {
 }
 --EXPECT--
 abs(): Argument #1 ($num) must be of type int|float, string given
-abs(): Argument #1 ($num) must be of type int|float, bool given
+abs(): Argument #1 ($num) must be of type int|float, true given

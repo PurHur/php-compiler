@@ -145,17 +145,8 @@ final class DnfCheck
 
     private static function givenTypeLabel(Variable $value): string
     {
-        return match ($value->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_ENUM_CASE => self::enumCaseClassLabel($value),
-            Variable::TYPE_OBJECT => self::objectClassLabel($value),
-            default => 'mixed',
-        };
+        // zend_execute.c — bool actuals print true/false (#29097).
+        return EnumCaseSupport::typeNameForTypeErrorActual($value);
     }
 
     private static function matchesClassNameArm(Variable $value, string $name, Context $context): bool

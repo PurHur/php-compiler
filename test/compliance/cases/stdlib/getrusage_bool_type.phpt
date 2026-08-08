@@ -17,6 +17,6 @@ try {
 $u = getrusage(0);
 echo is_array($u) ? "usage-ok\n" : "usage-fail\n";
 --EXPECT--
-getrusage(): Argument #1 ($mode) must be of type int, bool given
-getrusage(): Argument #1 ($mode) must be of type int, bool given
+getrusage(): Argument #1 ($mode) must be of type int, true given
+getrusage(): Argument #1 ($mode) must be of type int, false given
 usage-ok

@@ -243,7 +243,7 @@ final class InternalStrictArg
             $argIndex + 1,
             $paramName,
             $expected,
-            EnumCaseSupport::typeNameForVariable($arg)
+            EnumCaseSupport::typeNameForTypeErrorActual($arg)
         );
     }
 }

@@ -10,5 +10,5 @@ try {
 }
 echo "ok\n";
 --EXPECT--
-TypeError:exit(): Argument #1 ($status) must be of type string|int, bool given
+TypeError:exit(): Argument #1 ($status) must be of type string|int, true given
 ok
